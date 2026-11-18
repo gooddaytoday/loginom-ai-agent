@@ -323,7 +323,7 @@ function renderRunner(state, model) {
       <div class="sl-actions"><button type="button" class="btn" data-sl-action="stop">Остановить</button><small class="muted">Остановка прерывает агента, но не отменяет уже сделанное.</small></div></section>`;
   if (run.step === 'result') body = renderResult(key, run) + details(key, run);
   return `<div class="sl-page sl-runner"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${back[0]}">${back[1]}</button>
-    <header class="sl-heading"><h1>${title}</h1><p>${description}</p><p class="sl-meta">${tierBadge(item)} ${escape(item.product || item.title)} · версия ${item.version}</p></header>
+    <header class="sl-heading"><h1>${title}</h1><p>${description}</p><p class="sl-meta">${own ? `Своё действие · на основе «${escape(own.baseTitle)}»` : `${tierBadge(item)} ${escape(item.product || item.title)} · версия ${item.version}`}</p></header>
     ${stepper(run.step)}${body}</div>`;
 }
 

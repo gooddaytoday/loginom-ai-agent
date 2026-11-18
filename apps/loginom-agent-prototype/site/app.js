@@ -200,7 +200,7 @@ function runOwnAction(own) {
   state.overlay = null
   // From «Что сделать с пакетом» the chosen package goes into the wizard, as with built-in actions.
   if (state.draftPackage) state.runnerPackage = state.draftPackage
-  runSolution(own.solution, own.mode || 'review', 'hub')
+  runSolution(own.solution, own.mode || 'review', ['home','chat'].includes(state.page) ? state.page : 'hub')
   state.ownRun = own
   render()
 }
@@ -798,10 +798,9 @@ const scripts = {
     {plan:1, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
     {plan:2, icon:'check', live:'Сверяю узлы с правилами навыка', done:'Сверил узлы с правилами навыка: 3 расхождения', short:'сверил с навыком', time:5},
   ]},
-  skilltrialfile:{plan:['Открыть пакет','Проверить узлы'], steps:[
-    {plan:0, icon:'book', live:'Проверяю навык «{skill}»', done:'Навык «{skill}» выключен: он из файла, а агент работает в Loginom', short:'навык выключен', detail:'Навыки из файла и «Сообщество» не работают, пока агент работает в Loginom', time:1},
-    {plan:0, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
-    {plan:1, icon:'layers', live:'Проверяю узлы', done:'Проверил узлы «Продажи.lgp» без навыка', short:'проверил узлы', time:4},
+  skilltrialfile:{plan:['Прочитать навык','Написать описание'], steps:[
+    {plan:0, icon:'book', live:'Читаю навык «{skill}»', done:'Применил навык «{skill}»', short:'применил навык', detail:'Агент не работает в Loginom — навык из файла работает', time:2},
+    {plan:1, icon:'file', live:'Пишу описание для руководителя', done:'Написал описание для руководителя', short:'написал описание', time:4},
   ]},
   chat:{steps:[]},
 }
@@ -1327,7 +1326,8 @@ function review() {
     '<strong>Статус публикации без аккаунта.</strong> Пока сервис публикации простой (В-38), аккаунтов нет. Рекомендую: приложение хранит квитанцию отправки и по ней узнаёт статус («На проверке», «Опубликован», «Возвращён»); почту автор подтверждает один раз, ответ приходит и письмом. Согласны?',
     '<strong>Что проверяет сотрудник перед «Проверено Loginom».</strong> Такой навык теперь работает и в Loginom (В-36). Рекомендую четыре пункта из консоли: инструкции не просят обходить разрешения и отправлять данные наружу; нет скрытого текста и ссылок на программы; файлы соответствуют описанию; проверено на примере. Без всех четырёх — только «Сообщество». Согласны?',
     '<strong>Своё действие</strong> — пока только на основе «Документировать» и «Проверить сценарий», которые пакет не меняют. «Улучшить» и действия с запуском сценария — позже. Согласны?',
-    '<strong>Навык из файла опубликовать нельзя</strong>: его автор — не вы. Свой навык, переданный файлом коллеге, у него — «из файла». Согласны?',
+    '<strong>Навык из файла опубликовать нельзя</strong> — опубликовать можно только навык, созданный в приложении. Свой навык, переданный файлом коллеге, у него — «из файла». Согласны?',
+    '<strong>Текст из файла, вставленный в «С нуля».</strong> Такой навык становится своим и работает в Loginom; отличить копию приложение не может. Рекомендую принять: пользователь сам прочитал и вставил текст — это его указание агенту. Согласны?',
   ]
   const changed = [
     '«Создать своё» в каталоге: навык — из разговора, с нуля или из файла; своё действие на основе встроенного.',
@@ -1340,6 +1340,7 @@ function review() {
   const later = [
     'Публикация, шаг 2 — сервис со входом по почте и историей версий; сейчас показан шаг 1.',
     'Отозванная версия у тех, кто её установил: в прототипе описано словами, без экрана.',
+    'Запрет администратора на свои навыки (В-36) — в настройках его пока нет.',
     'Свои навыки и действия живут до перезагрузки страницы.',
   ]
   const chosen = [
@@ -1604,9 +1605,11 @@ function send() {
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     : old && old.kind !== 'chat' && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
   if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''))) kind = 'clean'
-  if (state.trialSkill && !old) kind = state.trialSkill.origin === 'file' ? 'skilltrialfile' : 'skilltrial'
+  // The trial applies to the trial task; another request is answered as usual.
+  const trialTurn = state.trialSkill && !old && prompt === state.trialSkill.prompt
+  if (trialTurn) kind = state.trialSkill.kind
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
-  const needsLoginom = kind !== 'chat' && !(kind === 'document' && state.draftPackage?.source === 'local')
+  const needsLoginom = !['chat','skilltrialfile'].includes(kind) && !(kind === 'document' && state.draftPackage?.source === 'local')
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
   if (old) {
     clearTimeout(old.timer)
@@ -1624,10 +1627,8 @@ function send() {
     step:0, decisions:[], cleared:[], steer:[],
   }
   state.editTurn = null
-  if (state.trialSkill && !old) {
-    next.trial = state.trialSkill
-    state.trialSkill = null
-  }
+  if (trialTurn) next.trial = state.trialSkill
+  if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
   if (state.draftPackage) state.progress.packages = true

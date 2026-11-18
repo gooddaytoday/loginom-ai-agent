@@ -58,3 +58,7 @@
   .own-row-actions { grid-column: 1; }
 }
 .own-leaks .btn, .own-review .btn.st-button-small { min-height: 28px; padding: 3px 10px; font-size: 12px; }
+.own-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+.own-hint { color: var(--muted); font-size: 12px; }
+.own-dialog select, .own-dialog textarea, .own-dialog input { width: 100%; max-width: 100%; box-sizing: border-box; }
+.own-leaks .btn { min-height: 28px; padding: 3px 10px; font-size: 12px; }

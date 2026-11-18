@@ -11,14 +11,21 @@ const origins = {
   chat: { label:'Из вашего разговора', loginom:true },
   file: { label:'Из файла', loginom:false },
 };
-// One set of words for the app and the moderation console.
-export const pubLabels = {
-  confirm:'Ждёт подтверждения почты', review:'На проверке', community:'Опубликован · Сообщество', verified:'Опубликован · Проверено Loginom',
-  returned:'Возвращён автору', withdrawn:'Снят с публикации', revoked:'Отозван Loginom', admin:'Передан администратору',
+// One set of words for the app and the moderation console; an action («действие») takes the neuter forms.
+const pubWords = {
+  confirm:['Ждёт подтверждения почты','Ждёт подтверждения почты'], review:['На проверке','На проверке'],
+  community:['Опубликован · Сообщество','Опубликовано · Сообщество'], verified:['Опубликован · Проверено Loginom','Опубликовано · Проверено Loginom'],
+  returned:['Возвращён автору','Возвращено автору'], withdrawn:['Снят с публикации','Снято с публикации'],
+  revoked:['Отозван Loginom','Отозвано Loginom'], admin:['Передан администратору','Передано администратору'],
 };
+export function pubLabel(item, stage = item.publication?.stage) {
+  return stage ? pubWords[stage][item.type === 'action' ? 1 : 0] : '';
+}
+// Stages after which the next send is a new version.
+const resendStages = ['community','verified','withdrawn','returned','revoked'];
 const actionBases = {
-  document: { title:'Документировать', key:'document', solution:'document' },
-  check: { title:'Проверить сценарий', key:'refactor:review', solution:'refactor', mode:'review' },
+  document: { title:'Документировать', key:'document', solution:'document', icon:'book' },
+  check: { title:'Проверить сценарий', key:'refactor:review', solution:'refactor', mode:'review', icon:'shield' },
 };
 const docFormats = [['pdf','PDF'],['docx','Word'],['md','Markdown']];
 const checkGoals = ['Понятность структуры','Повторяющиеся преобразования','Названия и организация'];
@@ -42,13 +49,13 @@ const fileSamples = {
     files:[['SKILL.md','']],
   },
 };
-// What may leak from a conversation into a skill. Each match can be replaced before saving or publishing.
+// What may leak from your files and conversations into a skill. «Убрать» removes the whole line with it.
 const leakRules = [
-  [/\/user(?:\/[^\s«»,.;:]+)*/g, 'путь в Loginom', 'вашей папке'],
-  [/[\wА-Яа-яЁё-]+\.(?:csv|lgp|xlsx)\b/g, 'имя файла', 'пакете'],
-  [/[А-ЯЁ][а-яё]+ [А-ЯЁ]\.(?:[А-ЯЁ]\.)?/g, 'имя сотрудника', 'ответственный'],
-  [/[\w.+-]+@[\w-]+\.[\w.]+/g, 'адрес почты', 'почта'],
-  [/(?:пароль|password|token|ключ)\s*[:=]\s*\S+/gi, 'пароль или ключ', ''],
+  [/\/user(?:\/[^\s«»,.;:]+)*/g, 'путь в Loginom'],
+  [/[\wА-Яа-яЁё-]+\.(?:csv|lgp|xlsx)\b/g, 'имя файла'],
+  [/[А-ЯЁ][а-яё]+ [А-ЯЁ]\.(?:[А-ЯЁ]\.)?/g, 'имя сотрудника'],
+  [/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, 'адрес почты'],
+  [/(?:пароль|password|token|ключ)\s*[:=]\s*\S+/gi, 'пароль или ключ'],
 ];
 
 export function ownState(state) {
@@ -69,37 +76,47 @@ function itemById(state, id) {
 export function ownCount(state) {
   return ownState(state).items.length;
 }
-export function leaksOf(item) {
-  const text = [item.name, item.when, item.body].join('\n');
+function textOf(item, extra = '') {
+  return [item.name, item.when, item.body, item.params?.custom, extra].filter(Boolean).join('\n');
+}
+export function leaksOf(item, extra = '') {
+  const text = textOf(item, extra);
   return leakRules.flatMap(([re, label]) => [...new Set(text.match(re) || [])].map((match) => ({ match, label })));
 }
-function removeLeak(item, match) {
-  const rule = leakRules.find(([re]) => new RegExp(re.source, re.flags).test(match));
-  const replacement = rule ? rule[2] : '';
-  for (const key of ['name','when','body']) item[key] = item[key].split(match).join(replacement).replace(/ {2,}/g, ' ');
+// Single-line fields lose just the match; in the text the whole line goes, so no broken sentence is left behind.
+function removeLeak(item, match, dialog) {
+  const dropLine = (text) => text.split('\n').filter((line) => !line.includes(match)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  item.name = item.name.split(match).join('').replace(/ {2,}/g, ' ').trim();
+  item.when = item.when.split(match).join('').replace(/ {2,}/g, ' ').trim();
+  item.body = dropLine(item.body);
+  if (item.params) item.params.custom = dropLine(item.params.custom);
+  if (dialog?.summary) dialog.summary = dropLine(dialog.summary);
 }
 function canCannot(state, item) {
   if (item.type === 'action') {
     const base = actionBases[item.base];
-    return [[`Запускать «${base.title}» с вашими настройками`, 'Перед каждым запуском — тот же шаг «Доступ», что у встроенного действия'],
-      ['Добавлять шаги или права сверх встроенного действия', 'Менять пакет — если встроенное действие его не меняет']];
+    return [[`Запускать «${base.title}» с вашими настройками`],
+      ['Добавлять шаги или права сверх встроенного действия', 'Менять пакет']];
   }
   const inLoginom = origins[item.origin].loginom;
   return [
-    ['Подсказывать агенту, как делать задачу, в разговоре', ...(inLoginom ? ['Работать и тогда, когда агент работает в Loginom'] : [])],
+    ['Подсказывать агенту, как делать задачу, в разговоре', ...(inLoginom ? ['Работать и тогда, когда агент работает в Loginom, если администратор не запретил свои навыки'] : [])],
     [...(inLoginom ? [] : ['Работать, пока агент работает в Loginom: навык из файла в это время выключен']), 'Запускать программы — в навыке только текст', 'Давать агенту новые права'],
   ];
 }
 function permsBlock(state, item) {
   const [can, cannot] = canCannot(state, item);
   return '<div class="hub-perms own-perms"><div><h4>'+icon('check',16)+' Сможет</h4><ul>'+can.map((text) => '<li>'+esc(text)+'</li>').join('')+'</ul></div>'+
-    '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+cannot.map((text) => '<li>'+esc(text)+'</li>').join('')+'</ul></div></div>';
+    '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+cannot.map((text) => '<li>'+esc(text)+'</li>').join('')+'</ul></div></div>'+
+    (item.type === 'action' ? '<p class="own-note">'+icon('help',15)+' Перед каждым запуском — шаг «Доступ», как у встроенного действия.</p>' : '');
 }
 function statusLine(item) {
   const action = item.type === 'action';
   const own = item.status === 'draft' ? 'Черновик' : item.status === 'on' ? (action ? 'Включено' : 'Включён') : (action ? 'Выключено' : 'Выключен');
-  const pub = item.publication ? pubLabels[item.publication.stage] : '';
-  return '<span class="own-status own-'+item.status+'">'+own+'</span>'+(pub ? '<span class="own-pub own-pub-'+item.publication.stage+'">'+esc(pub)+'</span>' : '');
+  const pub = pubLabel(item);
+  return '<span class="own-status own-'+item.status+'">'+own+'</span>'+
+    (item.type === 'skill' && item.origin === 'file' && item.status !== 'draft' ? '<span class="own-pub own-pub-returned">Не работает в Loginom</span>' : '')+
+    (pub ? '<span class="own-pub own-pub-'+item.publication.stage+'">'+esc(pub)+'</span>' : '');
 }
 function newItem(state, type, fields) {
   const own = ownState(state);
@@ -116,7 +133,7 @@ export function renderCreate(state) {
     '<header class="sl-heading"><span class="sl-product">Каталог</span><h1>Создать своё</h1><p>Своё работает только у вас. Опубликовать для всех можно потом — после проверки Loginom.</p></header>'+
     '<div class="own-choose">'+
       '<button type="button" class="own-choice" data-own="new-skill"><span class="hub-tile hub-sage">'+icon('book',24)+'</span><strong>Навык</strong><small>Как агенту делать задачу: правила, порядок, термины. Агент применяет его сам, когда задача подходит.</small></button>'+
-      '<button type="button" class="own-choice" data-own="new-action"><span class="hub-tile hub-lilac">'+icon('wand',24)+'</span><strong>Своё действие</strong><small>Встроенное действие с вашими настройками, например «Документировать» по шаблону отдела. Появится среди действий с пакетом.</small></button>'+
+      '<button type="button" class="own-choice" data-own="new-action"><span class="hub-tile hub-lilac">'+icon('layers',24)+'</span><strong>Своё действие</strong><small>Встроенное действие с вашими настройками, например «Документировать» по шаблону отдела. Появится среди действий с пакетом.</small></button>'+
     '</div><p class="own-note">'+icon('help',16)+' Подключения к внешним сервисам и программы создать нельзя: в навыке может быть только текст.</p></div>';
   return edit.type === 'action' ? renderActionEditor(state, edit) : renderSkillEditor(state, edit);
 }
@@ -132,27 +149,33 @@ function renderSkillEditor(state, edit) {
     (sessions.length ? '<div class="own-sessions">'+sessions.slice(0,6).map((session) => '<button type="button" class="sl-draft" data-own="from-session:'+esc(session.id)+'"><span><strong>'+esc(session.title)+'</strong><small>'+esc(session.date || '')+'</small></span><span>Выбрать →</span></button>').join('')+'</div>'
       : '<p class="muted">Завершённых разговоров пока нет. Начните с нуля или возьмите пример.</p><button type="button" class="btn" data-own="from-session:demo">Только для прототипа: пример разговора</button>')+'</section>';
   if (!saved && edit.method === 'file' && !edit.fromFile) source = '<section class="sl-panel"><h2>Из файла</h2>'+
-    '<label class="hub-drop"><input type="file" accept=".md,.zip" data-own-file aria-label="Выбрать SKILL.md или ZIP"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать SKILL.md, ZIP или папку</strong><small>Файл только читается: ничего из него не запускается.</small></label>'+
+    '<label class="hub-drop"><input type="file" accept=".md,.zip,.loginom-skill" data-own-file aria-label="Выбрать файл навыка"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать SKILL.md, ZIP или файл навыка от коллеги</strong><small>Файл только читается: ничего из него не запускается.</small></label>'+
     '<div class="hub-demo"><span>Только для прототипа</span><div><button class="btn" data-own="sample:zip">Навык от коллеги (ZIP)</button><button class="btn" data-own="sample:md">SKILL.md</button></div></div></section>';
   const ready = saved || edit.method === 'app' || edit.fromSession || edit.fromFile;
   const intro = edit.fromSession ? '<div class="sl-note">'+icon('help',16)+' Агент составил черновик по разговору «'+esc(edit.fromSession)+'». Прочитайте его целиком: в разговор мог попасть чужой текст или данные из ваших файлов.</div>'
-    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла: пока агент работает в Loginom, он выключен. Правка этого не меняет — навык остаётся «из файла».</div>' : '';
+    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла: пока агент работает в Loginom, он выключен. Правка этого не меняет — навык остаётся «из файла». Опубликовать его нельзя.</div>' : '';
   const files = item.files.length ? '<div class="own-files"><h3>Файлы навыка</h3><ul>'+item.files.map(([name, refused]) => '<li class="'+(refused ? 'refused' : '')+'">'+icon(refused ? 'close' : 'file',15)+' <span>'+esc(name)+(refused ? ' — <em>не принят: '+esc(refused)+'</em>' : '')+'</span></li>').join('')+'</ul></div>' : '';
   const form = ready ? '<section class="sl-panel"><form class="sl-form" data-own-form>'+intro+
     '<label class="sl-field"><span>Название</span><input name="name" maxlength="80" value="'+esc(item.name)+'" placeholder="Например, Правила оформления сценариев" required></label>'+
     '<label class="sl-field"><span>Когда агент его применяет</span><input name="when" maxlength="200" value="'+esc(item.when)+'" placeholder="Например, когда собираешь или проверяешь сценарий Loginom"><small>Агент читает эту строку и сам решает, нужен ли навык в разговоре.</small></label>'+
     '<label class="sl-field"><span>Что делать</span><textarea name="body" rows="9" placeholder="Правила, порядок действий, термины — обычным текстом">'+esc(item.body)+'</textarea></label>'+
     files+
-    (leaks.length ? '<div class="own-leaks"><h3>'+icon('alert',15)+' Похоже на данные из ваших файлов</h3><p>Уберите, если навыком будут пользоваться другие.</p><ul>'+leaks.map((leak) => '<li><code>'+esc(leak.match)+'</code> <small>'+leak.label+'</small> <button type="button" class="btn quiet st-button-small" data-own-leak="'+esc(leak.match)+'">Убрать</button></li>').join('')+'</ul></div>' : '')+
+    leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие. В тексте «Убрать» удаляет всю строку.')+
     '<div class="sl-actions"><button type="submit" class="btn">'+(saved ? 'Сохранить' : 'Сохранить черновик')+'</button>'+
     '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
-    (item.status === 'on' ? '' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>' : '';
+    (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>' : '';
   return '<div class="sl-page own-page"><button type="button" class="sl-back-link" data-own="to-mine">← Мои</button>'+
-    '<header class="sl-heading"><span class="sl-product">Навык · '+origins[item.origin].label+'</span><h1>'+(saved ? esc(item.name || 'Навык') : 'Новый навык')+'</h1><p>Навык подсказывает агенту, как делать задачу. Он работает только у вас, пока вы его не опубликуете.</p></header>'+
+    '<header class="sl-heading"><span class="sl-product">Навык · '+origins[item.origin].label+'</span><h1>'+(saved ? esc(item.name || 'Навык') : 'Новый навык')+'</h1><p>Навык подсказывает агенту, как делать задачу. '+(item.origin === 'file' ? 'Навык из файла работает только у вас.' : 'Он работает только у вас, пока вы его не опубликуете.')+'</p></header>'+
     (saved ? '' : '<div class="sl-switch" aria-label="Способ создания">'+[['chat','Из разговора'],['app','С нуля'],['file','Из файла']].map(([id, title]) => '<button type="button" class="sl-chip'+(edit.method === id ? ' is-active' : '')+'" data-own="method:'+id+'" aria-pressed="'+(edit.method === id)+'">'+title+'</button>').join('')+'</div>')+
     '<div class="sl-grid">'+(source || form)+
     '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2>'+statusLine(item)+'</div><h3>'+esc(item.name || 'Название навыка')+'</h3><p>'+esc(item.when || 'Когда агент его применяет')+'</p>'+permsBlock(state, item)+
-    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : '')+'</aside></div></div>';
+    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved && item.origin !== 'file' ? '<p class="own-note">'+icon('help',15)+' Включите навык, чтобы опубликовать его.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
+}
+
+function leaksBlock(leaks, hint) {
+  if (!leaks.length) return '';
+  return '<div class="own-leaks"><h3>'+icon('alert',15)+' Похоже на личные данные или данные из ваших файлов</h3><p>'+hint+'</p><ul>'+
+    leaks.map((leak) => '<li><code>'+esc(leak.match)+'</code> <small>'+leak.label+'</small> <button type="button" class="btn quiet" data-own-leak="'+esc(leak.match)+'">Убрать</button></li>').join('')+'</ul></div>';
 }
 
 function renderActionEditor(state, edit) {
@@ -161,7 +184,7 @@ function renderActionEditor(state, edit) {
   const saved = own.items.some((entry) => entry.id === item.id);
   const base = actionBases[item.base];
   const params = item.base === 'document'
-    ? '<fieldset class="sl-field"><legend>Формат документа</legend><div class="sl-checks">'+docFormats.map(([id, label]) => '<label><input type="checkbox" name="formats" value="'+id+'"'+(item.params.formats.includes(id) ? ' checked' : '')+'> '+label+'</label>').join('')+'</div></fieldset>'+
+    ? '<fieldset class="sl-seg sl-multi"><legend>Формат документа</legend><div class="sl-seg-row">'+docFormats.map(([id, label]) => '<label><input type="checkbox" name="formats" value="'+id+'"'+(item.params.formats.includes(id) ? ' checked' : '')+'><span>'+(item.params.formats.includes(id) ? '✓ ' : '')+label+'</span></label>').join('')+'</div><small>Можно несколько — по документу на каждый формат</small></fieldset>'+
       '<label class="sl-field"><span>Какая документация нужна</span><textarea name="custom" rows="5" placeholder="Например: по шаблону отдела — назначение, источники, владелец, расписание обновления">'+esc(item.params.custom)+'</textarea><small>Агент напишет документ по этому описанию вместо стандартной структуры.</small></label>'
     : '<label class="sl-field"><span>На что обратить внимание</span><select name="goal">'+checkGoals.map((goal) => '<option'+(item.params.goal === goal ? ' selected' : '')+'>'+goal+'</option>').join('')+'</select></label>'+
       '<label class="sl-field"><span>Свои правила проверки</span><textarea name="custom" rows="5" placeholder="Например: узлы по-русски, проверка пустых значений перед расчётом">'+esc(item.params.custom)+'</textarea></label>';
@@ -171,17 +194,22 @@ function renderActionEditor(state, edit) {
     (saved ? '' : '<label class="sl-field"><span>На основе</span><select name="base">'+Object.entries(actionBases).map(([id, entry]) => '<option value="'+id+'"'+(item.base === id ? ' selected' : '')+'>'+entry.title+'</option>').join('')+'</select></label>')+
     '<label class="sl-field"><span>Название</span><input name="name" maxlength="60" value="'+esc(item.name)+'" placeholder="Например, Документировать по шаблону отдела" required><small>Так действие будет называться в «Что сделать с пакетом» → «Ещё».</small></label>'+
     '<label class="sl-field"><span>Что делает</span><input name="when" maxlength="160" value="'+esc(item.when)+'" placeholder="Одна строка для списка действий"></label>'+params+
+    leaksBlock(leaksOf(item), 'Уберите, если действием будут пользоваться другие. В описании «Убрать» удаляет всю строку.')+
     '<div class="sl-actions"><button type="submit" class="btn primary">'+(saved ? 'Сохранить' : 'Сохранить действие')+'</button>'+(saved ? '<button type="button" class="btn" data-own="run:'+item.id+'">'+icon('arrow',15)+' Запустить</button>' : '')+'</div></form></section>'+
     '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка действия</h2>'+statusLine(item)+'</div><h3>'+esc(item.name || 'Название действия')+'</h3><p>'+esc(item.when || 'Что делает')+'</p>'+permsBlock(state, item)+
-    (saved ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : '')+'</aside></div></div>';
+    (saved ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
 }
 
+function publishTitle(state, item) {
+  if (state.contour === 'closed') return 'Передать администратору';
+  return resendStages.includes(item.publication?.stage) ? 'Отправить новую версию' : 'Опубликовать для всех';
+}
 function publishButton(state, item) {
-  if (item.origin === 'file') return '<p class="own-note">'+icon('help',15)+' Навык из файла опубликовать нельзя: его автор — не вы.</p>';
+  if (item.origin === 'file') return '';
   const stage = item.publication?.stage;
   if (['confirm','review'].includes(stage)) return '';
   const closed = state.contour === 'closed';
-  const label = closed ? 'Передать администратору…' : ['community','verified','withdrawn','returned'].includes(stage) ? 'Отправить новую версию…' : 'Опубликовать для всех…';
+  const label = publishTitle(state, item)+'…';
   return '<button type="button" class="btn" data-own="publish:'+item.id+'">'+icon(closed ? 'download' : 'upload',15)+' '+label+'</button>';
 }
 
@@ -193,20 +221,29 @@ export function renderMine(state) {
   if (!own.items.length) return '<div class="own-scope"><div class="hub-empty"><span class="hub-tile hub-sand">'+icon('book',24)+'</span><h3>Здесь будут ваши навыки и действия</h3><p>Они работают только у вас. Опубликовать для всех можно потом.</p><button class="btn primary" data-own="create">'+icon('plus',16)+' Создать своё</button></div>'+renderPublishDialog(state)+'</div>';
   return '<div class="own-scope"><div class="own-list">'+own.items.map((item) => {
     const pub = item.publication;
-    const note = pub?.stage === 'returned' ? '<p class="own-reason">'+icon('alert',14)+' Замечание проверяющего: «'+esc(pub.reason)+'»</p>'
+    const note = pub?.stage === 'returned' ? '<p class="own-reason">'+icon('alert',14)+' Замечание проверяющего: «'+esc(pub.reason)+'». Исправьте и отправьте новую версию.</p>'
       : pub?.stage === 'revoked' ? '<p class="own-reason">'+icon('alert',14)+' Loginom отозвал эту версию: «'+esc(pub.reason)+'». У тех, кто её установил, она выключена.</p>'
         : pub?.stage === 'review' ? '<p class="own-receipt">Квитанция № '+esc(pub.receipt)+' · ответ придёт на '+esc(pub.email)+' и появится здесь</p>'
-          : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
-    return '<article class="own-row"><span class="hub-tile '+(item.type === 'action' ? 'hub-lilac' : 'hub-sage')+'">'+icon(item.type === 'action' ? 'wand' : 'book',21)+'</span>'+
+          : pub?.stage === 'confirm' ? '<p class="own-receipt">Письмо отправлено на '+esc(pub.email)+'. Откройте ссылку в письме — после этого начнётся проверка.</p>'
+            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">У других этот навык не работает, пока агент работает в Loginom; с отметкой «Проверено Loginom» — работает.</p>'
+              : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
+    const confirm = pub?.stage === 'confirm' ? '<button class="btn quiet" data-own="resend:'+item.id+'">Отправить письмо ещё раз</button><button class="btn quiet" data-own="publish:'+item.id+'">Изменить почту</button><button class="btn quiet" data-own="confirm-mail:'+item.id+'">Только для прототипа: подтвердить</button>' : '';
+    const deleting = own.confirmDelete === item.id;
+    return '<article class="own-row"><span class="hub-tile '+(item.type === 'action' ? 'hub-lilac' : 'hub-sage')+'">'+icon(item.type === 'action' ? actionBases[item.base].icon : 'book',21)+'</span>'+
       '<div class="own-row-main"><div class="own-row-title"><button class="hub-card-title" data-own="edit:'+item.id+'">'+esc(item.name || 'Без названия')+'</button>'+
       '<span class="hub-type">'+(item.type === 'action' ? 'Действие' : 'Навык')+'</span><span class="own-origin">'+(item.type === 'action' ? 'на основе «'+actionBases[item.base].title+'»' : origins[item.origin].label)+'</span></div>'+
       '<p>'+esc(item.when)+'</p><div class="own-row-status">'+statusLine(item)+(item.version !== '1.0' || pub ? '<span class="own-version">версия '+esc(item.version)+'</span>' : '')+'</div>'+note+'</div>'+
       '<div class="own-row-actions">'+
-        (item.type === 'skill' ? (item.status === 'draft' ? '<button class="btn" data-own="enable:'+item.id+'">Включить</button>' : '<label class="own-toggle"><input type="checkbox" role="switch" data-own-toggle="'+item.id+'"'+(item.status === 'on' ? ' checked' : '')+'> '+(item.status === 'on' ? 'Включён' : 'Выключен')+'</label>')
+        (item.type === 'skill' ? (item.status === 'draft' ? '<button class="btn" data-own="enable:'+item.id+'">Включить</button>' : '<label class="own-toggle"><input type="checkbox" role="switch" data-own-toggle="'+item.id+'"'+(item.status === 'on' ? ' checked' : '')+'> Пользоваться</label>')
           +'<button class="btn quiet" data-own="try:'+item.id+'">Попробовать</button>' : '<button class="btn" data-own="run:'+item.id+'">Запустить '+icon('arrow',15)+'</button>')+
-        (item.status === 'draft' ? '' : publishButton(state, item).replace('class="btn"','class="btn quiet"'))+
+        '<button class="btn quiet" data-own="edit:'+item.id+'">Изменить</button>'+
+        (item.status === 'draft' ? '' : publishButton(state, item).replace('class="btn"','class="btn quiet"'))+confirm+
         (pub && ['community','verified'].includes(pub.stage) && !closed ? '<button class="btn quiet" data-own="withdraw:'+item.id+'">Снять с публикации</button>' : '')+
-        '<button class="btn quiet" data-own="export:'+item.id+'">Сохранить в файл</button><button class="btn quiet" data-own="delete:'+item.id+'">Удалить</button>'+
+        '<button class="btn quiet" data-own="export:'+item.id+'">Сохранить в файл</button>'+
+        (deleting ? '<span class="own-confirm">'+(pub && ['community','verified'].includes(pub.stage) ? 'Удалить у себя? Опубликованная версия останется в каталоге — снять её можно кнопкой «Снять с публикации».' : 'Удалить насовсем?')+
+          ' <button class="btn quiet" data-own="delete-yes:'+item.id+'">Удалить</button><button class="btn quiet" data-own="delete-no">Отмена</button></span>'
+          : '<button class="btn quiet" data-own="delete:'+item.id+'">Удалить</button>')+
+        (item.status === 'draft' && item.origin !== 'file' ? '<small class="own-hint">Включите, чтобы опубликовать</small>' : '')+
       '</div></article>';
   }).join('')+'</div><p class="own-note">'+icon('help',15)+' Свой навык, сохранённый в файл, у коллеги станет навыком «из файла»: пока агент работает в Loginom, он у коллеги выключен.</p>'+renderPublishDialog(state)+'</div>';
 }
@@ -217,20 +254,28 @@ function renderPublishDialog(state) {
   if (!dialog) return '';
   const item = itemById(state, dialog.id);
   const closed = state.contour === 'closed';
-  const leaks = leaksOf(item);
-  let title = closed ? 'Передать администратору' : 'Опубликовать для всех';
+  const leaks = leaksOf(item, dialog.summary);
+  const passwords = leaks.filter((leak) => leak.label === 'пароль или ключ');
+  const personal = leaks.filter((leak) => leak.label !== 'пароль или ключ');
+  const what = item.type === 'action' ? 'действие' : 'навык';
+  let title = publishTitle(state, item);
   let body = '';
   let actions = '';
-  const outgoing = '<div class="own-outgoing"><h3>Что уйдёт</h3><ul><li>'+icon('file',14)+' Навык: название, «когда применять» и текст — '+(item.body.split('\n').length)+' строк</li>'+
-    item.files.filter(([, refused]) => !refused && item.type === 'skill').filter(([name]) => name !== 'SKILL.md').map(([name]) => '<li>'+icon('file',14)+' '+esc(name)+'</li>').join('')+
-    (item.type === 'action' ? '<li>'+icon('file',14)+' Настройки действия «'+actionBases[item.base].title+'»</li>' : '')+
+  const lines = item.body.split('\n').filter((line) => line.trim()).length;
+  const outgoing = '<div class="own-outgoing"><h3>Что уйдёт</h3><ul>'+
+    (item.type === 'action'
+      ? '<li>'+icon('file',14)+' Действие: название, «что делает» и настройки «'+actionBases[item.base].title+'» — '+(item.base === 'document' ? 'форматы и описание документации' : 'на что смотреть и свои правила')+'</li>'
+      : '<li>'+icon('file',14)+' Навык: название, «когда применять» и текст — '+lines+' '+plural(lines, 'строка', 'строки', 'строк')+'</li>'+
+        item.files.filter(([name, refused]) => !refused && name !== 'SKILL.md').map(([name]) => '<li>'+icon('file',14)+' '+esc(name)+'</li>').join(''))+
+    '<li>'+icon('file',14)+' Описание для каталога и условия использования'+(closed ? '' : '; почта — только проверяющему')+'</li>'+
     '</ul><p>Не уйдут: ваши разговоры, пакеты, файлы проекта и настройки.</p></div>';
   if (dialog.step === 'form') {
     body = '<p class="hub-dialog-lead">'+(closed
       ? 'В закрытом контуре отправить в Loginom нельзя. Сохраните файл и передайте администратору — он добавит '+(item.type === 'action' ? 'действие' : 'навык')+' в каталог вашей организации.'
-      : 'Сотрудник Loginom проверит '+(item.type === 'action' ? 'действие' : 'навык')+' и опубликует его в каталоге с отметкой «Сообщество» или «Проверено Loginom». До этого его видите только вы.')+'</p>'+
+      : 'Сотрудник Loginom проверит '+what+' и опубликует его в каталоге с отметкой «Сообщество» или «Проверено Loginom». До этого его видите только вы.'+
+        (item.type === 'skill' ? ' С отметкой «Сообщество» навык у других не работает, пока агент работает в Loginom; с «Проверено Loginom» — работает.' : ''))+'</p>'+
       '<label class="sl-field"><span>Описание для каталога</span><textarea data-own-pub="summary" rows="3">'+esc(dialog.summary ?? item.when)+'</textarea></label>'+
-      '<label class="sl-field"><span>Как другим можно пользоваться</span><select data-own-pub="license"><option'+(dialog.license !== 'nd' ? ' selected' : '')+' value="by">Использовать и изменять, указав автора (CC BY 4.0)</option><option value="nd"'+(dialog.license === 'nd' ? ' selected' : '')+'>Только использовать, без изменений (CC BY-ND 4.0)</option></select></label>'+
+      '<label class="sl-field"><span>Как другим можно пользоваться</span><select data-own-pub="license"><option'+(dialog.license !== 'nd' ? ' selected' : '')+' value="by">Использовать и изменять (CC BY 4.0)</option><option value="nd"'+(dialog.license === 'nd' ? ' selected' : '')+'>Только использовать (CC BY-ND 4.0)</option></select><small>В обоих случаях — с указанием автора.</small></label>'+
       (closed ? '' : '<label class="sl-field"><span>Почта для ответа</span><input type="email" data-own-pub="email" value="'+esc(dialog.email || '')+'" placeholder="you@example.org"><small>Пришлём письмо, чтобы подтвердить почту, и ответ после проверки. Пароль не нужен.</small></label>')+
       (dialog.error ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' '+esc(dialog.error)+'</div>' : '');
     actions = '<button class="btn quiet" data-own="dialog-close">Отмена</button><button class="btn primary" data-own="pub-check">Проверить</button>';
@@ -239,11 +284,11 @@ function renderPublishDialog(state) {
     const checks = [
       ['Формат', 'в порядке', true],
       ['Только текст, без программ', item.files.some(([, refused]) => refused) ? 'программа не принята и не уйдёт' : 'в порядке', true],
-      ['Пароли и ключи', 'не найдены', !leaks.some((leak) => leak.label === 'пароль или ключ')],
-      ['Данные из ваших файлов', leaks.length ? 'найдено: '+leaks.length : 'не найдены', !leaks.length],
+      ['Пароли и ключи', passwords.length ? 'найдено: '+passwords.length : 'не найдены', !passwords.length],
+      ['Личные данные и данные из ваших файлов', personal.length ? 'найдено: '+personal.length : 'не найдены', !personal.length],
     ];
     body = '<ul class="own-checks">'+checks.map(([name, text, ok]) => '<li class="'+(ok ? 'ok' : 'warn')+'">'+icon(ok ? 'check' : 'alert',15)+' <strong>'+name+'</strong> — '+text+'</li>').join('')+'</ul>'+
-      (leaks.length ? '<div class="own-leaks"><p>Уберите перед отправкой:</p><ul>'+leaks.map((leak) => '<li><code>'+esc(leak.match)+'</code> <small>'+leak.label+'</small> <button type="button" class="btn quiet st-button-small" data-own-leak="'+esc(leak.match)+'">Убрать</button></li>').join('')+'</ul></div>' : '')+
+      leaksBlock(leaks, 'Уберите перед отправкой. В тексте «Убрать» удаляет всю строку.')+
       outgoing+
       '<label class="own-consent"><input type="checkbox" data-own-pub="consent"'+(dialog.consent ? ' checked' : '')+'> Я автор и могу это публиковать; здесь нет данных клиентов и паролей</label>';
     actions = '<button class="btn quiet" data-own="pub-back">Назад</button><button class="btn primary" data-own="pub-send"'+(leaks.length || !dialog.consent ? ' disabled' : '')+'>'+(closed ? icon('download',16)+' Сохранить файл' : 'Отправить на проверку')+'</button>';
@@ -269,7 +314,7 @@ function renderPublishDialog(state) {
 export function ownActionsGroup(state) {
   const list = ownState(state).items.filter((item) => item.type === 'action');
   if (!list.length) return '';
-  return '<p class="pkg-section">Мои</p><div class="all-actions own-scope">'+list.map((item) => '<div class="all-action"><button class="all-action-main" data-own="run:'+item.id+'"><span class="glyph red">'+icon('wand',17)+'</span>'+
+  return '<p class="pkg-section">Мои</p><div class="all-actions own-scope">'+list.map((item) => '<div class="all-action"><button class="all-action-main" data-own="run:'+item.id+'"><span class="glyph red">'+icon(actionBases[item.base].icon,17)+'</span>'+
     '<span><strong>'+esc(item.name)+'</strong><small>'+esc(item.when || 'На основе «'+actionBases[item.base].title+'»')+'</small></span></button></div>').join('')+'</div>';
 }
 
@@ -278,16 +323,18 @@ export function ownActionsGroup(state) {
 export function trialBanner(state) {
   const trial = state.trialSkill;
   if (!trial) return '';
-  return '<div class="edit-banner own-trial own-scope">'+icon('book',15)+'<span>Проба навыка «'+esc(trial.name)+'» — '+(trial.status === 'draft' ? 'черновик включён только в этом разговоре' : 'агент применит его в этом разговоре')+(trial.origin === 'file' ? '; пока агент работает в Loginom, навык из файла выключен' : '')+'</span><button type="button" class="small-icon" data-own="trial-cancel" aria-label="Отменить пробу">'+icon('close',13)+'</button></div>';
+  return '<div class="edit-banner own-trial own-scope">'+icon('book',15)+'<span>Проба навыка «'+esc(trial.name)+'» — '+(trial.status === 'draft' ? 'черновик включён только в этом разговоре' : trial.status === 'off' ? 'навык выключен, в этом разговоре включён для пробы' : 'агент применит его в этом разговоре')+(trial.origin === 'file' ? '; пока агент работает в Loginom, навык из файла выключен' : '')+'</span><button type="button" class="small-icon" data-own="trial-cancel" aria-label="Отменить пробу">'+icon('close',13)+'</button></div>';
 }
 export function trialResult(item) {
   const trial = item.trial || {};
   const back = '<div class="button-row own-scope"><button class="btn" data-own="edit:'+esc(trial.id)+'">'+icon('book',15)+' Вернуться к навыку</button></div>';
-  if (trial.origin === 'file') return '<div class="answer-block"><h2>Проверил без навыка</h2><p>Навык «'+esc(trial.name)+'» из файла, а проверка шла в Loginom — в это время такие навыки выключены. Пакет «Продажи.lgp» не менял.</p>'+
-    '<p class="muted">В разговоре без Loginom — например, когда вы обсуждаете готовый отчёт — навык работает.</p>'+back+'</div>';
+  const draftNote = trial.status === 'draft' ? '<p class="muted">Это проба: навык-черновик включён только в этом разговоре.</p>' : '';
+  if (trial.origin === 'file') return '<div class="answer-block"><h2>Описание для руководителя</h2><p>Написал по навыку «'+esc(trial.name)+'»: сценарий продаж каждое утро собирает выручку по городам и показывает, где продажи падают. Источник — выгрузка из учётной системы; отчётом пользуется коммерческий отдел.</p>'+
+    '<p class="muted">Здесь агент не работал в Loginom, поэтому навык из файла работал. Если агент начнёт работать в Loginom, этот навык выключится (В-36).</p>'+draftNote+back+'</div>';
+  if (!trial.rules) return '<div class="answer-block"><h2>Ответил по навыку «'+esc(trial.name)+'»</h2><p>В прототипе ответ условный: в приложении агент выполнит задачу по тексту навыка и покажет в ленте шаг «Применил навык».</p>'+draftNote+back+'</div>';
   return '<div class="answer-block"><h2>По правилам навыка — 3 расхождения</h2><p>Проверил «Продажи.lgp» по навыку «'+esc(trial.name)+'». Пакет не менял.</p>'+
     '<ol class="findings"><li><strong>«Узел14»</strong> назван не по смыслу — например, «Выручка по городам».</li><li><strong>Нет проверки пустых значений</strong> перед расчётом выручки.</li><li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает.</li></ol>'+
-    (trial.status === 'draft' ? '<p class="muted">Это проба: навык-черновик включён только в этом разговоре.</p>' : '')+back+'</div>';
+    draftNote+back+'</div>';
 }
 
 // ——— Moderation console (prototype only: a Loginom staff screen, not the analyst's) ———
@@ -313,13 +360,13 @@ export function renderModeration(state) {
       return '<article class="sl-panel own-review"><div class="sl-panel-head"><h3>'+esc(item.name)+'</h3><span class="hub-type">'+(item.type === 'action' ? 'Действие' : 'Навык')+'</span></div>'+
         '<p class="own-receipt">Версия '+esc(item.version)+' · '+esc(item.publication.email)+' · квитанция № '+esc(item.publication.receipt)+' · '+esc(item.publication.license)+'</p>'+
         '<ul class="own-checks"><li class="ok">'+icon('check',15)+' Автоматические проверки пройдены: формат, только текст, нет паролей и данных из файлов</li></ul>'+
-        '<details open><summary>Текст '+(item.type === 'action' ? 'действия' : 'навыка')+'</summary><p><strong>Когда применять:</strong> '+esc(item.when)+'</p><pre class="own-body">'+esc(item.body || (item.params?.custom ?? ''))+'</pre></details>'+
+        '<p><strong>Описание для каталога:</strong> '+esc(item.publication.summary || item.when)+'</p><details open><summary>Текст '+(item.type === 'action' ? 'действия' : 'навыка')+'</summary><p><strong>'+(item.type === 'action' ? 'Что делает' : 'Когда применять')+':</strong> '+esc(item.when)+'</p><pre class="own-body">'+esc(item.body || (item.params?.custom ?? ''))+'</pre></details>'+
         '<fieldset class="own-review-checks"><legend>Перед отметкой «Проверено Loginom»</legend>'+reviewChecks.map((text, index) => '<label><input type="checkbox" data-mod-check="'+item.id+':'+index+'"'+(checks.includes(index) ? ' checked' : '')+'> '+text+'</label>').join('')+'</fieldset>'+
         '<label class="sl-field"><span>Замечание автору (если возвращаете)</span><textarea rows="2" data-mod-reason="'+item.id+'">'+esc(mod['r-'+item.id] || '')+'</textarea></label>'+
         '<div class="sl-actions"><button class="btn" data-mod="community:'+item.id+'">Опубликовать в «Сообществе»</button><button class="btn primary" data-mod="verified:'+item.id+'"'+(all4 ? '' : ' disabled title="Отметьте все пункты проверки"')+'>Опубликовать как «Проверено Loginom»</button><button class="btn quiet" data-mod="returned:'+item.id+'">Вернуть автору</button></div></article>';
     }).join('') : '<div class="hub-empty"><h3>Очередь пуста</h3><p>Отправьте свой навык из «Моих» — он появится здесь.</p></div>')+
-    (published.length ? '<h2 class="rv-heading">Опубликовано</h2>'+published.map((item) => '<article class="sl-panel own-review"><div class="sl-panel-head"><h3>'+esc(item.name)+'</h3><span class="own-pub own-pub-'+item.publication.stage+'">'+pubLabels[item.publication.stage]+'</span></div>'+
-      '<label class="sl-field"><span>Причина отзыва</span><input data-mod-reason="'+item.id+'" value="'+esc(mod['r-'+item.id] || '')+'" placeholder="Например, найдена инструкция, которая обходит разрешения"></label>'+
+    (published.length ? '<h2 class="rv-heading">Опубликовано</h2>'+published.map((item) => '<article class="sl-panel own-review"><div class="sl-panel-head"><h3>'+esc(item.name)+'</h3><span class="own-pub own-pub-'+item.publication.stage+'">'+pubLabel(item)+'</span></div>'+
+      '<label class="sl-field"><span>Причина отзыва</span><input data-mod-revoke="'+item.id+'" value="'+esc(mod['v-'+item.id] || '')+'" placeholder="Например, найдена инструкция, которая обходит разрешения"></label>'+
       '<div class="sl-actions"><button class="btn quiet danger" data-mod="revoked:'+item.id+'">Отозвать версию</button></div></article>').join('') : '')+
     '<p class="own-note">'+icon('help',15)+' Что сотрудник проверяет перед «Проверено Loginom» — предложение; ждёт решения владельца.</p></div>';
 }
@@ -332,6 +379,7 @@ export function bindOwn(root, state, api) {
 }
 function bindScope(root, state, api) {
   const own = ownState(state);
+  toastHook = api.toast;
   const dialog = root.querySelector('.own-dialog');
   if (dialog && !dialog.open) {
     dialog.showModal();
@@ -355,6 +403,7 @@ function bindScope(root, state, api) {
     if (target.closest('[data-own-form]')) {
       readForm();
       if (target.name === 'base') { item0().params = defaultParams(item0().base); api.render(); }
+      if (target.name === 'formats') api.render();
       return;
     }
     const pub = target.dataset.ownPub;
@@ -369,6 +418,7 @@ function bindScope(root, state, api) {
       api.render();
     }
     if (target.dataset.modReason) (own.mod ??= {})['r-'+target.dataset.modReason] = target.value;
+    if (target.dataset.modRevoke) (own.mod ??= {})['v-'+target.dataset.modRevoke] = target.value;
     if (target.dataset.ownToggle) {
       const item = itemById(state, target.dataset.ownToggle);
       item.status = target.checked ? 'on' : 'off';
@@ -403,7 +453,7 @@ function bindScope(root, state, api) {
     event.preventDefault();
     readForm();
     const item = item0();
-    if (!item.name.trim()) { api.toast('Укажите название', 'alert'); return; }
+    if (!ready(item)) return;
     if (!own.items.includes(item)) own.items.unshift(item);
     // A saved action is ready to run; a skill stays a draft until it is switched on.
     if (item.type === 'action') item.status = 'on';
@@ -414,7 +464,7 @@ function bindScope(root, state, api) {
     const leak = event.target.closest('[data-own-leak]');
     if (leak) {
       readForm();
-      removeLeak(own.dialog ? itemById(state, own.dialog.id) : item0(), leak.dataset.ownLeak);
+      removeLeak(own.dialog ? itemById(state, own.dialog.id) : item0(), leak.dataset.ownLeak, own.dialog);
       api.render();
       return;
     }
@@ -437,25 +487,33 @@ function bindScope(root, state, api) {
     if (action === 'sample') return loadSample(value);
     if (action === 'edit') {
       const item = itemById(state, value);
-      if (!item) return;
+      if (!item) { api.toast('Навык удалён', 'alert'); return; }
       own.editing = { type:item.type, method:item.origin, item };
       return api.navigate('studio');
     }
     if (action === 'enable') {
       const item = value ? itemById(state, value) : item0();
-      if (!item.name.trim()) { api.toast('Укажите название', 'alert'); return; }
+      if (!ready(item, true)) return;
       if (!own.items.includes(item)) own.items.unshift(item);
       item.status = 'on';
       api.toast('Навык включён — агент применит его, когда задача подойдёт');
     }
+    if (action === 'disable') {
+      item0().status = 'off';
+      api.toast('Навык выключен — агент его не применяет');
+    }
     if (action === 'try') {
       const item = value ? itemById(state, value) : item0();
-      if (!item.name.trim()) { api.toast('Укажите название', 'alert'); return; }
+      if (!ready(item)) return;
       if (!own.items.includes(item)) own.items.unshift(item);
       own.editing = null;
-      return api.startTrial({ id:item.id, name:item.name, origin:item.origin, status:item.status }, 'Проверь «Продажи.lgp» по правилам навыка');
+      return api.startTrial(trialOf(item), trialOf(item).prompt);
     }
-    if (action === 'trial-cancel') { state.trialSkill = null; return api.render(); }
+    if (action === 'trial-cancel') {
+      if (state.draft === state.trialSkill?.prompt) state.draft = '';
+      state.trialSkill = null;
+      return api.render();
+    }
     if (action === 'run') {
       const item = itemById(state, value);
       const base = actionBases[item.base];
@@ -464,7 +522,8 @@ function bindScope(root, state, api) {
     }
     if (action === 'publish') {
       const item = itemById(state, value);
-      own.dialog = { id:item.id, step:'form', summary:item.when, email:own.email || '', license:'by' };
+      if (!ready(item, true)) return;
+      own.dialog = { id:item.id, step:'form', summary:item.publication?.summary ?? item.when, email:item.publication?.email || own.email || '', license:item.publication?.license === 'CC BY-ND 4.0' ? 'nd' : 'by' };
     }
     if (action === 'dialog-close') own.dialog = null;
     if (action === 'pub-back') own.dialog.step = 'form';
@@ -477,7 +536,7 @@ function bindScope(root, state, api) {
     if (action === 'pub-send') {
       const item = itemById(state, own.dialog.id);
       const closed = state.contour === 'closed';
-      const bump = item.publication && ['community','verified','withdrawn','returned','revoked'].includes(item.publication.stage);
+      const bump = resendStages.includes(item.publication?.stage);
       if (bump) item.version = (Number(item.version) + 0.1).toFixed(1);
       if (closed) {
         const file = item.name.replace(/[\\/:*?"<>|]/g, '') + (item.type === 'action' ? '.loginom-action' : '.loginom-skill');
@@ -488,14 +547,20 @@ function bindScope(root, state, api) {
       }
       own.email = own.dialog.email;
       // Assumption (on «Что решить»): no account — the app keeps the receipt and asks the service by it.
-      item.publication = { stage:own.confirmed ? 'review' : 'confirm', email:own.dialog.email, receipt:'2026-1118-00'+(++own.seq), license:own.dialog.license === 'nd' ? 'CC BY-ND 4.0' : 'CC BY 4.0', sent:'Сейчас' };
-      own.dialog.step = own.confirmed ? 'sent' : 'confirm';
+      const confirmed = (own.confirmedMails ??= []).includes(own.dialog.email);
+      item.publication = { stage:confirmed ? 'review' : 'confirm', email:own.dialog.email, receipt:'2026-1118-00'+(++own.seq), summary:own.dialog.summary, license:own.dialog.license === 'nd' ? 'CC BY-ND 4.0' : 'CC BY 4.0', sent:'Сейчас' };
+      own.dialog.step = confirmed ? 'sent' : 'confirm';
+      return api.render();
     }
-    if (action === 'pub-confirm') {
-      own.confirmed = true;
-      itemById(state, own.dialog.id).publication.stage = 'review';
-      own.dialog.step = 'sent';
+    // The address is confirmed once: everything waiting for it goes to review.
+    if (action === 'pub-confirm' || action === 'confirm-mail') {
+      const email = itemById(state, action === 'pub-confirm' ? own.dialog.id : value).publication.email;
+      (own.confirmedMails ??= []).push(email);
+      for (const item of own.items) if (item.publication?.stage === 'confirm' && item.publication.email === email) item.publication.stage = 'review';
+      if (own.dialog) own.dialog.step = 'sent';
+      else api.toast('Почта подтверждена — проверка началась');
     }
+    if (action === 'resend') api.toast('Письмо отправлено ещё раз на ' + itemById(state, value).publication.email);
     if (action === 'withdraw') {
       itemById(state, value).publication.stage = 'withdrawn';
       api.toast('Снят с публикации: новые пользователи его не увидят, у установивших он останется');
@@ -503,22 +568,52 @@ function bindScope(root, state, api) {
     if (action === 'export') {
       const item = itemById(state, value);
       download(item.name.replace(/[\\/:*?"<>|]/g, '') + (item.type === 'action' ? '.loginom-action' : '.loginom-skill'), item);
-      api.toast('Файл сохранён. У коллеги навык будет «из файла»');
+      api.toast(item.type === 'action' ? 'Файл действия сохранён' : 'Файл сохранён. У коллеги навык будет «из файла»: пока агент работает в Loginom, он выключен');
       return;
     }
-    if (action === 'delete') {
+    if (action === 'delete') own.confirmDelete = value;
+    if (action === 'delete-no') own.confirmDelete = null;
+    if (action === 'delete-yes') {
       own.items = own.items.filter((item) => item.id !== value);
+      own.confirmDelete = null;
       api.toast('Удалено');
     }
     api.render();
   });
 }
 
-// The agent drafts a skill from the conversation; the prototype shows one scripted draft with data to clean up.
+// A name and the «когда» line are required: the agent decides by that line whether the skill fits.
+function ready(item, needWhen = false) {
+  if (!item.name.trim()) return warn('Укажите название');
+  if (needWhen && item.type === 'skill' && !item.when.trim()) return warn('Заполните «Когда агент его применяет» — по этой строке агент решает, нужен ли навык');
+  return true;
+  function warn(text) { toastHook?.(text, 'alert'); return false; }
+}
+let toastHook = null;
+// The trial task depends on the skill: rules are checked on a package; a skill from a file is tried without Loginom.
+function trialOf(item) {
+  const rules = /Узлы называй/.test(item.body);
+  const prompt = item.origin === 'file' ? 'Напиши для руководителя, что даёт сценарий продаж' : rules ? 'Проверь «Продажи.lgp» по правилам навыка' : 'Сделай задачу по навыку «'+item.name+'» для «Продажи.lgp»';
+  return { id:item.id, name:item.name, origin:item.origin, status:item.status, rules, prompt, kind:item.origin === 'file' ? 'skilltrialfile' : 'skilltrial' };
+}
+// The agent drafts a skill from the conversation. The prototype has one scripted draft per kind of task.
+const drafts = {
+  abc: { name:'ABC-анализ по правилам отдела', when:'Когда строишь ABC-анализ товаров по выручке',
+    body:'1. Выручка — сумма продаж по товару за период.\n2. Пороги накопленной доли: A — 80 %, B — 15 %, C — 5 %.\n3. Итог сохраняй новым пакетом, исходные данные не меняй.' },
+  quality: { name:'Проверка выгрузки перед загрузкой', when:'Когда проверяешь таблицу на пропуски и дубликаты',
+    body:'1. Пропуски считай по каждому столбцу.\n2. Дубликат — полное совпадение строки, если не сказано иначе.\n3. В отчёте перечисли столбцы, которые нужно проверить перед загрузкой.' },
+  document: { name:'Описание пакета по шаблону отдела', when:'Когда документируешь пакет Loginom',
+    body:'1. Начни с назначения сценария одним предложением.\n2. Перечисли источники данных и владельца.\n3. Для каждого модуля — что он делает и что получает на выходе.' },
+};
 function fillFromSession(editing, session) {
-  const file = session?.files?.[0] || 'Продажи.lgp';
-  Object.assign(editing.item, { ...ruleSkill, origin:'chat',
-    body:ruleSkill.body+`\n\nПример из разговора: в «${file}» Иванов А. просил переименовать «Узел14» и сохранить копию в /user/Продажи.` });
+  const kind = session ? (['refactor','improve','clean'].includes(session.kind) ? 'rules' : session.kind) : 'rules';
+  const file = session?.files?.[0];
+  const draft = kind === 'rules' ? ruleSkill : drafts[kind];
+  const example = !session ? '\n\nПример из разговора: в «Продажи.lgp» Иванов А. просил переименовать «Узел14» и сохранить копию в /user/Продажи.'
+    : file ? `\n\nПример из разговора: «${file}» в /user.` : '';
+  Object.assign(editing.item, draft
+    ? { ...draft, origin:'chat', body:draft.body + example }
+    : { name:session.title, when:'Когда задача похожа на «'+session.title+'»', body:'Опишите, как агенту делать такие задачи: порядок, правила, что проверить в конце.', origin:'chat' });
   editing.fromSession = session ? session.title : 'Проверка сценария продаж';
 }
 // «Сохранить как навык» under an answer in the conversation.
@@ -539,13 +634,18 @@ export function demoOwn(state, api, kind) {
     return api.navigate('studio');
   }
   if (kind === 'moderation') return api.navigate('moderation');
-  let demo = own.items.find((item) => item.demo);
+  let demo = own.items.find((item) => item.demo || item.name === ruleSkill.name);
   if (!demo) {
     demo = newItem(state, 'skill', { ...ruleSkill, origin:'chat', status:'on', demo:true });
     own.items.unshift(demo);
   }
-  if (kind === 'trial') return api.startTrial({ id:demo.id, name:demo.name, origin:demo.origin, status:demo.status }, 'Проверь «Продажи.lgp» по правилам навыка');
+  if (kind === 'trial') return api.startTrial(trialOf(demo), trialOf(demo).prompt);
   return api.openMine();
+}
+function plural(count, one, few, many) {
+  const tail = count % 100;
+  if (tail > 10 && tail < 20) return many;
+  return [many, one, few, few, few, many, many, many, many, many][count % 10];
 }
 function defaultParams(base) {
   return base === 'document' ? { formats:['pdf'], custom:'' } : { goal:checkGoals[0], custom:'' };
@@ -553,10 +653,15 @@ function defaultParams(base) {
 function moderate(state, api, decision, id) {
   const own = ownState(state);
   const item = itemById(state, id);
-  const reason = ((own.mod ??= {})['r-'+id] || '').trim();
+  const key = (decision === 'revoked' ? 'v-' : 'r-') + id;
+  const reason = ((own.mod ??= {})[key] || '').trim();
   if ((decision === 'returned' || decision === 'revoked') && !reason) { api.toast('Напишите причину — её увидит автор', 'alert'); return; }
   item.publication.stage = decision;
   item.publication.reason = reason;
+  // Notes belong to one decision on one version.
+  delete own.mod['r-'+id];
+  delete own.mod['v-'+id];
+  delete own.mod[id];
   api.toast({ community:'Опубликовано в «Сообществе»', verified:'Опубликовано как «Проверено Loginom»', returned:'Возвращено автору с замечанием', revoked:'Версия отозвана: у установивших она выключится' }[decision]);
   api.render();
 }

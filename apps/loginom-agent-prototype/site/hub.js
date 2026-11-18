@@ -303,6 +303,7 @@ function renderDialog(hub, online) {
       '<label class="hub-drop"><input type="file" accept=".loginom-hub,.zip" aria-label="Выбрать файл"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать файл или перетащить сюда</strong><small>Офлайн-набор Loginom Hub</small></label>'+
       '<div class="hub-demo"><span>Демонстрационные файлы</span><div><button class="btn" data-hub-sample="correct">Корректный</button><button class="btn" data-hub-sample="damaged">Повреждённый</button><button class="btn" data-hub-sample="incompatible">Несовместимый</button></div></div>';
     actions = '<button class="btn quiet" data-hub-action="close">Отмена</button>';
+    body += '<p class="hub-dialog-footnote">Навык от коллеги добавляется иначе: «Создать своё» → «Навык» → «Из файла».</p>';
   }
   if (current.kind === 'checking') {
     title = 'Проверяем файл';
