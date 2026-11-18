@@ -27,8 +27,7 @@ export function SettingsLoginom(
   })
 
   function finishWizard(view = form.state.view, notify?: () => void) {
-    if (!props.wizard || wizardFinished || form.busy() || view?.state !== "ready" || !view.generation || view.failure)
-      return
+    if (!props.wizard || wizardFinished || form.busy() || !view?.generation || view.setupRequired) return
     wizardFinished = true
     props.onSaved(view, notify)
   }
@@ -172,7 +171,9 @@ export function SettingsLoginom(
                   </p>
                 </Show>
                 <Show when={form.state.view?.state === "recoverable-error" && !form.state.view?.recoveries?.length}>
-                  <p role="alert">{language.t("loginom.runtimeFailed")}</p>
+                  <p role="alert">
+                    {language.t(props.wizard ? "loginom.wizardRuntimeFailed" : "loginom.runtimeFailed")}
+                  </p>
                 </Show>
                 <Show when={form.state.message}>
                   {(message) => (

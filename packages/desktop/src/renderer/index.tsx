@@ -34,6 +34,7 @@ import "./styles.css"
 import { Button } from "@opencode-ai/ui/button"
 import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
+import { Toast } from "@opencode-ai/ui/toast"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -433,31 +434,37 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
     return (
       <Show when={ready()} fallback={<LoadingSplash />}>
         <Show
-          when={loginomSaved() || connection.latest?.generation}
+          when={loginomSaved() || (connection.latest?.generation && !connection.latest.setupRequired)}
           fallback={
-            <main class="flex h-dvh overflow-y-auto bg-background-base p-4">
-              <div class="m-auto w-full max-w-2xl rounded-xl border border-border-base bg-surface-raised-stronger-non-alpha">
-                <Show
-                  when={connection.latest}
-                  fallback={
-                    <div class="flex flex-col items-center gap-4 p-6">
-                      <p role="alert">{language.t("loginom.loadFailed")}</p>
-                      <Button type="button" onClick={() => void connectionActions.refetch()}>
-                        {language.t("loginom.refresh")}
-                      </Button>
-                    </div>
-                  }
-                >
-                  <SettingsLoginom
-                    wizard
-                    onSaved={(_view, notify) => {
-                      notifyLoginomSaved = notify
-                      setLoginomSaved(true)
-                    }}
-                  />
-                </Show>
-              </div>
-            </main>
+            <div class="flex h-dvh flex-col bg-background-base">
+              <Show when={platform.os === "windows" || platform.os === "macos"}>
+                <div class="h-10 shrink-0" data-tauri-drag-region aria-hidden="true" />
+              </Show>
+              <main class="flex min-h-0 flex-1 overflow-y-auto p-4">
+                <div class="m-auto w-full max-w-2xl rounded-xl border border-border-base bg-surface-raised-stronger-non-alpha">
+                  <Show
+                    when={connection.latest}
+                    fallback={
+                      <div class="flex flex-col items-center gap-4 p-6">
+                        <p role="alert">{language.t("loginom.loadFailed")}</p>
+                        <Button type="button" onClick={() => void connectionActions.refetch()}>
+                          {language.t("loginom.refresh")}
+                        </Button>
+                      </div>
+                    }
+                  >
+                    <SettingsLoginom
+                      wizard
+                      onSaved={(_view, notify) => {
+                        notifyLoginomSaved = notify
+                        setLoginomSaved(true)
+                      }}
+                    />
+                  </Show>
+                </div>
+              </main>
+              <Toast.Region />
+            </div>
           }
         >
           <Show when={effectiveDefaultServer()} keyed>

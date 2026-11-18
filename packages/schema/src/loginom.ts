@@ -33,6 +33,8 @@ export type BrowserStatus = typeof BrowserStatus.Type
 export const View = Schema.Struct({
   revision: NonNegativeInt,
   generation: NonNegativeInt,
+  // This host has yet to finish its first save and activation.
+  setupRequired: optional(Schema.Literal(true)),
   url: Schema.String,
   username: Schema.String,
   folder: Schema.String,
