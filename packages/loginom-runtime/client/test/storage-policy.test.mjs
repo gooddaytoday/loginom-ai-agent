@@ -108,6 +108,14 @@ test('a 1000-entry folder is listed with gesture-bounded strides from the render
  assert.equal(out.complete,true);assert.equal(out.native_entry_count,1000);assert.equal(out.files_matched,1000);
  assert.ok(f.acts.every(d=>d>0&&d<=1000));assert.equal(f.acts[0],1000);assert.ok(f.acts.length<=24,String(f.acts.length));
 });
+// Live 95ae7a09 (text-file-info main :114): 1012 native entries stopped at
+// 1005 seen by the old 1000-entry cap, before the sorted-last sales_* files.
+test('a 1300-entry folder is complete through its last sorted files',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1300),out=await listStorageDirectory({...f.options,pattern:'f0129*'});
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,1300);assert.equal(out.files_matched,10);
+ assert.deepEqual(out.entries.map(e=>e.name).slice(0,2),['f01290.csv','f01291.csv']);assert.ok(f.acts.length<=32,String(f.acts.length));
+});
 test('a listing scroll that renders no previously read row is refused, not silently skipped',async()=>{
  const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
  const f=grown(1000,{skip:2000});
