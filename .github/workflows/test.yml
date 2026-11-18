@@ -323,10 +323,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Setup pinned Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: Install locked dashboard workspace dependencies
+        uses: ./.github/actions/setup-bun
         with:
-          node-version-file: packages/loginom-runtime/client/.node-version
+          install-flags: --frozen-lockfile --ignore-scripts --filter @loginom-ai-agent/dashboard
 
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs

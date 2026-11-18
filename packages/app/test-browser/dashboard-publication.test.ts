@@ -1,4 +1,4 @@
-import { beforeAll, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { createComponent, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
@@ -12,8 +12,19 @@ const translate = (key: string, params: Record<string, string> = {}) => {
   const value = dictionary[key as keyof typeof dictionary] ?? key
   return value.replace(/{{(\w+)}}/g, (_match, name: string) => params[name] ?? "")
 }
-beforeAll(() => {
-  mock.module("@/context/language", () => ({ useLanguage: () => ({ t: translate }) }))
+const restoreMocks: Array<() => void> = []
+
+async function mockExports(name: string, overrides: Record<string, unknown>) {
+  const original = { ...await import(name) }
+  mock.module(name, () => ({ ...original, ...overrides }))
+  restoreMocks.push(() => mock.module(name, () => original))
+}
+
+beforeEach(async () => {
+  await mockExports("@/context/language", { useLanguage: () => ({ t: translate }) })
+})
+afterEach(() => {
+  for (const restore of restoreMocks.splice(0).reverse()) restore()
 })
 
 test("conflict is readable before a decision, keeps node/package, and offers no always approval", async () => {
@@ -46,19 +57,16 @@ test("conflict is readable before a decision, keeps node/package, and offers no 
 test("opening a local draft displays the new-publication toast", async () => {
   const toasts: { title: string }[] = []
   const opened: string[] = []
-  const server = { ...await import("@/context/server") }
+  const { ServerConnection } = await import("@/context/server")
   const local = { type: "sidecar", variant: "base", http: { url: "http://127.0.0.1:17080" } } as const
   let failure: string | undefined
-  mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }), useNavigate: () => () => {}, useParams: () => ({}), useSearchParams: () => [{}] }))
-  mock.module("@/context/layout", () => ({ useLayout: () => ({ projects: { open: (path: string) => opened.push(path) } }) }))
-  mock.module("@/context/tabs", () => ({ useTabs: () => ({ store: [] }) }))
-  mock.module("@/context/settings", () => ({ useSettings: () => ({ general: { newLayoutDesigns: () => false } }) }))
-  mock.module("@/context/server", () => ({
-    ...server,
-    useServer: () => ({ key: server.ServerConnection.key(local), list: [local] }),
-  }))
-  mock.module("@/context/platform", () => ({ usePlatform: () => ({ getDashboardTarget: async () => { if (failure) throw Error(failure); return { directory: "/fixture/work", nodeName: "Заказы", fresh: false, action: "edit", notice: { kind: "newer-publication", latest: "20261114T110000Z.json" } } } }) }))
-  mock.module("@/utils/toast", () => ({ showToast: (value: { title: string }) => toasts.push(value) }))
+  await mockExports("@solidjs/router", { useLocation: () => ({ pathname: "/" }), useNavigate: () => () => {}, useParams: () => ({}), useSearchParams: () => [{}] })
+  await mockExports("@/context/layout", { useLayout: () => ({ projects: { open: (path: string) => opened.push(path) } }) })
+  await mockExports("@/context/tabs", { useTabs: () => ({ store: [] }) })
+  await mockExports("@/context/settings", { useSettings: () => ({ general: { newLayoutDesigns: () => false } }) })
+  await mockExports("@/context/server", { useServer: () => ({ key: ServerConnection.key(local), list: [local] }) })
+  await mockExports("@/context/platform", { usePlatform: () => ({ getDashboardTarget: async () => { if (failure) throw Error(failure); return { directory: "/fixture/work", nodeName: "Заказы", fresh: false, action: "edit", notice: { kind: "newer-publication", latest: "20261114T110000Z.json" } } } }) })
+  await mockExports("@/utils/toast", { showToast: (value: { title: string }) => toasts.push(value) })
   const { useDashboardDeepLinks } = await import("../src/pages/layout/dashboard-links")
   window.__LOGINOM_AI_AGENT__ = { deepLinks: ["loginom-ai-agent://dashboard?id=77015e88-b7dd-408f-b09d-fb67dbad931d&action=edit"] }
   const dispose = createRoot(dispose => { useDashboardDeepLinks(); return dispose })
