@@ -104,11 +104,11 @@ export function createDemoArchive(ids = defaultSelection, compatible = true, nam
 export async function inspectDemoArchive(file) {
   if (file.size > 2_000_000) throw Error('Файл каталога больше 2 МБ.');
   const data = await file.arrayBuffer();
-  if (data.byteLength < 22) throw Error('Файл повреждён. Выберите другой файл.');
+  if (data.byteLength < 22) throw Error('Файл повреждён. Попросите у администратора исправный файл.');
   const view = new DataView(data);
   const end = data.byteLength - 22;
   const files = new Map();
-  if (view.getUint32(end,true) !== 0x06054b50) throw Error('Файл повреждён или имеет другой формат.');
+  if (view.getUint32(end,true) !== 0x06054b50) throw Error('Файл повреждён или имеет другой формат. Попросите у администратора исправный файл.');
   const directory = view.getUint32(end+16,true);
   const count = view.getUint16(end+10,true);
   let offset = 0;
@@ -199,8 +199,9 @@ export function openHubSolution(state, id) {
   });
 }
 
-function blockedByPolicy(item, online) {
-  if (item.tier === 'community' && !online) return 'Администратор вашей организации не разрешил навыки «Сообщество». Если такой навык нужен — обратитесь к нему.';
+function blockedByPolicy(item, online, byAdmin) {
+  if (item.tier === 'community' && !online) return byAdmin ? 'Администратор вашей организации не разрешил навыки «Сообщество». Если такой навык нужен — обратитесь к нему.'
+    : 'В закрытом контуре навыки «Сообщество» выключены, пока их не разрешит администратор.';
   if (!item.offline && !online) return 'Нужен доступ в интернет, а в закрытом контуре он отключён.';
   return '';
 }
@@ -226,9 +227,12 @@ function itemCard(item, hub, online, tab) {
 
 // Closed contour: a slim line saying where the catalog came from. Online: nothing — bundle export is an admin task,
 // offered as a link under the catalog instead of a banner every analyst has to scroll past.
-function sourceLine(online) {
-  if (online) return '';
-  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span></div>';
+function sourceLine(state) {
+  if (state.contour !== 'closed') return '';
+  const text = state.policy === 'set' ? '<strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Ставится только подготовленное или проверенное Loginom.'
+    : state.policy === 'broken' ? '<strong>Файл политики администратора с ошибкой.</strong> Пока его не исправят, работает только установленное, а из файла ставится только подготовленное или проверенное Loginom.'
+      : '<strong>Закрытый контур.</strong> Новое — через «Импорт из файла»; ставится только подготовленное или проверенное Loginom.';
+  return '<div class="hub-source">'+icon(state.policy === 'broken' ? 'alert' : 'lock',16)+'<span>'+text+'</span></div>';
 }
 
 function history(hub) {
@@ -254,7 +258,7 @@ export function renderHub(state) {
   const types = ['Все',...new Set(source.map(item=>item.kind))];
   return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Каталог</h1></div><p>Loginom Hub — действия с пакетами, навыки агента, готовые сценарии и подключения. Перед установкой видно, кто подготовил и что будет разрешено.</p></div>'+
     '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать своё</button><button class="btn" data-hub-action="import">'+icon('upload',18)+' Импорт из файла</button></div></header>'+
-    sourceLine(online)+
+    sourceLine(state)+
     '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
     (hub.tab === 'mine' ? renderMine(state) : hub.tab === 'history' ? history(hub) :
       (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск в каталоге" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
@@ -267,7 +271,7 @@ export function renderHub(state) {
         '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте файл каталога от администратора.')+'</p>'+
         (source.length?'<button class="btn" data-hub-action="clear">Сбросить фильтры</button>':!online?'<button class="btn" data-hub-action="import">Импорт из файла</button>':'')+'</div>'))+
       (online && hub.tab === 'catalog' ? '<p class="hub-admin-link">'+icon('archive',16)+' Для компьютеров без интернета — <a class="hub-text" href="hub-site/">сайт каталога hub.loginom.ai '+icon('arrow',15)+'</a>: скачайте нужное и передайте файлом</p>' : '')+
-    '</section>'+renderDialog(hub, online);
+    '</section>'+renderDialog(hub, online, state.policy === 'set');
 }
 
 function footer(content) { return '<footer class="hub-dialog-footer">'+content+'</footer>'; }
@@ -277,11 +281,11 @@ function permissionList(item) {
     (item.cannot.length ? '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+item.cannot.map(text=>'<li>'+escape(text)+'</li>').join('')+'</ul></div>' : '')+'</div>';
 }
 
-function detailDialog(hub, online, current) {
+function detailDialog(hub, online, current, byAdmin) {
   const item = byId(current.id);
   const installed = hub.installed[item.id];
   const update = installed && installed !== item.version && online;
-  const blocked = blockedByPolicy(item, online);
+  const blocked = blockedByPolicy(item, online, byAdmin);
   const tier = tiers[item.tier];
   const needsAck = item.tier === 'community' && !installed;
   const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
@@ -290,7 +294,7 @@ function detailDialog(hub, online, current) {
     '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item,true)+'</p></section>'+
     '<section class="hub-section"><h3>Что будет разрешено</h3>'+permissionList(item)+
     (item.runner ? '<p class="hub-dialog-footnote">При каждом запуске приложение ещё раз покажет, к какому пакету и с какими правами получит доступ агент.</p>' : '')+'</section>'+
-    '<dl class="hub-checks"><div><dt>Версия</dt><dd>'+(update ? installed+' → '+item.version : installed || item.version)+'</dd></div><div><dt>Размер</dt><dd>'+item.size+'</dd></div><div><dt>Совместимость</dt><dd>Loginom 7.4 и новее</dd></div><div><dt>Сеть</dt><dd>'+(item.offline?'Работает без интернета':'Нужен интернет')+'</dd></div></dl>'+
+    '<dl class="hub-checks"><div><dt>Версия</dt><dd>'+(update ? installed+' → '+item.version : installed || item.version)+'</dd></div><div><dt>Размер</dt><dd>'+item.size+'</dd></div><div><dt>Совместимость</dt><dd>Loginom 7.4.2 и новее</dd></div><div><dt>Сеть</dt><dd>'+(item.offline?'Работает без интернета':'Нужен интернет')+'</dd></div></dl>'+
     (blocked ? '<div class="hub-notice hub-notice-error">'+icon('lock',18)+'<div><strong>Установка запрещена</strong><p>'+blocked+'</p></div></div>' : '')+
     (needsAck && !blocked ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам</label>' : '');
   const actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button>'+
@@ -300,13 +304,13 @@ function detailDialog(hub, online, current) {
   return ['', body, actions, item.title];
 }
 
-function renderDialog(hub, online) {
+function renderDialog(hub, online, byAdmin) {
   const current = hub.dialog;
   if (!current) return '';
   let title = '';
   let body = '';
   let actions = '';
-  if (current.kind === 'detail') [, body, actions, title] = detailDialog(hub, online, current);
+  if (current.kind === 'detail') [, body, actions, title] = detailDialog(hub, online, current, byAdmin);
   if (current.kind === 'import') {
     title = 'Импорт из файла';
     const requested = byId(current.required);
@@ -339,10 +343,10 @@ function renderDialog(hub, online) {
       '<h3 class="hub-items-heading">Состав</h3><ul class="hub-preview-list">'+bundle.ids.map(id=>{
         const item = byId(id);
         const installed = hub.installed[id];
-        const status = installed === item.version ? 'Уже установлено' : item.tier === 'community' && !online ? 'Не разрешено администратором' : installed ? 'Обновление' : 'Новое';
+        const status = installed === item.version ? 'Уже установлено' : item.tier === 'community' && !online ? (byAdmin ? 'Не разрешено администратором' : 'Выключено в закрытом контуре') : installed ? 'Обновление' : 'Новое';
         return '<li><span>'+item.title+'<small>'+tiers[item.tier].label+' · '+item.kind+' · '+(installed && installed!==item.version ? installed+' → ' : '')+item.version+'</small></span><span class="hub-change">'+status+'</span></li>';
       }).join('')+'</ul>'+
-      (bundle.ids.some(id=>byId(id).tier === 'community') && !online ? '<p class="hub-dialog-footnote">'+icon('lock',14)+' Администратор вашей организации не разрешил навыки «Сообщество» — они не установятся.</p>' : '')+
+      (bundle.ids.some(id=>byId(id).tier === 'community') && !online ? '<p class="hub-dialog-footnote">'+icon('lock',14)+(byAdmin ? ' Администратор вашей организации не разрешил навыки «Сообщество» — они не установятся.' : ' В закрытом контуре навыки «Сообщество» выключены — они не установятся.')+'</p>' : '')+
       (community.length ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам</label>' : '')+
       '<p class="hub-dialog-footnote">Установка только добавляет это в приложение. Доступ к пакету и запуск подтверждаются отдельно при каждом использовании.</p>';
     actions = '<button class="btn quiet" data-hub-action="import">'+(incompatible?'Выбрать другой файл':'Назад')+'</button><button class="btn primary" data-hub-action="install" '+(incompatible||!changes.length||(community.length&&!current.ack)?'disabled':'')+'>Установить'+(changes.length?' ('+changes.length+')':'')+'</button>';

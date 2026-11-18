@@ -521,11 +521,16 @@ function header() {
 function composer() {
   const modelName = currentModel()
   const pkg = state.draftPackage
+  const model = state.settings?.model
+  // Where the data goes is said where the user decides to send it, not only in «Модели».
+  const note = state.policy === 'broken' && !modelName ? `${icon('alert',14)}<span>Файл политики администратора с ошибкой: модели — только на этом компьютере.</span><button type="button" class="link-btn" data-settings="models">Что делать</button>`
+    : modelName && model.kind === 'cloud' && (pkg || state.draftFiles.length) ? `${icon('globe',14)}<span>Модель в облаке: сообщение и то, что агент прочитает в приложенном, уйдут в «${esc(model.where)}».</span><button type="button" class="link-btn" data-settings="models">Модели</button>` : ''
   return `<form class="composer" id="composer">
     ${['home','chat','project'].includes(state.page) ? trialBanner(state) : ''}
     ${state.editTurn && state.editTurn.session === state.session && state.page === 'chat' ? `<div class="edit-banner">${icon('compose',15)}<span>Изменяете сообщение — ответы после него заменятся новыми${state.importedPackages.some(entry => entry.savedVersion) || salesState().replaced ? '. Пакеты, уже сохранённые в Loginom, останутся как есть' : ''}</span><button type="button" class="link-btn" data-action="cancel-edit">Отмена</button></div>` : ''}
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
+    ${note ? `<div class="composer-note">${note}</div>` : ''}
     <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && ['running','retrying'].includes(currentItem()?.phase) ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
@@ -653,6 +658,7 @@ function result(item) {
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>Пакет «Продажи.lgp» не менял. Что можно сделать лучше:</p>
     <ol class="findings"><li><strong>«Фильтр по дате» повторяется</strong> в двух ветках — достаточно одного до разветвления.</li><li><strong>«Узел14»</strong> — по имени не понять, что он считает; это выручка по городам.</li><li><strong>Нет проверки пустых значений</strong> перед расчётом — строки без цены или региона искажают итог.</li>${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.</span></div></div>`
+  if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
     <dl class="result-metrics"><div><dt>Узлов описано</dt><dd>12</dd></div><div><dt>Входные данные</dt><dd>2 таблицы</dd></div><div><dt>Изменено</dt><dd>ничего</dd></div></dl>
@@ -1410,9 +1416,16 @@ function review() {
       <li><b>Б:</b> оставить как есть.</li></ul>`,
     `<strong>«Разрешения» и кнопки пользователя.</strong> Двое из трёх спросили: если «Сохранять пакеты в Loginom» — «Спрашивать» или «Запрещено», почему «Сохранить новой версией» и «Заменить исходный» работают без вопроса? Варианты:<ul class="rv-variants">
       <li><b>А, рекомендую:</b> «Разрешения» — только про то, что агент делает сам; это сказано в разделе. Кнопки — решение человека, они работают по правам его учётной записи Loginom, замена исходного по-прежнему с подтверждением.</li>
-      <li><b>Б:</b> «Запрещено» выключает и кнопки сохранения.</li></ul>`,
+      <li><b>Б:</b> «Запрещено» выключает и кнопки сохранения.</li></ul>Администраторы по заданию 3 просят, чтобы «Запрещено» от администратора держалось и в разговоре. Так будет в любом варианте: запрет держит сервер продукта, а не клиент (этап B).`,
+    `<strong>Что запрещает политика администратора.</strong> Под политикой не ставятся навыки «Сообщество» и из файла. Двое из трёх администраторов заметили: текст такого навыка виден на сайте каталога, его можно перепечатать в свой навык — и тот включится. «Инструкции» тоже можно править, а то же самое — написать в сообщении. Варианты:<ul class="rv-variants">
+      <li><b>А, рекомендую:</b> правило — про происхождение того, что ставится, и так и названо: «Ставится только подготовленное или проверенное Loginom». Свои навыки не запрещать: запрет не мешает вставить тот же текст в сообщение. Что агент сделал, администратор видит в журнале (следующий вопрос).</li>
+      <li><b>Б:</b> политика может выключить свои навыки и «Инструкции» — понимая, что текст в сообщении это не закрывает.</li></ul>`,
+    `<strong>Журнал действий агента для администратора.</strong> Все три администратора ставят его условием согласования: что агент читал, менял, что и в какую модель отправлял, с выгрузкой для SIEM. В плане его нет; разовый «Отчёт для администратора» — не журнал. Основа есть: хуки серверного плагина OpenCode 2 видят каждый вызов инструмента. Варианты:<ul class="rv-variants">
+      <li><b>А, рекомендую:</b> добавить в этап F: локальный журнал и выгрузка в файл стандартного вида; в прототипе — строка в «Диагностике».</li>
+      <li><b>Б:</b> после первого выпуска.</li></ul>`,
   ]
   const changed = [
+    'По оценке администраторами (задание 3): над полем ввода сказано, что данные уйдут в облачную модель, если к сообщению что-то приложено; при ошибке в политике — причина там же; полоса каталога и тексты запретов зависят от того, действует ли политика; на «открой сайт» при запрете агент отвечает, кто запретил; в закрытом контуре навык отдают только через «Передать администратору…».',
     'По оценке экспертами (задание 2): «Контекст» показывает план, файлы и шаги этого ответа и что агент учитывает; схема «Продажи» совпадает с проверкой; замена исходного относится к своей карточке; поиск находит разговор по файлу; «Подключить публичный стенд» и «Свой сервер Loginom».',
     'По первым оценкам агентами: «Улучшить» правит копию; папка Loginom — по логину; у документа полный путь и имя «… — описание.docx»; запуск очищает поле ввода; в проверке видно «Применил навык» или «Учёл инструкции проекта»; адрес сервера в уведомлении о подключении.',
     '«Создать своё» в каталоге: навык — из разговора, с нуля или из файла; своё действие на основе встроенного.',
@@ -1701,8 +1714,12 @@ function send() {
     return
   }
   const withPackage = Boolean(state.draftPackage)
+  // The reason is fixed when asked: a later change of the network or permissions does not rewrite old answers.
+  const web = !withPackage && /(?:открой|открыть|зайди|прочитай|найди|поищи)[^.?!]{0,40}(?:сайт|интернет|https?:\/\/)/i.test(prompt)
+    && (state.contour === 'closed' || state.settings.permissions.web === 'deny')
+    && (state.contour !== 'closed' ? 'так стоит в «Настройки» → «Разрешения»' : state.policy === 'set' ? 'так решил администратор вашей организации' : state.policy === 'broken' ? 'файл политики администратора с ошибкой, приложение работает без сети' : 'включён закрытый контур')
   // Mock routing by task words; «что можно сделать лучше?» asks for a review, not a change («улучшения» is a change).
-  let kind = /документ|описан|опиши/i.test(prompt) && withPackage ? 'document'
+  let kind = web ? 'chat' : /документ|описан|опиши/i.test(prompt) && withPackage ? 'document'
     : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /провер|оптимиз|(?<![а-яё])лучше/i.test(prompt) ? 'refactor'
     : /внеси|улучш|объедин|исправ|переимен|измени|доработ|поправ/i.test(prompt) ? 'improve'
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
@@ -1728,7 +1745,7 @@ function send() {
     files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     history:editAt === null ? earlier : earlier.slice(0, editAt), allowed:[...(old?.allowed || [])],
-    step:0, decisions:[], cleared:[], steer:[],
+    step:0, decisions:[], cleared:[], steer:[], web,
   }
   state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
@@ -1846,7 +1863,7 @@ function feedAction(d) {
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
   return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, rules:item.rules})
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, rules:item.rules, web:item.web})
 }
 function connectLoginom() {
   if (state.connecting) return

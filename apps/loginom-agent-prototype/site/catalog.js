@@ -38,7 +38,7 @@ export const catalog = [
     version: '1.0.0', tier: 'official', builtIn: true, runner: true, offline: true, size: 'Встроено в приложение',
     keywords: 'документация описание отчёт docs',
     description: 'Создаёт понятное описание сценария: назначение, модули, потоки данных и заметки. PDF, Word или Markdown.',
-    evidence: { passed: 18, total: 18, loginom: '7.4', note: 'на 18 учебных и рабочих пакетах' },
+    evidence: { passed: 18, total: 18, loginom: '7.4.2', note: 'на 18 учебных и рабочих пакетах' },
     can: ['Прочитать выбранный файл .lgp', 'Пользоваться встроенной справкой Loginom', 'Создать документ в папке проекта'],
     cannot: ['Изменять пакет', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', 'Открывать сайты в интернете'],
     stages: ['Чтение пакета', 'Описание узлов по справке Loginom', 'Сборка документа', 'Проверка полноты'],
@@ -165,5 +165,5 @@ export function tierBadge(item, size = '') {
 export function evidenceLine(item, full = false) {
   if (!item.evidence) return '<span class="evidence evidence-none">Не проверялось на примерах</span>'
   const e = item.evidence
-  return `<span class="evidence${e.passed === e.total ? '' : ' evidence-partial'}">Проверено на примерах: ${e.passed} из ${e.total}${full ? ' ' + e.note : ''} · Loginom ${e.loginom}</span>`
+  return `<span class="evidence${e.passed === e.total ? '' : ' evidence-partial'}">Проверено на примерах: ${e.passed} из ${e.total}${full ? ' ' + e.note : ''}${e.passed === e.total ? '' : ', не прошло: ' + (e.total - e.passed)} · Loginom ${e.loginom}</span>`
 }
