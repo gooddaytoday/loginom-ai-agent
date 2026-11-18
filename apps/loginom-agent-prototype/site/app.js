@@ -587,6 +587,23 @@ function resultPackage(item) {
     scope:'personal', view:item.kind === 'quality' ? 'quality' : 'sales', isResult:true,
   }
 }
+// В-55…В-57: a chat without a project has its own visible folder; files follow the chat into a project.
+function chatFiles(item) {
+  const turns = [...(item.history || []), item]
+  return turns.flatMap(turn => turn.kind === 'document' ? [(turn.files?.[0] || item.files?.[0] || 'Пакет.lgp').replace(/\.lgp$/i,'') + ' — описание.md']
+    : turn.kind === 'quality' ? ['Качество выгрузки.html'] : [])
+}
+function chatFolder(item) {
+  const project = projectById(item.project)
+  if (project) return { label:'в папке проекта', path:'Документы → Loginom AI Agent → ' + project.name + (item.movedIn ? ' → ' + item.title : '') }
+  const day = {'Сейчас':'18.11','Сегодня':'18.11','Вчера':'17.11','3 дня назад':'15.11'}[item.date] || item.date
+  return { label:'в папке разговора', path:'Документы → Loginom AI Agent → Без проекта → ' + day + ' ' + item.title }
+}
+function filesWord(count) {
+  const tail = count % 100
+  if (tail > 10 && tail < 20) return 'файлов'
+  return ['файлов','файл','файла','файла','файла','файлов','файлов','файлов','файлов','файлов'][count % 10]
+}
 function result(item) {
   if (item.kind === 'skilltrial') return trialResult(item)
   if (item.kind === 'improve') return changeCard(item)
@@ -597,7 +614,7 @@ function result(item) {
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
     <dl class="result-metrics"><div><dt>Узлов описано</dt><dd>12</dd></div><div><dt>Входные данные</dt><dd>2 таблицы</dd></div><div><dt>Изменено</dt><dd>ничего</dd></div></dl>
-    <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>${esc((item.files[0] || 'Пакет.lgp').replace(/\.lgp$/i,''))} — описание.md</strong><small>В папке проекта</small></span><button class="btn" data-action="download-result">Скачать ${icon('download',14)}</button></div></div>`
+    <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>${esc((item.files[0] || 'Пакет.lgp').replace(/\.lgp$/i,''))} — описание.md</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать ${icon('download',14)}</button></div></div>`
   const info = item.kind === 'quality'
     ? ['Проверка данных завершена','Обнаружены 12 пропусков и 3 дубликата. В отчёте отмечены столбцы, которые нужно проверить перед загрузкой.',[['Строки','2 400'],['Пропуски','12'],['Дубликаты','3']]]
     : item.kind === 'refactor'
@@ -605,7 +622,7 @@ function result(item) {
     : ['Сценарий ABC-анализа собран','Товары распределены по трём группам по накопленной доле выручки. Итоговая таблица и шаги сценария доступны в результатах.',[['Группа A','15 товаров'],['Группа B','28 товаров'],['Группа C','77 товаров']]]
   return `<div class="answer-block"><h2>${info[0]}</h2><p>${info[1]}</p>
     <dl class="result-metrics">${info[2].map(([key,value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join('')}</dl>
-    ${item.kind === 'quality' ? `<div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>Качество выгрузки.html</strong><small>Отчёт в папке проекта</small></span><button class="btn" data-action="download-result">Скачать CSV ${icon('download',14)}</button></div>`
+    ${item.kind === 'quality' ? `<div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>Качество выгрузки.html</strong><small>Отчёт ${chatFolder(item).label}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать CSV ${icon('download',14)}</button></div>`
       : `<div class="artifact-card"><span class="glyph red">${icon('flow',19)}</span><span><strong>${resultPackage(item).name}</strong><small>${item.kind === 'refactor' ? 'Копия в /user, рядом с исходным' : 'Пакет в /user'}</small></span><button class="btn" data-action="open-result-package">Открыть ${icon('external',14)}</button></div>`}
     <div class="answer-actions"><button class="link-btn" data-action="download-result">${icon('download',15)} Скачать отчёт CSV</button><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div>
   </div>`
@@ -772,7 +789,7 @@ const scripts = {
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов', time:3},
     {plan:1, icon:'shield', live:'Ищу пропуски', done:'Нашёл 12 пропусков в 2 столбцах', short:'нашёл 12 пропусков', detail:'регион — 9, цена — 3', time:6},
     {plan:1, think:[4,'Дубликатом можно считать и полную копию строки, и повтор продажи с другой ценой. От этого зависит результат — лучше спросить.'], icon:'shield', ask:'question', live:'Ищу дубликаты', done:'Нашёл 3 дубликата', short:'нашёл 3 дубликата', detail:'Правило: {answer}', time:5},
-    {plan:2, icon:'file', live:'Составляю отчёт', done:'Составил отчёт «Качество выгрузки.html»', short:'составил отчёт', detail:'В папке проекта', time:4},
+    {plan:2, icon:'file', live:'Составляю отчёт', done:'Составил отчёт «Качество выгрузки.html»', short:'составил отчёт', detail:'{folder}', time:4},
   ], question:{text:'Какие строки считать дубликатами?', options:[['Полное совпадение строки','Все столбцы одинаковые'],['Совпадение товара и даты','Одна продажа записана дважды, например с разной ценой'],['Совпадение номера документа','Если в выгрузке есть номер документа']]}},
   clean:{plan:['Открыть пакет','Проверить узлы'], steps:[
     {plan:0, icon:'flow', live:'Открываю «{pkg}»', done:'Открыл «{pkg}» только для чтения', short:'открыл пакет', time:2},
@@ -795,7 +812,7 @@ const scripts = {
   document:{plan:['Прочитать пакет','Описать узлы','Собрать документ'], steps:[
     {plan:0, icon:'flow', live:'Читаю пакет', done:'Прочитал пакет «{pkg}»: 12 узлов, 3 подмодели', short:'прочитал пакет', time:3},
     {plan:1, icon:'book', live:'Ищу описания узлов в справке Loginom', done:'Нашёл в справке Loginom описания 9 типов узлов', short:'нашёл описания в справке', time:5},
-    {plan:2, icon:'file', live:'Пишу документ', done:'Написал «{doc}»', short:'написал описание', detail:'В папке проекта', time:12},
+    {plan:2, icon:'file', live:'Пишу документ', done:'Написал «{doc}»', short:'написал описание', detail:'{folder}', time:12},
   ]},
   // Iteration 6: trying a skill.
   skilltrial:{plan:['Прочитать навык','Открыть пакет','Сверить с навыком'], steps:[
@@ -815,7 +832,7 @@ function followed(text, turn) {
 }
 function stepText(text, turn) {
   const pkg = (turn.files?.[0] || 'Продажи.lgp')
-  return text.replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '')
+  return text.replaceAll('{folder}', chatFolder(state.sessions.find(item => item.id === state.session) || turn).label.replace(/^в/,'В')).replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '')
 }
 function turnTime(turn) {
   const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time + (step.think?.[0] || 0), 0) + (turn.errors?.length || 0) * 33
@@ -1324,17 +1341,7 @@ function review() {
     ['Своё действие','«Документировать» с вашими настройками: появляется в «Что сделать с пакетом» → «Ещё», мастер открывается с ними.',[['own-action','Начать']]],
     ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
-  const questions = [
-    `<strong>Своя папка у каждого разговора без проекта.</strong> Так делают настольные агенты: у разговора без папки в GitHub Copilot — своя временная папка, у сессий Claude для компьютера — своя папка с результатами; в OpenCode 2 это работает без правок (разбор — <code>docs/product/loginom-agent/research-chat-folders.md</code>). Варианты:<ul class="rv-variants">
-      <li><b>А, рекомендую:</b> своя видимая папка «Документы → Loginom AI Agent → Без проекта → дата и название разговора». Файлы разговора лежат вместе, одинаковые имена не мешают, агент не видит файлы других разговоров без вопроса.</li>
-      <li><b>Б:</b> одна общая папка «Без проекта» на все такие разговоры. Для нас проще, но файлы перемешаны, а при переносе и удалении придётся вычислять, какие файлы чьи.</li></ul>`,
-    `<strong>Перенос разговора в проект.</strong> Варианты:<ul class="rv-variants">
-      <li><b>А, рекомендую:</b> содержимое папки разговора переезжает в папку проекта, в подпапку с названием разговора; сообщение «Перенесён в «Отчётность» вместе с файлами (2)». «Убрать из проекта» даёт разговору новую папку, а сделанное в проекте остаётся в проекте.</li>
-      <li><b>Б:</b> файлы остаются на старом месте, как в Copilot. Проще, но результаты окажутся вне проекта.</li></ul>`,
-    `<strong>Удаление разговора.</strong> Варианты:<ul class="rv-variants">
-      <li><b>А, рекомендую:</b> папка разговора остаётся; в окне удаления — флажок «Удалить и папку разговора (2 файла)». Результаты часто уже нужны.</li>
-      <li><b>Б:</b> папка удаляется вместе с разговором, как в Claude для компьютера, — с перечнем файлов в окне подтверждения.</li></ul>`,
-  ]
+  const questions = []
   const changed = [
     '«Создать своё» в каталоге: навык — из разговора, с нуля или из файла; своё действие на основе встроенного.',
     'Карточка навыка: «Сможет / Не сможет»; навык из файла помечен «Не проверен Loginom» и включается после согласия (В-41). Программы в навыке не принимаются (В-37).',
@@ -1362,6 +1369,7 @@ function review() {
     '<strong>Навык из файла</strong> — как навык сообщества: работает и в Loginom после согласия (В-45). Опубликовать его можно, отметив «Я автор или автор разрешил».',
     '<strong>Названия в каталоге</strong> — Действие · Навык · Готовый сценарий · Подключение (В-48). <strong>Тексты для сообщества</strong> — «Сделал другой пользователь, Loginom это не проверял. Агент будет следовать указаниям навыка, в том числе в Loginom…»; отметка «Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам» (В-49).',
     '<strong>Закрытый контур</strong> — администратор скачивает навыки на сайте каталога и передаёт файлом или архивом; сборщика в приложении нет (В-51). Навыки «Сообщество» пускает сам администратор (В-50).',
+    '<strong>Разговоры без проекта</strong> — у каждого своя видимая папка «Документы → Loginom AI Agent → Без проекта → дата и название»; при переносе в проект файлы переезжают в подпапку проекта; при удалении папка остаётся, если не отметить «Удалить и папку разговора» (В-55…В-57).',
     '<strong>Сессия Loginom для окна выбора пакета</strong> — короткая, по требованию: вошли, прочитали папку, вышли; при исчерпанном лимите — «Сейчас заняты все сессии Loginom вашей организации» и «Недавние» или файл с компьютера (В-46).',
   ]
   const hubDecided = [
@@ -1369,7 +1377,7 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 6 — создать и опубликовать</p><h1>Что решить</h1><p>Новое — свои навыки и действия: создать, попробовать, пользоваться самому, опубликовать для всех. Пройдите пути, около 10 минут. Ниже — три вопроса о файлах разговоров с вариантами и рекомендацией.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 6 — создать и опубликовать</p><h1>Что решить</h1><p>Новое — свои навыки и действия: создать, попробовать, пользоваться самому, опубликовать для всех. Пройдите пути, около 10 минут. Открытых вопросов нет — решения ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>` : ''}
@@ -1410,6 +1418,14 @@ function projectForm(project) {
     <div class="button-row"><button class="btn primary">${project ? 'Сохранить' : 'Создать проект'}</button></div>
   </form>`
 }
+// В-57: deleting a chat keeps its folder unless the user ticks the box.
+function deleteChatFiles() {
+  const chat = state.sessions.find(item => item.id === state.deleteId)
+  const files = chat ? chatFiles(chat).length : 0
+  if (!files) return ''
+  if (projectById(chat.project)) return `<p class="dialog-desc">Файлы разговора (${files}) останутся в папке проекта.</p>`
+  return `<label class="delete-folder"><input type="checkbox" id="delete-chat-folder"> Удалить и папку разговора (${files} ${filesWord(files)})</label><p class="dialog-desc muted">Иначе папка «${esc(chatFolder(chat).path)}» останется.</p>`
+}
 // The «…» menu of a chat, a project or the chats list. It lives outside the panel so the panel's clipping
 // does not cut it; render() places it under the button that opened it.
 function rowMenu() {
@@ -1441,7 +1457,7 @@ function overlay() {
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
     'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в /user будет перезаписан изменённой копией. Перед этим агент сохранит прежнюю версию как «Продажи — до правки.lgp» — её можно будет вернуть.</p><p class="dialog-desc">Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
-    'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
     plus: ['Добавить',`<div class="dialog-options">
@@ -1891,6 +1907,10 @@ const actions = {
     render()
   },
   'download-result':downloadResult,
+  'open-chat-folder':() => {
+    const item = state.sessions.find(entry => entry.id === state.session)
+    if (item) toast('Откроется папка: ' + chatFolder(item).path)
+  },
   'edit-package-example':() => {
     state.activePackage = editablePackage
     state.node = 1
@@ -1987,9 +2007,10 @@ const actions = {
   'confirm-delete-chat':() => {
     const id = state.deleteId
     const project = sessionProjectOf(id)
+    const withFolder = Boolean($('#delete-chat-folder')?.checked)
     state.sessions = state.sessions.filter(item => item.id !== id)
     state.overlay = null
-    toast('Разговор удалён')
+    toast(withFolder ? 'Разговор и его папка удалены' : 'Разговор удалён')
     if (state.page === 'chat' && state.session === id) return projectById(project) ? openProject(project) : newSession()
     render()
   },
@@ -2043,15 +2064,19 @@ function menuAction(act) {
     state.overlay = 'project-settings'
   }
   if (act === 'unmove') {
+    const files = chatFiles(chat).length
     chat.project = null
+    chat.movedIn = false
     if (state.session === chat.id) state.project = null
-    toast('Разговор убран из проекта')
+    toast(files ? 'Разговор убран из проекта; его файлы остались в папке проекта' : 'Разговор убран из проекта')
   }
   if (act.startsWith('move:')) {
+    const files = chat.project ? 0 : chatFiles(chat).length
     chat.project = act.slice(5)
+    chat.movedIn = true
     expandProject(chat.project)
     if (state.session === chat.id) state.project = chat.project
-    toast(`Перенесено в «${projectById(chat.project).name}»`)
+    toast(files ? `Перенесён в «${projectById(chat.project).name}» вместе с файлами (${files})` : `Перенесён в «${projectById(chat.project).name}»`)
   }
   if (act === 'new-project-move') {
     state.moveAfterCreate = chat.id

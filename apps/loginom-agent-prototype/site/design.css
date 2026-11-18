@@ -519,3 +519,4 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .change-counts b{font-weight:600}
 @media(max-width:690px){.diff-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.diff-canvas .canvas-connector{display:none}.diff-canvas .canvas-node{flex:1 1 40%;width:auto}.package-top .detail-toggle{margin-left:0}.change-actions .discard-link{margin-left:0}}
 @media(max-width:690px){.package-top{flex-wrap:wrap}.package-top .detail-toggle{flex-basis:100%}.package-top .detail-toggle button{flex:1}}
+.delete-folder{display:flex;gap:8px;align-items:center;margin:4px 0 6px;font-size:14px}.delete-folder input{accent-color:var(--accent)}
