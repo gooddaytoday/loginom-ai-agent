@@ -1271,6 +1271,7 @@ function review() {
     'Ход разговора и счётчики живут до перезагрузки страницы.',
   ]
   const chosen = [
+    'Проект — папка, которую приложение создаёт само, вы вводите только название; разговоры без проекта — в скрытом проекте; «Удалить проект» удаляет и папку с файлами (В-29).',
     'Итерация 3 (лента разговора): «Кратко» по умолчанию; разрешения без постоянного «Всегда»; поправка во время работы без очереди; вместо «Повторить ответ» — «Изменить» и «Ответвить» (В-21…В-24).',
     'Итерация 2 (оболочка): «Пакеты» и «Каталог» через «+», подсказка «Опишите задачу…», Loginom в поле ввода, панель закреплена, поиск в панели, проекты-папки как в Codex.',
   ]
@@ -1279,14 +1280,9 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const spike = [
-    '<strong>Что такое проект.</strong> В OpenCode 2 проект — папка на диске, а разговоров вне проекта нет. Рекомендую: проект — папка, которую приложение создаёт само, вы вводите только название; разговоры без проекта живут в скрытом проекте по умолчанию; «Удалить проект» удаляет и его папку с файлами. «Открыть свою папку как проект», как в Codex, — отдельной функцией позже. Согласны?',
-  ]
   const changed = ['«Проверь сценарий» теперь только читает и находит улучшения; «Внести улучшения» — отдельный ход.','Агент правит копию пакета; в ленте — карточка изменений: +1 ~2 −1, строка на каждый узел, «Сверено с исходным».','«Посмотреть на схеме»: узлы с отметками «новый / изменён / удалён», «было → стало», переключатель «Как было».','Сохранить новой версией, заменить исходный (подтверждение и резервная копия), отменить изменения, отменить сохранение, вернуть прежнюю версию.','На странице пакета «Изменить с агентом» начинает этот же путь.','«Улучшить» над полем ввода, на странице пакета и в «Ещё» ведёт в разговор с карточкой изменений, а не в мастер.']
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 4 — пакет в разговоре</p><h1>Что решить</h1><p>Новое — как агент меняет пакет Loginom и как вы решаете, что с изменениями делать. Пройдите путь, около 10 минут. Решения по итерации — ниже.</p></div></div>
-    <h2 class="rv-heading">Вопрос по итогам проверки OpenCode 2</h2>
-    <ul class="rv-questions">${spike.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target,label],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${label} ${icon('arrow',15)}</button></article>`).join('')}</div>
     <h2 class="rv-heading">Решено по итерации 4</h2>
@@ -1357,7 +1353,7 @@ function overlay() {
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
     'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в /user будет перезаписан изменённой копией. Перед этим агент сохранит прежнюю версию как «Продажи — до правки.lgp» — её можно будет вернуть.</p><p class="dialog-desc">Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
-    'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}), инструкциями и источниками.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
     plus: ['Добавить',`<div class="dialog-options">
         <button data-action="plus-package"><span class="glyph red">${icon('flow',19)}</span><span><strong>Пакет из Loginom…</strong><small>Агент будет работать с пакетом; над полем появятся действия с ним</small></span>${icon('chevron',17)}</button>
