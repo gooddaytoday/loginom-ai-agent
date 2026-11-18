@@ -122,7 +122,7 @@
 .st-notice-glyph { color: var(--muted); flex: none; height: 18px; }
 .st-notice-error { border-color: color-mix(in srgb, var(--line), #b0473f 35%); background: color-mix(in srgb, var(--paper), #b0473f 8%); }
 .st-notice-error .st-notice-glyph { color: #b0473f; }
-.st-notice-good { background: var(--accent-soft); border-color: color-mix(in srgb, var(--line), var(--accent) 20%); }
+.st-notice-good { background: color-mix(in srgb, var(--paper), var(--success, #2f7d4f) 9%); border-color: color-mix(in srgb, var(--line), var(--success, #2f7d4f) 30%); }
 .st-notice-good .st-notice-glyph { color: var(--success,var(--accent)); }
 .st-list { display: grid; }
 .st-list > .st-field, .st-list > .st-inline-actions, .st-list > .st-notice { margin-top: 15px; }

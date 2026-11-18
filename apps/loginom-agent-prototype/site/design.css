@@ -294,7 +294,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .rv-choice[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 @media(max-width:690px){.collapse-btn{display:none}.home-area.new-chat{padding-top:12px}.new-chat .starter{min-height:0}.new-chat .example-grid,.rv-choices{grid-template-columns:1fr}.lgm-chip{padding-inline:8px}}
 @media(max-width:410px){.lgm-chip>span{max-width:150px;overflow:hidden;text-overflow:ellipsis}.pkg-actions>span{flex-basis:100%}}
-@media(max-width:410px){.mode-pick .filter-label,.mode-pick>.icon:last-child,.composer-model .filter-label{display:none}.composer-options{gap:4px}.top-actions .theme-btn{display:inline-grid}}
+@media(max-width:410px){.mode-pick .filter-label,.mode-pick>.icon:last-child,.composer-model .filter-label{display:none}.composer-model.off .filter-label{display:inline;max-width:118px}.composer-options{gap:4px}.top-actions .theme-btn{display:inline-grid}}
 #main:focus{outline:none}
 
 /* Projects and chats, organised as in the ChatGPT desktop app */

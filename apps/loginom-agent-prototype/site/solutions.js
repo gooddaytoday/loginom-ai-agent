@@ -117,7 +117,7 @@ function accessFor(key, run, project) {
   const runsScenario = 'При запуске сценария выполняются и его выгрузки — например, в файл или базу данных. Если это нежелательно, используйте копию сценария без выгрузок.';
   const noWeb = 'Открывать сайты в интернете';
   if (key === 'document') return {
-    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в папку проекта «${project}»: документирование работает только с файлом на компьютере`] : [],
+    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в ${project ? `папку проекта «${project}»` : 'рабочую папку агента'}: документирование работает только с файлом на компьютере`] : [],
     can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать ${docNames(run).length > 1 ? 'документы' : 'документ'} ${docNames(run).map(file => `«${file}»`).join(', ')} в ${folder}`],
     cannot: ['Изменить пакет — он только читается', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', noWeb],
     data: run.values.depth === 'custom' ? 'структура пакета, настройки узлов и ваше описание документации' : 'структура пакета и настройки узлов',
@@ -164,8 +164,10 @@ function docNames(run) {
   return docFormats.filter(([value]) => run.values.formats.includes(value)).map(([value]) => `${base}.lgp_report.${value}`);
 }
 
+// No fallback: without a model the run does not start, as a message does not send (В-10).
 function modelLine(state) {
-  const model = state.settings?.model || {kind:'local', name:'Демо-модель'};
+  const model = state.settings?.model;
+  if (!model) return [];
   const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:'облачный сервис — данные уйдут в интернет'}[model.kind] || '';
   return [model.name, where, model.kind === 'cloud'];
 }
@@ -318,8 +320,9 @@ function renderRunner(state, model) {
       <div class="sl-perms"><div><h3>✓ Агент сможет</h3><ul>${access.can.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div>
       <div><h3>✕ Агент не сможет</h3><ul>${access.cannot.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div></div>
       ${access.warn ? `<div class="sl-note sl-note-warn">${icon('alert',16)} ${escape(access.warn)}</div>` : ''}
-      <div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>
-      <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start">Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
+      ${modelName ? `<div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>`
+        : `<div class="sl-note sl-note-warn">${icon('alert',16)} Модель не выбрана — без неё действие не запустится. <button type="button" class="btn quiet" data-settings="models">Выбрать модель</button></div>`}
+      <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start" ${modelName ? '' : 'disabled'}>Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
       <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
   }
   if (run.step === 'running') body = `<section class="sl-panel"><ol class="sl-stages" aria-live="polite">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}"><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}</span><small>${index < run.stage ? 'Готово' : index === run.stage ? 'Идёт' : 'Ожидает'}</small></li>`).join('')}</ol>

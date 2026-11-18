@@ -190,8 +190,10 @@ function canNavigate(page, tab) {
   render()
   return false
 }
-function navigate(page) {
+// keepReturn: settings opened from a task («Настроить Loginom») return to it after saving.
+function navigate(page, keepReturn = false) {
   if (!Object.hasOwn(pages, page) || !canNavigate(page)) return
+  if (page === 'settings' && !keepReturn) state.returnTo = null
   state.page = page
   state.overlay = null
   state.mobile = false
@@ -207,9 +209,12 @@ function setContour(contour) {
 }
 function applyDemoPolicy(policy, tab) {
   if (state.policy !== policy) {
+    // The user's own settings wait under the policy and come back when it is removed.
+    if (!state.policy) state.userSettings = state.settings ? JSON.parse(JSON.stringify(state.settings)) : undefined
+    state.settings = policy ? undefined : state.userSettings
+    if (!policy) state.userSettings = undefined
     state.policy = policy
     write('policy',policy)
-    state.settings = undefined
     state.contour = policy ? 'closed' : read('contour','online')
   }
   if (tab) settingsTab(tab)
@@ -347,7 +352,7 @@ function settingsTab(tab) {
   if (state.page !== 'settings') state.returnTo = state.page
   state.settings ??= {}
   state.settings.tab = tab
-  navigate('settings')
+  navigate('settings', true)
 }
 function navButton(page, glyph, label = pages[page]) {
   const origin = state.page === 'runner' ? ({loginom:'loginom', home:'home', chat:'chat'}[state.runnerFrom] || 'hub') : state.page === 'studio' ? 'hub' : state.page
@@ -1038,7 +1043,7 @@ function connectCard() {
       : 'В закрытом контуре публичный стенд недоступен. Укажите адрес Loginom вашей организации.'
     return `<div class="connect-card"><span class="glyph red">${icon('lock',19)}</span><div><strong>Подключиться к Loginom</strong>
     <p class="muted">${text}</p>
-    <div class="button-row"><button class="btn primary" data-settings="loginom">${state.policy === 'set' ? 'Ввести пароль' : 'Указать адрес'}</button></div></div></div>`
+    <div class="button-row"><button class="btn primary" data-settings="loginom">${state.policy === 'set' ? 'Войти' : 'Указать адрес'}</button></div></div></div>`
   }
   return `<div class="connect-card"><span class="glyph red">${icon('external',19)}</span><div>
     <strong>Подключиться к Loginom</strong>
@@ -1269,7 +1274,7 @@ function packages() {
 function review() {
   const look = [
     ['Свой Loginom','«Loginom»: адрес, пользователь, пароль, «Проверить», «Сохранить». Адрес со словом «unavailable» показывает, как выглядит сбой.',[['try-own-loginom','Начать']]],
-    ['Своя модель','«Модели» → «Своя модель по адресу» → «Найти модели» → выбрать. Модель появится в поле ввода.',[['try-own-model','Начать']]],
+    ['Своя модель','«Модели» → «Своя модель по адресу» → «Найти модели» → «Добавить и выбрать». Модель появится в поле ввода.',[['try-own-model','Начать']]],
     ['Закрытый контур','«Режим работы» → «Закрытый контур»: облачные модели становятся недоступны, и, пока своей модели нет, поле ввода просит «Выберите модель». Ниже — что ещё меняется.',[['try-closed','Начать']]],
     ['Политика администратора','Демонстрационный файл политики задаёт режим, адрес Loginom, модель организации, сайты и терминал — у них замок. Второй вариант — файл с ошибкой.',[['policy-set','Включить'],['policy-broken','С ошибкой'],['policy-clear','Убрать']]],
     ['Разрешения и терминал','Новая страница: по каждому виду действий — «Разрешено», «Спрашивать» или «Запрещено». Терминал выключен.',[['try-permissions','Начать']]],
@@ -1277,8 +1282,8 @@ function review() {
   ]
   const questions = [
     '<strong>Разрешения по умолчанию.</strong> Рекомендую: читать файлы проекта — без вопроса; менять файлы, сохранять пакеты в Loginom, запускать сценарии с выгрузками, открывать сайты — спрашивать; терминал выключен. Согласны?',
-    '<strong>Терминал в разговоре.</strong> Команды каждый раз разные, поэтому для терминала рекомендую только «Разрешить один раз», без «Разрешать в этом разговоре». Согласны?',
-    '<strong>Бесплатные модели OpenCode.</strong> В режиме «Интернет» новый пользователь сразу работает на бесплатной модели: данные разговора уходят в облачный сервис OpenCode. Рекомендую оставить — иначе первый запуск требует ключа или своей модели, — но писать об этом в «Моделях» и на шаге «Доступ». Согласны?',
+    '<strong>Терминал.</strong> Команды каждый раз разные, поэтому для терминала рекомендую только «Разрешить один раз», без «Разрешать в этом разговоре». В закрытом контуре терминал выключен всегда, даже если режим выбрали вы, а не администратор (решение 12). Согласны?',
+    '<strong>Бесплатные модели OpenCode.</strong> В режиме «Интернет» новый пользователь сразу работает на бесплатной модели: данные разговора уходят в облачный сервис OpenCode. Рекомендую оставить — иначе первый запуск требует ключа или своей модели, — но писать об этом в «Моделях» и на шаге «Доступ» мастера действия (например, «Документировать»). Согласны?',
     '<strong>Ошибка в файле политики.</strong> Рекомендую: приложение работает без сети, пока администратор не исправит файл; причина и путь к файлу — в настройках и диагностике. Другой вариант — не запускаться вовсе. Согласны?',
   ]
   const changed = [
@@ -1291,6 +1296,7 @@ function review() {
     'Карточка «Подключиться к Loginom» в закрытом контуре говорит, что делать: указать адрес или ввести пароль.',
   ]
   const later = [
+    'Разрешения из настроек пока не меняют ленту: разговор спрашивает, как в итерации 3.',
     'Ошибка всего хода (кончился лимит модели) и смена модели прямо из ленты.',
     'Как администратор собирает файл политики и набор каталога — этап F.',
     'Настройки, кроме режима работы, темы и демо-политики, живут до перезагрузки страницы.',
@@ -1737,9 +1743,9 @@ const actions = {
   'policy-clear':() => applyDemoPolicy('', 'contour'),
   'try-own-loginom':() => applyDemoPolicy('', 'loginom'),
   'try-closed':() => { applyDemoPolicy('', null); settingsTab('contour') },
-  'try-own-model':() => settingsTab('models'),
-  'try-permissions':() => settingsTab('permissions'),
-  'try-diagnostics':() => settingsTab('diagnostics'),
+  'try-own-model':() => applyDemoPolicy('', 'models'),
+  'try-permissions':() => applyDemoPolicy('', 'permissions'),
+  'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
   'try-question':() => tryPrompt('Проверь выгрузку на пропуски и дубликаты'),
