@@ -188,6 +188,41 @@ print(json.dumps(results))
  for(const expected of JSON.parse(r.stdout))assert.doesNotThrow(()=>parseExpectedOutputs(expected));
 });
 
+test('trees-to-table-siblings binds the owner-approved native stacked rows, its own documents.csv and the oracle projection',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,io,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-siblings');e=r.expected_for(c,'/owned/tree.lgp')
+assert c['external'] and c['base'] is None
+assert [p.name for p in c['data'].iterdir()]==['documents.csv']
+task=c['prompt'].read_text()
+assert c['prompt'].name=='task-siblings.md' and 'documents.csv' in task and 'tags/tag' in task
+assert not any(w in task for w in ['oracle','input.json','NULL','декарт','5 строк'])
+case=next(x for x in json.loads((c['source']/'expected.json').read_text())['cases'] if x['id']=='siblings')
+assert case['native_status']=='observed'
+out,want=e['outputs'][0],case['output']
+assert [n['type'] for n in e['nodes']]==['imports.text','trees.from_json','trees.to_table']
+assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered'] and out['export_destination']=='siblings.csv'
+assert out['columns']==want['columns'] and out['rows']==want['rows']
+assert [c['name'] for c in out['columns']]==['batch','code','qty','tag']
+assert [(x['code'],x['qty'],x['tag']) for x in out['rows']]==[('x',2,None),('y',0,None),(None,None,'a'),(None,None,'b'),(None,None,'c')]
+assert {x['batch'] for x in out['rows']}=={'Бета'}
+source=json.loads((c['source'].parent.parent/'fixtures/modes/input.json').read_text())['document']
+rows=list(csv.DictReader(io.StringIO((c['data']/'documents.csv').read_text())))
+assert [int(x['RowID']) for x in rows]==[1] and json.loads(rows[0]['Document'])==source
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+ const e=JSON.parse(spawnSync('python3',['-B','-c',`import importlib.util,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+e=r.expected_for(r.scenario('trees-to-table-siblings'),'/owned/tree.lgp')
+for o in e['outputs']:o.pop('export_destination')
+print(json.dumps(e))`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'}).stdout);
+ assert.doesNotThrow(()=>parseExpectedOutputs(e));
+});
+
 test('trees-to-table-indices binds the approved task, documents.csv and expected derived from the independent oracle',()=>{
  const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,io,json
 from pathlib import Path
