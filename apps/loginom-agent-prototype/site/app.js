@@ -1317,9 +1317,20 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
+  // Iteration 6 waits for these: whether Loginom Hub needs its own site (research-hub-site.md).
+  const hubQuestions = [
+    '<strong>Навыки и работа в Loginom.</strong> Аналитики будут писать навыки в основном для работы в Loginom, а решение 11 выключает навыки сообщества на это время. Рекомендую: свой навык (написан в приложении или из своего разговора) и навык «Проверено Loginom» работают и в Loginom; навыки «Сообщество» и из файла — выключены, пока агент работает в Loginom; администратор может запретить и свои. Согласны?',
+    '<strong>Навык — только текст:</strong> инструкции и справочные файлы, без программ и скриптов. Рекомендую так в первой версии. Согласны?',
+    '<strong>Отдельный сайт Hub не нужен.</strong> Каталог — подписанные файлы: работают из интернета, с сервера организации и файлом в закрытом контуре. Публикация — из приложения: сначала навык уходит в Loginom на проверку, позже — сервис со статусами и консолью модерации. Публичные страницы навыков — раздел marketplace.loginom.ru. GitHub не нужен. Согласны?',
+    '<strong>Вход автора.</strong> Рекомендую аккаунт loginom.ru, если Loginom Company даст по нему вход для сервиса публикации; пока его нет — почта автора. Согласны?',
+    '<strong>Где работают сервис публикации, сборка каталога и ключи.</strong> Рекомендую: тестовый экземпляр — на вашем сервере, рабочий — у Loginom Company. Согласны?',
+  ]
   const policyNow = state.policy === 'set' ? 'Сейчас политика включена.' : state.policy === 'broken' ? 'Сейчас включён файл политики с ошибкой.' : ''
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 5 — настройки и закрытый контур</p><h1>Что решить</h1><p>Новое — настройки: свой Loginom, своя модель, разрешения, закрытый контур и что задаёт администратор. Пройдите пути, около 10 минут. Решения по итерации — ниже.</p></div></div>
+    <h2 class="rv-heading">Нужен ли отдельный сайт Hub</h2>
+    <p class="rv-lead">Итерация 6 («Создать и опубликовать») ждёт этих ответов. Разбор — в репозитории, <code>docs/product/loginom-agent/research-hub-site.md</code>: как устроены каталоги навыков, магазины расширений и реестры, подпись и отзыв, доступность GitHub.</p>
+    <ul class="rv-questions">${hubQuestions.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕ'[index]}</span><h3>${title}</h3><p>${text}${buttons.length > 1 && policyNow ? ' <strong>' + policyNow + '</strong>' : ''}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     <h2 class="rv-heading">Решено по итерации 5</h2>
