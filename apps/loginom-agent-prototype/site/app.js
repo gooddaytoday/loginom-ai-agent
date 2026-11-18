@@ -1,8 +1,9 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
-import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType } from './hub.js'
+import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab } from './hub.js'
 import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
+import { renderCreate, renderModeration, bindOwn, trialBanner, trialResult, startFromSession, ownActionsGroup, demoOwn } from './create.js'
 import { actions as packageActions, byId, tierBadge } from './catalog.js'
 
 const $ = (selector, scope = document) => scope.querySelector(selector)
@@ -16,7 +17,7 @@ const write = (key, value) => {
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
   home:'Новый разговор', chat:'Разговор', project:'Проект', hub:'Каталог', loginom:'Пакеты',
-  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', review:'Что решить',
+  runner:'Запуск действия', studio:'Создать своё', settings:'Настройки', review:'Что решить', moderation:'Консоль модерации',
 }
 // Clicking an example fills the composer; it never sends. «document» also attaches a sample package,
 // so a newcomer sees the package actions appear.
@@ -179,7 +180,29 @@ if (stage === 'used' && state.policy !== 'set') {
 }
 
 const api = {
-  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution,
+  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution, openMine, startTrial, runOwnAction,
+}
+// Iteration 6: own skills and actions (create.js).
+function openMine() {
+  showHubTab(state, 'mine')
+  navigate('hub')
+}
+function startTrial(trial, prompt) {
+  newSession()
+  state.trialSkill = trial
+  state.draft = prompt
+  render()
+  $('#prompt')?.focus()
+}
+// An own action is a built-in action with saved parameters; the wizard opens with them filled in.
+function runOwnAction(own) {
+  delete state.solutions.runs[own.key]
+  state.overlay = null
+  // From «Что сделать с пакетом» the chosen package goes into the wizard, as with built-in actions.
+  if (state.draftPackage) state.runnerPackage = state.draftPackage
+  runSolution(own.solution, own.mode || 'review', 'hub')
+  state.ownRun = own
+  render()
 }
 // Pins the package actions of a just-installed catalog item to Home, if there is room.
 function pinSolution(solution) {
@@ -247,6 +270,7 @@ function useTemplate(title, prompt) {
   $('#prompt')?.focus()
 }
 function runSolution(id, mode = 'review', from = 'hub') {
+  state.ownRun = null
   if (!hubHasInstalled(state,id)) {
     openHubSolution(state,id)
     return navigate('hub')
@@ -480,6 +504,7 @@ function composer() {
   const modelName = currentModel()
   const pkg = state.draftPackage
   return `<form class="composer" id="composer">
+    ${['home','chat','project'].includes(state.page) ? trialBanner(state) : ''}
     ${state.editTurn && state.editTurn.session === state.session && state.page === 'chat' ? `<div class="edit-banner">${icon('compose',15)}<span>Изменяете сообщение — ответы после него заменятся новыми${state.importedPackages.some(entry => entry.savedVersion) || salesState().replaced ? '. Пакеты, уже сохранённые в Loginom, останутся как есть' : ''}</span><button type="button" class="link-btn" data-action="cancel-edit">Отмена</button></div>` : ''}
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
@@ -558,6 +583,7 @@ function resultPackage(item) {
   }
 }
 function result(item) {
+  if (item.kind === 'skilltrial' || item.kind === 'skilltrialfile') return trialResult(item)
   if (item.kind === 'improve') return changeCard(item)
   if (item.kind === 'clean') return `<div class="answer-block"><h2>Замечаний нет</h2><p>Проверил «${esc(item.files?.[0] || 'Продажи.lgp')}»: повторов, непонятных имён и пропущенных проверок не нашёл. Пакет не менял.</p>${(item.files?.[0] || 'Продажи.lgp') === 'Продажи.lgp' && salesState().replaced ? `<p class="muted">«Продажи.lgp» уже заменён улучшенной версией. Прежняя версия сохранена как «Продажи — до правки.lgp».</p><button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}</div>`
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл 3 улучшения</h2><p>Пакет «Продажи.lgp» не менял. Что можно сделать лучше:</p>
@@ -766,6 +792,17 @@ const scripts = {
     {plan:1, icon:'book', live:'Ищу описания узлов в справке Loginom', done:'Нашёл в справке Loginom описания 9 типов узлов', short:'нашёл описания в справке', time:5},
     {plan:2, icon:'file', live:'Пишу документ', done:'Написал «{doc}»', short:'написал описание', detail:'В папке проекта', time:12},
   ]},
+  // Iteration 6: trying a skill draft. A skill from a file is off while the agent works in Loginom (В-36).
+  skilltrial:{plan:['Прочитать навык','Открыть пакет','Сверить с навыком'], steps:[
+    {plan:0, icon:'book', live:'Читаю навык «{skill}»', done:'Применил навык «{skill}»', short:'применил навык', detail:'Проба навыка в этом разговоре', time:2},
+    {plan:1, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
+    {plan:2, icon:'check', live:'Сверяю узлы с правилами навыка', done:'Сверил узлы с правилами навыка: 3 расхождения', short:'сверил с навыком', time:5},
+  ]},
+  skilltrialfile:{plan:['Открыть пакет','Проверить узлы'], steps:[
+    {plan:0, icon:'book', live:'Проверяю навык «{skill}»', done:'Навык «{skill}» выключен: он из файла, а агент работает в Loginom', short:'навык выключен', detail:'Навыки из файла и «Сообщество» не работают, пока агент работает в Loginom', time:1},
+    {plan:0, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
+    {plan:1, icon:'layers', live:'Проверяю узлы', done:'Проверил узлы «Продажи.lgp» без навыка', short:'проверил узлы', time:4},
+  ]},
   chat:{steps:[]},
 }
 function scriptOf(turn) {
@@ -778,7 +815,7 @@ function followed(text, turn) {
 }
 function stepText(text, turn) {
   const pkg = (turn.files?.[0] || 'Продажи.lgp')
-  return text.replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '')
+  return text.replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '')
 }
 function turnTime(turn) {
   const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time + (step.think?.[0] || 0), 0) + (turn.errors?.length || 0) * 33
@@ -1148,6 +1185,7 @@ function allActions() {
   const group = (title, list) => list.length ? `<p class="pkg-section">${title}</p><div class="all-actions">${list.map(row).join('')}</div>` : ''
   return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Закреплённые — до четырёх — видны над полем ввода, когда выбран пакет.</p>
     ${group('Установлены', installed.filter(([,action]) => !action.noPackage))}
+    ${ownActionsGroup(state)}
     ${group('Без пакета', installed.filter(([,action]) => action.noPackage))}
     ${group('Есть в каталоге', entries.filter(([,action]) => !hubHasInstalled(state, action.solution)))}
     <button class="link-btn" data-action="catalog-actions">Все действия в каталоге ${icon('arrow',15)}</button>`
@@ -1278,70 +1316,64 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
-    ['Свой Loginom','«Loginom»: адрес, пользователь, пароль, «Проверить», «Сохранить». Адрес со словом «unavailable» показывает, как выглядит сбой.',[['try-own-loginom','Начать']]],
-    ['Своя модель','«Модели» → «Своя модель по адресу» → «Найти модели» → «Добавить и выбрать». Модель появится в поле ввода.',[['try-own-model','Начать']]],
-    ['Закрытый контур','«Режим работы» → «Закрытый контур»: облачные модели становятся недоступны, и, пока своей модели нет, поле ввода просит «Выберите модель». Ниже — что ещё меняется.',[['try-closed','Начать']]],
-    ['Политика администратора','Демонстрационный файл политики задаёт режим, адрес Loginom, модель организации, сайты и терминал — у них замок. Второй вариант — файл с ошибкой.',[['policy-set','Включить'],['policy-broken','С ошибкой'],['policy-clear','Убрать']]],
-    ['Разрешения и терминал','Новая страница: по каждому виду действий — «Разрешено», «Спрашивать» или «Запрещено». Терминал выключен.',[['try-permissions','Начать']]],
-    ['Диагностика','«Проверить всё» и «Сохранить отчёт для администратора» — без паролей, ключей и разговоров.',[['try-diagnostics','Начать']]],
+    ['Навык из разговора','«Каталог» → «Создать своё» → «Навык» → «Из разговора». Агент составляет черновик, приложение находит в нём данные из ваших файлов — их можно убрать.',[['own-chat','Начать']]],
+    ['Попробовать навык','Проба идёт в отдельном разговоре: в ленте шаг «Применил навык», ответ — по правилам навыка.',[['own-trial','Начать']]],
+    ['Навык из файла','ZIP от коллеги: программа внутри не принимается, а пока агент работает в Loginom, навык из файла выключен (В-36) — это видно на карточке и в пробе.',[['own-file','Начать']]],
+    ['Опубликовать','«Мои» → «Опубликовать для всех»: проверка, что именно уйдёт, подтверждение почты, квитанция. В закрытом контуре — «Передать администратору».',[['own-mine','Начать']]],
+    ['Консоль модерации','Только для прототипа: служебный экран Loginom. Одобрить, вернуть с замечанием, отозвать — статус сразу виден автору в «Моих».',[['own-moderation','Открыть']]],
+    ['Своё действие','«Документировать» с вашими настройками: появляется в «Что сделать с пакетом» → «Ещё», мастер открывается с ними.',[['own-action','Начать']]],
   ]
   const questions = [
-    '<strong>Разрешения по умолчанию</strong> — читать файлы проекта без вопроса; менять файлы, сохранять пакеты в Loginom, запускать выгрузки, открывать сайты — спрашивать; терминал выключен (В-30).',
-    '<strong>Терминал</strong> — только «Разрешить один раз»; в закрытом контуре выключен всегда (В-31).',
-    '<strong>Бесплатные модели OpenCode</strong> остаются по умолчанию в режиме «Интернет»; что данные уходят в OpenCode, написано в «Моделях» и на шаге «Доступ» (В-32).',
-    '<strong>Ошибка в файле политики</strong> — приложение работает в режиме «Только этот компьютер», пока файл не исправят (В-33).',
+    '<strong>Статус публикации без аккаунта.</strong> Пока сервис публикации простой (В-38), аккаунтов нет. Рекомендую: приложение хранит квитанцию отправки и по ней узнаёт статус («На проверке», «Опубликован», «Возвращён»); почту автор подтверждает один раз, ответ приходит и письмом. Согласны?',
+    '<strong>Что проверяет сотрудник перед «Проверено Loginom».</strong> Такой навык теперь работает и в Loginom (В-36). Рекомендую четыре пункта из консоли: инструкции не просят обходить разрешения и отправлять данные наружу; нет скрытого текста и ссылок на программы; файлы соответствуют описанию; проверено на примере. Без всех четырёх — только «Сообщество». Согласны?',
+    '<strong>Своё действие</strong> — пока только на основе «Документировать» и «Проверить сценарий», которые пакет не меняют. «Улучшить» и действия с запуском сценария — позже. Согласны?',
+    '<strong>Навык из файла опубликовать нельзя</strong>: его автор — не вы. Свой навык, переданный файлом коллеге, у него — «из файла». Согласны?',
   ]
   const changed = [
-    'Настройки разложены по делам: «Работа» — Loginom, Модели, Разрешения, Режим работы; «Приложение» — Общие, Горячие клавиши, Справка, Диагностика.',
-    'Убрано то, за чем нет механизма или что повторяет другое: выбор источника справки, «Серверы» и MCP (это «Подключение» в каталоге), отдельные «Провайдеры», повторы «Кратко / Подробно», «Демо-данные», мастер первого запуска.',
-    '«Модели»: модель по умолчанию; своя модель по адресу с поиском моделей на сервере; облачный сервис по ключу; бесплатные модели OpenCode — с пометкой, куда уходят данные.',
-    '«Разрешения» — новая страница; постоянные разрешения живут здесь, а не в ленте (В-22). Терминал выключен (решение 12).',
-    '«Режим работы»: «Интернет» или «Закрытый контур» («Сеть организации» или «Только этот компьютер») и что меняется в каждом.',
-    'Строки, заданные администратором, — с замком и подписью «Задано администратором»; ошибка в файле политики — работа без сети с причиной.',
-    'Карточка «Подключиться к Loginom» в закрытом контуре говорит, что делать: указать адрес или ввести пароль.',
+    '«Создать своё» в каталоге: навык — из разговора, с нуля или из файла; своё действие на основе встроенного.',
+    'Карточка навыка: «Сможет / Не сможет» зависит от того, откуда навык (В-36). Программы в навыке не принимаются (В-37).',
+    'Перед сохранением и отправкой приложение находит пути, имена файлов, фамилии, почту и пароли — их можно убрать одной кнопкой.',
+    '«Попробовать» — отдельный разговор с навыком; «Мои» в каталоге — черновики, включение, публикация, файл, удаление.',
+    'Публикация (В-38, В-39): описание для каталога, условия использования, почта; проверки; что уйдёт и что нет; квитанция и статусы.',
+    'Консоль модерации (только для прототипа) — очередь, автоматические проверки, текст, решения; старый экран «Создать навык» убран.',
   ]
   const later = [
-    'Разрешения из настроек пока не меняют ленту: разговор спрашивает, как в итерации 3.',
-    'Ошибка всего хода (кончился лимит модели) и смена модели прямо из ленты.',
-    'Как администратор собирает файл политики и набор каталога — этап F.',
-    'Настройки, кроме режима работы, темы и демо-политики, живут до перезагрузки страницы.',
+    'Публикация, шаг 2 — сервис со входом по почте и историей версий; сейчас показан шаг 1.',
+    'Отозванная версия у тех, кто её установил: в прототипе описано словами, без экрана.',
+    'Свои навыки и действия живут до перезагрузки страницы.',
   ]
   const chosen = [
-    'Проект — папка, которую приложение создаёт само, вы вводите только название; разговоры без проекта — в скрытом проекте; «Удалить проект» удаляет и папку с файлами (В-29).',
-    'Итерация 4 (пакет в разговоре): сохранение новой версией, замена исходного — с подтверждением и копией; сверка запуском — только без выгрузок; имена «— v2»; «Улучшить» ведёт в разговор (В-25…В-28).',
-    'Итерация 3 (лента разговора): «Кратко» по умолчанию; разрешения без постоянного «Всегда»; поправка во время работы без очереди; вместо «Повторить ответ» — «Изменить» и «Ответвить» (В-21…В-24).',
-    'Итерация 2 (оболочка): «Пакеты» и «Каталог» через «+», подсказка «Опишите задачу…», Loginom в поле ввода, панель закреплена, поиск в панели, проекты-папки как в Codex.',
+    'Итерация 5 (настройки и закрытый контур): разрешения по умолчанию, терминал только «один раз», бесплатные модели OpenCode с пометкой, ошибка в файле политики — работа на этом компьютере (В-30…В-33).',
+    'Проект — папка, которую приложение создаёт само; «Удалить проект» удаляет и папку (В-29).',
+    'Итерация 4 (пакет в разговоре): сохранение новой версией, замена исходного — с подтверждением и копией; «Улучшить» ведёт в разговор (В-25…В-28).',
+    'Итерации 2–3: оболочка, лента разговора (В-15…В-24).',
   ]
   const open11 = [
-    'Названия в каталоге: Действие · Навык · Пакет Loginom · Подключение (И1.1-1).',
+    'Названия в каталоге: Действие · Навык · Пакет Loginom · Подключение (И1.1-1) — экраны итерации 6 на них опираются.',
+    'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4) — они нужны каталогу, куда теперь попадают ваши навыки.',
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
-    'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  // Decided after the Hub research (research-hub-site.md); iteration 6 follows them.
   const hubDecided = [
-    '<strong>Навыки и работа в Loginom</strong> — свои и «Проверено Loginom» работают; «Сообщество» и из файла выключены, пока агент работает в Loginom; администратор может запретить и свои (В-36).',
-    '<strong>Навык — только текст</strong>, без программ и скриптов (В-37).',
-    '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику; публичные страницы — позже, на поддомене loginom.ai; GitHub не нужен (В-38).',
-    '<strong>Вход автора</strong> — свои аккаунты с подтверждением по почте (В-39). <strong>Где всё работает</strong> — поддомен loginom.ai, тест — на вашем сервере, корневой ключ — офлайн у вас (В-40).',
+    '<strong>Навыки и работа в Loginom</strong> — свои и «Проверено Loginom» работают; «Сообщество» и из файла выключены, пока агент работает в Loginom (В-36). <strong>Навык — только текст</strong> (В-37).',
+    '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
-  const policyNow = state.policy === 'set' ? 'Сейчас политика включена.' : state.policy === 'broken' ? 'Сейчас включён файл политики с ошибкой.' : ''
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 5 — настройки и закрытый контур</p><h1>Что решить</h1><p>Новое — настройки: свой Loginom, своя модель, разрешения, закрытый контур и что задаёт администратор. Пройдите пути, около 10 минут. Решения по итерации — ниже.</p></div></div>
-    <h2 class="rv-heading">Решено по Hub</h2>
-    <p class="rv-lead">Разбор — в репозитории, <code>docs/product/loginom-agent/research-hub-site.md</code>. Итерация 6 («Создать и опубликовать») идёт по этим решениям.</p>
-    <ul class="rv-changes">${hubDecided.map(text => `<li>${text}</li>`).join('')}</ul>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 6 — создать и опубликовать</p><h1>Что решить</h1><p>Новое — свои навыки и действия: создать, попробовать, пользоваться самому, опубликовать для всех. Пройдите пути, около 10 минут. Вопросы с рекомендациями — ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕ'[index]}</span><h3>${title}</h3><p>${text}${buttons.length > 1 && policyNow ? ' <strong>' + policyNow + '</strong>' : ''}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
-    <h2 class="rv-heading">Решено по итерации 5</h2>
-    <ul class="rv-changes">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
+    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
+    <h2 class="rv-heading">Вопросы</h2>
+    <ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
+    <h2 class="rv-heading">Ещё ждут ответа с итерации 1.1</h2>
+    <ul class="rv-questions rv-answers">${open11.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Пока не показано</h2>
     <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
+    <h2 class="rv-heading">Решено по Hub</h2>
+    <ul class="rv-changes">${hubDecided.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Решено раньше</h2>
     <ul class="rv-changes">${chosen.map(text => `<li>${text}</li>`).join('')}</ul>
-    <h2 class="rv-heading">Ещё ждут ответа с итерации 1.1</h2>
-    <ul class="rv-questions rv-answers">${open11.map(text => `<li>${text}</li>`).join('')}</ul>
+    <p class="rv-lead">Только для прототипа: демо-политика администратора из итерации 5 — <button class="link-btn" data-action="policy-set">включить</button> · <button class="link-btn" data-action="policy-clear">убрать</button>.</p>
   </div>`
 }
 function searchResults(query) {
@@ -1432,8 +1464,9 @@ function pageContents() {
     case 'project': return projectPage()
     case 'hub': return renderHub(state)
     case 'settings': return renderSettings(state)
-    case 'runner':
-    case 'studio': return renderSolutions(state)
+    case 'runner': return renderSolutions(state)
+    case 'studio': return renderCreate(state)
+    case 'moderation': return renderModeration(state)
     case 'loginom': return packages()
     case 'review': return review()
   }
@@ -1508,7 +1541,8 @@ function render(resetScroll = false) {
   }
   if (state.page === 'hub') bindHub(app,state,api)
   if (state.page === 'settings') bindSettings(app,state,api)
-  if (['runner','studio'].includes(state.page)) bindSolutions(app,state,api)
+  if (state.page === 'runner') bindSolutions(app,state,api)
+  bindOwn(app,state,api)
 }
 function dismiss() {
   state.overlay = null
@@ -1570,6 +1604,7 @@ function send() {
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     : old && old.kind !== 'chat' && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
   if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''))) kind = 'clean'
+  if (state.trialSkill && !old) kind = state.trialSkill.origin === 'file' ? 'skilltrialfile' : 'skilltrial'
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
   const needsLoginom = kind !== 'chat' && !(kind === 'document' && state.draftPackage?.source === 'local')
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
@@ -1589,6 +1624,10 @@ function send() {
     step:0, decisions:[], cleared:[], steer:[],
   }
   state.editTurn = null
+  if (state.trialSkill && !old) {
+    next.trial = state.trialSkill
+    state.trialSkill = null
+  }
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
   if (state.draftPackage) state.progress.packages = true
@@ -1753,6 +1792,12 @@ const actions = {
   },
   'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); write('policy',''); location.hash = ''; location.reload() },
   // Demo of the administrator's machine policy: it is set outside the app, so the switch lives on «Что решить».
+  'own-chat':() => demoOwn(state, api, 'chat'),
+  'own-trial':() => demoOwn(state, api, 'trial'),
+  'own-file':() => demoOwn(state, api, 'file'),
+  'own-mine':() => demoOwn(state, api, 'mine'),
+  'own-moderation':() => demoOwn(state, api, 'moderation'),
+  'own-action':() => demoOwn(state, api, 'action'),
   'policy-set':() => applyDemoPolicy('set', 'contour'),
   'policy-broken':() => applyDemoPolicy('broken', 'contour'),
   'policy-clear':() => applyDemoPolicy('', 'contour'),
@@ -1916,10 +1961,7 @@ const actions = {
   'author-from-chat':() => {
     const session = state.sessions.find(item => item.id === state.session)
     if (!session) return
-    Object.assign(state.solutions.author,{
-      method:'chat',title:session.title,description:session.prompt.slice(0,900),id:'',
-      feedback:'Поля предложены по текущему разговору.',warning:false,
-    })
+    startFromSession(state, session)
     navigate('studio')
   },
   'confirm-replace-package':replacePackage,

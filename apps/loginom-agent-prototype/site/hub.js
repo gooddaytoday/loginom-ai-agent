@@ -1,6 +1,7 @@
 import { catalog, byId, tiers, kinds, tierBadge, evidenceLine } from './catalog.js';
+import { renderMine, ownCount } from './create.js';
 
-const tabs = [['catalog','Каталог'],['installed','Установленные'],['updates','Обновления'],['history','История']];
+const tabs = [['catalog','Каталог'],['installed','Установленные'],['mine','Мои'],['updates','Обновления'],['history','История']];
 const tierFilters = [['all','Все'],['official','Loginom'],['verified','Проверено Loginom'],['community','Сообщество']];
 const defaultSelection = ['quality','loads','profile'];
 const archiveName = 'loginom-hub-analytics-2026.11.loginom-hub';
@@ -167,6 +168,11 @@ export function hubHasInstalled(state, id) {
   return Object.hasOwn(hubState(state).installed, id);
 }
 
+// Opens one tab of the catalog, e.g. «Мои» after creating a skill.
+export function showHubTab(state, tab) {
+  Object.assign(hubState(state), {tab, dialog:null});
+}
+
 // Opens the catalog filtered to one type, e.g. «Действие» from «Ещё действия в каталоге».
 export function showHubType(state, type) {
   Object.assign(hubState(state), {tab:'catalog', tier:'all', type, query:'', dialog:null});
@@ -233,13 +239,13 @@ export function renderHub(state) {
   const query = hub.query.trim().toLocaleLowerCase('ru');
   const items = source.filter(item => (hub.tier === 'all' || item.tier === hub.tier) && (hub.type === 'Все' || item.kind === hub.type) &&
     (!query || [item.title,item.product,item.description,item.kind,item.keywords].join(' ').toLocaleLowerCase('ru').includes(query)));
-  const counts = {catalog:available.length,installed:installedItems.length,updates:updates.length};
+  const counts = {catalog:available.length,installed:installedItems.length,mine:ownCount(state),updates:updates.length};
   const types = ['Все',...new Set(source.map(item=>item.kind))];
   return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Каталог</h1></div><p>Loginom Hub — действия с пакетами, навыки агента, готовые пакеты Loginom и подключения. Перед установкой видно, кто подготовил и что будет разрешено.</p></div>'+
     '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать своё</button><button class="btn" data-hub-action="import">'+icon('upload',18)+' Импорт из файла</button></div></header>'+
     sourceLine(online)+
     '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
-    (hub.tab === 'history' ? history(hub) :
+    (hub.tab === 'mine' ? renderMine(state) : hub.tab === 'history' ? history(hub) :
       (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск в каталоге" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
         '<div class="hub-filters" aria-label="Кто подготовил">'+tierFilters.filter(([id]) => online || id !== 'community').map(([id,label])=>'<button data-hub-tier="'+id+'" aria-pressed="'+(hub.tier===id)+'">'+label+'</button>').join('')+'</div>'+
         '<div class="hub-filters hub-types" aria-label="Тип">'+types.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'"'+(kinds[type]?' title="'+kinds[type].how+'"':'')+'>'+(kinds[type]?.plural || type)+'</button>').join('')+'</div>'+
@@ -456,7 +462,7 @@ export function bindHub(root, state, api) {
       case 'export': hub.dialog = {kind:'export',ids:[...defaultSelection]}; break;
       case 'close': hub.dialog = null; break;
       case 'clear': hub.query = ''; hub.type = 'Все'; hub.tier = 'all'; break;
-      case 'studio': hub.dialog = null; api.navigate('studio'); return;
+      case 'studio': hub.dialog = null; if (state.own) state.own.editing = null; api.navigate('studio'); return;
       case 'install-one': {
         const item = byId(hub.dialog.id);
         const update = Boolean(hub.installed[item.id]);

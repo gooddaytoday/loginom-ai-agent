@@ -18,28 +18,15 @@ const demoPackages = [
   {name:'Сводка продаж.lgp', where:'Loginom · /Общие/Аналитика', source:'loginom'},
   {name:'Мой сценарий.lgp', where:'На компьютере · Документы', source:'local'},
 ];
-const draftKey = 'loginom-prototype-local-solutions';
 const sqlExample = 'SELECT city, SUM(amount) AS revenue\nFROM sales\nWHERE amount IS NOT NULL\nGROUP BY city;';
-const authorDefaults = { title:'Контроль качества данных', description:'Проверяет пропуски и дубликаты в таблице и формирует отчёт.', scope:'Личная библиотека', method:'manual', id:'' };
 
 function escape(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[char]);
 }
 
-function savedDrafts() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(draftKey) || '[]');
-    return Array.isArray(saved) ? saved.filter(item => item && typeof item.title === 'string' && typeof item.id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
 function getState(state) {
   state.solutions ??= {};
   state.solutions.runs ??= {};
-  state.solutions.drafts ??= savedDrafts();
-  state.solutions.author ??= { ...authorDefaults };
   return state.solutions;
 }
 
@@ -292,12 +279,18 @@ function renderRunner(state, model) {
   const key = runKey(state);
   const id = key.split(':')[0];
   const item = byId(id);
-  const [title, description] = titles[key];
+  // An own action (iteration 6) is this wizard with saved parameters filled in.
+  const own = state.ownRun?.key === key ? state.ownRun : null;
+  const [title, description] = own ? [own.name, `Своё действие на основе «${own.baseTitle}». Параметры подставлены из него; для этого запуска их можно изменить.`] : titles[key];
   const run = model.runs[key] ??= { values: {
     package:'Продажи.lgp', second:'Сводка продаж.lgp', formats:['pdf'], depth:'full', custom:'', goal:'Понятность структуры',
     target:'Продажи — улучшено.lgp', data:'sales_sample.csv', baseline:'sales_expected.csv', tolerance:'0.01',
     sql:sqlExample, repeats:'5',
   }, step:'params', stage:0, outcome:'success', demoOutcome:'success' };
+  if (own && run.ownApplied !== own.name && run.step === 'params') {
+    Object.assign(run.values, own.values);
+    run.ownApplied = own.name;
+  }
   // Seeing the result clears the «Готово — открыть результат» line in the sidebar.
   if (run.step === 'result') run.unseen = false;
   if (state.runnerPackage && run.boundPackage?.name !== state.runnerPackage.name && run.step !== 'running') {
@@ -334,31 +327,12 @@ function renderRunner(state, model) {
     ${stepper(run.step)}${body}</div>`;
 }
 
-function renderAuthor(model, state) {
-  const author = model.author;
-  const fromChat = state.solutions?.author?.method === 'chat' && state.session;
-  return `<div class="sl-page"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${fromChat ? 'chat' : 'hub'}">${fromChat ? '← Разговор' : '← Каталог'}</button>
-    <header class="sl-heading"><span class="sl-product">Свои навыки</span><h1>Создать навык</h1><p>Подготовьте повторяемую инструкцию для агента и сохраните черновик в библиотеке.</p></header>
-    <div class="sl-switch" aria-label="Способ создания">${[['manual','С нуля'],['chat','Из разговора'],['import','Импорт файла']].map(([id,title]) => `<button type="button" class="sl-chip${id === author.method ? ' is-active' : ''}" data-sl-author="${id}" aria-pressed="${id === author.method}">${title}</button>`).join('')}</div>
-    <div class="sl-grid"><section class="sl-panel"><div class="sl-panel-head"><h2>${author.method === 'import' ? 'Предпросмотр импорта' : 'Черновик навыка'}</h2><span class="sl-tag">Личный</span></div>
-      <form class="sl-form" data-sl-form="author">${author.method === 'import' ? `<label class="sl-field sl-upload"><span>Выбрать SKILL.md или манифест JSON</span><input name="import" type="file" accept=".md,.json,text/markdown,application/json"><small>Прочитаем название и описание для предпросмотра.</small></label>` : ''}
-      ${author.feedback ? note(escape(author.feedback),author.warning ? 'warn' : '') : ''}
-      <label class="sl-field"><span>Название навыка</span><input name="title" maxlength="110" value="${escape(author.title)}" required></label>
-      <label class="sl-field"><span>Что делает навык</span><textarea name="description" maxlength="900" rows="4" required>${escape(author.description)}</textarea></label>
-      ${select('scope','Кому доступен черновик',['Личная библиотека','Только в текущем проекте'],author.scope)}
-      <div class="sl-actions"><button type="submit" class="btn primary">Сохранить черновик</button><button type="button" class="btn quiet" data-sl-action="manifest">Скачать манифест</button></div></form></section>
-      <aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2><span class="sl-tag">Черновик</span></div><h3 data-sl-preview-title>${escape(author.title || 'Название навыка')}</h3><p data-sl-preview-desc>${escape(author.description)}</p><p>Из черновика можно экспортировать описание и входы решения.</p>${note('Черновик хранится в этом браузере.')}</aside></div>
-    ${model.drafts.length ? `<section class="sl-panel sl-drafts"><div class="sl-panel-head"><h2>Сохранённые черновики</h2></div>${model.drafts.map(draft => `<button type="button" class="sl-draft" data-sl-draft="${escape(draft.id)}"><span><strong>${escape(draft.title)}</strong><small>${escape(draft.scope)}</small></span><span>Открыть →</span></button>`).join('')}</section>` : ''}</div>`;
-}
-
 export function initSolutionDrafts(state) {
   getState(state);
 }
 
 export function renderSolutions(state) {
-  const model = getState(state);
-  if (state.page !== 'studio') return renderRunner(state,model);
-  return renderAuthor(model, state);
+  return renderRunner(state, getState(state));
 }
 
 function download(name, value) {
@@ -370,20 +344,6 @@ function download(name, value) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url),1000);
-}
-
-function readDraft(name, source) {
-  if (name.toLowerCase().endsWith('.json')) {
-    const parsed = JSON.parse(source);
-    if (!parsed || typeof parsed.title !== 'string' || typeof parsed.description !== 'string') throw new Error();
-    return { title:parsed.title, description:parsed.description };
-  }
-  if (!name.toLowerCase().endsWith('.md')) throw new Error();
-  const yaml = source.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\s|$)/)?.[1] ?? '';
-  const title = yaml.match(/^name:\s*(.+)$/m)?.[1] ?? source.match(/^#\s+(.+)$/m)?.[1];
-  if (!title) throw new Error();
-  const paragraph = source.slice(source.indexOf(title) + title.length).split(/\r?\n/).find(line => /^[\p{L}\d]/u.test(line.trim()));
-  return { title, description:yaml.match(/^description:\s*(.+)$/m)?.[1] ?? paragraph?.trim() ?? '' };
 }
 
 function validateRun(key, values) {
@@ -400,7 +360,6 @@ export function bindSolutions(root,state,api) {
   const panel = root.querySelector('.sl-page');
   if (!panel) return;
   const model = getState(state);
-  const author = model.author;
   const key = runKey(state);
   const item = byId(key.split(':')[0]);
   const run = model.runs[key];
@@ -408,13 +367,7 @@ export function bindSolutions(root,state,api) {
     const input = event.target;
     const form = input.closest('[data-sl-form]');
     if (!form || !input.name || input.type === 'file') return;
-    if (form.dataset.slForm === 'run') {
-      if (input.type !== 'checkbox') run.values[input.name] = input.value;
-      return;
-    }
-    author[input.name] = input.value;
-    if (input.name === 'title') panel.querySelector('[data-sl-preview-title]').textContent = input.value || 'Название навыка';
-    if (input.name === 'description') panel.querySelector('[data-sl-preview-desc]').textContent = input.value;
+    if (input.type !== 'checkbox') run.values[input.name] = input.value;
   });
   panel.addEventListener('change', async event => {
     if (event.target.name === 'demo-outcome') { run.demoOutcome = event.target.value; return; }
@@ -434,56 +387,16 @@ export function bindSolutions(root,state,api) {
       return;
     }
     if (event.target.name === 'baseline') { run.values.baseline = event.target.value; api.render(); return; }
-    if (event.target.name !== 'import') return;
-    const file = event.target.files[0];
-    if (!file) return;
-    try {
-      if (file.size > 1024 * 1024) throw new Error();
-      const draft = readDraft(file.name, await file.text());
-      Object.assign(author,{title:draft.title.slice(0,110),description:draft.description.slice(0,900),feedback:`Прочитан файл ${file.name}. Проверьте поля перед сохранением.`,warning:false,id:''});
-    } catch {
-      Object.assign(author,{feedback:'Не удалось прочитать карточку. Выберите SKILL.md или манифест JSON размером до 1 МБ.',warning:true});
-    }
-    if (state.page === 'studio') api.render();
   });
   panel.addEventListener('submit', event => {
     event.preventDefault();
-    if (event.target.dataset.slForm === 'run') {
-      run.error = validateRun(key,run.values);
-      if (!run.error) run.step = 'access';
-      api.render(true);
-      return;
-    }
-    const title = author.title.trim();
-    const description = author.description.trim();
-    if (!title || !description) { api.toast('Заполните название и описание навыка.'); return; }
-    author.id ||= `draft-${Date.now()}`;
-    const draft = {id:author.id,title,description,scope:author.scope};
-    const index = model.drafts.findIndex(entry => entry.id === author.id);
-    if (index === -1) model.drafts.push(draft);
-    else model.drafts[index] = draft;
-    let persisted = true;
-    try { localStorage.setItem(draftKey,JSON.stringify(model.drafts)); } catch { persisted = false; }
-    Object.assign(author,{feedback:persisted ? 'Черновик сохранён в библиотеке.' : 'Черновик сохранён на время этой вкладки.',warning:!persisted});
-    api.render();
+    run.error = validateRun(key,run.values);
+    if (!run.error) run.step = 'access';
+    api.render(true);
   });
   panel.addEventListener('click', event => {
     const button = event.target.closest('button, summary');
     if (!button) return;
-    if (button.dataset.slAuthor) {
-      const method = button.dataset.slAuthor;
-      if (method === 'chat') Object.assign(author,{title:'Аудит сценария продаж',description:'Проверяет структуру пакета продаж и отмечает дублирующие преобразования.',id:''});
-      if (method === 'import') Object.assign(author,{title:'',description:'',id:''});
-      Object.assign(author,{method,feedback:method === 'chat' ? 'Поля предложены по учебному разговору.' : '',warning:false});
-      api.render();
-      return;
-    }
-    if (button.dataset.slDraft) {
-      const draft = model.drafts.find(entry => entry.id === button.dataset.slDraft);
-      if (draft) Object.assign(author,draft,{method:'manual',feedback:'',warning:false});
-      api.render();
-      return;
-    }
     switch (button.dataset.slAction) {
       case 'back': api.navigate(button.dataset.slBack); return;
       case 'baseline-draft': run.baselineDraft = true; api.render(); return;
@@ -524,10 +437,6 @@ export function bindSolutions(root,state,api) {
         return;
       }
       case 'download-report': download(`${key.replace(':','-')}-demo-report.json`,{is_demo:true,real_execution:false,solution:item.product || item.title,version:item.version,tier:item.tier,parameters:run.values,outcome:run.outcome,checks:reportData(key,run.values).checks}); return;
-      case 'manifest': {
-        if (!author.title.trim() || !author.description.trim()) { api.toast('Заполните название и описание навыка.'); return; }
-        download('solution-manifest.demo.json',{schema_version:'proposal-0.1',is_demo:true,id:'local/draft',title:author.title,description:author.description,version:'0.1.0-draft',kind:'skill',status:'private_draft',entrypoint:'SKILL.md',permissions_requested:[],verification:{status:'not_verified'}});
-      }
     }
   });
 }
