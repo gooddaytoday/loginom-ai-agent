@@ -1028,6 +1028,12 @@ cold обоих портов с независимым Apriori oracle, точн�
 на length.csv и переобучает тот же узел; CSV/Save/cold проверяют конечные 0/1.
 
 `enrich-data-left`, `enrich-data-composite`: Дополнение данных, `left`, выход 0.
+Только `enrich-data-left` входит в `COLD_COLUMNS_BY_NAME_SCENARIOS`: native
+autosync Loginom при cold Execute переставляет `RowID, Key` в `Key, RowID`
+(LAB-1853/LAB-1869, `lab1837-b04/enrich-data-left/cold/actual-readback.json:1`).
+Для cold создаётся отдельный `expected-cold.json` с `column_order: any`;
+имена, типы, число строк, набор столбцов и значения сверяются строго штатным
+matcher. Основной expected, CSV и порядок столбцов остальных сценариев сохраняются.
 Первый сценарий сохраняет все сочетания двух справочников, меняет данные
 первого справочника на том же узле импорта: 8 → 13 → 8 → 13 строк.
 Второй использует один справочник и составной ключ Code+Zone.

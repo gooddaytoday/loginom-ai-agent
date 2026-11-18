@@ -30,6 +30,8 @@ SCENARIOS = {
 D76_STATUS = 'PASS с ограничением платформы D76'
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
+# LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
+COLD_COLUMNS_BY_NAME_SCENARIOS = ('enrich-data-left',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
@@ -1531,6 +1533,11 @@ def expected_for(case, package, cold=False):
                 if column['name'] in labels: column['label'] = labels[column['name']]
     expected['package_path'] = package
     return expected
+
+
+def cold_columns_by_name(expected, scenario):
+    if scenario not in COLD_COLUMNS_BY_NAME_SCENARIOS: return expected
+    return {**expected, 'outputs': [{**output, 'column_order': 'any'} for output in expected['outputs']]}
 
 
 def bind_source_dir(value, source_dir):
@@ -3520,6 +3527,9 @@ class Runner:
                             proof = read(stage / 'variable-oracle.stdout')
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, {**expected, 'variable_inventory': {**expected['variable_inventory'], 'links': proof['cold_links']}})
+                        if case in COLD_COLUMNS_BY_NAME_SCENARIOS:
+                            cold_expected = stage / 'expected-cold.json'
+                            write(cold_expected, cold_columns_by_name(expected, case))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
