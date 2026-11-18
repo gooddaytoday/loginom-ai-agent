@@ -18,6 +18,7 @@ export async function getDashboardTarget(id: string, deps: DashboardDeps) {
   if (!view.generation) throw new Error("DASHBOARD_NOT_CONFIGURED")
   const origin = new URL(view.url).origin
   return prepareDashboard({
+    deferCreatePublicationCheck: true,
     signal: deps.signal,
     readPublication: async binding => {
       const cancelled = Promise.withResolvers<never>()

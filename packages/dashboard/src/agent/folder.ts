@@ -32,6 +32,7 @@ export async function prepareDashboard(input: {
   dashboards: string
   template: string
   readPublication: (binding: typeof Binding.Type) => Promise<typeof PublicationSource.Type | null>
+  deferCreatePublicationCheck?: boolean
   signal?: AbortSignal
   fetch?: typeof fetch
 }) {
@@ -55,7 +56,8 @@ export async function prepareDashboard(input: {
         throw Error("DASHBOARD_BINDING_CONFLICT")
       previous = decoded.value
     }
-    const latest = await input.readPublication(snapshot.binding).catch(error => {
+    const deferred = input.deferCreatePublicationCheck && !snapshot.published
+    const latest = deferred ? null : await input.readPublication(snapshot.binding).catch(error => {
       input.signal?.throwIfAborted()
       if (!existsSync(join(folder, "work/src"))) throw error
       return undefined
@@ -95,9 +97,10 @@ export async function prepareDashboard(input: {
         const current = existsSync(join(control, "binding.json")) ? decodeControl(readFileSync(join(control, "binding.json"), "utf8")) : undefined
         if (current && (Option.isNone(current) || current.value.key !== key || current.value.origin !== input.origin))
           throw Error("DASHBOARD_BINDING_CONFLICT")
-        const base = current && Option.isSome(current) ? current.value.base : undefined
+        const initialBase = deferred ? undefined : (latest?.version ?? null)
+        const base = fresh ? initialBase : current && Option.isSome(current) ? current.value.base : undefined
         const binding: ControlBinding = { snapshotId: snapshot.id, binding: snapshot.binding, nodeName: snapshot.nodeName, origin: input.origin, key,
-          ...(fresh ? { base: latest?.version ?? null } : base !== undefined ? { base } : {}) }
+          ...(base !== undefined ? { base } : {}) }
         writeFileSync(join(control, "binding.json.tmp"), JSON.stringify(binding, null, 2) + "\n", { mode: 0o600 })
         if (existsSync(join(directory, "sample.json"))) unlinkSync(join(directory, "sample.json"))
         renameSync(join(directory, "snapshot.json.tmp"), join(directory, "snapshot.json"))

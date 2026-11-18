@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test"
+import { readDashboardSnapshot, updatePublicationBase } from "@loginom-ai-agent/dashboard/agent/folder"
 import { createHash } from "node:crypto"
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { checkDashboardTarget, getDashboardTarget } from "./dashboard-target"
+import { checkDashboardTarget, getDashboardTarget, type DashboardDeps } from "./dashboard-target"
 
 const id = "3b4aa44a-5c86-4798-aa7e-4f16a59e9c6b"
 const snapshot = {
@@ -19,26 +20,51 @@ const snapshot = {
   parameters: [],
   published: false,
 }
+const editSnapshot = { ...snapshot, published: true }
 
-test("consumes the requested one-time snapshot from the configured stand", async () => {
+test("creates a dashboard from the one-time snapshot without signing in to Studio", async () => {
   const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-"))
   const requests: [unknown, RequestInit | undefined][] = []
+  const studio: string[] = []
+  const refreshed = { ...snapshot, id: crypto.randomUUID(), sample: { ...snapshot.sample, rows: [[43]] } }
+  const snapshotURL = "http://127.0.0.1:32768/dashboard/snapshots/"
+  const deps: DashboardDeps = {
+    settled: async () => { studio.push("settled") },
+    catalog: async () => { studio.push("catalog") },
+    status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
+    dashboards: () => join(root, "dashboards"),
+    readPublication: async () => { studio.push("readPublication"); return null },
+    template: resolve(import.meta.dirname, "../../../dashboard/template"),
+    fetch: async (url, init) => {
+      requests.push([url, init])
+      return Response.json(url === snapshotURL + id ? snapshot : refreshed)
+    },
+  }
   try {
-    const target = await getDashboardTarget(id, {
-      settled: async () => {}, catalog: async () => {},
-      status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
-      dashboards: () => join(root, "dashboards"),
-      readPublication: async () => null,
-      template: resolve(import.meta.dirname, "../../../dashboard/template"),
-      fetch: async (url, init) => {
-        requests.push([url, init])
-        return Response.json(snapshot)
-      },
-    })
-    expect(requests).toEqual([["http://127.0.0.1:32768/dashboard/snapshots/" + id, { redirect: "error", signal: undefined }]])
+    const target = await getDashboardTarget(id, deps)
+    const options = { redirect: "error", signal: undefined }
+    expect(requests).toEqual([[snapshotURL + id, options]])
     expect(target).toMatchObject({ nodeName: snapshot.nodeName, action: "create", fresh: true })
     expect(target.directory.startsWith(join(root, "dashboards") + "/")).toBe(true)
     expect(JSON.parse(await readFile(join(target.directory, "sample.json"), "utf8"))).toEqual(snapshot.sample)
+    expect(studio).toEqual([])
+    expect(target.notice).toBeUndefined()
+    const original = readDashboardSnapshot(target.directory)!
+    expect(original.control).not.toHaveProperty("base")
+
+    const source = join(target.directory, "src/main.tsx")
+    await writeFile(source, "// local edit")
+    const base = { name: "20261115T120000Z.json", sourceHash: "a".repeat(64) }
+    updatePublicationBase(target.directory, original.control, base)
+    expect(await getDashboardTarget(refreshed.id, deps)).toEqual({
+      directory: target.directory, nodeName: snapshot.nodeName, action: "create", fresh: false,
+    })
+    expect(requests).toEqual([[snapshotURL + id, options], [snapshotURL + refreshed.id, options]])
+    expect(studio).toEqual([])
+    expect(await readFile(source, "utf8")).toBe("// local edit")
+    const reopened = readDashboardSnapshot(target.directory)
+    expect(reopened?.sample).toEqual(refreshed.sample)
+    expect(reopened?.control.base).toEqual(base)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -104,7 +130,7 @@ test("pre-chat publication read uses the captured origin, generation and lifecyc
       dashboards: () => join(root, "dashboards"), template: resolve(import.meta.dirname, "../../../dashboard/template"),
       signal: controller.signal,
       readPublication: async (input, signal) => { reads.push([input, signal]); return null },
-      fetch: async (_url, options) => { expect(options?.signal).toBe(controller.signal); return Response.json(snapshot) },
+      fetch: async (_url, options) => { expect(options?.signal).toBe(controller.signal); return Response.json(editSnapshot) },
     })
     expect(reads).toEqual([[{ origin: "http://127.0.0.1:32768", generation: 7, binding: snapshot.binding }, controller.signal]])
   } finally { await rm(root, { recursive: true, force: true }) }
@@ -128,7 +154,7 @@ test("cold dashboard waits for captured generation before private read", async (
     catalog: async generation => { expect(generation).toBe(7); listing.resolve("catalog"); await catalog.promise },
     dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"), signal: controller.signal,
     readPublication: async (input, signal) => { reads.push([input, signal]); return { content, version } },
-    fetch: async url => { requests.push(String(url)); return String(url).includes("/snapshots/") ? Response.json(snapshot) : new Response(null, { status: 404 }) },
+    fetch: async url => { requests.push(String(url)); return String(url).includes("/snapshots/") ? Response.json(editSnapshot) : new Response(null, { status: 404 }) },
   }).then(target => ({ target }), error => ({ error }))
   try {
     expect(await Promise.race([settling.promise, pending])).toBe("settling")
@@ -159,7 +185,7 @@ test("cancelling catalog wait never reads publication or falls back to local sou
       status: async () => ({ url: "http://example.test/app/", generation: 7 }),
       settled: async () => {}, catalog: async () => {},
       dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
-      readPublication: async () => null, fetch: async () => Response.json(snapshot),
+      readPublication: async () => null, fetch: async () => Response.json(editSnapshot),
     }
     const local = existing ? await getDashboardTarget(id, deps) : undefined
     const before = local && await readFile(join(local.directory, "src/main.tsx"))
@@ -190,7 +216,7 @@ test("failed readiness preserves existing sources and base but cannot create a f
     status: async () => ({ url: "http://example.test/app/", generation: 7 }),
     settled: async () => {}, catalog: async () => {},
     dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
-    readPublication: async () => null, fetch: async () => Response.json(snapshot),
+    readPublication: async () => null, fetch: async () => Response.json(editSnapshot),
   }
   const unavailable = { ...deps, catalog: async () => { throw Error("LOGINOM_CONNECTION_NOT_READY") },
     readPublication: async () => { throw Error("must not read an unready generation") },
@@ -218,7 +244,7 @@ test("a connection replacement during readiness never retargets the captured pri
       settled: async () => {},
       catalog: async generation => { expect(generation).toBe(7); view = { url: "http://replacement.test/app/", generation: 8 } },
       dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
-      fetch: async () => Response.json(snapshot),
+      fetch: async () => Response.json(editSnapshot),
       readPublication: async input => {
         reads.push(input)
         if (input.generation !== view.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
