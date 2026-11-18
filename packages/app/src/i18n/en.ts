@@ -25,6 +25,7 @@ export const LOGINOM_ENGLISH = {
     "Could not confirm whether the saved settings were applied. Open Loginom settings to check the status.",
   "loginom.checkedSaved": "Connection verified: the AI server is accessible and Loginom sign-in succeeded.",
   "loginom.refresh": "Refresh settings",
+  "loginom.loadFailed": "Could not load Loginom settings.",
   "loginom.discardTitle": "Close without saving?",
   "loginom.discardDescription": "Your changes will be discarded. Previously saved settings will remain unchanged.",
   "loginom.keepEditing": "Continue editing",
@@ -54,6 +55,8 @@ export const LOGINOM_ENGLISH = {
   "loginom.pending": "Settings will apply after active Loginom tasks and unfinished operation recovery complete.",
   "loginom.runtimeFailed":
     "Loginom is unavailable. Check and save your connection settings again. Other application features remain available.",
+  "loginom.wizardRuntimeFailed":
+    "Could not apply the Loginom connection. Check your connection settings and save them again.",
   "loginom.checked": "Connection verified. Settings have not been saved yet.",
   "loginom.failed": "Could not verify or apply the connection. Check server availability and credentials.",
   "loginom.conflict": "Another window changed these settings. Reload current settings and try again.",

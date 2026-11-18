@@ -103,6 +103,128 @@ test("automation query stays out of saved settings and restored public views", a
   }
 })
 
+test("a profile read failure prevents writes until the saved connection is read again", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-service-"))
+  const codec = credentials("linux")
+  let locked = false
+  let reads = 0
+  const store = connectionStore(directory, {
+    ...codec,
+    decode(value) {
+      reads++
+      if (locked) throw new Error("credential store locked")
+      return codec.decode(value)
+    },
+  })
+  const saved = { ...candidate, generation: 4, revision: 4, password: "saved-password", apiKey: "" }
+  await store.stage(saved)
+  await store.activate(saved.generation)
+  locked = true
+  const ready = Promise.withResolvers<void>()
+  const service = await connectionService(store, {
+    async check() {},
+    async prepare() {
+      return { ready: ready.promise, async close() {} }
+    },
+  })
+  try {
+    await expect(service.api.read()).rejects.toThrow(/^LOGINOM_STORE_READ_FAILED$/)
+    expect(await service.api.status()).toMatchObject({
+      generation: 0,
+      state: "recoverable-error",
+      failure: "LOGINOM_STORE_READ_FAILED",
+    })
+    await expect(service.api.check(candidate)).rejects.toThrow(/^LOGINOM_STORE_READ_FAILED$/)
+    await expect(service.api.save({ revision: 0, validationId: "unused" })).rejects.toThrow(
+      /^LOGINOM_STORE_READ_FAILED$/,
+    )
+    await expect(service.api.cancelPending({ revision: 0 })).rejects.toThrow(/^LOGINOM_STORE_READ_FAILED$/)
+    locked = false
+    const beforeRetry = reads
+    const views = await Promise.all([service.api.read(), service.api.read()])
+    expect(reads).toBe(beforeRetry + 1)
+    expect(views).toEqual([
+      expect.objectContaining({ generation: 4, username: "User", hasPassword: true, state: "starting" }),
+      expect.objectContaining({ generation: 4, username: "User", hasPassword: true, state: "starting" }),
+    ])
+    expect(views.every((view) => view.setupRequired === undefined)).toBe(true)
+    ready.resolve()
+    await ready.promise
+    await service.settled()
+    expect(await service.api.status()).toMatchObject({ generation: 4, state: "ready" })
+    expect(await store.read()).toEqual(saved)
+  } finally {
+    await service.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("all windows still require setup after a first activation fails", async () => {
+  const firstReady = Promise.withResolvers<void>()
+  const f = await fixture({
+    async check() {},
+    async prepare(record) {
+      return { ready: record.generation === 1 ? firstReady.promise : undefined, async close() {} }
+    },
+  })
+  try {
+    await save(f.service)
+    expect(await f.service.api.read()).toMatchObject({ generation: 1, state: "starting", setupRequired: true })
+    firstReady.reject(new Error("catalog unavailable"))
+    await firstReady.promise.catch(() => undefined)
+    expect(await f.service.api.read()).toMatchObject({
+      generation: 1,
+      state: "recoverable-error",
+      failure: "LOGINOM_RUNTIME_START_FAILED",
+      setupRequired: true,
+    })
+    await save(f.service, { ...candidate, revision: 1 })
+    expect(await f.service.api.status()).toMatchObject({ generation: 2, state: "ready" })
+    expect((await f.service.api.status()).setupRequired).toBeUndefined()
+  } finally {
+    await f.close()
+  }
+}, 20_000)
+
+test("first setup waits for write finalization before publishing readiness", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-service-"))
+  const store = connectionStore(directory, credentials("linux"))
+  const cleanupStarted = Promise.withResolvers<void>()
+  const cleanup = Promise.withResolvers<void>()
+  const service = await connectionService(
+    {
+      ...store,
+      async clearPending() {
+        cleanupStarted.resolve()
+        await cleanup.promise
+      },
+    },
+    {
+      async check() {},
+      async prepare() {
+        return { async close() {} }
+      },
+    },
+  )
+  try {
+    const validation = await service.api.check(candidate)
+    await service.api.save({ revision: candidate.revision, validationId: validation.validationId })
+    await cleanupStarted.promise
+    expect(await service.api.read()).toMatchObject({ generation: 1, state: "starting", setupRequired: true })
+    cleanup.reject(new Error("directory fsync failed"))
+    await service.settled()
+    expect(await service.api.status()).toMatchObject({
+      generation: 1,
+      failure: "LOGINOM_STORE_WRITE_FAILED",
+      setupRequired: true,
+    })
+  } finally {
+    cleanup.resolve()
+    await service.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 20_000)
+
 test("two active drains and an ambiguous receipt hold the old generation and gate new work", async () => {
   const f = await fixture()
   try {

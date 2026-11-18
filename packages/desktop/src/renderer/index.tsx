@@ -12,6 +12,7 @@ import {
   PlatformProvider,
   createDraftStore,
   ServerConnection,
+  SettingsLoginom,
   useCommand,
   useWslServers,
   useLanguage,
@@ -24,14 +25,16 @@ import { createEffect, createMemo, createResource, createSignal, onCleanup, Show
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
 import { t } from "./i18n"
-import { initializationData } from "./initialization"
+import { initializationData, initializationReady } from "./initialization"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./webview-zoom"
 import { windowFullscreen } from "./window-fullscreen"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import "./styles.css"
+import { Button } from "@opencode-ai/ui/button"
 import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
+import { Toast } from "@opencode-ai/ui/toast"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -371,6 +374,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
     <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
   )
   const onboarding = Promise.withResolvers<void>()
+  let notifyLoginomSaved: (() => void) | undefined
 
   function Inner() {
     const cmd = useCommand()
@@ -393,8 +397,15 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   function App() {
     const wslServers = useWslServers()
     const language = useLanguage()
+    const [connection, connectionActions] = createResource(() => window.api.loginom.read().catch(() => undefined))
+    const [loginomSaved, setLoginomSaved] = createSignal(false)
     const ready = createMemo(
-      () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading,
+      () =>
+        initializationReady(sidecar) &&
+        !defaultServer.loading &&
+        !locale.loading &&
+        !wslServers.isLoading &&
+        !connection.loading,
     )
     const servers = createMemo(() => {
       const data = initializationData(sidecar)
@@ -419,23 +430,62 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
     )
     return (
       <Show when={ready()} fallback={<LoadingSplash />}>
-        <Show when={effectiveDefaultServer()} keyed>
-          {(key) => (
-            <AppInterface
-              defaultServer={key}
-              servers={servers()}
-              router={router}
-              startup={onboarding.promise}
-              serverScoped={
-                <DesktopFirstLaunchOnboarding
-                  initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
-                  onLoaded={onboarding.resolve}
-                />
-              }
-            >
-              <Inner />
-            </AppInterface>
-          )}
+        <Show
+          when={loginomSaved() || (connection.latest?.generation && !connection.latest.setupRequired)}
+          fallback={
+            <div class="flex h-dvh flex-col bg-background-base">
+              <Show when={platform.os === "windows" || platform.os === "macos"}>
+                <div class="h-10 shrink-0" data-tauri-drag-region aria-hidden="true" />
+              </Show>
+              <main class="flex min-h-0 flex-1 overflow-y-auto p-4">
+                <div class="m-auto w-full max-w-2xl rounded-xl border border-border-base bg-surface-raised-stronger-non-alpha">
+                  <Show
+                    when={connection.latest}
+                    fallback={
+                      <div class="flex flex-col items-center gap-4 p-6">
+                        <p role="alert">{language.t("loginom.loadFailed")}</p>
+                        <Button type="button" onClick={() => void connectionActions.refetch()}>
+                          {language.t("loginom.refresh")}
+                        </Button>
+                      </div>
+                    }
+                  >
+                    <SettingsLoginom
+                      wizard
+                      onSaved={(_view, notify) => {
+                        notifyLoginomSaved = notify
+                        setLoginomSaved(true)
+                      }}
+                    />
+                  </Show>
+                </div>
+              </main>
+              <Toast.Region />
+            </div>
+          }
+        >
+          <Show when={effectiveDefaultServer()} keyed>
+            {(key) => (
+              <AppInterface
+                defaultServer={key}
+                servers={servers()}
+                router={router}
+                startup={onboarding.promise}
+                serverScoped={
+                  <DesktopFirstLaunchOnboarding
+                    initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
+                    onLoaded={() => {
+                      onboarding.resolve()
+                      notifyLoginomSaved?.()
+                      notifyLoginomSaved = undefined
+                    }}
+                  />
+                }
+              >
+                <Inner />
+              </AppInterface>
+            )}
+          </Show>
         </Show>
       </Show>
     )

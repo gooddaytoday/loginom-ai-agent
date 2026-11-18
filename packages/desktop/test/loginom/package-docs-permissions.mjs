@@ -6,6 +6,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, writeFile, rm } from "node:fs/pr
 import { isAbsolute, join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import { pathToFileURL } from "node:url"
+import { allowLocalGuiWithUnconfiguredHost } from "../../../loginom-host/script/skills-acceptance/renderer-connection.mjs"
 // Scripted provider verifies permissions and original file admission, not natural model routing.
 const executable = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
 const resources = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
@@ -180,7 +181,7 @@ try {
       const page = await app.firstWindow()
       const form = page.locator('[data-component="settings-loginom"]')
       await form.waitFor({ timeout: 120000 })
-      await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+      await allowLocalGuiWithUnconfiguredHost(app, page)
       await form.waitFor({ state: "hidden", timeout: 30000 })
       const backend = await page.evaluate(() => window.api.awaitInitialization())
       async function call(path, method = "GET", body) {
@@ -212,9 +213,6 @@ try {
       const [agentResponse] = await Promise.all([agentsReady, page.reload()])
       assert.ok(agentResponse.ok(), "renderer agent catalog must load before submission")
       await agentResponse.finished()
-      await form.waitFor({ timeout: 120000 })
-      await form.locator('[data-component="icon-button"][data-icon="close"]').click()
-      await form.waitFor({ state: "hidden", timeout: 30000 })
       const editor = page.locator('[data-component="prompt-input"][contenteditable="true"]')
       await editor.waitFor({ timeout: 60000 })
       await page.getByText("Test Model", { exact: true }).waitFor({ timeout: 60000 })
