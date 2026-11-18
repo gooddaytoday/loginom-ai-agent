@@ -65,7 +65,7 @@ export function ownState(state) {
     id:'foreign-1', type:'skill', name:'Сводка продаж для маркетинга', when:'Когда готовишь сводку продаж для отдела маркетинга',
     body:'Группируй продажи по каналам привлечения. Показывай долю каждого канала и изменение к прошлому месяцу. Без технических деталей.',
     files:[['SKILL.md','']], origin:'app', status:'on', version:'1.0',
-    publication:{ stage:'review', email:'m.petrova@example.org', receipt:'2026-1118-0040', license:'CC BY 4.0', sent:'Сегодня, 10:12' },
+    publication:{ stage:'review', email:'m.petrova@example.org', receipt:'2026-1118-0040', sent:'Сегодня, 10:12' },
   }];
   return state.own;
 }
@@ -239,7 +239,7 @@ export function renderMine(state) {
       : pub?.stage === 'revoked' ? '<p class="own-reason">'+icon('alert',14)+' Loginom отозвал эту версию: «'+esc(pub.reason)+'». У тех, кто её установил, она выключена.</p>'
         : pub?.stage === 'review' ? '<p class="own-receipt">Квитанция № '+esc(pub.receipt)+' · ответ придёт на '+esc(pub.email)+' и появится здесь</p>'
           : pub?.stage === 'confirm' ? '<p class="own-receipt">Письмо отправлено на '+esc(pub.email)+'. Откройте ссылку в письме — после этого начнётся проверка.</p>'
-            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">У других этот навык не работает, пока агент работает в Loginom; с отметкой «Проверено Loginom» — работает.</p>'
+            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">С отметкой «Сообщество» у других навык работает только в разговорах без Loginom.</p>'
               : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
     const confirm = pub?.stage === 'confirm' ? '<button class="btn quiet" data-own="resend:'+item.id+'">Отправить письмо ещё раз</button><button class="btn quiet" data-own="publish:'+item.id+'">Изменить почту</button><button class="btn quiet" data-own="confirm-mail:'+item.id+'">Только для прототипа: подтвердить</button>' : '';
     const deleting = own.confirmDelete === item.id;
@@ -281,15 +281,18 @@ function renderPublishDialog(state) {
       ? '<li>'+icon('file',14)+' Действие: название, «что делает» и настройки «'+actionBases[item.base].title+'» — '+(item.base === 'document' ? 'форматы и описание документации' : 'на что смотреть и свои правила')+'</li>'
       : '<li>'+icon('file',14)+' Навык: название, «когда применять» и текст — '+lines+' '+plural(lines, 'строка', 'строки', 'строк')+'</li>'+
         item.files.filter(([name, refused]) => !refused && name !== 'SKILL.md').map(([name]) => '<li>'+icon('file',14)+' '+esc(name)+'</li>').join(''))+
-    '<li>'+icon('file',14)+' Описание для каталога и условия использования'+(closed ? '' : '; почта — только проверяющему')+'</li>'+
+    '<li>'+icon('file',14)+' Описание для каталога'+(closed ? '' : '; почта — только проверяющему')+'</li>'+
     '</ul><p>Не уйдут: ваши разговоры, пакеты, файлы проекта и настройки.</p></div>';
   if (dialog.step === 'form') {
     body = '<p class="hub-dialog-lead">'+(closed
       ? 'В закрытом контуре отправить в Loginom нельзя. Сохраните файл и передайте администратору — он добавит '+(item.type === 'action' ? 'действие' : 'навык')+' в каталог вашей организации.'
-      : 'Сотрудник Loginom проверит '+what+' и опубликует его в каталоге с отметкой «Сообщество» или «Проверено Loginom». До этого его видите только вы.'+
-        (item.type === 'skill' ? ' С отметкой «Сообщество» навык у других не работает, пока агент работает в Loginom; с «Проверено Loginom» — работает.' : ''))+'</p>'+
+      : 'Сотрудник Loginom проверит '+what+' и опубликует его в каталоге. До этого его видите только вы.')+'</p>'+
+      (!closed && item.type === 'skill' ? '<div class="own-marks"><h3>Что получат другие</h3><p>После проверки сотрудник поставит одну из отметок:</p><ul>'+
+        '<li><strong>Проверено Loginom</strong> — навык работает у других везде, в том числе когда агент работает в Loginom.</li>'+
+        '<li><strong>Сообщество</strong> — навык работает у других только в разговорах без Loginom.</li></ul>'+
+        '<p>Почему так: в Loginom агент действует под учётной записью пользователя, поэтому там включены только свои навыки и проверенные Loginom.</p></div>' : '')+
       '<label class="sl-field"><span>Описание для каталога</span><textarea data-own-pub="summary" rows="3">'+esc(dialog.summary ?? item.when)+'</textarea></label>'+
-      '<label class="sl-field"><span>Как другим можно пользоваться</span><select data-own-pub="license"><option'+(dialog.license !== 'nd' ? ' selected' : '')+' value="by">Использовать и изменять (CC BY 4.0)</option><option value="nd"'+(dialog.license === 'nd' ? ' selected' : '')+'>Только использовать (CC BY-ND 4.0)</option></select><small>В обоих случаях — с указанием автора.</small></label>'+
+      '<p class="own-rule">'+icon('help',15)+' Другие смогут пользоваться '+(item.type === 'action' ? 'действием' : 'навыком')+' и менять свою копию под себя. Автором в каталоге всегда указаны вы.</p>'+
       (closed ? '' : '<label class="sl-field"><span>Почта для ответа</span><input type="email" data-own-pub="email" value="'+esc(dialog.email || '')+'" placeholder="you@example.org"><small>Пришлём письмо, чтобы подтвердить почту, и ответ после проверки. Пароль не нужен.</small></label>')+
       (dialog.error ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' '+esc(dialog.error)+'</div>' : '');
     actions = '<button class="btn quiet" data-own="dialog-close">Отмена</button><button class="btn primary" data-own="pub-check">Проверить</button>';
@@ -372,7 +375,7 @@ export function renderModeration(state) {
       const checks = mod[item.id] ??= [];
       const all4 = checks.length === reviewChecks.length;
       return '<article class="sl-panel own-review"><div class="sl-panel-head"><h3>'+esc(item.name)+'</h3><span class="hub-type">'+(item.type === 'action' ? 'Действие' : 'Навык')+'</span></div>'+
-        '<p class="own-receipt">Версия '+esc(item.version)+' · '+esc(item.publication.email)+' · квитанция № '+esc(item.publication.receipt)+' · '+esc(item.publication.license)+'</p>'+
+        '<p class="own-receipt">Версия '+esc(item.version)+' · '+esc(item.publication.email)+' · квитанция № '+esc(item.publication.receipt)+'</p>'+
         '<ul class="own-checks"><li class="ok">'+icon('check',15)+' Автоматические проверки пройдены: формат, только текст, нет паролей и данных из файлов</li></ul>'+
         '<p><strong>Описание для каталога:</strong> '+esc(item.publication.summary || item.when)+'</p><details open><summary>Текст '+(item.type === 'action' ? 'действия' : 'навыка')+'</summary><p><strong>'+(item.type === 'action' ? 'Что делает' : 'Когда применять')+':</strong> '+esc(item.when)+'</p><pre class="own-body">'+esc(item.body || (item.params?.custom ?? ''))+'</pre></details>'+
         '<fieldset class="own-review-checks"><legend>Перед отметкой «Проверено Loginom»</legend>'+reviewChecks.map((text, index) => '<label><input type="checkbox" data-mod-check="'+item.id+':'+index+'"'+(checks.includes(index) ? ' checked' : '')+'> '+text+'</label>').join('')+'</fieldset>'+
@@ -537,7 +540,7 @@ function bindScope(root, state, api) {
     if (action === 'publish') {
       const item = itemById(state, value);
       if (!ready(item, true)) return;
-      own.dialog = { id:item.id, step:'form', summary:item.publication?.summary ?? item.when, email:item.publication?.email || own.email || '', license:item.publication?.license === 'CC BY-ND 4.0' ? 'nd' : 'by' };
+      own.dialog = { id:item.id, step:'form', summary:item.publication?.summary ?? item.when, email:item.publication?.email || own.email || '' };
     }
     if (action === 'dialog-close') own.dialog = null;
     if (action === 'pub-back') own.dialog.step = 'form';
@@ -562,7 +565,7 @@ function bindScope(root, state, api) {
       own.email = own.dialog.email;
       // Assumption (on «Что решить»): no account — the app keeps the receipt and asks the service by it.
       const confirmed = (own.confirmedMails ??= []).includes(own.dialog.email);
-      item.publication = { stage:confirmed ? 'review' : 'confirm', email:own.dialog.email, receipt:'2026-1118-00'+(++own.seq), summary:own.dialog.summary, license:own.dialog.license === 'nd' ? 'CC BY-ND 4.0' : 'CC BY 4.0', sent:'Сейчас' };
+      item.publication = { stage:confirmed ? 'review' : 'confirm', email:own.dialog.email, receipt:'2026-1118-00'+(++own.seq), summary:own.dialog.summary, sent:'Сейчас' };
       own.dialog.step = confirmed ? 'sent' : 'confirm';
       return api.render();
     }
