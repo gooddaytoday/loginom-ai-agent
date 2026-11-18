@@ -412,3 +412,60 @@ test('tree-to-table read expects native composite names Root_<path> in leaf orde
   await assert.rejects(read(schema),/field names or order differ/);
  assert.equal((await read([col('batch'),col('code'),col('qty','integer')],{...configuration,composite_names:false})).verified,true);
 });
+// LAB-1830: an existing JSON-to-tree node configured outside this session is rerun with parameters:{}.
+function existingJsonPreflight(columns,parameters={},implementation=null){
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'},target={document_id:'doc',workflow_id:'wf',node_id:'tree'};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'existing',type:'trees.from_json',ref:target},parameters,inputs:[],finish:'execute'};
+ const port={port:0,port_guid:'port',fresh:true,sample_complete:true,execution_id:'exec',row_count:1,schema:columns.map(([name,type])=>({name,type})),
+  sample:[columns.map(([,,value])=>({is_null:value===null,value}))]};
+ const history=[{cleanup_confirmed:true,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node:source,cleanup_complete:true,
+  execution:{status:'completed',execution_id:'exec'},output:{ports:[port]}}}}];
+ const graph={nodes:[{ref:source},{ref:target}],links:[{source:'source',target:'tree',input:0,output:0}]};
+ const nodeApply={request:structuredClone(request)};
+ const operation={id:'op',parameters:request,nodeApply,nodeTargetAdapter:{observe:async()=>graph}};
+ const options={operation,execute:async()=>({verified:true,ports:[{index:0,active:true,port_guid:'port'}]}),nodeHistory:()=>history,now:Date.now,onRecord:async event=>event};
+ const ctx={deadline:Date.now()+10000};
+ const result=implementation?implementation.preflight(options,ctx)
+  :createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:true}).nodeApplyDriverFactory(options).beforeTarget(ctx);
+ return result.then(result=>({result,request:nodeApply.request}));
+}
+function jsonImplementation(){
+ const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
+ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+ return vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
+  createTabularTransformNodeSupport:(_config,implementation)=>implementation,makeNodeOutputContextCode:()=>'code',
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,validateTreeJsonScope,treeConfigurationReadback,
+  need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
+  one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,
+ })({}, {json:true});
+}
+function jsonConfigure(implementation,native,p,request){
+ const state={prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'json_tree',root_tid:'W'},
+  node_tree:{verified:true,inventory_complete:true,json_field:native,auto_structure:true,strict:true,exclude_root:false,root_mode:'auto'},
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
+ const channel={observe:async()=>structuredClone(state),perform:async()=>{state.wizard.stage='done';}};
+ return implementation.configure(channel,p,{request});
+}
+const doc='{"items":[{"sku":"A"}]}',columns=[['Name','string','note'],['Document','string',doc],['Count','integer',1]];
+test('existing JSON tree without json_field binds the native field to the JSON input columns',async()=>{
+ assert.equal((await existingJsonPreflight(columns)).result.verified,true);
+ for(const [native,error] of [['Document',null],['Name',/field «Name» is not a supported JSON input field; pass parameters\.json_field \(string input fields: Name, Document\)/],
+  ['',/pass parameters\.json_field \(string input fields: Name, Document\)/]]){
+  const implementation=jsonImplementation(),{result,request}=await existingJsonPreflight(columns,{},implementation);
+  assert.equal(result.verified,true);
+  if(error)await assert.rejects(jsonConfigure(implementation,native,{},request),error);
+  else assert.equal((await jsonConfigure(implementation,native,{},request)).verified,true);
+ }
+});
+test('existing JSON tree without a JSON input column refuses before mutation with the json_field hint',async()=>{
+ await assert.rejects(existingJsonPreflight([['Name','string','note'],['Document','string',null]]),
+  /no input string field holds one supported JSON document; pass parameters\.json_field \(string input fields: Name, Document\)/);
+ await assert.rejects(existingJsonPreflight([['Count','integer',1]]),/pass parameters\.json_field \(string input fields: none\)/);
+});
+test('existing JSON tree with explicit json_field keeps the exact-field preflight',async()=>{
+ const implementation=jsonImplementation(),{result,request}=await existingJsonPreflight([['Name','string','note'],['Document','string',doc]],{json_field:'Document'},implementation);
+ assert.equal(result.verified,true);
+ await assert.rejects(existingJsonPreflight([['Name','string',doc]],{json_field:'Document'}),/one non-NULL JSON string row in the exact input field/);
+ assert.equal((await jsonConfigure(implementation,'Document',{json_field:'Document'},request)).verified,true);
+});
