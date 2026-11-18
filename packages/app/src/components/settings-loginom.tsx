@@ -4,16 +4,36 @@ import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import type { Loginom } from "@opencode-ai/schema/loginom"
 import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
 import { dismissToast, showToast } from "@/utils/toast"
 import { createLoginomSettings, loginomBrowserMessage, watchLoginomApplication } from "./settings-loginom-state"
 
-export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => void; wizard?: boolean }) {
+export function SettingsLoginom(
+  props: { wizard: true; onSaved: (view: Loginom.View, notify?: () => void) => void } | { wizard?: false },
+) {
   const platform = usePlatform()
   const language = useLanguage()
   const dialog = useDialog()
+  let wizardFinished = false
   const form = createLoginomSettings(platform.loginom, (view) => {
+    if (props.wizard) {
+      finishWizard(view, () => notifySaved(view))
+      return
+    }
+    notifySaved(view)
+    dialog.close()
+  })
+
+  function finishWizard(view = form.state.view, notify?: () => void) {
+    if (!props.wizard || wizardFinished || form.busy() || view?.state !== "ready" || !view.generation || view.failure)
+      return
+    wizardFinished = true
+    props.onSaved(view, notify)
+  }
+
+  function notifySaved(view: Loginom.View) {
     const pending = view.state === "pending"
     const warning = view.browser?.state === "failed"
     const toast = showToast({
@@ -43,22 +63,20 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
         })
       })
     }
-    if (props.onSaved) props.onSaved()
-    else dialog.close()
-  })
-  const close = () => {
-    if (props.onLater) {
-      if (form.requestClose()) props.onLater()
-      return
-    }
-    dialog.close()
   }
+
+  async function load() {
+    await form.load()
+    finishWizard()
+  }
+
   onMount(() => {
-    void form.load()
-    const unguard = dialog.guardClose(form.requestClose)
-    const timer = setInterval(() => void form.refresh(), 1000)
+    void load()
+    const unguard = props.wizard ? undefined : dialog.guardClose(form.requestClose)
+    const timer = setInterval(() => void form.refresh().then(() => finishWizard()), 1000)
     onCleanup(() => {
-      unguard()
+      wizardFinished = true
+      unguard?.()
       clearInterval(timer)
     })
   })
@@ -67,14 +85,16 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
     <section class="flex flex-col gap-5 p-6 max-w-2xl mx-auto w-full" data-component="settings-loginom">
       <div class="loginom-heading">
         <h2 class="text-18-medium">{props.wizard ? language.t("loginom.welcome") : "Loginom"}</h2>
-        <IconButton
-          type="button"
-          icon="close"
-          variant="ghost"
-          aria-label={language.t("common.close")}
-          disabled={form.busy()}
-          onClick={close}
-        />
+        <Show when={!props.wizard}>
+          <IconButton
+            type="button"
+            icon="close"
+            variant="ghost"
+            aria-label={language.t("common.close")}
+            disabled={form.busy()}
+            onClick={dialog.close}
+          />
+        </Show>
       </div>
       <Show
         when={form.state.confirmClose}
@@ -161,14 +181,9 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                       data-failed={form.state.failed ? "true" : "false"}
                       role={form.state.failed ? "alert" : "status"}
                     >
-                      {language.t(message())}
-                      <Show when={message() === "loginom.conflict"}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={form.busy()}
-                          onClick={() => void form.load()}
-                        >
+                      {language.t(form.state.baseline ? message() : "loginom.loadFailed")}
+                      <Show when={!form.state.baseline || message() === "loginom.conflict"}>
+                        <Button type="button" variant="secondary" disabled={form.busy()} onClick={() => void load()}>
                           {language.t("loginom.refresh")}
                         </Button>
                       </Show>
@@ -202,9 +217,11 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                       {language.t("loginom.cancel")}
                     </Button>
                   </Show>
-                  <Button type="button" variant="ghost" disabled={form.busy()} onClick={close}>
-                    {language.t("common.close")}
-                  </Button>
+                  <Show when={!props.wizard}>
+                    <Button type="button" variant="ghost" disabled={form.busy()} onClick={dialog.close}>
+                      {language.t("common.close")}
+                    </Button>
+                  </Show>
                 </div>
               </form>
             </Show>
@@ -223,7 +240,7 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
               variant="secondary"
               onClick={() => {
                 form.discard()
-                close()
+                dialog.close()
               }}
             >
               {language.t("loginom.discardClose")}
