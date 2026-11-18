@@ -1,7 +1,7 @@
 // Iteration 6: create and publish your own skills and actions (В-34…В-40).
 // A skill is text only (В-37). Own skills live in the app; publishing sends one for review (В-38).
-// Origin decides whether a skill works while the agent works in Loginom (В-36): written in the app or drafted from
-// your conversation — yes; brought from a file — no, even after editing.
+// Every skill works while the agent works in Loginom (В-36, В-41). One from a file stays «из файла» even after
+// editing: it is switched on only after the user agrees that Loginom did not check it.
 import { icon } from './icons.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]);
@@ -9,7 +9,7 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&
 const origins = {
   app: { label:'Создан вами', loginom:true },
   chat: { label:'Из вашего разговора', loginom:true },
-  file: { label:'Из файла', loginom:false },
+  file: { label:'Из файла', loginom:true, unverified:true },
 };
 // One set of words for the app and the moderation console; an action («действие») takes the neuter forms.
 const pubWords = {
@@ -112,10 +112,10 @@ function canCannot(state, item) {
     return [[`Запускать «${base.title}» с вашими настройками`],
       ['Добавлять шаги или права сверх встроенного действия', 'Менять пакет']];
   }
-  const inLoginom = origins[item.origin].loginom;
+  // В-41: every skill works in Loginom too; one from a file only after the user agrees Loginom did not check it.
   return [
-    ['Подсказывать агенту, как делать задачу, в разговоре', ...(inLoginom ? ['Работать и тогда, когда агент работает в Loginom, если администратор не запретил свои навыки'] : [])],
-    [...(inLoginom ? [] : ['Работать, пока агент работает в Loginom: навык из файла в это время выключен']), 'Запускать программы — в навыке только текст', 'Давать агенту новые права'],
+    ['Подсказывать агенту, как делать задачу, в том числе когда агент работает в Loginom'],
+    ['Запускать программы — в навыке только текст', 'Давать агенту новые права'],
   ];
 }
 function permsBlock(state, item) {
@@ -129,7 +129,7 @@ function statusLine(item) {
   const own = item.status === 'draft' ? 'Черновик' : item.status === 'on' ? (action ? 'Включено' : 'Включён') : (action ? 'Выключено' : 'Выключен');
   const pub = pubLabel(item);
   return '<span class="own-status own-'+item.status+'">'+own+'</span>'+
-    (item.type === 'skill' && item.origin === 'file' && item.status !== 'draft' ? '<span class="own-pub own-pub-returned">Не работает в Loginom</span>' : '')+
+    (item.type === 'skill' && item.origin === 'file' ? '<span class="own-pub own-pub-review">Не проверен Loginom</span>' : '')+
     (pub ? '<span class="own-pub own-pub-'+item.publication.stage+'">'+esc(pub)+'</span>' : '');
 }
 function newItem(state, type, fields) {
@@ -167,13 +167,14 @@ function renderSkillEditor(state, edit) {
     '<div class="hub-demo"><span>Только для прототипа</span><div><button class="btn" data-own="sample:zip">Навык от коллеги (ZIP)</button><button class="btn" data-own="sample:md">SKILL.md</button></div></div></section>';
   const ready = saved || edit.method === 'app' || edit.fromSession || edit.fromFile;
   const intro = edit.fromSession ? '<div class="sl-note">'+icon('help',16)+' Агент составил черновик по разговору «'+esc(edit.fromSession)+'». Прочитайте его целиком: в разговор мог попасть чужой текст или данные из ваших файлов.</div>'
-    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла: пока агент работает в Loginom, он выключен. Правка этого не меняет — навык остаётся «из файла». Опубликовать его нельзя.</div>' : '';
+    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла Loginom не проверял: прочитайте его перед включением. Правка этого не меняет — навык остаётся «из файла». Опубликовать его нельзя.</div>' : '';
   const files = item.files.length ? '<div class="own-files"><h3>Файлы навыка</h3><ul>'+item.files.map(([name, refused]) => '<li class="'+(refused ? 'refused' : '')+'">'+icon(refused ? 'close' : 'file',15)+' <span>'+esc(name)+(refused ? ' — <em>не принят: '+esc(refused)+'</em>' : '')+'</span></li>').join('')+'</ul></div>' : '';
   const form = ready ? '<section class="sl-panel"><form class="sl-form" data-own-form>'+intro+
     '<label class="sl-field"><span>Название</span><input name="name" maxlength="80" value="'+esc(item.name)+'" placeholder="Например, Правила оформления сценариев" required></label>'+
     '<label class="sl-field"><span>Когда агент его применяет</span><input name="when" maxlength="200" value="'+esc(item.when)+'" placeholder="Например, когда собираешь или проверяешь сценарий Loginom"><small>Агент читает эту строку и сам решает, нужен ли навык в разговоре.</small></label>'+
     '<label class="sl-field"><span>Что делать</span><textarea name="body" rows="9" placeholder="Правила, порядок действий, термины — обычным текстом">'+esc(item.body)+'</textarea></label>'+
     files+
+    (item.origin === 'file' ? '<label class="own-consent"><input type="checkbox" data-own-ack'+(item.ack ? ' checked' : '')+'> Понимаю, что Loginom этот навык не проверял, и сам проверю результат</label>' : '')+
     leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие.')+
     '<div class="sl-actions"><button type="submit" class="btn">'+(saved ? 'Сохранить' : 'Сохранить черновик')+'</button>'+
     '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
@@ -239,7 +240,7 @@ export function renderMine(state) {
       : pub?.stage === 'revoked' ? '<p class="own-reason">'+icon('alert',14)+' Loginom отозвал эту версию: «'+esc(pub.reason)+'». У тех, кто её установил, она выключена.</p>'
         : pub?.stage === 'review' ? '<p class="own-receipt">Квитанция № '+esc(pub.receipt)+' · ответ придёт на '+esc(pub.email)+' и появится здесь</p>'
           : pub?.stage === 'confirm' ? '<p class="own-receipt">Письмо отправлено на '+esc(pub.email)+'. Откройте ссылку в письме — после этого начнётся проверка.</p>'
-            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">С отметкой «Сообщество» у других навык работает только в разговорах без Loginom.</p>'
+            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">С отметкой «Сообщество» другие ставят навык, подтвердив, что Loginom его не проверял; в закрытом контуре он недоступен.</p>'
               : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
     const confirm = pub?.stage === 'confirm' ? '<button class="btn quiet" data-own="resend:'+item.id+'">Отправить письмо ещё раз</button><button class="btn quiet" data-own="publish:'+item.id+'">Изменить почту</button><button class="btn quiet" data-own="confirm-mail:'+item.id+'">Только для прототипа: подтвердить</button>' : '';
     const deleting = own.confirmDelete === item.id;
@@ -259,7 +260,7 @@ export function renderMine(state) {
           : '<button class="btn quiet" data-own="delete:'+item.id+'">Удалить</button>')+
         (item.status === 'draft' && item.origin !== 'file' ? '<small class="own-hint">Включите, чтобы опубликовать</small>' : '')+
       '</div></article>';
-  }).join('')+'</div><p class="own-note">'+icon('help',15)+' Свой навык, сохранённый в файл, у коллеги станет навыком «из файла»: пока агент работает в Loginom, он у коллеги выключен.</p>'+renderPublishDialog(state)+'</div>';
+  }).join('')+'</div><p class="own-note">'+icon('help',15)+' Свой навык, сохранённый в файл, у коллеги станет навыком «из файла»: перед включением коллега подтвердит, что Loginom его не проверял.</p>'+renderPublishDialog(state)+'</div>';
 }
 
 function renderPublishDialog(state) {
@@ -288,9 +289,9 @@ function renderPublishDialog(state) {
       ? 'В закрытом контуре отправить в Loginom нельзя. Сохраните файл и передайте администратору — он добавит '+(item.type === 'action' ? 'действие' : 'навык')+' в каталог вашей организации.'
       : 'Сотрудник Loginom проверит '+what+' и опубликует его в каталоге. До этого его видите только вы.')+'</p>'+
       (!closed && item.type === 'skill' ? '<div class="own-marks"><h3>Что получат другие</h3><p>После проверки сотрудник поставит одну из отметок:</p><ul>'+
-        '<li><strong>Проверено Loginom</strong> — навык работает у других везде, в том числе когда агент работает в Loginom.</li>'+
-        '<li><strong>Сообщество</strong> — навык работает у других только в разговорах без Loginom.</li></ul>'+
-        '<p>Почему так: в Loginom агент действует под учётной записью пользователя, поэтому там включены только свои навыки и проверенные Loginom.</p></div>' : '')+
+        '<li><strong>Проверено Loginom</strong> — другие ставят навык без дополнительных вопросов; он доступен и организациям в закрытом контуре.</li>'+
+        '<li><strong>Сообщество</strong> — перед установкой человек подтверждает, что Loginom навык не проверял и он сам проверит результат; в закрытом контуре такие навыки недоступны.</li></ul>'+
+        '<p>С любой отметкой навык работает у других и тогда, когда агент работает в Loginom.</p></div>' : '')+
       '<label class="sl-field"><span>Описание для каталога</span><textarea data-own-pub="summary" rows="3">'+esc(dialog.summary ?? item.when)+'</textarea></label>'+
       '<p class="own-rule">'+icon('help',15)+' Другие смогут пользоваться '+(item.type === 'action' ? 'действием' : 'навыком')+' и менять свою копию под себя. Автором в каталоге всегда указаны вы.</p>'+
       (closed ? '' : '<label class="sl-field"><span>Почта для ответа</span><input type="email" data-own-pub="email" value="'+esc(dialog.email || '')+'" placeholder="you@example.org"><small>Пришлём письмо, чтобы подтвердить почту, и ответ после проверки. Пароль не нужен.</small></label>')+
@@ -340,14 +341,12 @@ export function ownActionsGroup(state) {
 export function trialBanner(state) {
   const trial = state.trialSkill;
   if (!trial) return '';
-  return '<div class="edit-banner own-trial own-scope">'+icon('book',15)+'<span>Проба навыка «'+esc(trial.name)+'» — '+(trial.status === 'draft' ? 'черновик включён только в этом разговоре' : trial.status === 'off' ? 'навык выключен, в этом разговоре включён для пробы' : 'агент применит его в этом разговоре')+(trial.origin === 'file' ? '; пока агент работает в Loginom, навык из файла выключен' : '')+'</span><button type="button" class="small-icon" data-own="trial-cancel" aria-label="Отменить пробу">'+icon('close',13)+'</button></div>';
+  return '<div class="edit-banner own-trial own-scope">'+icon('book',15)+'<span>Проба навыка «'+esc(trial.name)+'» — '+(trial.status === 'draft' ? 'черновик включён только в этом разговоре' : trial.status === 'off' ? 'навык выключен, в этом разговоре включён для пробы' : 'агент применит его в этом разговоре')+'</span><button type="button" class="small-icon" data-own="trial-cancel" aria-label="Отменить пробу">'+icon('close',13)+'</button></div>';
 }
 export function trialResult(item) {
   const trial = item.trial || {};
   const back = '<div class="button-row own-scope"><button class="btn" data-own="edit:'+esc(trial.id)+'">'+icon('book',15)+' Вернуться к навыку</button></div>';
   const draftNote = trial.status === 'draft' ? '<p class="muted">Это проба: навык-черновик включён только в этом разговоре.</p>' : '';
-  if (trial.origin === 'file') return '<div class="answer-block"><h2>Описание для руководителя</h2><p>Написал по навыку «'+esc(trial.name)+'»: сценарий продаж каждое утро собирает выручку по городам и показывает, где продажи падают. Источник — выгрузка из учётной системы; отчётом пользуется коммерческий отдел.</p>'+
-    '<p class="muted">Здесь агент не работал в Loginom, поэтому навык из файла работал. Если агент начнёт работать в Loginom, этот навык выключится (В-36).</p>'+draftNote+back+'</div>';
   if (!trial.rules) return '<div class="answer-block"><h2>Ответил по навыку «'+esc(trial.name)+'»</h2><p>В прототипе ответ условный: в приложении агент выполнит задачу по тексту навыка и покажет в ленте шаг «Применил навык».</p>'+draftNote+back+'</div>';
   return '<div class="answer-block"><h2>По правилам навыка — 3 расхождения</h2><p>Проверил «Продажи.lgp» по навыку «'+esc(trial.name)+'». Пакет не менял.</p>'+
     '<ol class="findings"><li><strong>«Узел14»</strong> назван не по смыслу — например, «Выручка по городам».</li><li><strong>Нет проверки пустых значений</strong> перед расчётом выручки.</li><li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает.</li></ol>'+
@@ -417,6 +416,7 @@ function bindScope(root, state, api) {
   };
   root.addEventListener('input', (event) => {
     const target = event.target;
+    if (target.matches('[data-own-ack]')) { item0().ack = target.checked; return; }
     if (target.closest('[data-own-form]')) {
       readForm();
       if (target.name === 'base') { item0().params = defaultParams(item0().base); api.render(); }
@@ -585,7 +585,7 @@ function bindScope(root, state, api) {
     if (action === 'export') {
       const item = itemById(state, value);
       download(item.name.replace(/[\\/:*?"<>|]/g, '') + (item.type === 'action' ? '.loginom-action' : '.loginom-skill'), item);
-      api.toast(item.type === 'action' ? 'Файл действия сохранён' : 'Файл сохранён. У коллеги навык будет «из файла»: пока агент работает в Loginom, он выключен');
+      api.toast(item.type === 'action' ? 'Файл действия сохранён' : 'Файл сохранён. У коллеги навык будет «из файла»: перед включением он подтвердит, что Loginom его не проверял');
       return;
     }
     if (action === 'delete') own.confirmDelete = value;
@@ -603,15 +603,16 @@ function bindScope(root, state, api) {
 function ready(item, needWhen = false) {
   if (!item.name.trim()) return warn('Укажите название');
   if (needWhen && item.type === 'skill' && !item.when.trim()) return warn('Заполните «Когда агент его применяет» — по этой строке агент решает, нужен ли навык');
+  if (needWhen && item.origin === 'file' && !item.ack) return warn('Отметьте, что понимаете: Loginom этот навык не проверял');
   return true;
   function warn(text) { toastHook?.(text, 'alert'); return false; }
 }
 let toastHook = null;
-// The trial task depends on the skill: rules are checked on a package; a skill from a file is tried without Loginom.
+// The trial task depends on the skill: rules are checked on a package; other skills get a task in their name.
 function trialOf(item) {
   const rules = /Узлы называй/.test(item.body);
-  const prompt = item.origin === 'file' ? 'Напиши для руководителя, что даёт сценарий продаж' : rules ? 'Проверь «Продажи.lgp» по правилам навыка' : 'Сделай задачу по навыку «'+item.name+'» для «Продажи.lgp»';
-  return { id:item.id, name:item.name, origin:item.origin, status:item.status, rules, prompt, kind:item.origin === 'file' ? 'skilltrialfile' : 'skilltrial' };
+  const prompt = rules ? 'Проверь «Продажи.lgp» по правилам навыка' : 'Сделай задачу по навыку «'+item.name+'» для «Продажи.lgp»';
+  return { id:item.id, name:item.name, origin:item.origin, status:item.status, rules, prompt, kind:'skilltrial' };
 }
 // The agent drafts a skill from the conversation. The prototype has one scripted draft per kind of task.
 const drafts = {
