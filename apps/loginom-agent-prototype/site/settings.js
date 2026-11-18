@@ -289,7 +289,7 @@ function diagnosticsTab(state, s) {
   const reason = loginomBlocked(state, s, s.connection.url)
   const rows = [
     ["Loginom", esc(s.connection.url || "Адрес не задан"), s.connection.connected ? ["Подключён", "good"] : [reason ? "Не используется в этом режиме" : "Не подключён", "error"], "loginom"],
-    ["Модель", s.model ? esc(s.model.name + " · " + s.model.where) : "Модели нет", s.model ? (ran ? ["Отвечает", "good"] : ["Не проверена", "neutral"]) : ["Нужна модель", "error"], "models"],
+    ["Модель", s.model ? esc(s.model.name + " · " + s.model.where) : "Модели нет", s.model ? (ran ? ["Отвечает", "good"] : ["Ещё не проверялась", "neutral"]) : ["Нужна модель", "error"], "models"],
     ["Документация Loginom", "Встроена в приложение", ["Работает", "good"]],
     ["Каталог", mode === "online" ? "Loginom Hub" : state.policy === "set" ? adminPolicy.catalog : "Из файла", ["Работает", "good"]],
     ["Политика администратора", state.policy ? esc(policyPath) : "Нет — настройки задаёте вы", state.policy === "broken" ? ["Ошибка в строке 7", "error"] : state.policy ? ["Применена", "good"] : ["Нет", "neutral"]],
@@ -406,9 +406,9 @@ function foundModels(url) {
   return isLocalUrl(url) ? ["qwen3:32b", "gemma3:27b"] : ["Qwen 3 32B", "Llama 3.3 70B"]
 }
 // Every change of the model in use is announced: data may now go elsewhere.
-function announceModel(api, before, s) {
-  if (before === (s.model?.name ?? "")) return
-  api.toast(s.model ? "Модель по умолчанию теперь «" + s.model.name + "»" : "В этом режиме нет доступной модели — добавьте свою в «Моделях»", s.model ? undefined : "alert")
+function announceModel(api, before, s, extra = "") {
+  if (before === (s.model?.name ?? "")) return extra && api.toast(extra, "alert")
+  api.toast((s.model ? "Модель по умолчанию теперь «" + s.model.name + "»." : "В этом режиме нет доступной модели — добавьте свою в «Моделях».") + (extra ? " " + extra : ""), s.model && !extra ? undefined : "alert")
 }
 function downloadReport(state, s, api) {
   const mode = closedMode(state, s)
@@ -524,7 +524,8 @@ export function bindSettings(root, state, api) {
       const before = s.model?.name ?? ""
       api.setContour(value)
       ensureSettings(state)
-      announceModel(api, before, s)
+      // The public stand is not used in a closed contour: say so, or the Loginom chip turns orange without a reason.
+      announceModel(api, before, s, s.connection.connected && loginomBlocked(state, s, s.connection.url) ? "Публичный стенд Loginom здесь недоступен — укажите сервер организации в «Loginom»." : "")
       api.render()
       return
     }

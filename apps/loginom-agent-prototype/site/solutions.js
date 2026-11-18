@@ -266,7 +266,7 @@ function renderResult(key, run) {
   const findings = ok && key !== 'document';
   return `<section class="sl-result sl-tone-${tone}" role="status">
       <header><span class="sl-result-icon">${icon(glyph,20)}</span><div><h2>${title}</h2><p>${escape(outcomeText(key, run))}</p></div></header>
-      ${ok ? files.map(([file, place]) => `<div class="sl-file">${icon('file',20)}<span><strong>${escape(file)}</strong><small>${place}</small></span><button type="button" class="btn primary" data-sl-action="open-file">Открыть</button></div>`).join('') : ''}
+      ${ok ? files.map(([file, place]) => `<div class="sl-file">${icon('file',20)}<span><strong>${escape(file)}</strong><small>${place}</small><small>В демо файл не создаётся; в приложении «Открыть» покажет его в программе по умолчанию.</small></span><button type="button" class="btn primary" data-sl-action="open-file">Открыть</button></div>`).join('') : ''}
       <div class="sl-checks-row"><span class="sl-checks-title">Проверено приложением:</span>${checks.map(([cls,text]) => `<span class="sl-check sl-check-${cls}">${cls === 'ok' ? '✓' : '!'} ${escape(text)}</span>`).join('')}</div>
     </section>
     ${findings ? `<section class="sl-panel sl-findings"><h2>${key === 'regression' ? 'Проверки' : key === 'tournament' ? 'Сравнение' : key === 'migration' ? 'Соответствие SQL и узлов' : 'Что нашёл агент'}</h2>

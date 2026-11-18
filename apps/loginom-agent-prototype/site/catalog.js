@@ -150,7 +150,7 @@ export const catalog = [
     version: '1.0.0', tier: 'official', offline: false, size: '64 КБ',
     keywords: 'обогащение внешний сервис api',
     description: 'Дополняет записи данными из внешнего сервиса по API.',
-    evidence: null, can: ['Отправлять выбранные поля во внешний сервис Example Data'], cannot: [],
+    evidence: null, can: ['Отправлять выбранные поля таблицы во внешний сервис Example Data (api.example-data.example) — какие поля, вы выберете при каждом запуске'], cannot: [],
   },
 ]
 

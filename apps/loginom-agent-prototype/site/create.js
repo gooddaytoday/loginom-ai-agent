@@ -192,7 +192,7 @@ function renderSkillEditor(state, edit) {
     (saved ? '' : '<div class="sl-switch" aria-label="Способ создания">'+[['chat','Из разговора'],['app','С нуля'],['file','Из файла']].map(([id, title]) => '<button type="button" class="sl-chip'+(edit.method === id ? ' is-active' : '')+'" data-own="method:'+id+'" aria-pressed="'+(edit.method === id)+'">'+title+'</button>').join('')+'</div>')+
     '<div class="sl-grid">'+(source || form)+
     '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2>'+statusLine(item, blockedFile(state, item))+'</div><h3>'+esc(item.name || 'Название навыка')+'</h3><p>'+esc(item.when || 'Когда агент его применяет')+'</p>'+permsBlock(state, item)+
-    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved ? '<p class="own-note">'+icon('help',15)+' Включите навык, чтобы опубликовать его.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
+    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved ? '<p class="own-note">'+icon('help',15)+' Включённый навык работает только у вас. Опубликовать его для всех можно потом, отдельной кнопкой.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
 }
 
 function leaksBlock(leaks, hint) {

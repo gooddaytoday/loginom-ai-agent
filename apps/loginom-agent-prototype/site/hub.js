@@ -284,7 +284,7 @@ function detailDialog(hub, online, current) {
   const blocked = blockedByPolicy(item, online);
   const tier = tiers[item.tier];
   const needsAck = item.tier === 'community' && !installed;
-  const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+(item.product ? ' · '+item.product : '')+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
+  const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
     '<section class="hub-section"><h3>Как этим пользоваться</h3><p>'+kinds[item.kind].how+'</p></section>'+
     '<section class="hub-section"><h3>Кто подготовил</h3><div class="hub-trust">'+tierBadge(item,'lg')+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div><p>'+tier.explain+'</p></section>'+
     '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item,true)+'</p></section>'+
