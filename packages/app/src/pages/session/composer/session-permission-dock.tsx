@@ -17,8 +17,10 @@ export function SessionPermissionDock(props: {
     const value = props.request.metadata.dashboardConflict
     if (!value || typeof value !== "object" || !("latest" in value)) return
     const latest = value.latest
-    if (latest && typeof latest === "object" && "name" in latest && typeof latest.name === "string") return latest.name
+    if (latest && typeof latest === "object" && "name" in latest && typeof latest.name === "string")
+      return { latest: latest.name, newDraft: "base" in value && value.base === null }
   }
+  const newDraftConflict = () => conflict()?.newDraft
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.permission}.description`
@@ -43,7 +45,7 @@ export function SessionPermissionDock(props: {
           <div />
           <div data-slot="permission-footer-actions">
             <Button variant="ghost" size="normal" onClick={() => props.onDecide("reject")} disabled={props.responding}>
-              {language.t("ui.permission.deny")}
+              {language.t(newDraftConflict() ? "dashboard.conflict.cancel" : "ui.permission.deny")}
             </Button>
             <Show when={props.request.always.length > 0}>
               <Button
@@ -56,7 +58,7 @@ export function SessionPermissionDock(props: {
               </Button>
             </Show>
             <Button variant="primary" size="normal" onClick={() => props.onDecide("once")} disabled={props.responding}>
-              {language.t("ui.permission.allowOnce")}
+              {language.t(newDraftConflict() ? "dashboard.conflict.publishMine" : "ui.permission.allowOnce")}
             </Button>
           </div>
         </>
@@ -70,9 +72,11 @@ export function SessionPermissionDock(props: {
       </Show>
 
       <Show when={conflict()}>
-        {(latest) => <div data-slot="permission-row" role="alert">
+        {(version) => <div data-slot="permission-row" role="alert">
           <span data-slot="permission-spacer" aria-hidden="true" />
-          <div data-slot="permission-hint">{language.t("dashboard.conflict", { latest: latest() })}</div>
+          <div data-slot="permission-hint">
+            {language.t(version().newDraft ? "dashboard.conflict.newDraft" : "dashboard.conflict", { latest: version().latest })}
+          </div>
         </div>}
       </Show>
 

@@ -44,13 +44,30 @@ test("conflict is readable before a decision, keeps node/package, and offers no 
     expect(host.textContent).toContain("Заказы")
     expect(host.textContent).toContain("/fixture/orders.lgp")
     expect(decisions).toEqual([])
-    setState("request", { ...request, metadata: { dashboardConflict: { base: null, latest: { name: "20261114T120000Z.json", sourceHash: "c".repeat(64) } } } })
+    const newDraft: PermissionRequest = {
+      ...request,
+      id: "new-draft",
+      metadata: { dashboardConflict: { base: null, latest: { name: "20261114T120000Z.json", sourceHash: "c".repeat(64) } } },
+    }
+    setState("request", newDraft)
+    expect(host.textContent).toContain("Для этого узла уже сохранили Dashboard. Если вы опубликуете свой черновик, после успешной сборки пользователи увидят вашу версию. Опубликовать?")
     expect(host.textContent).toContain("20261114T120000Z.json")
     expect(host.textContent).not.toContain("20261114T110000Z.json")
-    const buttons = [...host.querySelectorAll("button")]
-    expect(buttons).toHaveLength(2)
-    buttons.find(button => button.textContent === translate("ui.permission.deny"))!.click()
+    expect(host.textContent).toContain("Заказы")
+    expect(host.textContent).toContain("/fixture/orders.lgp")
+    expect(decisions).toEqual([])
+    const buttons = () => [...host.querySelectorAll("button")]
+    expect(buttons().map(button => button.textContent)).toEqual(["Отмена", "Опубликовать мою версию"])
+    buttons()[0].click()
     expect(decisions).toEqual(["reject"])
+    setState("request", { ...newDraft, id: "new-draft-retry" })
+    expect(decisions).toEqual(["reject"])
+    buttons()[1].click()
+    expect(decisions).toEqual(["reject", "once"])
+
+    setState("request", { ...request, id: "first-publication", metadata: {} })
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(buttons().map(button => button.textContent)).toEqual([translate("ui.permission.deny"), translate("ui.permission.allowOnce")])
   } finally { dispose(); host.remove() }
 })
 
