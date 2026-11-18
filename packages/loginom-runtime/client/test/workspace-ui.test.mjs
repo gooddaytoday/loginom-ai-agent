@@ -5,7 +5,7 @@ import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
-import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
+import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
 
 test('error toast template is private and requires the native error class, component and message structure',async()=>{
  for(const fault of [null,'info','native','messages']) {
@@ -679,6 +679,36 @@ test('failure output observes the graph after finally mouse-up, including effect
   assert.equal(outcome.status, 'AMBIGUOUS'); assert.equal(outcome.cleanup_complete, true);
   assert.deepEqual(outcome.output.nodes.map(node => node.node_ref.node_label), ['Последствие']);
   assert.equal(outcome.output.verification_required, true);
+});
+
+test('native Calculator graph captions containing code names remain clickable', async () => {
+  for (const label of ['Калькулятор_JavaScript', 'JavaScript', 'Калькулятор_python', 'Калькулятор_script', 'Калькулятор_codeeditor']) {
+    const {page,tid} = scriptGraphFixture(label, 'bg-vendor-icon-calcdata');
+    page.context.innerWidth = 1000; page.context.innerHeight = 800;
+    for (const suffix of ['', ';Label;Label']) {
+      const snapshot = await page.observe(), target = snapshot.ui.elements.find(e => e.tid === tid + suffix);
+      assert.equal(target.signature.native_graph.status, 'non_script');
+      assert.equal(target.interaction.state, 'point_observed');
+      assert.ok(target.allowed_actions.includes('click'), label + suffix);
+      assert.equal((await page.act({verb:'click',ref:target.ref}, snapshot)).status, 'SUCCEEDED');
+    }
+  }
+});
+
+test('graph caption exemption retains native script, editor and control identity guards', async () => {
+  for (const mode of ['script', 'unconfirmed', 'name', 'id', 'monaco-editor', 'CodeMirror', 'ace_editor']) {
+    const {page,tid,body,node,states} = scriptGraphFixture('Калькулятор_JavaScript', 'bg-vendor-icon-calcdata');
+    if (mode === 'script') node.FIconCls = 'bg-vendor-icon-javascript';
+    if (mode === 'unconfirmed') states.delete(node.FCell);
+    if (['name', 'id'].includes(mode)) body.attrs[mode] = 'javascript-editor';
+    if (['monaco-editor', 'CodeMirror', 'ace_editor'].includes(mode)) body.attrs.class = mode;
+    const snapshot = await page.observe(), target = snapshot.ui.elements.find(e => e.tid === tid);
+    assert.deepEqual(target.allowed_actions, [], mode);
+  }
+  const page = new Page(), editor = page.add('textarea', 'JavaScript;CodeEditor');
+  editor.value = 'return 1;';
+  const snapshot = await page.observe();
+  assert.deepEqual(snapshot.ui.elements.find(e => e.tid === 'JavaScript;CodeEditor').allowed_actions, []);
 });
 
 test('navigation links, URL/file/password fields and code editors are not actionable and model selectors are rejected', async () => {
