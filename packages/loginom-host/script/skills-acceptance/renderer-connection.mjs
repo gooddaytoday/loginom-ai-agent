@@ -5,7 +5,9 @@ export async function allowLocalGuiWithUnconfiguredHost(application, page) {
   // the renderer's startup read in the isolated, Playwright-owned process.
   await application.evaluate(({ ipcMain }, view) => {
     ipcMain.removeHandler("loginom-read")
-    ipcMain.handle("loginom-read", () => ({ ...view, generation: 1, revision: 1, state: "ready" }))
+    const configured = { ...view, generation: 1, revision: 1, state: "ready" }
+    delete configured.setupRequired
+    ipcMain.handle("loginom-read", () => configured)
   }, connection)
   await page.reload()
 }

@@ -55,6 +55,8 @@ export const LOGINOM_ENGLISH = {
   "loginom.pending": "Settings will apply after active Loginom tasks and unfinished operation recovery complete.",
   "loginom.runtimeFailed":
     "Loginom is unavailable. Check and save your connection settings again. Other application features remain available.",
+  "loginom.wizardRuntimeFailed":
+    "Could not apply the Loginom connection. Check your connection settings and save them again.",
   "loginom.checked": "Connection verified. Settings have not been saved yet.",
   "loginom.failed": "Could not verify or apply the connection. Check server availability and credentials.",
   "loginom.conflict": "Another window changed these settings. Reload current settings and try again.",
