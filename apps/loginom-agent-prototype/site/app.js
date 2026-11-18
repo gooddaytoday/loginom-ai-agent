@@ -1,7 +1,7 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType } from './hub.js'
-import { renderSettings, renderOnboarding, bindSettings, ensureSettings, beforeSettingsLeave } from './settings.js'
+import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
 import { actions as packageActions, byId, tierBadge } from './catalog.js'
 
@@ -16,7 +16,7 @@ const write = (key, value) => {
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
   home:'Новый разговор', chat:'Разговор', project:'Проект', hub:'Каталог', loginom:'Пакеты',
-  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', onboarding:'Первый запуск', review:'Что решить',
+  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', review:'Что решить',
 }
 // Clicking an example fills the composer; it never sends. «document» also attaches a sample package,
 // so a newcomer sees the package actions appear.
@@ -113,7 +113,7 @@ const serverPackages = [
 ]
 let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0, pointerInPanel = false
 const state = {
-  page:'home', contour:read('contour','online'), theme:read('theme','light'),
+  page:'home', policy:read('policy',''), contour:read('policy','') ? 'closed' : read('contour','online'), theme:read('theme','light'),
   project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null,
   projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
   expanded:stage === 'used' ? ['p-sales','p-report'] : [], showAll:[], detail:read('detail','brief'), editTurn:null,
@@ -204,6 +204,15 @@ function setContour(contour) {
   state.contour = contour === 'closed' ? 'closed' : 'online'
   write('contour',state.contour)
   render()
+}
+function applyDemoPolicy(policy, tab) {
+  if (state.policy !== policy) {
+    state.policy = policy
+    write('policy',policy)
+    state.settings = undefined
+    state.contour = policy ? 'closed' : read('contour','online')
+  }
+  if (tab) settingsTab(tab)
 }
 function setTheme(theme) {
   state.theme = ['light','dark','system'].includes(theme) ? theme : 'light'
@@ -1023,9 +1032,14 @@ function chat() {
 // Setup happens where it is needed: the public stand is filled in, one button connects.
 function connectCard() {
   const c = state.settings.connection
-  if (state.contour === 'closed') return `<div class="connect-card"><span class="glyph red">${icon('lock',19)}</span><div><strong>Подключиться к Loginom</strong>
-    <p class="muted">В закрытом контуре адрес Loginom задаёт администратор или вы — в настройках.</p>
-    <div class="button-row"><button class="btn primary" data-settings="loginom">Настройки подключения</button></div></div></div>`
+  if (state.contour === 'closed') {
+    const text = state.policy === 'set' ? `Адрес задал администратор: ${esc(hostOf(c.url))}. Введите пользователя и пароль.`
+      : state.policy === 'broken' ? 'Файл политики администратора с ошибкой, приложение работает без сети: подключиться можно только к Loginom на этом компьютере.'
+      : 'В закрытом контуре публичный стенд недоступен. Укажите адрес Loginom вашей организации.'
+    return `<div class="connect-card"><span class="glyph red">${icon('lock',19)}</span><div><strong>Подключиться к Loginom</strong>
+    <p class="muted">${text}</p>
+    <div class="button-row"><button class="btn primary" data-settings="loginom">${state.policy === 'set' ? 'Ввести пароль' : 'Указать адрес'}</button></div></div></div>`
+  }
   return `<div class="connect-card"><span class="glyph red">${icon('external',19)}</span><div>
     <strong>Подключиться к Loginom</strong>
     <dl><div><dt>Адрес</dt><dd>${esc(hostOf(c.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(c.username)}</dd></div></dl>
@@ -1254,24 +1268,36 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
-    ['Проверка → улучшения','«Проверь сценарий продаж» — агент читает пакет и находит 3 улучшения, ничего не меняя. Кнопка «Внести улучшения» — агент правит копию по шагам. В конце — карточка изменений: что добавлено, изменено, удалено.','try-check','Начать'],
-    ['Изменения на схеме','В карточке изменений — «Посмотреть на схеме»: изменённые узлы подсвечены, у каждого «было → стало»; переключатель «Как было». Отсюда же можно сохранить.','try-check','Начать'],
-    ['Сохранить или отменить','«Сохранить новой версией» — рядом с исходным появится «Продажи — v2.lgp», исходный не тронут. «Заменить исходный…» — только с подтверждением и с резервной копией. «Отменить изменения», «Отменить сохранение», «Вернуть прежнюю версию».','try-check','Начать'],
+    ['Свой Loginom','«Loginom»: адрес, пользователь, пароль, «Проверить», «Сохранить». Адрес со словом «unavailable» показывает, как выглядит сбой.',[['try-own-loginom','Начать']]],
+    ['Своя модель','«Модели» → «Своя модель по адресу» → «Найти модели» → выбрать. Модель появится в поле ввода.',[['try-own-model','Начать']]],
+    ['Закрытый контур','«Режим работы» → «Закрытый контур»: облачные модели становятся недоступны, и, пока своей модели нет, поле ввода просит «Выберите модель». Ниже — что ещё меняется.',[['try-closed','Начать']]],
+    ['Политика администратора','Демонстрационный файл политики задаёт режим, адрес Loginom, модель организации, сайты и терминал — у них замок. Второй вариант — файл с ошибкой.',[['policy-set','Включить'],['policy-broken','С ошибкой'],['policy-clear','Убрать']]],
+    ['Разрешения и терминал','Новая страница: по каждому виду действий — «Разрешено», «Спрашивать» или «Запрещено». Терминал выключен.',[['try-permissions','Начать']]],
+    ['Диагностика','«Проверить всё» и «Сохранить отчёт для администратора» — без паролей, ключей и разговоров.',[['try-diagnostics','Начать']]],
   ]
   const questions = [
-    '<strong>Сохранение</strong> — новой версией рядом с исходным; заменить исходный — отдельной кнопкой, с подтверждением и копией «… — до правки» (В-25).',
-    '<strong>Сверка запуском</strong> — только если в пакете нет выгрузок; если есть — агент спрашивает разрешение и перечисляет выгрузки (В-26).',
-    '<strong>Имя новой версии</strong> — «Продажи — v2.lgp», «— v3» и дальше (В-27).',
-    '<strong>«Улучшить»</strong> над полем ввода и на странице пакета — разговор с карточкой изменений; мастер — для действий, которые пакет не меняют (В-28).',
+    '<strong>Разрешения по умолчанию.</strong> Рекомендую: читать файлы проекта — без вопроса; менять файлы, сохранять пакеты в Loginom, запускать сценарии с выгрузками, открывать сайты — спрашивать; терминал выключен. Согласны?',
+    '<strong>Терминал в разговоре.</strong> Команды каждый раз разные, поэтому для терминала рекомендую только «Разрешить один раз», без «Разрешать в этом разговоре». Согласны?',
+    '<strong>Бесплатные модели OpenCode.</strong> В режиме «Интернет» новый пользователь сразу работает на бесплатной модели: данные разговора уходят в облачный сервис OpenCode. Рекомендую оставить — иначе первый запуск требует ключа или своей модели, — но писать об этом в «Моделях» и на шаге «Доступ». Согласны?',
+    '<strong>Ошибка в файле политики.</strong> Рекомендую: приложение работает без сети, пока администратор не исправит файл; причина и путь к файлу — в настройках и диагностике. Другой вариант — не запускаться вовсе. Согласны?',
+  ]
+  const changed = [
+    'Настройки разложены по делам: «Работа» — Loginom, Модели, Разрешения, Режим работы; «Приложение» — Общие, Горячие клавиши, Справка, Диагностика.',
+    'Убрано то, за чем нет механизма или что повторяет другое: выбор источника справки, «Серверы» и MCP (это «Подключение» в каталоге), отдельные «Провайдеры», повторы «Кратко / Подробно», «Демо-данные», мастер первого запуска.',
+    '«Модели»: модель по умолчанию; своя модель по адресу с поиском моделей на сервере; облачный сервис по ключу; бесплатные модели OpenCode — с пометкой, куда уходят данные.',
+    '«Разрешения» — новая страница; постоянные разрешения живут здесь, а не в ленте (В-22). Терминал выключен (решение 12).',
+    '«Режим работы»: «Интернет» или «Закрытый контур» («Сеть организации» или «Только этот компьютер») и что меняется в каждом.',
+    'Строки, заданные администратором, — с замком и подписью «Задано администратором»; ошибка в файле политики — работа без сети с причиной.',
+    'Карточка «Подключиться к Loginom» в закрытом контуре говорит, что делать: указать адрес или ввести пароль.',
   ]
   const later = [
-    'Правка пакета, открытого с компьютера (.lgp): та же карточка, сохранение — файлом рядом с исходным или в Loginom.',
-    'Несколько правок подряд в одном разговоре — сейчас каждая карточка независима.',
-    'Сверка пакета, в котором есть выгрузки: агент спрашивает разрешение на запуск и перечисляет, какие выгрузки сработают (В-26) — в прототипе у «Продажи.lgp» выгрузок нет.',
-    'Ход разговора и счётчики живут до перезагрузки страницы.',
+    'Ошибка всего хода (кончился лимит модели) и смена модели прямо из ленты.',
+    'Как администратор собирает файл политики и набор каталога — этап F.',
+    'Настройки, кроме режима работы, темы и демо-политики, живут до перезагрузки страницы.',
   ]
   const chosen = [
     'Проект — папка, которую приложение создаёт само, вы вводите только название; разговоры без проекта — в скрытом проекте; «Удалить проект» удаляет и папку с файлами (В-29).',
+    'Итерация 4 (пакет в разговоре): сохранение новой версией, замена исходного — с подтверждением и копией; сверка запуском — только без выгрузок; имена «— v2»; «Улучшить» ведёт в разговор (В-25…В-28).',
     'Итерация 3 (лента разговора): «Кратко» по умолчанию; разрешения без постоянного «Всегда»; поправка во время работы без очереди; вместо «Повторить ответ» — «Изменить» и «Ответвить» (В-21…В-24).',
     'Итерация 2 (оболочка): «Пакеты» и «Каталог» через «+», подсказка «Опишите задачу…», Loginom в поле ввода, панель закреплена, поиск в панели, проекты-папки как в Codex.',
   ]
@@ -1280,17 +1306,17 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['«Проверь сценарий» теперь только читает и находит улучшения; «Внести улучшения» — отдельный ход.','Агент правит копию пакета; в ленте — карточка изменений: +1 ~2 −1, строка на каждый узел, «Сверено с исходным».','«Посмотреть на схеме»: узлы с отметками «новый / изменён / удалён», «было → стало», переключатель «Как было».','Сохранить новой версией, заменить исходный (подтверждение и резервная копия), отменить изменения, отменить сохранение, вернуть прежнюю версию.','На странице пакета «Изменить с агентом» начинает этот же путь.','«Улучшить» над полем ввода, на странице пакета и в «Ещё» ведёт в разговор с карточкой изменений, а не в мастер.']
+  const policyNow = state.policy === 'set' ? 'Сейчас политика включена.' : state.policy === 'broken' ? 'Сейчас включён файл политики с ошибкой.' : ''
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 4 — пакет в разговоре</p><h1>Что решить</h1><p>Новое — как агент меняет пакет Loginom и как вы решаете, что с изменениями делать. Пройдите путь, около 10 минут. Решения по итерации — ниже.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 5 — настройки и закрытый контур</p><h1>Что решить</h1><p>Новое — настройки: свой Loginom, своя модель, разрешения, закрытый контур и что задаёт администратор. Пройдите пути, около 10 минут. Вопросы с рекомендациями — ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,target,label],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${label} ${icon('arrow',15)}</button></article>`).join('')}</div>
-    <h2 class="rv-heading">Решено по итерации 4</h2>
-    <ul class="rv-changes">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
-    <h2 class="rv-heading">Пока не показано</h2>
-    <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
+    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕ'[index]}</span><h3>${title}</h3><p>${text}${buttons.length > 1 && policyNow ? ' <strong>' + policyNow + '</strong>' : ''}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
+    <h2 class="rv-heading">Вопросы</h2>
+    <ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
+    <h2 class="rv-heading">Пока не показано</h2>
+    <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Решено раньше</h2>
     <ul class="rv-changes">${chosen.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Ещё ждут ответа с итерации 1.1</h2>
@@ -1385,7 +1411,6 @@ function pageContents() {
     case 'project': return projectPage()
     case 'hub': return renderHub(state)
     case 'settings': return renderSettings(state)
-    case 'onboarding': return renderOnboarding(state)
     case 'runner':
     case 'studio': return renderSolutions(state)
     case 'loginom': return packages()
@@ -1461,7 +1486,7 @@ function render(resetScroll = false) {
     $('#session-name')?.select()
   }
   if (state.page === 'hub') bindHub(app,state,api)
-  if (['settings','onboarding'].includes(state.page)) bindSettings(app,state,api)
+  if (state.page === 'settings') bindSettings(app,state,api)
   if (['runner','studio'].includes(state.page)) bindSolutions(app,state,api)
 }
 function dismiss() {
@@ -1705,7 +1730,16 @@ const actions = {
     state.progress.ownChats = 0
     dismiss()
   },
-  'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); location.hash = ''; location.reload() },
+  'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); write('policy',''); location.hash = ''; location.reload() },
+  // Demo of the administrator's machine policy: it is set outside the app, so the switch lives on «Что решить».
+  'policy-set':() => applyDemoPolicy('set', 'contour'),
+  'policy-broken':() => applyDemoPolicy('broken', 'contour'),
+  'policy-clear':() => applyDemoPolicy('', 'contour'),
+  'try-own-loginom':() => applyDemoPolicy('', 'loginom'),
+  'try-closed':() => { applyDemoPolicy('', null); settingsTab('contour') },
+  'try-own-model':() => settingsTab('models'),
+  'try-permissions':() => settingsTab('permissions'),
+  'try-diagnostics':() => settingsTab('diagnostics'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
   'try-question':() => tryPrompt('Проверь выгрузку на пропуски и дубликаты'),
