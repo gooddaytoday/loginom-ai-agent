@@ -23,6 +23,41 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_enrich_cold_columns_by_name_is_scoped_and_strict(self):
+        expected = runner.expected_for(runner.scenario('enrich-data-left'), '/test/enrich.lgp')
+        before = copy.deepcopy(expected)
+        cold = runner.cold_columns_by_name(expected, 'enrich-data-left')
+        self.assertEqual(expected, before)
+        self.assertEqual(cold['outputs'][0], {**expected['outputs'][0], 'column_order': 'any'})
+        for scenario in ['enrich-data-composite', 'enrich-three-lookups', 'logreg-enter', None]:
+            self.assertEqual(runner.cold_columns_by_name(expected, scenario), before)
+        matcher = """
+import {parseExpectedOutputs,matchExpectedOutputs} from './scripts/node-acceptance/expected-outputs.mjs';
+import assert from 'node:assert/strict';
+let text='';for await(const chunk of process.stdin)text+=chunk;
+const {expected,cold}=JSON.parse(text),want=parseExpectedOutputs(cold).outputs;
+const output=want[0],columns=output.columns;
+const indices=[1,0,...columns.slice(2).map((_,i)=>i+2)];
+const a={node:{node_id:'enrich'},type:output.output_node_type,output_port:0,data:{
+ schema:indices.map(i=>({...columns[i],label:columns[i].label??columns[i].name})),
+ row_count:output.rows.length,sample_complete:true,precision:{numbers_verified:true},
+ sample:output.rows.map(row=>indices.map(i=>({type:columns[i].type,is_null:row[columns[i].name]===null,
+  value:columns[i].type==='integer'&&row[columns[i].name]!==null?String(row[columns[i].name]):row[columns[i].name]})))}};
+assert.equal(matchExpectedOutputs([a],want).length,1);
+assert.throws(()=>matchExpectedOutputs([a],parseExpectedOutputs(expected).outputs),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+for(const change of [d=>{d.schema.pop();d.sample.forEach(r=>r.pop());},
+ d=>{d.schema.push({name:'Extra',label:'Extra',type:'string'});d.sample.forEach(r=>r.push({type:'string',is_null:false,value:'x'}));},
+ d=>d.schema[1].name='Other',d=>d.schema[1].name=d.schema[0].name,
+ d=>d.schema[0].type='string',d=>d.sample[0][0].type='string',
+ d=>d.sample[0][0].value='99',d=>d.row_count--,d=>d.sample.pop()]){
+ const bad=structuredClone(a);change(bad.data);
+ assert.throws(()=>matchExpectedOutputs([bad],want),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+}
+"""
+        result = subprocess.run(['node', '--input-type=module', '-e', matcher], cwd=runner.REPO,
+                                input=json.dumps(dict(expected=expected, cold=cold)), capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_rest_error_descriptions_reads_native_three_field_port(self):
         case = runner.scenario('rest-error-descriptions')
         self.assertEqual(case['input_files'], ['response.json'])
