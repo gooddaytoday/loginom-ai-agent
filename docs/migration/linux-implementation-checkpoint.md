@@ -1,5 +1,11 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-11-18 — v0.3.10
+
+Изменение [#1202](https://github.com/gooddaytoday/loginom-ai-agent/issues/1202) вошло в `loginom` через [#1204](https://github.com/gooddaytoday/loginom-ai-agent/pull/1204). Desktop принимает предзаполненные настройки и ждёт успешной активации первого подключения. После сбоя чтения мастер повторно загружает профиль.
+
+Версия выпуска, точный коммит, контрольные суммы и платформенные отчёты привязаны к [GitHub Release v0.3.10](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.3.10).
+
 ## 2026-10-26 — v0.3.3 опубликован
 
 Release source: `2eea642cf2f0363e12aa1a0078a3740a75cdda42`, ветка `loginom` (PR #441: v033-rel4 9f1d4a48).
