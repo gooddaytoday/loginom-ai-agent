@@ -12,7 +12,8 @@ import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixt
 // A long source caption overflows into a hidden native pending breadcrumb.
 const hiddenPendingSources=[
  {name:'variables calculator',icon:'calcvariables',label:'Params',wizard:'CalcVariablesWizard;btnAddExpr',stage:'variables_calculator'},
- {name:'text import',icon:'importtextfile',label:'Import',wizard:'ImportTextFilePreviewWizard;edtFileName',stage:'text_import_file'}];
+ {name:'text import',icon:'importtextfile',label:'Import',wizard:'ImportTextFilePreviewWizard;edtFileName',stage:'text_import_file'},
+ {name:'excel import',icon:'importexcelfile',label:'Book',wizard:'ImportExcelFilePreviewWizard;edtFileName',stage:'excel_import_file'}];
 for(const source of hiddenPendingSources)
 for(const fault of [null,'node','document','workflow','native','component','label','hidden','icon','question','button','duplicate','parent'])
 test(source.name+' hidden native pending breadcrumb uses the existing deactivation confirmation: '+fault,async()=>{
