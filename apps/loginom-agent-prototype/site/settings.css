@@ -72,7 +72,7 @@
 .st-page .btn.st-button-small { min-height: 30px; padding: 5px 10px; font-size: 12px; }
 .st-form-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 15px 14px; }
 .st-field { display: grid; align-content: start; gap: 6px; min-width: 0; color: var(--ink); font-size: 13px; font-weight: 620; }
-.st-field input, .st-readonly, .st-page select {
+.st-field input, .st-field textarea, .st-readonly, .st-page select {
   width: 100%;
   min-width: 0;
   min-height: 39px;
@@ -86,8 +86,9 @@
   padding: 8px 10px;
 }
 .st-page select { width: auto; cursor: pointer; }
-.st-field input:not([disabled]):focus, .st-page select:focus { border-color: var(--accent); outline: 2px solid var(--accent-soft); outline-offset: 1px; }
-.st-field input::placeholder { color: var(--muted); opacity: 1; }
+.st-field textarea { resize: vertical; line-height: 1.45; }
+.st-field input:not([disabled]):focus, .st-field textarea:focus, .st-page select:focus { border-color: var(--accent); outline: 2px solid var(--accent-soft); outline-offset: 1px; }
+.st-field input::placeholder, .st-field textarea::placeholder { color: var(--muted); opacity: 1; }
 .st-field input:disabled, .st-readonly { background: var(--soft); color: var(--muted); }
 .st-readonly {
   display: flex;

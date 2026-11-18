@@ -824,12 +824,13 @@ const scripts = {
   ]},
   chat:{steps:[]},
 }
-// Rules the agent follows show in the check itself: project instructions are read in every chat of the project,
+// Rules the agent follows show in the check itself: instructions (the project's, then the general ones, В-65) are read in every chat,
 // an enabled skill applies itself when the task fits «Когда агент его применяет». The prototype knows one set of rules.
 function appliedRules(projectId) {
   const hasRules = text => /узл/i.test(text || '') && /назыв/i.test(text || '')
   const project = projectById(projectId)
   if (hasRules(project?.instructions)) return {step:`Учёл инструкции проекта «${project.name}»`, detail:'Агент читает их в каждом разговоре проекта', by:'по инструкциям проекта'}
+  if (hasRules(state.settings.instructions)) return {step:'Учёл ваши инструкции для агента', detail:'«Настройки» → «Инструкции»: агент следует им во всех разговорах', by:'по вашим инструкциям'}
   const skill = state.own?.items.find(entry => entry.type === 'skill' && entry.status === 'on' && hasRules(entry.body))
   if (skill) return {step:`Применил навык «${skill.name}»`, detail:'Навык включён — агент выбрал его сам по строке «Когда агент его применяет»', by:`по навыку «${skill.name}»`}
   return null
@@ -1360,13 +1361,6 @@ function review() {
   ]
   // Questions from the first runs of the agent evaluators (docs/product/loginom-agent/agent-review/results/1-summary.md).
   const questions = [
-    `<strong>Где аналитик задаёт правила, которым агент следует всегда.</strong> В задаче «правила отдела» два оценщика из четырёх сначала искали в «Настройках», один записал правила в «Инструкции для агента» проекта, трое сделали навык через «Каталог → Создать своё». Варианты:<ul class="rv-variants">
-      <li><b>А, рекомендую:</b> в «Настройках» — «Инструкции для агента» для всех разговоров, таким же полем, как у проекта (В-16). Они действуют всегда, без выбора агентом; навык остаётся для приёмов под задачу. За этим — общий файл инструкций OpenCode (глобальный AGENTS.md).</li>
-      <li><b>Б:</b> только навык; в «Настройках» — строка «Правила для агента», ведущая в «Создать своё → Навык».</li>
-      <li><b>В:</b> оставить как есть: навык и инструкции проекта.</li></ul>`,
-    `<strong>Название «Режим работы» в настройках (В-5).</strong> Два оценщика из четырёх ждали там режим агента или правила, а нашли выбор сети «Интернет / Закрытый контур». Варианты:<ul class="rv-variants">
-      <li><b>А, рекомендую:</b> «Сеть» — раздел и так начинается словами «Куда приложению и агенту можно обращаться по сети».</li>
-      <li><b>Б:</b> оставить «Режим работы».</li></ul>`,
     `<strong>Следующие прогоны оценщиков.</strong> Исправления по заданию 1 уже на demo. Задания 2 (эксперт по harness) и 3 (администратор) ещё никто не проходил. Варианты:<ul class="rv-variants">
       <li><b>А, рекомендую:</b> задания 2 и 3 — у тех же трёх вендоров; задание 1 повторить у одного, например GPT, чтобы проверить «Улучшить» и видимость правил.</li>
       <li><b>Б:</b> только задания 2 и 3.</li>
@@ -1388,6 +1382,7 @@ function review() {
     'Свои навыки и действия живут до перезагрузки страницы.',
   ]
   const chosen = [
+    'По первым оценкам агентами: <strong>«Инструкции для агента» в «Настройках»</strong> — для всех разговоров, рядом с инструкциями проекта; навык — для приёмов под задачу (В-65). <strong>«Режим работы» теперь «Сеть»</strong> (В-66).',
     'Итерация 5 (настройки и закрытый контур): разрешения по умолчанию, терминал только «один раз», бесплатные модели OpenCode с пометкой, ошибка в файле политики — работа на этом компьютере (В-30…В-33).',
     'Проект — папка, которую приложение создаёт само; «Удалить проект» удаляет и папку (В-29).',
     'Итерация 4 (пакет в разговоре): сохранение новой версией, замена исходного — с подтверждением и копией; «Улучшить» ведёт в разговор (В-25…В-28).',
@@ -1450,7 +1445,7 @@ function projectForm(project) {
     <fieldset class="color-pick"><legend>Цвет</legend>${Object.entries(projectColors).map(([color,label]) => `<label title="${label}"><input type="radio" name="color" value="${color}" ${color === (project?.color || 'red') ? 'checked' : ''}><span class="pc-${color}">${icon('folder',20)}</span><span class="sr-only">${label}</span></label>`).join('')}</fieldset>
     ${project ? `<label for="project-instructions">Инструкции для агента</label>
     <textarea id="project-instructions" name="instructions" rows="4" placeholder="Например: отвечай кратко; новые сценарии сохраняй в папку «Продажи»">${esc(project.instructions)}</textarea>
-    <p class="field-hint">Агент следует им во всех разговорах проекта.</p>` : '<p class="field-hint">Инструкции и источники добавите на странице проекта.</p>'}
+    <p class="field-hint">Агент следует им во всех разговорах проекта — вместе с общими из «Настройки» → «Инструкции».</p>` : '<p class="field-hint">Инструкции и источники добавите на странице проекта.</p>'}
     <div class="button-row"><button class="btn primary">${project ? 'Сохранить' : 'Создать проект'}</button></div>
   </form>`
 }

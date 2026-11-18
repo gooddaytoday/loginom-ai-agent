@@ -2,7 +2,7 @@ import { icon } from "./icons.js"
 
 // Iteration 5: settings grouped by what the user does; no «Подключения» group (the word is a catalog type, И1.1-1).
 const sections = [
-  ["Работа", [["loginom", "Loginom", "external"], ["models", "Модели", "cpu"], ["permissions", "Разрешения", "shield"], ["contour", "Режим работы", "globe"]]],
+  ["Работа", [["loginom", "Loginom", "external"], ["models", "Модели", "cpu"], ["instructions", "Инструкции", "book"], ["permissions", "Разрешения", "shield"], ["contour", "Сеть", "globe"]]],
   ["Приложение", [["general", "Общие", "settings"], ["shortcuts", "Горячие клавиши", "grid"], ["help", "Справка", "help"], ["diagnostics", "Диагностика", "chart"]]],
 ]
 // The tabs where a policy sets something: they show a lock in the menu.
@@ -64,6 +64,8 @@ export function ensureSettings(state) {
   s.cloud ??= { open: false, service: "OpenAI", key: "", error: "" }
   s.permissions ??= Object.fromEntries(permissionKinds.map(([id, , , value]) => [id, value]))
   s.terminal ??= false
+  s.instructions ??= ""
+  s.instructionsDraft ??= s.instructions
   s.theme = state.theme ?? s.theme ?? "system"
   // Iteration 2: the agent mode picker is off for newcomers; it is turned on in «Общие».
   s.preferences ??= { notifications: true, sounds: false, agentPicker: false }
@@ -244,6 +246,13 @@ function permissionsTab(state, s) {
         : switchRow("Разрешить агенту терминал", s.terminal ? "Включён. Агент спросит про каждую команду и покажет её целиком." : "Выключен. Включите, только если понимаете, зачем агенту команды.", "terminal", s.terminal))
 }
 
+// В-65: instructions for every chat, as OpenCode's global AGENTS.md. A project adds its own; a skill is for one kind of task.
+function instructionsTab(s) {
+  return card("Инструкции для агента", "Агент следует им во всех разговорах. У проекта могут быть свои — агент учтёт и те, и другие.",
+    '<label class="st-field"><span>Инструкции</span><textarea data-st-input="instructions" rows="7" placeholder="Например: узлы называй по смыслу, по-русски; перед расчётом выручки — проверка пустых значений">' +
+      esc(s.instructionsDraft) + "</textarea><small>Приёмы для одного вида задач удобнее сделать навыком: «Каталог» → «Создать своё» → «Навык».</small></label>",
+    btn("Сохранить", "save-instructions", "primary"))
+}
 function contourTab(state, s) {
   const mode = closedMode(state, s)
   const choice = state.policy
@@ -268,7 +277,7 @@ function contourTab(state, s) {
     intranet: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только свои: на этом компьютере и в сети организации."], ["Loginom", "Сервер в сети организации; публичный стенд недоступен."], ["Каталог", "Из файла: «Каталог» → «Импорт из файла»; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
     device: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только на этом компьютере."], ["Loginom", "Только на этом компьютере."], ["Каталог", "Из файла; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
   }[mode]
-  return card("Режим работы", "Куда приложению и агенту можно обращаться по сети.", choice) +
+  return card("Сеть", "Куда приложению и агенту можно обращаться по сети.", choice) +
     card("Что меняется", "", '<div class="st-list">' + effects.map(([title, text, trailing = ""]) => listRow(title, text, trailing)).join("") +
       listRow("Документация Loginom", "Встроена в приложение: агент читает её без сети.", "") +
       (mode === "device" ? "" : listRow("Прокси", "Как в настройках системы.", "")) + "</div>")
@@ -308,7 +317,7 @@ function helpTab(state) {
         : "Адрес публичного стенда уже указан. Свой сервер — в «Loginom»: адрес, пользователь, пароль, «Проверить».", "tab:loginom", "Открыть «Loginom»"],
     ["Выбрать модель", policy ? "Модели задал администратор; в «Моделях» выберите одну из них по умолчанию."
       : "«Модели» → «Своя модель по адресу»: Ollama или LM Studio на этом компьютере или сервер вашей организации." + (closed ? "" : " Или облачный сервис по ключу."), "tab:models", "Открыть «Модели»"],
-    ["Чтобы ничего не уходило в интернет", state.policy ? "Режим работы задал администратор — он отмечен замком в «Режиме работы»." : "«Режим работы» → «Закрытый контур».", "tab:contour", "Открыть «Режим работы»"],
+    ["Чтобы ничего не уходило в интернет", state.policy ? "Настройку сети задал администратор — раздел «Сеть» отмечен замком." : "«Сеть» → «Закрытый контур».", "tab:contour", "Открыть «Режим работы»"],
     ["Что агент делает без вопроса", "«Разрешения»: по каждому виду действий — разрешено, спрашивать или запрещено." + (closed ? " Терминал в закрытом контуре выключен." : " Терминал выключен, пока вы его не включите."), "tab:permissions", "Открыть «Разрешения»"],
     ["Разобрать пакет Loginom", "Нажмите «+» у поля ввода и выберите пакет — над полем появятся действия с ним.", "goto:home", "Новый разговор"],
   ].map(([title, body, target, label], i) => "<details" + (i === 0 ? " open" : "") + "><summary>" + title + icon("down", 16) + "</summary><p>" + body + "</p>" + btn(label, target, "quiet st-button-small") + "</details>").join("") + "</div>")
@@ -318,6 +327,7 @@ function settingsBody(state, s) {
   switch (s.tab) {
     case "loginom": return loginomTab(state, s)
     case "models": return modelsTab(state, s)
+    case "instructions": return instructionsTab(s)
     case "permissions": return permissionsTab(state, s)
     case "contour": return contourTab(state, s)
     case "diagnostics": return diagnosticsTab(state, s)
@@ -338,7 +348,7 @@ function settingsBody(state, s) {
 
 export function renderSettings(state) {
   const s = ensureSettings(state)
-  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Loginom, модели, разрешения и режим работы.</p></div>' +
+  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Loginom, модели, инструкции, разрешения и сеть.</p></div>' +
     '</header><div class="st-layout"><nav class="st-nav" aria-label="Разделы настроек">' +
     sections.map(([group, tabs]) => '<div class="st-nav-group"><small>' + group + "</small>" + tabs.map(([id, label, glyph]) =>
       '<button type="button" data-st="tab:' + id + '"' + (s.tab === id ? ' aria-current="page"' : "") + ">" + icon(glyph, 16) + "<span>" + label + "</span>" +
@@ -404,7 +414,7 @@ function downloadReport(state, s, api) {
   const mode = closedMode(state, s)
   const lines = [
     "Loginom AI Agent — отчёт диагностики (прототип)",
-    "Режим работы: " + { online: "Интернет", intranet: "Закрытый контур, сеть организации", device: deviceName }[mode],
+    "Сеть: " + { online: "Интернет", intranet: "Закрытый контур, сеть организации", device: deviceName }[mode],
     "Политика администратора: " + (state.policy === "broken" ? "ошибка в строке 7 — " + policyPath : state.policy ? "применена — " + policyPath : "нет"),
     "Loginom: " + (s.connection.url || "адрес не задан") + " — " + (s.connection.connected ? "подключён" : "не подключён"),
     "Модель: " + (s.model ? s.model.name + " (" + s.model.where + ")" : "не выбрана"),
@@ -438,6 +448,7 @@ export function bindSettings(root, state, api) {
     const name = element.dataset.stInput
     if (!name) return
     const value = element.type === "checkbox" ? element.checked : element.value
+    if (name === "instructions") { s.instructionsDraft = value; return }
     if (name.startsWith("loginom-")) {
       const key = { "loginom-url": "url", "loginom-user": "username", "loginom-password": "password", "loginom-empty": "empty" }[name]
       s.draft[key] = value
@@ -514,6 +525,13 @@ export function bindSettings(root, state, api) {
       api.setContour(value)
       ensureSettings(state)
       announceModel(api, before, s)
+      api.render()
+      return
+    }
+    if (action === "save-instructions") {
+      s.instructions = s.instructionsDraft.trim()
+      s.instructionsDraft = s.instructions
+      api.toast(s.instructions ? "Инструкции сохранены — агент следует им во всех разговорах" : "Инструкции убраны")
       api.render()
       return
     }

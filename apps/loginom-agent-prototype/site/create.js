@@ -152,7 +152,7 @@ export function renderCreate(state) {
   if (!edit) return '<div class="sl-page own-page">'+back+
     '<header class="sl-heading"><span class="sl-product">Каталог</span><h1>Создать своё</h1><p>Своё работает только у вас. Опубликовать для всех можно потом — после проверки Loginom.</p></header>'+
     '<div class="own-choose">'+
-      '<button type="button" class="own-choice" data-own="new-skill"><span class="hub-tile hub-sage">'+icon('book',24)+'</span><strong>Навык</strong><small>Как агенту делать задачу: правила, порядок, термины. Агент применяет его сам, когда задача подходит.</small></button>'+
+      '<button type="button" class="own-choice" data-own="new-skill"><span class="hub-tile hub-sage">'+icon('book',24)+'</span><strong>Навык</strong><small>Как агенту делать задачу: правила, порядок, термины. Агент применяет его сам, когда задача подходит. Правила для всех разговоров — в «Настройки» → «Инструкции».</small></button>'+
       '<button type="button" class="own-choice" data-own="new-action"><span class="hub-tile hub-lilac">'+icon('layers',24)+'</span><strong>Своё действие</strong><small>Встроенное действие с вашими настройками, например «Документировать» по шаблону отдела. Появится среди действий с пакетом.</small></button>'+
     '</div><p class="own-note">'+icon('help',16)+' Подключения к внешним сервисам и программы создать нельзя: в навыке может быть только текст.</p></div>';
   return edit.type === 'action' ? renderActionEditor(state, edit) : renderSkillEditor(state, edit);
