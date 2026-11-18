@@ -138,3 +138,31 @@ test('an absent name after a chained jump is refused only after both directions'
 });
 for(const [label,options,error] of [['folder',{changeFolder:true},/folder changed/],['stuck',{stuckAt:3},/did not advance/]])
  test('a chained jump refuses '+label,async()=>{const f=orderedFolder(options);await assert.rejects(findNativeStorageRow(f.args),error);assert.ok(f.trace.length<=40);});
+// LAB-1872 lab1872-b1 text-file-info :242: a settled Files scroll had 29
+// anchors, but its paged observation delivered only the 8 buffer and
+// header-covered rows above them. Storage navigation retains it whole.
+test('a storage scroll retained whole delivers the anchors that issue the next gesture; the public page does not',async()=>{
+ const {createActionRuntime}=await import('../lib/executor.mjs');
+ const {actions,selectors,build}=await import('./support/executor-fixture.mjs');
+ const prefix='MF;TF-2',owner='ui-owner';let top=0;
+ const row=(i,state)=>({ref:'ui-r'+i,tid:prefix+';FileStorageForm;colName_f'+i+'.csv',kind:'control',role:'gridcell',label:'f'+i+'.csv',scope:'workspace',
+  storage_entry:{kind:'file',directory_entries:58,path:'/w/'+'x'.repeat(1200)+i},scroll:{ref:owner,top,max_top:24000},enabled:true,visible:true,
+  interaction:{state},bounding_box:{x:0,y:i*24,width:400,height:23},allowed_actions:state==='point_observed'?['click','scroll']:['click']});
+ const snapshot=()=>({origin:'https://loginom.invalid',authenticated:true,loginom_build:build,workflow_ref:{prefix,tab_tid:'tab'},active_tab_ref:'tab',
+  file_storage:{status:'observed',directory:'/w'},dom_epoch:{document:'doc'},observation_root:{ref:'ui-tbl',identity:{anchor_tid:prefix+';FileStorageForm;pnlFileStorage;tbl',path:[]}},
+  ui:{elements:Array.from({length:58},(_,i)=>row(i,i<5?'outside_viewport':i<8?'point_not_observed':i<37?'point_observed':'outside_viewport')),dialogs:[],masks:[],messages:[],table_cells:[]}});
+ const execute=async code=>{const act=code.includes('"mode":"act"');if(act)top+=1000;
+  return {status:'SUCCEEDED',action_key:act?'ui.act':'workspace.observe',action_revision:'1',operation_id:null,phase:act?'completed':'observed',
+   effect_possible:act,cleanup_complete:true,output:snapshot(),error:null,trace:[]};};
+ const runtime=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},allowCandidate:true,execute,now:()=>Date.now(),targetOrigin:'https://loginom.invalid'});
+ const anchors=output=>output.ui.elements.filter(e=>e.allowed_actions?.includes('scroll')&&e.interaction?.state==='point_observed');
+ for(const whole of [false,true]){
+  const s=await runtime.observe({whole:true}),a=anchors(s.output)[0];
+  const r=await runtime.uiAct({verb:'scroll',ref:a.ref,delta_y:1000},{observationId:s.output.observation_id,operationId:'scroll-'+whole,...(whole?{whole}:{})});
+  assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+  if(!whole){assert.equal(anchors(r.output).length,0);continue;}
+  const next=anchors(r.output);assert.equal(next.length,29);assert.equal(next[0].scroll.top,top);
+  const second=await runtime.uiAct({verb:'scroll',ref:next[0].ref,delta_y:1000},{observationId:r.output.observation_id,operationId:'scroll-next',whole:true});
+  assert.equal(second.status,'SUCCEEDED',JSON.stringify(second.error));
+ }
+});
