@@ -8,6 +8,7 @@ import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeCapabilityCode} from '../lib/executor.mjs';
 import {activatePreparedWorkflow} from '../lib/node-workflow-activation.mjs';
+import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -847,6 +848,91 @@ test('ordinary Save As without a storage binding preserves its legacy completed 
  assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
  assert.equal(saved.output.reopened,true);assert.equal(saved.cleanup_complete,true);
  assert.equal(saved.trace.some(e=>e.event==='save_continuations_observed'),false);
+});
+
+for(const fault of ['none','reopen-graph','guid','type','session','session-id','document','account','origin','path','package','tab','receipt','new-receipt','workflow','missing-proof','no-save'])
+test('ambiguous REST reopen then overwrite and native cleanup: '+fault,async()=>{
+ const page=await restSavePage([true,true]);
+ const prep=page.context.__loginomDockPreparationV1,original=prep.receipts.get('prepared'),oldTab=original.tab;
+ // Cached nested REST disappears from the reference probe after Open, while
+ // the root GUID/type inventory stays identical.
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-modelgeneric';
+ original.packageNode.FSubNodes={FItems:[{FCustomForm:{FDiagram:{FNodes:{FCollection:[{FIconCls:'bg-vendor-icon-restclientconnection'}]}}}}]};
+ const path='/user/data/packages/ambiguous-rest.lgp';
+ const accepted=['none','reopen-graph'].includes(fault);
+ if(fault==='reopen-graph'){
+  const reopen=page.onReopen;
+  page.onReopen=()=>{reopen();page.nodes[0].label='Normalized';};
+ }
+ const first=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(first.status,'AMBIGUOUS',JSON.stringify(first));
+ if(fault==='reopen-graph')assert.equal(first.output.graph_matches,false);
+ else assert.match(first.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.equal(original.tab,oldTab,'an ambiguous Save must not transfer ownership');
+ assert.ok(prep.savedPackageReopen,JSON.stringify(first));
+ const m=page.app.Application.FInstance.FMainForm.FMapTree;
+ if(fault==='guid')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign';
+ if(fault==='type')page.model.FDiagram.FNodes.FCollection[0].FIconCls='foreign';
+ if(fault==='session')m.FServerConnection.Session={...m.FServerConnection.Session};
+ if(fault==='session-id')page.storageBinding.session_id='foreign-session';
+ if(fault==='document')prep.id='foreign-doc';
+ if(fault==='account')m.FServerConnection.UserName='foreign';
+ if(fault==='origin')page.storageBinding.origin='https://foreign.invalid';
+ if(fault==='package'){
+  const flow=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
+  flow.ParentNode=Object.assign(Object.create(Object.getPrototypeOf(flow.ParentNode)),flow.ParentNode);
+ }
+ if(fault==='tab'){
+  const query=page.context.document.querySelectorAll;
+  const replacement={getAttribute:()=>page.tabTid,classList:{contains:()=>true}};
+  page.context.document.querySelectorAll=selector=>selector==='[data-tid='+JSON.stringify(page.tabTid)+']'?[replacement]:query(selector);
+ }
+ if(fault==='receipt')original.request=JSON.stringify({session:'save-session',operation:'changed'});
+ if(fault==='new-receipt')prep.receipts.set('foreign',{...original,packageNode:{}});
+ if(fault==='workflow')original.nodeTargetWorkflowNode={};
+ if(fault==='missing-proof')delete prep.savedPackageReopen;
+ let second;
+ if(fault!=='no-save'){
+  second=await run(page,'package.save_checkpoint',{path:fault==='path'?'/user/data/packages/other.lgp':path,conflict_policy:'replace'});
+  assert.equal(second.status,'SUCCEEDED',JSON.stringify(second));
+  assert.equal(second.output.reopened,false);
+  assert.equal(second.trace.some(e=>e.event==='rest_package_normalization'),false);
+ }
+ if(accepted){
+  assert.ok(second.trace.some(e=>e.event==='overwrite_confirmed'));
+  assert.equal(second.output.workflow_continuations[0]?.workflow_ref.workflow_id,'workflow',JSON.stringify(second));
+  assert.notEqual(original.tab,oldTab);
+  assert.equal(original.tab.getAttribute('data-tid'),page.tabTid);
+  assert.equal(original.packageNode,m.PackageNodes.Items(0));
+  assert.ok(second.trace.some(e=>e.event==='save_continuations_observed'&&e.recovered_reopen===true&&e.native_identity_verified===true));
+  assert.equal(prep.savedPackageReopen,undefined);
+ }else{
+  assert.equal(original.tab,oldTab,'unproved ownership must remain refused');
+  if(second)assert.deepEqual(second.output.workflow_continuations,[]);
+ }
+ // Run the production native close/logout body against the same external
+ // Loginom objects used by both serialized Save actions.
+ page.app.Version='7.4.2';
+ page.context.document.contains=tab=>page.active&&tab.getAttribute('data-tid')===page.tabTid;
+ let closed=0,loggedOut=false;
+ m.HasRunningNodes=()=>false;
+ m.FServerConnection.Session.IsPackageModified=async()=>false;
+ m.ClosePackage=async(node,suppress,after)=>{
+  assert.equal(node,m.PackageNodes.Items(0));assert.equal(suppress,false);assert.equal(after,true);
+  closed++;m.PackageNodes.Count=0;page.active=false;return true;
+ };
+ page.waitForFunction=async fn=>{
+  for(let i=0;i<8;i++){if(fn())return;await Promise.resolve();}
+  throw Error('External native close did not settle');
+ };
+ page.locator=selector=>({locator(){return this;},async waitFor(){},
+  async click(){if(selector.includes('btnLogOut'))loggedOut=true;},async innerText(){return 'save-user';},async isVisible(){return !loggedOut;}});
+ const cleanup=await page.execute(makePackageCleanupCode({sessionId:'save-session',documentId:'doc',account:'save-user',
+  packagePath:path,loginomUrl:'https://loginom.invalid/app',loginomBuild:'7.4.2',
+  tabTid:second?.output.workflow_continuations[0]?.workflow_ref.tab_tid??oldTab.getAttribute('data-tid')}));
+ assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
+ assert.equal(cleanup.package_closed,accepted);assert.equal(cleanup.logged_out,accepted);
+ assert.equal(closed,accepted?1:0);assert.equal(loggedOut,accepted);
 });
 
 for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
