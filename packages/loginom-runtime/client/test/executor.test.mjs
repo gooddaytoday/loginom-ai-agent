@@ -934,7 +934,7 @@ test('normalization cannot rebind a replaced native node with the same rendered 
  assert.equal(result.trace.some(e=>e.event==='save_continuations_observed'),false);
 });
 
-for(const icon of ['bg-vendor-icon-linregression','bg-vendor-icon-clusterization'])for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
+for(const icon of ['bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'])for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
 test('Save normalizes an observed dirty node type exactly once: '+icon+' '+action+' '+modified,async()=>{
  const page=await restSavePage(modified,false);
  page.model.FDiagram.FNodes.FCollection.forEach((node,i)=>{node.FIconCls=['bg-vendor-icon-importtextfile','bg-vendor-icon-sorting','bg-vendor-icon-exporttextfile'][i];});
