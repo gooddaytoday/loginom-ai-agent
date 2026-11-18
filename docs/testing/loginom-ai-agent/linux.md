@@ -4,11 +4,18 @@
 
 ## Сборка
 
-Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node 24.19.0 и Chromium revision 1243; точные хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
+Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node 24.19.0 и Chromium revision 1246; точные хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
 
-Из `packages/desktop`:
+Затем установить зависимости клиента Dock закреплённым Node, как в CI (`.github/actions/setup-loginom-inputs`). Без них `bun run build` завершается ошибкой `Could not resolve "yaml"`. Из `packages/loginom-runtime/client`:
 
 ```sh
+npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+```
+
+Из `packages/desktop`. `NODE_OPTIONS` нужен из-за того, что electron-vite собирает весь backend в main-процесс; со стандартным лимитом кучи V8 сборка падает с OOM (значение то же, что в `release.yml`):
+
+```sh
+export NODE_OPTIONS=--max-old-space-size=6144
 export LOGINOM_AI_AGENT_CHANNEL=prod
 export LOGINOM_AI_AGENT_NODE_SOURCE=/absolute/cache/node-v24.19.0-linux-x64/bin/node
 export LOGINOM_AI_AGENT_BROWSER_SOURCE=/absolute/cache/browsers
@@ -109,6 +116,8 @@ Endpoint меняется только в собственной копии mani
 остаётся source regression suite.
 
 `test/loginom/gui-smoke.mjs` запускается закреплённым Node под Xvfb либо в отдельной Wayland-сессии. `LOGINOM_AI_AGENT_TEST_EXECUTABLE` указывает установленный бинарник; без переменной проверяется локальная сборка. `LOGINOM_AI_AGENT_TEST_CONFIG` — абсолютный путь к приватному тестовому конфигу Dock с разрешённой passwordless учётной записью. Значение ключа не передаётся в аргументах процесса или выводе. Проверка использует отдельный временный профиль, выполняет check/save, проверяет plaintext/0600 и повторный запуск без мастера.
+
+Для [#1202](https://github.com/gooddaytoday/loginom-ai-agent/issues/1202) задать `LOGINOM_AI_AGENT_TEST_DEFAULT_CONNECTION=1`. Этот сценарий использует предзаполненные поля и встроенный ключ справки. Он проверяет, что после выхода без сохранения мастер появляется снова, отдельная проверка не создаёт файл и после сохранения Desktop открывается без мастера.
 
 Для Wayland указать `LOGINOM_AI_AGENT_TEST_WAYLAND=1`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `XDG_SESSION_TYPE=wayland`, убрать `DISPLAY`. Проверка в headless Weston подтверждает использование протокола Wayland, но не заменяет пользовательский сеанс GNOME/KDE. Если Weston извлечён из пакетов без системной установки, его модули можно задать через `WESTON_MODULE_MAP` — пары `имя=путь`, разделённые `;` ([исходный загрузчик Weston](https://cgit.freedesktop.org/wayland/weston/tree/libweston/compositor.c)).
 

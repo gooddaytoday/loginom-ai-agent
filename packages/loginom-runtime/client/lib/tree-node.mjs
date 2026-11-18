@@ -1,6 +1,6 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -25,6 +25,7 @@ export function treeConfigurationReadback({node,phases,operation_id}){
 }
 
 export function createTreeNodeSupport(config,{json}){
+ const jsonFieldScopes=new WeakMap();
  const type=json?'trees.from_json':'trees.to_table',stage=json?'json_tree':'tree_table';
  return createTabularTransformNodeSupport(config,{
   type,mode:json?'auto_structure':'selected_nodes',revision:'tree-stage1-v1',
@@ -52,9 +53,18 @@ export function createTreeNodeSupport(config,{json}){
     // Native JSON-to-tree turns several rows into a root array, not root rows; refuse before mutation.
     need(!(port.port_kind!=='tree'&&Number.isSafeInteger(port.row_count)&&port.row_count>1),
      'Несколько документов JSON в одном импорте пока не поддержаны; подай один документ (multiple JSON documents per input are not supported yet)');
-    need(port.port_kind!=='tree'&&port.row_count===1&&port.sample?.length===1&&index>=0&&port.sample[0][index]?.is_null===false
-     &&typeof port.sample[0][index].value==='string','Tree stage 1 needs one non-NULL JSON string row in the exact input field');
-    validateTreeJsonScope(port.sample[0][index].value);
+    if(field===undefined&&request.target.kind==='existing'){
+     // A node configured outside this session keeps its field in the wizard; configure binds it to these JSON columns.
+     need(port.port_kind!=='tree'&&port.row_count===1&&port.sample?.length===1,'Tree stage 1 needs one non-NULL JSON string row in the exact input field');
+     const strings=(port.schema??[]).flatMap((c,i)=>c.type==='string'?[[c.name,port.sample[0][i]]]:[]);
+     const fields=strings.filter(([,cell])=>{if(cell?.is_null!==false||typeof cell.value!=='string')return false;try{validateTreeJsonScope(cell.value);return true;}catch{return false;}}).map(([name])=>name);
+     need(fields.length,'Existing JSON-to-tree node: no input string field holds one supported JSON document; pass parameters.json_field (string input fields: '+(strings.map(([name])=>name).join(', ')||'none')+')');
+     const key=options.operation.nodeApply?.request;if(key)jsonFieldScopes.set(key,{fields,strings:strings.map(([name])=>name)});
+    }else{
+     need(port.port_kind!=='tree'&&port.row_count===1&&port.sample?.length===1&&index>=0&&port.sample[0][index]?.is_null===false
+      &&typeof port.sample[0][index].value==='string','Tree stage 1 needs one non-NULL JSON string row in the exact input field');
+     validateTreeJsonScope(port.sample[0][index].value);
+    }
    }else{
     need(port.port_kind==='tree'&&port.tree?.complete===true,'Tree-to-table needs the actual complete typed tree port');
     validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,request.parameters.global_index_paths??previous?.global_index_paths);
@@ -89,6 +99,9 @@ export function createTreeNodeSupport(config,{json}){
    };
    if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_tree};
    if(json){
+    const jsonFields=jsonFieldScopes.get(request);
+    if(p.json_field===undefined&&jsonFields)need(jsonFields.fields.includes(s.node_tree.json_field),'Existing JSON-to-tree node field «'+s.node_tree.json_field
+     +'» is not a supported JSON input field; pass parameters.json_field (string input fields: '+(jsonFields.strings.join(', ')||'none')+')');
     if(p.json_field!==undefined&&s.node_tree.json_field!==p.json_field){
      await click(s.node_tree.base+'pedSourceColumn;ValueControl;trg_picker','open JSON input column');
      s=await channel.observe({condition:'JSON column option',readTrees:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.label===p.json_field&&e.allowed_actions.includes('click'))});
@@ -142,8 +155,18 @@ export function createTreeNodeSupport(config,{json}){
     }
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     await setBool('pedCompositeColumnDisplayNames',p.composite_labels);
+    if(p.label_separator!==undefined&&s.node_tree.label_separator!==p.label_separator){
+     // The native separator combo is enabled only with composite labels; option tids replace spaces with _ (LAB-1815 probe).
+     const names={'.':'Точка (.)','|':'Вертикальная черта (|)',' ':'Пробел ( )','-':'Дефис (-)','_':'Подчёркивание (_)'};
+     const control=s.node_tree.base+'pedCompositeDisplayNameSeparator;ValueControl',option=control+';boundlist;'+names[p.label_separator].replaceAll(' ','_');
+     await click(control+';trg_picker','open tree label separator');
+     s=await channel.observe({condition:'tree label separator option',readTrees:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===option&&e.allowed_actions.includes('click'))});
+     await channel.perform({condition:'choose tree label separator',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+      resolve:s=>({verb:'click',ref:one(s,e=>e.tid===option&&e.allowed_actions.includes('click'),'Unique tree label separator option required').ref})});
+    }
     s=await observe('complete tree-to-table settings');
-    need(!s.node_tree.composite_names&&!s.node_tree.composite_labels&&s.node_tree.label_separator==='.'
+    need(['composite_names','composite_labels','label_separator'].every(k=>p[k]===undefined||s.node_tree[k]===p[k])
+     &&treeLabelSeparators.includes(s.node_tree.label_separator)
      &&(wantIndex===undefined||same(indexed(s),wantIndex))&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
     if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
    }
@@ -160,7 +183,9 @@ export function createTreeNodeSupport(config,{json}){
    if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateJsonTreeSchema(output.tree.schema);}
    else{
     need(output.port_kind!=='tree'&&output.sample_complete===true,'Tree table must be read completely');
-    const names=mapped.configuration.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.name);
+    // Native composite names join the root and every path node with _ (LAB-1807 probe: Root_items_code).
+    const tree=mapped.configuration.nodes,chain=n=>n.parent===null?[n.name]:[...chain(tree[n.parent]),n.name];
+    const names=tree.filter(n=>!n.is_container&&n.selected).map(n=>mapped.configuration.composite_names?chain(n).join('_'):n.name);
     // A selected global index adds one native integer column; its generated name and position are read, not assumed.
     const indexes=mapped.configuration.nodes.filter(n=>n.is_array&&n.selected_global_index).length,extra=output.schema.filter(n=>!names.includes(n.name));
     need(output.schema.length===names.length+indexes&&extra.length===indexes&&extra.every(n=>n.type==='integer')

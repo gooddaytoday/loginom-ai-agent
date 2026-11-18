@@ -2,7 +2,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
+import {treeLabelSeparators,treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
@@ -78,7 +78,7 @@ for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'sav
  const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,
  });
@@ -138,7 +138,7 @@ function tableImplementation(json=false){
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,JSON,
  });
@@ -354,4 +354,118 @@ test('JSON tree Variant preflight admits scalar subtype changes and retains cont
  assert.equal(validateSelectedTreePaths(schema,['/items/value']),true);
  for(const value of ['{"items":[{"value":1},{"value":{"x":1}}]}','{"items":[{"value":[]},{"value":"x"}]}'])
   assert.throws(()=>validateTreeJsonScope(value));
+});
+
+test('tree-to-table admits native composite names, labels and the five separators; other values refuse before UI',()=>{
+ const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
+ const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ validateTreeParameters(base,'selected_nodes',request);
+ for(const label_separator of ['.','|',' ','-','_'])validateTreeParameters({...base,composite_names:true,composite_labels:true,label_separator},'selected_nodes',request);
+ for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,label_separator},'selected_nodes',request),/label_separator/);
+ for(const k of ['composite_names','composite_labels'])assert.throws(()=>validateTreeParameters({...base,[k]:'true'},'selected_nodes',request),new RegExp(k));
+});
+function compositeState(){
+ const state=tableState(false),W='W;';
+ state.node_tree.nodes=state.node_tree.nodes.map((n,index)=>({...n,index,parent:[null,0,0,2,2][index]}));
+ const box=key=>({tid:W+key+';ValueControl;DisplayEl',ref:key,allowed_actions:['click']});
+ state.ui.elements.push(box('pedCompositeColumnNames'),box('pedCompositeColumnDisplayNames'),
+  {tid:W+'pedCompositeDisplayNameSeparator;ValueControl;trg_picker',ref:'picker',allowed_actions:['click']});
+ return state;
+}
+function compositeChannel(state,performed){
+ const W='W;',options={'Вертикальная_черта_(|)':'|','Пробел_(_)':' ','Подчёркивание_(_)':'_','Точка_(.)':'.','Дефис_(-)':'-'};
+ return {observe:async o=>{assert.ok(o.ready(state));return structuredClone(state);},perform:async o=>{
+  const action=o.resolve(state);if(action.verb!=='click'){state.wizard.stage='done';return;}
+  performed.push(action.ref);const t=state.node_tree;
+  if(action.ref==='pedCompositeColumnNames')t.composite_names=!t.composite_names;
+  else if(action.ref==='pedCompositeColumnDisplayNames')t.composite_labels=!t.composite_labels;
+  else if(action.ref==='picker')for(const [name,value] of Object.entries(options))
+   state.ui.elements.push({tid:W+'pedCompositeDisplayNameSeparator;ValueControl;boundlist;'+name,ref:'option:'+value,label:name,role:'option',allowed_actions:['click']});
+  else if(action.ref.startsWith('option:')){t.label_separator=action.ref.slice(7);state.ui.elements=state.ui.elements.filter(e=>!e.tid.includes(';boundlist;'));}
+ }};
+}
+for(const [label_separator,clicks] of [['|',['picker','option:|']],[' ',['picker','option: ']],['_',['picker','option:_']],['.',[]]])
+ test('tree-to-table configure sets composite names, labels and separator '+JSON.stringify(label_separator),async()=>{
+  const state=compositeState(),performed=[];
+  const result=await tableImplementation().configure(compositeChannel(state,performed),
+   {repeat_parents:true,composite_names:true,composite_labels:true,label_separator},{request:{finish:'execute',target:{kind:'new'}}});
+  assert.deepEqual(performed,['pedCompositeColumnNames','pedCompositeColumnDisplayNames',...clicks]);
+  assert.deepEqual([result.configuration.composite_names,result.configuration.composite_labels,result.configuration.label_separator],[true,true,label_separator]);
+ });
+test('tree-to-table keeps the plain dot settings without clicks and refuses a separator that does not settle',async()=>{
+ let state=compositeState(),performed=[];
+ const plain=await tableImplementation().configure(compositeChannel(state,performed),
+  {repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'},{request:{finish:'execute',target:{kind:'new'}}});
+ assert.deepEqual(performed,[]);assert.equal(plain.configuration.label_separator,'.');
+ state=compositeState();performed=[];const channel=compositeChannel(state,performed),perform=channel.perform;
+ channel.perform=async o=>{const a=o.resolve(state);if(a.ref?.startsWith?.('option:')){performed.push(a.ref);return;}return perform(o);};
+ await assert.rejects(tableImplementation().configure(channel,{composite_labels:true,label_separator:'|'},{request:{finish:'execute',target:{kind:'existing'}}}),/settings differ/);
+});
+test('tree-to-table read expects native composite names Root_<path> in leaf order',async()=>{
+ const configuration={...compositeState().node_tree,composite_names:true,composite_labels:true},implementation=tableImplementation();
+ const read=async(schema,config=configuration)=>implementation.readOutputs({readOutputPort:async()=>({output:{port_kind:'table',sample_complete:true,schema}})},
+  {ports:[0],sample_rows:100},{portExecution:{},execution:{execution_id:'exec'},receipt_id:'r'},{configuration:config});
+ const col=(name,type='string')=>({name,type});
+ assert.equal((await read([col('Root_batch'),col('Root_items_code'),col('Root_items_qty','integer')])).verified,true);
+ for(const schema of [[col('batch'),col('code'),col('qty','integer')],[col('items_code'),col('items_qty','integer'),col('batch')],
+  [col('Root_items_code'),col('Root_batch'),col('Root_items_qty','integer')],[col('Root.batch'),col('Root.items.code'),col('Root.items.qty','integer')]])
+  await assert.rejects(read(schema),/field names or order differ/);
+ assert.equal((await read([col('batch'),col('code'),col('qty','integer')],{...configuration,composite_names:false})).verified,true);
+});
+// LAB-1830: an existing JSON-to-tree node configured outside this session is rerun with parameters:{}.
+function existingJsonPreflight(columns,parameters={},implementation=null){
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'},target={document_id:'doc',workflow_id:'wf',node_id:'tree'};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'existing',type:'trees.from_json',ref:target},parameters,inputs:[],finish:'execute'};
+ const port={port:0,port_guid:'port',fresh:true,sample_complete:true,execution_id:'exec',row_count:1,schema:columns.map(([name,type])=>({name,type})),
+  sample:[columns.map(([,,value])=>({is_null:value===null,value}))]};
+ const history=[{cleanup_confirmed:true,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node:source,cleanup_complete:true,
+  execution:{status:'completed',execution_id:'exec'},output:{ports:[port]}}}}];
+ const graph={nodes:[{ref:source},{ref:target}],links:[{source:'source',target:'tree',input:0,output:0}]};
+ const nodeApply={request:structuredClone(request)};
+ const operation={id:'op',parameters:request,nodeApply,nodeTargetAdapter:{observe:async()=>graph}};
+ const options={operation,execute:async()=>({verified:true,ports:[{index:0,active:true,port_guid:'port'}]}),nodeHistory:()=>history,now:Date.now,onRecord:async event=>event};
+ const ctx={deadline:Date.now()+10000};
+ const result=implementation?implementation.preflight(options,ctx)
+  :createTreeNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'},{json:true}).nodeApplyDriverFactory(options).beforeTarget(ctx);
+ return result.then(result=>({result,request:nodeApply.request}));
+}
+function jsonImplementation(){
+ const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
+ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+ return vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
+  createTabularTransformNodeSupport:(_config,implementation)=>implementation,makeNodeOutputContextCode:()=>'code',
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,validateTreeJsonScope,treeConfigurationReadback,
+  need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
+  one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,
+ })({}, {json:true});
+}
+function jsonConfigure(implementation,native,p,request){
+ const state={prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'json_tree',root_tid:'W'},
+  node_tree:{verified:true,inventory_complete:true,json_field:native,auto_structure:true,strict:true,exclude_root:false,root_mode:'auto'},
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
+ const channel={observe:async()=>structuredClone(state),perform:async()=>{state.wizard.stage='done';}};
+ return implementation.configure(channel,p,{request});
+}
+const doc='{"items":[{"sku":"A"}]}',columns=[['Name','string','note'],['Document','string',doc],['Count','integer',1]];
+test('existing JSON tree without json_field binds the native field to the JSON input columns',async()=>{
+ assert.equal((await existingJsonPreflight(columns)).result.verified,true);
+ for(const [native,error] of [['Document',null],['Name',/field «Name» is not a supported JSON input field; pass parameters\.json_field \(string input fields: Name, Document\)/],
+  ['',/pass parameters\.json_field \(string input fields: Name, Document\)/]]){
+  const implementation=jsonImplementation(),{result,request}=await existingJsonPreflight(columns,{},implementation);
+  assert.equal(result.verified,true);
+  if(error)await assert.rejects(jsonConfigure(implementation,native,{},request),error);
+  else assert.equal((await jsonConfigure(implementation,native,{},request)).verified,true);
+ }
+});
+test('existing JSON tree without a JSON input column refuses before mutation with the json_field hint',async()=>{
+ await assert.rejects(existingJsonPreflight([['Name','string','note'],['Document','string',null]]),
+  /no input string field holds one supported JSON document; pass parameters\.json_field \(string input fields: Name, Document\)/);
+ await assert.rejects(existingJsonPreflight([['Count','integer',1]]),/pass parameters\.json_field \(string input fields: none\)/);
+});
+test('existing JSON tree with explicit json_field keeps the exact-field preflight',async()=>{
+ const implementation=jsonImplementation(),{result,request}=await existingJsonPreflight([['Name','string','note'],['Document','string',doc]],{json_field:'Document'},implementation);
+ assert.equal(result.verified,true);
+ await assert.rejects(existingJsonPreflight([['Name','string',doc]],{json_field:'Document'}),/one non-NULL JSON string row in the exact input field/);
+ assert.equal((await jsonConfigure(implementation,'Document',{json_field:'Document'},request)).verified,true);
 });

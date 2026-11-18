@@ -805,6 +805,17 @@ status «PASS с ограничением платформы D76»; port read an
 The CSV compares Variant integers as numbers; Int64 exactness is proven only
 by the typed read. Variant NULL is not covered (the R4 Collapse drops NULL).
 
+`trees-to-table-composite` (LAB-1815) uses `trees-treetodata/acceptance/modes/task-composite.md`
+and the prepared `fixtures/modes/composite-source.lgp`: Documents (relative
+`documents.csv`, seeded into the own package folder) → DocumentTree, JSON to tree
+with user labels batch/items/code/qty = Партия/Позиции/Код/Количество on its output
+port (native «Настроить порт…»; the model cannot set tree labels). The prompt names
+only the prepared node. The model adds Tree to Table with composite names and labels,
+separator «.». Private `expected-composite-run.json` is the pair oracle's
+`tree_to_table_composite_projection` (owner decision `tree-composite-native`): exact
+names `Root_items_code`, `Root_items_qty` and labels `Root.Позиции.Код`,
+`Root.Позиции.Количество`, two rows, its CSV, Save and cold.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.
@@ -1200,6 +1211,8 @@ CSV в порядке задания, cold Execute проверяет после
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
 
+`variables-union-type-refusal`: по решению владельца `variables-union-refusal-reads` ([LAB-1851](mention://issue/01a1ef25-a792-7d35-b096-1c6cd0fdfcb8)) после отказа разрешён только `read_existing_output` / `execution_policy:existing` готовых источников без изменения настроек (finish receipt `settings_applied:false`, `execution_started:false`); изменение настроек/источников и создание узлов остаются FAIL. Для ожидаемого отказа CSV/cold штатно неприменимы, включая запуск с `--cold`.
+
 `variables-union-inputs`: на одном native Соединении сначала два входа, затем
 третий, затем удаление только третьей связи. Три независимых Variables Calculator
 берут точные имена/метки/типы/значения из modes.json. Полный ordered variable
@@ -1294,6 +1307,7 @@ typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 
 `clustering-apply`: обучение k=3/none/seed 42 на train.csv, замена источника
 того же импорта на holdout.csv, Activate сохранённого узла без Teach.
+X/Y допускают integer или real при совпадении типов train/holdout и обоих выходов (решение `clustering-apply-types-consistent`, LAB-1850).
 Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
 2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
 и два исходных CSV передаются модели; oracle/expected остаются в оснастке.

@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {validateTreeConversionParameters,validateTableTreeSource,validateSerializationTree,tableToTreeParametersSchema,treeToJsonParametersSchema} from '../lib/tree-conversion-parameters.mjs';
 import {createTreeConversionNodeSupport} from '../lib/tree-conversion-node.mjs';
+import {makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
 import {nodeApplyInputSchema} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
@@ -17,7 +18,7 @@ async function conversionImplementation(table){
  const source=await readFile(new URL('../lib/tree-conversion-node.mjs',import.meta.url),'utf8');
  const factory=vm.runInNewContext(source.replace(/^import .*;$/gm,'').replaceAll('export ','')+';createTreeConversionNodeSupport',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  tableToTreeParametersSchema,treeToJsonParametersSchema,validateTreeConversionParameters,validateTableTreeSource,validateSerializationTree,structuredClone,
+  tableToTreeParametersSchema,treeToJsonParametersSchema,validateTreeConversionParameters,validateTableTreeSource,validateSerializationTree,makeNodeOutputContextCode,structuredClone,
  });
  return factory({}, {table});
 }
@@ -102,6 +103,38 @@ test('existing table conversion retains its last verified settings after a later
  const driver=support.nodeApplyDriverFactory({operation:{id:'op',parameters:request,nodeTargetAdapter:{observe:async()=>({nodes:[],links:[]})}},
   execute:async()=>({verified:true,ports:[{index:0,active:true,port_guid:'port'}]}),nodeHistory:()=>history,onRecord:async e=>e});
  assert.equal((await driver.beforeTarget({deadline:Date.now()+10000})).verified,true);
+});
+
+for(const invalid of [null,'field','size'])test('existing table conversion without session settings validates the native structure: '+(invalid??'retained'),async()=>{
+ const implementation=await conversionImplementation(true);
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'},target={...source,node_id:'target'};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'trees.from_table',ref:target},parameters:{},inputs:[],mappings:[],finish:'execute'};
+ const schema=nodes.filter(n=>n.source_field).map(n=>({name:n.source_field,type:n.type}));
+ const port={port:0,port_guid:'port',fresh:true,sample_complete:true,execution_id:'exec',row_count:3,schema,sample:[[],[],[]]};
+ if(invalid==='size'){port.row_count=100;port.sample=Array.from({length:100},()=>[]);}
+ const history=[{cleanup_confirmed:true,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node:source,cleanup_complete:true,
+  execution:{status:'completed',execution_id:'exec'},output:{ports:[port]}}}}];
+ const options={operation:{id:'op',parameters:request,nodeApply:{request},nodeTargetAdapter:{observe:async()=>({nodes:[{ref:source},{ref:target}],
+  links:[{source:'source',target:'target',input:0,output:0}]})}},nodeHistory:()=>history,
+  execute:async()=>({verified:true,ports:[{index:0,active:true,port_guid:'port'}]}),onRecord:async e=>e};
+ assert.equal((await implementation.preflight(options,{deadline:Date.now()+10000})).verified,true);
+ const native=structuredClone(nodes);
+ if(invalid==='field')native[2].source_field='Missing';
+ const state={prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'table_tree',root_tid:'W'},
+  node_tree:{verified:true,inventory_complete:true,nodes:native},ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
+ const actions=[];
+ const channel={observe:async o=>{assert.ok(o.ready(state),o.condition);return structuredClone(state);},perform:async o=>{
+  actions.push(o.resolve(state));state.wizard.stage='done';}};
+ const configure=()=>implementation.configure(channel,{}, {request});
+ if(invalid){
+  await assert.rejects(configure,invalid==='field'?/Tree source field\/type differs: Missing/:/Tree instances exceed 256/);
+  assert.deepEqual(actions,[]);
+ }else{
+  assert.equal((await configure()).verified,true);
+  assert.deepEqual(state.node_tree.nodes,nodes);
+  assert.equal(actions.length,1);assert.equal(actions[0].verb,'wizard_step');
+ }
 });
 
 for(const type of ['integer','datetime','variant'])test('replacement maps new '+type+' leaves without opening Clear Links confirmation',async()=>{

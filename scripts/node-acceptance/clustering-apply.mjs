@@ -4,6 +4,24 @@ import {matchesExpectedOutput} from './expected-outputs.mjs';
 const need=(v,m)=>{if(!v)throw Error('CLUSTERING_APPLY_'+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
+function featureTypes(expected,fields){
+ return Object.fromEntries(expected.clustering_apply.features.map(name=>{
+  const matches=(fields??[]).filter(f=>f.name===name),column=expected.outputs[0].columns.find(f=>f.name===name);
+  need(matches.length===1&&(column.types??[column.type]).includes(matches[0].type),'FEATURE_TYPES');
+  return [name,matches[0].type];
+ }));
+}
+function withFeatureTypes(expected,types){
+ // Owner decision clustering-apply-types-consistent (LAB-1850): auto-detected
+ // integer features are valid, but train/holdout and both ports must agree.
+ // https://mas.kartamyshev.dev/issues/01a1ef25-a54e-76bc-b5c1-15e748558916
+ return {...expected,outputs:expected.outputs.map(o=>({...o,columns:o.columns.map(f=>{
+  if(!Object.hasOwn(types,f.name))return f;
+  const {types:allowed,tolerance,...column}=f;
+  return {...column,type:types[f.name],...(types[f.name]==='real'&&tolerance?{tolerance}:{})};
+ })}))};
+}
+
 export function applyColdExpected(expected){
  return {...expected,outputs:expected.outputs.map((o,port)=>{
   const order=expected.clustering_apply.cold_column_order[port];
@@ -55,20 +73,32 @@ function* receipts(v){
  for(const child of Object.values(v))if(child&&typeof child==='object')yield* receipts(child);
 }
 export function checkApplyMain(expected,replies){
- const c=expected.clustering_apply;let trained,applied;
+ const c=expected.clustering_apply;let imported,trained,trainedTypes,applied;
  for(const r of receipts(replies)){
   const config=r.configuration?.readback;
+  if(config?.kind==='text_import'&&r.execution.status==='completed'){
+   need(r.cleanup_complete===true,'IMPORT_CLEANUP');
+   imported=featureTypes(expected,config.columns);
+   need(same(imported,featureTypes(expected,r.output.ports.find(p=>p.port===0)?.schema)),'IMPORT_OUTPUT_TYPES');
+   continue;
+  }
   if(config?.kind!=='clustering'||r.execution.status!=='completed')continue;
   need(r.cleanup_complete===true&&config.clusters===c.clusters&&config.seed===c.seed&&config.normalization==='none'&&same(config.features,c.features),'CONFIGURATION');
-  if(config.mode==='k_means'&&config.training?.status==='trained')trained=r;
+  if(config.mode==='k_means'&&config.training?.status==='trained'){
+   need(imported,'TRAIN_IMPORT_TYPES');
+   trained=r;trainedTypes=imported;
+   need(r.output.ports.length===2&&r.output.ports.every(p=>same(featureTypes(expected,p.schema),trainedTypes)),'TRAIN_OUTPUT_TYPES');
+   imported=undefined;
+  }
   if(config.mode!=='apply')continue;
   need(trained&&r.node.node_id===trained.node.node_id&&r.execution.execution_id!==trained.execution.execution_id,'TRAIN_THEN_APPLY_SAME_NODE');
   need(config.training?.status==='not_requested','NO_TRAINING');
+  need(imported&&same(imported,trainedTypes),'HOLDOUT_IMPORT_TYPES');
   const records=r.output.ports.map(data=>{
    need(data.fresh===true&&data.freshness_basis==='completed_execution_port_source'&&data.execution_id===r.execution.execution_id,'PORT_PROOF');
    return {type:'datamining.clustering',output_port:data.port,data};
   });
-  applied=checkApplyRound(expected,records);
+  applied=checkApplyRound(withFeatureTypes(expected,trainedTypes),records);
  }
  need(applied,'APPLY_RECEIPT');return applied;
 }

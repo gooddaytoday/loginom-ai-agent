@@ -1,9 +1,12 @@
+import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import { resolve, join } from "node:path"
 import { tmpdir } from "node:os"
 const require = createRequire(new URL("../../../loginom-runtime/client/package.json", import.meta.url))
-const { _electron } = require("playwright-core")
+const { _electron } = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
+  ? createRequire(join(process.env.LOGINOM_AI_AGENT_TEST_RESOURCES, "runtime/client/package.json"))("playwright-core")
+  : require("playwright-core")
 const directory = resolve(import.meta.dirname, "../..")
 const profile = await mkdtemp(join(tmpdir(), "loginom-gui-"))
 const evidence = join(tmpdir(), "loginom-gui-evidence")
@@ -19,10 +22,18 @@ const launch = () =>
     ],
     cwd: directory,
     env: { ...process.env, LOGINOM_AI_AGENT_TEST_ONBOARDING: "1", LOGINOM_AI_AGENT_TEST_ROOT: profile },
+    chromiumSandbox: true,
     timeout: 120_000,
   })
-const application = await launch()
+const defaultConnection = process.env.LOGINOM_AI_AGENT_TEST_DEFAULT_CONNECTION === "1"
+let application = await launch()
 try {
+  if (defaultConnection) {
+    const first = await application.firstWindow()
+    await first.locator('[data-component="settings-loginom"]').waitFor({ timeout: 120_000 })
+    await application.close()
+    application = await launch()
+  }
   const page = await application.firstWindow()
   const form = page.locator('[data-component="settings-loginom"]')
   await form.waitFor({ timeout: 120_000 })
@@ -53,11 +64,23 @@ try {
   await mkdir(evidence, { recursive: true })
   await page.screenshot({ path: join(evidence, "first-launch.png") })
   console.log(JSON.stringify({ status: "PASS", ...result }))
-  if (process.env.LOGINOM_AI_AGENT_TEST_CONFIG) {
-    const config = JSON.parse(await readFile(process.env.LOGINOM_AI_AGENT_TEST_CONFIG, "utf8"))
-    if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
-    await form.locator('input[type="url"]').fill(config.loginom_url)
-    await form.locator('input[autocomplete="username"]').fill(config.workflow_profile.loginom_user)
+  if (defaultConnection || process.env.LOGINOM_AI_AGENT_TEST_CONFIG) {
+    const file = join(profile, "desktop/loginom/connection/connection.json")
+    if (defaultConnection) {
+      const check = form.getByRole("button", { name: /^(Check connection|Проверить подключение)$/ })
+      await check.click()
+      await form.locator('[data-browser-state="verified"]').waitFor({ timeout: 180_000 })
+      const checked = await page.evaluate(() => window.api.loginom.read())
+      assert.equal(checked.revision, 0)
+      assert.equal(checked.generation, 0)
+      assert.equal(checked.state, "unconfigured")
+      await assert.rejects(stat(file), { code: "ENOENT" })
+    } else {
+      const config = JSON.parse(await readFile(process.env.LOGINOM_AI_AGENT_TEST_CONFIG, "utf8"))
+      if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
+      await form.locator('input[type="url"]').fill(config.loginom_url)
+      await form.locator('input[autocomplete="username"]').fill(config.workflow_profile.loginom_user)
+    }
     await form.locator('button[type="submit"]').click()
     await waitReady(page)
     await form.waitFor({ state: "hidden", timeout: 10_000 }).catch(async () => {
@@ -71,37 +94,11 @@ try {
       )
       throw Error("ONBOARDING_DID_NOT_CLOSE")
     })
-    const wordmark = page.locator('[data-component="wordmark-v2"]')
-    if (!(await wordmark.count())) await page.locator('[data-action="home-new-session"]').first().click()
-    await wordmark.waitFor({ timeout: 30_000 })
-    const brand = await wordmark.evaluate((svg) => {
-      const text = svg.querySelector("text")
-      const accent = svg.querySelector("tspan")
-      const bounds = text.getBBox()
-      return {
-        label: svg.getAttribute("aria-label"),
-        text: text.textContent.trim(),
-        accent: accent.textContent.trim(),
-        accentFill: getComputedStyle(accent).fill,
-        accentOpacity: getComputedStyle(accent).fillOpacity,
-        bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
-        fits: bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 720 && bounds.y + bounds.height <= 129,
-      }
-    })
-    await page.screenshot({ path: join(evidence, "new-chat.png") })
-    if (
-      brand.label !== "Loginom AI" ||
-      brand.text !== "Loginom AI" ||
-      brand.accent !== "AI" ||
-      brand.accentFill !== "rgb(199, 146, 146)" ||
-      brand.accentOpacity !== "0.32" ||
-      !brand.fits
-    )
-      throw Error(`NEW_CHAT_BRANDING_INVALID: ${JSON.stringify(brand)}`)
-    console.log(JSON.stringify({ status: "PASS", newChatBrand: brand }))
+    await page.getByRole("button", { name: "Loginom", exact: true }).waitFor({ timeout: 60_000 })
+    if (!defaultConnection) await checkNewChatBrand(page)
     const safe = await page.evaluate(() => window.api.loginom.read())
     if (!safe.generation || "hasApiKey" in safe) throw Error("SECRET_READBACK_INVALID")
-    const file = join(profile, "desktop/loginom/connection/connection.json")
+    if (defaultConnection) assert.equal(safe.generation, 1)
     if (process.platform !== "win32" && (await stat(file)).mode % 512 !== 0o600)
       throw Error("SECRET_PERMISSIONS_INVALID")
     const stored = JSON.parse(await readFile(file, "utf8"))
@@ -118,6 +115,7 @@ try {
     try {
       const page = await again.firstWindow()
       await waitReady(page)
+      await page.getByRole("button", { name: "Loginom", exact: true }).waitFor({ timeout: 60_000 })
       if (await page.locator('[data-component="settings-loginom"]').count()) throw Error("WIZARD_REPEATED")
       console.log("PASS: saved connection restored without repeating first-launch wizard")
     } finally {
@@ -127,6 +125,37 @@ try {
 } finally {
   await application.close().catch(() => undefined)
   await rm(profile, { recursive: true, force: true })
+}
+
+async function checkNewChatBrand(page) {
+  const wordmark = page.locator('[data-component="wordmark-v2"]')
+  if (!(await wordmark.count())) await page.locator('[data-action="home-new-session"]').first().click()
+  await wordmark.waitFor({ timeout: 30_000 })
+  const brand = await wordmark.evaluate((svg) => {
+    const text = svg.querySelector("text")
+    const accent = svg.querySelector("tspan")
+    const bounds = text.getBBox()
+    return {
+      label: svg.getAttribute("aria-label"),
+      text: text.textContent.trim(),
+      accent: accent.textContent.trim(),
+      accentFill: getComputedStyle(accent).fill,
+      accentOpacity: getComputedStyle(accent).fillOpacity,
+      bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+      fits: bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 720 && bounds.y + bounds.height <= 129,
+    }
+  })
+  await page.screenshot({ path: join(evidence, "new-chat.png") })
+  if (
+    brand.label !== "Loginom AI" ||
+    brand.text !== "Loginom AI" ||
+    brand.accent !== "AI" ||
+    brand.accentFill !== "rgb(199, 146, 146)" ||
+    brand.accentOpacity !== "0.32" ||
+    !brand.fits
+  )
+    throw Error(`NEW_CHAT_BRANDING_INVALID: ${JSON.stringify(brand)}`)
+  console.log(JSON.stringify({ status: "PASS", newChatBrand: brand }))
 }
 
 async function waitReady(page) {

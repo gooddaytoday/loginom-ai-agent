@@ -3,12 +3,51 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {checkApplyRound,checkApplyMain,applyColdExpected} from '../clustering-apply.mjs';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
 const root=new URL('../../../docs/node-development/nodes/datamining-clustering/acceptance/v040/',import.meta.url);
 const expected=JSON.parse(readFileSync(new URL('expected-apply-run.json',root),'utf8'));
 function records(e=expected){
  return e.outputs.map((o,port)=>({type:'datamining.clustering',output_port:port,data:{schema:o.columns.map(({name,type})=>({name,type})),row_count:o.rows.length,sample_complete:true,precision:{numbers_verified:true},sample:o.rows.map(row=>o.columns.map(f=>({type:f.type,is_null:false,value:f.type==='integer'?String(row[f.name]+(f.name==='Cluster'?17:0)):row[f.name]})))}}));
 }
 function receipt(mode,id){return {status:'SUCCEEDED',cleanup_complete:true,node:{node_id:'same'},execution:{status:'completed',execution_id:id},configuration:{readback:{kind:'clustering',mode,features:['X','Y'],clusters:3,seed:42,normalization:'none',training:{status:mode==='apply'?'not_requested':'trained'}}},output:{ports:records().map(r=>({...r.data,port:r.output_port,fresh:true,freshness_basis:'completed_execution_port_source',execution_id:id}))}};}
+function typedRun(type){
+ const e=structuredClone(expected);
+ for(const o of e.outputs)for(const f of o.columns)if(['X','Y'].includes(f.name))f.type=type;
+ const imports=id=>({status:'SUCCEEDED',cleanup_complete:true,node:{node_id:'import'},execution:{status:'completed',execution_id:id},configuration:{readback:{kind:'text_import',columns:['X','Y'].map(name=>({name,type}))}},output:{ports:[{port:0,schema:['X','Y'].map(name=>({name,type}))}]}});
+ const clustering=(mode,id)=>({...receipt(mode,id),output:{ports:records(e).map(r=>({...r.data,port:r.output_port,fresh:true,freshness_basis:'completed_execution_port_source',execution_id:id}))}});
+ return [imports('train-import'),clustering('k_means','train'),imports('holdout-import'),clustering('apply','apply')];
+}
+test('consistent integer and real imports, assignments and centers pass main and cold',()=>{
+ for(const type of ['integer','real']){
+  const e=checkApplyMain(expected,typedRun(type));
+  assert.doesNotThrow(()=>parseExpectedOutputs({...e,package_path:'/test.lgp'}));
+  assert.ok(e.outputs.every(o=>o.columns.filter(f=>['X','Y'].includes(f.name)).every(f=>f.type===type)));
+  const cold=records(applyColdExpected(e));
+  cold.forEach(t=>t.data.sample.forEach(row=>row[0].value=String(Number(row[0].value)-17)));
+  assert.ok(checkApplyRound(e,cold,{cold:true}));
+  cold[1].data.schema[1].type=type==='integer'?'real':'integer';
+  assert.throws(()=>checkApplyRound(e,cold,{cold:true}),/NATIVE_SCHEMA_ORDER/);
+ }
+});
+test('mixed import, holdout, assignment and center types refuse in either direction',()=>{
+ for(const type of ['integer','real'])for(const index of [0,1,2,3]){
+  const r=typedRun(type),other=type==='integer'?'real':'integer';
+  r[index]=typedRun(other)[index];
+  assert.throws(()=>checkApplyMain(expected,r),/CLUSTERING_APPLY/);
+ }
+ for(const port of [0,1]){
+  const r=typedRun('integer'),table=r[3].output.ports[port];
+  table.schema.forEach((f,i)=>{if(f.name==='X'){f.type='real';table.sample.forEach(row=>row[i]={...row[i],type:'real',value:Number(row[i].value)});}});
+  assert.throws(()=>checkApplyMain(expected,r),/CLUSTERING_APPLY/);
+ }
+});
+test('consistent numeric types never allow a changed saved center or missing import proof',()=>{
+ for(const type of ['integer','real']){
+  const r=typedRun(type);r[3].output.ports[1].sample[0][1].value=59;
+  assert.throws(()=>checkApplyMain(expected,r),/SAVED_CENTERS_UNCHANGED/);
+  assert.throws(()=>checkApplyMain(expected,typedRun(type).filter(r=>r.configuration.readback.kind==='clustering')),/CLUSTERING_APPLY/);
+ }
+});
 test('apply resolves arbitrary labels without deriving centers from holdout',()=>{
  const e=checkApplyRound(expected,records());
  assert.equal(e.outputs[0].rows[3].Distance,80);assert.equal(e.outputs[0].rows[3].Cluster,18);
@@ -20,9 +59,9 @@ test('retraining, wrong assignments, NULL/types/order and incomplete reads refus
  }
 });
 test('apply requires training first, same node, fresh proof and no Teach receipt',()=>{
- assert.ok(checkApplyMain(expected,[receipt('k_means','train'),receipt('apply','apply')]));
- for(const mutate of [r=>r.shift(),r=>r.reverse(),r=>r[1].node.node_id='other',r=>r[1].configuration.readback.training.status='trained',r=>r[1].output.ports[0].fresh=false,r=>r[1].configuration.readback.seed=7]){
-  const r=[receipt('k_means','train'),receipt('apply','apply')];mutate(r);assert.throws(()=>checkApplyMain(expected,r),/CLUSTERING_APPLY/);
+ assert.ok(checkApplyMain(expected,typedRun('real')));
+ for(const mutate of [r=>r.splice(1,1),r=>r.reverse(),r=>r[3].node.node_id='other',r=>r[3].configuration.readback.training.status='trained',r=>r[3].output.ports[0].fresh=false,r=>r[3].configuration.readback.seed=7]){
+  const r=typedRun('real');mutate(r);assert.throws(()=>checkApplyMain(expected,r),/CLUSTERING_APPLY/);
  }
 });
 test('cold requires its exact column order and preserves resolved labels',()=>{

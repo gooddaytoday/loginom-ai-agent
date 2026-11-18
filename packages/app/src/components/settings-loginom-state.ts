@@ -105,7 +105,12 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       !!state.password ||
       (state.passwordMode === "empty") !== !state.baseline.hasPassword)
   const disabled = () => !state.baseline || busy() || pending()
-  const canSave = () => !disabled() && (dirty() || !!state.view?.failure || state.view?.state === "recoverable-error")
+  const canSave = () =>
+    !disabled() &&
+    (dirty() ||
+      !!state.view?.failure ||
+      state.view?.state === "recoverable-error" ||
+      state.view?.state === "unconfigured")
 
   function error(value: unknown) {
     if (!disposed) setState({ failed: true, message: loginomError(value) })
@@ -180,13 +185,14 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (disposed) return
       setState("checkedBrowser", validation.browser ? { ...validation.browser } : undefined)
       if (!save) {
+        const unsaved = dirty() || state.view?.state === "unconfigured"
         setState(
           "message",
           validation.browser && validation.browser.state !== "verified"
-            ? dirty()
+            ? unsaved
               ? "loginom.helpChecked"
               : "loginom.helpCheckedSaved"
-            : dirty()
+            : unsaved
               ? "loginom.checked"
               : "loginom.checkedSaved",
         )
@@ -206,9 +212,10 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (disposed) return
       setState("view", reconcile({ ...current }))
       setState("baseline", { ...state.baseline!, revision: current.revision })
-      // The settings are durable but activation awaits explicit recovery. The
-      // form already shows that notice; this is not a failed connection check.
-      if (current.recoveries?.length && !current.failure) return
+      // Keep the draft until a first connection has activated, so an activation
+      // failure still allows retrying with the entered values.
+      if (!current.failure && (current.recoveries?.length || (current.state === "pending" && !current.generation)))
+        return
       if (current.failure || !["ready", "pending"].includes(current.state))
         throw Error(current.failure ?? "LOGINOM_RUNTIME_START_FAILED")
       apply(current)

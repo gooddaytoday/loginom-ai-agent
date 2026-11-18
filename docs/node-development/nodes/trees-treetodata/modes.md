@@ -40,3 +40,10 @@ Reader настроек уже читает выбранный глобальн�
 `native_status: observed`; сценарий `trees-to-table-siblings`
 (`fixtures/siblings/documents.csv`, `expected-siblings-run.json`).
 `trees.from_json` аддитивно принимает соседние массивы объектов.
+
+LAB-1815, composite: `native_status` — наблюдено (Loginom 7.4.2, проба LAB-1807 и
+мастер LAB-1815). Имена — Root и сегменты пути через `_` (`Root_items_code`), метки —
+метки дерева через разделитель (`Root.Позиции.Код`, «|» — `Root|Позиции|Код`).
+Разделитель — combo `pedCompositeDisplayNameSeparator` (`.` `|` пробел `-` `_`,
+опции `;boundlist;<имя>`), активен только с составными метками. Новый native узел
+включает составные метки по умолчанию; обработчик задаёт все три настройки явно.

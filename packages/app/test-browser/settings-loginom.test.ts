@@ -96,6 +96,66 @@ describe("Loginom settings", () => {
     f.dispose()
   })
 
+  test("a new profile can check and save unchanged connection defaults", async () => {
+    const f = setup({
+      revision: 0,
+      generation: 0,
+      url: Product.connection.url,
+      username: Product.connection.username,
+      state: "unconfigured",
+    })
+    try {
+      await f.form.load()
+      expect(f.form.canSave()).toBe(true)
+      await f.form.submit(false)
+      expect(await f.api.read()).toMatchObject({ revision: 0, generation: 0, state: "unconfigured" })
+      expect(f.saves).toHaveLength(0)
+      expect(f.closed).toHaveLength(0)
+      expect(f.form.canSave()).toBe(true)
+
+      f.update({ state: "ready" })
+      await f.form.submit(true)
+      const candidate = {
+        revision: 0,
+        url: Product.connection.url,
+        username: Product.connection.username,
+        password: { operation: "empty" },
+      }
+      expect(f.checks).toEqual([candidate, candidate])
+      expect(f.saves).toEqual([{ revision: 0, validationId: "checked" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ revision: 1, generation: 1, state: "ready" })
+      expect(f.form.canSave()).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("checking unchanged defaults in a new profile reports the connection as not saved", async () => {
+    const defaults = {
+      revision: 0,
+      generation: 0,
+      url: Product.connection.url,
+      username: Product.connection.username,
+    }
+    const fresh = setup({ ...defaults, state: "unconfigured" })
+    const configured = setup({ ...defaults, revision: 1, generation: 1 })
+    try {
+      await fresh.form.load()
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.checked")
+      const browser = { state: "unknown" as const }
+      fresh.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.helpChecked")
+
+      await configured.form.load()
+      await configured.form.submit(false)
+      expect(configured.form.state.message).toBe("loginom.checkedSaved")
+    } finally {
+      fresh.dispose()
+      configured.dispose()
+    }
+  })
   test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {
     expect(loginomBrowserMessage()).toBe("loginom.browserUnknown")
     expect(loginomBrowserMessage({ state: "unknown" })).toBe("loginom.browserUnknown")
@@ -274,8 +334,29 @@ describe("Loginom settings", () => {
       // The built-in knowledge key replaced the user key; the form never sends one.
       expect(f.checks[0]).not.toHaveProperty("apiKey")
       expect(f.checks[0].password).toEqual({ operation: "preserve" })
+      expect(f.form.canSave()).toBe(false)
       await f.form.submit(true)
       expect(f.saves).toHaveLength(0)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("a first save awaiting activation keeps the draft for retry if activation fails", async () => {
+    const f = setup({ state: "unconfigured", revision: 0, generation: 0 })
+    try {
+      await f.form.load()
+      f.form.edit({ username: "draft", password: "replacement", passwordMode: "replace" })
+      f.api.save = async () => {
+        f.update({ state: "pending", revision: 1 })
+        return f.api.read()
+      }
+      await f.form.submit(true)
+      expect(f.closed).toHaveLength(0)
+      f.update({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      await f.form.refresh()
+      expect(f.form.state.username).toBe("draft")
+      expect(f.form.state.password).toBe("replacement")
+      expect(f.form.canSave()).toBe(true)
     } finally {
       f.dispose()
     }

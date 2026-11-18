@@ -598,3 +598,33 @@ test('folder listing returns every native Files row with its own storage referen
  assert.deepEqual(await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list'),result);
  await assert.rejects(r.serverDownload({operation_id:'list',path:dir},'dock_storage_list'));
 });
+
+// LAB-1843 (lab1824-r10a main :2076/:960): every paged read re-ran the browser
+// observation, ~7 reads per scroll step. Navigation now reads each state once.
+test('storage navigation reads each roots/table state with one browser observation',async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot();
+ const nav='ui-navigation',table='ui-table',dir='/worker';
+ const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
+ const names=Array.from({length:60},(_,i)=>'file'+String(i).padStart(3,'0')+'.csv');
+ const rows=()=>names.map((name,i)=>({...element('ui-row-'+i,page.prefix+';FileStorageForm;colName_'+name),kind:'control',label:name,description:'x'.repeat(1800),
+  bounding_box:{x:0,y:i*24,width:400,height:23},storage_entry:{kind:'file',path:dir+'/'+name,bytes:1,mtime:'t',bytes_source:'native_file_store',directory_entries:60}}));
+ const filler=()=>Array.from({length:90},(_,i)=>({...element('ui-filler-'+i,'MF;cntMain;filler'+i),description:'y'.repeat(300)}));
+ const evaluate=page.evaluate.bind(page),reads={roots:0,table:0};
+ page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);state.active_tab_ref='files';
+  if(arg.discoverRoots){reads.roots++;state.observation_kind='roots';state.ui.elements=[element(nav,page.prefix+';NavigationBar;NavigationPanel'),
+   element(table,page.prefix+';FileStorageForm;pnlFileStorage;tbl'),...filler()];return state;}
+  state.file_storage={status:'observed',directory:dir};
+  state.observation_root={ref:arg.rootRef,identity:{anchor_tid:arg.rootRef===table?page.prefix+';FileStorageForm;pnlFileStorage;tbl':page.prefix+';NavigationBar;NavigationPanel',path:[]}};
+  if(arg.rootRef===table)reads.table++;
+  state.ui.elements=arg.rootRef===table?rows():[];
+  return state;
+ };
+ const r=runtime(page,{cacheDirectory:join(f.root,'whole-pages'),getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,
+  loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const result=await r.serverDownload({operation_id:'list-grown',path:dir},'dock_storage_list');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(result.output.complete,true);assert.equal(result.output.files_matched,60);
+ // Initial, directory() and listing roots reads; one table read; no page reads.
+ assert.deepEqual(reads,{roots:3,table:1});
+});

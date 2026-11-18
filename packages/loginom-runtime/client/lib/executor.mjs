@@ -1405,8 +1405,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           diagrams.push(current.FCustomForm?.FDiagram);
           pending.push(...(current.FSubNodes?.FItems ?? []));
         }
-        // Loginom also normalizes grouping input columns on Open after Execute.
-        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>n.FIconCls==='bg-vendor-icon-restclientconnection'||n.FIconCls==='bg-vendor-icon-groupdata'));
+        // Cold Open can dirty these observed node types; Save normalizes once.
+        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)));
         const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
         if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
@@ -3000,7 +3000,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const hasScrollAnchor=output=>scrollOnly&&output.file_storage?.status==='observed'
             &&output.ui.elements.some(e=>e.tid?.startsWith(output.workflow_ref.prefix+';FileStorageForm;colName_')
               &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
-          guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
+          // One browser read per navigation observation (LAB-1843): a whole internal
+          // page with row geometry instead of ~5 rows per fresh paged read.
+          guard();const result=await runtime.observe({...options,whole:true,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
@@ -3353,7 +3355,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return returned;
       } finally { running = false; }
     },
-    async observe({ signal, scope, cursor, rootRef, observationId, storageName, deadlineAt } = {}) {
+    async observe({ signal, scope, cursor, rootRef, observationId, storageName, deadlineAt, whole } = {}) {
       signal?.throwIfAborted();
       const browserOptions=(limit=35000)=>{
         signal?.throwIfAborted();const timeout=Math.min(limit,deadlineAt===undefined?limit:deadlineAt-now());
@@ -3415,7 +3417,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       serverSources.retain(outcome);
       await onRecord({operation_id:observationOperationId,phase:'observation_completed',outcome:structuredClone(outcome)});
       outcome.output.operation = view(pending).output;
-      return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope }) : observations.next(cursor, outcome);
+      return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope, whole:whole===true }) : observations.next(cursor, outcome);
     },
     async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt } = {}) {
       signal?.throwIfAborted(); checkId(operationId);

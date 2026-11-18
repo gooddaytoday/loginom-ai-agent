@@ -51,7 +51,19 @@ export function auditVariablesUnionRefusal(events){
  need(!own.some(e=>e.phase==='node_target_effect_prepared'||e.phase==='node_variables_union_materialized'
   ||e.action&&['execute_graph_node','deactivate_graph_node','begin_wizard','finish_wizard','execute_wizard','confirm_wizard_deactivation'].includes(e.action.verb)),'NO_ENGINE_MUTATION');
  const start=events.indexOf(attempts[0]);
- need(!events.slice(start+1).some(e=>e.phase==='node_apply_prepared'),'NO_WORKAROUND_OR_SOURCE_PATCH');
+ // Owner decision variables-union-refusal-reads: inspecting ready source outputs is not a workaround.
+ // mention://issue/01a1ef25-a792-7d35-b096-1c6cd0fdfcb8 (LAB-1851).
+ // The read driver's settings_changed:false is evidenced by finish.settings_applied:false in the journal.
+ need(!events.slice(start+1).some(e=>{
+  if(e.phase!=='node_apply_prepared')return false;
+  const r=e.request;
+  return !(r?.target?.kind==='existing'&&r.mode==='read_existing_output'&&r.parameters?.execution_policy==='existing'&&r.finish==='done'
+   &&p.graph_before.nodes.some(n=>n.type===r.target.type&&isDeepStrictEqual(n.ref,r.target.ref))
+   &&['inputs','variable_inputs','mappings','bindings'].every(k=>!(r[k]?.length))
+   &&Object.keys(r.parameters).every(k=>['source_operation_id','execution_policy','schemas'].includes(k))&&!r.parameters.schemas?.length
+   &&events.slice(events.indexOf(e)+1).some(c=>c.operation_id===r.operation_id&&c.phase==='node_phase_completed'
+    &&c.receipt?.phase==='finish'&&c.receipt.status==='verified'&&c.receipt.value?.settings_applied===false&&c.receipt.value.execution_started===false));
+ }),'NO_WORKAROUND_OR_SOURCE_PATCH');
  return {status:'PASS',operation_id:id,graph_unchanged:true,sources_unchanged:true};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
