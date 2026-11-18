@@ -10,8 +10,9 @@ const revision = snapshot => {
   if(state.scan)state.scan=guardScan; // Telemetry is not a DOM identity/version.
   return createHash('sha256').update(JSON.stringify(canonical(state))).digest('hex');
 };
-const compactElement = item => {
+const compactElement = (item, geometry = false) => {
   const { signature, bounding_box, ...rest } = item;
+  if (geometry && bounding_box) rest.bounding_box = bounding_box;
   if (typeof item.tid === 'string' && item.tid && item.identity?.anchor_tid === item.tid
       && Array.isArray(item.identity.path) && item.identity.path.length === 0
       && Object.keys(item.identity).every(key => ['anchor_tid', 'path'].includes(key))) delete rest.identity;
@@ -26,6 +27,10 @@ const compactOperation = operation => operation && ({
 
 // Full guard snapshots stay private. Only issued references may be acted on.
 // Cursors address one captured state; a fresh browser read must match its revision.
+// Runtime-internal storage navigation may request one whole page with row
+// geometry (LAB-1843): each further page is a fresh browser read. Model tool
+// calls never pass `whole`, so their pages and compact records are unchanged.
+const WHOLE_PAGE_BYTES = 1000000, WHOLE_PAGE_RECORDS = 6000;
 export function createObservationPages({ maxBytes = 12000, maxRecords = 32, capacity = 8 } = {}) {
   const entries = new Map(), cursors = new Map();
   const clear = () => { entries.clear(); cursors.clear(); };
@@ -33,7 +38,7 @@ export function createObservationPages({ maxBytes = 12000, maxRecords = 32, capa
     entries.delete(id);
     for (const [cursor, page] of cursors) if (page.id === id) cursors.delete(cursor);
   };
-  const records = (snapshot, scope) => {
+  const records = (snapshot, scope, geometry = false) => {
     const rows = [];
     if (scope === 'all' || scope === 'graph') {
       for (const node of snapshot.nodes ?? []) {
@@ -66,7 +71,7 @@ export function createObservationPages({ maxBytes = 12000, maxRecords = 32, capa
       const palette = /;ModelForm;colVendors_Компоненты>/.test(item.tid ?? '');
       if (scope === 'palette' && !palette || scope === 'graph' && !['graph', 'graph_editor'].includes(item.scope)
           || scope === 'dialogs' && item.scope !== 'dialog') continue;
-      rows.push(['elements', compactElement(item)]);
+      rows.push(['elements', compactElement(item, geometry)]);
     }
     for (const collection of ['dialogs', 'masks', 'messages', 'table_cells']) {
       if (scope === 'palette' || scope === 'graph') continue;
@@ -91,13 +96,18 @@ export function createObservationPages({ maxBytes = 12000, maxRecords = 32, capa
     }
     output.page = { schema_version: 1, scope: entry.scope, offset, returned: 0, total_records: entry.rows.length,
       next_cursor: null, captured_snapshot_complete: false, full_dom_complete: false };
-    if (bytes(output) > maxBytes - 700) throw new Error('Observation metadata exceeds the page budget; inspect a narrower context');
+    const pageBytes = entry.whole ? WHOLE_PAGE_BYTES : maxBytes, pageRecords = entry.whole ? WHOLE_PAGE_RECORDS : maxRecords;
+    let used = bytes(output);
+    if (used > pageBytes - 700) throw new Error('Observation metadata exceeds the page budget; inspect a narrower context');
     let end = offset;
-    while (end < entry.rows.length && end - offset < maxRecords) {
+    while (end < entry.rows.length && end - offset < pageRecords) {
       const [collection, value] = entry.rows[end];
       const target = ['nodes', 'links'].includes(collection) ? output[collection] : output.ui[collection];
       target.push(value);
-      if (bytes(output) > maxBytes - 700) { target.pop(); break; }
+      // A whole page counts each record once (+1 separator) instead of
+      // re-serializing the growing page; the bound stays conservative.
+      if (entry.whole) used += bytes(value) + 1; else used = bytes(output);
+      if (used > pageBytes - 700) { target.pop(); break; }
       end++;
     }
     if (end === offset && end < entry.rows.length) throw new Error('One observation record exceeds the page budget');
@@ -153,11 +163,11 @@ export function createObservationPages({ maxBytes = 12000, maxRecords = 32, capa
         throw new Error('UI reference has not been delivered in this observation; read its page first.'+hint);
       }
     },
-    retain(outcome, { scope = 'all' } = {}) {
+    retain(outcome, { scope = 'all', whole = false } = {}) {
       if (!scopes.has(scope)) throw new Error('Unknown observation scope');
       if (!outcome?.output?.ui) return outcome;
       const snapshot = structuredClone(outcome.output), id = randomUUID();
-      const entry = { id, snapshot, receiptOperationId:outcome.operation_id, revision: revision(snapshot), scope, rows: records(snapshot, scope), issued: new Set(), next: new Map() };
+      const entry = { id, snapshot, receiptOperationId:outcome.operation_id, revision: revision(snapshot), scope, whole: whole === true, rows: records(snapshot, scope, whole === true), issued: new Set(), next: new Map() };
       const output = render(entry, 0);
       entries.set(id, entry);
       while (entries.size > capacity) remove(entries.keys().next().value);
