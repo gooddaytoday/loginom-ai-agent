@@ -143,10 +143,12 @@ export function storageListPattern(value) {
 // Reads the rows of the one open Files folder. File rows keep the row-bound
 // native size/mtime and the server_source_ref minted by observation; a list
 // is complete only when the native FileStore count or the scroll end proves it.
-const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_REPLY_ENVELOPE=512,LIST_SCROLLS=64,LIST_SCROLL_PX=400;
+// LIST_SCROLL_PX is the ui.act scroll bound. The rendered row span (from the
+// whole internal page geometry, LAB-1843) keeps successive reads overlapping.
+const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_REPLY_ENVELOPE=512,LIST_SCROLLS=64,LIST_SCROLL_PX=1000;
 export async function listStorageDirectory({destination,pattern,guard,ready,roots,read,act}) {
   const filter=storageListPattern(pattern),seen=new Map();
-  let native=null,end=false,owner=null,lastTop=null,direction=null,parent=0;
+  let native=null,end=false,owner=null,lastTop=null,direction=null,parent=0,previous=null;
   // Loginom 7.4.2 renders the parent link as a `..` row of unknown kind
   // (LAB-1468 stage 0); it is a FileStore record but not a folder entry.
   const isUp=e=>e.label==='..'&&e.storage_entry.kind==='unknown';
@@ -160,6 +162,9 @@ export async function listStorageDirectory({destination,pattern,guard,ready,root
       &&s.ui.elements.filter(e=>isRow(s,e)).every(e=>isUp(e)||e.storage_entry.kind==='folder'
         ||e.storage_entry.kind==='file'&&typeof e.storage_entry.server_source_ref==='string'));
     const rows=state.ui.elements.filter(e=>isRow(state,e));
+    // A scroll that rendered no previously read row may have skipped rows.
+    if(previous&&!rows.some(e=>previous.has(e.storage_entry.kind+':'+e.label)))throw Error('Server storage listing skipped rows');
+    previous=new Set(rows.map(e=>e.storage_entry.kind+':'+e.label));
     for(const e of rows){
       const entry=e.storage_entry;
       if(Number.isSafeInteger(entry.directory_entries))native=entry.directory_entries;

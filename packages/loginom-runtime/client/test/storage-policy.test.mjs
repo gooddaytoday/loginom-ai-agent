@@ -88,3 +88,28 @@ test('folder listing bounds the serialized response in UTF-8 bytes for Cyrillic 
  assert.ok(out.entries.length>0&&out.entries.length<65);
  assert.deepEqual(out.entries.map(e=>e.name),names.slice(0,out.entries.length));
 });
+
+// LAB-1843 (lab1823-r08 main :292): a 1343-entry pair folder was listed in
+// 200 px steps and never finished in 90 s. Rows are 24 px, 58 rendered.
+const grown=(count,{rendered=58,skip=0}={})=>{
+ const prefix='MF;TF-1',dir='/pair',names=Array.from({length:count},(_,i)=>'f'+String(i).padStart(5,'0')+'.csv');
+ const height=24,max_top=count*height-671;let top=0;const acts=[];
+ const state=()=>{const first=Math.max(0,Math.floor(top/height)-8);return {observation_id:'obs-'+top,workflow_ref:{prefix},file_storage:{status:'observed',directory:dir},
+  ui:{elements:names.slice(first,first+rendered).map((name,i)=>({bounding_box:{x:0,y:(first+i)*height-top,width:400,height:23},tid:prefix+';FileStorageForm;colName_'+name,label:name,
+   allowed_actions:['scroll'],interaction:{state:(first+i)*height>=top?'point_observed':'outside_viewport'},scroll:{ref:'grid',top,max_top},
+   storage_entry:{kind:'file',path:dir+'/'+name,bytes:1,mtime:'t',server_source_ref:'storage-'+name,directory_entries:count}}))}};};
+ return {acts,names,options:{destination:dir,guard:()=>{},ready:async probe=>probe(),
+  roots:async()=>({observation_id:'roots',workflow_ref:{prefix},ui:{elements:[{tid:prefix+';FileStorageForm;pnlFileStorage;tbl',ref:'ui-table'}]}}),
+  read:async()=>state(),act:async(s,e,verb,extra)=>{acts.push(extra.delta_y);top=Math.min(max_top,top+extra.delta_y+skip);}}};
+};
+test('a 1000-entry folder is listed with gesture-bounded strides from the rendered row span',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1000),out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,1000);assert.equal(out.files_matched,1000);
+ assert.ok(f.acts.every(d=>d>0&&d<=1000));assert.equal(f.acts[0],1000);assert.ok(f.acts.length<=24,String(f.acts.length));
+});
+test('a listing scroll that renders no previously read row is refused, not silently skipped',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1000,{skip:2000});
+ await assert.rejects(listStorageDirectory(f.options),/skipped rows/);assert.equal(f.acts.length,1);
+});

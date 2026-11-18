@@ -252,3 +252,17 @@ test('wizard paging delivers editable settings before preview inventory without 
   assert.throws(()=>pages.assertIssued(id,{ref:'metadata-only'}), /not been delivered/);
   assert.deepEqual(pages.get(id).ui.elements, source.output.ui.elements);
 });
+
+// LAB-1843: every further page is a fresh browser read. Storage navigation
+// reads one whole internal page and keeps row geometry for its scroll stride.
+test('a whole internal page delivers every record with geometry; tool pages stay compact', () => {
+  const pages = createObservationPages();
+  const tool = pages.retain(structuredClone(fixture(90)), { scope: 'roots' });
+  assert.ok(tool.output.page.next_cursor);
+  assert.equal(tool.output.ui.elements.some(e => 'bounding_box' in e), false);
+  const whole = pages.retain(structuredClone(fixture(90)), { scope: 'roots', whole: true });
+  assert.equal(whole.output.page.next_cursor, null);
+  assert.equal(whole.output.ui.elements.length, 90);
+  assert.deepEqual(whole.output.ui.elements[7].bounding_box, { x: 7, y: 7 });
+  assert.doesNotThrow(() => pages.assertIssued(whole.output.observation_id, { ref: 'ref-89' }));
+});
