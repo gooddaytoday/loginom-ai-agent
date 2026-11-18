@@ -43,7 +43,7 @@ export function unionWizardOpeningRefusal(operation,receipt){
 function deactivationOpeningBinding(operation,r){
  const state=operation.nodeApply,ref=operation.lastReceipt,n=r?.output?.prepared_node_context;
  const gestures=r?.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
- if(operation.transportUncertain||state?.pending?.phase!=='open'||!['imports.text','variables.calculator'].includes(state.request.target?.type)
+ if(operation.transportUncertain||state?.pending?.phase!=='open'||!['imports.text','imports.excel','variables.calculator'].includes(state.request.target?.type)
   ||r?.action_key!=='ui.act'||ref?.action_key!=='ui.act'||typeof ref.operation_id!=='string'||r.operation_id!==ref.operation_id
   ||r.operation_id!==ref.id||!r.operation_id.startsWith(operation.id+':n')
   ||r.status!=='AMBIGUOUS'||r.effect_possible!==true||r.cleanup_complete!==true||r.error?.code!=='WIZARD_CONTEXT_CHANGED'
