@@ -167,7 +167,7 @@ function renderSkillEditor(state, edit) {
     '<div class="hub-demo"><span>Только для прототипа</span><div><button class="btn" data-own="sample:zip">Навык от коллеги (ZIP)</button><button class="btn" data-own="sample:md">SKILL.md</button></div></div></section>';
   const ready = saved || edit.method === 'app' || edit.fromSession || edit.fromFile;
   const intro = edit.fromSession ? '<div class="sl-note">'+icon('help',16)+' Агент составил черновик по разговору «'+esc(edit.fromSession)+'». Прочитайте его целиком: в разговор мог попасть чужой текст или данные из ваших файлов.</div>'
-    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла Loginom не проверял: прочитайте его перед включением. Правка этого не меняет — навык остаётся «из файла». Опубликовать его нельзя.</div>' : '';
+    : item.origin === 'file' ? '<div class="sl-note sl-note-warn">'+icon('alert',16)+' Навык из файла Loginom не проверял: прочитайте его перед включением. Правка этого не меняет — навык остаётся «из файла».</div>' : '';
   const files = item.files.length ? '<div class="own-files"><h3>Файлы навыка</h3><ul>'+item.files.map(([name, refused]) => '<li class="'+(refused ? 'refused' : '')+'">'+icon(refused ? 'close' : 'file',15)+' <span>'+esc(name)+(refused ? ' — <em>не принят: '+esc(refused)+'</em>' : '')+'</span></li>').join('')+'</ul></div>' : '';
   const form = ready ? '<section class="sl-panel"><form class="sl-form" data-own-form>'+intro+
     '<label class="sl-field"><span>Название</span><input name="name" maxlength="80" value="'+esc(item.name)+'" placeholder="Например, Правила оформления сценариев" required></label>'+
@@ -180,11 +180,11 @@ function renderSkillEditor(state, edit) {
     '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
     (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>' : '';
   return '<div class="sl-page own-page"><button type="button" class="sl-back-link" data-own="to-mine">← Мои</button>'+
-    '<header class="sl-heading"><span class="sl-product">Навык · '+origins[item.origin].label+'</span><h1>'+(saved ? esc(item.name || 'Навык') : 'Новый навык')+'</h1><p>Навык подсказывает агенту, как делать задачу. '+(item.origin === 'file' ? 'Навык из файла работает только у вас.' : 'Он работает только у вас, пока вы его не опубликуете.')+'</p></header>'+
+    '<header class="sl-heading"><span class="sl-product">Навык · '+origins[item.origin].label+'</span><h1>'+(saved ? esc(item.name || 'Навык') : 'Новый навык')+'</h1><p>Навык подсказывает агенту, как делать задачу. Он работает только у вас, пока вы его не опубликуете.</p></header>'+
     (saved ? '' : '<div class="sl-switch" aria-label="Способ создания">'+[['chat','Из разговора'],['app','С нуля'],['file','Из файла']].map(([id, title]) => '<button type="button" class="sl-chip'+(edit.method === id ? ' is-active' : '')+'" data-own="method:'+id+'" aria-pressed="'+(edit.method === id)+'">'+title+'</button>').join('')+'</div>')+
     '<div class="sl-grid">'+(source || form)+
     '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2>'+statusLine(item)+'</div><h3>'+esc(item.name || 'Название навыка')+'</h3><p>'+esc(item.when || 'Когда агент его применяет')+'</p>'+permsBlock(state, item)+
-    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved && item.origin !== 'file' ? '<p class="own-note">'+icon('help',15)+' Включите навык, чтобы опубликовать его.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
+    (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved ? '<p class="own-note">'+icon('help',15)+' Включите навык, чтобы опубликовать его.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
 }
 
 function leaksBlock(leaks, hint) {
@@ -220,7 +220,6 @@ function publishTitle(state, item) {
   return resendStages.includes(item.publication?.stage) ? 'Отправить новую версию' : 'Опубликовать для всех';
 }
 function publishButton(state, item) {
-  if (item.origin === 'file') return '';
   const stage = item.publication?.stage;
   if (['confirm','review'].includes(stage)) return '';
   const closed = state.contour === 'closed';
@@ -258,7 +257,7 @@ export function renderMine(state) {
         (deleting ? '<span class="own-confirm">'+(pub && ['community','verified'].includes(pub.stage) ? 'Удалить у себя? Опубликованная версия останется в каталоге — снять её можно кнопкой «Снять с публикации».' : 'Удалить насовсем?')+
           ' <button class="btn quiet" data-own="delete-yes:'+item.id+'">Удалить</button><button class="btn quiet" data-own="delete-no">Отмена</button></span>'
           : '<button class="btn quiet" data-own="delete:'+item.id+'">Удалить</button>')+
-        (item.status === 'draft' && item.origin !== 'file' ? '<small class="own-hint">Включите, чтобы опубликовать</small>' : '')+
+        (item.status === 'draft' ? '<small class="own-hint">Включите, чтобы опубликовать</small>' : '')+
       '</div></article>';
   }).join('')+'</div><p class="own-note">'+icon('help',15)+' Свой навык, сохранённый в файл, у коллеги станет навыком «из файла»: перед включением коллега подтвердит, что Loginom его не проверял.</p>'+renderPublishDialog(state)+'</div>';
 }
@@ -308,7 +307,7 @@ function renderPublishDialog(state) {
     body = '<ul class="own-checks">'+checks.map(([name, text, ok]) => '<li class="'+(ok ? 'ok' : 'warn')+'">'+icon(ok ? 'check' : 'alert',15)+' <strong>'+name+'</strong> — '+text+'</li>').join('')+'</ul>'+
       leaksBlock(leaks, 'Уберите перед отправкой.')+
       outgoing+
-      '<label class="own-consent"><input type="checkbox" data-own-pub="consent"'+(dialog.consent ? ' checked' : '')+'> Я автор и могу это публиковать; здесь нет данных клиентов и паролей</label>';
+      '<label class="own-consent"><input type="checkbox" data-own-pub="consent"'+(dialog.consent ? ' checked' : '')+'> '+(item.origin === 'file' ? 'Я автор этого навыка или автор разрешил мне его опубликовать' : 'Я автор и могу это публиковать')+'; здесь нет данных клиентов и паролей</label>';
     actions = '<button class="btn quiet" data-own="pub-back">Назад</button><button class="btn primary" data-own="pub-send"'+(leaks.length || !dialog.consent ? ' disabled' : '')+'>'+(closed ? icon('download',16)+' Сохранить файл' : 'Отправить на проверку')+'</button>';
   }
   if (dialog.step === 'confirm') {
@@ -374,7 +373,7 @@ export function renderModeration(state) {
       const checks = mod[item.id] ??= [];
       const all4 = checks.length === reviewChecks.length;
       return '<article class="sl-panel own-review"><div class="sl-panel-head"><h3>'+esc(item.name)+'</h3><span class="hub-type">'+(item.type === 'action' ? 'Действие' : 'Навык')+'</span></div>'+
-        '<p class="own-receipt">Версия '+esc(item.version)+' · '+esc(item.publication.email)+' · квитанция № '+esc(item.publication.receipt)+'</p>'+
+        '<p class="own-receipt">Версия '+esc(item.version)+' · '+esc(item.publication.email)+' · квитанция № '+esc(item.publication.receipt)+(item.origin === 'file' ? ' · добавлен из файла — проверьте, не копия ли это чужого навыка' : '')+'</p>'+
         '<ul class="own-checks"><li class="ok">'+icon('check',15)+' Автоматические проверки пройдены: формат, только текст, нет паролей и данных из файлов</li></ul>'+
         '<p><strong>Описание для каталога:</strong> '+esc(item.publication.summary || item.when)+'</p><details open><summary>Текст '+(item.type === 'action' ? 'действия' : 'навыка')+'</summary><p><strong>'+(item.type === 'action' ? 'Что делает' : 'Когда применять')+':</strong> '+esc(item.when)+'</p><pre class="own-body">'+esc(item.body || (item.params?.custom ?? ''))+'</pre></details>'+
         '<fieldset class="own-review-checks"><legend>Перед отметкой «Проверено Loginom»</legend>'+reviewChecks.map((text, index) => '<label><input type="checkbox" data-mod-check="'+item.id+':'+index+'"'+(checks.includes(index) ? ' checked' : '')+'> '+text+'</label>').join('')+'</fieldset>'+
