@@ -389,12 +389,11 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .dest-chip{max-width:220px}
 .dest-chip .filter-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The logo sits in the top bar, before the page title */
-.brand.top-brand{width:auto;min-height:0;margin:0 6px 0 0;padding:4px 6px;flex:none;border-radius:7px}
-.top-brand picture{width:92px}
-.top-brand>span{font-size:15px}
-.top-brand+:is(.crumb-current,.crumb-project){border-left:1px solid var(--line);padding-left:12px;border-radius:0}
-@media(max-width:690px){.sidebar-head{justify-content:flex-end}.top-brand picture{width:84px}.top-brand>span{font-size:14px}}
-@media(max-width:410px){.top-brand>span{display:none}}
+.start-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto 18px;width:auto;min-height:0;padding:0;background:none;border:0;pointer-events:none}
+.start-brand picture{width:118px}
+.start-brand>span{font-size:19px;font-weight:600;color:var(--muted);border-left:1px solid var(--line);padding-left:10px}
+.crumb-project+.crumb-current{border-left:1px solid var(--line);padding-left:12px}
+@media(max-width:690px){.sidebar-head{justify-content:flex-end}.start-brand picture{width:96px}.start-brand>span{font-size:16px}}
 /* Search (Ctrl K): a row under «Новый разговор» and a dialog */
 
 .search-input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}

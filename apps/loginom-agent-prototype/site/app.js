@@ -485,15 +485,19 @@ function hostOf(url) {
 function sessionProject() {
   return state.sessions.find(item => item.id === state.session)?.project
 }
+// В-54: no logo in the top bar — it says where you are; the brand is on the start screen and in «Справка».
+function topTitle() {
+  if (state.page === 'home') return ''
+  if (state.page === 'chat') return `<span class="crumb-current">${esc(state.sessions.find(item => item.id === state.session)?.title || 'Разговор')}</span>`
+  if (state.page === 'project') return `<span class="crumb-current">${esc(projectById(state.projectView)?.name || 'Проект')}</span>`
+  return `<span class="crumb-current">${pages[state.page]}</span>`
+}
 function header() {
   return `<header class="topbar">
     <div class="top-left">
       <button class="icon-btn mobile-menu" aria-label="Открыть меню" aria-expanded="${state.mobile}" data-action="menu">${icon('menu',20)}</button>
-      <button class="brand top-brand" data-action="new" aria-label="Loginom AI Agent, новый разговор">
-        <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
-      </button>
-      ${['home','chat','project'].includes(state.page) ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
       ${state.page === 'chat' && projectById(sessionProject()) ? `<button class="crumb-project" data-open-project="${sessionProject()}">${icon('folder',16)}<span>${esc(projectById(sessionProject()).name)}</span></button>` : ''}
+      ${topTitle()}
     </div>
     <div class="top-actions">
       ${['home','chat','project'].includes(state.page) ? '' : loginomChip()}
@@ -544,7 +548,7 @@ function home() {
   const p = state.progress
   const showExamples = !p.examplesHidden && p.ownChats < 3
   return `<div class="home-area new-chat">
-    <section class="starter" aria-label="Новый разговор">${composer()}</section>
+    <section class="starter" aria-label="Новый разговор"><div class="start-brand brand" aria-hidden="true"><picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt=""><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt=""></picture><span>AI Agent</span></div>${composer()}</section>
     ${showExamples ? `<section class="examples" aria-labelledby="examples-title">
       <div class="section-bar"><h2 id="examples-title">Примеры задач</h2><button class="icon-btn neutral" data-action="hide-examples" aria-label="Скрыть примеры задач" title="Скрыть. Вернуть можно через «+»">${icon('close',16)}</button></div>
       <div class="example-grid">${examples.map(item => `<button class="example-card" data-example="${item.id}">
