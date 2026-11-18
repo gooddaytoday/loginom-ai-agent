@@ -3,6 +3,16 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("existing Import edits retain verified source and Close requires a complete first form", () => {
+  expect(skill).toContain("resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches)")
+  expect(skill).toContain("Only unchanged Execute may omit source")
+  expect(skill).toContain("After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip)")
+  expect(skill).toContain('explicit decimal_separator "." or ",", never "Не задано (…)"')
+  expect(skill).toContain('columns or auto_detect_columns:"new"/"all"')
+  expect(skill).toContain("Reuse the verified delivery; do not upload again")
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+})
+
 test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
   const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
   expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
