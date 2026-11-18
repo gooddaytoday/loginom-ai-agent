@@ -239,7 +239,7 @@ export function renderMine(state) {
       : pub?.stage === 'revoked' ? '<p class="own-reason">'+icon('alert',14)+' Loginom отозвал эту версию: «'+esc(pub.reason)+'». У тех, кто её установил, она выключена.</p>'
         : pub?.stage === 'review' ? '<p class="own-receipt">Квитанция № '+esc(pub.receipt)+' · ответ придёт на '+esc(pub.email)+' и появится здесь</p>'
           : pub?.stage === 'confirm' ? '<p class="own-receipt">Письмо отправлено на '+esc(pub.email)+'. Откройте ссылку в письме — после этого начнётся проверка.</p>'
-            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">С отметкой «Сообщество» другие ставят навык, подтвердив, что Loginom его не проверял; в закрытом контуре он недоступен.</p>'
+            : pub?.stage === 'community' && item.type === 'skill' ? '<p class="own-receipt">С отметкой «Сообщество» другие ставят навык, подтвердив, что Loginom его не проверял; в закрытом контуре — только если разрешил администратор.</p>'
               : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
     const confirm = pub?.stage === 'confirm' ? '<button class="btn quiet" data-own="resend:'+item.id+'">Отправить письмо ещё раз</button><button class="btn quiet" data-own="publish:'+item.id+'">Изменить почту</button><button class="btn quiet" data-own="confirm-mail:'+item.id+'">Только для прототипа: подтвердить</button>' : '';
     const deleting = own.confirmDelete === item.id;
@@ -289,7 +289,7 @@ function renderPublishDialog(state) {
       : 'Сотрудник Loginom проверит '+what+' и опубликует его в каталоге. До этого его видите только вы.')+'</p>'+
       (!closed && item.type === 'skill' ? '<div class="own-marks"><h3>Что получат другие</h3><p>После проверки сотрудник поставит одну из отметок:</p><ul>'+
         '<li><strong>Проверено Loginom</strong> — другие ставят навык без дополнительных вопросов; он доступен и организациям в закрытом контуре.</li>'+
-        '<li><strong>Сообщество</strong> — перед установкой человек подтверждает, что Loginom навык не проверял и он сам проверит результат; в закрытом контуре такие навыки недоступны.</li></ul>'+
+        '<li><strong>Сообщество</strong> — перед установкой человек подтверждает, что Loginom навык не проверял и он сам проверит результат; в закрытом контуре — только если разрешил администратор.</li></ul>'+
         '<p>С любой отметкой навык работает у других и тогда, когда агент работает в Loginom.</p></div>' : '')+
       '<label class="sl-field"><span>Описание для каталога</span><textarea data-own-pub="summary" rows="3">'+esc(dialog.summary ?? item.when)+'</textarea></label>'+
       '<p class="own-rule">'+icon('help',15)+' Другие смогут пользоваться '+(item.type === 'action' ? 'действием' : 'навыком')+' и менять свою копию под себя. Автором в каталоге всегда указаны вы.</p>'+

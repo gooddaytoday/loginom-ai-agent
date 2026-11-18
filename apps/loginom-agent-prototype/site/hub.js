@@ -189,7 +189,7 @@ export function openHubSolution(state, id) {
 }
 
 function blockedByPolicy(item, online) {
-  if (item.tier === 'community' && !online) return 'Администратор вашей организации разрешил только то, что подготовил или проверил Loginom.';
+  if (item.tier === 'community' && !online) return 'Администратор вашей организации не разрешил навыки «Сообщество». Если такой навык нужен — обратитесь к нему.';
   if (!item.offline && !online) return 'Нужен доступ в интернет, а в закрытом контуре он отключён.';
   return '';
 }
