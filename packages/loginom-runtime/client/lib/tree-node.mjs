@@ -104,19 +104,41 @@ export function createTreeNodeSupport(config,{json}){
      await click(node.expander_tid,'expand owned tree schema');s=await observe('expanded tree schema');
     }
     need(s.node_tree.inventory_complete,'Complete tree schema required');
+    const indexed=s=>s.node_tree.nodes.filter(n=>n.is_array&&n.selected_global_index).map(n=>n.path);
+    const wantIndex=p.global_index_paths??(request.target.kind==='new'?[]:indexed(s));
+    const clickLeaf=async(path,index=false)=>{
+     for(let attempt=0;attempt<64;attempt++){
+      s=await observe('reveal tree leaf '+path);const node=s.node_tree.nodes.find(n=>n.path===path);
+      need(node,'Tree leaf disappeared');const tid=index?node.global_index_tid:node.checkbox_tid;
+      const e=s.ui.elements.find(e=>e.tid===tid&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed');
+      if(e){await click(tid,'toggle tree leaf '+path);return;}
+      const anchors=s.ui.elements.filter(e=>e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll')&&e.scroll
+       &&s.node_tree.nodes.some(n=>[n.checkbox_tid,n.global_index_tid,n.expander_tid].includes(e.tid)));
+      need(anchors.length&&new Set(anchors.map(e=>e.scroll.ref)).size===1,'Tree leaf cannot be revealed');
+      const anchor=anchors[0],first=s.node_tree.nodes.find(n=>[n.checkbox_tid,n.global_index_tid,n.expander_tid].includes(anchor.tid));
+      const before=anchor.scroll;
+      await channel.perform({condition:'scroll owned tree to leaf '+path,initialObservation:s,ready,identity:s=>s.prepared_node_context,
+       resolve:()=>({verb:'scroll',ref:anchor.ref,delta_y:node.index<first.index?-350:350})});
+      s=await observe('scrolled tree leaf');
+      need(s.ui.elements.some(e=>e.scroll?.ref===before.ref&&e.scroll.top!==before.top),'Tree leaf scroll did not move');
+     }
+     throw Error('Tree leaf scroll bound exceeded');
+    };
     if(p.selected_paths){
      const actual=s.node_tree.nodes.filter(n=>!n.is_container&&p.selected_paths.includes(n.path)).map(n=>n.path);
      need(same(actual,p.selected_paths),'Selected paths differ from the native schema');
-     if(s.node_tree.nodes.some(n=>n.selected))await click(s.node_tree.base+'btnDeselectAll','clear owned tree leaf selection');
-     for(const path of p.selected_paths){s=await observe('tree path '+path);const node=s.node_tree.nodes.find(n=>n.path===path&&!n.is_container);
-      need(node?.checkbox_tid,'Selected schema leaf is not rendered');if(!node.selected)await click(node.checkbox_tid,'select tree leaf '+path);}
+     if(p.selected_paths.length===s.node_tree.nodes.filter(n=>!n.is_container).length)
+      await click(s.node_tree.base+'btnSelectAll','select all owned tree leaves');
+     else{
+      if(s.node_tree.nodes.some(n=>n.selected))await click(s.node_tree.base+'btnDeselectAll','clear owned tree leaf selection');
+      for(const path of p.selected_paths){s=await observe('tree path '+path);const node=s.node_tree.nodes.find(n=>n.path===path&&!n.is_container);
+       if(!node.selected)await clickLeaf(path);}
+     }
     }
     // Native «Глобальный индекс узла» is one Node-less leaf per array; new nodes have none unless requested.
-    const indexed=s=>s.node_tree.nodes.filter(n=>n.is_array&&n.selected_global_index).map(n=>n.path);
-    const wantIndex=p.global_index_paths??(request.target.kind==='new'?[]:undefined);
     if(wantIndex)for(const path of s.node_tree.nodes.filter(n=>n.is_array).map(n=>n.path)){
      s=await observe('tree global index '+path);const node=s.node_tree.nodes.find(n=>n.path===path);
-     if(node.selected_global_index!==wantIndex.includes(path)){need(node.global_index_tid,'Tree global index leaf is not rendered');await click(node.global_index_tid,'toggle tree global index '+path);}
+     if(node.selected_global_index!==wantIndex.includes(path))await clickLeaf(path,true);
     }
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     await setBool('pedCompositeColumnDisplayNames',p.composite_labels);

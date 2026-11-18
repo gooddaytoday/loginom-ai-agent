@@ -37,7 +37,7 @@ test('MCP application refusals remain typed normal content and the same connecti
   const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0, preparationPath=[];
   const sourceCalls=[];
-  let browserPause;
+  let browserPause, nodePause, actionRuntime, nodeHandlers;
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
   const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
@@ -91,7 +91,18 @@ test('MCP application refusals remain typed normal content and the same connecti
   mock.module(new URL('../../lib/executor.mjs', import.meta.url).href, { namedExports: {
     executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
     rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult,
-    createActionRuntime: options => createActionRuntime({...options,
+    createActionRuntime: options => actionRuntime=createActionRuntime({...options,
+      nodeApplyHandlers:nodeHandlers=new Map(options.nodeApplyHandlers),
+      nodeApplyDriverFactory:input=>input.operation.id==='bridge-background'
+        ?Object.fromEntries(['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation']
+          .map(name=>[name,()=>{throw Error('Unexpected background browser driver: '+name);}])):options.nodeApplyDriverFactory(input),
+      onRecord:async event=>{
+        const recorded=await options.onRecord(event);
+        if(nodePause&&event.operation_id==='bridge-background'&&event.phase==='prepared'){
+          const pause=nodePause;nodePause=null;pause.enter();await pause.wait;
+        }
+        return recorded;
+      },
       nodeTargetAdapterFactory:()=>({observe:async request=>{
         assert.equal(request.target.kind,'existing');assert.equal(request.target.type,'programming.javascript');
         sourceCalls.push('graph');return {nodes:[{ref:request.target.ref,type:'programming.javascript'}],links:[]};
@@ -322,6 +333,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     const compactReadValidator=new AjvJsonSchemaValidator().getValidator(contextTool.outputSchema);
     assert.equal(compactReadValidator(contextReceipt).valid,true);
     assert.equal(compactReadValidator(sourceReceipt).valid,true);
+    assert.equal(compactReadValidator({...contextReceipt,cleanup_complete:false}).valid,false);
     const missingContext=structuredClone(contextReceipt);delete missingContext.ports;
     assert.equal(compactReadValidator(missingContext).valid,false);
     const compactCaption=compactTools.tools.find(tool=>tool.name==='dock_node_apply').inputSchema.properties.target.properties.label;
@@ -343,6 +355,40 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.deepEqual(compactResponse.structuredContent,compactReceipt);
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     assert.equal(browserCalls,beforeCompact);
+    nodeHandlers.set('programming.javascript',{revision:'1',modes:['script'],validate:()=>{},
+      configure:async()=>({verified:true,cleanup_complete:true})});
+    let releaseNode, enterNode;
+    const enteredNode=new Promise(resolve=>{enterNode=resolve;});
+    nodePause={enter:enterNode,wait:new Promise(resolve=>{releaseNode=resolve;})};
+    const background=actionRuntime.startNodeApply({operation_id:'bridge-background',contract_revision:'1.0.0',
+      document_id:sourceRequest.document_id,workflow_ref:sourceRequest.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:sourceRequest.node},inputs:[],mode:'script',
+      parameters:{},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+      budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+    assert.equal(background.state,'running');
+    try {
+      await Promise.race([enteredNode,actionRuntime.waitNodeApply('bridge-background',{timeoutMs:1000}).then(job=>{
+        assert.equal(job.state,'running',JSON.stringify(job));
+      })]);
+      const beforeRefusal=browserCalls;
+      const rejected=await client.callTool({name:'dock_node_read',arguments:{operation_id:'competing-read',
+        source_operation_id:'bridge-background',execution:'existing'}});
+      assert.notEqual(rejected.isError,true);
+      assert.equal(rejected.structuredContent.error.code,'REQUEST_REJECTED');
+      assert.equal(rejected.structuredContent.request_rejected,true);
+      assert.equal(rejected.structuredContent.next_step.tool,'dock_node_wait');
+      assert.equal(rejected.structuredContent.next_step.rejected_operation_id,'competing-read');
+      assert.equal(browserCalls,beforeRefusal,'the competing read must not reach the browser');
+      const waiting=await client.callTool({name:'dock_node_wait',arguments:{operation_id:'bridge-background',timeout_ms:1}});
+      assert.equal(waiting.structuredContent.state,'running');
+      assert.equal(bridge.hasActiveWork(),true);
+    } finally {
+      actionRuntime.cancelNodeApply('bridge-background');
+      releaseNode();
+      await actionRuntime.waitNodeApply('bridge-background',{timeoutMs:1000});
+    }
+    const afterRefusal=await client.callTool({name:'dock_node_read',arguments:{...compactRequest,operation_id:'after-refusal'}});
+    assert.equal(afterRefusal.structuredContent.source_text,sourceReceipt.source_text);
   } finally {
     await client?.close();
     await bridge?.close();

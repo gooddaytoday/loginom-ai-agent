@@ -534,7 +534,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'trees-to-table-indices':
         src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
-                    base=None, external=True, expected_name='expected-indices-run.json')
+                    input_files=['documents.csv'], base=None, external=True, expected_name='expected-indices-run.json')
+    if name == 'trees-to-table-wide':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-wide.md', data=src.parent.parent / 'fixtures/modes',
+                    input_files=['wide.csv'], base=None, external=True, expected_name='expected-wide-run.json')
 
     if name == 'coarse-classes-frozen-zero':
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'

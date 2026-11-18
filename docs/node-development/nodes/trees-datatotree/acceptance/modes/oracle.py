@@ -169,7 +169,7 @@ def proposals(slug):
              composite_names=True, composite_labels=True, label_separator='.',
              native_names='Root and path segments joined by _; the separator changes labels only',
              tree_input='prepared DocumentTree with user labels (composite-source.lgp)'), native_status='observed'),
-        case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}),
+        dict(case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}), native_status='observed'),
         case('siblings', table([*columns,dict(name='tag',label_any=True,type='string')],
              [dict(**r,tag=t['tag']) for r in rows for t in d['tags']]), multiplication=f['sibling_policy_proposal']),
     ]
@@ -251,6 +251,15 @@ def tree_to_table_composite_projection():
                               ordered=True, column_order='exact', columns=output['columns'], rows=output['rows'])])
 
 
+def tree_to_table_wide_projection():
+    output = next(c['output'] for c in proposals(SLUGS[3]) if c['id'] == 'wide')
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t) for t in ['imports.text', 'trees.from_json', 'trees.to_table']],
+                outputs=[dict(output_node_type='trees.to_table', output_port=0,
+                              export_destination='wide.csv', ordered=True, column_order='exact',
+                              columns=output['columns'], rows=output['rows'])])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
@@ -272,4 +281,7 @@ if __name__ == '__main__':
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_typed_projection(), str(projection)
             projection = target.with_name('expected-composite-run.json')
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_composite_projection(), str(projection)
-        print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native not_checked')
+            projection = target.with_name('expected-wide-run.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_wide_projection(), str(projection)
+        print(slug + ': ' + str(len(output['cases'])) + ' independent cases; native observed: '
+              + str(sum(c['native_status'] == 'observed' for c in output['cases'])))

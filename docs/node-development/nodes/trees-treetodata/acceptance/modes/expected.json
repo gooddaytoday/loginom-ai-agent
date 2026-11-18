@@ -104,7 +104,7 @@
     },
     {
       "id": "wide",
-      "native_status": "not_checked",
+      "native_status": "observed",
       "settings_proposal": {
         "selected_field_count": 70,
         "tree_input": {

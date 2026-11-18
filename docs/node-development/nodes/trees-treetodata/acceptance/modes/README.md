@@ -10,7 +10,9 @@
 пользовательское описание данных, не скрытый acceptance manifest.
 
 `expected.json` — контейнер предложенных случаев, **не вход stock run-check**.
-Все `native_status`, кроме composite (`observed`, LAB-1815), равны `not_checked`; совпадение арифметики не означает
+Для wide `native_status: observed` — имена, порядок и значения LAB-1807;
+все 70 типов проверяет `trees-to-table-wide`; для composite — LAB-1815.
+Остальные статусы — `not_checked`. Совпадение арифметики не означает
 наблюдение Loginom или PASS обработчика. Нужны утверждение критериев и
 минимальные native-пробы данных, перечисленные в [modes.md](../../modes.md).
 
