@@ -4,6 +4,7 @@ import { access, appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFil
 import { tmpdir } from "node:os"
 import { basename, dirname, isAbsolute, join } from "node:path"
 import { setTimeout } from "node:timers/promises"
+import { allowLocalGuiWithUnconfiguredHost } from "../../../loginom-host/script/skills-acceptance/renderer-connection.mjs"
 
 const executable = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
 const driverResources = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
@@ -119,7 +120,7 @@ try {
   const status = await page.evaluate(() => window.api.loginom.read())
   if (status.generation || status.state !== "unconfigured") throw Error("UNCONFIGURED_STATE_INVALID")
   await page.screenshot({ path: join(evidence, "first-launch.png") })
-  await form.locator('[data-component="icon-button"][data-icon="close"]').click()
+  await allowLocalGuiWithUnconfiguredHost(app, page)
   await form.waitFor({ state: "hidden", timeout: 30000 })
   await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
   const server = await page.evaluate(() => window.api.awaitInitialization())

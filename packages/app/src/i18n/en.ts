@@ -25,6 +25,7 @@ export const LOGINOM_ENGLISH = {
     "Could not confirm whether the saved settings were applied. Open Loginom settings to check the status.",
   "loginom.checkedSaved": "Connection verified: the AI server is accessible and Loginom sign-in succeeded.",
   "loginom.refresh": "Refresh settings",
+  "loginom.loadFailed": "Could not load Loginom settings.",
   "loginom.discardTitle": "Close without saving?",
   "loginom.discardDescription": "Your changes will be discarded. Previously saved settings will remain unchanged.",
   "loginom.keepEditing": "Continue editing",
