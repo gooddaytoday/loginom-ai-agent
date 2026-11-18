@@ -124,11 +124,17 @@ function permsBlock(state, item) {
     '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+cannot.map((text) => '<li>'+esc(text)+'</li>').join('')+'</ul></div></div>'+
     (item.type === 'action' ? '<p class="own-note">'+icon('help',15)+' Перед каждым запуском — шаг «Доступ», как у встроенного действия.</p>' : '');
 }
-function statusLine(item) {
+// В-62: in the closed contour a skill from a file works only if the administrator allowed unverified skills.
+function blockedFile(state, item) {
+  return state.contour === 'closed' && item.type === 'skill' && item.origin === 'file';
+}
+const blockedFileText = 'Администратор вашей организации не разрешил навыки, которые Loginom не проверял: из файла и «Сообщество». Если навык нужен — передайте файл администратору.';
+
+function statusLine(item, blocked = false) {
   const action = item.type === 'action';
-  const own = item.status === 'draft' ? 'Черновик' : item.status === 'on' ? (action ? 'Включено' : 'Включён') : (action ? 'Выключено' : 'Выключен');
+  const own = blocked ? 'Выключен администратором' : item.status === 'draft' ? 'Черновик' : item.status === 'on' ? (action ? 'Включено' : 'Включён') : (action ? 'Выключено' : 'Выключен');
   const pub = pubLabel(item);
-  return '<span class="own-status own-'+item.status+'">'+own+'</span>'+
+  return '<span class="own-status own-'+(blocked ? 'off' : item.status)+'">'+own+'</span>'+
     (item.type === 'skill' && item.origin === 'file' ? '<span class="own-pub own-pub-review">Не проверен Loginom</span>' : '')+
     (pub ? '<span class="own-pub own-pub-'+item.publication.stage+'">'+esc(pub)+'</span>' : '');
 }
@@ -162,7 +168,8 @@ function renderSkillEditor(state, edit) {
   if (!saved && edit.method === 'chat' && !edit.fromSession) source = '<section class="sl-panel"><h2>Из какого разговора</h2>'+
     (sessions.length ? '<div class="own-sessions">'+sessions.slice(0,6).map((session) => '<button type="button" class="sl-draft" data-own="from-session:'+esc(session.id)+'"><span><strong>'+esc(session.title)+'</strong><small>'+esc(session.date || '')+'</small></span><span>Выбрать →</span></button>').join('')+'</div>'
       : '<p class="muted">Завершённых разговоров пока нет. Начните с нуля или возьмите пример.</p><button type="button" class="btn" data-own="from-session:demo">Только для прототипа: пример разговора</button>')+'</section>';
-  if (!saved && edit.method === 'file' && !edit.fromFile) source = '<section class="sl-panel"><h2>Из файла</h2>'+
+  if (!saved && edit.method === 'file' && !edit.fromFile && state.contour === 'closed') source = '<section class="sl-panel"><h2>Из файла</h2><div class="sl-note sl-note-warn">'+icon('lock',16)+' '+blockedFileText+'</div></section>';
+  else if (!saved && edit.method === 'file' && !edit.fromFile) source = '<section class="sl-panel"><h2>Из файла</h2>'+
     '<label class="hub-drop"><input type="file" accept=".md,.zip,.loginom-skill" data-own-file aria-label="Выбрать файл навыка"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать SKILL.md, ZIP или файл навыка от коллеги</strong><small>Файл только читается: ничего из него не запускается.</small></label>'+
     '<div class="hub-demo"><span>Только для прототипа</span><div><button class="btn" data-own="sample:zip">Навык от коллеги (ZIP)</button><button class="btn" data-own="sample:md">SKILL.md</button></div></div></section>';
   const ready = saved || edit.method === 'app' || edit.fromSession || edit.fromFile;
@@ -177,13 +184,14 @@ function renderSkillEditor(state, edit) {
     (item.origin === 'file' ? '<label class="own-consent"><input type="checkbox" data-own-ack'+(item.ack ? ' checked' : '')+'> Понимаю: Loginom этот навык не проверял, а агент будет следовать его указаниям. Результат проверю сам</label>' : '')+
     leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие.')+
     '<div class="sl-actions"><button type="submit" class="btn">'+(saved ? 'Сохранить' : 'Сохранить черновик')+'</button>'+
-    '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
-    (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>' : '';
+    (blockedFile(state, item) ? '</div><div class="sl-note sl-note-warn">'+icon('lock',16)+' '+blockedFileText+'</div></form></section>'
+      : '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
+        (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>') : '';
   return '<div class="sl-page own-page"><button type="button" class="sl-back-link" data-own="to-mine">← Мои</button>'+
     '<header class="sl-heading"><span class="sl-product">Навык · '+origins[item.origin].label+'</span><h1>'+(saved ? esc(item.name || 'Навык') : 'Новый навык')+'</h1><p>Навык подсказывает агенту, как делать задачу. Он работает только у вас, пока вы его не опубликуете.</p></header>'+
     (saved ? '' : '<div class="sl-switch" aria-label="Способ создания">'+[['chat','Из разговора'],['app','С нуля'],['file','Из файла']].map(([id, title]) => '<button type="button" class="sl-chip'+(edit.method === id ? ' is-active' : '')+'" data-own="method:'+id+'" aria-pressed="'+(edit.method === id)+'">'+title+'</button>').join('')+'</div>')+
     '<div class="sl-grid">'+(source || form)+
-    '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2>'+statusLine(item)+'</div><h3>'+esc(item.name || 'Название навыка')+'</h3><p>'+esc(item.when || 'Когда агент его применяет')+'</p>'+permsBlock(state, item)+
+    '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка навыка</h2>'+statusLine(item, blockedFile(state, item))+'</div><h3>'+esc(item.name || 'Название навыка')+'</h3><p>'+esc(item.when || 'Когда агент его применяет')+'</p>'+permsBlock(state, item)+
     (saved && item.status !== 'draft' ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : saved ? '<p class="own-note">'+icon('help',15)+' Включите навык, чтобы опубликовать его.</p>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
 }
 
@@ -243,12 +251,13 @@ export function renderMine(state) {
               : pub?.stage === 'admin' ? '<p class="own-receipt">Файл «'+esc(pub.file)+'» сохранён — передайте его администратору</p>' : '';
     const confirm = pub?.stage === 'confirm' ? '<button class="btn quiet" data-own="resend:'+item.id+'">Отправить письмо ещё раз</button><button class="btn quiet" data-own="publish:'+item.id+'">Изменить почту</button><button class="btn quiet" data-own="confirm-mail:'+item.id+'">Только для прототипа: подтвердить</button>' : '';
     const deleting = own.confirmDelete === item.id;
+    const blocked = blockedFile(state, item);
     return '<article class="own-row"><span class="hub-tile '+(item.type === 'action' ? 'hub-lilac' : 'hub-sage')+'">'+icon(item.type === 'action' ? actionBases[item.base].icon : 'book',21)+'</span>'+
       '<div class="own-row-main"><div class="own-row-title"><button class="hub-card-title" data-own="edit:'+item.id+'">'+esc(item.name || 'Без названия')+'</button>'+
       '<span class="hub-type">'+(item.type === 'action' ? 'Действие' : 'Навык')+'</span><span class="own-origin">'+(item.type === 'action' ? 'на основе «'+actionBases[item.base].title+'»' : origins[item.origin].label)+'</span></div>'+
-      '<p>'+esc(item.when)+'</p><div class="own-row-status">'+statusLine(item)+(item.version !== '1.0' || pub ? '<span class="own-version">версия '+esc(item.version)+'</span>' : '')+'</div>'+note+'</div>'+
+      '<p>'+esc(item.when)+'</p><div class="own-row-status">'+statusLine(item, blockedFile(state, item))+(item.version !== '1.0' || pub ? '<span class="own-version">версия '+esc(item.version)+'</span>' : '')+'</div>'+(blocked ? '<p class="own-reason">'+icon('lock',14)+' '+blockedFileText+'</p>' : note)+'</div>'+
       '<div class="own-row-actions">'+
-        (item.type === 'skill' ? (item.status === 'draft' ? '<button class="btn" data-own="enable:'+item.id+'">Включить</button>' : '<label class="own-toggle"><input type="checkbox" role="switch" data-own-toggle="'+item.id+'"'+(item.status === 'on' ? ' checked' : '')+'> Пользоваться</label>')
+        (blocked ? '' : item.type === 'skill' ? (item.status === 'draft' ? '<button class="btn" data-own="enable:'+item.id+'">Включить</button>' : '<label class="own-toggle"><input type="checkbox" role="switch" data-own-toggle="'+item.id+'"'+(item.status === 'on' ? ' checked' : '')+'> Пользоваться</label>')
           +'<button class="btn quiet" data-own="try:'+item.id+'">Попробовать</button>' : '<button class="btn" data-own="run:'+item.id+'">Запустить '+icon('arrow',15)+'</button>')+
         '<button class="btn quiet" data-own="edit:'+item.id+'">Изменить</button>'+
         (item.status === 'draft' ? '' : publishButton(state, item).replace('class="btn"','class="btn quiet"'))+confirm+

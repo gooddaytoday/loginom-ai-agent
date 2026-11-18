@@ -105,7 +105,8 @@ function save(ids, name) {
   link.download = name.replace(/[\\/:*?"<>|]/g, '') + '.loginom-hub';
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast('Файл «' + link.download + '» сохранён — передайте его пользователям');
+  // В-60: a closed-network file is valid for 180 days.
+  toast('Файл «' + link.download + '» сохранён, действует до ' + new Date(Date.now() + 180 * 864e5).toLocaleDateString('ru-RU') + ' — передайте его пользователям');
 }
 function toast(text) {
   const box = document.getElementById('site-toast');

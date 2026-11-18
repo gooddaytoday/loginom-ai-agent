@@ -217,7 +217,7 @@ function itemCard(item, hub, online, tab) {
 // offered as a link under the catalog instead of a banner every analyst has to scroll past.
 function sourceLine(online) {
   if (online) return '';
-  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026. Разрешено только подготовленное или проверенное Loginom.</span><button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button></div>';
+  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span><button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button></div>';
 }
 
 function history(hub) {
@@ -320,7 +320,7 @@ function renderDialog(hub, online) {
     const changes = bundle.ids.filter(id=>hub.installed[id] !== byId(id).version);
     title = 'Что будет установлено';
     body = '<div class="hub-package-title"><span class="hub-tile hub-clay">'+icon('archive',24)+'</span><div><strong>'+bundle.name+'</strong><p class="hub-filename">'+escape(current.filename)+'</p></div></div>'+
-      '<dl class="hub-checks"><div><dt>Подпись</dt><dd>'+icon('check',14)+' Loginom · демонстрационный ключ</dd></div><div><dt>Собран</dt><dd>12.11.2026</dd></div><div><dt>Совместимость</dt><dd>Агент '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Сеть</dt><dd>Интернет не нужен</dd></div></dl>'+
+      '<dl class="hub-checks"><div><dt>Подпись</dt><dd>'+icon('check',14)+' Loginom · демонстрационный ключ</dd></div><div><dt>Собран</dt><dd>12.11.2026</dd></div><div><dt>Действует до</dt><dd>11.05.2027</dd></div><div><dt>Совместимость</dt><dd>Агент '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Сеть</dt><dd>Интернет не нужен</dd></div></dl>'+
       (incompatible?'<div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Нужна более новая версия приложения</strong><p>Пакет рассчитан на версию '+bundle.minAgent+'. Попросите администратора собрать пакет для вашей версии.</p></div></div>':
         '<div class="hub-notice hub-notice-ok">'+icon('check',19)+'<div><strong>Подпись и файлы проверены</strong><p>Пакет не изменялся после подписи. В прототипе используются учебные данные.</p></div></div>')+
       (current.required&&!bundle.ids.includes(current.required)?'<div class="hub-notice">'+icon('alert',19)+'<div><strong>Нужного в файле нет</strong><p>«'+byId(current.required).title+'» можно добавить из другого файла.</p></div></div>':'')+

@@ -147,7 +147,7 @@ export const catalog = [
   },
   {
     id: 'cloud', title: 'Внешнее обогащение данных', kind: 'Подключение', icon: 'link', color: 'blue',
-    version: '1.0.0', tier: 'community', publisher: 'Example Data Inc.', offline: false, size: '64 КБ',
+    version: '1.0.0', tier: 'official', offline: false, size: '64 КБ',
     keywords: 'обогащение внешний сервис api',
     description: 'Дополняет записи данными из внешнего сервиса по API.',
     evidence: null, can: ['Отправлять выбранные поля во внешний сервис Example Data'], cannot: [],

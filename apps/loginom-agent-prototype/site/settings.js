@@ -20,7 +20,7 @@ export const policyPath = "C:\\ProgramData\\Loginom AI Agent\\policy.json"
 const adminPolicy = {
   loginomUrl: "https://loginom.corp.example",
   models: [{ kind: "intranet", source: "admin", name: "Qwen 3 32B", url: "https://llm.corp.example/v1", where: "Сеть организации" }],
-  catalog: "Набор от администратора от 12.11.2026",
+  catalog: "Набор от администратора от 12.11.2026, действует до 11.05.2027",
 }
 
 const permissionKinds = [
