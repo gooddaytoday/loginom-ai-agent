@@ -1405,8 +1405,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           diagrams.push(current.FCustomForm?.FDiagram);
           pending.push(...(current.FSubNodes?.FItems ?? []));
         }
-        // Loginom also normalizes grouping input columns on Open after Execute.
-        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>n.FIconCls==='bg-vendor-icon-restclientconnection'||n.FIconCls==='bg-vendor-icon-groupdata'));
+        // Final regression also observed dirty Open for regression and clustering.
+        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization'].includes(n.FIconCls)));
         const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
         if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
