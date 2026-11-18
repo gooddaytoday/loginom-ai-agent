@@ -20,6 +20,7 @@ export function treeConversionReadback({node,phases,operation_id}){
  return c.kind==='table_to_tree'?{...common,nodes:c.nodes.map(declared)}:{...common,...Object.fromEntries(Object.keys(treeToJsonParametersSchema.properties).map(k=>[k,c[k]]))};
 }
 export function createTreeConversionNodeSupport(config,{table}){
+ const nativeSources=new WeakMap();
  const type=table?'trees.from_table':'trees.to_json',stage=table?'table_tree':'tree_json';
  return createTabularTransformNodeSupport(config,{
   type,mode:table?'manual_structure':'serialize',revision:'tree-conversion-stage1-v1',parameterSchema:table?tableToTreeParametersSchema:treeToJsonParametersSchema,
@@ -37,9 +38,8 @@ export function createTreeConversionNodeSupport(config,{table}){
    const inventory=await options.execute(makeNodeOutputContextCode({document_id:r.document_id,workflow_ref:r.workflow_ref,node:input.source}),{timeout:Math.max(5000,ctx.deadline-Date.now()+5000)});
    need(inventory?.verified&&inventory.ports?.some(p=>p.index===input.output&&p.active&&p.port_guid===port.port_guid),'Conversion source port changed');
    if(table){
-    const previous=r.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,r.target.ref)&&h.cleanup_confirmed&&h.outcome?.status==='SUCCEEDED'
-     &&h.outcome.cleanup_complete&&h.outcome.output.cleanup_complete&&h.outcome.output.configuration?.readback?.kind==='table_to_tree').at(-1)?.outcome.output.configuration.readback:null;
-    const nodes=r.parameters.nodes??previous?.nodes;need(nodes,'Existing structure requires its verified local readback');validateTableTreeSource(port,nodes);
+    if(r.parameters.nodes!==undefined)validateTableTreeSource(port,r.parameters.nodes);
+    else{const key=options.operation.nodeApply?.request;if(key)nativeSources.set(key,port);}
    }else validateSerializationTree(port);
    const event={phase:'tree_conversion_source_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,source_execution_id:out.execution.execution_id};
    const ack=await options.onRecord(event);need(same(event,Object.fromEntries(Object.keys(event).map(k=>[k,ack?.[k]]))),'Conversion source acknowledgement differs');
@@ -68,6 +68,13 @@ export function createTreeConversionNodeSupport(config,{table}){
    };
    if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_tree};
    if(table){
+    if(p.nodes===undefined){
+     const source=nativeSources.get(request);
+     need(source&&s.node_tree.inventory_complete,'Existing table-to-tree node: native structure is unavailable; pass parameters.nodes with the complete structure and source_field bindings');
+     const nodes=s.node_tree.nodes.map(declared);
+     validateTreeConversionParameters({nodes},'manual_structure',request);
+     validateTableTreeSource(source,nodes);
+    }
     if(p.nodes&&!same(s.node_tree.nodes.map(declared),p.nodes)){
      // Delete existing root children, preserving the native mandatory Root.
      for(let i=0;i<64;i++){
