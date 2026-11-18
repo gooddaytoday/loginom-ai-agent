@@ -6,9 +6,16 @@
 
 Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node 24.19.0 и Chromium revision 1243; точные хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
 
-Из `packages/desktop`:
+Затем установить зависимости клиента Dock закреплённым Node, как в CI (`.github/actions/setup-loginom-inputs`). Без них `bun run build` завершается ошибкой `Could not resolve "yaml"`. Из `packages/loginom-runtime/client`:
 
 ```sh
+npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+```
+
+Из `packages/desktop`. `NODE_OPTIONS` нужен из-за того, что electron-vite собирает весь backend в main-процесс; со стандартным лимитом кучи V8 сборка падает с OOM (значение то же, что в `release.yml`):
+
+```sh
+export NODE_OPTIONS=--max-old-space-size=6144
 export LOGINOM_AI_AGENT_CHANNEL=prod
 export LOGINOM_AI_AGENT_NODE_SOURCE=/absolute/cache/node-v24.19.0-linux-x64/bin/node
 export LOGINOM_AI_AGENT_BROWSER_SOURCE=/absolute/cache/browsers
