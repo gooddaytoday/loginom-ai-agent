@@ -38,11 +38,40 @@ test('manual oracle requires full typed ordered results, retained IDs, source-on
   const events=history();change(events);assert.throws(()=>auditVariablesUnionManual(events,initial,updated));
  }
 });
-test('type-refusal oracle requires native preflight, unchanged graph and values, no engine gesture or workaround',()=>{
+function refusalHistory(){
  const graph={complete:true,nodes:[{type:'variables.calculator',ref:{node_id:'left'}},{type:'variables.calculator',ref:{node_id:'right'}},{type:'variables.user',ref:{node_id:'builtin'}}],links:[],variable_links:[]};
- const events=[{phase:'node_apply_prepared',request:{operation_id:'refusal',target:{kind:'new',type:'variables.column_union'},parameters:{column_union:{mapping:'manual',fields:[{input:0,source:'amount',type:'string'}]}}}},
+ return [{phase:'node_apply_prepared',request:{operation_id:'refusal',target:{kind:'new',type:'variables.column_union'},parameters:{column_union:{mapping:'manual',fields:[{input:0,source:'amount',type:'string'}]}}}},
   {phase:'node_variables_union_preflight',operation_id:'refusal',settings_changed:false,graph_before:graph,graph_after:structuredClone(graph),outputs:[0,1].map(input=>({complete:true,count:2,variables:[{name:'amount',label:'amount',type:'integer',cell:{type:'integer',is_null:false,precision:'exact_integer',value:String(input?19:7)}},{name:input?'enabled':'empty',label:input?'enabled':'empty',type:input?'boolean':'string',cell:{type:input?'boolean':'string',is_null:false,value:input?false:''}}]}))},
   {phase:'node_phase_refused',operation_id:'refusal',receipt:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}}];
+}
+function refusalWithRead(){
+ return [...refusalHistory(),{phase:'node_apply_prepared',request:{operation_id:'read-left',target:{kind:'existing',type:'variables.calculator',ref:{node_id:'left'}},
+  mode:'read_existing_output',parameters:{source_operation_id:'left-create',execution_policy:'existing',schemas:[]},inputs:[],mappings:[],finish:'done'}},
+  {phase:'node_phase_completed',operation_id:'read-left',receipt:{phase:'finish',status:'verified',value:{settings_applied:false,execution_started:false}}}];
+}
+test('type-refusal oracle allows existing output reads after refusal without settings changes',()=>{
+ const events=refusalWithRead();
+ events.push(...structuredClone(events.slice(3)).map(e=>{
+  if(e.request){e.request.operation_id='read-right';e.request.target.ref.node_id='right';e.request.parameters.source_operation_id='right-create';}
+  else e.operation_id='read-right';
+  return e;
+ }));
+ assert.equal(auditVariablesUnionRefusal(events).status,'PASS');
+});
+test('type-refusal oracle still rejects settings edits, new nodes and source patches after refusal',()=>{
+ for(const change of [e=>e[3].request.target.kind='new',e=>e[3].request.mode='expression',
+  e=>e[3].request.parameters.execution_policy='execute',e=>e[3].request.finish='execute',
+  e=>e[3].request.parameters.expressions=[{target:{kind:'existing',name:'amount'},formula:'23'}],
+  e=>e[3].request.inputs=[{input:0}],e=>e[3].request.variable_inputs=[{input:0}],e=>e[3].request.mappings=[{input:0}],
+  e=>e[3].request.parameters.schemas=[{port:0}],e=>e[4].receipt.value.settings_applied=true,
+  e=>e[3].request.bindings=[{name:'amount'}],e=>e[3].request.target.ref.node_id='other',
+  e=>e[4].receipt.value.execution_started=true,e=>e[4].operation_id='unrelated',e=>e.pop()]){
+  const events=refusalWithRead();change(events);
+  assert.throws(()=>auditVariablesUnionRefusal(events),/VARIABLES_UNION_REFUSAL_NO_WORKAROUND_OR_SOURCE_PATCH/);
+ }
+});
+test('type-refusal oracle requires native preflight, unchanged graph and values, no engine gesture or workaround',()=>{
+ const events=refusalHistory();
  assert.equal(auditVariablesUnionRefusal(events).status,'PASS');
  for(const change of [e=>e.shift(),e=>e[1].graph_after.nodes.push({type:'variables.column_union'}),e=>e[1].outputs[1].variables[0].cell.value='23',
   e=>e[2].receipt.effect_possible=true,e=>e.push({phase:'node_step_prepared',operation_id:'refusal',action:{verb:'execute_graph_node'}}),
