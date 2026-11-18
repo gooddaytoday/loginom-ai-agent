@@ -198,6 +198,12 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
         )
         return
       }
+      if (
+        state.baseline?.state === "unconfigured" &&
+        validation.browser?.state === "failed" &&
+        validation.browser.failure === "LOGINOM_LOGIN_REJECTED"
+      )
+        throw Error(validation.browser.failure)
       setState("phase", "saving")
       let current = await api.save({ validationId: validation.validationId, revision: candidate.revision })
       const revision = current.revision

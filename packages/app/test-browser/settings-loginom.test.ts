@@ -130,6 +130,77 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
+  test("a rejected first-run login keeps the wizard open without saving and can be corrected", async () => {
+    const f = setup({ state: "unconfigured", revision: 0, generation: 0 })
+    f.api.check = async () => ({
+      validationId: "checked",
+      expiresAt: Date.now() + 10000,
+      browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" },
+    })
+    try {
+      await f.form.load()
+      f.form.edit({ username: "draft", password: "incorrect", passwordMode: "replace" })
+      await f.form.submit(true)
+      expect(f.saves).toHaveLength(0)
+      expect(f.closed).toHaveLength(0)
+      expect(f.form.state.view).toMatchObject({ state: "unconfigured", revision: 0, generation: 0 })
+      expect(f.form.state.failed).toBe(true)
+      expect(f.form.state.message).toBe("loginom.invalidPassword")
+      expect(f.form.state.checkedBrowser).toEqual({ state: "failed", failure: "LOGINOM_LOGIN_REJECTED" })
+      expect(f.form.state.username).toBe("draft")
+      expect(f.form.state.password).toBe("incorrect")
+      expect(f.form.canSave()).toBe(true)
+      await f.form.refresh()
+      expect(f.form.state.message).toBe("loginom.invalidPassword")
+
+      f.form.edit({ password: "correct" })
+      expect(f.form.state.message).toBeUndefined()
+      f.api.check = async () => ({
+        validationId: "corrected",
+        expiresAt: Date.now() + 10000,
+        browser: { state: "verified" },
+      })
+      f.update({ state: "ready", browser: { state: "verified" } })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 0, validationId: "corrected" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", revision: 1, generation: 1 })
+    } finally {
+      f.dispose()
+    }
+  })
+  test("an unavailable first-run server still allows saving with a browser warning", async () => {
+    const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" }
+    const f = setup({ state: "unconfigured", revision: 0, generation: 0 })
+    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    try {
+      await f.form.load()
+      f.update({ state: "ready", browser })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 0, validationId: "checked" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", generation: 1, browser })
+      expect(f.form.state.failed).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("a configured profile still allows saving after a rejected login", async () => {
+    const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" }
+    const f = setup({ browser })
+    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    try {
+      await f.form.load()
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 1, validationId: "checked" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", generation: 2, browser })
+      expect(f.form.state.failed).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
   test("checking unchanged defaults in a new profile reports the connection as not saved", async () => {
     const defaults = {
       revision: 0,
