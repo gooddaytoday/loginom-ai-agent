@@ -4659,6 +4659,40 @@ function readRenderedInputMapping(observation) {
           if (!moved) { effectPossible=false; fail('UI_SCROLL_UNAVAILABLE','Scroll owner changed or its boundary was reached; observe again'); }
           record('ui_scroll_applied',moved);
           await page.waitForTimeout(50);
+          // LAB-1872: Files buffered rows take the viewport after the scroll
+          // event, so the post-scroll read saw them covered by their grid
+          // (point_not_observed). Only a Files grid scroll waits, at most 1 s
+          // within this action's deadline, until one of its own in-view rows is
+          // hit-testable; its observation can then issue the next gesture.
+          // Unsettled rows keep the previous observation; callers re-read.
+          const prefix=task.snapshot?.workflow_ref?.prefix;
+          if(prefix&&task.snapshot.file_storage?.status==='observed'
+            &&task.snapshot.observation_root?.identity?.anchor_tid===prefix+';FileStorageForm;pnlFileStorage;tbl'
+            &&current.ui.elements.find(item=>item.ref===task.action.ref)?.tid?.startsWith(prefix+';FileStorageForm;colName_')){
+            const waitStart=Date.now(),until=Math.min(waitStart+1000,deadline);let settled=false;
+            for(;;){
+              settled=await page.evaluate(({rows,owner})=>{
+                const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                const width=globalThis.innerWidth??document.documentElement.clientWidth,height=globalThis.innerHeight??document.documentElement.clientHeight;
+                for(const row of document.querySelectorAll('[data-tid^='+JSON.stringify(rows)+']')){
+                  let parent=row.parentElement;
+                  for(let depth=0;parent&&parent!==document.body&&depth<64;parent=parent.parentElement,depth++)
+                    if(parent.scrollHeight>parent.clientHeight&&['auto','scroll'].includes(getComputedStyle(parent).overflowY))break;
+                  if(!parent||state?.ids.get(parent)!==owner)continue;
+                  const box=row.getBoundingClientRect(),view=parent.getBoundingClientRect();
+                  const left=Math.max(box.x,view.x,0),right=Math.min(box.x+box.width,view.x+view.width,width);
+                  const top=Math.max(box.y,view.y,0),bottom=Math.min(box.y+box.height,view.y+view.height,height);
+                  if(right-left<1||bottom-top<1)continue;
+                  const hit=document.elementFromPoint((left+right)/2,(top+bottom)/2);
+                  if(hit&&(hit===row||row.contains(hit)))return true;
+                }
+                return false;
+              },{rows:prefix+';FileStorageForm;colName_',owner:expected.ref});
+              if(settled||Date.now()+50>until)break;
+              await page.waitForTimeout(50);
+            }
+            record('ui_storage_rows_settled',{settled,waited_ms:Date.now()-waitStart});
+          }
         }
         else if (task.action.verb === 'replace_expression') {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref).calculator_editor;

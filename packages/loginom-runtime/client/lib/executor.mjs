@@ -3007,7 +3007,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           if(verb==='scroll'){
             guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
             if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
-            return;
+            // Its retained post-scroll observation issues the next gesture (LAB-1872).
+            return result.output;
           }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
