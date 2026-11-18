@@ -368,6 +368,7 @@ jobs:
           DASHBOARD_PROJECT=example-services DASHBOARD_IMAGE=example:local \
             DASHBOARD_WEB=example-web DASHBOARD_WEB_USER=1000:1000 \
             DASHBOARD_PUBLISHER_USER=1000:1000 DASHBOARD_OWNER_KEY=codex.owner \
+            DASHBOARD_JOB_GROUP=1000 DASHBOARD_STUDIO_PROXY=example-studio \
             DASHBOARD_OWNER_VALUE=example DASHBOARD_STATE="$RUNNER_TEMP/dashboard" \
             DASHBOARD_APP_PORT=32801 DASHBOARD_APP_ORIGIN=http://dashboards.localhost:32801 \
             DASHBOARD_CLIENT_ORIGINS=http://127.0.0.1:32800 DASHBOARD_USERSTORAGE=example-storage \

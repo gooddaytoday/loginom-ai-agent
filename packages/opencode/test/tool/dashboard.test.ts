@@ -33,6 +33,8 @@ import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixtur
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
 type HostRequest = { method: string; input: { content?: string; expected?: unknown; scope?: unknown } }
+const publicationName = "20261115T120000Z.json"
+
 function publicationHost(options: { error?: string; latest?: { name: string; sourceHash: string }; changed?: boolean } = {}) {
   const requests: HostRequest[] = []
   let receive: ((event: { data: unknown }) => void) | undefined
@@ -48,7 +50,7 @@ function publicationHost(options: { error?: string; latest?: { name: string; sou
         : request.method === "scope" ? request.input.scope
         : request.method === "dashboardRead" ? (options.latest ? { version: options.latest, content: "{}" } : null)
         : request.method === "dashboardPublish" && options.changed ? { status: "changed", latest: options.latest ?? null }
-        : request.method === "dashboardPublish" ? { status: "written", version: { name: "20261115T120000Z.json", sourceHash: createHash("sha256").update(request.input.content!).digest("hex") } }
+        : request.method === "dashboardPublish" ? { status: "written", version: { name: publicationName, sourceHash: createHash("sha256").update(request.input.content!).digest("hex") } }
         : true
       receive?.({ data: { id: request.id, result } })
     },
@@ -84,7 +86,7 @@ it.instance("dashboard_draft reports missing installation resources", () => Effe
   if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("DASHBOARD_RESOURCES_MISSING")
 }))
 
-const publicationFolder = Effect.fn(function* () {
+const publicationFolder = Effect.fn(function* (origin = "http://127.0.0.1:0") {
   const instance = yield* TestInstance
   const root = join(instance.directory, "resources")
   const template = resolve(import.meta.dir, "../../../dashboard/template")
@@ -99,7 +101,7 @@ const publicationFolder = Effect.fn(function* () {
   const id = crypto.randomUUID()
   const folder = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
     // Port zero fails locally without depending on external routing or proxy timeouts.
-    id, origin: "http://127.0.0.1:0", dashboards: dashboardDataRoot(process.env), template,
+    id, origin, dashboards: dashboardDataRoot(process.env), template,
     fetch: Object.assign(async () => Response.json({
       id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
       binding: { packagePath: "/fixture/orders-" + id + ".lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
@@ -137,8 +139,29 @@ it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-
 
 for (const reply of ["reject", "abort", "once"] as const) {
   it.instance("publishing with a global allow still asks once for the bound node and package: " + reply, () => Effect.gen(function* () {
-    const folder = yield* publicationFolder()
     const requests = publicationHost()
+    const lookups: unknown[] = []
+    const server = reply === "once" ? yield* Effect.acquireRelease(
+      Effect.sync(() => Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url)
+          const content = requests.find(item => item.method === "dashboardPublish")?.input.content
+          if (request.method !== "POST" || url.pathname !== "/dashboard/lookup" || !content)
+            return new Response(null, { status: 404 })
+          lookups.push(await request.json())
+          const version = { name: publicationName, sourceHash: createHash("sha256").update(content).digest("hex") }
+          const publication = { ...version, status: "ready", buildHash: "a".repeat(64) }
+          return Response.json({
+            key: "fixture", exists: true, hash: publication.buildHash, appOrigin: url.origin, mode: "normal",
+            cliButton: false, currentVersion: version, latest: publication, publication,
+          })
+        },
+      })),
+      server => Effect.promise(() => server.stop(true)),
+    ) : undefined
+    const folder = yield* publicationFolder(server?.url.origin)
     const flags = yield* RuntimeFlags.Service
     yield* Effect.gen(function* () {
       const sessions = yield* Session.Service
@@ -181,11 +204,12 @@ for (const reply of ["reject", "abort", "once"] as const) {
       if (reply === "reject") expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toBeInstanceOf(PermissionV1.RejectedError)
       if (reply === "abort") expect(Exit.isFailure(exit)).toBe(true)
       if (reply === "once") expect(Exit.isSuccess(exit) && exit.value).toMatchObject({
-        title: "Публикация dashboard", output: expect.stringMatching(/^pending: Исходники переданы/),
+        title: "Публикация dashboard", output: expect.stringMatching(/^published: Dashboard опубликован\./),
       })
       expect(requests.filter(item => item.method === "dashboardPublish")).toHaveLength(reply === "once" ? 1 : 0)
+      expect(lookups).toEqual(reply === "once" ? [{ ...binding.binding, publication: publicationName }] : [])
       expect((yield* permissions.list()).filter(item => item.sessionID === session.id)).toEqual([])
-      expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
+      expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(reply !== "once")
       expect((yield* Effect.promise(() => readdir(join(folder.work, "../control")))).filter(item => item.startsWith(".publish-"))).toEqual([])
     }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
   }), 20_000)
@@ -205,13 +229,14 @@ it.instance("interruption joins an active publication build before removing its 
     }).pipe(Effect.forkScoped)
     const control = join(folder.work, "../control")
     const draft = join(control, "draft")
-    yield* pollWithTimeout(Effect.promise(async () =>
-      (await readdir(draft).catch(() => [])).find(name => name.startsWith(".build-")),
-    ), "publication never entered the filesystem build")
+    yield* pollWithTimeout(Effect.promise(async () => {
+      const pending = (await readdir(draft).catch(() => [])).find(name => name.startsWith(".pending-"))
+      if (pending) return (await readdir(join(draft, pending)).catch(() => [])).find(name => name.startsWith(".build-"))
+    }), "publication never entered the filesystem build")
     yield* Fiber.interrupt(fiber)
     const hash = (yield* Effect.promise(() => Bun.file(join(draft, "current")).text())).trim()
     expect(hash).toMatch(/^[a-f0-9]{64}$/)
-    expect((yield* Effect.promise(() => readdir(draft))).filter(name => name.startsWith(".build-"))).toEqual([])
+    expect((yield* Effect.promise(() => readdir(draft))).filter(name => /^\.(pending|build)-/.test(name))).toEqual([])
     expect((yield* Effect.promise(() => readdir(control))).filter(name => name.startsWith(".publish-"))).toEqual([])
     expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
