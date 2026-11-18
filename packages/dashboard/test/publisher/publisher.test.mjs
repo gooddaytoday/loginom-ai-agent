@@ -239,6 +239,45 @@ test("multiple pending publications complete one at a time", async t => {
   assert.match(await page.text(), /Dashboard/)
 })
 
+test("published Vite assets with Unicode names and uppercase extensions are served", async t => {
+  const input = await fixture(t)
+  const publication = JSON.parse(content)
+  const images = { "логотип.png": Buffer.alloc(5000, 1), "Logo.PNG": Buffer.alloc(5000, 2) }
+  publication.files[0].content += '\nimport "./style.css"'
+  publication.files.push({
+    path: "src/style.css",
+    encoding: "utf8",
+    content: 'body { background-image: url("./логотип.png"), url("./Logo.PNG") }',
+  })
+  for (const [image, bytes] of Object.entries(images)) {
+    publication.files.push({ path: "src/" + image, encoding: "base64", content: bytes.toString("base64") })
+  }
+  await writeFile(join(input.storage, path), JSON.stringify(publication))
+  await scanPublications(input)
+  await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+  await scanPublications(input)
+  const ready = JSON.parse(await readFile(join(input.builds, "state.json")))[path]
+  assert.equal(ready.status, "ready", ready.error)
+
+  const apps = createServer().listen(0, "127.0.0.1")
+  await once(apps, "listening")
+  t.after(() => apps[Symbol.asyncDispose]())
+  const appOrigin = "http://127.0.0.1:" + apps.address().port
+  appHost({ server: apps, builds: key => join(input.builds, key), appOrigin, clientOrigins: [], mode: "normal" })
+  const address = `${appOrigin}/apps/${ready.key}/${ready.buildHash}/assets/`
+  const assets = await readdir(join(input.builds, ready.key, ready.buildHash, "assets"))
+  for (const [image, bytes] of Object.entries(images)) {
+    const stem = image.slice(0, -4)
+    const file = assets.find(asset => asset.startsWith(stem + "-") && asset.endsWith(image.slice(-4)))
+    assert.ok(file, image)
+    const response = await fetch(address + encodeURIComponent(file))
+    assert.equal(response.status, 200, file)
+    assert.equal(response.headers.get("content-type"), "image/png", file)
+    assert.equal(response.headers.get("cache-control"), "public, max-age=31536000, immutable", file)
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes, file)
+  }
+})
+
 test("failed publications retain the previous dashboard through real files and HTTP", async t => {
   const input = await fixture(t)
   await scanPublications(input)

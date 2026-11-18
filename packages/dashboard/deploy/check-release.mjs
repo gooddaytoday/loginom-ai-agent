@@ -128,7 +128,11 @@ if (action === "storage") {
   const result = JSON.parse(input())
   if (result.exists !== false || result.latest !== null || result.currentVersion !== null) process.exit(1)
 } else if (action === "assets") {
-  const assets = [...input().matchAll(/(?:src|href)="\.\/(assets\/[\w.-]+)"/g)].map(match => match[1])
+  const assets = Array.from(input().matchAll(/\s(?:src|href)="\.\/assets\/([^"]*)"/g), ([, segment]) => {
+    const name = decodeURIComponent(segment)
+    assert(name && !name.startsWith(".") && !/[/\\:%?#\p{Cc}]/u.test(name), "Invalid built asset path")
+    return "assets/" + encodeURIComponent(name)
+  })
   assert(assets.length, "No built assets")
   console.log(assets.join("\n"))
 } else if (action === "response") {

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import { once } from "node:events"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { request } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 import { createEventLog } from "../../src/log.ts"
 import { appHost } from "../../src/web/apps.ts"
 import { dashboardServer } from "../../src/web/server.ts"
@@ -132,8 +134,31 @@ test("app host serves the build document and immutable assets", async (t) => {
   }
 })
 
+test("release check requests ASCII and Unicode assets as single URL segments", async (t) => {
+  const { server, key, hash, dir } = await listen(t)
+  const raw = "логотип.PNG"
+  const encoded = encodeURIComponent("иконка é.webp")
+  await writeFile(join(dir, "assets", raw), "fixture")
+  await writeFile(join(dir, "assets", decodeURIComponent(encoded)), "fixture")
+  const helper = fileURLToPath(new URL("../../deploy/check-release.mjs", import.meta.url))
+  const html = [
+    '<script src="./assets/app.js"></script>',
+    '<link href="./assets/' + raw + '">',
+    '<link href="./assets/' + encoded + '">',
+  ].join("\n")
+  const output = execFileSync(process.execPath, [helper, "assets"], { input: html, encoding: "utf8" })
+  const assets = output.trimEnd().split("\n")
+  assert.deepEqual(assets, ["assets/app.js", "assets/" + encodeURIComponent(raw), "assets/" + encoded])
+  for (const asset of assets) {
+    const response = await send(server, "GET", "/apps/" + key + "/" + hash + "/" + asset)
+    assert.equal(response.status, 200)
+  }
+})
+
 test("app host keeps security headers on forbidden and missing responses", async (t) => {
-  const { server, key, hash } = await listen(t)
+  const { server, key, hash, dir } = await listen(t)
+  await writeFile(join(dir, "assets", ".hidden.js"), "hidden")
+  await writeFile(join(dir, "assets", "%2F.js"), "escaped")
   const base = `/apps/${key}/${hash}`
   const cases = [
     ["GET", base + "/", "evil.test:32769", 403],
@@ -144,6 +169,11 @@ test("app host keeps security headers on forbidden and missing responses", async
     ["GET", base + "/sample.json", host, 404],
     ["GET", base + "/assets/map.js.map", host, 404],
     ["GET", base + "/assets/..", host, 404],
+    ["GET", base + "/assets/%2e%2e%2Findex.html", host, 404],
+    ["GET", base + "/assets/%2e%2e%5Cindex.html", host, 404],
+    ["GET", base + "/assets/%2ehidden.js", host, 404],
+    ["GET", base + "/assets/%252F.js", host, 404],
+    ["GET", base + "/assets/%C0.js", host, 404],
     ["POST", base + "/", host, 404],
     ["GET", `/apps/${"A".repeat(64)}/${hash}/`, host, 404],
   ]

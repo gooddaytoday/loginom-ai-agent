@@ -874,19 +874,23 @@ test("the CLI button is absent when disabled by the stand", async t => {
   assert.equal(await app.page.getByRole("button", { name: "Скопировать команду для CLI", exact: true }).count(), 0)
 })
 
-test("a native clipboard refusal stays visible and does not claim a copied command", async t => {
+for (const clipboard of ["unavailable", "denied"]) test(`the CLI command is selectable when the clipboard is ${clipboard}`, async t => {
   const app = await fixture(t, { cliButton: true, clipboardWrite: false })
-  const before = await app.page.evaluate(() => navigator.clipboard.readText())
+  if (clipboard === "unavailable") await app.page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: undefined }))
+  const before = await app.page.evaluate(() => navigator.clipboard?.readText())
   await app.page.getByRole("button", { name: "Создать dashboard", exact: true }).click()
   const link = app.page.getByRole("link", { name: "Открыть чат в Desktop", exact: true })
   await link.waitFor()
   const href = await link.getAttribute("href")
+  const created = app.page.waitForResponse(response => response.url().endsWith("/dashboard/snapshots"))
   await app.page.getByRole("button", { name: "Скопировать команду для CLI", exact: true }).click()
-  const note = app.page.getByRole("status").filter({ hasText: /clipboard|writeText/i })
+  const id = (await (await created).json()).id
+  const command = `loginom-ai-agent-cli run --dashboard ${id} "<опишите задачу>"`
+  const note = app.page.getByRole("status").filter({ hasText: command })
   await note.waitFor()
-  assert.match(await note.textContent(), /clipboard|writeText/i)
-  assert.doesNotMatch(await note.textContent(), /Команда скопирована/)
-  assert.equal(await app.page.evaluate(() => navigator.clipboard.readText()), before)
+  assert.equal(await note.textContent(), command)
+  assert.equal(await note.evaluate(element => getComputedStyle(element).userSelect), "text")
+  assert.equal(await app.page.evaluate(() => navigator.clipboard?.readText()), before)
   assert.equal(app.snapshots.length, 2)
   assert.equal(await link.isVisible(), true)
   assert.equal(await link.getAttribute("href"), href)

@@ -92,6 +92,7 @@ function start() {
       header.append(back)
       const note = status("0 20px")
       const feedback = status("0 20px")
+      feedback.style.userSelect = "text"
       section.append(header, note)
       owner.View.el.dom.append(section)
       back.focus()
@@ -187,9 +188,16 @@ function start() {
           cli.type = "button"
           cli.style.cssText = buttonStyle
           cli.onclick = () => snapshotAction(async id => {
-            await navigator.clipboard.writeText(`loginom-ai-agent-cli run --dashboard ${id} "<опишите задачу>"`)
+            const command = `loginom-ai-agent-cli run --dashboard ${id} "<опишите задачу>"`
+            let text = command
+            try {
+              await navigator.clipboard.writeText(command)
+              text = "Команда скопирована"
+            } catch {
+              // Plain HTTP and clipboard policy can require manual copying.
+            }
             if (overlay !== section) return
-            feedback.textContent = "Команда скопирована"
+            feedback.textContent = text
             section.append(feedback)
           })
           back.before(cli)

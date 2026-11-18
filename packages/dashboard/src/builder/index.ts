@@ -22,14 +22,17 @@ export async function buildNext(input: { jobsIn: string; jobsOut: string; templa
     if (result.ok) {
       const entries = await readdir(result.dir, { recursive: true, withFileTypes: true })
       if (entries.some(entry => !entry.isFile() && !entry.isDirectory())) throw Error("DASHBOARD_OUTPUT_FILE")
+      const dist = join(output, "dist")
+      // An interrupted attempt may have copied part of dist before publishing result.json.
+      await rm(dist, { recursive: true, force: true })
       const directories = ["", ...entries.filter(entry => entry.isDirectory()).map(entry => relative(result.dir, join(entry.parentPath, entry.name)))].sort()
       for (const directory of directories) {
         // Never recreate a retired output root; every nonempty directory must already be removable by publisher's UID.
-        await mkdir(join(output, "dist", directory))
-        await chmod(join(output, "dist", directory), 0o777)
+        await mkdir(join(dist, directory))
+        await chmod(join(dist, directory), 0o777)
       }
       for (const file of entries.filter(entry => entry.isFile())) {
-        await copyFile(join(file.parentPath, file.name), join(output, "dist", relative(result.dir, join(file.parentPath, file.name))))
+        await copyFile(join(file.parentPath, file.name), join(dist, relative(result.dir, join(file.parentPath, file.name))))
       }
     }
     await writeFile(join(output, "result.tmp"), JSON.stringify({ id, sourceHash, outcome: result.ok ? "ready" : "failed", output: result.output }))

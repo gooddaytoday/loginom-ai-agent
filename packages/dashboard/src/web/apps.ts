@@ -1,7 +1,8 @@
 import { readFile, realpath } from "node:fs/promises"
 import { createServer, type IncomingMessage, type Server } from "node:http"
-import { extname, join } from "node:path"
+import { join } from "node:path"
 import { Option, Schema } from "effect"
+import { assetContentType } from "../contract/asset.ts"
 import { createEventLog, type EventWriter } from "../log.ts"
 
 export type Mode = "normal" | "strict"
@@ -22,16 +23,6 @@ export function appHeaders(appOrigin: string, clientOrigins: string[], connectio
     "referrer-policy": "no-referrer",
     "reporting-endpoints": `dashboard="${appOrigin}/_reports"`,
   }
-}
-
-const types: Record<string, string> = {
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".webp": "image/webp",
-  ".woff2": "font/woff2",
 }
 
 const cspDirective = Schema.Literals([
@@ -151,10 +142,15 @@ export function appHost(options: {
       }
       const app =
         request.method === "GET" &&
-        path.match(/^\/apps\/([a-f0-9]{64})\/([a-f0-9]{64})\/(?:assets\/([\w-][\w.-]*))?$/)
+        path.match(/^\/apps\/([a-f0-9]{64})\/([a-f0-9]{64})\/(?:assets\/([^/]+))?$/)
       if (!app) return send(404, "Not found")
-      const asset = app[3]
-      const type = asset ? types[extname(asset)] : "text/html; charset=utf-8"
+      let asset: string | undefined
+      try {
+        if (app[3]) asset = decodeURIComponent(app[3])
+      } catch {
+        return send(404, "Not found")
+      }
+      const type = asset ? assetContentType(asset) : "text/html; charset=utf-8"
       const dir = options.builds(app[1]!)
       const data = type && dir && (await buildFile(dir, app[2]!, asset ? join("assets", asset) : "index.html"))
       if (!data) return send(404, "Not found")

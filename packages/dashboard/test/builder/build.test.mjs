@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import test from "node:test"
@@ -90,6 +90,28 @@ test("concurrent identical drafts both reuse the installed hash", { timeout: 30_
   assert.equal(results[0].value.hash, results[1].value.hash)
   assert.equal(await fs.readFile(join(input.out, "current"), "utf8"), results[0].value.hash + "\n")
   assert.deepEqual((await readdir(input.out)).sort(), [results[0].value.hash, "current"].sort())
+})
+
+test("a restarted builder completes a job with partially copied output", async t => {
+  const root = await mkdtemp(join(tmpdir(), "restarted-builder-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const id = "a".repeat(64)
+  const input = { jobsIn: join(root, "jobs-in"), jobsOut: join(root, "jobs-out"), template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
+  const output = join(input.jobsOut, id)
+  await mkdir(join(input.jobsIn, id), { recursive: true })
+  await mkdir(join(output, "dist/assets"), { recursive: true })
+  await writeFile(join(output, "dist/assets/partial.js"), "incomplete output")
+  await writeFile(join(input.jobsIn, id, "publication.json"), JSON.stringify({ format: 1, template: 1,
+    binding: { packagePath: "/user/fixture.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" },
+    title: "Synthetic restarted job", parameters: [], files: [{ path: "src/main.tsx", encoding: "utf8", content: 'document.body.textContent = "Synthetic restarted job"' }],
+  }))
+
+  await buildNext(input)
+
+  const result = JSON.parse(await readFile(join(output, "result.json"), "utf8"))
+  assert.equal(result.outcome, "ready", result.output)
+  assert.match(await readFile(join(output, "dist/index.html"), "utf8"), /Dashboard/)
+  await assert.rejects(readFile(join(output, "dist/assets/partial.js")), { code: "ENOENT" })
 })
 
 test("retired builder cannot recreate output removed after it reads the job", async t => {

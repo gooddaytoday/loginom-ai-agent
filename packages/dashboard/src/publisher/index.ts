@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { chmod, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve, sep } from "node:path"
+import { assetContentType } from "../contract/asset.ts"
 import { parsePublication } from "../contract/publication.ts"
 import { bindingKey } from "../contract/snapshot.ts"
 import { outputText, treeHash } from "../builder/build.ts"
@@ -94,8 +95,9 @@ export async function scanPublications(input: {
           let remaining = 20 * 1024 * 1024
           for (const file of entries) {
             const path = relative(source, join(file.parentPath, file.name)).split(sep).join("/")
-            if (file.isDirectory() && (path === "assets" || path.startsWith("assets/"))) continue
-            if (!file.isFile() || !(path === "index.html" || /^assets\/(?!.*(?:^|\/)\.)[^\\]+\.(?:js|css|svg|png|jpg|webp|woff2)$/.test(path))) throw Error("DASHBOARD_OUTPUT_FILE")
+            if (file.isDirectory() && path === "assets") continue
+            const asset = path.startsWith("assets/") && assetContentType(path.slice("assets/".length))
+            if (!file.isFile() || (path !== "index.html" && !asset)) throw Error("DASHBOARD_OUTPUT_FILE")
             const bytes = await readBounded(join(source, path), remaining)
             remaining -= bytes.length
             await mkdir(dirname(join(staging, path)), { recursive: true })

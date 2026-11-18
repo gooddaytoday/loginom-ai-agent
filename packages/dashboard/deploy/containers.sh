@@ -62,6 +62,7 @@ installed=false
 builder_image=
 if [[ -e $state || -L $state ]]; then
   [[ -d $state && ! -L $state && -f $state/.env && ! -L $state/.env ]] || die "Dashboard state is occupied"
+  [[ $action != install || -O $state ]] || die "Dashboard state belongs to another user"
   # shellcheck disable=SC2094
   while IFS='=' read -r setting value; do
     case $setting in
@@ -541,18 +542,36 @@ mv "$tmp/compose-release.yaml" "$tmp/next-compose.yaml"
 if [[ $installed == true ]]; then
   cp -p "$state/.env" "$state/compose-release.yaml" "$tmp/"
 fi
-[[ -d $state ]] || install -d -m 755 "$state"
-for directory in builds jobs-in jobs-out; do
-  [[ -d $state/$directory ]] || install -d -m 777 "$state/$directory"
-done
 replace_site
-if ! { cp "$tmp/next.env" "$state/.env" && cp "$tmp/next-compose.yaml" "$state/compose-release.yaml" &&
-  { [[ $engine != podman ]] || cp -p "$tmp/next-conmon-rotate.sh" "$launcher"; } &&
-  compose_saved up -d --force-recreate && "$engine" exec "$studio" httpd -k graceful; }; then
+created_state=false
+created_mounts=()
+install_phase=prepare
+apply_install() {
+  local directory
+  # The host parent protects mounts shared by container roles with different UIDs.
+  if [[ $installed == false ]]; then
+    mkdir -m 700 "$state" || return 1
+    created_state=true
+  else
+    [[ -d $state && ! -L $state && -O $state ]] && chmod 00700 "$state" || return 1
+  fi
+  for directory in builds jobs-in jobs-out; do
+    [[ -d $state/$directory ]] && continue
+    mkdir -m 777 "$state/$directory" || return 1
+    created_mounts+=("$state/$directory")
+  done
+  install_phase=config
+  cp "$tmp/next.env" "$state/.env" || return 1
+  cp "$tmp/next-compose.yaml" "$state/compose-release.yaml" || return 1
+  if [[ $engine == podman ]]; then cp -p "$tmp/next-conmon-rotate.sh" "$launcher" || return 1; fi
+  install_phase=compose
+  compose_saved up -d --force-recreate && "$engine" exec "$studio" httpd -k graceful
+}
+if ! apply_install; then
   if [[ -e $tmp/previous.conf ]]; then
     { cp -a "$tmp/previous.conf" "$site.new" && mv -f "$site.new" "$site"; } || echo "Previous Apache file recovery failed" >&2
   else rm -f "$site" || echo "Apache candidate removal failed" >&2; fi
-  if [[ $installed == true ]]; then
+  if [[ $installed == true && $install_phase != prepare ]]; then
     if [[ $engine == podman ]]; then
       if [[ -f $tmp/conmon-rotate.sh ]]; then
         cp -p "$tmp/conmon-rotate.sh" "$launcher" || echo "Previous conmon launcher recovery failed" >&2
@@ -561,7 +580,14 @@ if ! { cp "$tmp/next.env" "$state/.env" && cp "$tmp/next-compose.yaml" "$state/c
       fi
     fi
     cp -p "$tmp/.env" "$tmp/compose-release.yaml" "$state/" || echo "Previous env/compose recovery failed" >&2
-    compose_saved up -d || echo "Previous compose recovery failed; data preserved" >&2
+    if [[ $install_phase == compose ]]; then
+      compose_saved up -d || echo "Previous compose recovery failed; data preserved" >&2
+    fi
+  elif [[ $created_state == true && $install_phase != compose ]]; then
+    if [[ $install_phase == config ]]; then
+      rm -f "$state/.env" "$state/compose-release.yaml" "$launcher" || echo "Partial dashboard configuration cleanup failed" >&2
+    fi
+    rmdir "${created_mounts[@]}" "$state" || echo "Partial dashboard state cleanup failed; data preserved" >&2
   fi
   "$engine" exec "$studio" httpd -k graceful || echo "Previous Apache reload failed; data preserved" >&2
   die "Dashboard apply failed; previous configuration recovery attempted; verify recovery"

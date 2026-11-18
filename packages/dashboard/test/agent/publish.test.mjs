@@ -43,7 +43,7 @@ async function fixture(t) {
   }
   const work = (await refresh()).directory
   const operation = await mkdtemp(join(work, "../control/.publish-"))
-  return { work, resources, operation, builds, refresh, lookup: () => post("lookup", binding).then(response => response.json()) }
+  return { work, resources, operation, builds, server, refresh, lookup: () => post("lookup", binding).then(response => response.json()) }
 }
 
 async function tree(dir) {
@@ -285,6 +285,38 @@ test("finish confirms its own ready A even when B is current", async t => {
   assert.equal(result.status, "published")
   assert.equal(result.version.name, name)
   assert.match(result.text, /новая|новее/)
+  await assert.rejects(readFile(join(input.work, "sample.json")), { code: "ENOENT" })
+})
+
+test("finish keeps polling after a text 503 and confirms its ready publication", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true, prepared.text)
+  const version = { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash }
+  const { key } = await input.lookup()
+  const folder = `${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/`
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({
+    [folder + version.name]: { key, sourceHash: version.sourceHash, status: "ready", buildHash: prepared.build.hash },
+  }))
+  let lookups = 0
+  const [handle] = input.server.listeners("request")
+  input.server.removeListener("request", handle).on("request", (request, response) => {
+    if (request.url === "/dashboard/lookup" && ++lookups === 1) {
+      request.resume()
+      response.writeHead(503, { "content-type": "text/plain" }).end("Temporary outage")
+      return
+    }
+    handle(request, response)
+  })
+  let writes = 0
+  const result = await finishPublish({ ...input, ...prepared, expected: null, timeoutMs: 10_000, publish: async () => {
+    writes++
+    return { status: "written", version }
+  } })
+  assert.equal(result.status, "published", result.text)
+  assert.deepEqual(result.version, version)
+  assert.equal(lookups, 2)
+  assert.equal(writes, 1)
   await assert.rejects(readFile(join(input.work, "sample.json")), { code: "ENOENT" })
 })
 

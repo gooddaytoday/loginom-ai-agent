@@ -238,6 +238,7 @@ if [[ $action == check ]]; then
   done
   asset=$(find "$builds/$roi/$current/assets" -maxdepth 1 -type f -printf '%f\n' -quit)
   [[ -n $asset ]] || die "ROI assets отсутствуют"
+  asset=$("$state/node" -p 'encodeURIComponent(process.argv[1])' -- "$asset")
   for path in "/apps/$roi/$current/" "/apps/$roi/$current/assets/$asset" /apps/ "/apps/$roi/$current" "/apps/$roi/$current/binding.json" "/apps/$roi/$current/sample.json"; do
     expected=404
     cache=no-store

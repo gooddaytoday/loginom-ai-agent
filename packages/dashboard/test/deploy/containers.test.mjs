@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -9,6 +9,108 @@ import test from "node:test"
 
 const script = fileURLToPath(new URL("../../deploy/containers.sh", import.meta.url))
 const master = fileURLToPath(new URL("../../deploy/dev-master.sh", import.meta.url))
+
+async function installFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), "dashboard-install-"))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const state = join(directory, "state")
+  const site = join(directory, "apache/dashboard.site.conf")
+  const image = "dashboard:test\n"
+  await mkdir(join(directory, "apache"))
+  await mkdir(join(directory, "workdir/storage"), { recursive: true })
+  // Redirect the fixed Docker state path while exercising the public install command.
+  const source = await readFile(script, "utf8")
+  const isolated = source.replace(/^state=\/var\/opt\/loginom-dashboard$/m, "state=$DASHBOARD_TEST_ROOT/state")
+  assert.notEqual(isolated, source)
+  await writeFile(join(directory, "containers.sh"), isolated)
+  await copyFile(new URL("../../deploy/check-release.mjs", import.meta.url), join(directory, "check-release.mjs"))
+  await copyFile(new URL("../../deploy/compose-release.yaml", import.meta.url), join(directory, "compose-release.yaml"))
+  await writeFile(join(directory, "image.ref"), image)
+  await writeFile(join(directory, "SHA256SUMS"), `${createHash("sha256").update(image).digest("hex")}  image.ref\n`)
+  // Emulate engine discovery and the two Apache calls. Validate with the shipped helper.
+  await writeFile(join(directory, "docker"), `#!/bin/bash
+case "$1" in
+  load|compose) exit 0;;
+  image) printf 'sha256:%064d\n' 1;;
+  container) exit 1;;
+  ps) case "$*" in *service=loginom-http*) echo studio;; *service=loginom-server*) echo server;; esac;;
+  inspect) case "$3" in
+    *Labels*) echo loginom;;
+    *apache2/conf*) echo "$DASHBOARD_TEST_ROOT/apache";;
+    *'json .Mounts'*) printf '[{"Type":"bind","Source":"%s/workdir","Destination":"/workdir"}]\n' "$DASHBOARD_TEST_ROOT";;
+    */workdir*) echo "$DASHBOARD_TEST_ROOT/workdir";;
+    *Networks*) echo loginom-network;;
+    '{{.Name}}') echo /studio;;
+    *) exit 2;;
+  esac;;
+  port) [[ $3 == 80/tcp ]] && echo 0.0.0.0:80;;
+  exec) case "$2/$3" in
+    server/cat) echo '<Settings><Directories UserStorage="storage"/></Settings>';;
+    server/stat) echo 1234:1234;;
+    studio/httpd) [[ $4 != -t || $DASHBOARD_TEST_APACHE_REJECT != 1 ]];;
+    *) exit 2;;
+  esac;;
+  run) while [[ $# -gt 0 && $1 != /check.mjs ]]; do shift; done
+    if [[ $# -gt 0 ]]; then shift; exec "$DASHBOARD_TEST_NODE" "$DASHBOARD_TEST_ROOT/check-release.mjs" "$@"; fi
+    echo sha384-synthetic;;
+  *) exit 2;;
+esac
+`, { mode: 0o700 })
+  for (const [command, status] of [["curl", 0], ["ss", 0], ["selinuxenabled", 1]])
+    await writeFile(join(directory, command), `#!/bin/bash\nexit ${status}\n`, { mode: 0o700 })
+  await writeFile(join(directory, "mkdir"), `#!/bin/bash
+[[ $DASHBOARD_TEST_MOUNT_REJECT != 1 || $3 != "$DASHBOARD_TEST_ROOT/state/jobs-in" ]] || exit 1
+exec /bin/mkdir "$@"
+`, { mode: 0o700 })
+  const install = ({ apacheReject = false, mountReject = false } = {}) => spawnSync("/bin/bash", [join(directory, "containers.sh"), "install", "--engine", "docker", "--public-host", "studio.example"], {
+    env: {
+      DASHBOARD_TEST_ROOT: directory, DASHBOARD_TEST_NODE: process.execPath,
+      DASHBOARD_TEST_APACHE_REJECT: apacheReject ? "1" : "0", DASHBOARD_TEST_MOUNT_REJECT: mountReject ? "1" : "0",
+      TMPDIR: directory, PATH: `${directory}:/usr/bin:/bin`,
+    },
+    encoding: "utf8",
+  })
+  return { state, site, install }
+}
+
+test("a rejected Apache candidate allows a fresh install to be repeated", async t => {
+  const { state, site, install } = await installFixture(t)
+  const rejected = install({ apacheReject: true })
+  assert.equal(rejected.status, 1, rejected.stderr)
+  assert.match(rejected.stderr, /Apache configuration rejected/)
+  await assert.rejects(readFile(site), { code: "ENOENT" })
+  const retried = install()
+  assert.equal(retried.status, 0, retried.stderr)
+  assert.match(await readFile(join(state, ".env"), "utf8"), /DASHBOARD_PUBLISHER_USER=1234:1234/)
+  assert.match(await readFile(site, "utf8"), /Managed by loginom-dashboard release installer/)
+})
+
+test("a mount creation failure rolls back the fresh Apache site and empty state", async t => {
+  const { state, site, install } = await installFixture(t)
+  const rejected = install({ mountReject: true })
+  assert.equal(rejected.status, 1, rejected.stderr)
+  assert.match(rejected.stderr, /Dashboard apply failed/)
+  await assert.rejects(readFile(site), { code: "ENOENT" })
+  await assert.rejects(readdir(state), { code: "ENOENT" })
+  const retried = install()
+  assert.equal(retried.status, 0, retried.stderr)
+})
+
+test("install keeps container mounts accessible under an owner-only host directory", async t => {
+  const { state, install } = await installFixture(t)
+  const fresh = install()
+  assert.equal(fresh.status, 0, fresh.stderr)
+  assert.equal((await stat(state)).mode & 0o777, 0o700)
+  const stateFile = join(state, "builds/state.json")
+  await writeFile(stateFile, "{}\n")
+  await chmod(state, 0o755) // Existing releases used a public state directory.
+  const repeated = install()
+  assert.equal(repeated.status, 0, repeated.stderr)
+  assert.equal((await stat(state)).mode & 0o777, 0o700)
+  assert.equal(await readFile(stateFile, "utf8"), "{}\n")
+  for (const mount of ["builds", "jobs-in", "jobs-out"])
+    assert.equal((await stat(join(state, mount))).mode & 0o777, 0o777)
+})
 
 test("Podman conmon rotates only bounded Dashboard role logs", async () => {
   const directory = await mkdtemp(join(tmpdir(), "dashboard-conmon-"))

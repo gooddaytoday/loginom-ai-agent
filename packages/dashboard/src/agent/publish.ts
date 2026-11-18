@@ -90,7 +90,6 @@ export async function finishPublish(input: Prepared & {
       }
     } catch {
       input.signal?.throwIfAborted()
-      break
     }
     if (Date.now() < deadline) await setTimeout(Math.min(3000, deadline - Date.now()), undefined, { signal: input.signal })
   }
