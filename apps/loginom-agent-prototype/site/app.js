@@ -399,9 +399,9 @@ function sidebar() {
   return `<aside class="sidebar${state.mobile ? ' expanded' : ''}" aria-label="Боковая панель">
     <div class="sidebar-head">
       <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'}" title="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'} (Ctrl+B)"><span class="rail-ico">${icon('panel',18)}</span>${state.collapsed ? `<span class="pin-ico">${icon('pin',18)}</span>` : ''}</button>
+      <button class="icon-btn neutral search-btn" data-overlay="search" aria-label="Поиск" title="Поиск (Ctrl+K)">${icon('search',18)}</button>
     </div>
     <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('compose',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
-    <button class="nav-item search-row" data-overlay="search">${icon('search',17)}<span>Поиск</span><kbd>Ctrl K</kbd></button>
     <div class="sidebar-history">
       <span class="rail-history" aria-hidden="true">${icon('clock',17)}${chatsMark(state.sessions)}</span>
       ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section" aria-label="Закреплённые">

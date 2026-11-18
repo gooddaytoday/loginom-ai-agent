@@ -206,7 +206,8 @@ button.prototype-mark:hover{color:var(--accent)}
 /* Panel: one layout pinned or collapsed. Every row's icon is centred 30px from the panel's left edge,
    so the collapsed rail is the same panel 60px wide and nothing moves when it opens over the page. */
 .sidebar{padding-inline:10px}
-.sidebar-head{display:flex;align-items:center;gap:2px;margin-bottom:11px}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-bottom:11px}
+.search-btn{width:40px;height:40px;color:var(--muted)}
 .collapse-btn{width:40px;height:40px;color:var(--muted)}
 .collapse-btn .pin-ico{display:none}
 .project-switch{padding:3px 9px 3px 2px}
@@ -224,10 +225,11 @@ button.prototype-mark:hover{color:var(--accent)}
 button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .proto-badge{display:inline-grid;place-items:center;width:24px;height:18px;border-radius:5px;background:var(--soft);font-size:10px;font-weight:700}
 .sidebar :is(.prototype-mark,.conn-run,.nav-item){white-space:nowrap}
-@media(max-width:1060px){:is(.new-session,.search-row) kbd{display:none}}
+@media(max-width:1060px){.new-session kbd{display:none}}
 @media(min-width:691px){
   .workspace.collapsed{grid-template-columns:60px minmax(0,1fr)}
   .workspace.collapsed .sidebar{position:relative;z-index:20;width:60px;overflow:hidden;transition:width .15s ease,box-shadow .15s ease}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .sidebar-head{flex-direction:column;align-items:flex-start}
   .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
   .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
   .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
@@ -390,11 +392,10 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .top-brand picture{width:92px}
 .top-brand>span{font-size:15px}
 .top-brand+:is(.crumb-current,.crumb-project){border-left:1px solid var(--line);padding-left:12px;border-radius:0}
-@media(max-width:690px){.sidebar-head{display:none}.top-brand picture{width:84px}.top-brand>span{font-size:14px}}
+@media(max-width:690px){.sidebar-head{justify-content:flex-end}.top-brand picture{width:84px}.top-brand>span{font-size:14px}}
 @media(max-width:410px){.top-brand>span{display:none}}
 /* Search (Ctrl K): a row under «Новый разговор» and a dialog */
-.search-row{margin:-6px 0 6px}
-.search-row kbd{margin-left:auto;font-weight:400}
+
 .search-input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
 .search-results{display:grid;gap:1px;margin-top:8px;max-height:min(60vh,420px);overflow:auto}
 .search-group{margin:8px 0 3px;padding:0 8px;color:var(--muted);font-size:12.5px;font-weight:600}
