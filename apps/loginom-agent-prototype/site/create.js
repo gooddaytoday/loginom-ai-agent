@@ -456,6 +456,8 @@ function bindScope(root, state, api) {
     const input = event.target.closest('[data-own-file]');
     if (!input?.files?.[0]) return;
     const file = input.files[0];
+    // A catalog file is not a skill of one's own: send the user to the import that checks the signature.
+    if (file.name.toLowerCase().endsWith('.loginom-hub')) return api.toast('Это файл каталога Loginom — откройте «Каталог» → «Импорт из файла»: там проверяется подпись.');
     if (file.name.toLowerCase().endsWith('.zip')) return loadSample('zip', file.name);
     file.text().then((text) => {
       const yaml = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? '';

@@ -54,7 +54,7 @@ export function createDemoArchive(ids = defaultSelection, compatible = true, nam
   const items = catalog.filter(item => item.offline && !item.builtIn && ids.includes(item.id));
   const manifest = {
     format:'loginom-hub-demo-v1', name, publisher:'Loginom · демо',
-    release:'2026.11', minAgent:compatible ? '0.5.0' : '0.7.0', minLoginom:'7.4.2',
+    release:'2026.11', created:new Date().toISOString().slice(0,10), minAgent:compatible ? '0.5.0' : '0.7.0', minLoginom:'7.4.2',
     items:items.map(item => ({id:item.id,version:item.version})),
   };
   const files = [
@@ -102,9 +102,9 @@ export function createDemoArchive(ids = defaultSelection, compatible = true, nam
 
 // shortcut: accepts only uncompressed archives produced by this prototype, until a signed production importer exists.
 export async function inspectDemoArchive(file) {
-  if (file.size > 2_000_000) throw Error('Демонстрационный пакет превышает 2 МБ.');
+  if (file.size > 2_000_000) throw Error('Файл каталога больше 2 МБ.');
   const data = await file.arrayBuffer();
-  if (data.byteLength < 22) throw Error('Файл повреждён. Выберите другой пакет.');
+  if (data.byteLength < 22) throw Error('Файл повреждён. Выберите другой файл.');
   const view = new DataView(data);
   const end = data.byteLength - 22;
   const files = new Map();
@@ -114,20 +114,20 @@ export async function inspectDemoArchive(file) {
   let offset = 0;
   let entryOffset = directory;
   if (!count || count > catalog.length+1 || directory >= end || directory+view.getUint32(end+12,true) !== end) {
-    throw Error('Не удалось прочитать состав пакета.');
+    throw Error('Не удалось прочитать состав файла.');
   }
   for (let index = 0; index < count; index++) {
     if (offset+30 > directory || view.getUint32(offset,true) !== 0x04034b50 || view.getUint16(offset+6,true) || view.getUint16(offset+8,true)) {
-      throw Error('Поддерживаются ZIP-пакеты, собранные в демонстрации.');
+      throw Error('Подходят только файлы каталога, скачанные в демонстрации.');
     }
     const size = view.getUint32(offset+18,true);
     const nameLength = view.getUint16(offset+26,true);
     const start = offset+30+nameLength+view.getUint16(offset+28,true);
-    if (start+size > directory) throw Error('Целостность пакета нарушена.');
+    if (start+size > directory) throw Error('Файл изменён или повреждён после подписи.');
     const name = decoder.decode(new Uint8Array(data,offset+30,nameLength));
     const bytes = new Uint8Array(data,start,size);
     const crc = view.getUint32(offset+14,true);
-    if (files.has(name) || checksum(bytes) !== crc) throw Error('Целостность пакета нарушена.');
+    if (files.has(name) || checksum(bytes) !== crc) throw Error('Файл изменён или повреждён после подписи.');
     const nextEntry = entryOffset+46+nameLength;
     if (nextEntry > end || view.getUint32(entryOffset,true) !== 0x02014b50 ||
       view.getUint32(entryOffset+16,true) !== crc || view.getUint32(entryOffset+42,true) !== offset ||
@@ -139,21 +139,32 @@ export async function inspectDemoArchive(file) {
     entryOffset = nextEntry;
     offset = start+size;
   }
-  if (offset !== directory || entryOffset !== end || !files.has('manifest.json')) throw Error('В архиве не найдена опись пакета.');
+  if (offset !== directory || entryOffset !== end || !files.has('manifest.json')) throw Error('В файле не найдена опись каталога.');
   let manifest;
   try { manifest = JSON.parse(decoder.decode(files.get('manifest.json'))); }
-  catch { throw Error('Не удалось прочитать опись пакета.'); }
+  catch { throw Error('Не удалось прочитать опись каталога.'); }
   if (manifest?.format !== 'loginom-hub-demo-v1' || manifest.release !== '2026.11' || !['0.5.0','0.7.0'].includes(manifest.minAgent) || manifest.minLoginom !== '7.4.2' || !Array.isArray(manifest.items) || !manifest.items.length) {
-    throw Error('Пакет собран для другого формата. Выберите пакет, скачанный в демонстрации.');
+    throw Error('Файл другого формата. Выберите файл каталога, скачанный в демонстрации.');
   }
   const ids = manifest.items.map(entry => catalog.find(item => item.offline && item.id === entry?.id && item.version === entry.version)?.id);
   if (ids.some(id => !id || !files.has('items/'+id+'.json')) || new Set(ids).size !== ids.length || files.size !== ids.length+1) {
-    throw Error('Состав архива не соответствует описи пакета.');
+    throw Error('Состав файла не соответствует описи.');
   }
   return {
     name:typeof manifest.name === 'string' && manifest.name ? manifest.name : 'Набор Loginom Hub', release:manifest.release, publisher:'Loginom',
     minAgent:manifest.minAgent, minLoginom:manifest.minLoginom, ids,
+    created:/^\d{4}-\d{2}-\d{2}$/.test(manifest.created ?? '') ? manifest.created : '2026-11-12',
   };
+}
+
+// В-50, В-49: a community item from a file installs only when the administrator allowed it, and after consent.
+function installable(bundle, hub, online) {
+  return bundle.ids.filter(id=>hub.installed[id] !== byId(id).version && (online || byId(id).tier !== 'community'));
+}
+
+// В-60: a closed-network file is valid for 180 days from the day it was made.
+function ruDate(iso, days = 0) {
+  return new Date(Date.parse(iso+'T00:00:00Z') + days*864e5).toLocaleDateString('ru-RU', {timeZone:'UTC'});
 }
 
 function hubState(state) {
@@ -217,7 +228,7 @@ function itemCard(item, hub, online, tab) {
 // offered as a link under the catalog instead of a banner every analyst has to scroll past.
 function sourceLine(online) {
   if (online) return '';
-  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span><button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button></div>';
+  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span><button class="hub-text" data-hub-action="import">Импорт из файла '+icon('arrow',15)+'</button></div>';
 }
 
 function history(hub) {
@@ -253,7 +264,7 @@ export function renderHub(state) {
         (kinds[hub.type] ? '<p class="hub-type-how"><strong>'+hub.type+'</strong> — '+kinds[hub.type].how.charAt(0).toLowerCase()+kinds[hub.type].how.slice(1)+'</p>' : '')+'</div>' : '')+
       (items.length ? '<div class="hub-grid">'+items.map(item=>itemCard(item,hub,online,hub.tab)).join('')+'</div>' :
         '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появится установленное')+'</h3>'+
-        '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте пакет обновлений от администратора.')+'</p>'+
+        '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте файл каталога от администратора.')+'</p>'+
         (source.length?'<button class="btn" data-hub-action="clear">Сбросить фильтры</button>':!online?'<button class="btn" data-hub-action="import">Импорт из файла</button>':'')+'</div>'))+
       (online && hub.tab === 'catalog' ? '<p class="hub-admin-link">'+icon('archive',16)+' Для компьютеров без интернета — <a class="hub-text" href="hub-site/">сайт каталога hub.loginom.ai '+icon('arrow',15)+'</a>: скачайте нужное и передайте файлом</p>' : '')+
     '</section>'+renderDialog(hub, online);
@@ -317,20 +328,24 @@ function renderDialog(hub, online) {
   if (current.kind === 'preview') {
     const bundle = current.bundle;
     const incompatible = bundle.minAgent !== '0.5.0';
-    const changes = bundle.ids.filter(id=>hub.installed[id] !== byId(id).version);
+    const changes = installable(bundle, hub, online);
+    const community = changes.filter(id=>byId(id).tier === 'community');
     title = 'Что будет установлено';
     body = '<div class="hub-package-title"><span class="hub-tile hub-clay">'+icon('archive',24)+'</span><div><strong>'+bundle.name+'</strong><p class="hub-filename">'+escape(current.filename)+'</p></div></div>'+
-      '<dl class="hub-checks"><div><dt>Подпись</dt><dd>'+icon('check',14)+' Loginom · демонстрационный ключ</dd></div><div><dt>Собран</dt><dd>12.11.2026</dd></div><div><dt>Действует до</dt><dd>11.05.2027</dd></div><div><dt>Совместимость</dt><dd>Агент '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Сеть</dt><dd>Интернет не нужен</dd></div></dl>'+
-      (incompatible?'<div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Нужна более новая версия приложения</strong><p>Пакет рассчитан на версию '+bundle.minAgent+'. Попросите администратора собрать пакет для вашей версии.</p></div></div>':
-        '<div class="hub-notice hub-notice-ok">'+icon('check',19)+'<div><strong>Подпись и файлы проверены</strong><p>Пакет не изменялся после подписи. В прототипе используются учебные данные.</p></div></div>')+
+      '<dl class="hub-checks"><div><dt>Подпись</dt><dd>'+icon('check',14)+' Loginom · демонстрационный ключ</dd></div><div><dt>Собран</dt><dd>'+ruDate(bundle.created)+'</dd></div><div><dt>Действует до</dt><dd>'+ruDate(bundle.created, 180)+'</dd></div><div><dt>Совместимость</dt><dd>Агент '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Сеть</dt><dd>Интернет не нужен</dd></div></dl>'+
+      (incompatible?'<div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Нужна более новая версия приложения</strong><p>Файл рассчитан на версию '+bundle.minAgent+'. Попросите у администратора файл для вашей версии.</p></div></div>':
+        '<div class="hub-notice hub-notice-ok">'+icon('check',19)+'<div><strong>Подпись и файлы проверены</strong><p>Файл не изменялся после подписи. В прототипе используются учебные данные.</p></div></div>')+
       (current.required&&!bundle.ids.includes(current.required)?'<div class="hub-notice">'+icon('alert',19)+'<div><strong>Нужного в файле нет</strong><p>«'+byId(current.required).title+'» можно добавить из другого файла.</p></div></div>':'')+
       '<h3 class="hub-items-heading">Состав</h3><ul class="hub-preview-list">'+bundle.ids.map(id=>{
         const item = byId(id);
         const installed = hub.installed[id];
-        const status = installed === item.version ? 'Уже установлено' : installed ? 'Обновление' : 'Новое';
+        const status = installed === item.version ? 'Уже установлено' : item.tier === 'community' && !online ? 'Не разрешено администратором' : installed ? 'Обновление' : 'Новое';
         return '<li><span>'+item.title+'<small>'+tiers[item.tier].label+' · '+item.kind+' · '+(installed && installed!==item.version ? installed+' → ' : '')+item.version+'</small></span><span class="hub-change">'+status+'</span></li>';
-      }).join('')+'</ul><p class="hub-dialog-footnote">Установка только добавляет это в приложение. Доступ к пакету и запуск подтверждаются отдельно при каждом использовании.</p>';
-    actions = '<button class="btn quiet" data-hub-action="import">'+(incompatible?'Выбрать другой файл':'Назад')+'</button><button class="btn primary" data-hub-action="install" '+(incompatible||!changes.length?'disabled':'')+'>Установить'+(changes.length?' ('+changes.length+')':'')+'</button>';
+      }).join('')+'</ul>'+
+      (bundle.ids.some(id=>byId(id).tier === 'community') && !online ? '<p class="hub-dialog-footnote">'+icon('lock',14)+' Администратор вашей организации не разрешил навыки «Сообщество» — они не установятся.</p>' : '')+
+      (community.length ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам</label>' : '')+
+      '<p class="hub-dialog-footnote">Установка только добавляет это в приложение. Доступ к пакету и запуск подтверждаются отдельно при каждом использовании.</p>';
+    actions = '<button class="btn quiet" data-hub-action="import">'+(incompatible?'Выбрать другой файл':'Назад')+'</button><button class="btn primary" data-hub-action="install" '+(incompatible||!changes.length||(community.length&&!current.ack)?'disabled':'')+'>Установить'+(changes.length?' ('+changes.length+')':'')+'</button>';
   }
   if (current.kind === 'installed') {
     title = 'Готово';
@@ -413,7 +428,8 @@ export function bindHub(root, state, api) {
   }
   root.querySelector('[data-hub-ack]')?.addEventListener('change', event => {
     hub.dialog.ack = event.target.checked;
-    root.querySelector('[data-hub-action="install-one"]').disabled = !event.target.checked;
+    const install = root.querySelector('[data-hub-action="install-one"], [data-hub-action="install"]');
+    if (install) install.disabled = !event.target.checked;
   });
 
   root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-pin], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
@@ -465,8 +481,8 @@ export function bindHub(root, state, api) {
       case 'install': {
         const bundle = hub.dialog.bundle;
         if (bundle.minAgent !== '0.5.0') return;
-        const ids = bundle.ids.filter(id=>hub.installed[id] !== byId(id).version);
-        if (!ids.length) return;
+        const ids = installable(bundle, hub, state.contour !== 'closed');
+        if (!ids.length || (ids.some(id=>byId(id).tier === 'community') && !hub.dialog.ack)) return;
         const required = hub.dialog.required;
         record(hub, 'import', ids, bundle.name);
         hub.dialog = {kind:'installed',name:bundle.name,next:ids.includes(required)?required:null};

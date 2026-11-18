@@ -1628,9 +1628,10 @@ function send() {
     return
   }
   const withPackage = Boolean(state.draftPackage)
-  let kind = /документ/i.test(prompt) && withPackage ? 'document'
-    : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /проверь|оптимиз/i.test(prompt) ? 'refactor'
-    : /внеси|улучш|объедин|исправ|переимен|измени/i.test(prompt) ? 'improve'
+  // Mock routing by task words; «что можно сделать лучше?» asks for a review, not a change.
+  let kind = /документ|описан|опиши/i.test(prompt) && withPackage ? 'document'
+    : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /провер|оптимиз|лучше/i.test(prompt) ? 'refactor'
+    : /внеси|улучш|объедин|исправ|переимен|измени|доработ|поправ/i.test(prompt) ? 'improve'
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     : old && old.kind !== 'chat' && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
