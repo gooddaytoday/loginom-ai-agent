@@ -356,7 +356,8 @@ jobs:
         run: |
           bash -n packages/dashboard/deploy/dev-master.sh
           bash -n packages/dashboard/deploy/containers.sh
-          shellcheck packages/dashboard/deploy/dev-master.sh packages/dashboard/deploy/containers.sh
+          bash -n packages/dashboard/deploy/mounts.sh
+          shellcheck packages/dashboard/deploy/dev-master.sh packages/dashboard/deploy/containers.sh packages/dashboard/deploy/mounts.sh
           cat > "$RUNNER_TEMP/dashboard-invalid.json" <<'JSON'
           {"server":"example-server","studio":"example-studio","network":"example-net","web":"invalid/name","project":"example-services","userstorage":"example-storage"}
           JSON
