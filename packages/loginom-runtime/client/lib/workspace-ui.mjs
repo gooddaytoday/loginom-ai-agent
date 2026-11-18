@@ -3957,18 +3957,21 @@ function readRenderedInputMapping(observation) {
     let tableSettings={status:'unobserved',settings_applied:false,result_complete:false,execution_verified:false};
     if(workflow) {
       const viewPattern=new RegExp('^'+workflow.prefix+';ViewsForm;BrowseView(?:-\\d+)?$');
-      const onScreen=element=>{
+      const onScreen=(element,whole=true)=>{
         if(!visible(element) || sensitive(element))return false;
         const b=boxOf(element),w=globalThis.innerWidth,h=globalThis.innerHeight;
         return [b.x,b.y,b.width,b.height,w,h].every(Number.isFinite) && b.width>0 && b.height>0
-          && b.x>=0 && b.y>=0 && b.x+b.width<=w && b.y+b.height<=h;
+          && (whole ? b.x>=0 && b.y>=0 && b.x+b.width<=w && b.y+b.height<=h
+            : b.x<w && b.y<h && b.x+b.width>0 && b.y+b.height>0);
       };
-      const views=all.filter(e=>{charge();return viewPattern.test(getTid(e)??'') && onScreen(e);});
+      // Frames identify the owner, not an interaction point. Their borders may
+      // extend below a short viewport; keep full bounds for the observed content.
+      const views=all.filter(e=>{charge();return viewPattern.test(getTid(e)??'') && onScreen(e,false);});
       if(views.length===1) {
         const view=views[0],viewKey=getTid(view);
         const modalNames=['BrowseFormat','BrowseFilter'];
         const modals=all.filter(e=>{charge();return modalNames.some(name=>getTid(e)===viewKey+';ModalWindow_'+name)
-          && onScreen(e) && (!selectedRoot || selectedRoot===e || selectedRoot.contains(e));});
+          && onScreen(e,false) && (!selectedRoot || selectedRoot===e || selectedRoot.contains(e));});
         if(modals.length===1 && !masks.length && !dialogElements.some(e=>e!==modals[0] && !e.contains(modals[0]) && !modals[0].contains(e))) {
           const modal=modals[0],kind=getTid(modal).endsWith('_BrowseFormat')?'format':'filter';
           const base=getTid(modal)+';'+(kind==='format'?'BrowseFormat':'BrowseFilter')+';';
@@ -3995,7 +3998,7 @@ function readRenderedInputMapping(observation) {
                 painted=input;part='input';
               }
             }
-            if(!painted || !owner.contains(painted))return {status:'unobserved'};
+            if(!painted || !owner.contains(painted) || !onScreen(painted))return {status:'unobserved'};
             const state=checkStateOf(painted);
             return state?.source==='loginom_ext' && state.kind==='checkbox' && !state.indeterminate
               ?{status:'observed',value:state.checked,enabled:enabled(painted),owner_ref:refOf(owner),
