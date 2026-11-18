@@ -130,6 +130,32 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
+  test("checking unchanged defaults in a new profile reports the connection as not saved", async () => {
+    const defaults = {
+      revision: 0,
+      generation: 0,
+      url: Product.connection.url,
+      username: Product.connection.username,
+    }
+    const fresh = setup({ ...defaults, state: "unconfigured" })
+    const configured = setup({ ...defaults, revision: 1, generation: 1 })
+    try {
+      await fresh.form.load()
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.checked")
+      const browser = { state: "unknown" as const }
+      fresh.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.helpChecked")
+
+      await configured.form.load()
+      await configured.form.submit(false)
+      expect(configured.form.state.message).toBe("loginom.checkedSaved")
+    } finally {
+      fresh.dispose()
+      configured.dispose()
+    }
+  })
   test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {
     expect(loginomBrowserMessage()).toBe("loginom.browserUnknown")
     expect(loginomBrowserMessage({ state: "unknown" })).toBe("loginom.browserUnknown")

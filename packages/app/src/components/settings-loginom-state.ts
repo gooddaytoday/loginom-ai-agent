@@ -185,13 +185,14 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (disposed) return
       setState("checkedBrowser", validation.browser ? { ...validation.browser } : undefined)
       if (!save) {
+        const unsaved = dirty() || state.view?.state === "unconfigured"
         setState(
           "message",
           validation.browser && validation.browser.state !== "verified"
-            ? dirty()
+            ? unsaved
               ? "loginom.helpChecked"
               : "loginom.helpCheckedSaved"
-            : dirty()
+            : unsaved
               ? "loginom.checked"
               : "loginom.checkedSaved",
         )
