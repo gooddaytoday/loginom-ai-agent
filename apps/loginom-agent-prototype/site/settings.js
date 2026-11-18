@@ -530,7 +530,7 @@ export function bindSettings(root, state, api) {
       else s.connection = next.connection
       s.draft = { ...next.connection, password: "" }
       s.test = undefined
-      api.toast(s.pendingConnection ? "Сохранено — заработает после текущего хода агента" : "Loginom подключён")
+      api.toast(s.pendingConnection ? "Сохранено — заработает после текущего хода агента" : "Loginom подключён: " + s.connection.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))
       // Back to the task only when settings were opened from it («Подключиться к Loginom», «Настроить Loginom»).
       if (state.returnTo) {
         const page = state.returnTo

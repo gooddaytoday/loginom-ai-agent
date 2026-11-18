@@ -228,7 +228,7 @@ function itemCard(item, hub, online, tab) {
 // offered as a link under the catalog instead of a banner every analyst has to scroll past.
 function sourceLine(online) {
   if (online) return '';
-  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span><button class="hub-text" data-hub-action="import">Импорт из файла '+icon('arrow',15)+'</button></div>';
+  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026, действует до 11.05.2027. Разрешено только подготовленное или проверенное Loginom.</span></div>';
 }
 
 function history(hub) {
@@ -312,7 +312,7 @@ function renderDialog(hub, online) {
     const requested = byId(current.required);
     body = '<p class="hub-dialog-lead">'+(requested?'«'+requested.title+'» нет среди установленного. Выберите файл от администратора, в котором это есть.':'Выберите файл <code>.loginom-hub</code> от администратора или из Loginom Hub. До установки вы увидите состав и проверку подписи.')+'</p>'+
       '<label class="hub-drop"><input type="file" accept=".loginom-hub,.zip" aria-label="Выбрать файл"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать файл или перетащить сюда</strong><small>Офлайн-набор Loginom Hub</small></label>'+
-      '<div class="hub-demo"><span>Демонстрационные файлы</span><div><button class="btn" data-hub-sample="correct">Корректный</button><button class="btn" data-hub-sample="damaged">Повреждённый</button><button class="btn" data-hub-sample="incompatible">Несовместимый</button></div></div>';
+      '<div class="hub-demo"><span>Только для прототипа: примеры файлов</span><div><button class="btn" data-hub-sample="correct">Корректный</button><button class="btn" data-hub-sample="damaged">Повреждённый</button><button class="btn" data-hub-sample="incompatible">Несовместимый</button></div></div>';
     actions = '<button class="btn quiet" data-hub-action="close">Отмена</button>';
     body += '<p class="hub-dialog-footnote">Навык от коллеги добавляется иначе: «Создать своё» → «Навык» → «Из файла».</p>';
   }

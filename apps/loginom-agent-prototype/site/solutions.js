@@ -13,11 +13,16 @@ const steps = [['params','Параметры'],['access','Доступ'],['runni
 const outcomes = [
   ['success','Готово'],['inconclusive','Не подтверждено'],['recovery','Нужна проверка'],['failed','Не удалось'],
 ];
-const demoPackages = [
-  {name:'Продажи.lgp', where:'Loginom · /user', source:'loginom'},
-  {name:'Сводка продаж.lgp', where:'Loginom · /Общие/Аналитика', source:'loginom'},
-  {name:'Мой сценарий.lgp', where:'На компьютере · Документы', source:'local'},
-];
+// The personal folder follows the Loginom user and holds the same packages as «Открыть из Loginom».
+let homeFolder = '/user';
+function demoPackages() {
+  return [
+    {name:'Продажи.lgp', where:'Loginom · ' + homeFolder, source:'loginom'},
+    {name:'Качество данных.lgp', where:'Loginom · ' + homeFolder, source:'loginom'},
+    {name:'Сводка продаж.lgp', where:'Loginom · /Общие/Аналитика', source:'loginom'},
+    {name:'Мой сценарий.lgp', where:'На компьютере · Документы', source:'local'},
+  ];
+}
 const sqlExample = 'SELECT city, SUM(amount) AS revenue\nFROM sales\nWHERE amount IS NOT NULL\nGROUP BY city;';
 
 function escape(value) {
@@ -25,6 +30,7 @@ function escape(value) {
 }
 
 function getState(state) {
+  homeFolder = '/' + (state.settings?.connection?.username || 'analyst');
   state.solutions ??= {};
   state.solutions.runs ??= {};
   return state.solutions;
@@ -37,7 +43,8 @@ function runKey(state) {
 
 function packageChoices(run) {
   const bound = run.boundPackage;
-  return bound && !demoPackages.some(item => item.name === bound.name) ? [bound,...demoPackages] : demoPackages;
+  const examples = demoPackages();
+  return bound && !examples.some(item => item.name === bound.name) ? [bound,...examples] : examples;
 }
 
 function select(name, label, choices, selected, hint = '') {
@@ -89,7 +96,7 @@ function renderFields(key, run) {
 }
 
 function chosenPackage(run, name = 'package') {
-  return packageChoices(run).find(item => item.name === run.values[name]) || demoPackages[0];
+  return packageChoices(run).find(item => item.name === run.values[name]) || demoPackages()[0];
 }
 
 // What the run is allowed to do, in the words of the real profiles:
@@ -99,13 +106,13 @@ function chosenPackage(run, name = 'package') {
 function accessFor(key, run, project) {
   const pkg = chosenPackage(run);
   const name = pkg.name;
-  const folder = project ? `папке проекта «${project}»` : 'рабочей папке агента';
+  const folder = `папке «${runFolder(key, project)}»`;
   const report = `отчёт в ${folder}`;
   const runsScenario = 'При запуске сценария выполняются и его выгрузки — например, в файл или базу данных. Если это нежелательно, используйте копию сценария без выгрузок.';
   const noWeb = 'Открывать сайты в интернете';
   if (key === 'document') return {
-    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в ${project ? `папку проекта «${project}»` : 'рабочую папку агента'}: документирование работает только с файлом на компьютере`] : [],
-    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать ${docNames(run).length > 1 ? 'документы' : 'документ'} ${docNames(run).map(file => `«${file}»`).join(', ')} в ${folder}`],
+    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в ${folder.replace(/^папке/, 'папку')}: документирование работает только с файлом на компьютере`] : [],
+    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать ${docNames(run).length > 1 ? 'документы' : 'документ'} ${docNames(run).map(file => `«${file}»`).join(', ')} в ${pkg.source === 'loginom' ? 'той же папке' : folder}`],
     cannot: ['Изменить пакет — он только читается', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', noWeb],
     data: run.values.depth === 'custom' ? 'структура пакета, настройки узлов и ваше описание документации' : 'структура пакета и настройки узлов',
   };
@@ -148,7 +155,11 @@ const docFormats = [['pdf','PDF','Для чтения и печати'],['docx',
 // One document per chosen format, in the order of the list.
 function docNames(run) {
   const base = chosenPackage(run).name.replace(/\.lgp$/,'');
-  return docFormats.filter(([value]) => run.values.formats.includes(value)).map(([value]) => `${base}.lgp_report.${value}`);
+  return docFormats.filter(([value]) => run.values.formats.includes(value)).map(([value]) => `${base} — описание.${value}`);
+}
+// В-55: a run is a conversation, so its files go to that conversation's folder, as in chat.
+function runFolder(key, project) {
+  return 'Документы → Loginom AI Agent → ' + (project || 'Без проекта → ' + new Date().toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' ' + titles[key][0]);
 }
 
 // No fallback: without a model the run does not start, as a message does not send (В-10).
@@ -239,9 +250,9 @@ function outcomeText(key, run) {
 }
 
 function resultFiles(key, run) {
-  if (key === 'document') return docNames(run).map(file => [file, 'Папка проекта']);
+  if (key === 'document') return docNames(run).map(file => [file, run.folder]);
   if (key === 'refactor:copy' || key === 'migration') return [[run.values.target, 'Ваша папка Loginom, рядом с исходным']];
-  return [['Отчёт.html', 'Папка проекта']];
+  return [['Отчёт.html', run.folder]];
 }
 
 function renderResult(key, run) {
@@ -405,7 +416,7 @@ export function bindSolutions(root,state,api) {
       case 'check-state': run.outcome = 'success'; api.toast('Копия найдена в Loginom и открывается — результат подтверждён'); api.render(); return;
       case 'toggle-details': event.preventDefault(); run.details = !run.details; api.render(); return;
       case 'open-session': api.toast('В приложении откроется разговор этого запуска со всеми шагами агента'); return;
-      case 'open-file': api.toast('Файл откроется в программе по умолчанию'); return;
+      case 'open-file': api.toast('В приложении файл откроется в программе по умолчанию. В демо файла нет'); return;
       case 'discuss': {
         const data = reportData(key, run.values);
         api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + data.summary + ' Что стоит сделать дальше?', ['Отчёт.html']);
@@ -414,6 +425,14 @@ export function bindSolutions(root,state,api) {
       case 'stop': clearInterval(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
       case 'start': {
         run.step = 'running';
+        run.folder = runFolder(key, state.projects.find(entry => entry.id === state.project)?.name);
+        // A run started from «Что сделать с пакетом» took the package and the request, as sending a message does:
+        // a new conversation starts empty. A draft left on another screen stays.
+        if (state.draftPackage && state.runnerPackage?.name === state.draftPackage.name) {
+          state.draft = '';
+          state.draftPackage = null;
+          state.draftFiles = [];
+        }
         run.stage = 0;
         run.details = false;
         const finalStage = item.stages.length;

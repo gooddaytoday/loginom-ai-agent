@@ -620,7 +620,7 @@ function ready(item, needWhen = false) {
 let toastHook = null;
 // The trial task depends on the skill: rules are checked on a package; other skills get a task in their name.
 function trialOf(item) {
-  const rules = /Узлы называй/.test(item.body);
+  const rules = /узл/i.test(item.body) && /назыв/i.test(item.body);
   const prompt = rules ? 'Проверь «Продажи.lgp» по правилам навыка' : 'Сделай задачу по навыку «'+item.name+'» для «Продажи.lgp»';
   return { id:item.id, name:item.name, origin:item.origin, status:item.status, rules, prompt, kind:'skilltrial' };
 }
