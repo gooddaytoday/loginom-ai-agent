@@ -168,7 +168,7 @@ function docNames(run) {
 function modelLine(state) {
   const model = state.settings?.model;
   if (!model) return [];
-  const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:'облачный сервис — данные уйдут в интернет'}[model.kind] || '';
+  const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:`облачный сервис ${model.source === 'free' ? 'OpenCode' : model.where} — данные уйдут в интернет`}[model.kind] || '';
   return [model.name, where, model.kind === 'cloud'];
 }
 
