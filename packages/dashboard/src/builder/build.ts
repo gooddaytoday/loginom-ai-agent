@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process"
-import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, unlink } from "node:fs/promises"
+import { cp, lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, symlink, unlink } from "node:fs/promises"
 import { dirname, extname, join, relative, sep } from "node:path"
+import { treeHash } from "./tree.ts"
+
+export { treeHash } from "./tree.ts"
 
 export const PLATFORM_FILES = ["index.html", "tsconfig.json", "env.d.ts", "vite.config.mjs", "resolver.mjs", "scan.mjs"]
 const OUTPUT = 8_192
@@ -102,17 +104,4 @@ function execute(node: string, args: string[], cwd: string, signal: AbortSignal,
 
 export function outputText(bytes: Buffer) {
   return new TextDecoder().decode(bytes.subarray(0, OUTPUT), { stream: true })
-}
-
-export async function treeHash(dir: string) {
-  const files = (await readdir(dir, { recursive: true, withFileTypes: true }))
-    .filter(entry => entry.isFile())
-    .map(entry => relative(dir, join(entry.parentPath, entry.name)).split(sep).join("/"))
-    .toSorted()
-  const sha = createHash("sha256")
-  for (const file of files) {
-    const bytes = await readFile(join(dir, file))
-    sha.update(file).update("\0").update(String(bytes.length)).update("\0").update(bytes)
-  }
-  return sha.digest("hex")
 }

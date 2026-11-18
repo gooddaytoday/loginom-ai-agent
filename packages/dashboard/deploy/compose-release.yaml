@@ -28,6 +28,7 @@ services:
       DASHBOARD_CLI_BUTTON: ${DASHBOARD_CLI_BUTTON:-0}
       DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?required}
       DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?required}
+      DASHBOARD_STUDIO_PROXY: ${DASHBOARD_STUDIO_PROXY:?required}
       DASHBOARD_TLS_UPSTREAM: ${DASHBOARD_TLS_UPSTREAM}
       DASHBOARD_BUILDS: /builds
   publisher:
@@ -35,6 +36,7 @@ services:
     container_name: loginom-dashboard-publisher
     command: [publisher]
     user: ${DASHBOARD_PUBLISHER_USER:?required}
+    group_add: ["65534"]
     network_mode: none
     mem_limit: 512m
     pids_limit: 64

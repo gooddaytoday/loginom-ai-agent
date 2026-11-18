@@ -22,8 +22,11 @@ try {
     addEventListener("error", event => console.error("Uncaught " + event.message))
   })
   const page = await context.newPage()
-  page.on("console", message => { if (message.type() === "error" && errors.length < 20) errors.push(message.text()) })
-  page.on("pageerror", error => { if (errors.length < 20) errors.push(String(error)) })
+  const record = message => {
+    if (errors.length < 20) errors.push(message.slice(0, 2_048).replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, " "))
+  }
+  page.on("console", message => { if (message.type() === "error") record(message.text()) })
+  page.on("pageerror", error => record(String(error)))
   await page.goto(url)
   const state = await page.waitForFunction(() => document.body?.dataset.state, undefined, { timeout: 15_000 })
     .then(handle => handle.jsonValue()).catch(() => "timeout")

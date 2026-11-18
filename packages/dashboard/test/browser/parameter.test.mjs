@@ -32,6 +32,30 @@ test("bundled adapter reads active numeric variables without opening an edit ope
   assert.deepEqual(await app.page.evaluate(() => window.fixture.operations), [])
 })
 
+test("unsafe Int64 values stay exact in the table and are omitted as parameters", async (t) => {
+  const app = await fixture(t, {
+    published: true,
+    variables: [
+      { name: "Safe", type: 1, value: "9007199254740991" },
+      { name: "Large", type: 1, value: "9007199254740993" },
+      { name: "Small", type: 1, value: "-9007199254740993" },
+    ],
+    table: { schema: [{ name: "Count", type: 1 }], rows: [["9007199254740993"]] },
+  })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  const state = await app.settled()
+  const parameters = [{ name: "Safe", value: Number.MAX_SAFE_INTEGER }]
+  assert.deepEqual(state.parameters, parameters)
+  assert.deepEqual(state.table.rows, [["9007199254740993"]])
+  assert.equal(await app.page.getByRole("spinbutton").count(), 1)
+  assert.equal(await app.page.getByLabel("Safe", { exact: true }).inputValue(), "9007199254740991")
+  const created = app.page.waitForResponse(response => response.url().endsWith("/dashboard/snapshots"))
+  await app.page.getByRole("button", { name: "Изменить в чате", exact: true }).click()
+  await created
+  assert.deepEqual(app.snapshots[0].parameters, parameters)
+  assert.deepEqual(app.snapshots[0].sample.rows, [["9007199254740993"]])
+})
+
 test("bundled adapter reads inactive variables in an operation cancelled after reading", async (t) => {
   const app = await parameters(t, "inactive")
   assert.deepEqual((await app.settled()).parameters, expected)

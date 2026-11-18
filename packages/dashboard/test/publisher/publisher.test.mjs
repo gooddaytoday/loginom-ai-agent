@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
@@ -37,8 +37,13 @@ test("publisher logs a verified build once after committing state", async t => {
     if (event.event === "build_ready") ready.push({ event, state: JSON.parse(readFileSync(join(input.builds, "state.json")))[path] })
   })
   await scanPublications({ ...input, events, builderImage })
+  const [id] = await readdir(input.jobsOut)
+  assert.equal((await stat(join(input.jobsOut, id))).mode & 0o7777, 0o2770)
   await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+  for (const path of ["dist", "dist/assets"])
+    assert.equal((await stat(join(input.jobsOut, id, path))).mode & 0o7777, 0o2770)
   await scanPublications({ ...input, events, builderImage })
+  assert.deepEqual(await readdir(input.jobsOut), [])
   await scanPublications({ ...input, events, builderImage })
   assert.equal(ready.length, 1)
   assert.equal(ready[0].state.status, "ready")
@@ -48,6 +53,27 @@ test("publisher logs a verified build once after committing state", async t => {
   assert.equal(ready[0].event.buildHash, ready[0].state.buildHash)
   assert.equal(ready[0].event.template, 1)
   assert.equal(ready[0].event.builderImage, builderImage)
+})
+
+test("publisher rebuilds a ready publication after its output is truncated", async t => {
+  const input = await fixture(t)
+  const job = { ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
+  const state = async () => JSON.parse(await readFile(join(input.builds, "state.json")))[path]
+  await scanPublications(input)
+  await buildNext(job)
+  await scanPublications(input)
+  const original = await state()
+  assert.equal(original.status, "ready")
+  const entry = join(input.builds, original.key, original.buildHash, "index.html")
+  const originalPage = await readFile(entry)
+  await writeFile(entry, originalPage.subarray(0, 16))
+
+  await scanPublications(input)
+  assert.equal((await state()).status, "building")
+  await buildNext(job)
+  await scanPublications(input)
+  assert.deepEqual(await state(), original)
+  assert.deepEqual(await readFile(entry), originalPage)
 })
 
 test("publisher records invalid and oversized publications only once", async t => {

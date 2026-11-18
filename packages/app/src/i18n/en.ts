@@ -36,6 +36,7 @@ export const LOGINOM_ENGLISH = {
   "dashboard.target.failed": "The dashboard could not be opened. Check the Loginom connection and try a new snapshot from Studio.",
   "dashboard.target.snapshotGone":
     "The snapshot was already used, has expired or belongs to another stand. Press the button in Studio again.",
+  "dashboard.target.checkFailed": "Could not check the snapshot in Desktop. Try sending again.",
   "dashboard.target.notConfigured": "Connect a Loginom stand in settings first.",
   "dashboard.target.localOnly": "Open a local Desktop chat to work on this dashboard.",
   "prompt.context.dashboardDraft": "Dashboard draft for node “{{name}}”",

@@ -53,7 +53,7 @@ if (action === "storage") {
     settings.DASHBOARD_MODE === "strict" ? app : "", ...hosts].join("\n"))
 } else if (action === "discovery") {
   const settings = Object.fromEntries(input().trim().split("\n").map(line => line.split("=")))
-  for (const [index, name] of ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER"].entries())
+  for (const [index, name] of ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER", "STUDIO_PROXY"].entries())
     assert.equal(settings["DASHBOARD_" + name], args[index], "Loginom changed; repeat install required: " + name)
 } else if (action === "apache") {
   const [fds, rest] = input().split("\nTCP\n")

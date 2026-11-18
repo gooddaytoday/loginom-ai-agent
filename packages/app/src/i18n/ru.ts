@@ -518,6 +518,7 @@ export const dict = {
   "dashboard.target.failed": "Не удалось открыть dashboard. Проверьте подключение Loginom и получите новый снимок из Studio.",
   "dashboard.target.snapshotGone":
     "Снимок уже использован, устарел или создан на другом стенде. Нажмите кнопку в Studio ещё раз.",
+  "dashboard.target.checkFailed": "Не удалось проверить снимок в Desktop. Повторите отправку.",
   "dashboard.target.notConfigured": "Сначала подключите стенд в настройках.",
   "dashboard.target.localOnly": "Откройте локальный чат Desktop для работы с этим dashboard.",
   "prompt.context.dashboardDraft": "Черновик dashboard для узла «{{name}}»",

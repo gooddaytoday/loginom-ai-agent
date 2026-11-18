@@ -1,13 +1,14 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import test from "node:test"
 import { pathToFileURL } from "node:url"
+import { treeHash } from "../../src/builder/tree.ts"
 
 const binding = {
   packagePath: "/user/dashboard/A.lgp",
@@ -75,9 +76,13 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   await copyFile(new URL("../../dist/server.mjs", import.meta.url), artifact)
   await copyFile(new URL("../../dist/shell.js", import.meta.url), join(root, "shell.js"))
   const key = "a".repeat(64)
-  const hash = "b".repeat(64)
-  await mkdir(join(root, "builds", key, hash), { recursive: true })
-  await writeFile(join(root, "builds", key, hash, "index.html"), "Existing dashboard")
+  const parent = join(root, "builds", key)
+  const staging = join(parent, "current")
+  await mkdir(join(staging, "assets"), { recursive: true })
+  await writeFile(join(staging, "index.html"), "Existing dashboard")
+  await writeFile(join(staging, "assets/main.js"), 'console.log("Dashboard loaded")')
+  const hash = await treeHash(staging)
+  await rename(staging, join(parent, hash))
   const { base, appOrigin } = await launch(t, root, artifact)
   assert.deepEqual(await (await fetch(base + "/health")).json(), { ok: true })
   assert.equal(await (await fetch(base + "/shell.js")).text(), await readFile(join(root, "shell.js"), "utf8"))
@@ -110,7 +115,8 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   assert.match(await bundle.bindingKey(binding), /^[a-f0-9]{64}$/)
   const app = await fetch(base + "/apps/" + key + "/")
   assert.equal(app.status, 404)
-  const page = await fetch(`${appOrigin}/apps/${key}/${hash}/`)
+  const pageUrl = `${appOrigin}/apps/${key}/${hash}/`
+  const page = await fetch(pageUrl)
   assert.equal(page.status, 200)
   assert.ok(page.headers.get("content-security-policy"))
   assert.equal(await page.text(), "Existing dashboard")
@@ -120,6 +126,14 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   for (const [alias, target] of [["c".repeat(64), outside], ["d".repeat(64), join(root, "builds", key)]]) {
     await symlink(target, join(root, "builds", alias), process.platform === "win32" ? "junction" : "dir")
     const response = await fetch(`${appOrigin}/apps/${alias}/${hash}/`)
+    assert.equal(response.status, 404)
+    assert.ok(response.headers.get("content-security-policy"))
+  }
+  const assetUrl = pageUrl + "assets/main.js"
+  assert.equal(await (await fetch(assetUrl)).text(), 'console.log("Dashboard loaded")')
+  await writeFile(join(parent, hash, "assets/main.js"), "")
+  for (const url of [pageUrl, assetUrl]) {
+    const response = await fetch(url)
     assert.equal(response.status, 404)
     assert.ok(response.headers.get("content-security-policy"))
   }

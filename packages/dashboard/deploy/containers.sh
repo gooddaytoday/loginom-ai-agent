@@ -66,7 +66,7 @@ if [[ -e $state || -L $state ]]; then
   # shellcheck disable=SC2094
   while IFS='=' read -r setting value; do
     case $setting in
-      DASHBOARD_IMAGE|DASHBOARD_BUILDER_IMAGE|DASHBOARD_STATE|DASHBOARD_APP_HOST_PORT|DASHBOARD_APP_ORIGIN|DASHBOARD_CLIENT_ORIGINS|DASHBOARD_TLS_UPSTREAM|DASHBOARD_USERSTORAGE|DASHBOARD_PUBLISHER_USER|DASHBOARD_NETWORK|DASHBOARD_MODE|DASHBOARD_CLI_BUTTON) ;;
+      DASHBOARD_IMAGE|DASHBOARD_BUILDER_IMAGE|DASHBOARD_STATE|DASHBOARD_APP_HOST_PORT|DASHBOARD_APP_ORIGIN|DASHBOARD_CLIENT_ORIGINS|DASHBOARD_STUDIO_PROXY|DASHBOARD_TLS_UPSTREAM|DASHBOARD_USERSTORAGE|DASHBOARD_PUBLISHER_USER|DASHBOARD_NETWORK|DASHBOARD_MODE|DASHBOARD_CLI_BUTTON) ;;
       *) die "Unknown saved setting";;
     esac
     [[ $value != *[^a-zA-Z0-9/_.:@,-]* && $(grep -c "^$setting=" "$state/.env") == 1 ]] || die "Invalid saved setting"
@@ -77,6 +77,8 @@ if [[ -e $state || -L $state ]]; then
   installed=true
 fi
 [[ $action != check || $installed == true ]] || die "Dashboard is not installed"
+# shellcheck source=packages/dashboard/deploy/mounts.sh
+source "$bundle/mounts.sh"
 if [[ $engine == podman && $action != stop ]]; then
   if [[ -e $launcher || -L $launcher ]]; then
     [[ -f $launcher && ! -L $launcher ]] || die "Dashboard conmon launcher is occupied"
@@ -208,6 +210,7 @@ if [[ $action == uninstall ]]; then
   "$engine" exec "$studio" httpd -k graceful
   compose_saved down
   autostart remove
+  dashboard_mounts "$engine" "${builder_image:-$image}" "$state" clear builds jobs-in jobs-out
   rm -rf "$state"
   if [[ $remove_image == true ]]; then
     if [[ -n $builder_image && $(builder_image_id 2>/dev/null) == "$builder_image" ]]; then
@@ -252,7 +255,7 @@ if [[ -n $https_port || $mode == strict ]]; then scheme=https; upstream=$studio_
 publisher_user=$("$engine" exec "$server" stat -c '%u:%g' /proc/1)
 # Saved installation is data, never shell code.
 if [[ $action == check ]]; then
-  json discovery "$clients" "$upstream" "$storage" "$network" "$publisher_user" < "$state/.env"
+  json discovery "$clients" "$upstream" "$storage" "$network" "$publisher_user" "$studio_name" < "$state/.env"
   image=$(saved DASHBOARD_IMAGE)
   [[ $image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$ ]] || die "Invalid saved image"
   mode=$(saved DASHBOARD_MODE)
@@ -284,7 +287,7 @@ if [[ $action == check ]]; then
   name=$(date -u +%Y%m%dT%H%M%SZ).json
   directory=$storage/$probe.dashboards/$guid
   publication=$directory/$name
-  app_url='' html_file='' html_mode=''
+  app_url=''
   exec 3>&1 4>&2
   # ShellCheck cannot follow EXIT traps registered inside this branch.
   # shellcheck disable=SC2317
@@ -292,7 +295,6 @@ if [[ $action == check ]]; then
     result=$?
     exec 1>&3 2>&4
     trap - EXIT INT TERM
-    if [[ -n $html_mode ]]; then chmod "$html_mode" "$html_file" || result=1; fi
     rm -f "$publication" "$directory/.upload"
     rmdir "$directory" "$storage/$probe.dashboards" 2>/dev/null || true
     deadline=$((SECONDS + 60))
@@ -365,16 +367,7 @@ if [[ $action == check ]]; then
   while read -r asset; do http 200 app "$app_url$asset"; done < "$tmp/assets"
   for path in binding.json sample.json dashboard/health; do http 404 app "$app_origin/$path"; done
   http 403 app "$app_url" -H 'Host: dashboard.invalid'
-  # Only our unique probe can be unreadable; always restore its exact prior mode.
-  build_path=${app_url#"$app_origin/apps/"}
-  [[ $build_path =~ ^[a-f0-9]{64}/[a-f0-9]{64}/$ ]] || die "Unexpected probe build path"
-  html_file=$state/builds/${build_path}index.html
-  html_mode=$(stat -c '%a' "$html_file")
-  chmod 000 "$html_file"
-  http 500 app "$app_url"
-  chmod "$html_mode" "$html_file"
-  html_mode=''
-  http 200 app "$app_url"
+  http 404 app "${app_url}assets/dashboard-check-not-found.js"
   "$engine" inspect loginom-dashboard-web loginom-dashboard-publisher loginom-dashboard-builder | json roles "$image" "$storage" "$state" "$(saved DASHBOARD_PUBLISHER_USER)" "$(saved DASHBOARD_NETWORK)" "$builder_image" "$engine"
   for role in web publisher builder; do
     "$engine" exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import assert from "node:assert/strict"; const status=readFileSync("/proc/1/status","utf8"); for (const name of ["CapInh","CapPrm","CapEff","CapBnd","CapAmb"]) assert(new RegExp("^"+name+":\\s+0+$","m").test(status), name)'
@@ -458,6 +451,7 @@ RewriteEngine On
 RewriteOptions InheritDownBefore
 RewriteRule ^/dashboard/(.*)$ http://loginom-dashboard-web:8100/dashboard/\$1 [P,L]
 <Location /dashboard/>
+  RequestHeader set X-Loginom-Dashboard-Client-IP "expr=%{CONN_REMOTE_ADDR}" env=!DASHBOARD_APP_HOST
   Header always set Content-Security-Policy "sandbox; default-src 'none'" env=!DASHBOARD_APP_HOST
   Header always set X-Content-Type-Options "nosniff" env=!DASHBOARD_APP_HOST
 </Location>
@@ -530,6 +524,7 @@ DASHBOARD_STATE=$state
 DASHBOARD_APP_HOST_PORT=$app_port
 DASHBOARD_APP_ORIGIN=$app_origin
 DASHBOARD_CLIENT_ORIGINS=$clients
+DASHBOARD_STUDIO_PROXY=$studio_name
 DASHBOARD_TLS_UPSTREAM=$upstream
 DASHBOARD_USERSTORAGE=$storage
 DASHBOARD_PUBLISHER_USER=$publisher_user
@@ -545,10 +540,11 @@ fi
 replace_site
 created_state=false
 created_mounts=()
+previous_mount_permissions=
 install_phase=prepare
 apply_install() {
   local directory
-  # The host parent protects mounts shared by container roles with different UIDs.
+  # The host parent is private. The shared group applies only to role mounts.
   if [[ $installed == false ]]; then
     mkdir -m 700 "$state" || return 1
     created_state=true
@@ -557,9 +553,13 @@ apply_install() {
   fi
   for directory in builds jobs-in jobs-out; do
     [[ -d $state/$directory ]] && continue
-    mkdir -m 777 "$state/$directory" || return 1
+    mkdir -m 700 "$state/$directory" || return 1
     created_mounts+=("$state/$directory")
   done
+  if [[ $installed == true ]]; then
+    previous_mount_permissions=$(dashboard_mounts "$engine" "$builder_image" "$state" read) || return 1
+  fi
+  dashboard_mounts "$engine" "$builder_image" "$state" apply "${unprivileged_user#*:}" || return 1
   install_phase=config
   cp "$tmp/next.env" "$state/.env" || return 1
   cp "$tmp/next-compose.yaml" "$state/compose-release.yaml" || return 1
@@ -571,6 +571,16 @@ if ! apply_install; then
   if [[ -e $tmp/previous.conf ]]; then
     { cp -a "$tmp/previous.conf" "$site.new" && mv -f "$site.new" "$site"; } || echo "Previous Apache file recovery failed" >&2
   else rm -f "$site" || echo "Apache candidate removal failed" >&2; fi
+  if [[ $installed == true && $install_phase == compose ]]; then
+    # An old publisher may not share the candidate builder's group. It reissues interrupted jobs on restart.
+    if compose_saved stop; then
+      dashboard_mounts "$engine" "$builder_image" "$state" clear jobs-out || echo "Candidate job cleanup failed" >&2
+    else echo "Candidate compose stop failed" >&2; fi
+  fi
+  if [[ -n $previous_mount_permissions ]]; then
+    dashboard_mounts "$engine" "$builder_image" "$state" restore <<< "$previous_mount_permissions" ||
+      echo "Previous mount permissions recovery failed" >&2
+  fi
   if [[ $installed == true && $install_phase != prepare ]]; then
     if [[ $engine == podman ]]; then
       if [[ -f $tmp/conmon-rotate.sh ]]; then

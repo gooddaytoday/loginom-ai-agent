@@ -82,6 +82,7 @@ async function buildCommandAttachments(text: string, images: ImageAttachmentPart
 export async function sendFollowupDraft(input: FollowupSendInput) {
   const text = draftText(input.draft.prompt)
   const images = draftImages(input.draft.prompt)
+  const dashboard = input.checkDashboard && input.draft.context.find((item) => item.type === "dashboard")
   const setBusy = () => {
     if (!input.optimisticBusy) return
     input.serverSync.session.set("session_status", input.draft.sessionID, { type: "busy" })
@@ -95,10 +96,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const wait = async () => {
     const ok = await input.before?.()
     if (ok === false) return false
-    if (input.checkDashboard) {
-      const item = input.draft.context.find((item) => item.type === "dashboard")
-      if (item) await input.checkDashboard(item.id)
-    }
+    if (dashboard) await input.checkDashboard?.(dashboard.id)
     return true
   }
 
@@ -179,17 +177,18 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 
   batch(() => {
     setBusy()
-    add()
+    if (!dashboard) add()
   })
 
   try {
     if (!(await wait())) {
       batch(() => {
         setIdle()
-        remove()
+        if (!dashboard) remove()
       })
       return false
     }
+    if (dashboard) add()
 
     await input.api.prompt({
       sessionID: input.draft.sessionID,
@@ -261,7 +260,10 @@ export function useDashboardTargetCheck() {
   const platform = usePlatform()
   const language = useLanguage()
   return async (id: string) => {
-    const ready = await platform.checkDashboardTarget?.(id).catch(() => false)
+    if (!platform.checkDashboardTarget) throw new Error(language.t("dashboard.target.localOnly"))
+    const ready = await platform.checkDashboardTarget(id).catch((cause: unknown) => {
+      throw new Error(language.t("dashboard.target.checkFailed"), { cause })
+    })
     if (!ready) throw new Error(language.t("dashboard.target.snapshotGone"))
   }
 }

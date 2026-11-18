@@ -624,7 +624,7 @@ export async function createLoginomHost(options: {
         throw error
       } finally {
         signal?.removeEventListener("abort", cancel)
-        await child.close().catch((error: unknown) => { shutdown.failed = true; throw error })
+        await child.close().catch(() => { shutdown.failed = true })
         current.children.delete(chat)
         lost.delete(chat)
       }

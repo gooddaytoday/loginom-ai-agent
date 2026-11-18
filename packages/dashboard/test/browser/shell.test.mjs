@@ -765,9 +765,11 @@ test("a workflow tree without a generic form node preserves the ROI binding", as
 
 test("creation sends a strict snapshot and links Desktop to its returned ID", async t => {
   const app = await fixture(t)
+  const created = app.page.waitForRequest(request => request.url() === app.origin + "/dashboard/snapshots")
   await app.page.getByRole("button", { name: "Создать dashboard", exact: true }).click()
   const link = app.page.getByRole("link", { name: "Открыть чат в Desktop", exact: true })
   await link.waitFor()
+  assert.equal(await (await created).headerValue("origin"), app.origin)
   assert.deepEqual(app.snapshots, [{
     binding: { packagePath: "/user/fixture/campaign.lgp", workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7", nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930" },
     nodeName: "Fixture node", sample: { schema: [{ name: "count", type: 1 }], rows: [[42]] },

@@ -226,10 +226,14 @@ test("direct pre-chat input failures expose a fixed safe error", async () => {
 })
 
 
-test("a failed short-runtime cleanup remains a Host shutdown failure", async () => {
+test("a failed short-runtime cleanup preserves dashboard results and fails Host shutdown", async () => {
   const f = await fixture(false, true)
   try {
-    await expect(f.host.readDashboard({ origin: "http://example.test", generation: 1, binding })).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    const target = { origin: "http://example.test", generation: 1, binding }
+    expect(await f.host.readDashboard(target)).toBeNull()
+    expect(await f.host.publishDashboard({ ...target, content: "{}", expected: null })).toMatchObject({
+      status: "written", version: { name: "20261115T000000Z.json" },
+    })
     await expect(f.host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
   } finally { await f.close().catch(() => undefined) }
 })

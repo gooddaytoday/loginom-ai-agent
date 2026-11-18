@@ -24,6 +24,7 @@ services:
       DASHBOARD_HOST: 0.0.0.0
       DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?}
       DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?}
+      DASHBOARD_STUDIO_PROXY: ${DASHBOARD_STUDIO_PROXY:?}
       DASHBOARD_MODE: ${DASHBOARD_MODE:-normal}
       DASHBOARD_CLI_BUTTON: ${DASHBOARD_CLI_BUTTON:-0}
       DASHBOARD_BUILDS: /builds
@@ -32,6 +33,7 @@ services:
     container_name: ${DASHBOARD_PROJECT:?}-publisher
     command: [publisher]
     user: ${DASHBOARD_PUBLISHER_USER:?}
+    group_add: ["${DASHBOARD_JOB_GROUP:?}"]
     network_mode: none
     mem_limit: 512m
     pids_limit: 64

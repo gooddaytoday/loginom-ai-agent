@@ -25,6 +25,7 @@ async function installFixture(t) {
   await writeFile(join(directory, "containers.sh"), isolated)
   await copyFile(new URL("../../deploy/check-release.mjs", import.meta.url), join(directory, "check-release.mjs"))
   await copyFile(new URL("../../deploy/compose-release.yaml", import.meta.url), join(directory, "compose-release.yaml"))
+  await copyFile(new URL("../../deploy/mounts.sh", import.meta.url), join(directory, "mounts.sh"))
   await writeFile(join(directory, "image.ref"), image)
   await writeFile(join(directory, "SHA256SUMS"), `${createHash("sha256").update(image).digest("hex")}  image.ref\n`)
   // Emulate engine discovery and the two Apache calls. Validate with the shipped helper.
@@ -47,10 +48,26 @@ case "$1" in
   exec) case "$2/$3" in
     server/cat) echo '<Settings><Directories UserStorage="storage"/></Settings>';;
     server/stat) echo 1234:1234;;
-    studio/httpd) [[ $4 != -t || $DASHBOARD_TEST_APACHE_REJECT != 1 ]];;
+    studio/httpd)
+      if [[ $4 == -t ]]; then [[ $DASHBOARD_TEST_APACHE_REJECT != 1 ]];
+      else [[ $DASHBOARD_TEST_RELOAD_REJECT != 1 ]]; fi;;
     *) exit 2;;
   esac;;
-  run) while [[ $# -gt 0 && $1 != /check.mjs ]]; do shift; done
+  run)
+    if [[ $* == *' --entrypoint /bin/sh '* ]]; then
+      while [[ $1 != -ec ]]; do shift; done
+      code=$2
+      shift 2
+      args=()
+      for arg do
+        case "$arg" in
+          /builds|/jobs-in|/jobs-out) arg="$DASHBOARD_TEST_ROOT/state$arg";;
+        esac
+        args+=("$arg")
+      done
+      exec /bin/sh -ec "$code" "\${args[@]}"
+    fi
+    while [[ $# -gt 0 && $1 != /check.mjs ]]; do shift; done
     if [[ $# -gt 0 ]]; then shift; exec "$DASHBOARD_TEST_NODE" "$DASHBOARD_TEST_ROOT/check-release.mjs" "$@"; fi
     echo sha384-synthetic;;
   *) exit 2;;
@@ -62,10 +79,16 @@ esac
 [[ $DASHBOARD_TEST_MOUNT_REJECT != 1 || $3 != "$DASHBOARD_TEST_ROOT/state/jobs-in" ]] || exit 1
 exec /bin/mkdir "$@"
 `, { mode: 0o700 })
-  const install = ({ apacheReject = false, mountReject = false } = {}) => spawnSync("/bin/bash", [join(directory, "containers.sh"), "install", "--engine", "docker", "--public-host", "studio.example"], {
+  // Emulate numeric GID mapping without requiring root in the installer test.
+  await writeFile(join(directory, "chgrp"), `#!/bin/bash
+[[ $2 == 65534 || $2 == "$(id -g)" ]] || exit 2
+exec /bin/chgrp -- "$(id -g)" "\${@:3}"
+`, { mode: 0o700 })
+  const install = ({ apacheReject = false, mountReject = false, reloadReject = false } = {}) => spawnSync("/bin/bash", [join(directory, "containers.sh"), "install", "--engine", "docker", "--public-host", "studio.example"], {
     env: {
       DASHBOARD_TEST_ROOT: directory, DASHBOARD_TEST_NODE: process.execPath,
       DASHBOARD_TEST_APACHE_REJECT: apacheReject ? "1" : "0", DASHBOARD_TEST_MOUNT_REJECT: mountReject ? "1" : "0",
+      DASHBOARD_TEST_RELOAD_REJECT: reloadReject ? "1" : "0",
       TMPDIR: directory, PATH: `${directory}:/usr/bin:/bin`,
     },
     encoding: "utf8",
@@ -85,6 +108,15 @@ test("a rejected Apache candidate allows a fresh install to be repeated", async 
   assert.match(await readFile(site, "utf8"), /Managed by loginom-dashboard release installer/)
 })
 
+test("release install configures its Studio as the private snapshot proxy", async t => {
+  const { state, site, install } = await installFixture(t)
+  const installed = install()
+  assert.equal(installed.status, 0, installed.stderr)
+  assert.match(await readFile(join(state, ".env"), "utf8"), /^DASHBOARD_STUDIO_PROXY=studio$/m)
+  assert.match(await readFile(join(state, "compose-release.yaml"), "utf8"), /DASHBOARD_STUDIO_PROXY: \$\{DASHBOARD_STUDIO_PROXY:\?required\}/)
+  assert.ok((await readFile(site, "utf8")).includes('RequestHeader set X-Loginom-Dashboard-Client-IP "expr=%{CONN_REMOTE_ADDR}" env=!DASHBOARD_APP_HOST'))
+})
+
 test("a mount creation failure rolls back the fresh Apache site and empty state", async t => {
   const { state, site, install } = await installFixture(t)
   const rejected = install({ mountReject: true })
@@ -96,20 +128,41 @@ test("a mount creation failure rolls back the fresh Apache site and empty state"
   assert.equal(retried.status, 0, retried.stderr)
 })
 
-test("install keeps container mounts accessible under an owner-only host directory", async t => {
+test("install applies shared-group permissions to fresh and existing mounts", async t => {
   const { state, install } = await installFixture(t)
   const fresh = install()
   assert.equal(fresh.status, 0, fresh.stderr)
   assert.equal((await stat(state)).mode & 0o777, 0o700)
+  for (const mount of ["builds", "jobs-in", "jobs-out"])
+    assert.equal((await stat(join(state, mount))).mode & 0o7777, 0o2770)
   const stateFile = join(state, "builds/state.json")
   await writeFile(stateFile, "{}\n")
   await chmod(state, 0o755) // Existing releases used a public state directory.
+  for (const mount of ["builds", "jobs-in", "jobs-out"])
+    await chmod(join(state, mount), 0o777)
   const repeated = install()
   assert.equal(repeated.status, 0, repeated.stderr)
   assert.equal((await stat(state)).mode & 0o777, 0o700)
   assert.equal(await readFile(stateFile, "utf8"), "{}\n")
   for (const mount of ["builds", "jobs-in", "jobs-out"])
-    assert.equal((await stat(join(state, mount))).mode & 0o777, 0o777)
+    assert.equal((await stat(join(state, mount))).mode & 0o7777, 0o2770)
+})
+
+test("a failed reinstall restores previous mount permissions and preserves accepted builds", async t => {
+  const { state, install } = await installFixture(t)
+  const fresh = install()
+  assert.equal(fresh.status, 0, fresh.stderr)
+  for (const mount of ["builds", "jobs-in", "jobs-out"])
+    await chmod(join(state, mount), 0o777)
+  await writeFile(join(state, "builds/state.json"), "{}\n")
+  await mkdir(join(state, "jobs-out/retired"))
+  const failed = install({ reloadReject: true })
+  assert.equal(failed.status, 1, failed.stderr)
+  assert.match(failed.stderr, /Dashboard apply failed/)
+  for (const mount of ["builds", "jobs-in", "jobs-out"])
+    assert.equal((await stat(join(state, mount))).mode & 0o7777, 0o777)
+  assert.equal(await readFile(join(state, "builds/state.json"), "utf8"), "{}\n")
+  assert.deepEqual(await readdir(join(state, "jobs-out")), [])
 })
 
 test("Podman conmon rotates only bounded Dashboard role logs", async () => {
@@ -147,6 +200,7 @@ test("Podman stop preserves an unowned launcher and stops the saved release", as
     const image = "dashboard:test\n"
     await mkdir(state)
     await copyFile(script, join(directory, "containers.sh"))
+    await copyFile(new URL("../../deploy/mounts.sh", import.meta.url), join(directory, "mounts.sh"))
     await writeFile(join(directory, "image.ref"), image)
     await writeFile(join(directory, "SHA256SUMS"), `${createHash("sha256").update(image).digest("hex")}  image.ref\n`)
     await writeFile(join(state, ".env"), `DASHBOARD_STATE=${state}\nDASHBOARD_IMAGE=${image}`)
@@ -507,9 +561,9 @@ test("occupied app port is accepted only as the owned web published TLS binding"
   assert.equal(run("9443").status, 1)
 })
 
-test("check refuses stale discovered ports, mounts, network and publisher identity", () => {
-  const values = ["https://studio.example:4433", "studio:8444", "/synthetic/storage", "synthetic-network", "1234:1234"]
-  const keys = ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER"]
+test("check refuses stale discovered ports, mounts, network, publisher and Studio identity", () => {
+  const values = ["https://studio.example:4433", "studio:8444", "/synthetic/storage", "synthetic-network", "1234:1234", "studio"]
+  const keys = ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER", "STUDIO_PROXY"]
   const saved = values.map((value, index) => `DASHBOARD_${keys[index]}=${value}`).join("\n")
   assert.equal(check("discovery", saved, ...values).status, 0)
   for (let index = 0; index < values.length; index++) {
@@ -532,11 +586,11 @@ test("Apache reuse requires its PID1 sockets and only the managed 8444 virtual h
 
 test("repeat settings retain uppercase public hosts and their order through discovery and config", () => {
   const clients = "http://Studio.Example:8080,https://Studio.Example:8443,http://Second.Example:8080"
-  const saved = `DASHBOARD_APP_HOST_PORT=8101\nDASHBOARD_MODE=normal\nDASHBOARD_CLI_BUTTON=0\nDASHBOARD_APP_ORIGIN=https://Studio.Example:8101\nDASHBOARD_CLIENT_ORIGINS=${clients}\nDASHBOARD_TLS_UPSTREAM=studio:8444\nDASHBOARD_USERSTORAGE=/synthetic/storage\nDASHBOARD_NETWORK=synthetic-network\nDASHBOARD_PUBLISHER_USER=1234:1234\n`
+  const saved = `DASHBOARD_APP_HOST_PORT=8101\nDASHBOARD_MODE=normal\nDASHBOARD_CLI_BUTTON=0\nDASHBOARD_APP_ORIGIN=https://Studio.Example:8101\nDASHBOARD_CLIENT_ORIGINS=${clients}\nDASHBOARD_TLS_UPSTREAM=studio:8444\nDASHBOARD_USERSTORAGE=/synthetic/storage\nDASHBOARD_NETWORK=synthetic-network\nDASHBOARD_PUBLISHER_USER=1234:1234\nDASHBOARD_STUDIO_PROXY=studio\n`
   const result = check("settings", saved)
   assert.equal(result.status, 0, result.stderr)
   assert.equal(result.stdout, "8101\nnormal\n0\n\nStudio.Example\nSecond.Example\n")
-  assert.equal(check("discovery", saved, clients, "studio:8444", "/synthetic/storage", "synthetic-network", "1234:1234").status, 0)
+  assert.equal(check("discovery", saved, clients, "studio:8444", "/synthetic/storage", "synthetic-network", "1234:1234", "studio").status, 0)
   const config = check("config", "", "https://Studio.Example:8101", clients, "/synthetic/storage")
   assert.equal(config.status, 0, config.stderr)
 })

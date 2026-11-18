@@ -2,6 +2,7 @@ import { readFile, realpath } from "node:fs/promises"
 import { createServer, type IncomingMessage, type Server } from "node:http"
 import { join } from "node:path"
 import { Option, Schema } from "effect"
+import { verifiedBuildFile } from "../builder/tree.ts"
 import { assetContentType } from "../contract/asset.ts"
 import { createEventLog, type EventWriter } from "../log.ts"
 
@@ -73,6 +74,7 @@ parent.postMessage({ type: "loginom-dashboard/ready", version: 1 }, "*")
 export function appHost(options: {
   server?: Server
   builds: (key: string) => string | undefined
+  verifyHash?: boolean
   appOrigin: string
   clientOrigins: string[]
   mode: Mode
@@ -152,7 +154,10 @@ export function appHost(options: {
       }
       const type = asset ? assetContentType(asset) : "text/html; charset=utf-8"
       const dir = options.builds(app[1]!)
-      const data = type && dir && (await buildFile(dir, app[2]!, asset ? join("assets", asset) : "index.html"))
+      const name = asset ? "assets/" + asset : "index.html"
+      const data = type && dir && (options.verifyHash
+        ? await verifiedBuildFile(join(dir, app[2]!), app[2]!, name)
+        : await buildFile(dir, app[2]!, name))
       if (!data) return send(404, "Not found")
       if (!asset) return send(200, data, { "content-type": type })
       return send(200, data, {

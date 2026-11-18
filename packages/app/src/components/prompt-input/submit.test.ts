@@ -7,6 +7,7 @@ import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
 let sendFollowupDraft: typeof import("./submit").sendFollowupDraft
+let useSync: typeof import("@/context/sync").useSync
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -289,6 +290,7 @@ beforeAll(async () => {
   const mod = await import("./submit")
   createPromptSubmit = mod.createPromptSubmit
   sendFollowupDraft = mod.sendFollowupDraft
+  useSync = (await import("@/context/sync")).useSync
 })
 
 beforeEach(() => {
@@ -800,17 +802,17 @@ function dashboardDraft(prompt: string) {
   return state
 }
 
-function sendQueuedReview(checkDashboard?: (id: string) => Promise<void>) {
+function sendQueuedDashboard(prompt: string, checkDashboard?: (id: string) => Promise<void>) {
   commands.push({ name: "review" })
   return sendFollowupDraft({
     checkDashboard,
     api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
     serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
-    sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+    sync: useSync()(),
     draft: {
       sessionID: "ses",
       sessionDirectory: "/repo/main",
-      prompt: [{ type: "text", content: "/review chart", start: 0, end: 13 }],
+      prompt: [{ type: "text", content: prompt, start: 0, end: prompt.length }],
       context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "A", action: "edit" }],
       agent: "build",
       model: { modelID: "m", providerID: "p" },
@@ -819,7 +821,7 @@ function sendQueuedReview(checkDashboard?: (id: string) => Promise<void>) {
 }
 
 test("a queued slash command includes its pinned dashboard in the accepted message", async () => {
-  await sendQueuedReview()
+  await sendQueuedDashboard("/review chart")
   expect(sentCommands[0]).toMatchObject({
     arguments: "chart",
     legacyParts: [
@@ -879,7 +881,7 @@ test("an expired dashboard keeps the draft and tells the user to reopen it in Lo
   const state = dashboardDraft("Edit chart")
   lookupDashboard = async (id) => {
     expect(id).toBe("target-a")
-    throw new Error("404")
+    return false
   }
 
   await dashboardSubmit(state).handleSubmit(new Event("submit"))
@@ -887,6 +889,25 @@ test("an expired dashboard keeps the draft and tells the user to reopen it in Lo
   expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
   expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
   expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.snapshotGone", variant: "error" }))
+})
+
+test("a Desktop snapshot check failure keeps the dashboard draft available for retry", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit chart")
+  const submit = dashboardSubmit(state)
+  lookupDashboard = async () => {
+    throw new Error("IPC unavailable")
+  }
+
+  await submit.handleSubmit(new Event("submit"))
+  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.checkFailed", variant: "error" }))
+  expect(promptInputs).toHaveLength(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+
+  lookupDashboard = async () => true
+  await submit.handleSubmit(new Event("submit"))
+  expect(promptInputs).toHaveLength(1)
 })
 
 test("queueing a validated dashboard keeps a newer selection and text in the editor", async () => {
@@ -911,13 +932,24 @@ test("queueing a validated dashboard keeps a newer selection and text in the edi
 test("an expired queued dashboard rejects delivery without sending its command", async () => {
   const ids: string[] = []
   await expect(
-    sendQueuedReview(async (id) => {
+    sendQueuedDashboard("/review chart", async (id) => {
       ids.push(id)
       throw new Error("dashboard.target.snapshotGone")
     }),
   ).rejects.toThrow("dashboard.target.snapshotGone")
   expect(ids).toEqual(["target-a"])
   expect(sentCommands).toHaveLength(0)
+})
+
+test("text queued with an expired dashboard never appears in the timeline", async () => {
+  await expect(
+    sendQueuedDashboard("Edit chart", async () => {
+      throw new Error("dashboard.target.snapshotGone")
+    }),
+  ).rejects.toThrow("dashboard.target.snapshotGone")
+
+  expect(optimistic).toHaveLength(0)
+  expect(promptInputs).toHaveLength(0)
 })
 
 test("repeat Enter during a dashboard lookup submits the captured draft once", async () => {
@@ -987,10 +1019,7 @@ test("a dashboard that expires during session creation stays in the draft", asyn
   const gate = Promise.withResolvers<void>()
   createSessionGate = gate.promise
   let available = true
-  lookupDashboard = async () => {
-    if (!available) throw new Error("404")
-    return true
-  }
+  lookupDashboard = async () => available
   const state = dashboardDraft("Edit A")
   const sending = dashboardSubmit(state, { info: () => undefined }).handleSubmit(new Event("submit"))
   await Bun.sleep(0)

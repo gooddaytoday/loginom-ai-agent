@@ -1,5 +1,7 @@
 import type { Form, Studio, Update } from "./types"
 
+const maxSafeInteger = BigInt(Number.MAX_SAFE_INTEGER)
+
 export async function parameters(studio: Pick<Studio, "bg" | "Out">, form: Form, update?: Update) {
   const node = form.FDiagram.VariablesNode?.GetData()
   if (!node) return []
@@ -23,19 +25,23 @@ export async function parameters(studio: Pick<Studio, "bg" | "Out">, form: Form,
     for (let i = 0, n = await elements.get_Count(); i < n; i++) {
       const variable = await elements.getItem(i)
       const type = await variable.get_DataType()
-      if (type !== studio.bg.TBGDataType.dtFloat && type !== studio.bg.TBGDataType.dtInteger) continue
+      const integer = type === studio.bg.TBGDataType.dtInteger
+      if (type !== studio.bg.TBGDataType.dtFloat && !integer) continue
       const name = await variable.get_Name()
       const value = await variable.get_Value()
       if (update && update.name === name) {
-        if (
-          !Number.isFinite(update.value) ||
-          (type === studio.bg.TBGDataType.dtInteger && !Number.isSafeInteger(update.value))
-        )
+        if (!Number.isFinite(update.value) || (integer && !Number.isSafeInteger(update.value)))
           throw Error("Значение не соответствует числовому типу переменной " + name)
         await value.set_AsVariant(update.value)
       }
       const actual = await value.get_AsVariant()
-      rows.push({ name, value: actual == null ? null : Number(String(actual)), integer: type === studio.bg.TBGDataType.dtInteger })
+      const text = actual == null ? null : String(actual)
+      if (integer && text !== null) {
+        if (!/^[+-]?\d+$/.test(text)) continue
+        const exact = BigInt(text)
+        if (exact < -maxSafeInteger || exact > maxSafeInteger) continue
+      }
+      rows.push({ name, value: text === null ? null : Number(text), integer })
     }
     if (update && !rows.some((row) => row.name === update.name))
       throw Error("Числовая переменная не найдена: " + update.name)

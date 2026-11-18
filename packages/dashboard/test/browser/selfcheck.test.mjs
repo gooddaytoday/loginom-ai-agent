@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFileSync, spawnSync } from "node:child_process"
-import { cp, mkdtemp, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
+import { appendFile, cp, mkdtemp, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createServer } from "node:http"
@@ -24,15 +24,16 @@ async function fixture(t, app = "recorder") {
   const root = await mkdtemp(join(tmpdir(), "dashboard-selfcheck-"))
   t.after(() => rm(root, { recursive: true, force: true }))
   const hash = "b".repeat(64)
-  await cp(resolve(import.meta.dirname, "apps", app), join(root, hash), { recursive: true })
-  if (app !== "silent") await writeFile(join(root, hash, "assets/loginom.js"), sdk)
+  const dir = join(root, hash)
+  await cp(resolve(import.meta.dirname, "apps", app), dir, { recursive: true })
+  if (app !== "silent") await writeFile(join(dir, "assets/loginom.js"), sdk)
   const server = await draftServer(resources.page)
   t.after(() => server.close())
   const url = server.publish({
     key: "a".repeat(64), hash, builds: root,
     data: { nodeName: "Fixture node", created: "2026-11-12T12:00:00Z", parameters: [], sample: { schema: [{ name: "n", type: 3 }], rows: [[1]] } },
   })
-  return { root, url }
+  return { root, dir, url }
 }
 
 test("self-check observes the real recorder handshake", async t => {
@@ -46,6 +47,18 @@ test("self-check reports an exception after the real handshake", async t => {
   assert.equal(result.ok, false)
   assert.equal(result.state, "ready")
   assert.ok(result.errors.some(error => error.includes("boom")), JSON.stringify(result))
+})
+
+test("self-check limits diagnostic length and removes line controls", async t => {
+  const { dir, url } = await fixture(t, "throws")
+  await appendFile(join(dir, "assets/throws.js"), '\nonState(() => console.error("Render\\tdiagnostic\\n" + "detail".repeat(600)))\n')
+  const result = await selfCheck({ resources, url })
+  assert.equal(result.state, "ready")
+  assert.equal(result.ok, false)
+  const diagnostic = result.errors.find(error => error.startsWith("Render"))
+  assert.ok(diagnostic)
+  assert.equal(diagnostic.length, 2_048)
+  assert.match(diagnostic, /^Render diagnostic detail/)
 })
 
 test("self-check reports CSP violations after the real handshake", async t => {

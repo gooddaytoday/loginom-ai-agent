@@ -80,7 +80,7 @@ try {
     if (imageArchiveEntries(imageArchive).some(name => ociMetadata.has(name))) throw Error("Saved image archive still contains OCI metadata")
   }
   await Bun.write(join(release, "image.ref"), image + "\n")
-  const files = ["containers.sh", "README.md", "compose-release.yaml", "check-release.mjs", "conmon-rotate.sh"]
+  const files = ["containers.sh", "README.md", "compose-release.yaml", "check-release.mjs", "conmon-rotate.sh", "mounts.sh"]
   for (const name of files) await cp(join(pkg, "deploy", name), join(release, name))
   await chmod(join(release, "check-release.mjs"), 0o644)
 

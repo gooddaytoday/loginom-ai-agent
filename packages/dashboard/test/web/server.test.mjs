@@ -20,7 +20,7 @@ const binding = {
 }
 const other = { ...binding, packagePath: "/user/dashboard/B.lgp" }
 
-async function stand(t, options = {}) {
+async function stand(t, { listenHost = "127.0.0.1", ...options } = {}) {
   const root = await mkdtemp(join(tmpdir(), "dashboard checkout's test-"))
   const server = dashboardServer({
     shell: new Uint8Array(),
@@ -31,7 +31,7 @@ async function stand(t, options = {}) {
     clientOrigins: ["http://127.0.0.1:32768"],
     ...options,
   })
-  server.listen(0, "127.0.0.1")
+  server.listen(0, listenHost)
   await once(server, "listening")
   t.after(async () => {
     await new Promise(resolve => server.close(resolve))
@@ -286,6 +286,56 @@ test("snapshot creation rejects a foreign Origin and accepts configured or absen
   const { timestamp, ...event } = JSON.parse(lines[0])
   assert.deepEqual(event, { role: "web", event: "request_rejected", code: "origin" })
   assert.equal(lines.length, 1)
+})
+
+test("Studio snapshot creation needs an allowed Origin", async t => {
+  const server = await stand(t, { studioProxy: "127.0.0.1" })
+  const create = origin => fetch(server.base + "/snapshots", {
+    method: "POST", body: JSON.stringify(snapshot),
+    headers: { "content-type": "application/json", "x-loginom-dashboard-client-ip": "192.0.2.2", ...(origin && { origin }) },
+  })
+  assert.equal((await create()).status, 403)
+  assert.equal((await create("http://127.0.0.1:32768")).status, 201)
+})
+
+test("snapshot creation resets the client limit after one minute", async t => {
+  let now = Date.now()
+  t.mock.method(Date, "now", () => now)
+  const server = await stand(t)
+  const create = () => fetch(server.base + "/snapshots", {
+    method: "POST", body: JSON.stringify(snapshot), headers: { "content-type": "application/json" },
+  })
+  const first = await create()
+  assert.equal(first.status, 201)
+  const { id } = await first.json()
+  for (let i = 1; i < 10; i++) assert.equal((await create()).status, 201)
+  assert.equal((await create()).status, 429)
+  assert.equal((await server.request("snapshots/" + id)).id, id)
+  assert.equal((await fetch(server.base + "/snapshots/" + id)).status, 404)
+  assert.equal((await server.request("lookup", binding)).exists, false)
+  now += 60_000
+  assert.equal((await create()).status, 201)
+})
+
+test("Studio proxy connections share the limit per client address", async t => {
+  const server = await stand(t, { studioProxy: "127.0.0.1", listenHost: "::" })
+  const create = client => fetch(server.base + "/snapshots", {
+    method: "POST", body: JSON.stringify(snapshot),
+    headers: { "content-type": "application/json", origin: "http://127.0.0.1:32768", "x-loginom-dashboard-client-ip": client },
+  })
+  for (let i = 0; i < 10; i++) assert.equal((await create("192.0.2.2")).status, 201)
+  assert.equal((await create("192.0.2.2")).status, 429)
+  assert.equal((await create("192.0.2.3")).status, 201)
+})
+
+test("the installed API accepts a Studio snapshot only from the configured proxy peer", async t => {
+  const server = await stand(t, { studioProxy: "127.0.0.2" })
+  const created = await fetch(server.base + "/snapshots", {
+    method: "POST", body: JSON.stringify(snapshot),
+    headers: { "content-type": "application/json", origin: "http://127.0.0.1:32768", "x-loginom-dashboard-client-ip": "192.0.2.2" },
+  })
+  assert.equal(created.status, 403)
+  assert.equal((await server.request("lookup", binding)).exists, false)
 })
 
 test("API body and schema failures use bounded reasons without echoing request data", async t => {

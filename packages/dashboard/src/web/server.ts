@@ -1,7 +1,9 @@
 import { realpathSync } from "node:fs"
 import { randomUUID } from "node:crypto"
+import { lookup } from "node:dns/promises"
 import { readFile } from "node:fs/promises"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { isIP, SocketAddress } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { Option, Schema } from "effect"
@@ -16,6 +18,12 @@ export { bindingKey } from "../contract/snapshot.ts"
 function json(response: ServerResponse, status: number, data: unknown) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })
   response.end(JSON.stringify(data))
+}
+
+function normalizeIp(address: string) {
+  const family = isIP(address)
+  if (family === 4) return address
+  if (family === 6) return new SocketAddress({ address, family: "ipv6" }).address.replace(/^::ffff:(?=\d+\.)/, "")
 }
 
 const decodeJson = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
@@ -42,6 +50,7 @@ type Options = {
   maxSnapshots?: number
   ttlMs?: number
   allowedHosts?: string[]
+  studioProxy?: string
   events?: EventWriter
 }
 
@@ -55,9 +64,12 @@ export function dashboardServer({
   maxSnapshots = 100,
   ttlMs = 15 * 60 * 1000,
   allowedHosts,
+  studioProxy,
   events,
 }: Options) {
   const snapshots = new Map<string, { snapshot: typeof Snapshot.Type; expires: number }>()
+  const snapshotRates = new Map<string, number>()
+  let snapshotWindowEnds = 0
   return createServer(async (request, response) => {
     const reject = (status: number, message: string, code: string) => {
       events?.("request_rejected", { code })
@@ -103,13 +115,33 @@ export function dashboardServer({
       }
       if (request.method === "POST" && path === "/dashboard/snapshots") {
         const origin = request.headers.origin
-        if (origin !== undefined && !clientOrigins.includes(origin)) return reject(403, "Forbidden origin", "origin")
+        if (origin === undefined ? studioProxy !== undefined : !clientOrigins.includes(origin))
+          return reject(403, "Forbidden origin", "origin")
         const content = await body(request, 655_360)
         if (Option.isNone(content)) return reject(400, "Invalid request body", "body")
         const input = Schema.decodeUnknownOption(SnapshotRequest, { onExcessProperty: "error" })(content.value)
         if (Option.isNone(input) || Buffer.byteLength(JSON.stringify(input.value.sample)) > 524_288)
           return reject(400, "Invalid snapshot", "schema")
+        let address = normalizeIp(request.socket.remoteAddress ?? "") ?? ""
+        if (studioProxy !== undefined) {
+          const forwarded = request.headers["x-loginom-dashboard-client-ip"]
+          const client = typeof forwarded === "string" && normalizeIp(forwarded)
+          if (!client) return reject(403, "Forbidden proxy", "snapshot_proxy")
+          // Resolve the installed Studio on the shared container network so recreation can change its IP.
+          const peers = await lookup(studioProxy, { all: true }).catch(() => [])
+          if (!peers.some(peer => normalizeIp(peer.address) === address))
+            return reject(403, "Forbidden proxy", "snapshot_proxy")
+          address = client
+        }
         const now = Date.now()
+        if (now >= snapshotWindowEnds) {
+          snapshotRates.clear()
+          snapshotWindowEnds = now + 60_000
+        }
+        const count = snapshotRates.get(address) ?? 0
+        if (count >= 10 || (count === 0 && snapshotRates.size >= 1024))
+          return reject(429, "Too many snapshot requests", "snapshot_rate")
+        snapshotRates.set(address, count + 1)
         snapshots.forEach((item, id) => item.expires <= now && snapshots.delete(id))
         const id = randomUUID()
         snapshots.set(id, { snapshot: { id, created: new Date(now).toISOString(), ...input.value }, expires: now + ttlMs })
@@ -152,12 +184,14 @@ export function startDashboard(env: NodeJS.ProcessEnv, shell: Uint8Array) {
     appOrigin,
     mode,
     clientOrigins,
+    studioProxy: env.DASHBOARD_STUDIO_PROXY,
     events,
     cliButton: env.DASHBOARD_CLI_BUTTON === "1",
     allowedHosts:
       env.DASHBOARD_CLIENT_ORIGINS === undefined ? undefined : clientOrigins.map((origin) => new URL(origin).host),
   })
   const apps = appHost({
+    verifyHash: true,
     builds: key => {
       try {
         const root = realpathSync(buildsRoot)

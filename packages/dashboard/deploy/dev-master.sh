@@ -86,11 +86,13 @@ docker inspect "$server" > "$tmp/server.json"
 node -e 'const v=JSON.parse(require("node:fs").readFileSync(process.argv[1]))[0]; if(!v.Mounts.some(m=>m.Destination==="/workdir/UserStorage"&&m.Name===process.argv[2]&&m.RW))throw Error("UserStorage mount mismatch")' "$tmp/server.json" "$userstorage"
 publisher_user=$(docker exec "$server" stat -c '%u:%g' /proc/1)
 DASHBOARD_WEB_USER="$(id -u):$(id -g)"
+export DASHBOARD_JOB_GROUP="${DASHBOARD_WEB_USER##*:}"
 export DASHBOARD_PROJECT=$project DASHBOARD_IMAGE=$image DASHBOARD_WEB=$web DASHBOARD_WEB_USER
 [[ $(id -u) != 0 ]] || die "web/builder должны работать не от root"
 export DASHBOARD_OWNER_KEY=${owner%%=*} DASHBOARD_OWNER_VALUE=${owner#*=} DASHBOARD_STATE=$state
 export DASHBOARD_PUBLISHER_USER=$publisher_user DASHBOARD_USERSTORAGE=$userstorage DASHBOARD_NETWORK=$net
 export DASHBOARD_APP_PORT=$app_port DASHBOARD_APP_ORIGIN=$app_origin DASHBOARD_CLIENT_ORIGINS=$client_origins
+export DASHBOARD_STUDIO_PROXY=$studio
 export DASHBOARD_MODE=$mode DASHBOARD_CLI_BUTTON=$cli_button
 compose() { docker compose -f "$pkg/deploy/compose.yaml" "$@"; }
 check_builder_image() {
@@ -220,6 +222,7 @@ if [[ $action == check ]]; then
     [[ $code == "$expected" ]] || die "Snapshot read: HTTP $code (expected $expected)"
   done
   [[ $(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'Origin: http://evil.invalid' -d "$snapshot" "$base/dashboard/snapshots") == 403 ]] || die 'Snapshot origin: expected 403'
+  [[ $(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$snapshot" "$base/dashboard/snapshots") == 403 ]] || die 'Missing snapshot origin: expected 403'
   for path in current "targets/$id" "apps/$roi/" "apps/$roi/binding.json" "apps/$roi/sample.json"; do
     [[ $(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' "$base/dashboard/$path") == 404 ]] || die "Expected 404: $path"
   done
@@ -266,8 +269,10 @@ for artifact in "$pkg/dist/server.mjs" "$pkg/dist/shell.js"; do
 done
 for file in campaign.lgp dataset.csv; do [[ -s dashboard/fixture/$file ]] || die "Нет dashboard/fixture/$file"; done
 install -d -m 700 "$state"
-# The private 0700 parent protects host access; each role receives only its own mounts.
-install -d -m 777 "$builds" "$state/jobs-in" "$state/jobs-out"
+for directory in "$builds" "$state/jobs-in" "$state/jobs-out"; do
+  [[ ! -L $directory ]] || die "Dashboard directory is occupied"
+  [[ -d $directory ]] || mkdir -m 700 "$directory"
+done
 install -m 755 "$node_bin" "$state/node.new" && mv -f "$state/node.new" "$state/node"
 install -m 644 "$pkg/dist/server.mjs" "$state/server.mjs.new" && mv -f "$state/server.mjs.new" "$state/server.mjs"
 mkdir -p "$tmp/image/node-runtime/bin" "$tmp/image/node-runtime/lib/node_modules" "$tmp/image/template"
@@ -291,6 +296,9 @@ docker build --network none --build-arg "BASE_IMAGE=$base_image" -f "$pkg/deploy
 DASHBOARD_BUILDER_IMAGE=$(docker image inspect --format '{{.Id}}' "$image") || die "Не удалось проверить образ builder"
 [[ $DASHBOARD_BUILDER_IMAGE =~ ^sha256:[a-f0-9]{64}$ ]] || die "Неверный ID образа builder"
 export DASHBOARD_BUILDER_IMAGE
+# shellcheck source=packages/dashboard/deploy/mounts.sh
+source "$pkg/deploy/mounts.sh"
+dashboard_mounts docker "$DASHBOARD_BUILDER_IMAGE" "$state" apply "$DASHBOARD_JOB_GROUP"
 compose config --quiet
 docker exec "$server" mkdir -p "$storage"
 for file in campaign.lgp dataset.csv; do
@@ -343,6 +351,7 @@ Alias "/app-debug/client.json" "$htdocs/dashboard-config/client-debug.json"
 <Location "/dashboard/">
   Require expr "tolower(req('Host')) == '${base#http://}'"
   ProxyPreserveHost On
+  RequestHeader set X-Loginom-Dashboard-Client-IP "expr=%{CONN_REMOTE_ADDR}"
   Header always set Content-Security-Policy "sandbox; default-src 'none'"
   Header always set X-Content-Type-Options "nosniff"
 </Location>

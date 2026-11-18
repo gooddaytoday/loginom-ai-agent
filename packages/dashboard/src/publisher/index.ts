@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from "node:crypto"
-import { constants } from "node:fs"
-import { chmod, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { assetContentType } from "../contract/asset.ts"
 import { parsePublication } from "../contract/publication.ts"
 import { bindingKey } from "../contract/snapshot.ts"
-import { outputText, treeHash } from "../builder/build.ts"
+import { outputText } from "../builder/build.ts"
+import { BUILD_SIZE_LIMIT, readBounded, treeHash, verifiedBuildFile } from "../builder/tree.ts"
 import type { EventName, EventWriter } from "../log.ts"
 
 type Entry = {
@@ -48,10 +48,16 @@ export async function scanPublications(input: {
     try {
       const bytes = await readBounded(join(input.storage, path), 1_048_576)
       sourceHash = createHash("sha256").update(bytes).digest("hex")
-      if (state[path]?.sourceHash === sourceHash && state[path]?.status !== "pending") continue
+      const current = state[path]
+      const sameSource = current?.sourceHash === sourceHash
+      if (sameSource && current.status !== "pending" && current.status !== "ready") continue
       const publication = parsePublication(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
       if (path !== `${publication.binding.packagePath}.dashboards/${publication.binding.nodeGuid}/${path.split("/").at(-1)}`) throw Error("DASHBOARD_BINDING_MISMATCH")
-      state[path] = { sourceHash, status: "pending", key: await bindingKey(publication.binding), template: publication.template }
+      const key = await bindingKey(publication.binding)
+      const hash = current?.buildHash
+      if (sameSource && current.status === "ready" && current.key === key && hash && /^[a-f0-9]{64}$/.test(hash) &&
+        await verifiedBuildFile(join(input.builds, key, hash), hash)) continue
+      state[path] = { sourceHash, status: "pending", key, template: publication.template }
       candidate ??= { path, bytes }
     } catch (error) {
       const message = error instanceof Error ? error.message : ""
@@ -92,7 +98,7 @@ export async function scanPublications(input: {
           if (await realpath(source) !== resolve(source)) throw Error("DASHBOARD_OUTPUT_LINK")
           const entries = await readdir(source, { recursive: true, withFileTypes: true })
           if (!entries.some(file => file.parentPath === source && file.name === "index.html" && file.isFile())) throw Error("DASHBOARD_OUTPUT_ENTRY")
-          let remaining = 20 * 1024 * 1024
+          let remaining = BUILD_SIZE_LIMIT
           for (const file of entries) {
             const path = relative(source, join(file.parentPath, file.name)).split(sep).join("/")
             if (file.isDirectory() && path === "assets") continue
@@ -103,18 +109,21 @@ export async function scanPublications(input: {
             await mkdir(dirname(join(staging, path)), { recursive: true })
             await writeFile(join(staging, path), bytes)
           }
-        } catch (error) {
+          const buildHash = await treeHash(staging)
+          const parent = join(input.builds, entry.key!)
+          await mkdir(parent, { recursive: true })
+          if (await realpath(parent) !== resolve(parent)) throw Error("DASHBOARD_BUILD_LINK")
+          const target = join(parent, buildHash)
+          await rename(staging, target).catch(async error => {
+            if (!["EEXIST", "ENOTEMPTY", "ENOTDIR"].includes(error.code)) throw error
+            if (await verifiedBuildFile(target, buildHash)) return
+            await rm(target, { recursive: true, force: true })
+            await rename(staging, target)
+          })
+          state[job.path] = { ...entry, status: "ready", buildHash }
+        } finally {
           await rm(staging, { recursive: true, force: true })
-          throw error
         }
-        const buildHash = await treeHash(staging)
-        const parent = join(input.builds, entry.key!)
-        await mkdir(parent, { recursive: true })
-        await rename(staging, join(parent, buildHash)).catch(async error => {
-          if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error
-          await rm(staging, { recursive: true, force: true })
-        })
-        state[job.path] = { ...entry, status: "ready", buildHash }
       }
     } catch (error) {
       if (entry)
@@ -134,8 +143,8 @@ export async function scanPublications(input: {
       const path = candidate.path
       const id = createHash("sha256").update(path).update(entry.sourceHash!).update(randomUUID()).digest("hex")
       await rm(join(input.jobsOut, id), { recursive: true, force: true })
-      await mkdir(join(input.jobsOut, id), { mode: 0o777 })
-      await chmod(join(input.jobsOut, id), 0o777)
+      await mkdir(join(input.jobsOut, id), { mode: 0o2770 })
+      await chmod(join(input.jobsOut, id), 0o2770)
       const temporary = join(input.jobsIn, `.job-${randomUUID()}`)
       await mkdir(temporary)
       await writeFile(join(temporary, "publication.json"), candidate.bytes)
@@ -169,9 +178,9 @@ export async function scanPublications(input: {
   const retained = new Set(Object.values(state).filter(entry => entry.status === "ready").map(entry => `${entry.key}/${entry.buildHash}`))
   for (const key of await readdir(input.builds, { withFileTypes: true })) {
     if (!key.isDirectory() || !/^[a-f0-9]{64}$/.test(key.name)) continue
-    for (const build of await readdir(join(input.builds, key.name), { withFileTypes: true })) {
-      if (build.isDirectory() && /^[a-f0-9]{64}$/.test(build.name) && !retained.has(`${key.name}/${build.name}`))
-        await rm(join(input.builds, key.name, build.name), { recursive: true, force: true })
+    for (const hash of await readdir(join(input.builds, key.name))) {
+      if (/^[a-f0-9]{64}$/.test(hash) && !retained.has(`${key.name}/${hash}`))
+        await rm(join(input.builds, key.name, hash), { recursive: true, force: true })
     }
   }
 }
@@ -184,42 +193,5 @@ function emit(events: EventWriter, event: EventName, publication: string, entry:
     })
   } catch {
     // A diagnostic sink must not interrupt publication or cleanup.
-  }
-}
-
-async function readBounded(path: string, limit: number) {
-  if (await realpath(path) !== resolve(path)) throw Error("DASHBOARD_FILE_LINK")
-  const file = await openFile(path)
-  try {
-    const before = await file.stat()
-    if (!before.isFile() || before.size > limit) throw Error("DASHBOARD_FILE_LIMIT")
-    const bytes = Buffer.alloc(Math.min(before.size + 1, limit + 1))
-    let length = 0
-    while (length < bytes.length) {
-      const read = await file.read(bytes, length, bytes.length - length, length)
-      if (!read.bytesRead) break
-      length += read.bytesRead
-    }
-    const after = await file.stat()
-    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || length !== before.size || await realpath(path) !== resolve(path)) throw Error("DASHBOARD_FILE_CHANGED")
-    return bytes.subarray(0, length)
-  } finally {
-    await file.close()
-  }
-}
-
-// Linux publisher: retain each directory while opening its child, so a rename cannot redirect a read.
-async function openFile(path: string) {
-  const parts = resolve(path).split("/").filter(Boolean)
-  let directory = await open("/", constants.O_RDONLY | constants.O_DIRECTORY)
-  try {
-    for (const part of parts.slice(0, -1)) {
-      const next = await open(`/proc/self/fd/${directory.fd}/${part}`, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
-      await directory.close()
-      directory = next
-    }
-    return await open(`/proc/self/fd/${directory.fd}/${parts.at(-1)}`, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
-  } finally {
-    await directory.close()
   }
 }

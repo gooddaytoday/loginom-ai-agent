@@ -320,6 +320,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
         nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
       }),
     })
+    expect(pending.status).toBe(201)
     let pendingWatcher: ReturnType<typeof setInterval> | undefined
     try {
       const cancelled = await invoke(fixture, ["--dashboard", (await pending.json()).id, "--headless", "--", "Отмена."], interrupt => {
@@ -347,6 +348,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
         binding, nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
       }),
     })
+    expect(cancelling.status).toBe(201)
     const log = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
     const offset = (await log.text()).length
     let watcher: ReturnType<typeof setInterval> | undefined

@@ -86,6 +86,10 @@ export async function dashboardStorage(context, input, publish = false, signal) 
           const moved = await storage.MoveFile(directory + "/" + values.part, directory + "/" + values.name, false)
           return moved === true ? { written: true } : { error: "DASHBOARD_WRITE_UNKNOWN" }
         }
+        if (mode === "discard") {
+          await storage.DeleteFile(directory + "/" + values.part)
+          return {}
+        }
         return { error: "DASHBOARD_INPUT_INVALID" }
       } catch (error) {
         const message = String(error?.message ?? error?._message ?? "")
@@ -122,11 +126,14 @@ export async function dashboardStorage(context, input, publish = false, signal) 
     await native("finish", { part, name })
     return { status: "written", version }
   } catch (error) {
-    if (["DASHBOARD_VERSION_EXISTS", "DASHBOARD_ACCESS_DENIED"].includes(error?.message)) throw error
-    // No retries after dispatch: only an exact final-name/hash read-back can
-    // establish success when the write reply was lost.
-    const confirmed = await source(name).catch(() => null)
-    if (confirmed?.version.sourceHash === version.sourceHash) return { status: "written", version }
+    const known = ["DASHBOARD_VERSION_EXISTS", "DASHBOARD_ACCESS_DENIED"].includes(error?.message)
+    if (!known) {
+      // Only an exact final-name/hash read-back can establish success after a lost reply.
+      const confirmed = await source(name).catch(() => null)
+      if (confirmed?.version.sourceHash === version.sourceHash) return { status: "written", version }
+    }
+    await native("discard", { part }).catch(() => undefined)
+    if (known) throw error
     throw Error("DASHBOARD_WRITE_UNKNOWN")
   }
 }
