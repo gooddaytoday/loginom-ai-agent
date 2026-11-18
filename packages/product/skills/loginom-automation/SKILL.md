@@ -240,6 +240,14 @@ Import edits on the SAME existing node: resend the exact parameters.source from 
 прочитай выход Калькулятора: тип real, все значения и NULL сохранены. Сообщи
 итоговый числовой тип и преобразование; исходный файл и строковый Import сохранены.
 
+Prevent avoidable retries:
+- Describe one node type and only needed modes: `{node_types:["imports.text"],modes:["delimited"]}`; request Save separately. This avoids `USER_RESPONSE_BUDGET`.
+- `Preparation operation conflict`: repeat the original prepare arguments and operation_id to reconcile; follow its next_step before changing intent/path/navigation. A new preparation uses a new ID only after reconciliation.
+- After open_package, old source_operation_id receipts are invalid. Take current NodeRef from fresh workspace_observe; use the node's described existing-node form, then read from its new successful local operation (cleanup_complete:true).
+- Switching an Import's file: keep the SAME node; pass the new verified source AND `settings.source.source_path` equal to the verified delivery destination, not the old path. For an unresolved refusal, inspect/recover first.
+- Manual Import columns require nonempty name and label, e.g. `name:"Amount",label:"Amount"`; never copy `label:null` from preview. Native auto-detection: omit columns.
+- Continuation: reuse the existing Export and its NodeRef. Only a new upstream node AND a different destination justify another Export; changing the filename alone does not.
+
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
 `{"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}`.
