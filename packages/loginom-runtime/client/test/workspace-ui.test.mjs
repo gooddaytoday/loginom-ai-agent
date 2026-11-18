@@ -4711,6 +4711,81 @@ test('candidate Table filter proves only complete empty predicates while enabled
   s=(await f.page.observe()).table_settings;assert.equal(s.filter.predicates_complete,false);
 });
 
+test('Table settings observe clipped frames only while the checkbox and grid remain in the viewport',async()=>{
+  for(const kind of ['filter','format'])for(const overflow of [1,40]) {
+    const f=candidateTableFixture(kind);
+    f.page.context.innerWidth=1280;f.page.context.innerHeight=665;
+    f.page.viewportSize=()=>({width:1280,height:665});
+    f.view.box={x:10,y:50,width:1260,height:615+overflow};
+    f.modal.box={x:100,y:150,width:1000,height:515+overflow};
+    const s=await f.page.observe();
+    assert.equal(s.table_settings.status,'observed',kind+' overflow '+overflow);
+    const setting=kind==='filter'?s.table_settings.filter.enabled:s.table_settings.format.selected_numeric.formatting;
+    assert.equal(setting.status,'observed');
+    assert.equal(kind==='filter'?s.table_settings.filter.predicates_complete:s.table_settings.format.fieldlist_complete,true);
+    const checkbox=s.ui.elements.find(e=>e.ref===setting.display_ref);
+    if(kind==='filter')assert.equal(checkbox.interaction.state,'point_observed');
+    assert.ok(checkbox.allowed_actions.includes('set_checked'));
+  }
+});
+
+test('Table settings refuse offscreen frames and checkbox state without authorizing an offscreen click',async()=>{
+  for(const target of ['view','modal','checkbox']) {
+    const f=candidateTableFixture('filter');
+    f.page.context.innerHeight=665;
+    f.page.viewportSize=()=>({width:1400,height:665});
+    f.view.box.height=615;f.modal.box.height=515;
+    if(target==='checkbox')f.modal.querySelector('[data-tid$=";DisplayEl"]').box.y=700;
+    else f[target].box.y=700;
+    const s=await f.page.observe();
+    if(target!=='checkbox')assert.equal(s.table_settings.status,'unobserved',target);
+    else {
+      assert.equal(s.table_settings.filter.enabled.status,'unobserved');
+      const checkbox=s.ui.elements.find(e=>e.tid===f.base+'chkEnableFilter;DisplayEl');
+      assert.equal(checkbox.interaction.state,'outside_viewport');
+      const result=await f.page.act({verb:'set_checked',ref:checkbox.ref,checked:false},s);
+      assert.equal(result.status,'NOT_APPLIED');
+      assert.deepEqual(f.page.events,[]);
+    }
+  }
+});
+
+test('Table read preparation disables filtering and applies through clipped dialog frames',async()=>{
+  const {prepareTableRead}=await import('../lib/node-output-procedure.mjs');
+  for(const overflow of [1,40]) {
+    const f=candidateTableFixture('filter'),table={table_tid:f.viewKey,view_guid:'view',port_guid:'port'};
+    f.page.waitForTimeout=async ms=>{f.page.clock.advance(ms);};
+    f.page.context.innerWidth=1280;f.page.context.innerHeight=665;
+    f.page.viewportSize=()=>({width:1280,height:665});
+    f.view.box={x:10,y:50,width:1260,height:615+overflow};
+    f.modal.box={x:100,y:150,width:1000,height:515+overflow};
+    const apply=f.page.add('button',f.viewKey+';ModalWindow_BrowseFilter;btnApply','Применить',
+      {x:900,y:630,width:100,height:24},f.modal);
+    const checkbox=f.modal.querySelector('[data-tid$=";DisplayEl"]'),click=f.page.mouse.click;
+    f.page.mouse.click=async(...args)=>{
+      await click(...args);
+      if(f.page.document.activeElement===checkbox)checkbox.parentElement.attrs.class='';
+      if(f.page.document.activeElement===apply)f.modal.remove();
+    };
+    let opened=false;
+    const channel={observe:async options=>{
+      const s=opened?await f.page.observe():{ui:{elements:[
+        ...['nulls','data_types'].map(kind=>({view_toggle:{kind,pressed:true}})),
+        {tid:f.viewKey+';btnDataGridFilter'}]}};
+      if(opened&&!f.modal.isConnected)s.node_outputs={tables:[{...table,active:true}]};
+      assert.equal(options.ready(s),true,options.condition);return s;
+    },perform:async options=>{
+      const s=options.initialObservation;
+      assert.equal(options.ready(s),true,options.condition);
+      const result=await f.page.act(options.resolve(s),s);
+      assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+    }};
+    const proof=await prepareTableRead(channel,table,{openFilter:async()=>{opened=true;}});
+    assert.equal(proof.filter_enabled,false);assert.equal(proof.settings_applied,true);
+    assert.equal(f.modal.isConnected,false);assert.deepEqual(f.page.events,['click','click']);
+  }
+});
+
 test('grouping cells are native issued controls only after exact grid row and section binding',async()=>{
   for(const mode of ['valid','duplicate','foreign_grid','wrong_section','hidden','disabled','covered']) {
     const {page,records,base,wizard}=groupingFixture();
