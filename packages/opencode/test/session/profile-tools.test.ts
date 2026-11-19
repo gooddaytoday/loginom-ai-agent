@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { rm } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
@@ -951,15 +951,25 @@ it.instance("Dock calls exclude local reference attachments from repeated byte a
 )
 
 
+const prepareProfileDashboard = Effect.fn(function* () {
+  expect(dashboardDataRoot(process.env)).toBe(DashboardSession.dashboardRoot())
+  const id = crypto.randomUUID()
+  const prepared = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
+    id, origin: "http://localhost:32768", dashboards: dashboardDataRoot(process.env),
+    template: resolve(import.meta.dir, "../../../dashboard/template"),
+    fetch: Object.assign(async () => Response.json({
+      id, created: new Date().toISOString(), published: false, nodeName: "Dashboard skeleton",
+      binding: { packagePath: "/user/skeleton-" + id + ".lgp", workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7", nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930" },
+      parameters: [], sample: { schema: [{ name: "count", type: 1 }], rows: [[1], [2]] },
+    }), { preconnect: () => undefined }),
+  }))
+  yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(prepared.directory, ".."), { recursive: true, force: true })))
+  return prepared.directory
+})
+
 codeMode.instance("a dashboard directory selects its real builtin whitelist before any activation", () =>
   Effect.gen(function* () {
-    yield* Effect.promise(() => mkdir(DashboardSession.dashboardRoot(), { recursive: true }))
-    const folder = yield* Effect.acquireRelease(
-      Effect.promise(() => mkdtemp(join(DashboardSession.dashboardRoot(), "resolver-"))),
-      (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
-    )
-    const work = join(folder, "work")
-    yield* Effect.promise(() => mkdir(work))
+    const work = yield* prepareProfileDashboard()
     for (const options of [{ api: "test-model" }, { api: "gpt-5" }, { emptyHistory: true }]) {
       const result = yield* resolveProfile("default", undefined, undefined, undefined, undefined, options).pipe(
         provideInstance(work),
@@ -1000,19 +1010,7 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
 
 codeMode.instance("a folder prepared by Desktop resolves dashboard tools without bash", () =>
   Effect.gen(function* () {
-    expect(dashboardDataRoot(process.env)).toBe(DashboardSession.dashboardRoot())
-    const id = crypto.randomUUID()
-    const prepared = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
-      id, origin: "http://localhost:32768", dashboards: dashboardDataRoot(process.env),
-      template: resolve(import.meta.dir, "../../../dashboard/template"),
-      fetch: Object.assign(async () => Response.json({
-        id, created: new Date().toISOString(), published: false, nodeName: "Dashboard skeleton",
-        binding: { packagePath: "/user/skeleton-" + id + ".lgp", workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7", nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930" },
-        parameters: [], sample: { schema: [{ name: "count", type: 1 }], rows: [[1], [2]] },
-      }), { preconnect: () => undefined }),
-    }))
-    yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(prepared.directory, ".."), { recursive: true, force: true })))
-    const result = yield* resolveProfile("default").pipe(provideInstance(prepared.directory))
+    const result = yield* resolveProfile("default").pipe(provideInstance(yield* prepareProfileDashboard()))
     expect(result.tools.dashboard_draft).toBeDefined()
     expect(result.tools.bash).toBeUndefined()
     expect(result.tools.dashboard_publish?.execute).toBeDefined()
