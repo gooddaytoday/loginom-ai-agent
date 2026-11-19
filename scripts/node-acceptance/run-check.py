@@ -1383,13 +1383,32 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
                    and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
                    and reply['configuration']['readback'].get('destination') == destination]
         assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
-        reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
-                 for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
-                 and (owner.get('configuration', {}).get('readback', {}).get('kind') == kind
-                      or kind == 'javascript' and owner.get('output', {}).get('javascript_source'))
-                 and port.get('port') == 0]
+        reads, configured = [], {}
+        for n, reply in replies:
+            if n >= exports[-1]: continue
+            snapshots = list(ports(reply))
+            # A saved package may reopen with a new document/workflow context,
+            # but its Import GUID survives. Only earlier successful readbacks
+            # can identify an unconfigured read or supply its table caption.
+            for owner in [reply] + [owner for owner, _ in snapshots]:
+                identity = owner.get('node', {})
+                config = owner.get('configuration', {}).get('readback', {})
+                if owner.get('status') == 'SUCCEEDED' and identity.get('node_id') and config.get('kind') == kind:
+                    configured[identity['node_id']] = config
+            if n <= previous: continue
+            for owner, port in snapshots:
+                if owner.get('status') != 'SUCCEEDED' or port.get('port') != 0: continue
+                identity = owner.get('node', {})
+                config = owner.get('configuration', {}).get('readback', {})
+                prior = configured.get(identity.get('node_id'), {})
+                unconfigured_import = (kind == 'text_import' and identity.get('node_id')
+                    and owner.get('configuration', {}).get('status') == 'not_requested'
+                    and (identity['type'] == 'imports.text' if identity.get('type') else prior.get('kind') == kind))
+                if (config.get('kind') == kind or unconfigured_import
+                        or kind == 'javascript' and owner.get('output', {}).get('javascript_source')):
+                    reads.append((n, owner, port, prior if kind == 'text_import' else config))
         assert reads, 'TEXT_UPDATE_PORT_MISSING'
-        _, owner, port = reads[-1]
+        _, owner, port, config = reads[-1]
         identity = owner.get('node')
         assert identity and (node is None or (identity['node_id'] == node['node_id'] if same_node_id else identity == node)), 'TEXT_UPDATE_IMPORT_CHANGED'
         node = identity
@@ -1397,7 +1416,7 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
         tables.append(dict(actual=dict(node=identity, type=dict(javascript='programming.javascript', excel_import='imports.excel').get(kind, 'imports.text'),
-            label=owner.get('configuration', {}).get('readback', {}).get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
+            label=config.get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
         previous = exports[-1]
     # Use the same typed full-table matcher as cold, including exact numeric and
     # datetime evidence. Each stage has its own snapshot of the same node.

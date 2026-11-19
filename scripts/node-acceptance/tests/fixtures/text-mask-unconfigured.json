@@ -1,0 +1,181 @@
+[
+  {
+    "status": "SUCCEEDED",
+    "cleanup_complete": true,
+    "node": {"document_id": "11111111-1111-4111-8111-111111111111", "workflow_id": "11111111-1111-4111-8111-111111111111-1", "node_id": "33333333-3333-4333-8333-333333333333"},
+    "configuration": {
+      "status": "applied",
+      "readback": {
+        "kind": "text_import",
+        "node_title": {"mode": "custom", "label": "Месячные продажи"}
+      }
+    },
+    "output": {
+      "status": "complete",
+      "ports": [
+        {
+          "port": 0,
+          "port_guid": "55555555-5555-4555-8555-555555555555",
+          "fresh": true,
+          "execution_id": "11111111-1111-4111-8111-111111111111:3693:1",
+          "freshness_basis": "completed_execution_port_source",
+          "schema": [
+            {"index": 0, "name": "SaleID", "label": "SaleID", "type": "integer", "data_kind": "Непрерывный"},
+            {"index": 1, "name": "Month", "label": "Month", "type": "string", "data_kind": "Дискретный"},
+            {"index": 2, "name": "Amount", "label": "Amount", "type": "real", "data_kind": "Непрерывный"},
+            {"index": 3, "name": "Note", "label": "Note", "type": "string", "data_kind": "Дискретный"},
+            {"index": 4, "name": "FileName", "label": "Имя файла", "type": "string", "data_kind": "Дискретный"}
+          ],
+          "row_count": 5,
+          "sample": [
+            [
+              {"type": "integer", "value": "1", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": 10.25, "decimal": "10.25", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "январь", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "2", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": 0, "decimal": "0", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "3", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": null, "precision": "exact_null", "is_null": true},
+              {"type": "string", "value": "повтор", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "4", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-02", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": -2.5, "decimal": "-2.5", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "февраль;акция", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-02.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "3", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": null, "precision": "exact_null", "is_null": true},
+              {"type": "string", "value": "повтор", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-02.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ]
+          ],
+          "sample_rows": 5,
+          "sample_complete": true,
+          "precision": {
+            "numbers_verified": true,
+            "limitations": [],
+            "strings": "data source text; existing secret redaction applies; original byte encoding is not attested"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "status": "SUCCEEDED",
+    "cleanup_complete": true,
+    "node": {"document_id": "11111111-1111-4111-8111-111111111111", "workflow_id": "11111111-1111-4111-8111-111111111111-1", "node_id": "44444444-4444-4444-8444-444444444444"},
+    "configuration": {
+      "status": "applied",
+      "readback": {"kind": "text_export", "destination": "/own/initial.csv"}
+    },
+    "output": {
+      "status": "complete",
+      "ports": []
+    }
+  },
+  {
+    "status": "SUCCEEDED",
+    "cleanup_complete": true,
+    "node": {"document_id": "22222222-2222-4222-8222-222222222222", "workflow_id": "22222222-2222-4222-8222-222222222222-1", "node_id": "33333333-3333-4333-8333-333333333333"},
+    "configuration": {"status": "not_requested"},
+    "output": {
+      "status": "complete",
+      "ports": [
+        {
+          "port": 0,
+          "port_guid": "55555555-5555-4555-8555-555555555555",
+          "fresh": true,
+          "execution_id": "22222222-2222-4222-8222-222222222222:447:1",
+          "freshness_basis": "completed_execution_port_source",
+          "schema": [
+            {"index": 0, "name": "SaleID", "label": "SaleID", "type": "integer"},
+            {"index": 1, "name": "Month", "label": "Month", "type": "string"},
+            {"index": 2, "name": "Amount", "label": "Amount", "type": "real"},
+            {"index": 3, "name": "Note", "label": "Note", "type": "string"},
+            {"index": 4, "name": "FileName", "label": "Имя файла", "type": "string"}
+          ],
+          "row_count": 6,
+          "sample": [
+            [
+              {"type": "integer", "value": "9", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-03", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": 3.75, "decimal": "3.75", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "новый месяц", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-03.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "1", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": 10.25, "decimal": "10.25", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "январь", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "2", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": 0, "decimal": "0", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "3", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": null, "precision": "exact_null", "is_null": true},
+              {"type": "string", "value": "повтор", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-01.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "4", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-02", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": -2.5, "decimal": "-2.5", "representation": "binary64", "precision": "17_significant_digits", "is_null": false},
+              {"type": "string", "value": "февраль;акция", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-02.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ],
+            [
+              {"type": "integer", "value": "3", "representation": "decimal_integer", "precision": "exact_integer", "is_null": false},
+              {"type": "string", "value": "2026-01", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "real", "value": null, "precision": "exact_null", "is_null": true},
+              {"type": "string", "value": "повтор", "representation": "data_source_string", "precision": "source_text", "is_null": false},
+              {"type": "string", "value": "sales_2026-02.csv", "representation": "data_source_string", "precision": "source_text", "is_null": false}
+            ]
+          ],
+          "sample_rows": 6,
+          "sample_complete": true,
+          "precision": {
+            "numbers_verified": true,
+            "limitations": [],
+            "strings": "data source text; existing secret redaction applies; original byte encoding is not attested"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "status": "SUCCEEDED",
+    "cleanup_complete": true,
+    "node": {"document_id": "22222222-2222-4222-8222-222222222222", "workflow_id": "22222222-2222-4222-8222-222222222222-1", "node_id": "44444444-4444-4444-8444-444444444444"},
+    "configuration": {
+      "status": "applied",
+      "readback": {"kind": "text_export", "destination": "/own/final.csv"}
+    },
+    "output": {
+      "status": "complete",
+      "ports": []
+    }
+  }
+]
