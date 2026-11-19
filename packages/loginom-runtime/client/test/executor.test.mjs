@@ -9,11 +9,14 @@ import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeCapabilityCode} from '../lib/executor.mjs';
 import {activatePreparedWorkflow} from '../lib/node-workflow-activation.mjs';
 import {withStorageIdentity} from '../lib/storage-policy.mjs';
+import {readPreparedNodeContext} from '../lib/node-context.mjs';
+import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 
 for(const action of ['package.save_checkpoint','package.save_as'])
-for(const fault of ['none','reopened','path','graph','guid','type','account','document','native-session','dirty'])
+for(const fault of ['none','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
 test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
  const page=await restSavePage([fault==='dirty'],false),binding={...page.storageBinding,loginom_build:build};
+ page.staleSavedNavigation=fault==='stale-navigation';
  const prepared=page.context.__loginomDockPreparationV1.receipts.get('prepared'),nativePort={};
  const portIdentity={tid:'MF;TF-1;Graph;Vars;Output_Var-4'};
  prepared.nodeTargetPortIdentities=new WeakMap([[nativePort,portIdentity]]);
@@ -90,6 +93,29 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   form.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode);
  if(fault==='none')assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
  if(fault==='reopened')assert.equal(prepared.nodeTargetPortIdentities,undefined);
+ if(fault==='stale-navigation'){
+  const continuation=inspected.output.outcome.trace.find(e=>e.event==='save_continuations_observed').continuations[0];
+  const nodeBinding={document_id:'doc',workflow_ref:continuation.workflow_ref,node:{document_id:'doc',workflow_id:'workflow',node_id:'reference'}};
+  const dom=page.element(page.prefix+';Graph;Vars'),diagram=page.model.FDiagram;
+  diagram.FmxGraph.view.getState=()=>({shape:{node:dom}});
+  const query=page.context.document.querySelectorAll;
+  page.context.document.querySelectorAll=s=>s==='[data-tid='+JSON.stringify(dom.tid)+']'?[dom]:query(s);
+  const evaluate=page.evaluate.bind(page),locate=page.locator.bind(page);
+  page.evaluate=async(fn,arg)=>{
+   if(arg?.mode==='dirty')return false;
+   if(arg?.mode==='inventory')return {port_guid:'user-port',variables:[],count:0,complete:true};
+   diagram.FmxGraph.container.contains=e=>e===dom;
+   return evaluate(fn,arg);
+  };
+  page.locator=s=>s.includes(';btnClose"')?{click:async()=>{page.canonicalSavedNavigation=true;page.userWizardOpen=false;}}
+   :s.includes(';WizrdMCF"')?{count:async()=>0}:locate(s);
+  page.waitForFunction=async()=>{};
+  const snapshot=await page.execute(`async page=>(${readUserVariablesSnapshot.toString()})(page,${JSON.stringify({binding:nodeBinding,operation_id:'next-user-snapshot',deadline:10000})},${readPreparedNodeContext.toString()},async page=>{page.userWizardOpen=true;return {status:'SUCCEEDED',effect_possible:true}},()=>{},()=>{})`);
+  assert.equal(snapshot.status,'SUCCEEDED',JSON.stringify(snapshot));
+  assert.equal(snapshot.cleanup_complete,true);assert.equal(page.userWizardOpen,false);
+  assert.equal(engine.hasUnsettledWork(),false);assert.equal(page.saveWrites,1);
+  assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
+ }
  const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
  assert.equal(repeated.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
 });
@@ -845,13 +871,15 @@ async function continuationPage() {
  const crumbs=()=>{
   const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
   return labels.slice(0,parentLength||labels.length).map((label,i)=>{
-   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
+   // Save can update captions before the native NavigationBar rebuilds its keys.
+   const keys=[...labels];if(page.staleSavedNavigation&&!page.canonicalSavedNavigation)keys[2]='Draft';
+   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+keys.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
    components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
   });
  };
  const elements=page.elements.bind(page),click=page.click.bind(page);
  page.elements=()=>[...elements(),...crumbs(),...(page.missingSaveUp?[]:[up]),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
- page.click=async item=>{if(item.kind==='save_up'){parentLength=4;return;}if(item.kind==='save_nav_parent'){parentLength=item.navigationLength;return;}return click(item);};
+ page.click=async item=>{if(item.kind==='save_up'){page.canonicalSavedNavigation=true;parentLength=4;return;}if(item.kind==='save_nav_parent'){page.canonicalSavedNavigation=true;parentLength=item.navigationLength;return;}return click(item);};
  page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
  const document={querySelectorAll:selector=>{
    if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');

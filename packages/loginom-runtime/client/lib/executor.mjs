@@ -1866,8 +1866,17 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (state.modified !== false)
       return result('AMBIGUOUS', {}, { code: 'SAVE_RESULT_UNVERIFIED', message: 'The package still has unsaved changes; no Save was repeated' });
     if (!same(await graphSnapshot(prefix), before.graph)) throw Error('Saved graph changed during reconciliation');
-    const continuations = await rebindSavedContinuations(before, before.continuations, true);
+    let continuations = await rebindSavedContinuations(before, before.continuations, true);
     const reopened = workflow.tab_tid !== before.workflow_ref.tab_tid;
+    if (!reopened && continuations.some(c => !same(c.previous_workflow_ref.navigation_path, c.workflow_ref.navigation_path))) {
+      // The saved caption can precede the native NavigationBar key rebuild.
+      // Settle it through the same owned UI transition as ordinary Save before
+      // a variable wizard returns to the graph and rebuilds those keys itself.
+      await refreshSavedNavigation(continuations[0]);
+      await ensureReady();
+      if (!same(await graphSnapshot(workflow.prefix), before.graph)) throw Error('Saved graph changed while refreshing navigation');
+      continuations = await rebindSavedContinuations(before, before.continuations, true);
+    }
     record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
     phase = 'verified'; effectPossible = true;
     record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
