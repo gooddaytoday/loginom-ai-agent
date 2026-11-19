@@ -248,9 +248,33 @@ test('download failure preserves bounded stage and cause flags without URLs or p
  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
  const failure=result.trace.find(e=>e.event==='download_browser_failure');
  assert.equal(failure.step,'download.saveAs');assert.equal(failure.page_closed,true);assert.equal(failure.causes[1].target_closed,true);
+ // The runtime consumes this field into its private journal before returning
+ // the fixed receipt, including when the browser ledger is inspected later.
+ delete failure.private_download;
  assert.equal(result.trace.find(e=>e.event==='download_cleanup_failure').step,'download.cancel');
  assert.ok(!JSON.stringify(result).includes('secret=hidden'));assert.ok(!JSON.stringify(result).includes('private cancellation'));
  assert.deepEqual(f.calls,['listen','click']);
+});
+
+test('saveAs failure captures download and native receipt before cancellation',async()=>{
+ const f=fixture();let cancelled=false;
+ f.download.saveAs=async()=>{throw Error('download.saveAs: canceled password=PRIVATE');};
+ f.download.failure=async()=>{assert.equal(cancelled,false);return 'canceled';};
+ f.download.cancel=async()=>{cancelled=true;f.calls.push('cancel');};
+ const evaluate=f.page.evaluate.bind(f.page);
+ f.page.evaluate=async(fn,arg)=>{
+  if(fn.name==='downloadFailureReceipt'){
+   assert.equal(cancelled,false);
+   return {state:'observed',expected_bytes:34,received_bytes:34};
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await f.run(),failure=result.trace.find(e=>e.event==='download_browser_failure');
+ assert.equal(failure.private_download.download_failure,'canceled');
+ assert.equal(failure.private_download.cancelled,true);
+ assert.equal(failure.private_download.native_receipt.received_bytes,34);
+ assert.match(failure.private_download.message,/download.saveAs: canceled/);
+ assert.ok(cancelled);
 });
 
 test('download refuses a different file label, formatted-name collision or package before the browser',()=>{
@@ -418,12 +442,11 @@ test('failed toast binding records the actual bounded class and text',async()=>{
   }
 });
 
-test('toast closure before binding completes upload byte/SHA verification and releases both transfers once',async t=>{
+for(const transportFailure of [false,true])test('toast closure before binding completes verification or retains its private transport cause: '+transportFailure,async t=>{
   const f=downloadToastFixture('cleared_before_binding'),root=await mkdtemp(join(tmpdir(),'toast-transfer-'));
-  t.after(()=>rm(root,{recursive:true,force:true}));
   const source=join(root,'source');await writeFile(source,'abc');
   const store=await createArtifactStore({directory:join(root,'store')});
-  t.after(()=>store.releaseUploads());
+  t.after(async()=>{await store.releaseUploads();await rm(root,{recursive:true,force:true});});
   const artifact=await store.admit({sourcePath:source,name:f.options.artifact.name,bytes:3,
     sha256:createHash('sha256').update('abc').digest('hex'),upload:{directory:'/test',overwrite:'replace'}});
   let uploads=0;
@@ -435,13 +458,28 @@ test('toast closure before binding completes upload byte/SHA verification and re
     count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,locator:()=>input}:locator(selector);
   const save=f.download.saveAs;
   f.download.saveAs=async path=>{f.options.download_path=path;await save(path);await writeFile(path,'abc');};
-  const rt=runtime(f.page,{artifactStore:store});
+  const records=[];
+  const rt=runtime(f.page,{artifactStore:store,onRecord:async e=>{records.push(e);return e;},execute:async code=>{
+    if(transportFailure&&code.includes('async function browserArtifactDownload('))throw Error('Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]',{
+      cause:Error('download.saveAs: canceled password=PRIVATE C:\\Users\\Name\\out.csv')});
+    return f.page.execute(code);
+  }});
   const observed=await rt.observe();
   await rt.upload({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
     observationId:observed.output.observation_id,operationId:'upload'});
   const row=await rt.observe(),request={operationId:'upload',verificationId:'verify',observationId:row.output.observation_id,
     fileRef:row.output.ui.elements.find(e=>e.label===artifact.name).ref};
   const result=await rt.verifyArtifact(request);
+  if(transportFailure){
+    assert.equal(result.error.code,'BROWSER_CALL_UNCERTAIN');
+    assert.doesNotMatch(JSON.stringify(result),/PRIVATE|Users|download.saveAs/);
+    for(const phase of ['browser_capability_failed','artifact_download_transport_failed']){
+      const diagnostic=records.find(e=>e.phase===phase);assert.ok(diagnostic,phase);
+      assert.match(diagnostic.cause.original_message,/download.saveAs: canceled/);
+      assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE|Users/);
+    }
+    return;
+  }
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.sha256,artifact.sha256);
   assert.equal(result.output.bytes_verified,true);assert.equal(result.output.upload_completion_verified,true);
   assert.equal(result.cleanup_complete,true);assert.equal(uploads,1);assert.deepEqual(f.calls,['listen','click','save']);

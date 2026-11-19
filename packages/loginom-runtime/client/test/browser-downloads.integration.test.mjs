@@ -130,10 +130,12 @@ for (const owner of ['mcp', 'managed']) {
         headless, managed:{directory:join(directory,'session'), browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER, browserRoot:dirname(process.env.LOGINOM_DOCK_TEST_BROWSER)},
       });
       const config = JSON.parse(await readFile(session.browserConfig, 'utf8'));
+      assert.equal(config.browser.launchOptions.downloadsPath,join(session.directory,'d'));
       await writeFile(join(session.metadata.artifacts, 'input.csv'), 'value\n42\n');
       if (owner === 'managed') {
         const authenticated = await loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER, profile:join(directory,'authenticated'),
-          candidate:{url, username:'user', password:''}, headless, keepOpen:true});
+          candidate:{url, username:'user', password:''}, headless, keepOpen:true,
+          downloadsPath:config.browser.launchOptions.downloadsPath});
         handles.context = authenticated.context;
         // This assertion intentionally precedes MCP: its init script cannot fix
         // a capability decision already made by an authenticated application.
@@ -210,6 +212,28 @@ for (const owner of ['mcp', 'managed']) {
       assert.ok(downloaded.listeners > 0);
       assert.equal(downloaded.uploaded, 'value\n42\n');
       assert.equal(await readFile(join(session.metadata.artifacts, 'sales.csv'), 'utf8'), 'group;qty\nA;1\n');
+      // The same real Download is also saved by pinned MCP's automatic handler.
+      // Exercise a failing destination while a second consumer still succeeds.
+      for(const failFirst of [false,true]){
+        const first=join(session.directory,failFirst?'occupied':'first.csv');
+        const second=join(session.directory,'second.csv');
+        if(failFirst)await writeFile(first,'not a directory');
+        const copied=await code(`async page=>{
+          const pending=page.waitForEvent('download');
+          await page.locator('#save').click();
+          const download=await pending;
+          const copies=await Promise.allSettled([
+            download.saveAs(${JSON.stringify(first+(failFirst?'/bad.csv':''))}),
+            download.saveAs(${JSON.stringify(second)})
+          ]);
+          return {copies:copies.map(c=>c.status),failure:await download.failure(),path:await download.path()};
+        }`);
+        assert.deepEqual(copied.copies,[failFirst?'rejected':'fulfilled','fulfilled']);
+        assert.equal(copied.failure,null);
+        assert.equal(dirname(copied.path),config.browser.launchOptions.downloadsPath);
+        assert.equal(await readFile(second,'utf8'),'group;qty\nA;1\n');
+        if(!failFirst)assert.equal(await readFile(first,'utf8'),'group;qty\nA;1\n');
+      }
       const navigation = await code(`async page => {
         await page.reload();
         const reloaded = await page.evaluate(() => window.initialPicker);

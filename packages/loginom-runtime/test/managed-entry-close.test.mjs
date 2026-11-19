@@ -15,6 +15,8 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
     await mkdir(join(directory, "src"), { recursive: true })
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }
+  await mkdir(join(directory, "client/lib"), { recursive: true })
+  await copyFile(new URL("../client/lib/browser-downloads.mjs", import.meta.url), join(directory, "client/lib/browser-downloads.mjs"))
   const files = {
     "src/resources.mjs": "export async function verifyResources() { return {manifestHash:'fixture',manifest:{}} }",
     "src/connection-check.mjs": "export const loginomAddress=value=>value; export async function loginBrowser(){return {context:{close:async()=>{}}}}",

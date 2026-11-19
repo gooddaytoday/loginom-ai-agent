@@ -6,9 +6,48 @@ import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import vm from 'node:vm';
+import {Page,runtime} from './support/executor-fixture.mjs';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
+
+test('download diagnostics retain redacted original message and stack before bounding',()=>{
+ const error=Object.assign(Error('download.saveAs: cancelled password=PRIVATE at C:\\Users\\Private Name\\out.csv'),{
+  stack:'Error: cancelled password=PRIVATE\n    at saveAs (C:\\Users\\Private Name\\client.mjs:20:3)\n    at copy (/home/private/client.mjs:10:2)',
+  cause:Error('peer reset https://user:PRIVATE@private.invalid/?token=PRIVATE'),
+ });
+ const diagnostic=operationFailureDiagnostic(error,{downloadCause:true,redactor:createRedactor(['PRIVATE'])});
+ assert.match(diagnostic.message,/download.saveAs: cancelled/);
+ assert.match(diagnostic.stack,/at saveAs/);
+ assert.match(diagnostic.original_message,/peer reset/);
+ assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE|Private Name|Users|home\/private|private.invalid/);
+ assert.ok(diagnostic.stack.split('\n').length<=6);
+ const secret='SECRET_CROSSING_THE_BOUNDARY';
+ const bounded=operationFailureDiagnostic(Error('x'.repeat(2040)+secret),{downloadCause:true,redactor:createRedactor([secret])});
+ assert.doesNotMatch(bounded.message,/SECRET/);
+ assert.ok(bounded.message.length<=2048);
+});
+
+test('runtime consumes private download evidence even inside a recovered receipt',async()=>{
+ const records=[],page=new Page();
+ const failure={event:'download_browser_failure',step:'download.saveAs',private_download:{
+  message:'download.saveAs: cancelled password=PRIVATE C:\\Users\\Name\\out.csv',
+  stack:'Error: cancelled\n at saveAs (/private/client.mjs:10:2)',
+  download_failure:'canceled',cancelled:true,received_bytes:34,native_receipt:{state:'observed',received_bytes:34},
+ }};
+ const r=runtime(page,{redactor:createRedactor(['PRIVATE']),onRecord:async e=>{records.push(e);return e;},
+  execute:async()=>({status:'SUCCEEDED',action_key:'workspace.observe',action_revision:'1',phase:'observed',effect_possible:false,
+   cleanup_complete:true,error:null,trace:[],output:{receipt:{trace:[structuredClone(failure)]}}})});
+ const result=await r.observe({scope:'roots'});
+ assert.doesNotMatch(JSON.stringify(result),/private_download|PRIVATE|client.mjs/);
+ const diagnostic=records.find(e=>e.phase==='download_browser_diagnostic');
+ assert.ok(diagnostic);
+ assert.equal(diagnostic.cause.received_bytes,34);
+ assert.equal(diagnostic.cause.native_receipt.received_bytes,34);
+ assert.match(diagnostic.cause.message,/download.saveAs: cancelled/);
+ assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE|Users|client.mjs/);
+});
+
 test('private operation diagnostics retain fixed causes and omit arbitrary error text',()=>{
  assert.deepEqual(operationFailureDiagnostic(Error('Pinned browser capability call failed [BROWSER_SCRIPT_ERROR] (exception=TypeError)')),
   {code:'BROWSER_SCRIPT_ERROR',detail:'exception=TypeError',exception:'Error'});
@@ -57,7 +96,7 @@ test('browser transport diagnostics retain the bounded original cause privately'
  const text='Error: socket peer reset password=PRIVATE';
  assert.throws(()=>parseCapabilityResult({isError:true,content:[{type:'text',text}]}),error=>{
   assert.equal(error.message,'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]');
-  assert.equal(error.cause.message,text);
+  assert.equal(error.cause.message,'Error: socket peer reset password= [redacted]');
   return true;
  });
 });
@@ -76,11 +115,11 @@ test('untyped browser reply retains only bounded text in its private cause',()=>
  });
 });
 
-test('untyped diagnostics redact known secrets before the UTF-8 boundary cuts them',()=>{
+for(const isError of [false,true])test('diagnostics redact known secrets before the UTF-8 boundary cuts them: '+isError,()=>{
  const secret='PARTIAL_SECRET_THAT_CROSSES_THE_DIAGNOSTIC_BOUNDARY';
- assert.throws(()=>parseCapabilityResult({content:[{type:'text',text:' '.repeat(2034)+secret}]},
+ assert.throws(()=>parseCapabilityResult({isError,content:[{type:'text',text:' '.repeat(2034)+secret}]},
   {redactor:createRedactor([secret])}),error=>{
-  assert.equal(error.message,'Pinned browser capability returned no typed result');
+  assert.equal(error.message,isError?'Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]':'Pinned browser capability returned no typed result');
   assert.ok(Buffer.byteLength(error.cause.message)<=2048);
   assert.ok(!error.cause.message.includes('PARTIAL'));
   assert.ok(error.cause.message.includes('[redacted]'));
