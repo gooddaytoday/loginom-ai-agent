@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null,verticalClip=false}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null,verticalClip=false,previewOwnScroll=false}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -28,9 +28,9 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   ui:{elements:[...(dateFormat===null?[]:[
    {ref:'date-picker',wizard_combo:{kind:'picker',field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:'date-input',root_ref:'wizard-ref'}}},
    ...(dateOpened?[{ref:'date-option',wizard_combo:{kind:'option',label:dateFormat,field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:optionMode==='foreign_input'?'foreign-input':'date-input',root_ref:'wizard-ref'}}}]:[])
-  ]),...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:verticalClip&&!verticalTop?[]:['scroll_horizontal'],bounding_box:{x:0,width:800,...(verticalClip?{y:589-verticalTop,height:119}:{})},...(verticalClip?{scroll:{ref:'body',top:verticalTop,max_top:141}}:{})},
+  ]),...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:verticalClip&&!verticalTop?[]:['scroll_horizontal'],bounding_box:{x:0,width:800,...(verticalClip?{y:589-verticalTop,height:119}:{})},...(verticalClip?{scroll:previewOwnScroll?{ref:'scroll',top:0,max_top:2}:{ref:'body',top:verticalTop,max_top:141}}:{})},
    ...(verticalClip?[{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshData',ref:'vertical-anchor',allowed_actions:['scroll'],interaction:{state:'point_observed'},scroll:{ref:'body',top:verticalTop,max_top:141}}]:[]),
-   {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
+   {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'},...(previewOwnScroll?{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;'+ref,allowed_actions:['scroll'],scroll:{ref:'body',top:verticalTop,max_top:141}}:{})})))]}});
  const channel={observe:async options=>{
   check();const offset=options.importColumnPage?.offset??0;reads.push({condition:options.condition,offset});
   if(options.condition==='complete import definition page at 0'&&initialSweep&&drift)columns.at(-1).used=false;
@@ -41,7 +41,7 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   check();gestures++;
   if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
   if(action.verb==='scroll'){
-   assert.equal(action.ref,'vertical-anchor');assert.equal(action.delta_y,141);
+   assert.equal(action.ref,previewOwnScroll?'name:0':'vertical-anchor');assert.equal(action.delta_y,141);
    if(verticalClip!=='stalled')verticalTop+=action.delta_y;
    if(verticalClip==='changed')columns[0].type='integer';
    return;
@@ -88,8 +88,8 @@ test('metadata commit resolves a fresh editor reference with the same draft',asy
  const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
  assert.equal(result.columns[0].label,'Label0');
 });
-for(const verticalClip of [true,'stalled','changed'])test('import preview below the wizard footer is revealed through its own vertical owner: '+verticalClip,async()=>{
- const f=fixture(5,{editLabels:true,verticalClip});
+for(const previewOwnScroll of [false,true])for(const verticalClip of [true,'stalled','changed'])test('import preview below the wizard footer is revealed through its own vertical owner: '+verticalClip+', nested='+previewOwnScroll,async()=>{
+ const f=fixture(5,{editLabels:true,verticalClip,previewOwnScroll});
  const run=()=>configureTextImportFields(f.channel,f.parameters,f.owner);
  if(verticalClip===true){const result=await run();assert.deepEqual(result.columns.map(c=>c.label),f.parameters.columns.map(c=>c.label));}
  else await assert.rejects(run(),/Import preview/);
