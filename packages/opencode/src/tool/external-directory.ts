@@ -25,8 +25,10 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   if (!target) return false
 
   const ins = yield* InstanceState.context
+  if (ctx.dashboardWork && DashboardSession.draftMarker(ctx.dashboardWork.directory) !== (ctx.dashboardWork.draftId ?? true))
+    throw Error("LOGINOM_SCOPE_DENIED")
   const denied = DashboardSession.dashboardPathError(
-    ctx.dashboardWork ?? ins.directory,
+    ctx.dashboardWork?.directory ?? ins.directory,
     path.isAbsolute(target) ? target : `${ins.directory}${path.sep}${target}`,
     options?.write,
     ctx.dashboardWork !== undefined,
@@ -61,12 +63,13 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
 })
 
 export function workspaceWriter(fs: FSUtil.Interface, ctx: Tool.Context, directory: string) {
-  const work = ctx.dashboardWork ?? (DashboardSession.isDashboardWork(directory) ? directory : undefined)
+  const work = ctx.dashboardWork?.directory ?? (DashboardSession.isDashboardWork(directory) ? directory : undefined)
   if (!work) return { write: fs.writeWithDirs, remove: fs.remove }
   const snapshotId = (control: string) => {
-    const id: unknown = JSON.parse(readFileSync(path.join(control, "binding.json"), "utf8")).snapshotId
-    if (typeof id !== "string" || !id) throw Error("LOGINOM_SCOPE_DENIED")
-    return id
+    const binding: { snapshotId?: unknown; draftId?: unknown } = JSON.parse(readFileSync(path.join(control, "binding.json"), "utf8"))
+    if (typeof binding.snapshotId !== "string" || !binding.snapshotId ||
+        (ctx.dashboardWork && ctx.dashboardWork.draftId !== binding.draftId)) throw Error("LOGINOM_SCOPE_DENIED")
+    return binding.snapshotId
   }
   if (!DashboardSession.isDashboardWork(work)) throw Error("LOGINOM_SCOPE_DENIED")
   const captured = withSnapshot(work, (_directory, control) => snapshotId(control))

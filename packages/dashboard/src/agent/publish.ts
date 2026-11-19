@@ -1,16 +1,16 @@
 import { createHash } from "node:crypto"
-import { readFile, realpath } from "node:fs/promises"
+import { cp, readFile, realpath, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import { LookupResponse } from "../contract/snapshot.ts"
 import { Option, Schema } from "effect"
 import { parsePublication, PublicationVersion, PublicationWrite } from "../contract/publication.ts"
-import { buildDashboard, sourceFiles } from "./build.ts"
+import { buildSources, outputText, sourceFiles } from "../builder/build.ts"
 import { NO_SAMPLE } from "./draft.ts"
-import { readDashboardSnapshot, removePublishedSample, updatePublicationBase, type ControlBinding } from "./folder.ts"
+import { readDashboardDraftId, readDashboardSnapshot, removePublishedSample, updatePublicationBase, withSnapshot, type ControlBinding } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 
-export { embeddedValues, outputText } from "./build.ts"
+export { outputText } from "../builder/build.ts"
 
 type Prepared = { publication: { content: string; sourceHash: string }; control: ControlBinding; build: { hash: string; dir: string } }
 
@@ -19,21 +19,37 @@ export async function preparePublish(input: { work: string; operation: string; r
   const work = await realpath(input.work)
   const saved = readDashboardSnapshot(work)
   if (!saved) return { ok: false, text: NO_SAMPLE }
-  const build = await buildDashboard({
-    work, node: input.resources.node, template: input.resources.template, out: join(work, "../control/draft"),
-    publication: { operation: input.operation, sample: saved.sample }, signal: input.signal,
+  const listed = await sourceFiles(work)
+  if ("error" in listed) return { ok: false, text: "Сборка не удалась.\n" + listed.error }
+  await rm(join(input.operation, "src"), { recursive: true, force: true })
+  await cp(join(work, "src"), join(input.operation, "src"), { recursive: true })
+  const captured = await sourceFiles(input.operation)
+  if ("error" in captured) return { ok: false, text: "Сборка не удалась.\n" + captured.error }
+  const bytes = await Promise.all(captured.files.map(file => readFile(join(input.operation, file))))
+  const found = embeddedValues(saved.sample, bytes)
+  if (found.length) return {
+    ok: false, text: "Сборка не удалась.\n" + outputText(Buffer.from("Опубликованная сборка будет публичной. Удалите из src/ данные образца: " + found.slice(0, 5).join(", "))),
+  }
+  const build = await buildSources({
+    work: input.operation, node: input.resources.node, template: input.resources.template,
+    out: input.operation, signal: input.signal,
   })
   if (!build.ok) return { ok: false, text: "Сборка не удалась.\n" + build.output }
-  const captured = await sourceFiles(input.operation)
-  if ("error" in captured) return { ok: false, text: captured.error }
+  try {
+    if (!withSnapshot(work, directory => readDashboardDraftId(directory) === saved.control.draftId))
+      return { ok: false, text: "Черновик изменился во время подготовки публикации." }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    return { ok: false, text: "Локальная папка черновика больше недоступна." }
+  }
   const content = JSON.stringify({
     format: 1, template: 1, binding: saved.control.binding, title: saved.control.nodeName,
     parameters: saved.snapshot.parameters.map(parameter => ({ name: parameter.name, label: parameter.name })),
-    files: await Promise.all(captured.files.map(async path => {
-      const bytes = await readFile(join(input.operation, path))
+    files: captured.files.map((path, index) => {
+      const file = bytes[index]!
       const binary = /\.(png|jpg|webp|woff2)$/i.test(path)
-      return { path, encoding: binary ? "base64" : "utf8", content: binary ? bytes.toString("base64") : new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) }
-    })),
+      return { path, encoding: binary ? "base64" : "utf8", content: binary ? file.toString("base64") : new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(file) }
+    }),
   })
   try {
     parsePublication(content)
@@ -45,7 +61,12 @@ export async function preparePublish(input: { work: string; operation: string; r
   return { ok: true, control: saved.control, publication: { content, sourceHash: createHash("sha256").update(content).digest("hex") }, build: { hash: build.hash, dir: build.dir } }
 }
 
-export async function finishPublish(input: Prepared & {
+export function embeddedValues(sample: { rows: readonly (readonly unknown[])[] }, files: Buffer[]) {
+  const values = new Set(sample.rows.flat().filter(cell => cell != null).map(String))
+  return [...values].filter(value => [...value].length >= 6 && files.some(file => file.includes(value)))
+}
+
+export async function finishPublish(input: Pick<Prepared, "publication" | "control"> & {
   work: string
   signal?: AbortSignal
   expected: PublicationVersion | null

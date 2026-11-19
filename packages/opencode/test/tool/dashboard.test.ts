@@ -18,7 +18,6 @@ import { createHash } from "node:crypto"
 import { join, resolve } from "node:path"
 import { mkdir, readdir, rm, symlink } from "node:fs/promises"
 import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
-import { draftServer } from "@loginom-ai-agent/dashboard/draft/server"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { Config } from "@/config/config"
 import { Permission } from "@/permission"
@@ -208,6 +207,8 @@ for (const reply of ["reject", "abort", "once"] as const) {
       expect(request.patterns).toEqual([binding.nodeName, binding.binding.packagePath])
       expect(request.always).toEqual([])
       expect(requests.map(item => item.method)).toEqual(["acquire", "scope", "dashboardRead", "release"])
+      expect((yield* Effect.promise(() => readdir(join(folder.work, "../.."))))
+        .filter(item => item.startsWith(".publish-") || item.startsWith(".stage-"))).toEqual([])
       if (reply === "abort") controller.abort()
       else yield* permissions.reply({ requestID: request.id, reply })
       const exit = yield* Fiber.join(fiber)
@@ -220,14 +221,41 @@ for (const reply of ["reject", "abort", "once"] as const) {
       expect(lookups).toEqual(reply === "once" ? [{ ...binding.binding, publication: publicationName }] : [])
       expect((yield* permissions.list()).filter(item => item.sessionID === session.id)).toEqual([])
       expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(reply !== "once")
-      expect((yield* Effect.promise(() => readdir(join(folder.work, "../..")))).filter(item => item.startsWith(".publish-"))).toEqual([])
     }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
   }), 20_000)
 }
 
-const deletionSession = Effect.fn(function* (work: string) {
+it.instance("a publication confirmation cannot send the old draft after recreation", () => Effect.gen(function* () {
+  const requests = publicationHost({ error: "DASHBOARD_STORAGE_UNAVAILABLE" })
+  const folder = yield* publicationFolder()
+  const flags = yield* RuntimeFlags.Service
+  const root = dashboardDataRoot(process.env)
+  const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, root))
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const permissions = yield* Permission.Service
+    const session = yield* sessions.create()
+    const execute = (yield* dashboardTools(session, folder.work)).dashboard_publish?.execute
+    if (!execute) throw Error("dashboard_publish unavailable")
+    const pending = yield* Effect.promise(() => execute({}, {
+      toolCallId: "publish", abortSignal: new AbortController().signal, messages: [],
+    })).pipe(Effect.exit, Effect.forkScoped)
+    const request = yield* pollWithTimeout(
+      permissions.list().pipe(Effect.map(items => items.find(item => item.sessionID === session.id))),
+      "missing one-time publication request", "15 seconds",
+    )
+    removeDashboard(folder.work, root, captured)
+    expect((yield* folder.prepare(captured.binding)).work).toBe(folder.work)
+    yield* permissions.reply({ requestID: request.id, reply: "once" })
+    const exit = yield* Fiber.join(pending)
+    expect(requests.map(item => item.method)).toEqual(["acquire", "scope", "dashboardRead", "release"])
+    expect(Exit.isFailure(exit) && String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}), 20_000)
+
+const deletionSession = Effect.fn(function* (work: string, permission = Permission.fromConfig({ "*": "allow" })) {
   const sessions = yield* Session.Service
-  const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow" }) })
+  const session = yield* sessions.create({ permission })
   const permissions = yield* Permission.Service
   const execute = (yield* dashboardTools(session, work)).dashboard_delete?.execute
   if (!execute) throw Error("dashboard_delete unavailable")
@@ -279,6 +307,24 @@ for (const [tool, input] of [
 }
 
 const deletionVersion = { name: publicationName, sourceHash: "a".repeat(64) }
+
+it.instance("dashboard deletion honors an explicit denial for the bound package", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, dashboardDataRoot(process.env)))
+  const requests = publicationHost({ respond: request =>
+    request.method === "dashboardVersions" ? { generation: 1, versions: [deletionVersion] } : undefined,
+  })
+  yield* Effect.gen(function* () {
+    const deletion = yield* deletionSession(folder.work, Permission.fromConfig({
+      "*": "allow", dashboard_delete: { [captured.binding.packagePath]: "deny" },
+    }))
+    const fiber = yield* deletion.start()
+    const exit = yield* Effect.raceFirst(Fiber.join(fiber), deletion.nextRequest().pipe(Effect.as(undefined)))
+    expect(exit && Exit.isFailure(exit) && Cause.squash(exit.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+    expect(requests.filter(item => item.method === "dashboardDelete")).toHaveLength(0)
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(true)
+  }).pipe(provideInstance(folder.work))
+}))
 
 for (const reply of ["reject", "abort", "always"] as const) {
   it.instance("delete preserves publications and draft until explicit once: " + reply, () => Effect.gen(function* () {
@@ -369,6 +415,30 @@ it.instance("delete asks for the updated publication set after the first approva
   }).pipe(provideInstance(folder.work))
 }))
 
+it.instance("declining the new deletion set preserves confirmed removals in the terminal tool error", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const remaining = [{ ...deletionVersion, sourceHash: "b".repeat(64) }]
+  const requests = publicationHost({ respond: request => {
+    if (request.method === "dashboardVersions") return { generation: 1, versions: [deletionVersion] }
+    if (request.method === "dashboardDelete") return { status: "changed", confirmedRemoved: 1, remaining }
+  } })
+  yield* Effect.gen(function* () {
+    const deletion = yield* deletionSession(folder.work)
+    const fiber = yield* deletion.start()
+    const first = yield* deletion.nextRequest()
+    yield* deletion.permissions.reply({ requestID: first.id, reply: "once" })
+    const second = yield* deletion.nextRequest(first.id)
+    expect(second.metadata).toEqual({ publicationCount: 1, confirmedRemoved: 1 })
+    yield* deletion.permissions.reply({ requestID: second.id, reply: "reject" })
+    const exit = yield* Fiber.join(fiber)
+    const error = Exit.isFailure(exit) && Cause.squash(exit.cause)
+    expect(error).toBeInstanceOf(PermissionV1.RejectedError)
+    expect(error).toHaveProperty("message", expect.stringContaining("Подтверждено удаление версий: 1. Локальный черновик сохранён."))
+    expect(requests.filter(request => request.method === "dashboardDelete")).toHaveLength(1)
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(true)
+  }).pipe(provideInstance(folder.work))
+}))
+
 it.instance("delete reports confirmed partial progress and submits only the newly approved set", () => Effect.gen(function* () {
   const folder = yield* publicationFolder()
   const remaining = [{ ...deletionVersion, sourceHash: "b".repeat(64) }]
@@ -409,19 +479,10 @@ it.instance("delete reports confirmed partial progress and submits only the newl
 for (const outcome of ["unknown", "denied", "invalid", "invalid count"] as const) {
   it.instance("delete keeps sources and live preview after " + outcome, () => Effect.gen(function* () {
     const folder = yield* publicationFolder()
-    const preview = yield* Effect.acquireRelease(
-      Effect.promise(() => draftServer(join(folder.root, "dashboard/draft.js"))),
-      server => Effect.promise(() => server.close()),
-    )
-    const saved = readDashboardSnapshot(folder.work)!
-    const url = preview.publish({
-      key: saved.control.key, builds: join(folder.work, "../control/draft"), hash: "c".repeat(64),
-      data: {
-        created: saved.snapshot.created, sample: saved.sample, parameters: [],
-        nodeName: saved.control.nodeName, packagePath: saved.control.binding.packagePath,
-      },
-    }).replace("localhost", "127.0.0.1")
-    const before = yield* Effect.promise(() => fetch(url + "data").then(response => response.json()))
+    const flags = yield* RuntimeFlags.Service
+    yield* Effect.promise(() => Bun.write(join(folder.root, "dashboard/selfcheck.mjs"),
+      'console.log(JSON.stringify({ok:true,state:"ready",errors:[]}))',
+    ))
     const source = join(folder.work, "src/main.tsx")
     const original = yield* Effect.promise(() => Bun.file(source).text())
     const remaining = { name: "20261115T120001Z.json", sourceHash: "b".repeat(64) }
@@ -444,6 +505,16 @@ for (const outcome of ["unknown", "denied", "invalid", "invalid count"] as const
     } })
     yield* Effect.gen(function* () {
       const deletion = yield* deletionSession(folder.work)
+      const draft = yield* DashboardDraftTool
+      const tool = yield* draft.init()
+      const preview = yield* tool.execute({}, {
+        sessionID: deletion.session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
+        abort: new AbortController().signal, metadata: () => Effect.void, ask: () => Effect.die("Draft must not ask permission"),
+      })
+      const url = preview.output.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0]?.replace("localhost", "127.0.0.1")
+      if (!url) throw Error(preview.output)
+      const before = yield* Effect.promise(() => fetch(url + "data").then(response => response.json()))
+      expect(before.sample.rows).toEqual([[7]])
       const fiber = yield* deletion.start()
       const request = yield* deletion.nextRequest()
       yield* deletion.permissions.reply({ requestID: request.id, reply: "once" })
@@ -471,8 +542,9 @@ for (const outcome of ["unknown", "denied", "invalid", "invalid count"] as const
       yield* deletion.permissions.reply({ requestID: next.id, reply: "once" })
       expect(Exit.isSuccess(yield* Fiber.join(retry))).toBe(true)
       expect(yield* Effect.promise(() => Bun.file(source).exists())).toBe(false)
-    }).pipe(provideInstance(folder.work))
-  }))
+      expect(yield* Effect.promise(() => fetch(url + "data").then(response => response.status))).toBe(404)
+    }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+  }), 20_000)
 }
 
 it.instance("delete preserves a newly prepared snapshot and retries from a fresh empty listing", () => Effect.gen(function* () {
@@ -535,6 +607,28 @@ it.instance("delete preserves a newly prepared snapshot and retries from a fresh
   }).pipe(provideInstance(folder.work))
 }))
 
+it.instance("approval from a deleted draft cannot mutate publications after recreation", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const root = dashboardDataRoot(process.env)
+  const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, root))
+  const requests = publicationHost({ respond: request => {
+    if (request.method === "dashboardVersions") return { generation: 1, versions: [deletionVersion] }
+    if (request.method === "dashboardDelete") return { status: "empty" }
+  } })
+  yield* Effect.gen(function* () {
+    const deletion = yield* deletionSession(folder.work)
+    const pending = yield* deletion.start()
+    const approval = yield* deletion.nextRequest()
+    removeDashboard(folder.work, root, captured)
+    yield* folder.prepare(captured.binding)
+    yield* deletion.permissions.reply({ requestID: approval.id, reply: "once" })
+    const exit = yield* Fiber.join(pending)
+    expect(requests.some(item => item.method === "dashboardDelete")).toBe(false)
+    expect(Exit.isSuccess(exit) && exit.value).toHaveProperty("output", expect.stringContaining("Дальнейшее удаление остановлено"))
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(true)
+  }).pipe(provideInstance(folder.work))
+}))
+
 it.instance("delete removes two versions and the local draft, and leaves the neighbour available", () => Effect.gen(function* () {
   const origin = "http://127.0.0.1:0"
   const binding = { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() }
@@ -594,16 +688,14 @@ it.instance("interruption joins an active publication build before removing its 
     const root = join(folder.work, "../..")
     const draft = join(folder.work, "../control/draft")
     const operation = yield* pollWithTimeout(Effect.promise(async () => {
-      for (const name of (await readdir(root)).filter(name => name.startsWith(".publish-"))) {
+      for (const name of (await readdir(root)).filter(name => name.startsWith(".stage-"))) {
         const path = join(root, name)
-        const pending = (await readdir(path).catch(() => [])).find(name => name.startsWith(".pending-"))
-        if (pending && (await readdir(join(path, pending)).catch(() => [])).some(name => name.startsWith(".build-")))
+        if ((await readdir(path).catch(() => [])).some(name => name.startsWith(".build-")))
           return path
       }
     }), "publication never entered the filesystem build")
     yield* Fiber.interrupt(fiber)
-    const hash = (yield* Effect.promise(() => Bun.file(join(draft, "current")).text())).trim()
-    expect(hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(yield* Effect.promise(() => Bun.file(join(draft, "current")).exists())).toBe(false)
     expect(yield* Effect.promise(() => readdir(operation).then(() => true, () => false))).toBe(false)
     expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))

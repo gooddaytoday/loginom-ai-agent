@@ -1713,21 +1713,24 @@ withMcpInstructions.instance("the first dashboard prompt advertises only dashboa
   ),
 )
 
-it.instance("successful dashboard deletion ends its turn before the next model call, and the old chat refuses new commands", () =>
+it.instance("successful dashboard deletion ends its turn and retires every old chat across recreation", () =>
   Effect.gen(function* () {
-    const id = crypto.randomUUID()
-    const target = yield* Effect.acquireRelease(
-      Effect.promise(() => prepareDashboard({
+    const binding = { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() }
+    const prepare = Effect.promise(() => {
+      const id = crypto.randomUUID()
+      return prepareDashboard({
         id, origin: "http://127.0.0.1:0", dashboards: DashboardSession.dashboardRoot(),
         template: path.resolve(import.meta.dir, "../../../dashboard/template"),
         readPublication: async () => null,
         fetch: Object.assign(async () => Response.json({
           id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
-          binding: { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
+          binding,
           parameters: [], sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
         }), { preconnect: () => undefined }),
-      })),
-      (target) => Effect.promise(() => rm(path.dirname(target.directory), { recursive: true, force: true })),
+      })
+    })
+    const target = yield* Effect.acquireRelease(prepare, (target) =>
+      Effect.promise(() => rm(path.dirname(target.directory), { recursive: true, force: true })),
     )
     let receive: ((event: { data: unknown }) => void) | undefined
     LoginomHost.connect({
@@ -1750,7 +1753,13 @@ it.instance("successful dashboard deletion ends its turn before the next model c
       const sessions = yield* Session.Service
       const permissions = yield* Permission.Service
       const chat = yield* sessions.create({ title: "Заказы" })
+      const other = yield* sessions.create({ title: "Другой чат заказов" })
       const input = { sessionID: chat.id, model: ref, agent: "build" }
+      yield* prompt.prompt({
+        ...input, sessionID: other.id, noReply: true, parts: [{ type: "text", text: "Сохрани этот запрос" }],
+      })
+      yield* prepare
+      expect((yield* sessions.getForExecution(other.id)).id).toBe(other.id)
       yield* llm.tool("dashboard_delete", {})
       const deletion = yield* prompt.prompt({
         ...input, parts: [{ type: "text", text: "Удали этот дашборд" }],
@@ -1776,6 +1785,24 @@ it.instance("successful dashboard deletion ends its turn before the next model c
       expect(Exit.isFailure(subsequent)).toBe(true)
       if (Exit.isFailure(subsequent)) expect(String(Cause.squash(subsequent.cause))).toContain("LOGINOM_SCOPE_DENIED")
       expect(yield* llm.calls).toBe(1)
+      expect((yield* prepare).directory).toBe(target.directory)
+      for (const previous of [chat, other]) {
+        const denied = yield* sessions.getForExecution(previous.id).pipe(Effect.exit)
+        expect(Exit.isFailure(denied)).toBe(true)
+        if (Exit.isFailure(denied)) expect(String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
+        expect(yield* sessions.messages({ sessionID: previous.id })).not.toHaveLength(0)
+      }
+      const fresh = yield* sessions.create({ title: "Новый черновик заказов" })
+      expect((yield* sessions.getForExecution(fresh.id)).id).toBe(fresh.id)
+      yield* sessions.setMetadata({
+        sessionID: other.id, metadata: { [DASHBOARD_SESSION_MARKER]: fresh.metadata?.[DASHBOARD_SESSION_MARKER] },
+      })
+      const fork = yield* sessions.fork({ sessionID: other.id })
+      for (const previous of [other, fork]) {
+        const denied = yield* sessions.getForExecution(previous.id).pipe(Effect.exit)
+        expect(Exit.isFailure(denied)).toBe(true)
+        if (Exit.isFailure(denied)) expect(String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      }
     }).pipe(provideInstance(target.directory), Effect.provideService(TestInstance, { directory: target.directory }))
   }),
 )

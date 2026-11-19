@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 import test from "node:test"
@@ -18,9 +18,11 @@ const resources = {
   chromium: createRequire(import.meta.url)(resolve(import.meta.dirname, "../../../loginom-runtime/client/node_modules/playwright-core")).chromium.executablePath(),
 }
 
-async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), "dashboard-draft-"))
-  t.after(() => rm(root, { recursive: true, force: true }))
+async function fixture(t, root) {
+  if (!root) {
+    root = await mkdtemp(join(tmpdir(), "dashboard-draft-"))
+    t.after(() => rm(root, { recursive: true, force: true }))
+  }
   const id = crypto.randomUUID()
   const prepared = await prepareDashboard({ readPublication: async () => null,
     id, origin: "http://localhost:32768", dashboards: root, template,
@@ -51,6 +53,17 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   assert.equal(again.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0], url)
 })
 
+test("a request admitted for an earlier draft cannot start a preview for its replacement", async t => {
+  const prepared = await fixture(t)
+  const selfcheck = join(dirname(prepared.directory), "check.mjs")
+  await writeFile(selfcheck, 'console.log(JSON.stringify({ok:true,state:"ready",errors:[]}))')
+  const output = await draftDashboard({
+    work: prepared.directory, resources: { ...resources, selfcheck }, expectedDraftId: crypto.randomUUID(),
+  })
+  assert.match(output, /^Черновик остановлен/)
+  await assert.rejects(stat(join(prepared.directory, "../control/draft")), { code: "ENOENT" })
+})
+
 test("a build that completed before deletion cannot publish after local cleanup", { timeout: 15_000 }, async t => {
   const prepared = await fixture(t)
   const root = dirname(dirname(prepared.directory))
@@ -62,7 +75,7 @@ test("a build that completed before deletion cannot publish after local cleanup"
   const built = Promise.withResolvers()
   const resume = Promise.withResolvers()
   t.mock.method(fs, "rm", async (path, options) => {
-    if (basename(path).startsWith(".pending-")) {
+    if (basename(path).startsWith(".stage-")) {
       built.resolve()
       await resume.promise
     }
@@ -102,6 +115,42 @@ test("a running draft compiler cannot recreate the deleted dashboard folder", { 
   resume.resolve()
   assert.match(await pending, /^Черновик остановлен/)
   await assert.rejects(stat(dirname(prepared.directory)), { code: "ENOENT" })
+})
+
+test("a stopped draft cannot install a build into a reopened dashboard", { timeout: 15_000 }, async t => {
+  const { directory: work } = await fixture(t)
+  const root = dirname(dirname(work))
+  const captured = await readDashboardBinding(work, root)
+  const selfcheck = join(root, "selfcheck.mjs")
+  await writeFile(selfcheck, 'console.log(JSON.stringify({ ok: true, state: "ready", errors: [] }))')
+  await writeFile(join(work, "src/main.tsx"), 'document.body.textContent = "before deletion"; export {}')
+  const fs = (await import("node:fs/promises")).default
+  const rename = fs.rename
+  const compiled = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  let paused = false
+  t.mock.method(fs, "rename", async (from, to) => {
+    if (!paused && basename(from) === "dist") {
+      paused = true
+      compiled.resolve()
+      await resume.promise
+    }
+    return rename(from, to)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+  const pending = draftDashboard({ work, resources: { ...resources, selfcheck } })
+  await Promise.race([compiled.promise, pending.then(output => assert.fail(output))])
+  removeDashboard(work, root, captured)
+  assert.equal((await fixture(t, root)).directory, work)
+  assert.match(await draftDashboard({ work, resources: { ...resources, selfcheck } }), /Черновик: http:/)
+  const cache = join(work, "../control/draft")
+  const files = await readdir(cache)
+  const current = await readFile(join(cache, "current"), "utf8")
+  resume.resolve()
+  assert.match(await pending, /^Черновик остановлен/)
+  assert.deepEqual(await readdir(cache), files)
+  assert.equal(await readFile(join(cache, "current"), "utf8"), current)
 })
 
 test("type errors return compiler diagnostics without a draft link", async t => {

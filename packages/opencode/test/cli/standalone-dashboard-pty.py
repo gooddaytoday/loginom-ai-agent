@@ -27,6 +27,7 @@ os.close(slave)
 output = {"stdout": bytearray(), "stderr": bytearray()}
 cwd = None
 phrase = None
+partial_cancelled = False
 
 try:
     if queued:
@@ -45,18 +46,21 @@ try:
                     selector.unregister(key.fileobj)
                     continue
                 output[key.data].extend(chunk)
-                if cwd is None:
-                    prompt = re.search(r'Введите «(Удалить [0-9a-f]{8})»', output["stderr"].decode(errors="ignore"))
-                    if prompt is None:
-                        continue
-                    phrase = prompt[1]
+                if key.data != "stderr":
+                    continue
+                prompts = re.findall(r'Введите «(Удалить [0-9a-f]{8})»', output["stderr"].decode(errors="ignore"))
+                if cwd is None and prompts:
+                    phrase = prompts[0]
                     cwd = os.readlink(f"/proc/{child.pid}/cwd")
                     answers = {
-                        "delete": phrase + "\n", "pipe-delete": phrase + "\n", "cancel": "Отмена\n",
+                        "delete": phrase + "\n", "pipe-delete": phrase + "\n", "partial": phrase + "\n", "cancel": "Отмена\n",
                         "eof": "\x04", "interrupt": "\x03", "incomplete": phrase + "\x04",
                     }
                     if choice in answers:
                         os.write(master, answers[choice].encode())
+                if choice == "partial" and len(prompts) > 1 and not partial_cancelled:
+                    partial_cancelled = True
+                    os.write(master, "Отмена\n".encode())
             if time.monotonic() >= deadline:
                 raise TimeoutError(choice, output)
     exit_code = child.wait(timeout=2)

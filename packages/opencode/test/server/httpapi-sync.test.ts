@@ -85,10 +85,11 @@ describe("sync HttpApi", () => {
       })
       const rows = (yield* history.json) as Array<{ id: string; aggregate_id: string; seq: number; type: string }>
       const latest = rows.filter((row) => row.aggregate_id === session.id).at(-1)!
+      const draftId = crypto.randomUUID()
       for (const [index, metadata] of [
-        { [DASHBOARD_SESSION_MARKER]: true },
+        { [DASHBOARD_SESSION_MARKER]: draftId },
         undefined,
-        {},
+        { [DASHBOARD_SESSION_MARKER]: crypto.randomUUID() },
         { [DASHBOARD_SESSION_MARKER]: false, annotation: "latest" },
       ].entries()) {
         const replayed = yield* requestInDirectory(SyncPaths.replay, tmp.directory, {
@@ -109,7 +110,7 @@ describe("sync HttpApi", () => {
         })
         expect(replayed.status).toBe(200)
         const restored = yield* sessions.get(session.id)
-        expect(restored.metadata?.[DASHBOARD_SESSION_MARKER]).toBe(true)
+        expect(restored.metadata?.[DASHBOARD_SESSION_MARKER]).toBe(draftId)
         if (index === 3) expect(restored.metadata?.annotation).toBe("latest")
       }
     }),

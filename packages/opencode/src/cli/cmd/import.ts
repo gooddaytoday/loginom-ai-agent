@@ -74,17 +74,20 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
     .transaction(() =>
       Effect.gen(function* () {
         const current = yield* db
-          .select({ metadata: SessionTable.metadata })
+          .select({ metadata: SessionTable.metadata, directory: SessionTable.directory })
           .from(SessionTable)
           .where(eq(SessionTable.id, info.id))
           .get()
           .pipe(Effect.orDie)
+        const previous = current && dashboardSessionMarker(
+          current.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(current.directory),
+        )
+        const imported = dashboardSessionMarker(info.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(exportData.info.directory))
         const row = Session.toRow({
           ...info,
           metadata: DashboardSession.metadata(
-            info.directory,
             current ? (current.metadata ?? undefined) : info.metadata,
-            dashboardSessionMarker(current?.metadata?.[DASHBOARD_SESSION_MARKER], info.metadata?.[DASHBOARD_SESSION_MARKER]),
+            dashboardSessionMarker(dashboardSessionMarker(previous, imported), DashboardSession.isDashboardWork(info.directory)),
           ),
         })
         yield* db

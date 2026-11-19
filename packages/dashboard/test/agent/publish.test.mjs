@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs/promises"
 import { syncBuiltinESMExports } from "node:module"
 import { once } from "node:events"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 import test from "node:test"
@@ -11,7 +11,7 @@ import { setTimeout } from "node:timers/promises"
 import { buildDashboard } from "../../src/agent/build.ts"
 import { treeHash } from "../../src/builder/build.ts"
 import { NO_SAMPLE } from "../../src/agent/draft.ts"
-import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "../../src/agent/folder.ts"
+import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard, withDashboardStage } from "../../src/agent/folder.ts"
 import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/publish.ts"
 import { dashboardServer } from "../../src/web/server.ts"
 
@@ -158,6 +158,8 @@ test("approved sources survive concurrent draft installation and later pruning",
   assert.equal(concurrent.ok, true, concurrent.output)
   assert.equal(prepared.ok, true, prepared.text)
   assert.equal(await treeHash(prepared.build.dir), prepared.build.hash)
+  assert.deepEqual((await readdir(out)).sort(), [concurrent.hash, "current"].sort())
+  assert.equal((await readFile(join(out, "current"), "utf8")).trim(), concurrent.hash)
   assert.equal(JSON.parse(prepared.publication.content).files.find(file => file.path === "src/main.tsx").content, original)
   for (const text of ["third", "fourth"]) {
     await writeFile(join(input.work, "src/main.tsx"), "document.body.textContent = " + JSON.stringify(text))
@@ -177,35 +179,32 @@ test("approved sources survive concurrent draft installation and later pruning",
   assert.ok(await readFile(join(input.work, "sample.json")))
 })
 
-test("concurrent publication preparation cannot block reopening a deleted dashboard", { timeout: 15_000 }, async t => {
-  for (const part of ["publication operation", "retained local build"]) {
-    await t.test(part, async t => {
-      const input = await fixture(t)
-      const root = dirname(dirname(input.work))
-      const captured = await readDashboardBinding(input.work, root)
-      const blocked = part === "publication operation" ? input.operation : join(input.work, "../control/draft")
-      const mkdir = fs.mkdir
-      const preparing = Promise.withResolvers()
-      const resume = Promise.withResolvers()
-      t.mock.method(fs, "mkdir", async (path, options) => {
-        if (path === blocked) {
-          preparing.resolve()
-          await resume.promise
-        }
-        return mkdir(path, options)
-      })
-      syncBuiltinESMExports()
-      t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+test("an active publication build cleans up without modifying a reopened draft", { timeout: 15_000 }, async t => {
+  const input = await fixture(t)
+  const root = dirname(dirname(input.work))
+  const captured = await readDashboardBinding(input.work, root)
+  const copy = fs.cp
+  const preparing = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  t.mock.method(fs, "cp", async (from, to, options) => {
+    await copy(from, to, options)
+    if (from === join(input.work, "src")) {
+      preparing.resolve(dirname(to))
+      await resume.promise
+    }
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
 
-      const pending = preparePublish(input)
-      await Promise.race([preparing.promise, pending.then(result => assert.fail(JSON.stringify(result)))])
-      removeDashboard(input.work, root, captured)
-      resume.resolve()
-      assert.equal(await pending.then(result => result.ok, () => false), false)
-      await rm(input.operation, { recursive: true, force: true })
-      assert.equal((await input.refresh()).fresh, true)
-    })
-  }
+  const pending = withDashboardStage(input.work, operation => preparePublish({ ...input, operation }))
+  const stage = await Promise.race([preparing.promise, pending.then(result => assert.fail(JSON.stringify(result)))])
+  removeDashboard(input.work, root, captured)
+  assert.ok((await stat(stage)).isDirectory())
+  assert.equal((await input.refresh()).fresh, true)
+  resume.resolve()
+  assert.deepEqual(await pending, { ok: false, text: "Черновик изменился во время подготовки публикации." })
+  await assert.rejects(stat(stage), { code: "ENOENT" })
+  await assert.rejects(stat(join(input.work, "../control/draft")), { code: "ENOENT" })
 })
 
 test("missing sample stops preparation before building", async t => {

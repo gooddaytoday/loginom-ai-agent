@@ -7,10 +7,13 @@ import { productChannel, productSlug } from "./index"
 
 export const DASHBOARD_SESSION_MARKER = "loginom_dashboard"
 
-// Import and replay can add a restriction, but must preserve a completed deletion.
-export function dashboardSessionMarker(previous: unknown, incoming: unknown) {
+const draftId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
+
+// Preserve the original draft lifetime and any completed deletion.
+export function dashboardSessionMarker(previous: unknown, incoming?: unknown) {
   if (previous === "deleted" || incoming === "deleted") return "deleted"
-  if (previous === true || incoming === true) return true
+  if (previous === true || (typeof previous === "string" && draftId.test(previous))) return previous
+  if (incoming === true || (typeof incoming === "string" && draftId.test(incoming))) return incoming
 }
 
 // Desktop and CLI must create folders under the same data root as the backend.

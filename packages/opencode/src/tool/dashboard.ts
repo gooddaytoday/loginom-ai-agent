@@ -1,12 +1,12 @@
-import { mkdtemp, realpath, rm } from "node:fs/promises"
-import { join } from "node:path"
+import { realpath } from "node:fs/promises"
 import { preparePublish, finishPublish, outputText } from "@loginom-ai-agent/dashboard/agent/publish"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { PublicationSource } from "@loginom-ai-agent/dashboard/contract/publication"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Effect, Schema } from "effect"
 import { dashboardResources } from "@loginom-ai-agent/dashboard/agent/resources"
-import { readDashboardBinding, removeDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
+import { readDashboardBinding, removeDashboard, withDashboardStage } from "@loginom-ai-agent/dashboard/agent/folder"
 import { draftDashboard, revokeDashboardDraft } from "@loginom-ai-agent/dashboard/agent/draft"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Session } from "@/session/session"
@@ -14,6 +14,7 @@ import { DashboardSession } from "@/product/dashboard-session"
 import { Tool } from "./tool"
 
 const Parameters = Schema.Struct({})
+const deleteTitle = "Удаление dashboard"
 
 export const DashboardDraftTool = Tool.define(
   "dashboard_draft",
@@ -28,7 +29,10 @@ export const DashboardDraftTool = Tool.define(
         Effect.gen(function* () {
           const session = yield* sessions.getForExecution(ctx.sessionID)
           const resources = dashboardResources(flags.loginomResources)
-          const output = yield* Effect.promise(() => draftDashboard({ work: session.directory, resources, signal: ctx.abort }))
+          const output = yield* Effect.promise(() => draftDashboard({
+            work: session.directory, resources, signal: ctx.abort,
+            expectedDraftId: ctx.dashboardWork && (ctx.dashboardWork.draftId ?? null),
+          }))
           return { title: "Черновик dashboard", output: outputText(Buffer.from(output)), metadata: { truncated: false } }
         }).pipe(Effect.orDie),
     }
@@ -48,42 +52,43 @@ export const DashboardPublishTool = Tool.define(
           const session = yield* sessions.getForExecution(ctx.sessionID)
           const resources = dashboardResources(flags.loginomResources)
           const work = yield* Effect.promise(() => realpath(session.directory))
-          const result = yield* Effect.acquireUseRelease(
-            Effect.promise(() => mkdtemp(join(work, "../../.publish-"))),
-            operation => Effect.gen(function* () {
-              const prepared = yield* Effect.uninterruptible(Effect.promise(() =>
-                preparePublish({ work, operation, resources, signal: ctx.abort }),
-              ))
-              if (!prepared.ok) return { status: "failed", text: prepared.text }
-              const latest = yield* Effect.uninterruptible(Effect.tryPromise({ try: () => dashboardOperation(ctx, async host =>
-                Schema.decodeUnknownSync(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })(
-                  await host.dashboardRead({ origin: prepared.control.origin, binding: prepared.control.binding }, ctx.abort),
-                ),
-              ), catch: error => error }).pipe(Effect.catch(error => Effect.die(Error(hostErrorText(error))))))
-              const expected = latest?.version ?? null
-              yield* Effect.raceFirst(ctx.ask({
-                permission: "dashboard_publish",
-                patterns: [prepared.control.nodeName, prepared.control.binding.packagePath],
-                always: [], metadata: {
-                  sourceHash: prepared.publication.sourceHash,
-                  ...(expected && (prepared.control.base?.name !== expected.name || prepared.control.base.sourceHash !== expected.sourceHash)
-                    ? { dashboardConflict: { base: prepared.control.base ?? null, latest: expected } } : {}),
-                },
-              }), dashboardCancellation(ctx.abort))
-              ctx.abort.throwIfAborted()
-              return yield* Effect.uninterruptible(Effect.tryPromise({ try: () => finishPublish({
-                work, ...prepared, expected, signal: ctx.abort,
-                publish: (request, signal) => dashboardOperation(ctx, host => host.dashboardPublish(request, signal)),
-              }), catch: error => error }).pipe(Effect.catch(error => Effect.succeed({ status: "failed", text: hostErrorText(error) }))))
-            }),
-            operation => Effect.tryPromise(() => rm(operation, { recursive: true, force: true })).pipe(Effect.ignore),
-          )
-          const output = outputText(Buffer.from(result.status + ": " + result.text))
-          return { title: "Публикация dashboard", output, metadata: { truncated: false } }
+          const prepared = yield* Effect.uninterruptible(Effect.promise(() => withDashboardStage(work, operation =>
+            preparePublish({ work, operation, resources, signal: ctx.abort }),
+          )))
+          if (!prepared.ok) return publishResult("failed", prepared.text)
+          if (ctx.dashboardWork && prepared.control.draftId !== ctx.dashboardWork.draftId)
+            return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+          const latest = yield* Effect.uninterruptible(Effect.tryPromise({ try: () => dashboardOperation(ctx, async host =>
+            Schema.decodeUnknownSync(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })(
+              await host.dashboardRead({ origin: prepared.control.origin, binding: prepared.control.binding }, ctx.abort),
+            ),
+          ), catch: error => error }).pipe(Effect.catch(error => Effect.die(Error(hostErrorText(error))))))
+          const expected = latest?.version ?? null
+          yield* Effect.raceFirst(ctx.ask({
+            permission: "dashboard_publish",
+            patterns: [prepared.control.nodeName, prepared.control.binding.packagePath],
+            always: [], metadata: {
+              sourceHash: prepared.publication.sourceHash,
+              ...(expected && (prepared.control.base?.name !== expected.name || prepared.control.base.sourceHash !== expected.sourceHash)
+                ? { dashboardConflict: { base: prepared.control.base ?? null, latest: expected } } : {}),
+            },
+          }), dashboardCancellation(ctx.abort))
+          ctx.abort.throwIfAborted()
+          yield* sessions.getForExecution(ctx.sessionID)
+          const result = yield* Effect.uninterruptible(Effect.tryPromise({ try: () => finishPublish({
+            work, publication: prepared.publication, control: prepared.control, expected, signal: ctx.abort,
+            publish: (request, signal) => dashboardOperation(ctx, host => host.dashboardPublish(request, signal)),
+          }), catch: error => error }).pipe(Effect.catch(error => Effect.succeed({ status: "failed", text: hostErrorText(error) }))))
+          return publishResult(result.status, result.text)
         }).pipe(Effect.orDie),
     }
   }),
 )
+
+function publishResult(status: string, text: string) {
+  const output = outputText(Buffer.from(status + ": " + text))
+  return { title: "Публикация dashboard", output, metadata: { truncated: false } }
+}
 
 export const DashboardDeleteTool = Tool.define(
   "dashboard_delete",
@@ -99,7 +104,8 @@ export const DashboardDeleteTool = Tool.define(
           const control = yield* Effect.tryPromise(() => readDashboardBinding(session.directory, root)).pipe(
             Effect.catch(() => Effect.succeed(undefined)),
           )
-          if (!control) return deleteOutput("Не удалось проверить привязку локального черновика. Удаление не началось.")
+          if (!control || (ctx.dashboardWork && control.draftId !== ctx.dashboardWork.draftId))
+            return deleteOutput("Не удалось проверить привязку локального черновика. Удаление не началось.")
           const input = { origin: control.origin, binding: control.binding }
           const listed = yield* dashboardDeleteRequest(ctx, host => host.dashboardVersions(input, ctx.abort))
           if ("error" in listed) return deleteOutput(listed.error)
@@ -116,8 +122,24 @@ export const DashboardDeleteTool = Tool.define(
                   publicationCount: expected.length,
                   ...(confirmedRemoved > 0 ? { confirmedRemoved } : {}),
                 },
-              }), dashboardCancellation(ctx.abort)))
+              }), dashboardCancellation(ctx.abort))).pipe(
+                Effect.catchDefect(error => Effect.die(
+                  confirmedRemoved > 0 && error instanceof PermissionV1.RejectedError
+                    ? new DashboardDeleteRejected(confirmedRemoved)
+                    : error,
+                )),
+              )
               ctx.abort.throwIfAborted()
+              const current = yield* sessions.getForExecution(ctx.sessionID).pipe(
+                Effect.catch(() => Effect.succeed(undefined)),
+                Effect.catchDefect(error => error instanceof Error && error.message === "LOGINOM_SCOPE_DENIED"
+                  ? Effect.succeed(undefined)
+                  : Effect.die(error)),
+              )
+              if (current?.directory !== session.directory) {
+                const progress = confirmedRemoved ? ` Подтверждено удаление версий: ${confirmedRemoved}.` : ""
+                return deleteOutput("Черновик удалён или пересоздан. Дальнейшее удаление остановлено." + progress)
+              }
               const result = yield* dashboardDeleteRequest(ctx, host => host.dashboardDelete({
                 ...input, generation: listed.generation, expected,
               }, ctx.abort))
@@ -126,6 +148,8 @@ export const DashboardDeleteTool = Tool.define(
                 : result.error)
               if (result.status === "changed") {
                 confirmedRemoved += result.confirmedRemoved
+                if (result.confirmedRemoved > 0)
+                  yield* ctx.metadata({ title: deleteTitle, metadata: { confirmedRemoved } })
                 expected = result.remaining
                 continue
               }
@@ -145,10 +169,7 @@ export const DashboardDeleteTool = Tool.define(
                 return deleteOutput("На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
               yield* Effect.promise(() => revokeDashboardDraft(control.key))
               yield* sessions.retireDashboard(ctx.sessionID)
-              return {
-                ...deleteOutput("Дашборд удалён. Опубликованных версий и локального черновика больше нет."),
-                metadata: { truncated: false, dashboardDeleted: true },
-              }
+              return deleteOutput("Дашборд удалён. Опубликованных версий и локального черновика больше нет.", "deleted")
             }
           }))
         }).pipe(Effect.orDie),
@@ -156,8 +177,22 @@ export const DashboardDeleteTool = Tool.define(
   }),
 )
 
-function deleteOutput(output: string) {
-  return { title: "Удаление dashboard", output, metadata: { truncated: false } }
+class DashboardDeleteRejected extends PermissionV1.RejectedError {
+  constructor(readonly confirmedRemoved: number) {
+    super()
+  }
+
+  override get message() {
+    return `Дальнейшее удаление отменено. Подтверждено удаление версий: ${this.confirmedRemoved}. Локальный черновик сохранён.`
+  }
+}
+
+function deleteOutput(output: string, status: "failed" | "deleted" = "failed") {
+  return {
+    title: deleteTitle,
+    output,
+    metadata: { truncated: false, ...(status === "deleted" ? { dashboardDeleted: true } : { isError: true }) },
+  }
 }
 
 function dashboardDeleteRequest<T extends object>(

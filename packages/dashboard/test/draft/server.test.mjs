@@ -98,7 +98,9 @@ test("revoking one draft removes its page, sample, hash and build while its neig
   }
 })
 
-test("an asset already read before revocation cannot be served under a replacement entry", async t => {
+for (const revoke of [false, true]) test(revoke
+  ? "assets already read before revocation cannot be served"
+  : "an active draft can be re-published while its asset is being read", async t => {
   const { server, entry, key } = await fixture(t)
   const fs = (await import("node:fs/promises")).default
   const asset = join(entry.builds, hash, "assets/app.js")
@@ -121,11 +123,19 @@ test("an asset already read before revocation cannot be served under a replaceme
   const route = `/apps/${key}/${hash}/assets/app.js`
   const pending = send(server.appOrigin, route)
   await read.promise
-  server.revoke(entry.key)
-  await writeFile(asset, "new bytes")
+  if (revoke) {
+    server.revoke(entry.key)
+    await writeFile(asset, "new bytes")
+  }
   const fresh = new URL(server.publish(entry)).pathname.split("/")[1]
   resume.resolve()
   const expired = await pending
+  if (!revoke) {
+    assert.equal(fresh, key)
+    assert.equal(expired.status, 200)
+    assert.equal(expired.body, "old bytes")
+    return
+  }
   assert.equal(expired.status, 404)
   assert.doesNotMatch(expired.body, /old bytes/)
   assert.equal((await send(server.appOrigin, route)).status, 404)

@@ -1,4 +1,4 @@
-import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
+import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker } from "@loginom-ai-agent/product/dashboard-root"
 import { DashboardSession } from "@/product/dashboard-session"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
@@ -510,6 +510,7 @@ const layer: Layer.Layer<
       directory: string
       path?: string
       metadata?: typeof Metadata.Type
+      dashboardMarker?: ReturnType<typeof dashboardSessionMarker>
       permission?: PermissionV1.Ruleset
     }) {
       const ctx = yield* InstanceState.context
@@ -525,7 +526,7 @@ const layer: Layer.Layer<
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
         model: input.model,
-        metadata: DashboardSession.metadata(input.directory, input.metadata),
+        metadata: DashboardSession.metadata(input.metadata, input.dashboardMarker ?? DashboardSession.draftMarker(input.directory)),
         permission: input.permission ? [...input.permission] : undefined,
         cost: 0,
         tokens: EmptyTokens,
@@ -702,6 +703,9 @@ const layer: Layer.Layer<
         workspaceID: original.workspaceID,
         title,
         metadata: structuredClone(original.metadata),
+        dashboardMarker: dashboardSessionMarker(
+          original.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(original.directory),
+        ),
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -760,14 +764,14 @@ const layer: Layer.Layer<
       const session = yield* get(sessionID)
       if (
         DashboardSession.profile(session) !== "loginom-dashboard" ||
-        session.metadata?.[DASHBOARD_SESSION_MARKER] === true
+        dashboardSessionMarker(session.metadata?.[DASHBOARD_SESSION_MARKER])
       )
         return session
       const adopted = yield* db
         .transaction(() =>
           Effect.gen(function* () {
             const current = yield* get(sessionID)
-            yield* patch(sessionID, { metadata: DashboardSession.metadata(current.directory, current.metadata, true) })
+            yield* patch(sessionID, { metadata: DashboardSession.metadata(current.metadata, true) })
             return yield* get(sessionID)
           }),
         )
@@ -797,9 +801,8 @@ const layer: Layer.Layer<
       const current = yield* get(input.sessionID).pipe(Effect.orDie)
       yield* patch(input.sessionID, {
         metadata: DashboardSession.metadata(
-          current.directory,
           input.metadata,
-          current.metadata?.[DASHBOARD_SESSION_MARKER],
+          dashboardSessionMarker(current.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(current.directory)),
         ),
         time: { updated: Date.now() },
       }).pipe(Effect.orDie)

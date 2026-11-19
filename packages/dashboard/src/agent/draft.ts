@@ -15,17 +15,20 @@ export async function revokeDashboardDraft(key: string) {
   await shared?.then(server => server.revoke(key), () => undefined)
 }
 
-export async function draftDashboard(input: { work: string; resources: DashboardResources; signal?: AbortSignal }) {
+export async function draftDashboard(input: {
+  work: string; resources: DashboardResources; signal?: AbortSignal; expectedDraftId?: string | null
+}) {
   const work = await realpath(input.work)
   const saved = readDashboardSnapshot(work)
   if (!saved) return NO_SAMPLE
+  if (input.expectedDraftId !== undefined && input.expectedDraftId !== (saved.control.draftId ?? null)) return STOPPED
   const builds = join(work, "..", "control", "draft")
   const withCurrentSnapshot = <T>(run: () => T) => {
     try {
       return withSnapshot(work, (directory, control) => {
         if (!existsSync(join(directory, "sample.json"))) return
         const binding = JSON.parse(readFileSync(join(control, "binding.json"), "utf8")) as ControlBinding
-        if (binding.snapshotId === saved.control.snapshotId) return run()
+        if (binding.snapshotId === saved.control.snapshotId && binding.draftId === saved.control.draftId) return run()
       })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
@@ -38,7 +41,7 @@ export async function draftDashboard(input: { work: string; resources: Dashboard
   // The compiler can create directories while a different session removes this draft.
   const build = await buildDashboard({
     work, template: input.resources.template, node: input.resources.node, out: builds,
-    draftStagingRoot: join(work, "..", ".."), signal: input.signal,
+    install: withCurrentSnapshot, signal: input.signal,
   }).catch(error => {
     if (withCurrentSnapshot(() => true)) throw error
   })

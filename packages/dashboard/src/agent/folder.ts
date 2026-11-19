@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { open } from "#sqlite"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
@@ -8,9 +8,18 @@ import { bindingKey, Binding, Snapshot, PublicationVersion, LookupResponse } fro
 import { parsePublication, type PublicationSource } from "../contract/publication.ts"
 
 let updates = Promise.resolve()
+const activeStages = new Set<string>()
 
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
-const Control = Schema.Struct({ snapshotId: Schema.String, binding: Binding, nodeName: Schema.String, origin: Schema.String, key: Schema.String, base: Schema.optional(Schema.NullOr(PublicationVersion)) })
+const Control = Schema.Struct({
+  snapshotId: Schema.String,
+  draftId: Schema.optional(Schema.String.check(Schema.makeFilter(value => uuid.test(value)))),
+  binding: Binding,
+  nodeName: Schema.String,
+  origin: Schema.String,
+  key: Schema.String,
+  base: Schema.optional(Schema.NullOr(PublicationVersion)),
+})
 const decodeControl = Schema.decodeUnknownOption(Schema.fromJsonString(Control), { onExcessProperty: "error" })
 export type ControlBinding = typeof Control.Type
 
@@ -88,6 +97,7 @@ export async function prepareDashboard(input: {
         const file = join(control, "binding.json")
         const current = existsSync(file) ? decodeControl(readFileSync(file, "utf8")) : Option.none()
         if (staging ? existsSync(folder) : Option.isNone(current) || current.value.snapshotId !== previous?.snapshotId ||
+            current.value.draftId !== previous?.draftId ||
             current.value.key !== key || current.value.origin !== input.origin) throw Error("DASHBOARD_BINDING_CONFLICT")
         const fresh = !existsSync(join(directory, "src"))
         if (fresh) {
@@ -103,7 +113,9 @@ export async function prepareDashboard(input: {
         writeFileSync(join(directory, "sample.json.tmp"), `{"schema": ${JSON.stringify(snapshot.sample.schema)},\n"rows": [\n${rows}\n]}\n`, { mode: 0o600 })
         const initialBase = deferred ? undefined : (latest?.version ?? null)
         const base = fresh ? initialBase : Option.isSome(current) ? current.value.base : undefined
+        const draftId = staging ? randomUUID() : previous?.draftId
         const binding: ControlBinding = { snapshotId: snapshot.id, binding: snapshot.binding, nodeName: snapshot.nodeName, origin: input.origin, key,
+          ...(draftId !== undefined ? { draftId } : {}),
           ...(base !== undefined ? { base } : {}) }
         writeFileSync(file + ".tmp", JSON.stringify(binding, null, 2) + "\n", { mode: 0o600 })
         if (existsSync(join(directory, "sample.json"))) unlinkSync(join(directory, "sample.json"))
@@ -170,13 +182,58 @@ export async function readDashboardBinding(work: string, dashboards: string) {
   return captured
 }
 
+export function readDashboardDraftId(work: string) {
+  const file = join(realpathSync(work), "../control/binding.json")
+  let content
+  try {
+    content = readFileSync(file, "utf8")
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+    throw error
+  }
+  const binding = decodeControl(content)
+  if (Option.isNone(binding)) throw Error("LOGINOM_SCOPE_DENIED")
+  return binding.value.draftId
+}
+
+export async function withDashboardStage<T>(work: string, run: (directory: string) => Promise<T>): Promise<T> {
+  const stage = withSnapshot(work, directory => {
+    const folder = dirname(directory)
+    const stage = mkdtempSync(join(dirname(folder), stagePrefix(folder)))
+    activeStages.add(stage)
+    return stage
+  })
+  try {
+    return await run(stage)
+  } finally {
+    try {
+      await rm(stage, { recursive: true, force: true })
+    } finally {
+      activeStages.delete(stage)
+    }
+  }
+}
+
+function stagePrefix(folder: string) {
+  // The dot cannot appear in a dashboard folder name.
+  return ".stage-" + basename(folder) + "."
+}
+
 export function removeDashboard(work: string, dashboards: string, captured: ControlBinding) {
   assertDashboardDirectory(work, dashboards, realpathSync(work))
   withSnapshot(work, (directory, control) => {
     const current = ownedBinding(work, dashboards, directory, control)
-    if (current.snapshotId !== captured.snapshotId || current.origin !== captured.origin || current.key !== captured.key ||
+    if (current.snapshotId !== captured.snapshotId || current.draftId !== captured.draftId ||
+        current.origin !== captured.origin || current.key !== captured.key ||
         !sameBinding(current.binding, captured.binding)) throw Error("DASHBOARD_BINDING_CONFLICT")
     const folder = dirname(directory)
+    const prefix = stagePrefix(folder)
+    for (const name of readdirSync(dirname(folder))) {
+      if (!name.startsWith(prefix)) continue
+      const stage = join(dirname(folder), name)
+      // A running build owns its temporary files until its compiler exits.
+      if (!activeStages.has(stage)) rmSync(stage, { recursive: true, force: true })
+    }
     const detached = join(dirname(folder), ".delete-" + randomUUID())
     renameSync(folder, detached)
     try {
@@ -242,7 +299,7 @@ export function updatePublicationBase(work: string, captured: ControlBinding, ve
     const decoded = decodeControl(readFileSync(file, "utf8"))
     if (Option.isNone(decoded)) throw Error("DASHBOARD_BINDING_CONFLICT")
     const current = decoded.value
-    if (current.key !== captured.key || current.origin !== captured.origin ||
+    if (current.draftId !== captured.draftId || current.key !== captured.key || current.origin !== captured.origin ||
         !sameBinding(current.binding, captured.binding)) throw Error("DASHBOARD_BINDING_CONFLICT")
     if (current.base && version.name < current.base.name) return
     const same = current.base === captured.base || (current.base != null && captured.base != null &&

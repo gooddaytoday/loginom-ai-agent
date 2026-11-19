@@ -132,7 +132,12 @@ async function dashboardFixture() {
         if(m.operation==='dashboardVersions') process.send({id:m.id,result:[
           {name:'20261119T120000Z.json',sourceHash:'a'.repeat(64)},{name:'20261119T130000Z.json',sourceHash:'b'.repeat(64)}
         ]});
-        if(m.operation==='dashboardDelete') process.send({id:m.id,result:{status:'empty'}});
+        if(m.operation==='dashboardDelete') {
+          const modeFile = ${JSON.stringify(join(fixture.directory, "delete-mode"))};
+          const mode = existsSync(modeFile) ? readFileSync(modeFile, 'utf8') : '';
+          process.send({id:m.id,result:mode==='denied' ? {status:'failed',reason:'DASHBOARD_ACCESS_DENIED',confirmedRemoved:0}
+            : mode==='partial' ? {status:'changed',confirmedRemoved:1,remaining:m.input.expected.slice(1)} : {status:'empty'}});
+        }
         if(m.operation==='dashboardPublish') process.send({id:m.id,result:{status:'changed',latest:null}});
         if(m.operation==='interrupt') { if(reading) process.send({id:reading,error:'DASHBOARD_CANCELLED'}); process.send({id:m.id,result:true}); }
         if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
@@ -390,16 +395,8 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
   }
 }, 60_000)
 
-test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a separate terminal choice before deleting", async () => {
-  await using setup = await dashboardFixture()
-  const { fixture, provider, llm, origin, binding, knowledge, originalKnowledge } = setup
-  await writeFile(knowledge, originalKnowledge)
-  const deleteBinding = { ...binding, packagePath: "/user/fixture/delete.lgp" }
-  const deleteWork = join(fixture.profile, "data/dashboards", "delete-" + (await bindingKey(deleteBinding)).slice(0, 8), "work")
-  const operations = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
-  let deletions = 0
-  let previousPhrase = ""
-  for (const [choice, auto] of [
+test.skipIf(process.platform !== "linux").each([
+  ["waits for a separate terminal choice before deleting", [
     ["pretyped", ""],
     ["cancel", "--auto"],
     ["eof", "--yolo"],
@@ -409,11 +406,24 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
     ["delete", ""],
     ["stale", ""],
     ["pipe-delete", ""],
-  ] as const) {
+  ]],
+  ["reports denied and partially completed deletion", [["partial", ""], ["denied", ""]]],
+] as const)("ordinary dashboard run %s", async (_description, cases) => {
+  await using setup = await dashboardFixture()
+  const { fixture, provider, llm, origin, binding, knowledge, originalKnowledge } = setup
+  await writeFile(knowledge, originalKnowledge)
+  const deleteBinding = { ...binding, packagePath: "/user/fixture/delete.lgp" }
+  const deleteWork = join(fixture.profile, "data/dashboards", "delete-" + (await bindingKey(deleteBinding)).slice(0, 8), "work")
+  const operations = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
+  let deletions = 0
+  let previousPhrase = ""
+  for (const [choice, auto] of cases) {
     const success = choice === "delete" || choice === "pipe-delete"
     const human = choice === "pipe-delete"
+    if (choice === "denied" || choice === "partial") await writeFile(join(fixture.directory, "delete-mode"), choice)
     await provider.runPromise(llm.reset)
     await provider.runPromise(llm.tool("dashboard_delete", {}))
+    if (choice === "denied") await provider.runPromise(llm.text("Удалить дашборд не удалось."))
     const response = await fetch(origin + "/dashboard/snapshots", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         binding: deleteBinding, nodeName: "Узел\n\u001b[31m", sample: { schema: [], rows: [] }, parameters: [], published: false,
@@ -427,7 +437,7 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
     ], undefined, false)
     const args = human ? command.argv.filter(arg => arg !== "--format=json") : command.argv
     const queued = choice === "pretyped" ? "Удалить" : choice === "stale" ? previousPhrase : ""
-    const child = Bun.spawn(["python3", join(import.meta.dir, "standalone-dashboard-pty.py"), choice, queued, ...args], {
+    const child = Bun.spawn(["python3", join(import.meta.dir, "standalone-dashboard-pty.py"), choice === "denied" ? "delete" : choice, queued, ...args], {
       cwd: command.cwd, env: command.env, stdout: "pipe", stderr: "inherit",
     })
     const [output, code] = await Promise.all([new Response(child.stdout).json(), child.exited])
@@ -449,21 +459,38 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
       expect(output.stdout).toBe("")
     } else {
       const events = output.stdout.trim().split("\n").map((line: string) => JSON.parse(line))
+      if (choice === "denied" || choice === "partial") {
+        expect(events).toContainEqual(expect.objectContaining({
+          type: "tool_use",
+          part: expect.objectContaining({ tool: "dashboard_delete", state: expect.objectContaining(
+            choice === "denied" ? { output: expect.stringContaining("Недостаточно прав") } : {
+              status: "error",
+              error: expect.stringContaining("Подтверждено удаление версий: 1. Локальный черновик сохранён."),
+            },
+          ) }),
+        }))
+      }
       expect(events).toContainEqual(success ? expect.objectContaining({
         type: "tool_use",
         part: expect.objectContaining({ tool: "dashboard_delete", state: expect.objectContaining({
           status: "completed", output: expect.stringContaining("Дашборд удалён"),
         }) }),
       }) : expect.objectContaining({
-        type: "error", error: expect.objectContaining({ name: choice === "interrupt" ? "CLI_CANCELLED" : "CLI_PERMISSION_REJECTED" }),
+        type: "error", error: expect.objectContaining({
+          name: choice === "denied" ? "CLI_TOOL_FAILED" : choice === "interrupt" ? "CLI_CANCELLED" : "CLI_PERMISSION_REJECTED",
+        }),
       }))
     }
     if (choice === "stale") expect(output.phrase).not.toBe(previousPhrase)
     if (success) {
       previousPhrase = output.phrase
-      deletions++
       expect(await provider.runPromise(llm.calls)).toBe(1)
     }
+    if (choice === "partial") {
+      expect(output.stderr).toContain("Уже подтверждено удаление версий: 1")
+      expect(await provider.runPromise(llm.calls)).toBe(1)
+    }
+    if (success || choice === "denied" || choice === "partial") deletions++
     expect((await operations.text()).match(/"operation":"dashboardDelete"/g) ?? []).toHaveLength(deletions)
     expect(await Bun.file(join(deleteWork, "src/main.tsx")).exists()).toBe(!success)
     expect(await readdir(fixture.profile)).not.toContain(".writer")

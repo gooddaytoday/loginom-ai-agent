@@ -1,6 +1,7 @@
 import { toolContributor } from "@/product/tool-contributor"
 import { toolPolicy } from "@/product/tool-policy"
 import { DashboardSession } from "@/product/dashboard-session"
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { Agent } from "@/agent/agent"
@@ -79,6 +80,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     revert: input.session.revert,
   })
   const base = DashboardSession.profile(session)
+  const draftId = session.metadata?.[DASHBOARD_SESSION_MARKER]
   const task = TaskScope.derive({ sessionID: input.session.id, messages: history, base })
   const profile = task?.profile ?? base
   if (input.loginom && task) {
@@ -95,7 +97,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     abort: options.abortSignal!,
     messageID: input.processor.message.id,
     callID: options.toolCallId,
-    dashboardWork: profile === "loginom-dashboard" ? session.directory : undefined,
+    dashboardWork: profile === "loginom-dashboard" ? {
+      directory: session.directory,
+      draftId: typeof draftId === "string" ? draftId : undefined,
+    } : undefined,
     extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps: input.promptOps },
     agent: input.agent.name,
     messages: input.messages,
@@ -170,6 +175,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { args },
             )
             const result = yield* item.execute(args, ctx)
+            if (ctx.dashboardWork && (id === "read" || id === "glob" || id === "grep"))
+              yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

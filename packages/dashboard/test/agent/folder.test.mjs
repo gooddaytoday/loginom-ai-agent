@@ -5,7 +5,7 @@ import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import test from "node:test"
 import { folderName, prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "../../src/agent/folder.ts"
 import { bindingKey } from "../../src/contract/snapshot.ts"
@@ -58,7 +58,9 @@ test("a snapshot creates a private dashboard project and control outside it", as
   assert.deepEqual(JSON.parse(text), snapshot.sample)
   assert.ok(text.split("\n").length >= snapshot.sample.rows.length)
   const control = join(result.directory, "../control")
-  assert.deepEqual(JSON.parse(await readFile(join(control, "binding.json"), "utf8")), {
+  const { draftId, ...saved } = JSON.parse(await readFile(join(control, "binding.json"), "utf8"))
+  assert.ok(draftId)
+  assert.deepEqual(saved, {
     snapshotId: input.id, binding, nodeName: "Узел", origin: app.origin, key, base: null,
   })
   if (process.platform !== "win32") {
@@ -453,9 +455,11 @@ test("legacy M3 sources retain unknown base when a new snapshot finds a publicat
   const file = join(first.directory, "../control/binding.json")
   const original = JSON.parse(await readFile(file, "utf8"))
   delete original.base
+  delete original.draftId
   await writeFile(file, JSON.stringify(original))
   const result = await prepareDashboard({ ...await app.create(), readPublication: async () => publication() })
   assert.equal(Object.hasOwn(JSON.parse(await readFile(file, "utf8")), "base"), false)
+  assert.equal(Object.hasOwn(JSON.parse(await readFile(file, "utf8")), "draftId"), false)
   assert.equal(result.notice.kind, "newer-publication")
 })
 
@@ -474,6 +478,36 @@ test("base update cannot replace changed bytes under the same name or a differen
   updatePublicationBase(first.directory, readDashboardSnapshot(first.directory).control, versionA)
   assert.deepEqual(readDashboardSnapshot(first.directory).control.base, other)
   await assert.rejects(async () => updatePublicationBase(first.directory, { ...current, origin: "http://other.localhost" }, versionB), /DASHBOARD_BINDING_CONFLICT/)
+})
+
+test("a publication from a deleted draft cannot update the recreated draft's base", async t => {
+  const app = await fixture(t)
+  const first = await prepareDashboard(await app.create())
+  const { updatePublicationBase } = await import("../../src/agent/folder.ts")
+  const captured = await readDashboardBinding(first.directory, app.dashboards)
+  removeDashboard(first.directory, app.dashboards, captured)
+  const recreated = await prepareDashboard(await app.create())
+  assert.equal(recreated.directory, first.directory)
+  assert.throws(() => updatePublicationBase(recreated.directory, captured, versionB), /DASHBOARD_BINDING_CONFLICT/)
+  assert.equal((await readDashboardBinding(recreated.directory, app.dashboards)).base, null)
+})
+
+test("deleting a dashboard also removes its abandoned build copies", async t => {
+  const app = await fixture(t)
+  const target = await prepareDashboard(await app.create())
+  const neighbour = await prepareDashboard(await app.create({
+    ...snapshot,
+    binding: { ...binding, nodeGuid: "33c145b1-6ce3-458f-aa36-e6afdab2a930" },
+  }))
+  const copies = await Promise.all([target, neighbour].map(async ({ directory }) => {
+    const stage = await mkdtemp(join(app.dashboards, ".stage-" + basename(dirname(directory)) + "."))
+    await writeFile(join(stage, "source.tsx"), "unpublished test sources")
+    return stage
+  }))
+  const captured = await readDashboardBinding(target.directory, app.dashboards)
+  removeDashboard(target.directory, app.dashboards, captured)
+  await assert.rejects(stat(copies[0]), { code: "ENOENT" })
+  assert.equal(await readFile(join(copies[1], "source.tsx"), "utf8"), "unpublished test sources")
 })
 
 test("a filesystem failure after detaching the folder leaves the binding usable for a retry", {

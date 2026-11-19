@@ -22,6 +22,7 @@ import { ReadTool } from "../../src/tool/read"
 import { GlobTool } from "../../src/tool/glob"
 import { EditTool } from "../../src/tool/edit"
 import { WriteTool } from "../../src/tool/write"
+import { workspaceWriter } from "../../src/tool/external-directory"
 import {
   disposeAllInstances,
   provideInstance,
@@ -86,11 +87,25 @@ it.live("a read with an expired dashboard context is denied before requesting pe
       const read = yield* definition.init()
       yield* Effect.promise(() => rm(dirs.work, { recursive: true }))
       const exit = yield* read.execute({ filePath: path.join(dirs.work, "sample.json") }, {
-        ...context(asks), dashboardWork: dirs.work,
+        ...context(asks), dashboardWork: { directory: dirs.work },
       }).pipe(Effect.exit)
       expect(Exit.isFailure(exit) && String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
       expect(asks).toEqual([])
     }).pipe(provideInstance(dirs.work))
+  }),
+)
+
+it.live("an admitted dashboard tool cannot capture a replacement draft as its write target", () =>
+  Effect.gen(function* () {
+    const dirs = yield* folder
+    const fs = yield* FSUtil.Service
+    yield* Effect.promise(() => Bun.write(path.join(dirs.root, "control/binding.json"), JSON.stringify({
+      snapshotId: crypto.randomUUID(), draftId: crypto.randomUUID(),
+    })))
+    const ctx = { ...context([]), dashboardWork: { directory: dirs.work, draftId: crypto.randomUUID() } }
+    const denied = yield* Effect.sync(() => workspaceWriter(fs, ctx, dirs.work)).pipe(Effect.exit)
+    expect(Exit.isFailure(denied)).toBe(true)
+    if (Exit.isFailure(denied)) expect(String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
   }),
 )
 

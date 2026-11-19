@@ -1,15 +1,13 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs"
 import { dirname, join, parse, relative, resolve, sep } from "node:path"
 import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker, isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
+import { readDashboardDraftId } from "@loginom-ai-agent/dashboard/agent/folder"
 import { Global } from "@opencode-ai/core/global"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { TaskScope } from "@/session/task-scope"
 
 export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] =>
-  profile === "loginom-dashboard" ? [
-    { permission: "dashboard_publish", pattern: "*", action: "ask" },
-    { permission: "dashboard_delete", pattern: "*", action: "ask" },
-  ] : []
+  profile === "loginom-dashboard" ? [{ permission: "dashboard_publish", pattern: "*", action: "ask" }] : []
 
 export const dashboardRoot = () => join(Global.Path.data, "dashboards")
 
@@ -48,10 +46,13 @@ export function dashboardPathError(directory: string, target: string, write = fa
 export const baseProfile = (directory: string): TaskScope.Profile =>
   isDashboardWork(directory) ? "loginom-dashboard" : "default"
 
-export function metadata(directory: string, metadata?: Record<string, unknown>, marked?: unknown) {
+export function draftMarker(directory: string) {
+  if (baseProfile(directory) === "loginom-dashboard") return readDashboardDraftId(directory) ?? true
+}
+
+export function metadata(metadata?: Record<string, unknown>, marker?: ReturnType<typeof dashboardSessionMarker>) {
   const clean = { ...metadata }
   delete clean[DASHBOARD_SESSION_MARKER]
-  const marker = dashboardSessionMarker(marked, isDashboardWork(directory))
   return marker
     ? { ...clean, [DASHBOARD_SESSION_MARKER]: marker }
     : metadata
@@ -60,11 +61,11 @@ export function metadata(directory: string, metadata?: Record<string, unknown>, 
 }
 
 export function profile(session: { directory: string; metadata?: Record<string, unknown> }) {
-  const base = baseProfile(session.directory)
-  const marker = session.metadata?.[DASHBOARD_SESSION_MARKER]
-  if (marker === "deleted" || (marker === true && base !== "loginom-dashboard"))
+  const current = draftMarker(session.directory)
+  const marker = dashboardSessionMarker(session.metadata?.[DASHBOARD_SESSION_MARKER])
+  if (marker !== current && (marker || typeof current === "string"))
     throw Error("LOGINOM_SCOPE_DENIED")
-  return base
+  return current ? "loginom-dashboard" : "default"
 }
 
 export * as DashboardSession from "./dashboard-session"
