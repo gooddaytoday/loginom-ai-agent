@@ -111,12 +111,16 @@ export function restReplacementStep(graph,restId,input){
  const encoder=input&&node(input.source);
  const generated=!!encoder&&encoder.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
   &&graph.links.filter(e=>e.source===input.source).length===1&&!(graph.variable_links??[]).some(e=>e.source===input.source||e.target===input.source);
+ // The saved connection's graph reference is removed only when this REST alone uses it.
+ const services=graph.rest_connection_links??[],own=services.filter(e=>e.target===restId&&e.input==='connection:0');
+ const reference=own.length===1&&services.filter(e=>e.source===own[0].source).length===1&&node(own[0].source)?own[0].source:null;
  const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
   +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
  return 'This REST keeps its saved connection: a new URL or query list needs a replacement REST, not a second chain. next_step: '
   +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target with a NEW unique target.label, the requested raw inputs and query_parameters and finish:"execute". '
   +'If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. '
-  +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')+'. '
+  +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')
+  +(reference?', then its connection reference '+reference+' that no other REST uses':'')+' (NodeRef only, no label). '
   +(consumers.length?'3) Reconnect each former consumer to the new REST with dock_node_apply on the SAME existing target, the new REST as source of these inputs, parameters:{} and finish:"execute": '+consumers.join('; ')+'. '
    +'Keep the existing parsing and Export; change only what the task asks. Do not duplicate the union, Calculator or Export.':'');
 }

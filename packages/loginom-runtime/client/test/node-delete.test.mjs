@@ -206,15 +206,15 @@ test('a locked node is refused before the selection click',async()=>{
 });
 
 // Public tool: running node operations refuse without touching the graph.
-function runtime(){
- let graph=chain();const calls=[];
+function runtime(initial=chain()){
+ let graph=initial;const calls=[];
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:()=>false,reconcile:async()=>({verified:false}),
   mutate:async effect=>{calls.push(effect.kind);graph=remove(graph,effect.parameters.ref.node_id);return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};}};
  const value=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,execute:async()=>{throw Error('Unexpected public transport');},
   onRecord:async e=>e,nodeTargetAdapterFactory:()=>adapter,
   nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:async()=>{}}]]),
   nodeApplyDriverFactory:()=>({})});
- return {runtime:value,calls,get graph(){return graph;}};
+ return {runtime:value,calls,adapter,set:v=>{graph=v;},get graph(){return graph;}};
 }
 const args={operation_id:'del-1',document_id:'doc',workflow_ref:workflow,node:ref('b'),label:'Фильтр'};
 test('dock_node_delete deletes through the public tool and reports a user-v1 receipt',async()=>{
@@ -260,4 +260,24 @@ test('user-v1 deletion expands the compact workflow issued by preparation',async
  const expanded=bindings.expandNodeDelete(compact);assert.deepEqual(expanded.workflow_ref,workflow);
  const f=runtime(),result=await dispatchNodeApi(f.runtime,'dock_node_delete',expanded);
  assert.equal(result.outcome.status,'SUCCEEDED');assert.deepEqual(f.calls,['delete_node']);
+});
+
+// LAB-1904 ab-1904-g/h r5,r6: the replaced REST's connection reference stayed (×2).
+for(const shared of [false,true])test('deleting a REST names its connection reference only when it is unused: shared='+shared,async()=>{
+ const tid=to=>'MF;TF-1;Graph;Подключение|Output_Connection-0|'+to+'|Input_Connection-0';
+ const g=chain();g.nodes[1].type='integration.rest_request';g.nodes[1].label='REST';
+ g.nodes.push({ref:ref('conn'),type:'bg-vendor-icon-restclientconnection',label:'↶Httpbin requests',position:{x:96,y:300},inputs:[],outputs:[],locked:false,dom_epoch:30});
+ g.rest_connection_links=[{tid:tid('b'),source:'conn',target:'b',output:'connection:0',input:'connection:0'}];g.foreign_links=[tid('b')];
+ if(shared){g.nodes.push({ref:ref('rest2'),type:'integration.rest_request',label:'REST 2',position:{x:300,y:300},inputs:[0],outputs:[0,1],locked:false,dom_epoch:31});
+  g.rest_connection_links.push({tid:tid('rest2'),source:'conn',target:'rest2',output:'connection:0',input:'connection:0'});g.foreign_links.push(tid('rest2'));}
+ const f=runtime(g),mutate=async effect=>{f.calls.push(effect.kind);const id=effect.parameters.ref.node_id,cur=f.graph;
+  const gone=(cur.rest_connection_links??[]).filter(e=>e.source===id||e.target===id).map(e=>e.tid);
+  f.set({...remove(cur,id),rest_connection_links:(cur.rest_connection_links??[]).filter(e=>!gone.includes(e.tid)),foreign_links:cur.foreign_links.filter(t=>!gone.includes(t))});
+  return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};};
+ f.adapter.mutate=mutate;
+ const result=await dispatchNodeApi(f.runtime,'dock_node_delete',{...args,label:'REST'});
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));assert.match(result.outcome.output.warnings[0],/3 own link/);
+ const warnings=result.outcome.output.warnings.join(' ');
+ if(shared)assert.doesNotMatch(warnings,/connection reference/);
+ else assert.match(warnings,/connection reference "↶Httpbin requests" \(conn\) is now unused by any REST.*dock_node_delete \(NodeRef only, no label\)/);
 });
