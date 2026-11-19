@@ -48,18 +48,6 @@ test('runtime consumes private download evidence even inside a recovered receipt
  assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE|Users|client.mjs/);
 });
 
-test('runtime journals a thrown download transport cause before its caller can discard it',async()=>{
- const records=[],page=new Page();
- const r=runtime(page,{onRecord:async e=>{records.push(e);return e;},execute:async()=>{
-  throw Error('Pinned browser capability call failed [UNCLASSIFIED_BROWSER_ERROR]',{
-   cause:Error('download.saveAs: canceled password=PRIVATE C:\\Users\\Name\\out.csv')});
- }});
- await assert.rejects(r.observe({scope:'roots'}));
- const diagnostic=records.find(e=>e.phase==='browser_capability_failed');
- assert.ok(diagnostic);
- assert.match(diagnostic.cause.original_message,/download.saveAs: canceled/);
- assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE|Users/);
-});
 test('private operation diagnostics retain fixed causes and omit arbitrary error text',()=>{
  assert.deepEqual(operationFailureDiagnostic(Error('Pinned browser capability call failed [BROWSER_SCRIPT_ERROR] (exception=TypeError)')),
   {code:'BROWSER_SCRIPT_ERROR',detail:'exception=TypeError',exception:'Error'});

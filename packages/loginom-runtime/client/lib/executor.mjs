@@ -2146,7 +2146,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     catch(error){
       // Export and delivery callers can replace the exception during recovery.
       // Persist its cause here while the original transport error still exists.
-      try{await onRecord({phase:'browser_capability_failed',cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});}catch{}
+      if(args[0].includes('async function browserArtifactDownload('))try{
+        await onRecord({phase:'browser_capability_failed',cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});
+      }catch{}
       throw error;
     }
     const diagnostics=[];

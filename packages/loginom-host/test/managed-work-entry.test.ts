@@ -51,6 +51,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/client/lib/redact.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/client/lib/browser-downloads.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/browser-downloads.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/catalog.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/catalog.mjs", import.meta.url),
       "utf8",
