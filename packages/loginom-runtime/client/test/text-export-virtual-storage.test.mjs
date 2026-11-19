@@ -14,7 +14,7 @@ function fixture({start=0,at=1500,end=3000,stuck=false,changeFolder=false,change
 test('virtual file search renders a missing row with bounded scrolling',async()=>{const f=fixture();const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.deepEqual(f.trace,[1000,1000]);});
 test('already rendered exact file needs no gesture',async()=>{const f=fixture({at:0});await findNativeStorageRow(f.args);assert.deepEqual(f.trace,[]);});
 test('search resets an existing scroll before traversing',async()=>{const f=fixture({start:500,at:1500});await findNativeStorageRow(f.args);assert.deepEqual(f.trace,[-500,1000,1000]);});
-for(const [label,options,error] of [['stuck',{stuck:true},/did not advance/],['folder',{changeFolder:true},/folder changed/],['owner',{changeOwner:true},/owner changed/],['end',{at:4000},{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name:'wanted.csv',directory:'/test-2',reason:'folder_end'}}],['budget',{at:50000,end:50000},/budget exhausted/]])test('virtual search refuses '+label,async()=>{const f=fixture(options);await assert.rejects(findNativeStorageRow(f.args),error);assert.ok(f.trace.length<=40);});
+for(const [label,options,error] of [['stuck',{stuck:true},/did not advance/],['folder',{changeFolder:true},/folder changed/],['owner',{changeOwner:true},/owner changed/],['end',{at:4000},{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name:'wanted.csv',directory:'/test-2',reason:'folder_end'}}],['budget',{at:10000000,end:10000000},{code:'EXPORT_SEARCH_BUDGET_EXHAUSTED',message:'Export file search scroll budget exhausted'}]])test('virtual search refuses '+label,async()=>{const f=fixture(options);await assert.rejects(findNativeStorageRow(f.args),error);assert.ok(f.trace.length<=(label==='budget'?964:40),String(f.trace.length));});
 test('a file deep in a grown shared folder is still found',async()=>{const f=fixture({at:19000,end:19700});const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.equal(f.trace.length,19);});
 test('cancelled search performs no gesture',async()=>{const f=fixture();f.args.guard=()=>{throw Error('cancelled');};await assert.rejects(findNativeStorageRow(f.args),/cancelled/);assert.deepEqual(f.trace,[]);});
 
@@ -165,4 +165,25 @@ test('a storage scroll retained whole delivers the anchors that issue the next g
   const second=await runtime.uiAct({verb:'scroll',ref:next[0].ref,delta_y:1000},{observationId:r.output.observation_id,operationId:'scroll-next',whole:true});
   assert.equal(second.status,'SUCCEEDED',JSON.stringify(second.error));
  }
+});
+// LAB-1897: a grown shared folder (1794-1802 entries) put the exported
+// file last; a fixed 40-gesture budget stopped at top=40000. Search reaches
+// any position of the 10000-entry FileStore inventory, and absence is still
+// refused only after both directions. Gestures stay within 1000 px.
+for(const count of [2000,10000])for(const [where,wanted] of [['end',count-1],['start',0],['absent','zz-absent.csv']])
+ test('a '+count+'-entry folder: target '+where,async()=>{
+  const f=orderedFolder({count,wanted}),length=Math.ceil(f.max_top/1000);
+  if(where==='absent'){
+   const steps=[0],act=f.args.act;f.args.act=async(s,e,v,extra)=>{steps.push(Math.max(0,Math.min(f.max_top,e.scroll.top+extra.delta_y)));return act(s,e,v,extra);};
+   await assert.rejects(findNativeStorageRow(f.args),{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name:'zz-absent.csv',directory:'/test-2',reason:'folder_end'}});
+   assert.ok(steps.includes(f.max_top)&&steps.at(-1)===0,JSON.stringify(steps.slice(-3)));
+   assert.ok(f.trace.length<=2*length+2,String(f.trace.length));return;
+  }
+  const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,typeof wanted==='number'?'f'+String(wanted).padStart(4,'0')+'.csv':wanted);
+  // The approach chains on post-scroll observations: one read pair at the place.
+  assert.ok(f.trace.length<=(where==='end'?length:0),String(f.trace.length));assert.ok(f.reads.length<=6,JSON.stringify(f.reads.slice(-8)));
+ });
+test('a 10000-entry folder: a target at the start is reached upward from a kept end position',async()=>{
+ const f=orderedFolder({count:10000,wanted:0,start:10000*24-600});const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'f0000.csv');
+ assert.ok(f.trace.every(d=>d<0)&&f.trace.length<=Math.ceil(f.max_top/1000),String(f.trace.length));
 });

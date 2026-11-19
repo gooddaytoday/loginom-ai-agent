@@ -87,14 +87,21 @@ export async function releaseRefusedExportRead({operationId,binding,navigationOn
 }
 // A virtual file row may not exist in the DOM until its page is rendered.
 // Search only the observed folder, through bounded native scroll gestures.
-const EXPORT_SEARCH_SCROLLS=40;
+// A gesture moves at most 1000 px. The budget follows the observed extent:
+// an approach plus both directions is at most three folder lengths
+// (LAB-1897: 1794 entries needed more than a fixed 40). Loginom 7.4.2 rows
+// are ~24 px (1714 entries, max_top 40465); the cap covers the 10000-entry
+// FileStore inventory at up to 32 px per row. The deadline bounds it all.
+const EXPORT_SEARCH_STEP=1000,EXPORT_SEARCH_SCROLLS=3*Math.ceil(10000*32/EXPORT_SEARCH_STEP)+4;
+const exportSearchBudget=scroll=>Math.min(EXPORT_SEARCH_SCROLLS,3*Math.ceil(Math.max(0,scroll.max_top)/EXPORT_SEARCH_STEP)+4);
 // Loginom 7.4.2 Files orders file rows as this collation does (LAB-1843:
 // 0 inversions over 2361 observed names). It only picks the first direction;
 // absence still needs both directions from the kept scroll position.
 const NATIVE_FILE_ORDER=new Intl.Collator('ru',{numeric:true});
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
- let binding=null,owner=null,lastTop=null,direction=null,reversed=false;
+ let binding=null,owner=null,lastTop=null,direction=null,reversed=false,budget=null;
+ const exhausted=()=>Object.assign(Error('Export file search scroll budget exhausted'),{code:'EXPORT_SEARCH_BUDGET_EXHAUSTED'});
  const unavailable=(s,reason)=>Object.assign(new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory)),
   {code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason}});
  const bind=s=>{
@@ -124,6 +131,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(!anchors.length||!files.length)break;
   const e=anchors[0],scroll=e.scroll;
   need(anchors.every(a=>a.scroll.ref===scroll.ref),'Export search scroll owner ambiguous');
+  budget??=exportSearchBudget(scroll);if(jumps>=budget)break;
   if(top!==null)need(dir==='up'?scroll.top<top:scroll.top>top,'Export search scroll did not advance');
   const below=NATIVE_FILE_ORDER.compare(name,files.at(-1).label)>0,above=NATIVE_FILE_ORDER.compare(name,files[0].label)<0;
   dir??=below?'down':above?'up':null;
@@ -159,11 +167,11 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){if(reversed)throw unavailable(s,'folder_end');direction='down';lastTop=null;reversed=true;}
   if(direction==='down'&&scroll.top>=scroll.max_top){if(reversed||scroll.top===0)throw unavailable(s,'folder_end');direction='up';lastTop=null;reversed=true;}
-  need(step<EXPORT_SEARCH_SCROLLS,'Export file search scroll budget exhausted');
+  budget??=exportSearchBudget(scroll);if(step>=budget)throw exhausted();
   const delta=direction==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top);
   lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});
  }
- throw Error('Export file search exhausted');
+ throw exhausted();
 }
 // Navigates only the assigned storage path using the existing observed UI
 // controls. Downloads use the shared artifact primitive, never a network API.
