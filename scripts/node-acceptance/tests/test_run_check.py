@@ -3080,7 +3080,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
     def test_arguments_and_load_boundary(self):
         args = runner.arguments(['start', '--head', 'abc123', '--scenarios', 'n1,q7', '--pair', '/pair', '--cold'])
         self.assertEqual((args.host_load_max, args.spacing, args.cold), (8, 60, True))
-        for viewport in ['1280x665', '1280x800', '1920x945']:
+        for viewport in ['1024x633', '1280x665', '1280x800', '1920x945']:
             args = runner.arguments(['start', '--head', 'abc123', '--scenarios', 's1', '--pair', '/pair', '--viewport', viewport])
             self.assertEqual(args.viewport, viewport)
         self.assertTrue(runner.load_ready((8, 8, 100), 8))

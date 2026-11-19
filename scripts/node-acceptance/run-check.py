@@ -1593,7 +1593,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
-    start.add_argument('--viewport', choices=['1280x665', '1280x800', '1920x945'], default='1280x800')
+    start.add_argument('--viewport', choices=['1024x633', '1280x665', '1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
