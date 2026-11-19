@@ -129,6 +129,20 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     if(group.rendered!==true||group.expanded!==true&&!group.expander_tid){
       const current=state=>state.node_processes?.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
       s=await revealExecutionControl(channel,node,s,group,state=>current(state)?.process_tid);
+      if(current(s)?.rendered!==true){
+        // Native completion can precede the split grid's completed progress
+        // class while the same row is already actionable. Wait without scrolling
+        // or replaying execution, under the ordinary observation/parent deadline.
+        const root=s.node_processes.root_id;
+        s=await observe('execution group rendering settled',state=>{
+          requireValue(processes(state)&&state.node_processes.root_id===root
+            &&state.node_processes.node_context?.verified===true
+            &&['document_id','workflow_id','node_id'].every(k=>state.node_processes.node_context[k]===node[k]),
+          'Execution group owner changed before rendering');
+          requireValue(current(state),'Execution group replaced before rendering');
+          return current(state).rendered===true;
+        });
+      }
       group=current(s);requireValue(group?.rendered===true,'Execution group did not become visible');
     }
     if(group.expanded!==true&&!group.expander_tid){
