@@ -84,7 +84,7 @@ export async function acquire(session: string) {
       return result.value
     },
     async dashboardDelete(input: DashboardDelete, signal?: AbortSignal): Promise<DashboardDeleteResult> {
-      const result = decodeDashboardDeleteResult(await dashboard("dashboardDelete", input, signal))
+      const result = decodeDashboardDeleteResult(await dashboard("dashboardDelete", input, signal), input.expected.length)
       if (Option.isNone(result)) throw new Error("DASHBOARD_DELETE_UNKNOWN")
       return result.value
     },

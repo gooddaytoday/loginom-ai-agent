@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { validPublicationSet } from "../../loginom-runtime/src/dashboard-storage.mjs"
 
 export const DashboardBinding = Schema.Struct({
@@ -49,4 +49,8 @@ export const DashboardDeleteResult = Schema.Union([
   }),
 ])
 export type DashboardDeleteResult = typeof DashboardDeleteResult.Type
-export const decodeDashboardDeleteResult = Schema.decodeUnknownOption(DashboardDeleteResult, { onExcessProperty: "error" })
+const decodeDeleteResult = Schema.decodeUnknownOption(DashboardDeleteResult, { onExcessProperty: "error" })
+
+export function decodeDashboardDeleteResult(input: unknown, approvedCount: number) {
+  return Option.filter(decodeDeleteResult(input), result => result.status === "empty" || result.confirmedRemoved <= approvedCount)
+}

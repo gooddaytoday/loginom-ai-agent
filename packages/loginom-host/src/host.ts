@@ -696,7 +696,7 @@ export async function createLoginomHost(options: {
     },
     async deleteDashboard(input: DashboardDelete, signal?: AbortSignal): Promise<DashboardDeleteResult> {
       if (!Schema.is(DashboardDelete)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
-      const result = decodeDashboardDeleteResult(await dashboardOperation("dashboardDelete", input, signal))
+      const result = decodeDashboardDeleteResult(await dashboardOperation("dashboardDelete", input, signal), input.expected.length)
       if (Option.isNone(result)) throw new Error("DASHBOARD_DELETE_UNKNOWN")
       return result.value
     },

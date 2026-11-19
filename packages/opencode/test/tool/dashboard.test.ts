@@ -287,6 +287,15 @@ for (const reply of ["reject", "abort", "always"] as const) {
       expect(requests.map(item => item.method)).toEqual(["acquire", "scope", "dashboardVersions", "release"])
       expect(versions).toEqual([deletionVersion])
       expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(true)
+      if (reply !== "always") return
+
+      const retry = yield* deletion.start()
+      const next = yield* deletion.nextRequest(request.id)
+      expect(next.metadata.publicationCount).toBe(1)
+      expect(requests.filter(item => item.method === "dashboardDelete")).toEqual([])
+      yield* deletion.permissions.reply({ requestID: next.id, reply: "reject" })
+      expect(Exit.isFailure(yield* Fiber.join(retry))).toBe(true)
+      expect(yield* deletion.permissions.list()).toEqual([])
     }).pipe(provideInstance(folder.work))
   }))
 }
@@ -363,7 +372,7 @@ it.instance("delete reports confirmed partial progress and submits only the newl
   }).pipe(provideInstance(folder.work))
 }))
 
-for (const outcome of ["unknown", "denied", "invalid"] as const) {
+for (const outcome of ["unknown", "denied", "invalid", "invalid count"] as const) {
   it.instance("delete keeps sources and live preview after " + outcome, () => Effect.gen(function* () {
     const folder = yield* publicationFolder()
     const preview = yield* Effect.acquireRelease(
@@ -393,6 +402,7 @@ for (const outcome of ["unknown", "denied", "invalid"] as const) {
         return { status: "empty" }
       }
       if (outcome === "invalid") return { status: "empty", remaining: versions }
+      if (outcome === "invalid count") return { status: "changed", remaining: [remaining], confirmedRemoved: 3 }
       versions = [remaining]
       return outcome === "unknown"
         ? { status: "failed", reason: "DASHBOARD_DELETE_UNKNOWN", confirmedRemoved: 1 }
@@ -403,12 +413,15 @@ for (const outcome of ["unknown", "denied", "invalid"] as const) {
       const fiber = yield* deletion.start()
       const request = yield* deletion.nextRequest()
       yield* deletion.permissions.reply({ requestID: request.id, reply: "once" })
-      const exit = yield* Fiber.join(fiber)
+      const exit = yield* Effect.raceFirst(
+        Fiber.join(fiber),
+        deletion.nextRequest(request.id).pipe(Effect.flatMap(() => Effect.die("Unexpected deletion reconfirmation"))),
+      )
       const result = Exit.isSuccess(exit) && exit.value
       expect(result).toHaveProperty("output", expect.stringContaining(
         outcome === "denied" ? "Недостаточно прав" : "Не удалось подтвердить результат",
       ))
-      if (outcome === "invalid") expect(result).not.toHaveProperty("output", expect.stringContaining("Подтверждено удаление версий"))
+      if (outcome === "invalid" || outcome === "invalid count") expect(result).not.toHaveProperty("output", expect.stringContaining("Подтверждено удаление версий"))
       else expect(result).toHaveProperty("output", expect.stringContaining("Подтверждено удаление версий: 1"))
       expect(yield* deletion.permissions.list()).toEqual([])
       expect(attempts).toBe(1)
