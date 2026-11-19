@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto"
-import { existsSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { open } from "#sqlite"
-import { cp, lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
-import { basename, dirname, join } from "node:path"
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { basename, dirname, join, resolve } from "node:path"
 import { Option, Schema } from "effect"
 import { bindingKey, Binding, Snapshot, PublicationVersion, LookupResponse } from "../contract/snapshot.ts"
 import { parsePublication, type PublicationSource } from "../contract/publication.ts"
@@ -79,35 +79,40 @@ export async function prepareDashboard(input: {
     try {
       const work = join(staging ?? folder, "work")
       const control = join(staging ?? folder, "control")
-      await mkdir(work, { recursive: true, mode: 0o700 })
-      await mkdir(control, { recursive: true, mode: 0o700 })
-      const fresh = !existsSync(join(work, "src"))
-      if (fresh) {
-        const source = latest ? parsePublication(latest.content) : undefined
-        if (latest && (await bindingKey(source!.binding) !== key || createHash("sha256").update(latest.content).digest("hex") !== latest.version.sourceHash))
-          throw Error("DASHBOARD_PUBLICATION_INVALID")
-        await copySources(input.template, work, control, source)
+      if (staging) {
+        await mkdir(work, { mode: 0o700 })
+        await mkdir(control, { mode: 0o700 })
       }
-      await writeFile(join(work, "snapshot.json.tmp"), JSON.stringify({ nodeName: snapshot.nodeName, schema: snapshot.sample.schema, parameters: snapshot.parameters, created: snapshot.created }, null, 2) + "\n", { mode: 0o600 })
-      const rows = snapshot.sample.rows.map(row => "  " + JSON.stringify(row)).join(",\n")
-      // One row per line: the read tool truncates long lines.
-      await writeFile(join(work, "sample.json.tmp"), `{"schema": ${JSON.stringify(snapshot.sample.schema)},\n"rows": [\n${rows}\n]}\n`, { mode: 0o600 })
-      input.signal?.throwIfAborted()
-      withSnapshot(work, (directory, control) => {
-        const current = existsSync(join(control, "binding.json")) ? decodeControl(readFileSync(join(control, "binding.json"), "utf8")) : undefined
-        if (current && (Option.isNone(current) || current.value.key !== key || current.value.origin !== input.origin))
-          throw Error("DASHBOARD_BINDING_CONFLICT")
+      const fresh = withSnapshot(work, (directory, control) => {
+        input.signal?.throwIfAborted()
+        const file = join(control, "binding.json")
+        const current = existsSync(file) ? decodeControl(readFileSync(file, "utf8")) : Option.none()
+        if (staging ? existsSync(folder) : Option.isNone(current) || current.value.snapshotId !== previous?.snapshotId ||
+            current.value.key !== key || current.value.origin !== input.origin) throw Error("DASHBOARD_BINDING_CONFLICT")
+        const fresh = !existsSync(join(directory, "src"))
+        if (fresh) {
+          const source = latest ? parsePublication(latest.content) : undefined
+          if (latest && (!source || !sameBinding(source.binding, snapshot.binding) ||
+              createHash("sha256").update(latest.content).digest("hex") !== latest.version.sourceHash))
+            throw Error("DASHBOARD_PUBLICATION_INVALID")
+          copySources(input.template, directory, control, source)
+        }
+        writeFileSync(join(directory, "snapshot.json.tmp"), JSON.stringify({ nodeName: snapshot.nodeName, schema: snapshot.sample.schema, parameters: snapshot.parameters, created: snapshot.created }, null, 2) + "\n", { mode: 0o600 })
+        const rows = snapshot.sample.rows.map(row => "  " + JSON.stringify(row)).join(",\n")
+        // One row per line: the read tool truncates long lines.
+        writeFileSync(join(directory, "sample.json.tmp"), `{"schema": ${JSON.stringify(snapshot.sample.schema)},\n"rows": [\n${rows}\n]}\n`, { mode: 0o600 })
         const initialBase = deferred ? undefined : (latest?.version ?? null)
-        const base = fresh ? initialBase : current && Option.isSome(current) ? current.value.base : undefined
+        const base = fresh ? initialBase : Option.isSome(current) ? current.value.base : undefined
         const binding: ControlBinding = { snapshotId: snapshot.id, binding: snapshot.binding, nodeName: snapshot.nodeName, origin: input.origin, key,
           ...(base !== undefined ? { base } : {}) }
-        writeFileSync(join(control, "binding.json.tmp"), JSON.stringify(binding, null, 2) + "\n", { mode: 0o600 })
+        writeFileSync(file + ".tmp", JSON.stringify(binding, null, 2) + "\n", { mode: 0o600 })
         if (existsSync(join(directory, "sample.json"))) unlinkSync(join(directory, "sample.json"))
         renameSync(join(directory, "snapshot.json.tmp"), join(directory, "snapshot.json"))
-        renameSync(join(control, "binding.json.tmp"), join(control, "binding.json"))
+        renameSync(file + ".tmp", file)
         renameSync(join(directory, "sample.json.tmp"), join(directory, "sample.json"))
-      })
-      if (staging) await rename(staging, folder)
+        if (staging) renameSync(staging, folder)
+        return fresh
+      }, folder)
       return { directory: join(folder, "work"), nodeName: snapshot.nodeName, action: snapshot.published ? ("edit" as const) : ("create" as const), fresh, ...(notice ? { notice } : {}) }
     } finally {
       if (staging) await rm(staging, { recursive: true, force: true })
@@ -129,33 +134,88 @@ export async function findDashboard(dashboards: string, id: string) {
   }
 }
 
-async function copySources(template: string, work: string, control: string, source?: ReturnType<typeof parsePublication>) {
-  const staging = await mkdtemp(join(control, ".src-"))
+function copySources(template: string, work: string, control: string, source?: ReturnType<typeof parsePublication>) {
+  const staging = mkdtempSync(join(control, ".src-"))
   try {
     if (source) {
       for (const file of source.files) {
         const path = join(staging, file.path.slice(4))
-        await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-        await writeFile(path, file.content, { encoding: file.encoding, mode: 0o600 })
+        mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+        writeFileSync(path, file.content, { encoding: file.encoding, mode: 0o600 })
       }
-    } else await cp(join(template, "src"), staging, { recursive: true })
-    await rename(staging, join(work, "src"))
+    } else cpSync(join(template, "src"), staging, { recursive: true })
+    renameSync(staging, join(work, "src"))
   } finally {
-    await rm(staging, { recursive: true, force: true })
+    rmSync(staging, { recursive: true, force: true })
   }
 }
 
-// The callback stays synchronous; never hold this lock during builds or HTTP.
-export function withSnapshot<T>(work: string, body: (work: string, control: string) => T): T {
+// Keep the per-folder lock outside the tree so it remains held across a rename.
+export function withSnapshot<T>(work: string, body: (work: string, control: string) => T, target?: string): T {
   const directory = realpathSync(work)
-  const control = join(directory, "..", "control")
-  const db = open(join(control, "snapshot.sqlite"))
+  const folder = dirname(directory)
+  const db = open(join(dirname(folder), "." + basename(target ?? folder) + ".snapshot.sqlite"))
   try {
     db.exec("PRAGMA busy_timeout = 5000; BEGIN IMMEDIATE")
-    return body(directory, control)
+    return body(directory, join(folder, "control"))
   } finally {
     db.close()
   }
+}
+
+export async function readDashboardBinding(work: string, dashboards: string) {
+  assertDashboardDirectory(work, dashboards, realpathSync(work))
+  const captured = withSnapshot(work, (directory, control) => ownedBinding(work, dashboards, directory, control))
+  if (await bindingKey(captured.binding) !== captured.key) throw Error("DASHBOARD_BINDING_CONFLICT")
+  return captured
+}
+
+export function removeDashboard(work: string, dashboards: string, captured: ControlBinding) {
+  assertDashboardDirectory(work, dashboards, realpathSync(work))
+  withSnapshot(work, (directory, control) => {
+    const current = ownedBinding(work, dashboards, directory, control)
+    if (current.snapshotId !== captured.snapshotId || current.origin !== captured.origin || current.key !== captured.key ||
+        !sameBinding(current.binding, captured.binding)) throw Error("DASHBOARD_BINDING_CONFLICT")
+    const folder = dirname(directory)
+    const detached = join(dirname(folder), ".delete-" + randomUUID())
+    renameSync(folder, detached)
+    try {
+      rmSync(detached, { recursive: true })
+    } catch (error) {
+      // Restore enough of this same snapshot for the chat to retry local cleanup.
+      mkdirSync(join(detached, "work"), { recursive: true, mode: 0o700 })
+      mkdirSync(join(detached, "control"), { recursive: true, mode: 0o700 })
+      const file = join(detached, "control/binding.json")
+      if (!existsSync(file)) writeFileSync(file, JSON.stringify(current), { mode: 0o600, flag: "wx" })
+      renameSync(detached, folder)
+      throw error
+    }
+  })
+}
+
+function assertDashboardDirectory(work: string, dashboards: string, directory: string) {
+  if (basename(directory) !== "work" || dirname(dirname(directory)) !== realpathSync(dashboards) ||
+      realpathSync(work) !== directory || !lstatSync(work).isDirectory() || !lstatSync(dirname(resolve(work))).isDirectory())
+    throw Error("DASHBOARD_BINDING_CONFLICT")
+}
+
+function ownedBinding(work: string, dashboards: string, directory: string, control: string) {
+  assertDashboardDirectory(work, dashboards, directory)
+  const file = join(control, "binding.json")
+  if (!lstatSync(control).isDirectory() || !lstatSync(file).isFile()) throw Error("DASHBOARD_BINDING_CONFLICT")
+  const value = decodeControl(readFileSync(file, "utf8"))
+  if (Option.isNone(value) || !uuid.test(value.value.snapshotId) || !/^[a-f0-9]{64}$/.test(value.value.key) ||
+      !value.value.nodeName || basename(dirname(directory)) !== folderName(value.value.binding.packagePath, value.value.key))
+    throw Error("DASHBOARD_BINDING_CONFLICT")
+  const origin = URL.parse(value.value.origin)
+  if (origin?.origin !== value.value.origin || !["http:", "https:"].includes(origin.protocol)) throw Error("DASHBOARD_BINDING_CONFLICT")
+  return value.value
+}
+
+function sameBinding(left: typeof Binding.Type, right: typeof Binding.Type) {
+  return left.packagePath === right.packagePath &&
+    left.workflowGuid.toLowerCase() === right.workflowGuid.toLowerCase() &&
+    left.nodeGuid.toLowerCase() === right.nodeGuid.toLowerCase()
 }
 
 export function readDashboardSnapshot(work: string) {
@@ -183,9 +243,7 @@ export function updatePublicationBase(work: string, captured: ControlBinding, ve
     if (Option.isNone(decoded)) throw Error("DASHBOARD_BINDING_CONFLICT")
     const current = decoded.value
     if (current.key !== captured.key || current.origin !== captured.origin ||
-        current.binding.packagePath !== captured.binding.packagePath ||
-        current.binding.workflowGuid.toLowerCase() !== captured.binding.workflowGuid.toLowerCase() ||
-        current.binding.nodeGuid.toLowerCase() !== captured.binding.nodeGuid.toLowerCase()) throw Error("DASHBOARD_BINDING_CONFLICT")
+        !sameBinding(current.binding, captured.binding)) throw Error("DASHBOARD_BINDING_CONFLICT")
     if (current.base && version.name < current.base.name) return
     const same = current.base === captured.base || (current.base != null && captured.base != null &&
       current.base.name === captured.base.name && current.base.sourceHash === captured.base.sourceHash)

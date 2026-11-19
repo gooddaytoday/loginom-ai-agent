@@ -3,7 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } fro
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { Loginom } from "@opencode-ai/schema/loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
@@ -11,8 +11,8 @@ import { connectionStore, type ActiveConnection } from "./connection/connection-
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
 import { fileReferences } from "./file-reference"
-import { dashboardRequest } from "../../loginom-runtime/src/dashboard-storage.mjs"
-import { DashboardRead, DashboardPublish, PublicationSource, PublicationWrite } from "./dashboard"
+import { dashboardRequest, type DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
+import { DashboardRead, DashboardDelete, DashboardDeleteResult, DashboardPublish, PublicationRef, PublicationSet, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
 import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
@@ -587,16 +587,16 @@ export async function createLoginomHost(options: {
     journal,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
-  function dashboardOperation(operation: "dashboardRead" | "dashboardPublish", input: DashboardRead | DashboardPublish, signal?: AbortSignal) {
+  function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
     const controller = new AbortController()
     const pending = performDashboard(operation, input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
     dashboardOperations.set(controller, pending)
     void pending.finally(() => dashboardOperations.delete(controller)).catch(() => undefined)
     return pending
   }
-  async function performDashboard(operation: "dashboardRead" | "dashboardPublish", input: DashboardRead | DashboardPublish, signal?: AbortSignal) {
+  async function performDashboard(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
     const request = input
-    dashboardRequest(request, operation === "dashboardPublish")
+    dashboardRequest(request, operation)
     if (!Number.isSafeInteger(request.generation) || request.generation < 1) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
     if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
     const current = generations.get(request.generation)
@@ -621,6 +621,8 @@ export async function createLoginomHost(options: {
         if (operation === "dashboardPublish" && !(error instanceof Error && [
           "DASHBOARD_INPUT_INVALID", "DASHBOARD_VERSION_EXISTS", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_STORAGE_UNAVAILABLE", "DASHBOARD_CANCELLED",
         ].includes(error.message))) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+        if (operation === "dashboardDelete" && !(error instanceof Error && error.message === "DASHBOARD_CANCELLED"))
+          throw new Error("DASHBOARD_DELETE_UNKNOWN")
         throw error
       } finally {
         signal?.removeEventListener("abort", cancel)
@@ -683,6 +685,20 @@ export async function createLoginomHost(options: {
       const result = await dashboardOperation("dashboardPublish", input, signal)
       if (!Schema.is(PublicationWrite)(result)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
       return result
+    },
+    async listDashboardVersions(input: DashboardRead, signal?: AbortSignal): Promise<readonly PublicationRef[]> {
+      if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
+      const result = Schema.decodeUnknownOption(PublicationSet, { onExcessProperty: "error" })(
+        await dashboardOperation("dashboardVersions", input, signal),
+      )
+      if (Option.isNone(result)) throw new Error("LOGINOM_REPLY_INVALID")
+      return result.value
+    },
+    async deleteDashboard(input: DashboardDelete, signal?: AbortSignal): Promise<DashboardDeleteResult> {
+      if (!Schema.is(DashboardDelete)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
+      const result = decodeDashboardDeleteResult(await dashboardOperation("dashboardDelete", input, signal))
+      if (Option.isNone(result)) throw new Error("DASHBOARD_DELETE_UNKNOWN")
+      return result.value
     },
     async close() {
       beginClose()

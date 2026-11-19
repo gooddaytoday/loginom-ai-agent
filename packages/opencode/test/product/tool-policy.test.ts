@@ -71,6 +71,7 @@ test("loginom-dashboard exposes only its built-in tools without MCP or Loginom",
     "skill",
     "dashboard_draft",
     "dashboard_publish",
+    "dashboard_delete",
   ]
   for (const id of allowed) {
     expect(policy.permits("loginom-dashboard", id, "builtin")).toBe(true)
@@ -86,6 +87,6 @@ test("loginom-dashboard exposes only its built-in tools without MCP or Loginom",
 
 test("dashboard built-ins stay unavailable in ordinary and other product profiles", () => {
   for (const profile of ["default", "package-docs", "loginom-automation"] as const)
-    for (const id of ["dashboard_draft", "dashboard_publish"])
+    for (const id of ["dashboard_draft", "dashboard_publish", "dashboard_delete"])
       expect(policy.permits(profile, id, "builtin")).toBe(false)
 })

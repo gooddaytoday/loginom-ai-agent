@@ -6,7 +6,10 @@ import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { TaskScope } from "@/session/task-scope"
 
 export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] =>
-  profile === "loginom-dashboard" ? [{ permission: "dashboard_publish", pattern: "*", action: "ask" }] : []
+  profile === "loginom-dashboard" ? [
+    { permission: "dashboard_publish", pattern: "*", action: "ask" },
+    { permission: "dashboard_delete", pattern: "*", action: "ask" },
+  ] : []
 
 export const dashboardRoot = () => join(Global.Path.data, "dashboards")
 

@@ -203,6 +203,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:join(directory,'browser-downloads'),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
+      state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
@@ -275,7 +276,11 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
-    if (message.operation === "dashboardRead" || message.operation === "dashboardPublish") {
+    if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
+      if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
+        if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+        if (message.input.origin !== state.owner.origin) throw Error("DASHBOARD_ORIGIN_MISMATCH")
+      }
       if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
       const controller = new AbortController()
       state.controller = controller
@@ -286,10 +291,10 @@ async function handle(message) {
       }
       controller.signal.addEventListener("abort", cancel, { once: true })
       try {
-        const result = await dashboardStorage(state.browser, message.input, message.operation === "dashboardPublish", controller.signal)
+        const result = await dashboardStorage(state.browser, message.input, message.operation, controller.signal)
         send({ id: message.id, result })
       } catch (error) {
-        if (controller.signal.aborted && message.operation === "dashboardRead") throw Error("DASHBOARD_CANCELLED")
+        if (controller.signal.aborted && (message.operation === "dashboardRead" || message.operation === "dashboardVersions")) throw Error("DASHBOARD_CANCELLED")
         throw error
       } finally {
         controller.signal.removeEventListener("abort", cancel)

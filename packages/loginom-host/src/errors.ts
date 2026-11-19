@@ -4,6 +4,8 @@ const codes = new Set([
   "DASHBOARD_ACCESS_DENIED",
   "DASHBOARD_VERSION_EXISTS",
   "DASHBOARD_WRITE_UNKNOWN",
+  "DASHBOARD_DELETE_BUSY",
+  "DASHBOARD_DELETE_UNKNOWN",
   "DASHBOARD_CANCELLED",
   "LOGINOM_RUNTIME_CLEANUP_FAILED",
   "LOGINOM_REPLY_INVALID",
@@ -77,6 +79,9 @@ export function hostError(value: unknown) {
 const reasons: Record<string, string> = {
   DASHBOARD_CANCELLED: "Операция dashboard отменена.",
   DASHBOARD_WRITE_UNKNOWN: "Результат публикации неизвестен. Проверьте версию на стенде; повторная запись автоматически не выполняется.",
+  DASHBOARD_DELETE_BUSY: "Этот дашборд уже удаляется. Повторите запрос после завершения операции.",
+  DASHBOARD_DELETE_UNKNOWN: "Не удалось подтвердить результат удаления версий. Повторная команда начнётся с проверки стенда.",
+  DASHBOARD_STORAGE_UNAVAILABLE: "Не удалось прочитать хранилище публикаций или установить принадлежность версий.",
   DASHBOARD_VERSION_EXISTS: "Имя публикации уже занято. Существующая версия сохранена.",
   DASHBOARD_ACCESS_DENIED: "Недостаточно прав для чтения или записи публикации в Loginom.",
   DASHBOARD_ORIGIN_MISMATCH: "Подключение относится к другому стенду. Откройте dashboard заново из Studio.",

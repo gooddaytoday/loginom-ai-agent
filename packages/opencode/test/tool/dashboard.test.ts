@@ -13,6 +13,7 @@ import { Truncate } from "@/tool/truncate"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppProcess } from "@opencode-ai/core/process"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import type { DashboardBinding } from "@loginom-ai-agent/loginom-host/dashboard"
 import { createHash } from "node:crypto"
 import { join, resolve } from "node:path"
 import { mkdir, readdir, rm, symlink } from "node:fs/promises"
@@ -32,10 +33,10 @@ import { TestConfig } from "../fixture/config"
 import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
-type HostRequest = { method: string; input: { content?: string; expected?: unknown; scope?: unknown } }
+type HostRequest = { method: string; input: { binding?: DashboardBinding; content?: string; expected?: unknown; generation?: number; scope?: unknown } }
 const publicationName = "20261115T120000Z.json"
 
-function publicationHost(options: { error?: string; latest?: { name: string; sourceHash: string }; changed?: boolean } = {}) {
+function publicationHost(options: { error?: string; latest?: { name: string; sourceHash: string }; changed?: boolean; respond?: (request: HostRequest) => unknown } = {}) {
   const requests: HostRequest[] = []
   let receive: ((event: { data: unknown }) => void) | undefined
   LoginomHost.connect({
@@ -46,12 +47,12 @@ function publicationHost(options: { error?: string; latest?: { name: string; sou
       requests.push(request)
       if (request.method === "dashboardPublish" && options.error)
         return receive?.({ data: { id: request.id, error: options.error } })
-      const result = request.method === "acquire" ? { generation: 1 }
+      const result = options.respond?.(request) ?? (request.method === "acquire" ? { generation: 1 }
         : request.method === "scope" ? request.input.scope
         : request.method === "dashboardRead" ? (options.latest ? { version: options.latest, content: "{}" } : null)
         : request.method === "dashboardPublish" && options.changed ? { status: "changed", latest: options.latest ?? null }
         : request.method === "dashboardPublish" ? { status: "written", version: { name: publicationName, sourceHash: createHash("sha256").update(request.input.content!).digest("hex") } }
-        : true
+        : true)
       receive?.({ data: { id: request.id, result } })
     },
   })
@@ -86,7 +87,7 @@ it.instance("dashboard_draft reports missing installation resources", () => Effe
   if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("DASHBOARD_RESOURCES_MISSING")
 }))
 
-const publicationFolder = Effect.fn(function* (origin = "http://127.0.0.1:0") {
+const publicationFolder = Effect.fn(function* (origin = "http://127.0.0.1:0", binding?: DashboardBinding) {
   const instance = yield* TestInstance
   const root = join(instance.directory, "resources")
   const template = resolve(import.meta.dir, "../../../dashboard/template")
@@ -98,18 +99,22 @@ const publicationFolder = Effect.fn(function* (origin = "http://127.0.0.1:0") {
     await Bun.write(join(root, "resource-manifest.json"), JSON.stringify({ node: "bin/node", browser: "browsers/chrome" }))
     for (const name of ["dashboard/draft.js", "dashboard/selfcheck.mjs", "browsers/chrome"]) await Bun.write(join(root, name), "fixture")
   })
-  const id = crypto.randomUUID()
-  const folder = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
-    // Port zero fails locally without depending on external routing or proxy timeouts.
-    id, origin, dashboards: dashboardDataRoot(process.env), template,
-    fetch: Object.assign(async () => Response.json({
-      id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
-      binding: { packagePath: "/fixture/orders-" + id + ".lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
-      parameters: [], sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
-    }), { preconnect: () => undefined }),
-  }))
-  yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(folder.directory, ".."), { recursive: true, force: true })))
-  return { root, work: folder.directory }
+  const prepare = Effect.fn(function* (binding?: DashboardBinding) {
+    const id = crypto.randomUUID()
+    const folder = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
+      // Port zero fails locally without depending on external routing or proxy timeouts.
+      id, origin, dashboards: dashboardDataRoot(process.env), template,
+      fetch: Object.assign(async () => Response.json({
+        id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
+        binding: binding ?? { packagePath: "/fixture/orders-" + id + ".lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
+        parameters: [], sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
+      }), { preconnect: () => undefined }),
+    }))
+    yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(folder.directory, ".."), { recursive: true, force: true })))
+    return { work: folder.directory }
+  })
+  const folder = yield* prepare(binding)
+  return { ...folder, root, prepare }
 })
 
 it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-8 code points", () => Effect.gen(function* () {
@@ -136,6 +141,25 @@ it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-
     expect(result.metadata).toEqual({ truncated: false })
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
 }))
+
+const dashboardTools = Effect.fn(function* (session: Session.Info, work: string) {
+  const agents = yield* Agent.Service
+  const agent = yield* agents.get("build")
+  const providerID = ProviderV2.ID.make("test")
+  const modelID = ModelV2.ID.make("test")
+  return yield* SessionTools.resolve({
+    agent, session, model: { providerID, api: { id: "test" } } as Provider.Model,
+    processor: {
+      message: {
+        id: MessageID.ascending(), sessionID: session.id, role: "assistant", parentID: MessageID.ascending(),
+        agent: agent.name, mode: agent.name, path: { cwd: work, root: work }, cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, modelID, providerID, time: { created: 1 },
+      },
+      updateToolCall: () => Effect.succeed(undefined), completeToolCall: () => Effect.void,
+    },
+    messages: [], history: [], bypassAgentCheck: false, promptOps: {} as never,
+  })
+})
 
 for (const reply of ["reject", "abort", "once"] as const) {
   it.instance("publishing with a global allow still asks once for the bound node and package: " + reply, () => Effect.gen(function* () {
@@ -166,23 +190,8 @@ for (const reply of ["reject", "abort", "once"] as const) {
     yield* Effect.gen(function* () {
       const sessions = yield* Session.Service
       const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow" }) })
-      const agents = yield* Agent.Service
-      const agent = yield* agents.get("build")
       const permissions = yield* Permission.Service
-      const providerID = ProviderV2.ID.make("test")
-      const modelID = ModelV2.ID.make("test")
-      const tools = yield* SessionTools.resolve({
-        agent, session, model: { providerID, api: { id: "test" } } as Provider.Model,
-        processor: {
-          message: {
-            id: MessageID.ascending(), sessionID: session.id, role: "assistant", parentID: MessageID.ascending(),
-            agent: agent.name, mode: agent.name, path: { cwd: folder.work, root: folder.work }, cost: 0,
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, modelID, providerID, time: { created: 1 },
-          },
-          updateToolCall: () => Effect.succeed(undefined), completeToolCall: () => Effect.void,
-        },
-        messages: [], history: [], bypassAgentCheck: false, promptOps: {} as never,
-      })
+      const tools = yield* dashboardTools(session, folder.work)
       const execute = tools.dashboard_publish?.execute
       if (!execute) throw Error("dashboard_publish unavailable")
       const controller = new AbortController()
@@ -214,6 +223,62 @@ for (const reply of ["reject", "abort", "once"] as const) {
     }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
   }), 20_000)
 }
+
+it.instance("delete removes two versions and the local draft, and leaves the neighbour available", () => Effect.gen(function* () {
+  const origin = "http://127.0.0.1:0"
+  const binding = { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() }
+  const neighbourBinding = { ...binding, nodeGuid: crypto.randomUUID() }
+  const folder = yield* publicationFolder(origin, binding)
+  const neighbour = yield* folder.prepare(neighbourBinding)
+  const neighbourVersion = { name: publicationName, sourceHash: "c".repeat(64) }
+  const key = (item: DashboardBinding) => JSON.stringify([item.packagePath, item.workflowGuid, item.nodeGuid])
+  const versions = new Map([
+    [key(binding), [
+      { name: "20261115T110000Z.json", sourceHash: "a".repeat(64) },
+      { name: publicationName, sourceHash: "b".repeat(64) },
+    ]],
+    [key(neighbourBinding), [neighbourVersion]],
+  ])
+  const respond = (request: HostRequest) => {
+    if (request.method !== "dashboardVersions" && request.method !== "dashboardDelete") return
+    if (!request.input.binding) throw Error("Dashboard binding required")
+    const nodeKey = key(request.input.binding)
+    const remaining = versions.get(nodeKey) ?? []
+    if (request.method === "dashboardVersions") return { generation: 1, versions: remaining }
+    if (request.input.generation !== 1) throw Error("Captured generation required")
+    if (JSON.stringify(request.input.expected) !== JSON.stringify(remaining))
+      return { status: "changed", remaining, confirmedRemoved: 0 }
+    versions.delete(nodeKey)
+    return { status: "empty" }
+  }
+  publicationHost({ respond })
+  const flags = yield* RuntimeFlags.Service
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow" }) })
+    const permissions = yield* Permission.Service
+    const tools = yield* dashboardTools(session, folder.work)
+    const execute = tools.dashboard_delete?.execute
+    if (!execute) throw Error("dashboard_delete unavailable")
+    const fiber = yield* Effect.promise(() => execute({}, {
+      toolCallId: "delete", abortSignal: new AbortController().signal, messages: [],
+    })).pipe(Effect.forkScoped)
+    const request = yield* pollWithTimeout(
+      permissions.list().pipe(Effect.map(items => items.find(item => item.sessionID === session.id))),
+      "missing one-time deletion request", "15 seconds",
+    )
+    expect(request.permission).toBe("dashboard_delete")
+    expect(request.always).toEqual([])
+    expect(request.metadata.publicationCount).toBe(2)
+    yield* permissions.reply({ requestID: request.id, reply: "once" })
+    const result = yield* Fiber.join(fiber)
+    expect(result).toHaveProperty("output", expect.stringContaining("Дашборд удалён"))
+    expect(respond({ method: "dashboardVersions", input: { binding } })).toEqual({ generation: 1, versions: [] })
+    expect(respond({ method: "dashboardVersions", input: { binding: neighbourBinding } })).toEqual({ generation: 1, versions: [neighbourVersion] })
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(false)
+    expect(yield* Effect.promise(() => Bun.file(join(neighbour.work, "src/main.tsx")).exists())).toBe(true)
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}), 20_000)
 
 it.instance("interruption joins an active publication build before removing its operation", () => Effect.gen(function* () {
   const folder = yield* publicationFolder()

@@ -885,7 +885,7 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              if (auto) {
+              if (auto && permission.permission !== "dashboard_delete") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",

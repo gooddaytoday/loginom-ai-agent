@@ -24,8 +24,9 @@ const DASHBOARD_BUILTINS = new Set([
   "skill",
   "dashboard_draft",
   "dashboard_publish",
+  "dashboard_delete",
 ])
-const PROFILE_TOOLS = ["package_docs_run", "dashboard_draft", "dashboard_publish"]
+const PROFILE_TOOLS = ["package_docs_run", "dashboard_draft", "dashboard_publish", "dashboard_delete"]
 
 export const toolPolicy = {
   permits(profile: TaskScope.Profile, id: string, origin: Tool.Def["origin"]) {

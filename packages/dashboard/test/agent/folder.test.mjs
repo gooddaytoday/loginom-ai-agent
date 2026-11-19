@@ -211,7 +211,7 @@ test("failed template initialization leaves no project and the next ID copies a 
   await assert.rejects(prepareDashboard({ ...input, template: join(app.root, "missing-template") }), { code: "ENOENT" })
   const folder = join(app.dashboards, folderName(binding.packagePath, await bindingKey(binding)))
   await assert.rejects(stat(folder), { code: "ENOENT" })
-  assert.deepEqual(await readdir(app.dashboards), [])
+  assert.deepEqual((await readdir(app.dashboards, { withFileTypes: true })).filter(entry => entry.isDirectory()), [])
   const result = await prepareDashboard(await app.create())
   assert.equal(result.fresh, true)
   for (const file of ["main.tsx", "loginom.ts"]) {
@@ -287,7 +287,6 @@ async function snapshotProcess(t, app, runtime, input) {
 test("Node refresh excludes Bun readers, survives interruption and accepts a new Studio snapshot", { skip: process.platform === "win32", timeout: 15_000 }, async t => {
   const app = await fixture(t)
   const prepared = await prepareDashboard(await app.create())
-  await rm(join(prepared.directory, "../control/snapshot.sqlite"))
   const next = { ...snapshot, nodeName: "Updated", parameters: [{ name: "New", value: 99 }], sample: { schema: [{ name: "updated", type: 1 }], rows: [[99], [100]] } }
   for (const crash of [false, true]) {
     const options = await app.create(next)
@@ -445,7 +444,7 @@ test("invalid latest never falls back to a template", async t => {
     { ...publication(), content: "{}" },
     { ...publication(), version: versionB },
   ]) await assert.rejects(prepareDashboard({ ...await app.create(), readPublication: async () => source }), /DASHBOARD_PUBLICATION_INVALID/)
-  assert.deepEqual(await readdir(app.dashboards), [])
+  assert.deepEqual((await readdir(app.dashboards, { withFileTypes: true })).filter(entry => entry.isDirectory()), [])
 })
 
 test("legacy M3 sources retain unknown base when a new snapshot finds a publication", async t => {

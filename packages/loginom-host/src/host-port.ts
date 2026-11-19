@@ -5,7 +5,7 @@ import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
-import { DashboardRead, DashboardPublish } from "./dashboard"
+import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
@@ -331,7 +331,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         return
       }
-      if (data.method === "dashboardRead" || data.method === "dashboardPublish") {
+      if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(data.method)) {
         if (run.scope?.profile !== "loginom-dashboard" || run.applyingScope) throw new Error("LOGINOM_SCOPE_DENIED")
         if (run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
         run.dispatching = true
@@ -340,9 +340,18 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         run.dashboardController = controller
         try {
           const status = await service.api.status()
-          const result = data.method === "dashboardRead"
-            ? await service.readDashboard(Schema.decodeUnknownSync(DashboardRead)({ ...input, generation: status.generation }), controller.signal)
-            : await service.publishDashboard(Schema.decodeUnknownSync(DashboardPublish)({ ...input, generation: status.generation }), controller.signal)
+          const request = { ...input, generation: status.generation }
+          const result = await (async () => {
+            switch (data.method) {
+              case "dashboardRead": return service.readDashboard(Schema.decodeUnknownSync(DashboardRead)(request), controller.signal)
+              case "dashboardPublish": return service.publishDashboard(Schema.decodeUnknownSync(DashboardPublish)(request), controller.signal)
+              case "dashboardVersions": return {
+                generation: status.generation,
+                versions: await service.listDashboardVersions(Schema.decodeUnknownSync(DashboardRead)(request), controller.signal),
+              }
+              case "dashboardDelete": return service.deleteDashboard(Schema.decodeUnknownSync(DashboardDelete)(input), controller.signal)
+            }
+          })()
           reply({ id: data.id, result }, status.generation)
         } finally {
           run.dashboardController = undefined

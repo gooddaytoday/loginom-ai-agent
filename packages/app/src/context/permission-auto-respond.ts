@@ -43,8 +43,7 @@ export function autoRespondsPermission(
   permission: { sessionID: string; permission?: string },
   directory?: string,
 ) {
-  // Publication always requires confirmation by the user.
-  if (permission.permission === "dashboard_publish") return false
+  if (permission.permission === "dashboard_publish" || permission.permission === "dashboard_delete") return false
   const value = sessionAutoAccept(autoAccept, session, permission, directory)
   if (value !== undefined) return value
   return directory ? isDirectoryAutoAccepting(autoAccept, directory) : false
@@ -56,8 +55,7 @@ export function sessionAutoAccept(
   permission: { sessionID: string; permission?: string },
   directory?: string,
 ) {
-  // Publication always requires confirmation by the user.
-  if (permission.permission === "dashboard_publish") return false
+  if (permission.permission === "dashboard_publish" || permission.permission === "dashboard_delete") return false
   return sessionLineage(session, permission.sessionID)
     .map((id) => accepted(autoAccept, id, directory))
     .find((item): item is boolean => item !== undefined)

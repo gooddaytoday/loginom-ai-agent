@@ -351,6 +351,8 @@ for (const failure of [
           generation: 7,
           async dashboardRead() { throw Error("Unexpected dashboard read") },
           async dashboardPublish() { throw Error("Unexpected dashboard publish") },
+          async dashboardVersions() { throw Error("Unexpected dashboard versions") },
+          async dashboardDelete() { throw Error("Unexpected dashboard deletion") },
           async scope(mode, scope) {
             scopes.push({ mode, scope })
             return scope

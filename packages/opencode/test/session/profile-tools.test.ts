@@ -576,6 +576,8 @@ codeMode.instance("code mode keeps the verified Host Help catalog available in d
       generation: 9,
       async dashboardRead() { throw Error("Unexpected dashboard read") },
       async dashboardPublish() { throw Error("Unexpected dashboard publish") },
+      async dashboardVersions() { throw Error("Unexpected dashboard versions") },
+      async dashboardDelete() { throw Error("Unexpected dashboard deletion") },
       async scope(_mode, scope) {
         return scope
       },
@@ -675,6 +677,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
         generation: 9,
         async dashboardRead() { throw Error("Unexpected dashboard read") },
         async dashboardPublish() { throw Error("Unexpected dashboard publish") },
+        async dashboardVersions() { throw Error("Unexpected dashboard versions") },
+        async dashboardDelete() { throw Error("Unexpected dashboard deletion") },
         async scope(mode, scope) {
           scopes.push({ mode, scope })
           return scope
@@ -734,6 +738,8 @@ for (const image of [false, true])
         generation: 9,
         async dashboardRead() { throw Error("Unexpected dashboard read") },
         async dashboardPublish() { throw Error("Unexpected dashboard publish") },
+        async dashboardVersions() { throw Error("Unexpected dashboard versions") },
+        async dashboardDelete() { throw Error("Unexpected dashboard deletion") },
         async scope(mode, scope) {
           return scope
         },
@@ -780,6 +786,8 @@ function preparedLoginom(
     generation: 9,
     async dashboardRead() { throw Error("Unexpected dashboard read") },
     async dashboardPublish() { throw Error("Unexpected dashboard publish") },
+    async dashboardVersions() { throw Error("Unexpected dashboard versions") },
+    async dashboardDelete() { throw Error("Unexpected dashboard deletion") },
     async scope(_mode, scope) {
       return scope
     },
@@ -958,7 +966,7 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
       )
       expect(result.session.directory).toBe(work)
       const ids = Object.keys(result.tools)
-      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish"].includes(id))).toBe(
+      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish", "dashboard_delete"].includes(id))).toBe(
         true,
       )
       for (const id of ["read", "glob", "grep", "skill", "dashboard_draft"]) expect(ids).toContain(id)
@@ -1008,5 +1016,6 @@ codeMode.instance("a folder prepared by Desktop resolves dashboard tools without
     expect(result.tools.dashboard_draft).toBeDefined()
     expect(result.tools.bash).toBeUndefined()
     expect(result.tools.dashboard_publish?.execute).toBeDefined()
+    expect(result.tools.dashboard_delete?.execute).toBeDefined()
   }),
 )
