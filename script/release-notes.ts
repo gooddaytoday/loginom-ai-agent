@@ -128,7 +128,9 @@ const notes = [
   ...(version === "0.4.0"
     ? [
         "- Users of 0.3.9 on any platform must install 0.4.0 manually over the existing installation; 0.3.9 has its update feed disabled. Keep the existing profile; do not uninstall or delete application data first.",
-        "- Рекомендуемая ширина экрана — от 1280 px.",
+        "- Recommended screen resolution: 1280×800 or higher. On smaller screens such as 1366×768, a node requested at an explicit position far outside the visible workflow may be refused; automatic placement works.",
+        "- Known limitation: with a local OpenCode plugin configured and an npm registry that silently drops connections, a session can wait up to about 970 s before it continues.",
+        ...(withoutMacos ? [] : ["- Known limitation: macOS automatic update (notify mode) was not verified on a live Mac for this release."]),
       ]
     : []),
   "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",
