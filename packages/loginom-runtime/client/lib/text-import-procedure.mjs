@@ -268,7 +268,10 @@ export function mergeImportColumnPatch(fields,changes=[]) {
   for(const change of resolveImportSourceColumns(changes,fields)) {
     const key=change.source_name??change.name,index=fields.findIndex(c=>c.name===key);
     requireValue(index>=0,'Patch column is absent from the observed schema: '+key);
-    result[index]={...result[index],...Object.fromEntries(Object.entries(change).filter(([k])=>k!=='source_name')),
+    // String and boolean lists have no «Непрерывный»; Loginom resets an omitted
+    // kind to «Дискретный» on that type change (LAB-1866).
+    const reset=!Object.hasOwn(change,'data_kind')&&['string','boolean'].includes(change.type)&&result[index].data_kind==='Непрерывный';
+    result[index]={...result[index],...Object.fromEntries(Object.entries(change).filter(([k])=>k!=='source_name')),...(reset?{data_kind:'Дискретный'}:{}),
       ...(change.name!==undefined&&change.name!==key?{source_name:key}:{})};
   }
   requireValue(new Set(result.map(c=>c.name)).size===result.length,'Column patch creates duplicate names');

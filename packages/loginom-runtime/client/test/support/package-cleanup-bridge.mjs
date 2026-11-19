@@ -53,6 +53,7 @@ class ExternalClient {
         // After Save As reopened the package, only an Open binding of that
         // already active package can issue a receipt for its new tab.
         const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
+        if(o.bindOpenOnly)this.f.bindAttempts=(this.f.bindAttempts??0)+1;
         if(o.bindOpenOnly&&this.f.bindingError)throw Error('Binding response lost');
         this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
         if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
@@ -157,15 +158,16 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
-      if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
-      if(f.normalized||f.verifiedReopen){
+      if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen||f.recovered){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
+      if(f.normalized||f.verifiedReopen||f.recovered&&f.saves>1){
         const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
           navigation_path:['Server','Packages','Saved','Module','Workflow'].map((label,index,labels)=>({
             tid:'MF;TF-5;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label}))}}];
         result.trace=[...(f.normalized?[{event:'rest_package_normalization',modified_after:false}]:[]),
-          {event:'save_continuations_observed',continuations,reopened:true,native_identity_verified:true}];
+          {event:'save_continuations_observed',continuations,...(f.recovered?{recovered_reopen:true}:{reopened:true}),native_identity_verified:true}];
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
       }
+      if(f.recovered){result.output.reopened=false;if(f.saves===1){result.status='AMBIGUOUS';result.output={};}}
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -622,6 +624,34 @@ test('verified reopened Save keeps its successful receipt when workspace binding
    const prepared=await client.callTool({name:advice.next_step.tool,arguments:advice.next_step.arguments});
    assert.notEqual(prepared.isError,true,JSON.stringify(prepared));assert.equal(f.saves,1);
   }
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
+
+for(const fault of ['none','transport'])test('ambiguous reopen then confirmed overwrite rebinds workspace and shutdown: '+fault,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'ambiguous-reopen-cleanup-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const f=current={scenario:'ambiguous-reopen',events:[],saves:0,path,receipts:new Map(),catalog,recovered:true,bindingError:fault==='transport'};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+  mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+  loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+ const client=new AgentClient({name:'ambiguous-reopen-cleanup',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  await client.callTool({name:'dock_prepare',arguments:{}});
+  const first=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'ambiguous-save'}})).content[0].text);
+  assert.equal(first.status,'AMBIGUOUS');assert.equal(session.metadata.workflowRef.tab_tid,'own-tab');
+  const second=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'confirmed-save'}})).content[0].text);
+  assert.equal(second.status,'SUCCEEDED');assert.equal(second.output.reopened,false);
+  assert.equal(f.bindAttempts,1,'a confirmed recovery must attempt bindOpenOnly');
+  assert.equal(session.metadata.workflowRef.tab_tid,fault==='none'?f.activeTab:'own-tab');
+  f.bindingError=false;
+  await bridge.close();
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  assert.equal(cleanup.status,'SUCCEEDED',JSON.stringify(cleanup));
+  assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+  assert.equal(cleanup.save_operation_id,'confirmed-save');assert.equal(f.cleanupOptions.tabTid,f.activeTab);
  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 

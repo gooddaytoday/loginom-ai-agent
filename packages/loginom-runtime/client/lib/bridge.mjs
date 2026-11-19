@@ -601,7 +601,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
                 document_id:admission.document_id,sequence:admission.sequence};
-              if(confirmedSave.output?.reopened===true)
+              if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
+                &&e.recovered_reopen===true&&e.native_identity_verified===true))
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
             }
             const savedOutcome = confirmedSave ?? outcome;
@@ -610,8 +611,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             const saveContinuations = savedOutcome.output?.workflow_continuations
               ?? savedOutcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
             if (savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)
-                && savedOutcome.output?.reopened === true
-                && savedOutcome.trace?.some(e => e.event === 'save_continuations_observed' && e.reopened === true && e.native_identity_verified === true)) {
+                && savedOutcome.trace?.some(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true
+                  && (savedOutcome.output?.reopened === true && e.reopened === true || e.recovered_reopen === true))) {
               const beforeBinding = Object.fromEntries(['workspacePreparation','workspaceReady','targetIdentity','workflowRef']
                 .map(key => [key,session.metadata[key]]));
               const previous = beforeBinding.workspacePreparation?.state;

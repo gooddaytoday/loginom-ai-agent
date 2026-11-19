@@ -8645,3 +8645,49 @@ test('Python code editor grants replace_expression only to the bound Python hand
   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'wizard',tid:'MF;TF-1;WizrdMCF'})));
  assert.deepEqual(bound.output.ui.elements.find(e=>e.tid===tid).allowed_actions,['replace_expression']);
 });
+// LAB-1872 (lab1872-a text-file-info :24): right after a Files scroll its
+// buffered rows were still covered by their grid, so the gesture's own
+// observation could not issue the next search gesture.
+function coveredStorageScroll(waitsToSettle){
+ const f=storageScrollCostFixture();let top=f.table.scrollTop,cover=null,waits=0;
+ Object.defineProperty(f.table,'scrollTop',{get:()=>top,set:v=>{top=v;cover??=f.page.add('div',null,'',{x:0,y:80,width:1100,height:1120},f.table);},configurable:true});
+ f.page.waitForTimeout=async ms=>{f.clock.advance(ms);waits++;if(cover&&waitsToSettle!==null&&waits>=waitsToSettle){cover.remove();cover=null;}};
+ return {...f,top:()=>top,waits:()=>waits};
+}
+const storageScrollStart=async f=>{
+ const roots=await f.page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===f.table.attrs['data-tid']);
+ const before=await f.page.execute({mode:'observe',root_ref:root.ref});
+ return {before:before.output,target:before.output.ui.elements.find(e=>e.tid===f.prefix+'colName_file-10.csv')};
+};
+const scrollAnchor=(output,prefix)=>output.ui.elements.find(e=>e.tid?.startsWith(prefix+'colName_')&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
+test('a Files scroll waits for its rows, so its own observation issues the next gesture',async()=>{
+ const f=coveredStorageScroll(3),{before,target}=await storageScrollStart(f);
+ const result=await f.page.act({verb:'scroll',ref:target.ref,delta_y:1000},before);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(f.top(),5000);
+ const settled=result.trace.find(e=>e.event==='ui_storage_rows_settled');
+ assert.equal(settled?.settled,true);assert.ok(settled.waited_ms<=1000);
+ const next=scrollAnchor(result.output,f.prefix);assert.ok(next,'post-scroll observation has a scroll anchor');
+ assert.equal(next.scroll.top,5000);
+ const second=await f.page.act({verb:'scroll',ref:next.ref,delta_y:1000},result.output);
+ assert.equal(second.status,'SUCCEEDED',JSON.stringify(second.error));assert.equal(f.top(),6000);
+});
+test('unsettled Files rows stop waiting within 1 s and keep the previous observation',async()=>{
+ const f=coveredStorageScroll(null),{before,target}=await storageScrollStart(f);
+ const result=await f.page.act({verb:'scroll',ref:target.ref,delta_y:1000},before);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(f.top(),5000);
+ const settled=result.trace.find(e=>e.event==='ui_storage_rows_settled');
+ assert.equal(settled?.settled,false);assert.ok(settled.waited_ms<=1000,String(settled.waited_ms));assert.ok(f.waits()<=21);
+ assert.equal(scrollAnchor(result.output,f.prefix),undefined);
+});
+test('a scroll outside Files does not wait for rows',async()=>{
+ const page=new Page();let waits=0;page.waitForTimeout=async ms=>{waits++;page.clock.advance(ms);};
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const inner=page.add('div','Inner','',{x:20,y:80,width:300,height:300});
+ Object.assign(inner,{scrollTop:0,scrollHeight:1000,clientHeight:300,style:{overflowY:'auto'}});
+ page.add('button','Inner;btnRow','Row',undefined,inner);
+ const initial=await page.observe(),target=initial.ui.elements.find(e=>e.tid==='Inner;btnRow');
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:500},initial);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(inner.scrollTop,500);
+ assert.equal(result.trace.some(e=>e.event==='ui_storage_rows_settled'),false);assert.equal(waits,1);
+});

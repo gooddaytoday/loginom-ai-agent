@@ -262,6 +262,33 @@ test('an already initialized cache cannot be replaced while metadata is read',as
 });
 
 
+for(const nativeNull of [true,false])test('Calculator cached NULL requires the current native NULL, nativeNull='+nativeNull,async()=>{
+ const f=fixture({rows:[[null,0,false,'']],types:[4,4,1,5]});
+ f.node.FIconCls='bg-vendor-icon-calcdata';
+ f.dataSource.nativeNull=nativeNull;f.dataSource.nullChecks=[];
+ const capability={read:(async function(source,{stable}){
+  return {unsettled:false,async read(row,column){stable();source.nullChecks.push([row,column]);return {tag:source.nativeNull?1:20};}};
+ }).toString()};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,capability);
+ assert.equal(result.verified,nativeNull,JSON.stringify(result));
+ assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.dataSource.nullChecks.map(row=>Array.from(row)),[[0,0]]);
+ if(nativeNull)assert.deepEqual(result.output.sample[0].map(c=>c.value),[null,'0',false,'']);
+ else {assert.match(result.reason,/calculator_output_cache_not_current/);assert.equal(result.output,undefined);}
+ assert.ok(f.disposed.includes('dataSource'));assert.ok(f.disposed.includes('output'));
+ assert.deepEqual(f.uiCalls,[]);
+});
+
+test('Calculator native NULL verification retains an unsettled getter and its proxies',async()=>{
+ const f=fixture({rows:[[null]],types:[4]});f.node.FIconCls='bg-vendor-icon-calcdata';
+ const capability={read:(async function(){return {unsettled:true,async read(){throw Error('native pending');}};}).toString()};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,capability);
+ assert.equal(result.verified,false);assert.equal(result.cleanup_complete,false);
+ assert.equal(result.reason,'variant_native_pending');assert.deepEqual(f.disposed,[]);
+});
+
 test('preserves_native_scalar_values',()=>{
  for(const type of ['integer','real','string','boolean','datetime','variant'])for(const raw of [null,undefined]){
   assert.deepEqual(decodePortCell(raw,type),{cell:{type,is_null:true,value:null,precision:'exact_null'},limitations:[]});

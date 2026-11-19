@@ -471,6 +471,16 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      }
      live();stable();const raw=quality&&column===8?null:await dataSource.AsVariant(row,column);live();stable();
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
+     // Loginom 7.4.2 can retain a false NULL in its Calculator bulk cache after
+     // expression reorder while fixed321 already returns the computed value.
+     // Verify absence through the existing guarded native reader; never publish
+     // that stale cache as fresh output or silently substitute another value.
+     if(raw==null&&baseline.node.FIconCls==='bg-vendor-icon-calcdata'){
+      nativeReader??=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},
+       eval('('+variant.decode+')'),eval('('+variant.collect+')'),variant.pins);
+      const current=await nativeReader.read(row,column);live();stable();
+      need(current.tag===1,'calculator_output_cache_not_current: read the output again without Execute or settings changes');
+     }
      rawValues.push(raw);
     }
     if(variantFailures.length)continue;
