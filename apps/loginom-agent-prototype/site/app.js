@@ -708,7 +708,7 @@ function result(item) {
   return `<div class="answer-block"><h2>${info[0]}</h2><p>${info[1]}</p>
     <dl class="result-metrics">${info[2].map(([key,value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join('')}</dl>
     ${item.kind === 'quality' ? `<div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>Качество выгрузки.html</strong><small>Отчёт ${chatFolder(item).label}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать CSV ${icon('download',14)}</button></div>`
-      : `<div class="artifact-card"><span class="glyph red">${icon('flow',19)}</span><span><strong>${resultPackage(item).name}</strong><small>${item.kind === 'refactor' ? `Копия в ${esc(packageFolder('personal'))}, рядом с исходным` : `Пакет в ${esc(packageFolder('personal'))}`}</small></span><button class="btn" data-action="open-result-package">Открыть ${icon('external',14)}</button></div>`}
+      : `<div class="artifact-card"><span class="glyph red">${icon('flow',19)}</span><span><strong>${resultPackage(item).name}</strong><small>Пакет в ${esc(packageFolder('personal'))}</small></span><button class="btn" data-action="open-result-package">Открыть ${icon('external',14)}</button></div>`}
     <div class="answer-actions"><button class="link-btn" data-action="download-result">${icon('download',15)} Скачать отчёт CSV</button><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div>
   </div>`
 }
@@ -745,21 +745,21 @@ function changeCard(turn) {
   const next = proposedVersionName(serverPackages.find(entry => entry.id === 'sales'))
   const counts = [['add','новый'],['mod','изменено'],['del','удалён']].map(([kind,label]) => [kind, packageChanges.filter(([type]) => type === kind).length, label])
   const status = {
-    draft:`Изменения — в копии «${agentCopy().name}» в папке «Копии агента». «Продажи.lgp» в Loginom не менялся: сохраните изменения новой версией рядом с ним или замените исходный.`,
+    draft:`Изменения — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». «Продажи.lgp» в Loginom не менялся: сохраните изменения новой версией рядом с ним или замените исходный.`,
     saved:`Сохранено новой версией «${esc(saved?.name || '')}» в ${esc(packageFolder('personal'))}. Исходный «Продажи.lgp» не изменён.`,
     replaced:'Исходный «Продажи.lgp» в Loginom заменён этими изменениями. Прежняя версия сохранена как «Продажи — до правки.lgp» — её можно вернуть.',
     discarded:'Изменения отменены: копия удалена, «Продажи.lgp» не менялся.',
   }[current]
-  const view = `<button class="btn" data-change="view:${at}">${icon('flow',15)} Посмотреть на схеме</button>`
+  const view = `<button class="btn" data-change="view:${at}" title="Схема с отметками агента: что добавлено, изменено, удалено">${icon('flow',15)} Посмотреть на схеме</button>`
   const actions = {
-    draft:`<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${view}${loginomButton('copy')}<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`,
+    draft:`<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${view}${loginomButton(`copy:${state.session}:${at}`)}<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`,
     saved:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «${esc(saved?.name || '')}»</button>${view}${loginomButton(saved?.id)}<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="unsave:${at}">Удалить новую версию</button>`,
     replaced:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «Продажи.lgp»</button>${view}${loginomButton('sales')}<button class="link-btn discard-link" data-change="restore:${at}">Вернуть прежнюю версию</button>`,
     discarded:`<button class="link-btn" data-change="undiscard:${at}">Вернуть изменения</button>`,
   }[current]
   return `<div class="answer-block change-block"><h2>${current === 'discarded' ? 'Изменения отменены' : 'Изменил копию «Продажи.lgp»'}</h2><p>${status}</p>
     ${current === 'discarded' ? '' : `<div class="change-card${current === 'draft' ? '' : ' is-' + current}">
-      <div class="change-head">${icon('flow',17)}<strong>${current === 'saved' ? esc(saved.name) : 'Продажи.lgp'}</strong><span class="badge">${{draft:'копия агента', saved:'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
+      <div class="change-head">${icon('flow',17)}<strong>${esc(current === 'saved' ? saved.name : current === 'draft' ? agentCopy(turn).name : 'Продажи.lgp')}</strong><span class="badge">${{draft:'копия агента', saved:'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
       <ul class="change-list">${packageChanges.map(([kind,name,what,node]) => `<li class="c-${kind}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong> — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node),'diff')}</details></div></li>`).join('')}</ul>
       <p class="change-check">${icon('check',14)} Агент сверил копию с исходным запуском на данных: в результате 120 строк, как раньше; 12 строк без цены или региона в расчёт больше не попадают</p>
     </div>`}
@@ -1405,10 +1405,10 @@ function changedPackage(item) {
   const current = turn ? changeState(turn) : 'draft'
   const node = Number.isInteger(state.node) ? shown[state.node] : null
   const mark = {add:'Новый', mod:'Изменён', del:'Удалён'}
-  const inLoginom = turn ? loginomButton({draft:'copy', saved:savedVersion(turn)?.id, replaced:'sales'}[current]) : ''
+  const inLoginom = turn ? loginomButton({draft:`copy:${item.changeOf.session}:${item.changeOf.at}`, saved:savedVersion(turn)?.id, replaced:'sales'}[current]) : ''
   return `<div class="native-page packages-page">
-    <div class="native-heading"><div><p class="eyebrow">Loginom · копия из разговора</p><h1>Изменения в «Продажи.lgp»</h1><p>${{draft:'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
-    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(agentCopy().folder + '/' + agentCopy().name)}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
+    <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»</h1><p>${{draft:'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
+    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span></div>
     <div class="package-canvas diff-canvas" aria-label="Схема пакета с изменениями">${shown.map(([glyph,title,kind,detail,status,before],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''} ${status && !showBefore ? 'is-' + status : ''}" data-node="${i}" aria-pressed="${state.node === i}">${status && !showBefore ? `<span class="node-mark">${mark[status]}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${showBefore && before ? before : title}</strong><small>${kind}</small></button>`).join('')}</div>
@@ -1594,7 +1594,7 @@ function overlay() {
     search: ['Поиск', kind === 'search' ? `<label class="sr-only" for="chat-search">Поиск по проектам и разговорам</label><input id="chat-search" class="search-input" type="search" autocomplete="off" placeholder="Название, проект или слова из запроса"><div id="search-results" class="search-results">${searchResults('')}</div>` : ''],
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
-    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан изменённой копией. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton('copy','Посмотреть копию в Loginom')}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${replaceSource().what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton(replaceSource().target, replaceSource().label)}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'loginom-window': ['Окно Loginom', kind === 'loginom-window' ? loginomWindow() : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
@@ -1712,10 +1712,14 @@ function render(resetScroll = false) {
   bindOwn(app,state,api)
 }
 function dismiss() {
-  if (state.overlay === 'loginom-window' && state.loginomView?.back) {
-    state.overlay = state.loginomView.back
+  if (state.overlay === 'loginom-window') {
+    const opened = state.loginomView
+    state.overlay = opened?.back || null
     state.loginomView = null
-    return render()
+    render()
+    // The same button can sit in the card behind the dialog it returns to; the dialog's one takes focus.
+    const opener = `[data-loginom="${CSS.escape(opened?.target || '')}"]`
+    return (document.querySelector('#app-dialog ' + opener) || document.querySelector(opener))?.focus()
   }
   state.overlay = null
   state.moveAfterCreate = null
@@ -1805,6 +1809,7 @@ function send() {
   state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
   if (!trialTurn && kind === 'refactor') next.rules = appliedRules(next.project)
+  if (kind === 'improve') next.copy = newAgentCopy()
   if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
@@ -1881,16 +1886,34 @@ function replaceRefs() {
 // Loginom itself. In the product the button opens a Loginom window (the browser the agent uses, signed in with this
 // connection) with the package opened by its path; the window takes one Loginom session while it is open. The prototype
 // shows the package's nodes instead.
-function agentCopy() {
-  return {name:'Продажи — копия.lgp', folder:packageFolder('personal') + '/Копии агента', view:'sales-v2', copy:true}
+// Each improvement turn has its own copy, named when the turn starts.
+function newAgentCopy() {
+  const taken = state.sessions.flatMap(entry => [...(entry.history || []), entry]).filter(turn => turn.copy).length
+  return {name:'Продажи — правка агента' + (taken ? ' ' + (taken + 1) : '') + '.lgp', folder:packageFolder('personal') + '/Копии агента'}
+}
+function agentCopy(turn) {
+  return {...(turn?.copy || {name:'Продажи — правка агента.lgp', folder:packageFolder('personal') + '/Копии агента'}), view:'sales-v2', copy:true}
+}
+function turnAt(session, at) {
+  const item = state.sessions.find(entry => entry.id === session)
+  return item && [...(item.history || []), item][at]
+}
+// What «Заменить исходный» writes over the original: the saved new version, or the agent's copy.
+function replaceSource() {
+  const turn = state.replaceTurn && turnAt(state.replaceTurn.session, state.replaceTurn.at)
+  const saved = turn && changeState(turn) === 'saved' && savedVersion(turn)
+  if (saved) return {target:saved.id, what:`новой версией «${esc(saved.name)}»`, label:`Посмотреть «${esc(saved.name)}» в Loginom`}
+  return {target:state.replaceTurn ? `copy:${state.replaceTurn.session}:${state.replaceTurn.at}` : '', what:`копией агента «${esc(agentCopy(turn).name)}»`, label:'Посмотреть копию в Loginom'}
 }
 function loginomButton(target, label = 'Посмотреть в Loginom') {
-  return target && state.settings.connection.connected ? `<button class="btn" data-loginom="${esc(target)}">${icon('external',15)} ${label}</button>` : ''
+  return target && state.settings.connection.connected && !state.loginomDown ? `<button class="btn" data-loginom="${esc(target)}" title="Открыть пакет в самом Loginom, без отметок агента">${icon('external',15)} ${label}</button>` : ''
 }
 function viewInLoginom(target) {
-  const entry = target === 'copy' ? agentCopy() : packageEntries().find(item => item.id === target) || (state.activePackage?.id === target ? state.activePackage : null)
+  const [kind, session, at] = target.split(':')
+  // A package outside the lists (a conversation's result) opens from its own page; a deleted one is gone.
+  const entry = kind === 'copy' ? agentCopy(turnAt(session, Number(at))) : packageEntries().find(item => item.id === target) || (state.activePackage?.isResult && state.activePackage.id === target ? state.activePackage : null)
   if (!entry) return toast('Этого пакета в Loginom уже нет', 'alert')
-  state.loginomView = {name:entry.name, path:entry.copy ? entry.folder : packagePath(entry), view:entry.view, copy:Boolean(entry.copy), back:state.overlay === 'replace-package' ? 'replace-package' : null}
+  state.loginomView = {target, name:entry.name, path:entry.copy ? entry.folder : packagePath(entry), view:entry.view, copy:Boolean(entry.copy), back:state.overlay === 'replace-package' ? 'replace-package' : null}
   state.overlay = 'loginom-window'
   render()
 }
@@ -1954,7 +1977,7 @@ function feedAction(d) {
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
   return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, rules:item.rules, web:item.web})
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web})
 }
 function connectLoginom() {
   if (state.connecting) return

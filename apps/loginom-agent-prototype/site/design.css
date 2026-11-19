@@ -551,7 +551,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .canvas-node.is-focus.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 0 0 2px var(--amber) inset}
 @media(max-width:690px){.package-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.package-canvas .canvas-connector{display:none}.package-canvas .canvas-node{flex:1 1 40%;width:auto}}
 /* В-72: «Посмотреть в Loginom» — a stand-in for the Loginom window */
-.package-top>[data-loginom]{flex:none}
+.package-top{flex-wrap:wrap}.package-top>div:nth-child(2){flex:1 1 180px}.package-top>[data-loginom]{flex:none}
 .loginom-window{margin:10px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .lw-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--soft);font-size:13px;overflow-wrap:anywhere}
 .lw-bar .icon{flex:none}
@@ -561,3 +561,6 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .lw-nodes li>span:last-child{display:grid;min-width:0}
 .lw-nodes small{color:var(--muted);font-size:12px}
 .lw-note{margin:0;padding:6px 12px 10px;color:var(--muted);font-size:12px}
+/* The schema wraps by its own width, not the window's: with the side panel open a 700–1000px window leaves it narrow. */
+.package-frame{container-type:inline-size}
+@container (max-width:760px){.package-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.package-canvas .canvas-connector{display:none}.package-canvas .canvas-node{flex:1 1 40%;width:auto}}
