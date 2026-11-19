@@ -339,7 +339,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     return {viewport:{width:innerWidth,height:innerHeight},ancestors};
    },${JSON.stringify({tid:refresh.tid,ref:refresh.ref})})`);
    await record('export_file_refresh_geometry',{geometry});
-   // Files keeps its minimum width in a narrow window. Re-enter the same
+   // Files shrinks, but toolbar children overflow its hidden body. Re-enter the same
    // assigned directory through visible native navigation to reload its list.
    const current=await inDirectory(directory);
    await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
