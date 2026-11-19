@@ -282,3 +282,34 @@ test("an absent version after a lost DeleteFile reply does not count as confirme
   assert.equal(f.files.has(path), false)
   assert.equal(f.locks.size, 0)
 })
+
+test("a read-only node denies opening the delete lock before removing any version", async () => {
+  const deleted = []
+  const f = fixture(undefined, (files, path) => {
+    deleted.push(path)
+    return files.delete(path)
+  })
+  const directory = dashboardRequest({ binding }).directory
+  const lock = directory + "/.delete.lock"
+  const path = directory + "/20261119T090000Z.json"
+  const content = JSON.stringify({ binding })
+  f.files.set(path, content)
+  f.files.set(lock, "")
+
+  const storage = f.connection.Session.get_FileStorage()
+  const open = storage.OpenFile
+  storage.OpenFile = (path, mode, share) => {
+    if (path === lock && mode === 2 && share === 0) {
+      throw Object.assign(Error('Невозможно открыть файл "' + path + '" на запись'), { name: "EBGException" })
+    }
+    return open(path, mode, share)
+  }
+
+  const expected = await f.versions()
+  assert.equal(expected.length, 1)
+  assert.deepEqual(await f.deleteVersions(expected), {
+    status: "failed", reason: "DASHBOARD_ACCESS_DENIED", confirmedRemoved: 0,
+  })
+  assert.deepEqual(deleted, [])
+  assert.equal(f.files.get(path), content)
+})
