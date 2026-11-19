@@ -108,8 +108,8 @@ async function readRestOutputs(channel,read,ctx){
 // with the observed refs: the old REST, its generated encoder and consumers.
 export function restReplacementStep(graph,restId,input){
  const node=id=>graph.nodes.find(n=>n.ref.node_id===id);
- const encoder=node(input.source);
- const generated=encoder?.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
+ const encoder=input&&node(input.source);
+ const generated=!!encoder&&encoder.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
   &&graph.links.filter(e=>e.source===input.source).length===1&&!(graph.variable_links??[]).some(e=>e.source===input.source||e.target===input.source);
  const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
   +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
@@ -156,7 +156,19 @@ export function createRestRequestNodeSupport(config){
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
     const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
-    const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
+    let result;
+    try{result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);}
+    catch(error){
+     // LAB-1904: an existing REST keeps its saved connection (rest-connection.mjs:148).
+     // Name the same replacement steps from a read-only graph, never a bare new REST.
+     if(request.target.kind!=='existing'||!/requested connection differs from the existing REST reference/.test(error?.message??''))throw error;
+     let graph=null;
+     try{graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);}catch{throw error;}
+     if(graph?.complete!==true||graph.document_id!==request.document_id||JSON.stringify(graph.workflow_ref)!==JSON.stringify(request.workflow_ref))throw error;
+     const input=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
+     error.message=error.message+'. '+restReplacementStep(graph,request.target.ref.node_id,input.length===1?input[0]:null);
+     throw error;
+    }
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
    beforeInput:async(_,ctx,{channel})=>{

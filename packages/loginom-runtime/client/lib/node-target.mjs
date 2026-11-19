@@ -300,7 +300,10 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         const owned=graph.nodes.filter(n=>n.ref.node_id===ref.node_id);
         if(owned.length!==1)throw Error('Node to delete is absent or its identity is ambiguous; nothing was deleted');
         const target=owned[0];
-        if(request.target.label!==undefined&&target.label!==request.target.label)throw Error('Node to delete has a different caption; nothing was deleted');
+        // LAB-1904 e-r5/model.stdout:116: workspace_observe names a node by its data-tid
+        // form, the caption with whitespace as '_'. It is the same caption of this node.
+        if(request.target.label!==undefined&&target.label!==request.target.label&&target.label.replace(/\s/g,'_')!==request.target.label)
+          throw Error('Node to delete has a different caption; nothing was deleted');
         if(target.locked)throw Error('Node to delete is locked or executing; nothing was deleted');
         if(target.boundary_role!==undefined||['control.supernode_output','bg-vendor-icon-nullvendor'].includes(target.type))
           throw Error('Service boundary node of a Supernode or Loop cannot be deleted; nothing was deleted');

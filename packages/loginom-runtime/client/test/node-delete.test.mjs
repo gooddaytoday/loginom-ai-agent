@@ -79,6 +79,19 @@ for(const [name,change,r,pattern] of [
  assert.match(result.error,pattern);assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
 });
 
+// LAB-1904 e-r5/model.stdout:116: the model passed the observed node_label form.
+for(const [label,ok] of [['Запросы_httpbin',true],['Запросы httpbin',true],['Запросы_httpbin2',false],['Запросы-httpbin',false],['Запросы__httpbin',false]])
+ test('deletion accepts only the observed node_label form of the same caption: '+label,async()=>{
+  const f=fixture(g=>{g.nodes[1].label='Запросы httpbin';}),before=structuredClone(f.graph),result=await f.run(request('b',{label}));
+  if(ok){assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.deleted_node.label,'Запросы httpbin');assert.deepEqual(f.calls,['delete_node']);}
+  else{assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/different caption/);assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);}
+ });
+test('the node_label form never authorizes deleting another node with that caption',async()=>{
+ const f=fixture(g=>{g.nodes[1].label='Запросы httpbin';g.nodes[2].label='Запросы_httpbin';});
+ const result=await f.run(request('c',{label:'Запросы httpbin'}));
+ assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/different caption/);assert.deepEqual(f.calls,[]);
+});
+
 test('a native pre-gesture refusal of deletion is reported once and leaves no pending effect',async()=>{
  const f=fixture();
  f.adapter.mutate=async effect=>{f.calls.push(effect.kind);return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
