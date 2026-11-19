@@ -46,6 +46,7 @@ const seedProjects = [
   {id:'p-sales', name:'Аналитика продаж', color:'red', instructions:'Отвечай кратко. Новые сценарии сохраняй в папку «Продажи».', sources:['sales-demo.csv','Продажи.lgp'], pinned:false},
   {id:'p-report', name:'Ежемесячная отчётность', color:'blue', instructions:'', sources:[], pinned:false},
 ]
+const dateCondition = '«Дата» ≥ 01.01.2026 И «Дата» ≤ 31.10.2026'
 const packageViews = {
   // «Продажи.lgp» as the check, the change card and «Как было» describe it: two branches, each with its own date filter.
   sales:[
@@ -75,20 +76,44 @@ const packageViews = {
     ['file','ExportCSV','Выход','Сохранение результата в CSV'],
   ],
   // Iteration 4: the agent's working copy of «Продажи.lgp». 5th: what happened to the node, 6th: how it was.
+  // 7th (В-67): the node's Loginom type and [setting or port, before, after] — the target product view; the parser reads
+  // types, ports and links today, filter conditions and grouping fields need extending it (ux-spec, iteration 7);
+  // links are shown on the receiving input, plus a filter's outputs. «Продажи.lgp» and its new version read the same rows.
   'sales-improve':[
-    ['database','CSV продаж','Входные данные','Демонстрационный CSV · 2 400 строк'],
-    ['layers','Фильтр по дате','Преобразование','Теперь стоит до разветвления и фильтрует один раз для обеих веток','mod','Фильтр по дате (ветка «Регионы»)'],
-    ['chart','Выручка по регионам','Расчёт','Не менялся'],
-    ['shield','Проверка пустых значений','Контроль','Новый узел: строки без цены или региона уходят в таблицу «Пропуски»','add',''],
-    ['layers','Фильтр по дате (ветка «Города»)','Преобразование','Удалён: дублировал фильтр в ветке «Регионы»','del','Фильтр по дате (ветка «Города»)'],
-    ['chart','Выручка по городам','Расчёт','Переименован; расчёт не менялся','mod','Узел14'],
-    ['file','Результат','Выход','120 строк — как в исходном пакете'],
+    ['database','CSV продаж','Входные данные','Демонстрационный CSV · 2 400 строк',undefined,'',['Импорт из текстового файла',[
+      ['Имя файла/URL','продажи.csv','продажи.csv'],['Разделитель столбцов','точка с запятой','точка с запятой']]]],
+    ['layers','Фильтр по дате','Преобразование','Теперь стоит до разветвления и фильтрует один раз для обеих веток','mod','Фильтр по дате (ветка «Регионы»)',['Фильтр строк',[
+      ['Имя','Фильтр по дате (ветка «Регионы»)','Фильтр по дате'],
+      ['Условие',dateCondition,dateCondition],
+      ['Вход «Входной источник данных»','← «CSV продаж»','← «CSV продаж»'],
+      ['Выход «Соответствуют условию»','→ «Выручка по регионам»','→ «Проверка пустых значений»'],
+      ['Выход «Не соответствуют условию»','не подключён','не подключён']]]],
+    ['shield','Проверка пустых значений','Контроль','Новый узел: строки без цены или региона не идут в расчёт — они на выходе «Не соответствуют условию»','add','',['Фильтр строк',[
+      ['Условие','','«Цена» не пустой И «Регион» не пустой'],
+      ['Вход «Входной источник данных»','','← «Фильтр по дате»'],
+      ['Выход «Соответствуют условию»','','→ «Выручка по регионам», «Выручка по городам»'],
+      ['Выход «Не соответствуют условию»','','не подключён: строки без цены или региона, при проверочном запуске — 12']]]],
+    ['chart','Выручка по регионам','Расчёт','Получает данные от узла «Проверка пустых значений»; расчёт не менялся','mod','Выручка по регионам',['Группировка',[
+      ['Группа','Регион','Регион'],['Показатели','Выручка — сумма','Выручка — сумма'],
+      ['Вход «Входной источник данных»','← «Фильтр по дате (ветка «Регионы»)»','← «Проверка пустых значений»']]]],
+    ['layers','Фильтр по дате (ветка «Города»)','Преобразование','Удалён: дублировал фильтр в ветке «Регионы»','del','Фильтр по дате (ветка «Города»)',['Фильтр строк',[
+      ['Условие',dateCondition,''],
+      ['Вход «Входной источник данных»','← «CSV продаж»',''],
+      ['Выход «Соответствуют условию»','→ «Узел14»',''],
+      ['Выход «Не соответствуют условию»','не подключён','']]]],
+    ['chart','Выручка по городам','Расчёт','Переименован и получает данные от узла «Проверка пустых значений»; расчёт не менялся','mod','Узел14',['Группировка',[
+      ['Имя','Узел14','Выручка по городам'],
+      ['Группа','Город','Город'],['Показатели','Выручка — сумма','Выручка — сумма'],
+      ['Вход «Входной источник данных»','← «Фильтр по дате (ветка «Города»)»','← «Проверка пустых значений»']]]],
+    ['file','Результат','Выход','120 строк — как в исходном пакете',undefined,'',['Объединение',[
+      ['Вход «Главная таблица»','← «Выручка по регионам»','← «Выручка по регионам»'],
+      ['Вход «Присоединяемая таблица»','← «Узел14»','← «Выручка по городам»']]]],
   ],
   'sales-v2':[
     ['database','CSV продаж','Входные данные','Демонстрационный CSV · 2 400 строк'],
     ['layers','Фильтр по дате','Преобразование','Один фильтр до разветвления'],
+    ['shield','Проверка пустых значений','Контроль','Строки без цены или региона не идут в расчёт'],
     ['chart','Выручка по регионам','Расчёт','Сумма выручки по регионам'],
-    ['shield','Проверка пустых значений','Контроль','Строки без цены или региона — в отдельную таблицу'],
     ['chart','Выручка по городам','Расчёт','Сумма выручки по городам'],
     ['file','Результат','Выход','120 строк'],
   ],
@@ -651,12 +676,24 @@ function filesWord(count) {
   if (tail > 10 && tail < 20) return 'файлов'
   return ['файлов','файл','файла','файла','файла','файлов','файлов','файлов','файлов','файлов'][count % 10]
 }
+// В-67: each finding of the check points at nodes of «Продажи.lgp» (indexes in its schema); after a replace — of the backup.
+const salesFindings = [
+  ['«Фильтр по дате» повторяется',' в двух ветках — достаточно одного до разветвления.',[1,3]],
+  ['«Узел14»',' — по имени не понять, что он считает; это выручка по городам.',[4]],
+  ['Нет проверки пустых значений',' перед расчётом — строки без цены или региона искажают итог.',[2,4]],
+]
+function showFinding(index) {
+  const [title,text,nodes] = salesFindings[index]
+  const target = packageEntries().find(entry => entry.id === (salesState().replaced ? 'sales-backup' : 'sales'))
+  if (!target) return toast('Замечания относятся к прежней версии «Продажи.lgp», а её в этом подключении Loginom нет', 'alert')
+  openPackage(target, {pkg:target.id, view:target.view, nodes, text:title + text, session:state.session})
+}
 function result(item) {
   if (item.kind === 'skilltrial') return trialResult(item)
   if (item.kind === 'improve') return changeCard(item)
   if (item.kind === 'clean') return `<div class="answer-block"><h2>Замечаний нет</h2><p>Проверил «${esc(item.files?.[0] || 'Продажи.lgp')}»: повторов, непонятных имён и пропущенных проверок не нашёл. Пакет не менял.</p>${(item.files?.[0] || 'Продажи.lgp') === 'Продажи.lgp' && salesState().replaced ? `<p class="muted">«Продажи.lgp» уже заменён улучшенной версией. Прежняя версия сохранена как «Продажи — до правки.lgp».</p><button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}</div>`
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>Пакет «Продажи.lgp» не менял. Что можно сделать лучше:</p>
-    <ol class="findings"><li><strong>«Фильтр по дате» повторяется</strong> в двух ветках — достаточно одного до разветвления.</li><li><strong>«Узел14»</strong> — по имени не понять, что он считает; это выручка по городам.</li><li><strong>Нет проверки пустых значений</strong> перед расчётом — строки без цены или региона искажают итог.</li>${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
+    <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.</span></div></div>`
   if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
@@ -693,11 +730,13 @@ function improvable(name) {
   return (name || 'Продажи.lgp') === 'Продажи.lgp' && !salesState().replaced
 }
 // What the agent changed in its working copy, as in Codex's «Edited file +2 −2» card: one row per node.
+// 4th: the node in the copy whose settings and ports «Настройки и связи» shows before → after (В-67).
 const packageChanges = [
-  ['mod','Фильтр по дате','перенесён из ветки «Регионы» до разветвления — теперь один на обе ветки'],
-  ['del','Фильтр по дате (ветка «Города»)','удалён — дублировал фильтр в ветке «Регионы»'],
-  ['mod','Узел14 → «Выручка по городам»','переименован'],
-  ['add','Проверка пустых значений','новый узел: строки без цены или региона — в отдельную таблицу'],
+  ['mod','Фильтр по дате','перенесён из ветки «Регионы» до разветвления — теперь один на обе ветки','Фильтр по дате'],
+  ['add','Проверка пустых значений','новый узел между «Фильтр по дате» и расчётами: строки без цены или региона в расчёт не идут','Проверка пустых значений'],
+  ['mod','Выручка по регионам','получает данные от узла «Проверка пустых значений»; расчёт не менялся','Выручка по регионам'],
+  ['del','Фильтр по дате (ветка «Города»)','удалён — дублировал фильтр в ветке «Регионы»','Фильтр по дате (ветка «Города»)'],
+  ['mod','Узел14 → «Выручка по городам»','переименован и получает данные от узла «Проверка пустых значений»','Выручка по городам'],
 ]
 function changeCard(turn) {
   const at = turn.index
@@ -721,8 +760,8 @@ function changeCard(turn) {
   return `<div class="answer-block change-block"><h2>${current === 'discarded' ? 'Изменения отменены' : 'Изменил копию «Продажи.lgp»'}</h2><p>${status}</p>
     ${current === 'discarded' ? '' : `<div class="change-card${current === 'draft' ? '' : ' is-' + current}">
       <div class="change-head">${icon('flow',17)}<strong>${current === 'saved' ? esc(saved.name) : 'Продажи.lgp'}</strong><span class="badge">${{draft:'копия, не сохранена', saved:'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
-      <ul class="change-list">${packageChanges.map(([kind,name,what]) => `<li class="c-${kind}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><span><strong>${esc(name)}</strong> — ${esc(what)}</span></li>`).join('')}</ul>
-      <p class="change-check">${icon('check',14)} Агент сверил копию с исходным: те же 120 товаров и итог; 12 строк без цены или региона теперь в отдельной таблице «Пропуски»</p>
+      <ul class="change-list">${packageChanges.map(([kind,name,what,node]) => `<li class="c-${kind}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong> — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node),'diff')}</details></div></li>`).join('')}</ul>
+      <p class="change-check">${icon('check',14)} Агент сверил копию с исходным запуском на данных: в результате 120 строк, как раньше; 12 строк без цены или региона в расчёт больше не попадают</p>
     </div>`}
     <div class="change-actions">${actions}</div>
     ${current === 'draft' ? `<p class="change-note">Новая версия появится рядом с исходным: ${esc(packageFolder('personal'))}/${esc(next)}</p>` : ''}
@@ -854,8 +893,8 @@ const scripts = {
     {plan:1, icon:'layers', live:'Переношу «Фильтр по дате»', done:'Вынес «Фильтр по дате» до разветвления', short:'вынес фильтр', detail:'Раньше он стоял отдельно в каждой ветке', time:6, think:[4,'Фильтр одинаковый в обеих ветках: поставлю его один раз перед разветвлением, второй удалю.']},
     {plan:1, icon:'close', live:'Удаляю повтор фильтра', done:'Удалил повторный «Фильтр по дате»', short:'удалил повтор', detail:'Он дублировал первый', time:2},
     {plan:1, icon:'compose', live:'Переименовываю узел', done:'Переименовал «Узел14» → «Выручка по городам»', short:'переименовал узел', time:2},
-    {plan:1, icon:'shield', live:'Добавляю проверку пустых значений', done:'Добавил узел «Проверка пустых значений»', short:'добавил проверку', detail:'Строки без цены или региона уходят в отдельную таблицу', time:7},
-    {plan:2, icon:'check', live:'Сверяю результат с исходным пакетом', done:'Сверил результат с исходным пакетом', short:'сверил результат', detail:'Те же 120 товаров и итог; 12 строк без цены или региона — в таблице «Пропуски». Выгрузок в пакете нет — запуск ничего не записал', time:9},
+    {plan:1, icon:'shield', live:'Добавляю проверку пустых значений', done:'Добавил узел «Проверка пустых значений»', short:'добавил проверку', detail:'Поставил между «Фильтр по дате» и расчётами: строки без цены или региона в расчёт не идут', time:7},
+    {plan:2, icon:'check', live:'Сверяю результат с исходным пакетом', done:'Сверил результат с исходным пакетом', short:'сверил результат', detail:'В результате 120 строк, как в исходном; 12 строк без цены или региона в расчёт больше не попадают. Выгрузок в пакете нет — запуск ничего не записал', time:9},
   ]},
   document:{plan:['Прочитать пакет','Описать узлы','Собрать документ'], steps:[
     {plan:0, icon:'flow', live:'Читаю пакет', done:'Прочитал пакет «{pkg}»: 12 узлов, 3 подмодели', short:'прочитал пакет', time:3},
@@ -1185,8 +1224,9 @@ function packagePath(item) {
 function packageEntries() {
   return [...serverPackages,...state.importedPackages]
 }
-function openPackage(item) {
+function openPackage(item, focus = null) {
   state.activePackage = item
+  state.focus = focus
   rememberPackage(item.id, 'просмотр')
   state.node = item.view === 'calculation' ? 1 : null
   if (state.page === 'loginom') dismiss()
@@ -1339,6 +1379,22 @@ function downloadEditedPackage() {
   setTimeout(() => URL.revokeObjectURL(url),1000)
   toast('Учебный .lgp скачивается')
 }
+// В-67: a node's facts as the product is to show them (see the comment on 'sales-improve'). «Продажи.lgp» (and its backup) is the «before» of the agent's
+// copy, the replaced version is its «after»; other demo packages have no facts.
+function nodeFacts(view, title) {
+  const node = packageViews['sales-improve'].find(([, name, , , status, before]) =>
+    view === 'sales' ? status !== 'add' && (before || name) === title : view === 'sales-v2' ? status !== 'del' && name === title : name === title)
+  return ['sales','sales-v2','sales-improve'].includes(view) ? node?.[6] : undefined
+}
+function nodeFactsHtml(facts, mode) {
+  if (!facts) return ''
+  const [type, rows] = facts
+  if (mode !== 'diff') return `<dl class="node-facts"><div><dt>Узел Loginom</dt><dd>${esc(type)}</dd></div>${rows.map(([label,before,after]) => label !== 'Имя' && (mode === 'before' ? before : after)
+    ? `<div><dt>${esc(label)}</dt><dd>${esc(mode === 'before' ? before : after)}</dd></div>` : '').join('')}</dl>`
+  return `<table class="facts-diff"><caption>Узел Loginom: ${esc(type)}</caption><thead><tr><th scope="col">Настройка или порт</th><th scope="col">Было</th><th scope="col">Стало</th></tr></thead>
+    <tbody>${rows.map(([label,before,after]) => `<tr${before === after ? ' class="same"' : ''}><th scope="row">${esc(label)}</th>${before === after
+      ? `<td colspan="2">${esc(before)} <span class="muted">· не менялось</span></td>` : `<td class="was" data-label="Было">${esc(before || '—')}</td><td class="now" data-label="Стало">${esc(after || '—')}</td>`}</tr>`).join('')}</tbody></table>`
+}
 // The working copy on the schema: added, changed and removed nodes marked; a selected node shows before → after.
 function changedPackage(item) {
   const nodes = packageViews['sales-improve']
@@ -1355,7 +1411,8 @@ function changedPackage(item) {
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span></div>
     <div class="package-canvas diff-canvas" aria-label="Схема пакета с изменениями">${shown.map(([glyph,title,kind,detail,status,before],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''} ${status && !showBefore ? 'is-' + status : ''}" data-node="${i}" aria-pressed="${state.node === i}">${status && !showBefore ? `<span class="node-mark">${mark[status]}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${showBefore && before ? before : title}</strong><small>${kind}</small></button>`).join('')}</div>
-    <div class="package-foot" role="status">${node ? (node[4] && !showBefore ? `<strong>${mark[node[4]]}: ${esc(node[1])}.</strong> ${esc(node[3])}${node[5] && node[4] === 'mod' ? `<br><span class="muted">Было: ${esc(node[5])}.</span>` : ''}` : esc(node[2] + (showBefore && node[4] === 'mod' ? ' — до изменений' : ''))) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
+    <div class="package-foot" role="status">${node ? (node[4] && !showBefore ? `<strong>${mark[node[4]]}: ${esc(node[1])}.</strong> ${esc(node[3])}${nodeFactsHtml(node[6],'diff')}`
+      : esc(node[2] + (showBefore && node[4] === 'mod' ? ' — до изменений' : '')) + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
     <div class="package-save-bar">
       ${current === 'draft' ? `<button class="btn primary" data-change="save:${item.changeOf?.at}">${icon('plus',15)} Сохранить новой версией</button><button class="btn quiet" data-change="replace:${item.changeOf?.at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="discard:${item.changeOf?.at}">Отменить изменения</button>` : ''}
       ${chat ? `<button class="link-btn" data-session="${chat.id}">${icon('message',16)} Вернуться к разговору</button>` : ''}
@@ -1377,11 +1434,13 @@ function packages() {
   const isCalculation = item.view === 'calculation'
   const dirty = hasPackageEdits(item)
   const canDownload = dirty || Boolean(item.savedVersion)
+  const focus = state.focus?.pkg === item.id && state.focus.view === item.view ? state.focus : null
+  const node = Number.isInteger(state.node) ? nodes[state.node] : null
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span></div>
-    <div class="package-canvas" aria-label="Схема пакета">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}" data-node="${i}"><span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
-    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${Number.isInteger(state.node) ? nodes[state.node][3]:'Выберите узел, чтобы увидеть сведения.'}</div>`}
+    <div class="package-canvas${focus ? ' focus-canvas' : ''}" aria-label="Схема пакета">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}${focus?.nodes.includes(i) ? ' is-focus' : ''}" data-node="${i}">${focus?.nodes.includes(i) ? '<span class="node-mark">Замечание</span>' : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
+    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${esc(node[3])}` + nodeFactsHtml(nodeFacts(item.view, node[1]), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
     <div class="package-save-bar">
       ${isCalculation ? `<span class="package-save-status${dirty ? ' dirty' : ''}" role="status">${icon(dirty ? 'circle' : 'check',15)} ${dirty ? 'Есть несохранённые изменения' : item.savedVersion ? 'Сохранено в Loginom · демо' : 'Исходная версия'}</span>`
         : ''}
@@ -1398,17 +1457,16 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
-    ['Навык из разговора','«Каталог» → «Создать своё» → «Навык» → «Из разговора». Агент составляет черновик, приложение находит в нём данные из ваших файлов — их можно убрать.',[['own-chat','Начать']]],
-    ['Попробовать навык','Проба идёт в отдельном разговоре: в ленте шаг «Применил навык», ответ — по правилам навыка.',[['own-trial','Начать']]],
-    ['Навык из файла','ZIP от коллеги: программа внутри не принимается; перед включением — отметка, что Loginom этот навык не проверял.',[['own-file','Начать']]],
-    ['Опубликовать','«Мои» → «Опубликовать для всех»: проверка, что именно уйдёт, подтверждение почты, квитанция. В закрытом контуре — «Передать администратору».',[['own-mine','Начать']]],
+    ['Замечание на схеме','Отправьте «Проверь сценарий продаж», затем у замечания — «Показать на схеме»: откроется «Продажи.lgp», нужные узлы подсвечены. Нажмите узел — его настройки и связи.',[['try-check','Начать']]],
+    ['Правка: было / стало','Отправьте «Внеси улучшения в сценарий продаж». В карточке правки у каждого узла — «Настройки и связи»: условие, поля, входы и выходы до и после. «Посмотреть на схеме» — то же по узлу.',[['try-improve','Начать']]],
+    ['Перед заменой исходного','В той же карточке — «Заменить исходный…»: какие пакеты из доступных вам папок ссылаются на «Продажи.lgp» и есть ли в копии узлы, на которые они ссылаются; что не проверено.',[['try-improve','Начать']]],
     ['Консоль модерации','Только для прототипа: служебный экран Loginom. Одобрить, вернуть с замечанием, отозвать — статус сразу виден автору в «Моих».',[['own-moderation','Открыть']]],
-    ['Своё действие','«Документировать» с вашими настройками: появляется в «Что сделать с пакетом» → «Ещё», мастер открывается с ними.',[['own-action','Начать']]],
     ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
   // Open owner questions, each with a recommended variant; empty when everything is decided.
   const questions = []
   const changed = [
+    'Итерация 7 (В-67): у замечаний проверки — «Показать на схеме»; выбранный узел «Продажи.lgp» показывает тип, основные настройки и связи; в карточке правки — «Настройки и связи» до и после; перед заменой исходного — какие пакеты ссылаются на него и есть ли в копии их узлы.',
     'По оценке администраторами (задание 3): над полем ввода сказано, что данные уйдут в облачную модель, если к сообщению что-то приложено; при ошибке в политике — причина там же; полоса каталога и тексты запретов зависят от того, действует ли политика; на «открой сайт» при запрете агент отвечает, кто запретил; в закрытом контуре навык отдают только через «Передать администратору…».',
     'По оценке экспертами (задание 2): «Контекст» показывает план, файлы и шаги этого ответа и что агент учитывает; схема «Продажи» совпадает с проверкой; замена исходного относится к своей карточке; поиск находит разговор по файлу; «Подключить публичный стенд» и «Свой сервер Loginom».',
     'По первым оценкам агентами: «Улучшить» правит копию; папка Loginom — по логину; у документа полный путь и имя «… — описание.docx»; запуск очищает поле ввода; в проверке видно «Применил навык» или «Учёл инструкции проекта»; адрес сервера в уведомлении о подключении.',
@@ -1453,7 +1511,7 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 6 — создать и опубликовать</p><h1>Что решить</h1><p>Новое — свои навыки и действия: создать, попробовать, пользоваться самому, опубликовать для всех. Пройдите пути, около 10 минут. Открытых вопросов нет — решения ниже.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 7 — глубина Loginom</p><h1>Что решить</h1><p>Новое — пакет Loginom подробнее: замечание проверки ведёт к узлу на схеме, в правке видны настройки и связи узлов до и после, перед заменой — какие пакеты ссылаются на исходный. Около 5 минут. Открытых вопросов нет — решения ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>` : ''}
@@ -1532,7 +1590,7 @@ function overlay() {
     search: ['Поиск', kind === 'search' ? `<label class="sr-only" for="chat-search">Поиск по проектам и разговорам</label><input id="chat-search" class="search-input" type="search" autocomplete="off" placeholder="Название, проект или слова из запроса"><div id="search-results" class="search-results">${searchResults('')}</div>` : ''],
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
-    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан изменённой копией. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p><p class="dialog-desc">Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию. Расписание и ссылки из других пакетов агент не проверял.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан изменённой копией. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
@@ -1580,6 +1638,7 @@ function render(resetScroll = false) {
   if (state.packageAccount && state.packageAccount !== packageAccount) {
     state.importedPackages = []
     state.activePackage = serverPackages[0]
+    state.focus = null
     state.runnerPackage = null
     state.calculationChanged = false
     state.node = null
@@ -1596,6 +1655,7 @@ function render(resetScroll = false) {
   }
   if (state.activePackage.isDraft && state.activePackage.project !== state.project) {
     state.activePackage = serverPackages[0]
+    state.focus = null
     state.node = null
   }
   const scroll = resetScroll ? 0 : ($('#main')?.scrollTop ?? 0)
@@ -1797,6 +1857,16 @@ function restoreSales() {
   state.sessions.flatMap(entry => [...(entry.history || []), entry]).forEach(turn => { if (turn.change) delete turn.change.replaced })
   toast('Вернул прежнюю версию «Продажи.lgp»')
 }
+// В-67: before a replace — which packages in the folders the user can read refer to «Продажи.lgp», and what the copy
+// does to the node each one takes results from. Mechanism: References.xml and reference nodes of those packages, read
+// through Loginom file access; how a reference node stores its target (name or id) is to be checked on real packages.
+function replaceRefs() {
+  if (!state.settings.connection.connected) return '<p class="dialog-desc">Ссылки из других пакетов не проверены: Loginom не подключён.</p>'
+  return `<div class="replace-refs"><strong>Ссылки из других пакетов</strong><p>Среди 14 пакетов в папках Loginom, которые вам доступны, на «Продажи.lgp» ссылаются два:</p><ul>
+    <li>${icon('flow',15)}<span><b>«Отчёт директору.lgp»</b> · ${esc(packageFolder('shared'))} — узел-ссылка на узел «Выручка по регионам». Этот узел и его выход в копии есть. Цифры изменятся: строки без цены или региона в расчёт больше не попадают.</span></li>
+    <li class="bad">${icon('alert',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». В копии этого узла нет — ссылаться будет не на что.</span></li></ul>
+    <p>Если «Города — неделя.lgp» нужен, отмените замену и сохраните изменения новой версией: исходный останется как есть.</p></div>`
+}
 // Replacing the original is a separate, explicit step: the agent keeps a backup first.
 function replacePackage() {
   const item = state.sessions.find(entry => entry.id === state.replaceTurn?.session)
@@ -1922,6 +1992,7 @@ const actions = {
   'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
+  'try-improve':() => tryPrompt('Внеси улучшения в сценарий продаж'),
   'try-question':() => tryPrompt('Проверь выгрузку на пропуски и дубликаты'),
   'try-detail':() => {
     if (stage === 'used' && state.sessions.some(item => item.id === 'seed-sales')) return openSession('seed-sales')
@@ -2000,6 +2071,7 @@ const actions = {
   },
   'edit-package-example':() => {
     state.activePackage = editablePackage
+    state.focus = null
     state.node = 1
     render()
     $('.calculation-inspector button')?.focus()
@@ -2173,6 +2245,14 @@ function menuAction(act) {
   render()
   if (menu.keyboard && !state.overlay) menuOpener(menu)?.focus()
 }
+// «Настройки и связи» in the change card stays open across redraws (В-67); «toggle» does not bubble, so capture it.
+app.addEventListener('toggle', event => {
+  const key = event.target.dataset?.facts
+  if (!key) return
+  state.openFacts ??= new Set()
+  if (event.target.open) state.openFacts.add(key)
+  else state.openFacts.delete(key)
+}, true)
 app.addEventListener('click', event => {
   const opener = event.target.closest('[data-menu]')
   if (opener) {
@@ -2259,6 +2339,7 @@ app.addEventListener('click', event => {
   }
   if (d.agentMode) { state.mode = d.agentMode; return dismiss() }
   if (d.review) { state.reviewTab = d.review; return render() }
+  if (d.finding != null) return showFinding(Number(d.finding))
   if (d.node != null) {
     state.node = Number(d.node)
     render()

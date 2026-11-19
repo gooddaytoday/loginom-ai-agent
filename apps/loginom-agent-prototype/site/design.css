@@ -503,7 +503,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .change-list li{display:flex;gap:10px;padding:6px 12px;font-size:14px;line-height:1.4}
 .change-list .mark{flex:none;width:16px;font-weight:700;text-align:center}
 .change-list li.c-add .mark{color:var(--success)}.change-list li.c-mod .mark{color:var(--amber)}.change-list li.c-del .mark{color:var(--accent)}
-.change-list li>span:last-child{color:var(--ink)}
+.change-list li>:last-child{color:var(--ink)}
 .change-list li.c-del strong{text-decoration:line-through}
 .change-check{display:flex;align-items:center;gap:6px;margin:0;padding:8px 12px;border-top:1px solid var(--line);color:var(--success);font-size:13px}
 .change-card.is-saved .change-head,.change-card.is-replaced .change-head{background:var(--success-soft)}
@@ -523,3 +523,30 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 @media(max-width:690px){.diff-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.diff-canvas .canvas-connector{display:none}.diff-canvas .canvas-node{flex:1 1 40%;width:auto}.package-top .detail-toggle{margin-left:0}.change-actions .discard-link{margin-left:0}}
 @media(max-width:690px){.package-top{flex-wrap:wrap}.package-top .detail-toggle{flex-basis:100%}.package-top .detail-toggle button{flex:1}}
 .delete-folder{display:flex;gap:8px;align-items:center;margin:4px 0 6px;font-size:14px}.delete-folder input{accent-color:var(--accent)}
+/* В-67: a finding's nodes on the schema, node facts, before → after, references before a replace */
+.focus-canvas .canvas-node{position:relative}
+.canvas-node.is-focus{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-soft),0 0 0 1px var(--amber) inset}
+.is-focus .node-mark{color:var(--amber)}
+.focus-note{margin:0 0 6px;color:var(--ink)}
+.finding-link{font-size:13px;margin-left:2px}
+.node-facts{display:grid;gap:3px;margin:8px 0 0;font-size:13px}
+.node-facts>div{display:grid;grid-template-columns:minmax(120px,240px) 1fr;gap:10px}
+.node-facts dt{color:var(--muted)}.node-facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.facts-diff{width:100%;margin:8px 0 2px;border-collapse:collapse;font-size:13px;color:var(--ink)}
+.facts-diff caption{text-align:left;color:var(--muted);padding:0 0 4px;font-size:12.5px}
+.facts-diff th,.facts-diff td{padding:4px 8px;border-top:1px solid var(--line);text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.facts-diff thead th{color:var(--muted);font-weight:600;border-top:0}
+.facts-diff tbody th{font-weight:500;color:var(--muted);width:32%}
+.facts-diff td.was{color:var(--accent)}.facts-diff td.now{color:var(--success)}
+.change-facts{margin-top:4px}
+.change-facts summary{cursor:pointer;color:var(--blue);font-size:13px;width:max-content}
+.replace-refs{margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px}
+.replace-refs p{margin:6px 0}
+.replace-refs ul{list-style:none;margin:6px 0;padding:0;display:grid;gap:6px}
+.replace-refs li{display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+.replace-refs li .icon{flex:none;margin-top:3px}
+.replace-refs li.ok .icon{color:var(--success)}.replace-refs li.bad .icon{color:var(--accent)}
+@media(max-width:560px){.node-facts>div{grid-template-columns:1fr;gap:0}.facts-diff thead{display:none}.facts-diff tr{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}.facts-diff tbody th{grid-column:1/-1;width:auto}.facts-diff th,.facts-diff td{border-top:0}.facts-diff tr.same td{grid-column:1/-1}.facts-diff td[data-label]::before{content:attr(data-label) ": ";color:var(--muted)}}
+.change-list .change-facts{max-width:100%}.change-list li>:last-child{flex:1;min-width:0}
+.canvas-node.is-focus.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 0 0 2px var(--amber) inset}
+@media(max-width:690px){.package-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.package-canvas .canvas-connector{display:none}.package-canvas .canvas-node{flex:1 1 40%;width:auto}}
