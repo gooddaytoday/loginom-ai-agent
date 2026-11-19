@@ -103,7 +103,7 @@ export async function finishPublish(input: Pick<Prepared, "publication" | "contr
             let cleanup = ""
             try { removePublishedSample(input.work, input.control.snapshotId) } catch { cleanup = " Не удалось удалить локальный образец." }
             return { status: "published" as const, version,
-              text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard." +
+              text: "Dashboard опубликован. Открытый дашборд в Studio обновится автоматически. Если окно закрыто, откройте Dashboard на узле." +
                 (decoded.value.currentVersion?.name !== version.name ? " На стенде уже активна более новая версия." : "") + baseWarning + cleanup,
             }
           }

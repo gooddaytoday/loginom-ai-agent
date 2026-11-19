@@ -178,6 +178,58 @@ test("a failed newer publication reports its error while the previous dashboard 
   assert.deepEqual(app.errors, [])
 })
 
+test("an open dashboard follows ready publications and keeps its live header parameters", async t => {
+  const app = await fixture(t)
+  const key = "a".repeat(64)
+  const hash = "c".repeat(64)
+  const next = `${app.appOrigin}/apps/${key}/${hash}/`
+  const lookup = `${app.origin}/dashboard/lookup`
+  let response
+  await app.page.route(lookup, route => response ? route.fulfill(response) : route.fallback())
+  await app.page.route(`${next}**`, async route => {
+    const asset = route.request().url().slice(next.length)
+    await route.fulfill({ response: await route.fetch({ url: `${app.appOrigin}/apps/${key}/${"b".repeat(64)}/${asset}` }) })
+  })
+
+  await app.page.getByRole("button", { name: "Создать dashboard", exact: true }).click()
+  const link = app.page.getByRole("link", { name: "Открыть чат в Desktop", exact: true })
+  await link.waitFor()
+  const overlay = await app.page.locator("#dashboard-tab-overlay").elementHandle()
+  app.publish()
+  await app.page.getByText("Версия 20261115T120000Z", { exact: true }).waitFor({ timeout: 7_000 })
+  assert.deepEqual((await app.settled()).parameters, [{ name: "MinBudget", value: 0 }])
+  assert.equal(await link.count(), 0)
+
+  const input = app.page.getByLabel("MinBudget", { exact: true })
+  await app.page.evaluate(() => { window.fixture.rows = [[99]] })
+  await input.fill("17")
+  await input.press("Enter")
+  assert.deepEqual((await app.settled(1)).parameters, [{ name: "MinBudget", value: 17 }])
+  const oldFrame = app.frame()
+  const focusedInput = await input.elementHandle()
+  await input.fill("29")
+
+  response = { status: 503 }
+  await app.page.waitForResponse(result => result.url() === lookup && result.status() === 503, { timeout: 7_000 })
+  assert.equal(app.frame(), oldFrame)
+  response = { json: {
+    exists: true, key, hash, appOrigin: app.appOrigin, mode: "normal", cliButton: false,
+    currentVersion: { name: "20261115T120001Z.json", sourceHash: hash }, latest: null,
+  } }
+  await app.page.locator(`iframe[src="${next}"]`).waitFor({ timeout: 7_000 })
+  const state = await app.settled()
+  assert.notEqual(app.frame(), oldFrame)
+  assert.deepEqual(state.parameters, [{ name: "MinBudget", value: 17 }])
+  assert.deepEqual(state.table.rows, [[99]])
+  assert.equal(await overlay.evaluate(element => element.isConnected), true)
+  assert.equal(await focusedInput.evaluate(element => document.activeElement === element && element.value === "29"), true)
+  await app.page.getByText("Версия 20261115T120001Z", { exact: true }).waitFor()
+  assert.equal(await app.page.evaluate(() => window.channels), 2)
+  assert.equal(await app.page.evaluate(() => window.fixture.calls), 1)
+  assert.equal(app.snapshots.length, 1)
+  assert.deepEqual(app.errors, [])
+})
+
 test("dashboard tables retain at most ten thousand rows and report the full count", async t => {
   const app = await fixture(t, { published: true, table: {
     schema: [{ name: "count", type: 1 }], rows: Array.from({ length: 10_001 }, (_, index) => [index]),

@@ -1,9 +1,9 @@
 import type { DashboardState } from "../sdk/loginom"
 
-export const ALLOW =
-  "camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; " +
-  "display-capture 'none'; fullscreen 'none'; payment 'none'; publickey-credentials-get 'none'; " +
-  "identity-credentials-get 'none'; usb 'none'; serial 'none'; hid 'none'; bluetooth 'none'"
+export const ALLOW = (
+  "camera microphone geolocation clipboard-read clipboard-write display-capture fullscreen payment " +
+  "publickey-credentials-get identity-credentials-get usb serial hid bluetooth"
+).split(" ").join(" 'none'; ") + " 'none'"
 
 export function isMessage(data: unknown, type: string) {
   if (typeof data !== "object" || data === null || Array.isArray(data) || Object.keys(data).length !== 2) return false
@@ -20,6 +20,12 @@ export function sandboxFrame(src: string) {
   return frame
 }
 
+export function connectFrame(frame: HTMLIFrameElement) {
+  const channel = new MessageChannel()
+  frame.contentWindow!.postMessage({ type: "loginom-dashboard/init", version: 1 }, "*", [channel.port2])
+  return channel.port1
+}
+
 export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): void; silent(): void; ready?(): void }) {
   let port: MessagePort | undefined
   let last: (DashboardState & { type: "state" }) | undefined
@@ -34,6 +40,7 @@ export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): vo
     if (reason) console.warn("Dashboard closed: " + reason)
     clearTimeout(timer)
     removeEventListener("message", listen)
+    frame.onload = null
     port?.close()
   }
   const close = (reason?: string) => {
@@ -58,18 +65,16 @@ export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): vo
     if (!isMessage(event.data, "loginom-dashboard/ready")) return
     if (port) return close("second ready")
     clearTimeout(timer)
-    const channel = new MessageChannel()
-    port = channel.port1
+    port = connectFrame(frame)
     // Consume reverse messages so the port cannot retain an unbounded disabled queue.
     port.onmessage = admit
-    frame.contentWindow!.postMessage({ type: "loginom-dashboard/init", version: 1 }, "*", [channel.port2])
     if (last) port.postMessage(last)
     handlers.ready?.()
   }
   // The first load may come before or after the first ready; any later document is foreign.
-  frame.addEventListener("load", () => {
+  frame.onload = () => {
     if (++loads > 1) close("frame navigated")
-  })
+  }
   addEventListener("message", listen)
   return {
     send(state: DashboardState & { type: "state" }) {
