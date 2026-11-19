@@ -1468,7 +1468,7 @@ function review() {
   // Open owner questions, each with a recommended variant; empty when everything is decided.
   const questions = []
   const changed = [
-    'По вашему замечанию (В-72): «Посмотреть в Loginom» — в карточке правки, на схеме изменений, в окне замены и на странице пакета. Копия, которую правит агент, лежит в Loginom в папке «Копии агента», её тоже можно открыть.',
+    'По вашему замечанию (В-72): «Посмотреть в Loginom» — в карточке правки, на схеме изменений, в окне замены и на странице пакета. Копия, которую правит агент, лежит в Loginom в папке «Копии агента», её тоже можно открыть. Проверено на стенде: пока пакет открыт в Loginom, заменить его нельзя — окно замены об этом говорит; окно Loginom открывается минуту-две.',
     'Итерация 7 (В-67): у замечаний проверки — «Показать на схеме»; выбранный узел «Продажи.lgp» показывает тип, основные настройки и связи; в карточке правки — «Настройки и связи» до и после; перед заменой исходного — какие пакеты ссылаются на него и есть ли в копии их узлы.',
     'По оценке администраторами (задание 3): над полем ввода сказано, что данные уйдут в облачную модель, если к сообщению что-то приложено; при ошибке в политике — причина там же; полоса каталога и тексты запретов зависят от того, действует ли политика; на «открой сайт» при запрете агент отвечает, кто запретил; в закрытом контуре навык отдают только через «Передать администратору…».',
     'По оценке экспертами (задание 2): «Контекст» показывает план, файлы и шаги этого ответа и что агент учитывает; схема «Продажи» совпадает с проверкой; замена исходного относится к своей карточке; поиск находит разговор по файлу; «Подключить публичный стенд» и «Свой сервер Loginom».',
@@ -1594,7 +1594,7 @@ function overlay() {
     search: ['Поиск', kind === 'search' ? `<label class="sr-only" for="chat-search">Поиск по проектам и разговорам</label><input id="chat-search" class="search-input" type="search" autocomplete="off" placeholder="Название, проект или слова из запроса"><div id="search-results" class="search-results">${searchResults('')}</div>` : ''],
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
-    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${replaceSource().what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если пакет запускается по расписанию или его открывают коллеги, они сразу получат изменённую версию.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton(replaceSource().target, replaceSource().label)}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${replaceSource().what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если «Продажи.lgp» сейчас открыт в Loginom — у коллеги или у вас в окне Loginom, — заменить не получится, пока его не закроют: Loginom держит открытый пакет занятым. Запуски по расписанию после замены пойдут по изменённой версии.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton(replaceSource().target, replaceSource().label)}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'loginom-window': ['Окно Loginom', kind === 'loginom-window' ? loginomWindow() : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
@@ -1886,7 +1886,9 @@ function replaceRefs() {
 // other. In the product the button opens a separate Loginom window (not the conversation's agent browser, which is
 // signed out after the answer), signs in with this connection and opens the package by its path; while open, the
 // window takes one Loginom session. Editing a copy instead of the original needs a change to the agent's skill (ux-spec,
-// iteration 7). The prototype shows the package's nodes instead.
+// iteration 7). The prototype shows the package's nodes instead. Checked on the stand (Loginom 7.4.2, 19.11.2026): a package
+// open in another session opens read-only («Сохранить» disabled, «Сохранить как…» works); overwriting a package open
+// elsewhere fails («Этот файл уже используется другим процессом»); the window must close the package before signing out.
 // Each improvement turn has its own copy, named when the turn starts; the number never repeats.
 function newAgentCopy() {
   state.copyCount = (state.copyCount || 0) + 1
@@ -1920,11 +1922,11 @@ function viewInLoginom(target) {
 }
 function loginomWindow() {
   const view = state.loginomView
-  return `<p class="dialog-desc">Здесь откроется окно Loginom с этим пакетом — таким, какой он сейчас в Loginom, без отметок агента. В нём можно открыть узлы, посмотреть данные и запустить пакет. Пока окно открыто, оно занимает одну сессию Loginom.</p>
+  return `<p class="dialog-desc">Здесь откроется окно Loginom с этим пакетом — таким, какой он сейчас в Loginom, без отметок агента. В нём можно открыть узлы, посмотреть данные и запустить пакет. Открывается не сразу: вход в Loginom и открытие пакета могут занять минуту-две. Пока окно открыто, оно занимает одну сессию Loginom.</p>
     <div class="loginom-window"><div class="lw-bar">${icon('flow',15)}<code>${esc(view.path + '/' + view.name)}</code></div>
       <ol class="lw-nodes">${(packageViews[view.view] || []).map(([glyph,title,kind]) => `<li><span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,16)}</span><span><strong>${esc(title)}</strong><small>${esc(nodeFacts(view.view, title)?.[0] || kind)}</small></span></li>`).join('')}</ol>
       <p class="lw-note">Прототип: вместо Loginom — список узлов пакета.</p></div>
-    ${view.copy ? '<p class="dialog-desc">Копию можно поменять и здесь. Если вы её сохраните, приложение это заметит: «было / стало» пересчитается, а сверка агента будет помечена как устаревшая.</p>' : ''}
+    <p class="dialog-desc">${view.copy ? 'Копию можно поменять и здесь. Если вы её сохраните, приложение это заметит: «было / стало» пересчитается, а сверка агента будет помечена как устаревшая. Пока окно открыто, копия занята им: агент сможет сохранить её только новой версией.' : 'Пока пакет открыт здесь, он занят этим окном: заменить его из разговора не получится, пока окно не закрыто.'}</p>
     <div class="button-row"><button class="btn primary" data-action="dismiss">${view.back ? 'Вернуться к замене' : 'Закрыть'}</button></div>`
 }
 // Replacing the original is a separate, explicit step: the agent keeps a backup first.
