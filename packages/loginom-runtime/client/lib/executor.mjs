@@ -4001,10 +4001,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         outcome=await runtime.runNodeTarget(request,{operationId:id,signal,resume:true,actionKey:'node.delete'});
       const result=outcome.output??{};
       const deleted=result.deleted_node;
+      // LAB-1904: a deleted REST leaves its connection reference on the graph.
+      // Name it only when no other REST still uses it in the final graph.
+      const finalGraph=operation?.targetPhase?.final_graph;
+      const unused=outcome.status==='SUCCEEDED'&&deleted?.type==='integration.rest_request'&&finalGraph
+        ?[...new Set((result.removed_service_links??[]).map(e=>e.source))].filter(id=>finalGraph.nodes.some(n=>n.ref.node_id===id&&n.type==='bg-vendor-icon-restclientconnection')
+          &&!(finalGraph.rest_connection_links??[]).some(e=>e.source===id||e.target===id)&&!finalGraph.links.some(e=>e.source===id||e.target===id)):[];
       return settled({...outcome,output:{node:null,package_saved:false,
         warnings:outcome.status==='SUCCEEDED'&&deleted?['Deleted node '+JSON.stringify(deleted.label)+' ('+deleted.type+') with '
           +(result.removed_links.length+result.removed_variable_links.length+result.removed_service_links.length)
-          +' own link(s); other nodes and links are unchanged. The package is not saved: use package.save_checkpoint.']
+          +' own link(s); other nodes and links are unchanged. The package is not saved: use package.save_checkpoint.',
+          ...unused.map(id=>'Its connection reference '+JSON.stringify(finalGraph.nodes.find(n=>n.ref.node_id===id).label)+' ('+id+') is now unused by any REST. '
+            +'When this REST was replaced, delete that reference too with dock_node_delete (NodeRef only, no label).')]
           :outcome.status==='NOT_APPLIED'?['Nothing was deleted: '+String(result.error??'precondition refused')]:[],
         ...(deleted?{output:{status:'deleted'},deleted_node:deleted}:{})}},
         outcome.status==='SUCCEEDED'?null:outcome.status==='NOT_APPLIED'

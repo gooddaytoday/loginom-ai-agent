@@ -258,6 +258,9 @@ Prevent avoidable retries:
 именно этот узел либо подтверждена конкретная операция, недоступная стандартной
 композиции. До выбора JS прочитай границы допуска в [файле узла](references/nodes/programming.javascript.md).
 Существующие JS-узлы не удаляй автоматически.
+REST continuation, new URL/query: the request authorizes replacement, don't ask.
+New REST, unique label; delete old REST, its URL encoder, unused connection ref (no label); reconnect consumers
+(existing target, parameters:{}). No duplicate union/Calculator/Export.
 Узел удаляй только по явной просьбе пользователя: `loginom_dock_node_delete` с NodeRef
 из квитанции. Отказ (узел выполняется, заблокирован или служебный) не обходи и не повторяй;
 сообщи пользователю. После удаления сохрани пакет; связи переподключай только по задаче.

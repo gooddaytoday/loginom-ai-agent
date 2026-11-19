@@ -142,7 +142,8 @@ test('D82 existing connected REST refuses before effects and directs changed que
   assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);
   assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
   assert.deepEqual(calls,['observe']);assert.deepEqual(graph,before);
-  assert.match(result.error.message,/next_step: dock_node_apply with a NEW operation_id/);
+  assert.match(result.error.message,/next_step: 1\) dock_node_apply with a NEW operation_id/);
+  assert.match(result.error.message,/dock_node_delete the replaced REST rest/);
   assert.match(result.error.message,/NEW integration.rest_request target/);assert.match(result.error.message,/NEW unique connection name and base_url/);
   assert.match(result.error.message,/reuse.*only.*unchanged/);
   assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'new',type:'integration.rest_request'},
@@ -175,4 +176,72 @@ test('D88 the explicitly confirmed connected source is preserved before connecti
  assert.equal(operation.restQueryEncoder,undefined,'the confirmed input must not get another encoder');
  assert.equal(operation.restQueryInput,undefined,'the existing data edge must not be authorized for replacement');
  assert.equal(events.some(e=>e.operation_id?.startsWith('rest-url-')),false);
+});
+
+// LAB-1904 r5/model.stdout:65→80: the refusal named only "a NEW REST", so the
+// continuation left the old REST and duplicated union, Calculator and Export.
+test('LAB-1904 refusal names the replaced REST, its generated encoder and each consumer to reconnect',async()=>{
+ const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
+  mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
+ r.parameters.connection={name:'Echo audience',base_url:'https://echo.test/anything/audience'};
+ const id=node_id=>({document_id:'doc',workflow_id:'flow',node_id});
+ const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,nodes:[
+  {ref:id('rest'),type:'integration.rest_request'},{ref:id('import'),type:'imports.text'},
+  {ref:id('old'),type:'programming.javascript',label:'URL query encoding '+'d'.repeat(32)},
+  {ref:id('union'),type:'transform.col_union_data'},{ref:id('calc'),type:'transform.calculator'}],
+  links:[{source:'import',output:0,target:'old',input:0},{source:'old',output:0,target:'rest',input:0},
+   {source:'rest',output:1,target:'union',input:1},{source:'rest',output:0,target:'union',input:0},
+   {source:'import',output:0,target:'union',input:2},{source:'union',output:0,target:'calc',input:0}],
+  rest_connection_links:[{tid:'t',source:'conn',target:'rest',output:'connection:0',input:'connection:0'}]},before=structuredClone(graph);
+ graph.nodes.push({ref:id('conn'),type:'bg-vendor-icon-restclientconnection',label:'↶Echo'});before.nodes.push(structuredClone(graph.nodes.at(-1)));
+ const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>structuredClone(graph)}};
+ const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+  execute:async()=>assert.fail('No browser mutation or encoder operation may start')});
+ const error=await drivers.beforeTarget({deadline:Date.now()+60000}).then(()=>assert.fail('must refuse'),e=>e);
+ assert.equal(error.nodePhaseRefusal.effect_possible,false);assert.equal(operation.restQueryEncoder,undefined);
+ assert.match(error.message,/dock_node_delete the replaced REST rest and then its generated URL encoder old, then its connection reference conn that no other REST uses \(NodeRef only, no label\)\./);
+ assert.match(error.message,/transform\.col_union_data union inputs:\[\{output:0,input:0\},\{output:1,input:1\}\]/);
+ assert.doesNotMatch(error.message,/calc|import inputs|existing REST and its input are preserved/);
+ assert.match(error.message,/Do not duplicate the union, Calculator or Export/);
+ // ab-1904-f r5/model.stdout:70→161: an unlabeled new REST took 'REST-запрос@0' beside the old one and the Save graph check failed.
+ assert.match(error.message,/NEW integration.rest_request target with a NEW unique target.label/);
+ assert.deepEqual(graph,before);
+ // A reference shared with another REST is never offered for deletion.
+ graph.rest_connection_links.push({tid:'t2',source:'conn',target:'other',output:'connection:0',input:'connection:0'});
+ const sharedError=await drivers.beforeTarget({deadline:Date.now()+60000}).then(()=>null,e=>e);
+ assert.doesNotMatch(sharedError.message,/connection reference/);
+ graph.nodes[2].label='Parse response';
+ const user=await createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation:{...operation,restQueryEncoder:undefined},now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),execute:async()=>assert.fail('no effect')})
+  .beforeTarget({deadline:Date.now()+60000}).then(()=>null,e=>e);
+ assert.doesNotMatch(user.message,/URL encoder old/,'a user JavaScript node is never offered for deletion');
+});
+
+// LAB-1904: a new URL on the REST input already fed by its encoder reaches the
+// saved-connection refusal (rest-connection.mjs:148); it must name the replacement.
+test('LAB-1904 changed connection on an existing REST names the same replacement steps',async()=>{
+ const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
+  inputs:[{source:{document_id:'doc',workflow_id:'flow',node_id:'old'},output:0,input:0}],
+  mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false}};
+ r.parameters.connection={name:'Echo audience',base_url:'https://echo.test/anything/audience'};
+ const id=node_id=>({document_id:'doc',workflow_id:'flow',node_id});
+ const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,nodes:[
+  {ref:id('rest'),type:'integration.rest_request'},{ref:id('import'),type:'imports.text'},
+  {ref:id('old'),type:'programming.javascript',label:'URL query encoding '+'d'.repeat(32)},{ref:id('union'),type:'transform.col_union_data'}],
+  links:[{source:'import',output:0,target:'old',input:0},{source:'old',output:0,target:'rest',input:0},
+   {source:'rest',output:0,target:'union',input:0},{source:'rest',output:1,target:'union',input:1},{source:'import',output:0,target:'union',input:2}]};
+ const before=structuredClone(graph),calls=[];
+ const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>{calls.push('observe');return structuredClone(graph);}}};
+ const refusal=message=>async()=>{calls.push('connection');return {status:'NOT_APPLIED',action_key:'node.rest.connection.internal',operation_id:operation.id+':n'+operation.nodeStepSequence,
+  phase:'connection',effect_possible:false,cleanup_complete:true,error:{message},output:{verified:false}};};
+ const run=async message=>{operation.nodeStepSequence=0;calls.length=0;
+  const drivers=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),execute:refusal(message)});
+  return drivers.beforeTarget({deadline:Date.now()+60000}).then(()=>assert.fail('must refuse'),e=>e);};
+ const error=await run('REST connection: requested connection differs from the existing REST reference; use a new REST target and operation_id');
+ assert.match(error.message,/requested connection differs.*next_step: 1\) dock_node_apply with a NEW operation_id/);
+ assert.match(error.message,/dock_node_delete the replaced REST rest and then its generated URL encoder old \(NodeRef only, no label\)\./);
+ assert.match(error.message,/transform\.col_union_data union inputs:\[\{output:0,input:0\},\{output:1,input:1\}\]/);
+ assert.deepEqual(calls,['observe','connection','observe']);assert.deepEqual(graph,before);
+ const other=await run('REST connection: saved query parameters differ');
+ assert.equal(other.message,'REST connection: saved query parameters differ');assert.deepEqual(calls,['observe','connection']);
 });

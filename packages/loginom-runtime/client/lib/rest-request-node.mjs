@@ -103,6 +103,27 @@ async function readRestOutputs(channel,read,ctx){
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }
 
+// LAB-1904 r5/model.stdout:65→80: "create a NEW REST" alone left the old REST,
+// union, Calculator and Export as a second chain. Name the replacement steps
+// with the observed refs: the old REST, its generated encoder and consumers.
+export function restReplacementStep(graph,restId,input){
+ const node=id=>graph.nodes.find(n=>n.ref.node_id===id);
+ const encoder=input&&node(input.source);
+ const generated=!!encoder&&encoder.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
+  &&graph.links.filter(e=>e.source===input.source).length===1&&!(graph.variable_links??[]).some(e=>e.source===input.source||e.target===input.source);
+ // The saved connection's graph reference is removed only when this REST alone uses it.
+ const services=graph.rest_connection_links??[],own=services.filter(e=>e.target===restId&&e.input==='connection:0');
+ const reference=own.length===1&&services.filter(e=>e.source===own[0].source).length===1&&node(own[0].source)?own[0].source:null;
+ const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
+  +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
+ return 'This REST keeps its saved connection: a new URL or query list needs a replacement REST, not a second chain. next_step: '
+  +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target with a NEW unique target.label, the requested raw inputs and query_parameters and finish:"execute". '
+  +'If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. '
+  +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')
+  +(reference?', then its connection reference '+reference+' that no other REST uses':'')+' (NodeRef only, no label). '
+  +(consumers.length?'3) Reconnect each former consumer to the new REST with dock_node_apply on the SAME existing target, the new REST as source of these inputs, parameters:{} and finish:"execute": '+consumers.join('; ')+'. '
+   +'Keep the existing parsing and Export; change only what the task asks. Do not duplicate the union, Calculator or Export.':'');
+}
 export function createRestRequestNodeSupport(config){
  const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-methods-v1',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
   configurationObservation:{condition:'owned REST wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
@@ -129,7 +150,7 @@ export function createRestRequestNodeSupport(config){
      need(links.length<=1,'input 0 is ambiguous');
      existingInput=links[0]??null;
      if(existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
-      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs and query_parameters and finish:"execute". If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. The existing REST and its input are preserved.');
+      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. '+restReplacementStep(graph,request.target.ref.node_id,existingInput));
       error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
       throw error;
      }
@@ -139,7 +160,19 @@ export function createRestRequestNodeSupport(config){
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
     const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
-    const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
+    let result;
+    try{result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);}
+    catch(error){
+     // LAB-1904: an existing REST keeps its saved connection (rest-connection.mjs:148).
+     // Name the same replacement steps from a read-only graph, never a bare new REST.
+     if(request.target.kind!=='existing'||!/requested connection differs from the existing REST reference/.test(error?.message??''))throw error;
+     let graph=null;
+     try{graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);}catch{throw error;}
+     if(graph?.complete!==true||graph.document_id!==request.document_id||JSON.stringify(graph.workflow_ref)!==JSON.stringify(request.workflow_ref))throw error;
+     const input=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
+     error.message=error.message+'. '+restReplacementStep(graph,request.target.ref.node_id,input.length===1?input[0]:null);
+     throw error;
+    }
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
    beforeInput:async(_,ctx,{channel})=>{
