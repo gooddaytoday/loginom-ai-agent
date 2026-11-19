@@ -3,6 +3,23 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("frequent recoverable mistakes have concrete preventive forms within the entry budget", () => {
+  for (const hint of [
+    'node_types:["imports.text"],modes:["delimited"]',
+    "Preparation operation conflict",
+    "repeat the original prepare arguments and operation_id",
+    "After open_package, old source_operation_id receipts are invalid",
+    "fresh workspace_observe",
+    "settings.source.source_path",
+    "verified delivery destination",
+    "label:null",
+    'label:"Amount"',
+    "reuse the existing Export",
+    "new upstream node AND a different destination",
+  ]) expect(skill).toContain(hint)
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 1_500)
+})
+
 test("existing Import edits retain verified source and Close requires a complete first form", () => {
   expect(skill).toContain("resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches)")
   expect(skill).toContain("Only unchanged Execute may omit source")
