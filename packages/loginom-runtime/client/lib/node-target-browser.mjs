@@ -479,7 +479,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         return d.FmxGraph.getSelectionCells().map(c=>({edge:c.edge===true,tid:d.FmxGraph.view.getState(c)?.shape?.node?.getAttribute('data-tid')}));});
       if(selected.length!==1 || selected[0].edge!==true || selected[0].tid!==linkTid)throw new Error('Deletion selection includes another object');
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
-      await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      const command=await wait('single_link_delete_toolbar_reachable',async()=>{
+        if(await remove.count()!==1||!await remove.isVisible()||!await remove.isEnabled())return null;
+        try{await point(remove);return {via:'toolbar'};}catch{
+          const geometry=await remove.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
+            return {outside_viewport:x<0||y<0||x>=innerWidth||y>=innerHeight,
+              box:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight}};});
+          deletion={via:'unreachable_toolbar',button_geometry:geometry};
+          return geometry.outside_viewport?{via:'delete_key',button_geometry:geometry}:null;
+        }
+      });
       // A loading mask may appear after the owned selection click. Read only
       // until it clears; never replay selection or accept changed graph/GUIDs.
       const selectedGraph=await wait('owned_link_selection_graph_ready',async()=>{
@@ -493,13 +502,18 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       // Selection redraws node bodies. Rebind only after the complete graph,
       // native link GUIDs and exact single-edge selection have been preserved.
       gestureBefore=selectedGraph;
-      await remove.click({timeout:remaining()});transient='delete';
+      deletion=command;transient='delete';
+      // Loginom documents Delete for selected graph objects. At small widths
+      // the toolbar can be outside the viewport; keep the same edge and dialog.
+      if(command.via==='delete_key')await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').press('Delete',{timeout:remaining()});
+      else await remove.click({timeout:remaining()});
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Exact single-link confirmation unavailable');
       const yes=find('msgbox;tlb;yes');
       await wait('single_link_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
+      deletion.confirmation_text='Удалить выделенную связь?';
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
       // Select exactly this node cell by a body pixel owned by it (never its
