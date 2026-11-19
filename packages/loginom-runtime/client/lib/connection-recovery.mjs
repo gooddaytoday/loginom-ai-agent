@@ -40,14 +40,20 @@ export async function guardLoginomConnection(page, binding, storageSession) {
   let a=store.get(b.session_id);
   const unchanged=()=>a&&a.document===document&&a.connection===c&&a.remote===c.FRemoteSession&&a.session===c.FSession
    &&current&&(saveRecovery||a.packages.length===current.length&&a.packages.every((p,i)=>p.node===current[i].node&&p.path===current[i].path));
+  // Loginom 7.4.2 shows a new Ext.Msg configuration only after the previous
+  // native reconnect has finished with an error. The same prompt (including a
+  // lost click reply) cannot authorize another gesture.
+  const prompt=globalThis.Ext?.Msg?.cfg;
+  const retry=!!(a?.pending&&a.prompt&&prompt&&a.prompt!==prompt);
   if(storageSession==='verify'&&!unchanged())return {reason:'owner'};
   if(a?.pending||mode==='verify'||mode==='reserve'){
    if(!unchanged())return {reason:'owner'};
    if(mode==='reserve'){
-    if(a.pending)return {reason:'attempted'};
-    a.pending=true;return {reserved:true};
+    if(a.pending&&!retry)return {reason:'attempted'};
+    a.pending=true;a.prompt=prompt;return {reserved:true};
    }
    if(connected&&form.FReconnecting===false){a.pending=false;return {connected:true,restored:true};}
+   if(mode==='observe')return {connected:false,pending:!retry,retry};
    return {reason:'attempted'};
   }
   if(connected){
@@ -65,19 +71,23 @@ export async function guardLoginomConnection(page, binding, storageSession) {
  const before=await inspect('observe');
  if(before.reason)fail(before.reason);
  if(before.connected)return;
- const title=page.locator('[data-tid="msgbox;p.h;p.t"]');
- const button=page.locator('[data-tid="msgbox;tlb;yes"]');
- try{
-  await title.waitFor({state:'visible',timeout:3000});
-  const content=page.locator('[data-tid="msgbox;cnt"]');
-  if(await title.count()!==1||await button.count()!==1||!await button.isVisible()
-   ||(await title.innerText()).trim()!=='Восстановление сессии'
-   ||(await button.innerText()).trim()!=='Восстановить'
-   ||!(await content.innerText()).replace(/\s/g,'').includes('Обнаруженразрывсвязи.Восстановитьсессию?'))fail('dialog');
- }catch{fail('dialog');}
- const reserved=await inspect('reserve');if(!reserved.reserved)fail(reserved.reason);
- // Reserve before the only gesture: timeout/lost reply never authorizes a repeat.
- await button.click({timeout:3000});
+ if(!before.pending){
+  const title=page.locator('[data-tid="msgbox;p.h;p.t"]');
+  const button=page.locator('[data-tid="msgbox;tlb;yes"]');
+  try{
+   await title.waitFor({state:'visible',timeout:3000});
+   const content=page.locator('[data-tid="msgbox;cnt"]');
+   if(await title.count()!==1||await button.count()!==1||!await button.isVisible()
+    ||(await title.innerText()).trim()!=='Восстановление сессии'
+    ||(await button.innerText()).trim()!=='Восстановить'
+    ||!(await content.innerText()).replace(/\s/g,'').endsWith(before.retry?'Восстановитьсессию?':'Обнаруженразрывсвязи.Восстановитьсессию?'))fail('dialog');
+  }catch{fail('dialog');}
+  const reserved=await inspect('reserve');if(!reserved.reserved)fail(reserved.reason);
+  // Reserve before each observed prompt: timeout/lost reply never authorizes a repeat.
+  await button.click({timeout:3000});
+ }
+ // A transport timeout does not finish the native reconnect. Later inspection
+ // waits on that same attempt instead of immediately returning "attempted".
  try{await page.waitForFunction(()=>{
   const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
   return f?.FMapTree?.FServerConnection?.Connected===true&&f.FReconnecting===false;

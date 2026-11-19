@@ -27,15 +27,15 @@ function fixture(){
  const c={Connected:true,UserName:'mimo',FRemoteSession:{},FSession:{}};
  const packageNode={PackageFileName:'/mimo/result.lgp'}, packages=[packageNode];
  const form={FReconnecting:false,FMapTree:{FServerConnection:c,PackageNodes:{get Count(){return packages.length;},Items:i=>packages[i]}}};
- const globals={document:{},location:{origin:'http://test.local'},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:form}}}},__loginomDockPreparationV1:{id:'doc'}};
+ const globals={document:{},Ext:{Msg:{cfg:{}}},location:{origin:'http://test.local'},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:form}}}},__loginomDockPreparationV1:{id:'doc'}};
  const binding=createStorageBinding({sessionId:'s',origin:globals.location.origin,build:'7.4.2',documentId:'doc',account:'mimo',directories:{packages:'/mimo',inputs:'/mimo',exports:'/mimo'}});
- const state={clicks:0,effects:0,timeout:false,title:'Восстановление сессии',onClick:()=>{c.Connected=true;form.FReconnecting=false;}};
+ const state={clicks:0,effects:0,timeout:false,title:'Восстановление сессии',content:'Обнаружен разрыв связи. Восстановить сессию?',onWait:()=>{},onClick:()=>{c.Connected=true;form.FReconnecting=false;}};
  const evaluate=async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg});
  const page={evaluate,effect:()=>++state.effects,
   locator:selector=>({waitFor:async()=>{},count:async()=>1,isVisible:async()=>true,
-   innerText:async()=>selector.includes('p.h;p.t')?state.title:selector.includes('tlb;yes')?'Восстановить':'Обнаружен разрыв связи. Восстановить сессию?',
+   innerText:async()=>selector.includes('p.h;p.t')?state.title:selector.includes('tlb;yes')?'Восстановить':state.content,
    click:async()=>{state.clicks++;await state.onClick();}}),
-  waitForFunction:async fn=>{if(state.timeout||!await evaluate(fn))throw Error('timeout');}};
+  waitForFunction:async fn=>{await state.onWait();if(state.timeout||!await evaluate(fn))throw Error('timeout');}};
  const run=vm.runInNewContext('('+withStorageIdentity('async page=>page.effect()',binding)+')');
  return {c,form,globals,packages,packageNode,state,page,run:()=>run(page)};
 }
@@ -64,6 +64,19 @@ test('lost restore response does not repeat the gesture or run the caller',async
  await assert.rejects(f.run());await assert.rejects(f.run());assert.equal(f.state.clicks,1);assert.equal(f.state.effects,1);
  f.c.Connected=true;f.form.FReconnecting=false;f.state.timeout=false;
  assert.equal(await f.run(),2);assert.equal(f.state.clicks,1);
+});
+test('a pending original restore is observed again without another gesture',async()=>{
+ const f=fixture();await f.run();f.c.Connected=false;f.form.FReconnecting=true;f.state.onClick=()=>{};
+ await assert.rejects(f.run(),/awaiting_original_attempt/);
+ f.state.onWait=()=>{f.c.Connected=true;f.form.FReconnecting=false;};
+ assert.equal(await f.run(),2);assert.equal(f.state.clicks,1);
+});
+test('a newly shown native recovery prompt permits restoring the same session after a failed connection',async()=>{
+ const f=fixture();await f.run();f.c.Connected=false;f.form.FReconnecting=true;f.state.onClick=()=>{};
+ await assert.rejects(f.run(),/awaiting_original_attempt/);
+ f.globals.Ext.Msg.cfg={};f.state.content='Ошибка при попытке восстановить сессию\nВосстановить сессию?';
+ f.state.onClick=()=>{f.c.Connected=true;f.form.FReconnecting=false;};
+ assert.equal(await f.run(),2);assert.equal(f.state.clicks,2);
 });
 test('replacement session after restoration blocks caller',async()=>{
  const f=fixture();await f.run();f.c.Connected=false;f.state.onClick=()=>{f.c.Connected=true;f.c.FSession={};};
