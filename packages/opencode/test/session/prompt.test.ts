@@ -14,6 +14,7 @@ import { afterAll, expect } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import { cp, mkdir, mkdtemp, rm, symlink } from "fs/promises"
 import { tmpdir } from "node:os"
+import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
@@ -1705,11 +1706,78 @@ withMcpInstructions.instance("the first dashboard prompt advertises only dashboa
           )
         : []
       expect(
-        names.every((name) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish"].includes(name)),
+        names.every((name) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish", "dashboard_delete"].includes(name)),
       ).toBe(true)
-      for (const name of ["read", "glob", "grep", "skill", "edit", "write", "dashboard_draft", "dashboard_publish"]) expect(names).toContain(name)
+      for (const name of ["read", "glob", "grep", "skill", "edit", "write", "dashboard_draft", "dashboard_publish", "dashboard_delete"]) expect(names).toContain(name)
     }),
   ),
+)
+
+it.instance("successful dashboard deletion ends its turn before the next model call, and the old chat refuses new commands", () =>
+  Effect.gen(function* () {
+    const id = crypto.randomUUID()
+    const target = yield* Effect.acquireRelease(
+      Effect.promise(() => prepareDashboard({
+        id, origin: "http://127.0.0.1:0", dashboards: DashboardSession.dashboardRoot(),
+        template: path.resolve(import.meta.dir, "../../../dashboard/template"),
+        readPublication: async () => null,
+        fetch: Object.assign(async () => Response.json({
+          id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
+          binding: { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
+          parameters: [], sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
+        }), { preconnect: () => undefined }),
+      })),
+      (target) => Effect.promise(() => rm(path.dirname(target.directory), { recursive: true, force: true })),
+    )
+    let receive: ((event: { data: unknown }) => void) | undefined
+    LoginomHost.connect({
+      start() {},
+      on(_event, listener) { receive = listener },
+      postMessage(value) {
+        if (!isRecord(value)) throw Error("Invalid Host request")
+        const result = value.method === "acquire" ? { generation: 1 }
+          : value.method === "scope" && isRecord(value.input) ? value.input.scope
+          : value.method === "dashboardVersions" ? { generation: 1, versions: [] }
+          : value.method === "dashboardDelete" ? { status: "empty" }
+          : true
+        receive?.({ data: { id: value.id, result } })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+    yield* Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const permissions = yield* Permission.Service
+      const chat = yield* sessions.create({ title: "Заказы" })
+      const input = { sessionID: chat.id, model: ref, agent: "build" }
+      yield* llm.tool("dashboard_delete", {})
+      const deletion = yield* prompt.prompt({
+        ...input, parts: [{ type: "text", text: "Удали этот дашборд" }],
+      }).pipe(Effect.forkChild)
+      const request = yield* pollWithTimeout(
+        permissions.list().pipe(Effect.map(items => items.find(item => item.permission === "dashboard_delete"))),
+        "missing deletion confirmation",
+      )
+      yield* permissions.reply({ requestID: request.id, reply: "once" })
+      const result = yield* Fiber.join(deletion)
+      expect(result.info.role).toBe("assistant")
+      if (result.info.role === "assistant") {
+        expect(result.info.error).toBeUndefined()
+        expect(result.info.time.completed).toBeDefined()
+      }
+      const history = yield* sessions.messages({ sessionID: chat.id })
+      expect(completedTool(history.find(message => message.info.id === result.info.id)?.parts ?? [])?.state.output)
+        .toContain("Дашборд удалён")
+      expect(yield* llm.calls).toBe(1)
+      const subsequent = yield* prompt.prompt({
+        ...input, parts: [{ type: "text", text: "Собери дашборд снова" }],
+      }).pipe(Effect.exit)
+      expect(Exit.isFailure(subsequent)).toBe(true)
+      if (Exit.isFailure(subsequent)) expect(String(Cause.squash(subsequent.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(yield* llm.calls).toBe(1)
+    }).pipe(provideInstance(target.directory), Effect.provideService(TestInstance, { directory: target.directory }))
+  }),
 )
 
 withMcpInstructions.instance("a dashboard prompt refuses an MCP resource before reading it", () =>

@@ -7,7 +7,7 @@ import { PublicationSource } from "@loginom-ai-agent/dashboard/contract/publicat
 import { Effect, Schema } from "effect"
 import { dashboardResources } from "@loginom-ai-agent/dashboard/agent/resources"
 import { readDashboardBinding, removeDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
-import { draftDashboard } from "@loginom-ai-agent/dashboard/agent/draft"
+import { draftDashboard, revokeDashboardDraft } from "@loginom-ai-agent/dashboard/agent/draft"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Session } from "@/session/session"
 import { DashboardSession } from "@/product/dashboard-session"
@@ -141,9 +141,13 @@ export const DashboardDeleteTool = Tool.define(
                 },
                 catch: () => undefined,
               }).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
-              return deleteOutput(cleaned
-                ? "Дашборд удалён. Опубликованных версий и локального черновика больше нет."
-                : "На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
+              if (!cleaned)
+                return deleteOutput("На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
+              yield* Effect.promise(() => revokeDashboardDraft(control.key))
+              return {
+                ...deleteOutput("Дашборд удалён. Опубликованных версий и локального черновика больше нет."),
+                metadata: { truncated: false, dashboardDeleted: true },
+              }
             }
           }))
         }).pipe(Effect.orDie),

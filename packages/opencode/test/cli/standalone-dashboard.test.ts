@@ -13,7 +13,7 @@ import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-cr
 import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
 import { profileEnvironment } from "../../src/cli/profile"
 import { dashboardFlag } from "../../src/cli/standalone-dashboard"
-import { standaloneFixture, invoke } from "../fixture/standalone"
+import { standaloneFixture, standaloneRun, invoke } from "../fixture/standalone"
 import { TestLLMServer } from "../lib/llm-server"
 import { testProviderConfig } from "../lib/test-provider"
 
@@ -94,8 +94,8 @@ test("standalone dashboard does not accept a headless option as its missing snap
   expect(await readdir(fixture.profile)).not.toContain(".writer")
 }, 30_000)
 
-test("standalone dashboard starts from the snapshot and preserves explicit publication approval", async () => {
-  await using fixture = await standaloneFixture()
+async function dashboardFixture() {
+  const fixture = await standaloneFixture()
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   const server = dashboardServer({
     shell: new Uint8Array(),
@@ -106,6 +106,11 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
   })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
+  const dispose = async () => {
+    await provider.dispose()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    await fixture[Symbol.asyncDispose]()
+  }
   try {
     await stageKnowledgeFixture(fixture.bundle)
     const knowledge = join(fixture.bundle, "runtime/src/knowledge-entry.mjs")
@@ -124,6 +129,10 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
           if(mode==='hold') reading=m.id;
           else process.send({id:m.id,...(mode==='denied'?{error:'DASHBOARD_ACCESS_DENIED'}:{result:null})});
         }
+        if(m.operation==='dashboardVersions') process.send({id:m.id,result:[
+          {name:'20261119T120000Z.json',sourceHash:'a'.repeat(64)},{name:'20261119T130000Z.json',sourceHash:'b'.repeat(64)}
+        ]});
+        if(m.operation==='dashboardDelete') process.send({id:m.id,result:{status:'empty'}});
         if(m.operation==='dashboardPublish') process.send({id:m.id,result:{status:'changed',latest:null}});
         if(m.operation==='interrupt') { if(reading) process.send({id:reading,error:'DASHBOARD_CANCELLED'}); process.send({id:m.id,result:true}); }
         if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
@@ -137,19 +146,6 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
       workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7",
       nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930",
     }
-    const response = await fetch(origin + "/dashboard/snapshots", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        binding,
-        nodeName: "Узел",
-        sample: { schema: [{ name: "count", type: 1 }], rows: [[42]] },
-        parameters: [],
-        published: false,
-      }),
-    })
-    expect(response.status).toBe(201)
-    const snapshot = await response.json()
     const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
     await store.stage({
       generation: 1,
@@ -168,8 +164,32 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
     const manifest = Bun.file(join(fixture.bundle, "resource-manifest.json"))
     await Bun.write(manifest, JSON.stringify({ ...await manifest.json(), node: "bin/node", browser: "chrome" }))
     const llm = await provider.runPromise(TestLLMServer)
-    await provider.runPromise(llm.text("Создаю dashboard."))
     await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
+    return { fixture, provider, llm, origin, binding, knowledge, originalKnowledge, listReply, [Symbol.asyncDispose]: dispose }
+  } catch (error) {
+    await dispose()
+    throw error
+  }
+}
+
+test("standalone dashboard starts from the snapshot and preserves explicit publication approval", async () => {
+  const setup = await dashboardFixture()
+  try {
+    const { fixture, provider, llm, origin, binding, knowledge, originalKnowledge, listReply } = setup
+    const response = await fetch(origin + "/dashboard/snapshots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        binding,
+        nodeName: "Узел",
+        sample: { schema: [{ name: "count", type: 1 }], rows: [[42]] },
+        parameters: [],
+        published: false,
+      }),
+    })
+    expect(response.status).toBe(201)
+    const snapshot = await response.json()
+    await provider.runPromise(llm.text("Создаю dashboard."))
     const result = await invoke(
       fixture,
       ["--dashboard", snapshot.id, "--headless", "--", "Покажи суммы."],
@@ -263,7 +283,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
         }),
       })
       const result = await invoke(fixture, ["--dashboard", (await response.json()).id, "--headless", "--", "Открой."], undefined, undefined, false)
-      expect(result.exit).toBe(local ? 0 : 1)
+      expect(result.exit, JSON.stringify(result)).toBe(local ? 0 : 1)
       if (local) {
         expect(result.errors).toContain("Не удалось проверить публикацию")
         expect(result.events.some(event => event.type === "error")).toBe(false)
@@ -287,7 +307,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
         }),
       })
       const result = await invoke(fixture, ["--dashboard", (await response.json()).id, "--headless", "--", "Открой."], undefined, undefined, false)
-      expect(result.exit).toBe(local ? 0 : 1)
+      expect(result.exit, JSON.stringify(result)).toBe(local ? 0 : 1)
       if (local) {
         expect(result.errors).toContain("Не удалось проверить публикацию")
         expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
@@ -366,7 +386,80 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
       expect(await readdir(fixture.profile)).not.toContain(".writer")
     } finally { clearInterval(watcher) }
   } finally {
-    await provider.dispose()
-    await new Promise<void>((resolve) => server.close(() => resolve()))
+    await setup[Symbol.asyncDispose]()
   }
 }, 60_000)
+
+test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a separate terminal choice before deleting", async () => {
+  await using setup = await dashboardFixture()
+  const { fixture, provider, llm, origin, binding, knowledge, originalKnowledge } = setup
+  await writeFile(knowledge, originalKnowledge)
+  const deleteBinding = { ...binding, packagePath: "/user/fixture/delete.lgp" }
+  const deleteWork = join(fixture.profile, "data/dashboards", "delete-" + (await bindingKey(deleteBinding)).slice(0, 8), "work")
+  const operations = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
+  let deletions = 0
+  for (const [choice, auto] of [
+    ["cancel", "--auto"],
+    ["eof", "--yolo"],
+    ["incomplete", "--dangerously-skip-permissions"],
+    ["interrupt", ""],
+    ["no-tty", "--auto"],
+    ["delete", ""],
+    ["pipe-delete", ""],
+  ] as const) {
+    const success = choice === "delete" || choice === "pipe-delete"
+    const human = choice === "pipe-delete"
+    await provider.runPromise(llm.reset)
+    await provider.runPromise(llm.tool("dashboard_delete", {}))
+    const response = await fetch(origin + "/dashboard/snapshots", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        binding: deleteBinding, nodeName: "Узел\n\u001b[31m", sample: { schema: [], rows: [] }, parameters: [], published: false,
+      }),
+    })
+    expect(response.status).toBe(201)
+    const command = standaloneRun(fixture, [
+      "--dashboard", (await response.json()).id, "--headless", "--title=Удаление",
+      ...(choice === "delete" ? ["--file", "src/main.tsx"] : []),
+      ...(auto ? [auto] : []), "--", "Удали дашборд.",
+    ], undefined, false)
+    const args = human ? command.argv.filter(arg => arg !== "--format=json") : command.argv
+    const child = Bun.spawn(["python3", join(import.meta.dir, "standalone-dashboard-pty.py"), choice, ...args], {
+      cwd: command.cwd, env: command.env, stdout: "pipe", stderr: "inherit",
+    })
+    const [output, code] = await Promise.all([new Response(child.stdout).json(), child.exited])
+    expect(code, choice).toBe(0)
+    expect(output.exit, JSON.stringify(output)).toBe(success ? 0 : choice === "interrupt" ? 130 : 1)
+    if (choice === "no-tty") {
+      expect(output.cwd).toBeNull()
+      expect(output.stderr).toContain("требуется управляющий терминал")
+    } else {
+      expect(output.cwd).toBe(join(fixture.profile, "data/dashboards"))
+      expect(output.stderr).toContain('Узел\\n\\u001b[31m')
+      expect(output.stderr).toContain(deleteBinding.packagePath)
+      expect(output.stderr).toContain("Опубликованных версий к удалению: 2")
+      expect(output.stderr).toContain("Локальный черновик и неопубликованные правки будут удалены")
+    }
+    expect(output.stderr + output.stdout).not.toContain("ENOENT")
+    if (human) {
+      expect(output.stderr).toContain("Дашборд удалён")
+      expect(output.stdout).toBe("")
+    } else {
+      const events = output.stdout.trim().split("\n").map((line: string) => JSON.parse(line))
+      expect(events).toContainEqual(success ? expect.objectContaining({
+        type: "tool_use",
+        part: expect.objectContaining({ tool: "dashboard_delete", state: expect.objectContaining({
+          status: "completed", output: expect.stringContaining("Дашборд удалён"),
+        }) }),
+      }) : expect.objectContaining({
+        type: "error", error: expect.objectContaining({ name: choice === "interrupt" ? "CLI_CANCELLED" : "CLI_PERMISSION_REJECTED" }),
+      }))
+    }
+    if (success) {
+      deletions++
+      expect(await provider.runPromise(llm.calls)).toBe(1)
+    }
+    expect((await operations.text()).match(/"operation":"dashboardDelete"/g) ?? []).toHaveLength(deletions)
+    expect(await Bun.file(join(deleteWork, "src/main.tsx")).exists()).toBe(!success)
+    expect(await readdir(fixture.profile)).not.toContain(".writer")
+  }
+}, 70_000)

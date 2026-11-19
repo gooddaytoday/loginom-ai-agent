@@ -1362,6 +1362,16 @@ const layer = Layer.effect(
               toolChoice: format.type === "json_schema" ? "required" : undefined,
             })
 
+            if (base === "loginom-dashboard") {
+              const parts = yield* MessageV2.parts(handle.message.id).pipe(Effect.provideService(Database.Service, database))
+              if (parts.some(part => part.type === "tool" && part.tool === "dashboard_delete" &&
+                  part.state.status === "completed" && part.state.metadata.dashboardDeleted === true)) {
+                handle.message.finish = "stop"
+                yield* sessions.updateMessage(handle.message)
+                return "break" as const
+              }
+            }
+
             if (structured !== undefined) {
               handle.message.structured = structured
               handle.message.finish = handle.message.finish ?? "stop"

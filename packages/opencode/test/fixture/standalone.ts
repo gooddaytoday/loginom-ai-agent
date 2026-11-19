@@ -84,15 +84,14 @@ export async function standaloneFixture(binary?: string) {
   }
 }
 
-export async function invoke(
+export function standaloneRun(
   fixture: Awaited<ReturnType<typeof standaloneFixture>>,
   args: string[],
-  onStart?: (interrupt: () => void) => void,
   environment?: NodeJS.ProcessEnv,
   directory = true,
 ) {
-  const child = Bun.spawn(
-    [
+  return {
+    argv: [
       ...(fixture.binary ? [fixture.binary] : [process.execPath, "run", "./src/standalone.ts"]),
       "run",
       "--format=json",
@@ -101,31 +100,43 @@ export async function invoke(
       "test/test-model",
       ...args,
     ],
-    {
-      cwd: fixture.binary ? fixture.directory : resolve(import.meta.dir, "../.."),
-      env: {
-        ...process.env,
-        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        LOGINOM_AI_AGENT_PURE: "1",
-        LOGINOM_AI_AGENT_CHANNEL: fixture.channel,
-        LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
-        LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
-        LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
-        LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
-        DISPLAY: "",
-        WAYLAND_DISPLAY: "",
-        HOME: join(fixture.directory, "home"),
-        XDG_CONFIG_HOME: join(fixture.directory, "desktop-config"),
-        XDG_DATA_HOME: join(fixture.directory, "desktop-data"),
-        XDG_STATE_HOME: join(fixture.directory, "desktop-state"),
-        XDG_CACHE_HOME: join(fixture.directory, "desktop-cache"),
-        ...environment,
-      },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
+    cwd: fixture.binary ? fixture.directory : resolve(import.meta.dir, "../.."),
+    env: {
+      ...process.env,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_CHANNEL: fixture.channel,
+      LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
+      LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
+      LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+      LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
+      DISPLAY: "",
+      WAYLAND_DISPLAY: "",
+      HOME: join(fixture.directory, "home"),
+      XDG_CONFIG_HOME: join(fixture.directory, "desktop-config"),
+      XDG_DATA_HOME: join(fixture.directory, "desktop-data"),
+      XDG_STATE_HOME: join(fixture.directory, "desktop-state"),
+      XDG_CACHE_HOME: join(fixture.directory, "desktop-cache"),
+      ...environment,
     },
-  )
+  }
+}
+
+export async function invoke(
+  fixture: Awaited<ReturnType<typeof standaloneFixture>>,
+  args: string[],
+  onStart?: (interrupt: () => void) => void,
+  environment?: NodeJS.ProcessEnv,
+  directory = true,
+) {
+  const command = standaloneRun(fixture, args, environment, directory)
+  const child = Bun.spawn(command.argv, {
+    cwd: command.cwd,
+    env: command.env,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   const output = new Response(child.stdout).text()
   const errors = new Response(child.stderr).text()
   const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
