@@ -32,10 +32,14 @@ export async function guardLoginomConnection(page, binding, storageSession) {
   const current=proof?Array.from({length:packages.Count},(_,i)=>{const node=packages.Items(i);return {node,path:node.PackageFileName};}):null;
   // A download keeps its original native session through final verification.
   // Ordinary UI calls may refresh their baseline after legitimate graph edits.
-  const store=storageSession?(prep.downloadConnectionGuard??=new Map()):(prep.connectionGuard??=new Map());
+  // Save As can change the package inventory before its reply is lost. Only
+  // its reconciliation may cross that change; the caller must still prove the
+  // exact destination, full graph and GUID/types before rebinding receipts.
+  const saveRecovery=storageSession==='save-reconcile';
+  const store=storageSession&&!saveRecovery?(prep.downloadConnectionGuard??=new Map()):(prep.connectionGuard??=new Map());
   let a=store.get(b.session_id);
   const unchanged=()=>a&&a.document===document&&a.connection===c&&a.remote===c.FRemoteSession&&a.session===c.FSession
-   &&current&&a.packages.length===current.length&&a.packages.every((p,i)=>p.node===current[i].node&&p.path===current[i].path);
+   &&current&&(saveRecovery||a.packages.length===current.length&&a.packages.every((p,i)=>p.node===current[i].node&&p.path===current[i].path));
   if(storageSession==='verify'&&!unchanged())return {reason:'owner'};
   if(a?.pending||mode==='verify'||mode==='reserve'){
    if(!unchanged())return {reason:'owner'};
