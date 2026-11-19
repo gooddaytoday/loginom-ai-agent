@@ -4471,7 +4471,7 @@ function readRenderedInputMapping(observation) {
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
     const formatCell = current.date_time_cell?.role==='format_cell';
-    const point = (formatCell || current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const point = (formatCell || current.process_row || current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
     const hit = await handle.evaluate((element, { point, viewport, isGraphLink, formatCell }) => {

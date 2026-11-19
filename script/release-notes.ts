@@ -128,6 +128,7 @@ const notes = [
   ...(version === "0.4.0"
     ? [
         "- Users of 0.3.9 on any platform must install 0.4.0 manually over the existing installation; 0.3.9 has its update feed disabled. Keep the existing profile; do not uninstall or delete application data first.",
+        "- Рекомендуемая ширина экрана — от 1280 px.",
       ]
     : []),
   "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",

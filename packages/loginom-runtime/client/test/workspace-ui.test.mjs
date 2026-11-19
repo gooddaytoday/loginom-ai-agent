@@ -7558,6 +7558,27 @@ test('scrolled process window offers native-bound rows without claiming complete
  assert.ok(row?.allowed_actions.includes('right_click'));assert.equal(row.process_row.record_index,4);
 });
 
+test('process rows use their observed point above the console bottom gutter and recheck it',async()=>{
+ // LAB-1855 execution-events.jsonl:565: row y=608..631, visible point y=613.75.
+ for(const verb of ['click','right_click'])for(const covered of [false,true]){
+  const f=scrolledProcessWindowFixture('MF;ConsoleForm');
+  f.page.context.innerWidth=1024;f.page.context.innerHeight=633;
+  f.page.viewportSize=()=>({width:1024,height:633});
+  f.grids.forEach(g=>g.box={...g.box,y:533,height:100});
+  f.cell.box={x:110,y:608,width:250,height:23};
+  const gutter=f.page.add('div',null,'',{x:0,y:619,width:1024,height:14});
+  const snapshot=await f.page.observe(),row=snapshot.ui.elements.find(e=>e.process_row?.record_id==='record-5');
+  assert.equal(row.interaction.state,'point_observed');
+  assert.deepEqual(row.interaction.point,{x:235,y:613.75});
+  if(covered)f.page.beforeHandleGeometry=target=>{if(target===f.cell){gutter.box.y=608;gutter.box.height=25;}};
+  const result=await f.page.act({verb,ref:row.ref},snapshot);
+  assert.equal(result.status,covered?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(f.page.clickedPoints,covered?[]:[{...row.interaction.point,clickCount:1}]);
+  if(!covered)assert.equal(f.page.clickedButton,verb==='right_click'?'right':'left');
+  if(covered){assert.equal(result.error.code,'UI_REFERENCE_OBSCURED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);}
+ }
+});
+
 test('issue579 retains the exact process row when the two console views renumber history separately',async()=>{
  // execution-events.jsonl:5990,6016,6028: history evicts group 1 at launch 21.
  // Left process retains Activation-20 while right controls use Activation-19;

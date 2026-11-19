@@ -338,7 +338,29 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   let s=await navigateExportDirectory({directory,inDirectory,row,act});
   r=await roots();const refreshRoot=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
   const details=await read({root_ref:refreshRoot.ref}),refresh=one(details.ui.elements.filter(e=>e.tid===details.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
-  await act(details,refresh);await inDirectory(directory);
+  if(refresh.interaction?.state==='outside_viewport'){
+   const geometry=await execute(`async page=>page.evaluate(({tid,ref})=>{
+    const elements=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+    const element=elements.length===1?elements[0]:null;
+    if(!element||globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(element)!==ref)return null;
+    const ancestors=[];
+    for(let p=element;p&&ancestors.length<24;p=p.parentElement){
+     const r=p.getBoundingClientRect(),s=getComputedStyle(p);
+     ancestors.push({tag:p.tagName,tid:p.getAttribute('data-tid'),box:{x:r.x,y:r.y,width:r.width,height:r.height},
+      client_width:p.clientWidth,scroll_width:p.scrollWidth,scroll_left:p.scrollLeft,overflow_x:s.overflowX,min_width:s.minWidth});
+    }
+    return {viewport:{width:innerWidth,height:innerHeight},ancestors};
+   },${JSON.stringify({tid:refresh.tid,ref:refresh.ref})})`);
+   await record('export_file_refresh_geometry',{geometry});
+   // Files shrinks, but toolbar children overflow its hidden body. Re-enter the same
+   // assigned directory through visible native navigation to reload its list.
+   const current=await inDirectory(directory);
+   await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+   await inDirectory('/',current);
+   await navigateExportDirectory({directory,inDirectory,row,act});
+   await record('export_file_directory_refreshed',{directory,via:'native_directory_navigation'});
+  }else await act(details,refresh);
+  await inDirectory(directory);
   s=await row(name);need(s.file_storage?.directory===directory,'Export file directory differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
