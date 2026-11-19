@@ -167,3 +167,8 @@ test("deletion removes only the two approved versions through FileStorage", asyn
   assert.deepEqual(f.files, new Map([...preserved, [directory + "/.delete.lock", ""]]))
   assert.equal(f.locks.size, 0)
 })
+
+test("deletion without a browser page reports storage unavailable and zero removals", async () => {
+  const result = await dashboardStorage({ pages: () => [] }, { binding, expected: [] }, "dashboardDelete")
+  assert.deepEqual(result, { status: "failed", reason: "DASHBOARD_STORAGE_UNAVAILABLE", confirmedRemoved: 0 })
+})

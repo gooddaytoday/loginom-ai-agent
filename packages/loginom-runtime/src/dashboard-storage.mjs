@@ -48,9 +48,9 @@ export async function dashboardStorage(context, input, operation = "dashboardRea
   const request = dashboardRequest(input, operation)
   signal?.throwIfAborted()
   const page = context.pages()[0]
-  if (!page) throw Error("DASHBOARD_STORAGE_UNAVAILABLE")
   const native = async (mode, values = {}) => {
     signal?.throwIfAborted()
+    if (!page) throw Error("DASHBOARD_STORAGE_UNAVAILABLE")
     const call = async ({ mode, directory, packagePath, ...values }) => {
       const connection = bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection
       if (!connection?.Connected || !connection.Session || !connection.UserName) return { error: "DASHBOARD_STORAGE_UNAVAILABLE" }
