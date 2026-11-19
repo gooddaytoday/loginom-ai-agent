@@ -507,34 +507,6 @@ test('D19 lost disconnect reply remains uncertain and is never repeated',async()
  assert.deepEqual(f.calls,['remove_link']);assert.ok(f.operation.targetPhase.pending);
 });
 
-// LAB-1904 r5/model.stdout:65→75: a continuation passed the import behind the
-// handler's own encoder and was told to build a second REST chain.
-const oldLabel='URL query encoding '+'a'.repeat(32);
-function restEncoderSwapFixture(){
- const {f,r}=restReplacementFixture(),old={source:'old',output:0,target:'rest',input:0};
- f.graph.nodes.push({ref:ref('old'),type:'programming.javascript',label:oldLabel,position:{x:320,y:320},inputs:[0],outputs:[0]});
- f.graph.links.splice(0,1,old,{source:'source',output:0,target:'old',input:0});
- f.operation.restQueryInput={edge:old,encoder:ref('encoder'),replaced_encoder:ref('old')};
- return {f,r};
-}
-test('LAB-1904 swaps only the handler-owned previous encoder into the new encoder',async()=>{
- const {f,r}=restEncoderSwapFixture(),before=structuredClone(f.graph);
- const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
- assert.deepEqual(f.calls,['remove_link','connect']);assert.deepEqual(f.graph.nodes,before.nodes);
- assert.deepEqual(f.graph.links,[{source:'source',output:0,target:'old',input:0},{source:'source',output:0,target:'encoder',input:0},{source:'encoder',output:0,target:'rest',input:0}]);
-});
-for(const mutation of ['user JavaScript','second output','variable link','foreign workflow','same encoder','second input'])test('LAB-1904 refuses '+mutation+' before replacing an encoder',async()=>{
- const {f,r}=restEncoderSwapFixture(),old=f.graph.nodes.find(n=>n.ref.node_id==='old');
- if(mutation==='user JavaScript')old.label='Parse response';
- if(mutation==='second output'){f.graph.nodes.push({ref:ref('calc'),type:'transform.calculator',label:'Calc',position:{x:480,y:480},inputs:[0],outputs:[0]});f.graph.links.push({source:'old',output:0,target:'calc',input:0});}
- if(mutation==='variable link')f.graph.variable_links=[{source:'source',output:0,target:'old',input:0,kind:'variables'}];
- if(mutation==='foreign workflow')f.operation.restQueryInput.replaced_encoder.workflow_id='foreign';
- if(mutation==='same encoder')f.operation.restQueryInput.replaced_encoder=ref('encoder');
- if(mutation==='second input'){old.inputs=[0,1];f.graph.links.push({source:'source',output:0,target:'old',input:1});}
- const before=structuredClone(f.graph),result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');
- assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
-});
-
 for(const fault of ['none','y','ordinary','identity','port'])test('connect verifies native output boundary horizontal relayout: '+fault,()=>{
  const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[structuredClone(source),{ref:ref('boundary'),type:'control.supernode_output',boundary_role:'output',position:{x:906,y:272},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
  if(fault==='ordinary'){before.nodes[1].type='transform.calculator';delete before.nodes[1].boundary_role;}

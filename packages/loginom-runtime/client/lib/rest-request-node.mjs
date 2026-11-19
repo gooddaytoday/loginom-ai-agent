@@ -71,40 +71,6 @@ async function prepareQueryEncoder(options,ctx,config){
  need(result.status==='SUCCEEDED'&&result.cleanup_complete===true&&result.execution.status==='completed','query encoder did not complete');
  return {source:result.node,output:0,input:0};
 }
-// The generated encoder is proven by its type, generated caption and a single
-// data edge in and out (the latter into this REST input 0), without variables.
-export function ownedQueryEncoder(graph,edge){
- const encoder=graph.nodes.filter(n=>n.ref.node_id===edge.source);
- const touches=e=>e.source===edge.source||e.target===edge.source;
- return encoder.length===1&&edge.output===0&&encoder[0].type==='programming.javascript'
-  &&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder[0].label??'')
-  &&graph.links.filter(e=>e.source===edge.source).length===1
-  &&graph.links.filter(e=>e.target===edge.source&&e.input===0).length===1&&graph.links.filter(e=>e.target===edge.source).length===1
-  &&!(graph.variable_links??[]).some(touches)&&!(graph.rest_connection_links??[]).some(touches)?encoder[0]:null;
-}
-// After the verified input swap, delete the replaced encoder by the standard
-// node deletion target. Its child receipt is kept and never re-dispatched.
-export async function removeReplacedEncoder(options,ctx){
- const replaced=options.operation.restQueryInput?.replaced_encoder,request=options.operation.parameters;
- if(!replaced||options.operation.restEncoderRemoval?.result?.status==='SUCCEEDED')return;
- const adapter=options.operation.nodeTargetAdapter;
- const child=options.operation.restEncoderRemoval??={result:null,operation:{
-  id:'rest-url-del-'+createHash('sha256').update(options.operation.id).digest('hex').slice(0,32),
-  parameters:{document_id:request.document_id,workflow_ref:request.workflow_ref,target:{kind:'delete',ref:replaced},inputs:[]},
-  action:options.operation.action,deadline:ctx.deadline,nodeTargetAdapter:adapter}};
- const refused=()=>'replaced URL query encoder '+replaced.node_id+' was not deleted: '+(child.result.error??child.result.status);
- // Only an unresolved pending gesture is reconciled; a settled refusal is final.
- need(!child.result||child.operation.targetPhase?.pending,child.result&&refused());
- if(!child.operation.targetPhase){
-  const graph=await adapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
-  need(graph.complete===true&&graph.links.some(e=>e.target===request.target.ref.node_id&&e.input===0&&e.source===options.operation.restQueryInput.encoder.node_id)
-   &&!graph.links.some(e=>e.source===replaced.node_id),'replaced URL query encoder is still connected; nothing was deleted');
- }
- const result=await prepareNodeTarget({request:child.operation.parameters,operation:child.operation,adapter,record:options.onRecord,signal:ctx.signal,now:options.now});
- child.result=result;
- options.operation.nodeEffectPossible ||= child.operation.targetPhase?.effect_possible===true;
- need(result.status==='SUCCEEDED',refused());
-}
 async function readRestOutputs(channel,read,ctx){
  const ports=[],observed=new Map();
  const readPort=async port=>{
@@ -137,6 +103,23 @@ async function readRestOutputs(channel,read,ctx){
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }
 
+// LAB-1904 r5/model.stdout:65→80: "create a NEW REST" alone left the old REST,
+// union, Calculator and Export as a second chain. Name the replacement steps
+// with the observed refs: the old REST, its generated encoder and consumers.
+export function restReplacementStep(graph,restId,input){
+ const node=id=>graph.nodes.find(n=>n.ref.node_id===id);
+ const encoder=node(input.source);
+ const generated=encoder?.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
+  &&graph.links.filter(e=>e.source===input.source).length===1&&!(graph.variable_links??[]).some(e=>e.source===input.source||e.target===input.source);
+ const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
+  +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
+ return 'This REST keeps its saved connection: a new URL or query list needs a replacement REST, not a second chain. next_step: '
+  +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs and query_parameters and finish:"execute". '
+  +'If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. '
+  +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')+'. '
+  +(consumers.length?'3) Reconnect each former consumer to the new REST with dock_node_apply on the SAME existing target, the new REST as source of these inputs, parameters:{} and finish:"execute": '+consumers.join('; ')+'. '
+   +'Keep the existing parsing and Export; change only what the task asks. Do not duplicate the union, Calculator or Export.':'');
+}
 export function createRestRequestNodeSupport(config){
  const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-methods-v1',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
   configurationObservation:{condition:'owned REST wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
@@ -153,7 +136,7 @@ export function createRestRequestNodeSupport(config){
   const drivers=createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
-    let existingInput=null,replacedEncoder=null;
+    let existingInput=null;
     if(request.target.kind==='existing'&&request.inputs.length){
      const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
      need(graph.complete===true&&graph.document_id===request.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'complete owned graph is required before query encoding');
@@ -162,10 +145,8 @@ export function createRestRequestNodeSupport(config){
      const links=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
      need(links.length<=1,'input 0 is ambiguous');
      existingInput=links[0]??null;
-     replacedEncoder=existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)
-      &&request.parameters.query_parameters?.length?ownedQueryEncoder(graph,existingInput):null;
-     if(existingInput&&!replacedEncoder&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
-      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs and query_parameters and finish:"execute". If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. The existing REST and its input are preserved.');
+     if(existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
+      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. '+restReplacementStep(graph,request.target.ref.node_id,existingInput));
       error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
       throw error;
      }
@@ -174,15 +155,11 @@ export function createRestRequestNodeSupport(config){
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
-    // A continuation may change the raw source or query fields of a REST fed by
-    // its own generated encoder: replace only that encoder, never the REST chain.
-    const target_inputs=request.inputs.length?(existingInput&&!replacedEncoder||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
-    if(replacedEncoder)options.operation.restQueryInput={edge:existingInput,encoder:target_inputs[0].source,replaced_encoder:replacedEncoder.ref};
+    const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
    beforeInput:async(_,ctx,{channel})=>{
-    await removeReplacedEncoder(options,ctx);
     await linkConnection(ctx);
     if(request.parameters.headers?.some(h=>typeof h.value==='object')){
      const explicit=request.mappings.some(m=>m.kind==='variables');

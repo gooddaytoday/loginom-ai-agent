@@ -182,16 +182,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       ||r.target.kind!=='existing'||r.target.type!=='integration.rest_request'
       ||!same(r.target,request.target)||r.document_id!==request.document_id||!same(r.workflow_ref,request.workflow_ref)
       ||r.inputs.length!==1||request.inputs.length!==1)return false;
-    const raw=r.inputs[0],encoded=request.inputs[0],old=p.replaced_encoder;
-    // Or replace the handler's own previous encoder: generated caption, one input
-    // and no other output edge or variable link; deleted after the new edge.
-    const replaced=()=>{const n=graph.nodes.filter(n=>n.ref.node_id===old.node_id),touches=e=>e.source===old.node_id||e.target===old.node_id;
-      return n.length===1&&n[0].type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(n[0].label??'')
-        &&old.document_id===request.document_id&&old.workflow_id===request.workflow_ref.workflow_id&&!same(old,p.encoder)
-        &&p.edge.source===old.node_id&&p.edge.output===0&&graph.links.every(e=>e.source!==old.node_id||edgeKey(e)===edgeKey(p.edge))
-        &&graph.links.filter(e=>e.target===old.node_id).length===1&&!(graph.variable_links??[]).some(touches);};
+    const raw=r.inputs[0],encoded=request.inputs[0];
     return p.edge.target===request.target.ref.node_id&&p.edge.input===0&&raw.input===0&&encoded.input===0&&encoded.output===0
-      &&(old?replaced():p.edge.source===raw.source.node_id&&p.edge.output===raw.output)&&same(encoded.source,p.encoder)
+      &&p.edge.source===raw.source.node_id&&p.edge.output===raw.output&&same(encoded.source,p.encoder)
       &&p.encoder.document_id===request.document_id&&p.encoder.workflow_id===request.workflow_ref.workflow_id
       &&node(graph,p.encoder.node_id).type==='programming.javascript'
       &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
