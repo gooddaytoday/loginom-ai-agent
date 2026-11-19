@@ -2,6 +2,7 @@
 from collections import Counter
 from decimal import Decimal, localcontext
 import re
+import unicodedata
 
 MAXIMA = {'structure': 3, 'notes': 2, 'node_labels': 2, 'variables': 3}
 DECISIONS = {'structure': ('modularity', 'balance', 'depth'), 'notes': ('adequacy', 'substance'),
@@ -145,19 +146,16 @@ def facts(evidence, module=None):
                       and bool(targets.intersection(r['targets'])) for r in evidence['relations'])
         incoming, outgoing = (len(owner['incoming']), len(owner['outgoing'])) if owner else (0, 0)
         roles = []
-        unknown_role = owner is not None and owner['active_state'] == 'unknown_delta' or owner is None and not callers
-        if unknown_role:
-            roles.append('unknown')
-        elif callers:
+        if callers:
             roles.append('reused')
-        if not unknown_role and incoming >= 2:
+        if incoming >= 2:
             roles.append('convergence')
-        if not unknown_role and outgoing >= 2:
+        if outgoing >= 2:
             roles.append('divergence')
-        if not unknown_role and incoming and not outgoing:
-            roles.append('terminal')
-        if not unknown_role and outgoing and not incoming:
-            roles.append('source')
+        if owner and owner['topology'] in ('source', 'terminal'):
+            roles.append(owner['topology'])
+        if not roles and (owner is None or owner['topology'] == 'unknown' or owner['unresolved_incoming'] or owner['unresolved_outgoing']):
+            roles.append('unknown')
         if not roles:
             roles.append('linear' if incoming == outgoing == 1 else 'isolated')
             suspicious += 1
@@ -165,7 +163,8 @@ def facts(evidence, module=None):
     limitations = []
     if any(n['active_state'] == 'unknown_delta' for n in evidence['nodes'] if n['scope'] in scope_ids):
         limitations.append('incomplete_active_content')
-    if any(r['status'] != 'resolved' and (module is None or r['consumer'].startswith(module.split('#')[0] + '#')) for r in evidence['relations']):
+    member = module.rsplit('#', 1)[0] if module is not None else None
+    if any(r['status'] != 'resolved' and (member is None or r['consumer'].rsplit('#', 1)[0] == member) for r in evidence['relations']):
         limitations.append('unresolved_dependencies')
     if any(e['status'] != 'resolved' and e['scope'] in scope_ids for e in evidence['links']):
         limitations.append('unresolved_links')
@@ -205,9 +204,15 @@ def facts(evidence, module=None):
                               'density': str(Decimal(len(notes)) / total) if total else '0',
                               'trivial_share': str(Decimal(trivial) / len(notes)) if notes else '0'}}
     known = [n for n in nodes if n.get('vendor_name') and n.get('label') is not None and (n.get('generated_title') or '').lower() not in ('true', '1')]
-    renamed = [n for n in known if n['label'].strip() != n['vendor_name'].strip()]
-    system_count = len(known) - len(renamed)
-    unrenamed_file = any(file_type(n['vendor_name']) for n in known if n not in renamed)
+    renamed = []
+    system_count = 0
+    unrenamed_file = False
+    for node in known:
+        if node['label'].strip() != node['vendor_name'].strip():
+            renamed.append(node)
+            continue
+        system_count += 1
+        unrenamed_file = unrenamed_file or file_type(node['vendor_name'])
     no_extension = any(file_type(n['vendor_name']) and not file_extension(n['label']) for n in renamed)
     duplicate_counts = Counter((n['module'], n['label']) for n in renamed)
     duplicate = any(count > 1 for count in duplicate_counts.values())
@@ -227,7 +232,8 @@ def facts(evidence, module=None):
     variables = list({v['locator']: v for v in variable_rows if v.get('provenance', {}).get('__deleted', '').lower() not in ('true', '1')}.values())
     names = [v['name'] or '' for v in variables]
     consistent, dominant, violations = variable_style(names)
-    cyrillic = sum(bool(re.search('[а-яА-ЯёЁ]', v['label'] or '')) for v in variables)
+    cyrillic = sum(any(c.isalpha() and 'CYRILLIC' in unicodedata.name(c, '') for c in v['label'] or '')
+                   for v in variables)
     var_forced = {'style': consistent, 'labels': cyrillic * 10 >= len(variables) * 7} if variables else {}
     always_poor = sum(bool(re.fullmatch(r'[a-zA-Z]|var\d+|tmp|field\d+|obj', name, re.I)) for name in names)
     if variables and always_poor * 2 >= len(variables):

@@ -15,6 +15,7 @@ import re
 import stat
 import sys
 import zipfile
+from tempfile import TemporaryDirectory
 
 from lxml import etree
 import scoring
@@ -40,12 +41,20 @@ def safe_path(path):
     return path
 
 
+def read_source(source):
+    with source.open('rb') as stream:
+        opened = os.fstat(stream.fileno())
+        require(stat.S_ISREG(opened.st_mode), 'Source must be a regular package file')
+        require(opened.st_size <= MAX_TOTAL, 'Source exceeds byte limit')
+        payload = stream.read(opened.st_size + 1)
+    require(len(payload) == opened.st_size, 'Source changed while reading')
+    return payload
+
+
 def load(source):
     source = safe_path(source)
     require(source.is_file(), 'Source must be a regular package file')
-    require(source.stat().st_size <= MAX_TOTAL, 'Source exceeds byte limit')
-    payload = source.read_bytes()
-    require(len(payload) <= MAX_TOTAL, 'Source exceeds byte limit')
+    payload = read_source(source)
     roots = {}
     variable_roots = {}
     metadata_roots = {}
@@ -83,29 +92,30 @@ def load(source):
                     metadata_roots[name] = root
     except (zipfile.BadZipFile, etree.XMLSyntaxError, RuntimeError, OSError, NotImplementedError) as exc:
         raise ValueError('Cannot safely read package: ' + str(exc)) from exc
-    if index is not None:
-        bases = [item.get('BasePath', '').replace('\\', '/').strip('/')
-                 for item in index.findall('Units/Item')]
-        indexed = [base + '/Unit.xml' for base in bases if base]
-        if indexed:
-            by_name = {name.casefold(): name for name in roots}
-            selected = {}
-            for member in indexed:
-                name = by_name.get(member.casefold())
-                require(name is not None, 'Missing indexed Unit.xml: ' + member)
-                selected[name] = roots[name]
-            roots = selected
+    bases = [item.get('BasePath', '').replace('\\', '/').strip('/')
+             for item in index.findall('Units/Item')] if index is not None else []
+    indexed = [base + '/Unit.xml' for base in bases if base]
+    if indexed:
+        by_name = {name.casefold(): name for name in roots}
+        selected = {}
+        for member in indexed:
+            name = by_name.get(member.casefold())
+            require(name is not None, 'Missing indexed Unit.xml: ' + member)
+            selected[name] = roots[name]
+        roots = selected
+    else:
+        roots = dict(sorted(roots.items()))
     require(roots, 'No own Unit.xml modules found')
     for root in roots.values():
         require(root.tag == 'Unit', 'Unit.xml must contain native Unit XML')
-    return source, payload, dict(sorted(roots.items())), dict(sorted(variable_roots.items())), metadata_roots
+    return source, payload, roots, dict(sorted(variable_roots.items())), metadata_roots
 
 
 def inspect(source):
     source, payload, roots, variable_roots, metadata_roots = load(source)
     result = {'schema_version': 1, 'source': {'path': str(source), 'sha256': hashlib.sha256(payload).hexdigest(), 'bytes': len(payload)},
               'modules': [], 'scopes': [], 'nodes': [], 'notes': [], 'variables': [], 'links': [],
-              'relations': [], 'groups': [], 'locators': [], 'coverage': [], 'package': {}, 'declared_references': [],
+              'relations': [], 'groups': [], 'view_nodes': [], 'locators': [], 'coverage': [], 'package': {}, 'declared_references': [],
               'limits': ['Static own XML only; native opening, execution and business correctness unverified.',
                          'Opaque code, inherited deltas and external packages may hide relationships or variables.',
                          'Unknown demand or terminal purpose never proves obsolescence.']}
@@ -153,7 +163,9 @@ def inspect(source):
                 hint = item.get('HintPath', '').replace('\\', '/').split('?', 1)[0].split('#', 1)[0].rsplit('/', 1)[-1]
                 if any(c in hint for c in ':@') or not hint.lower().endswith('.lgp'):
                     hint = None
-                result['declared_references'].append({'package_guid': item.get('PackageGuid') or item.get('Guid'),
+                name = item.find('Name')
+                result['declared_references'].append({'package_guid': name.get('Guid') if name is not None else item.get('PackageGuid'),
+                                                       'package_name': name.get('Name') if name is not None else None,
                                                        'hint_basename': hint, 'locator': loc(member, item),
                                                        'status': 'declared_opaque', 'usage': 'unknown'})
 
@@ -192,13 +204,6 @@ def inspect(source):
                          'info_locator': loc(sidecar[0], info) if info is not None else None,
                          'provenance': provenance(info) if info is not None else {}, 'locator': module}
         result['modules'].append(module_record)
-        own_types = {}
-        for declaration in root.findall('.//Vendors/Item/Vendor'):
-            if origin(declaration) == 'own_package' and declaration.get('DerivedComponentVendorGuid'):
-                item = declaration.getparent()
-                label = declaration.get('DisplayName') or item.get('DisplayName') or declaration.get('Name') or item.get('Name') or declaration.get('Caption')
-                if label:
-                    own_types[declaration.get('DerivedComponentVendorGuid').casefold()] = label
         aliases = {member, str(PurePosixPath(member).parent), root.get('Guid'), root.get('ModuleGuid'), root.get('ModuleID')}
         if info is not None and origin(info) == 'own_package':
             aliases.update({info.get('Guid'), info.get('Name')})
@@ -214,11 +219,18 @@ def inspect(source):
             kind = 'catalog_definition' if any(p.tag == 'Vendors' for p in unit.iterancestors()) else 'workflow'
             row = {'id': scope, 'module': module, 'kind': kind, 'locator': scope, 'parent_scope': None,
                    'owner': None, 'node_count': 0, 'note_count': 0, 'variable_visibility': 'none_observed',
-                   'explicitly_deleted': deleted(flow),
+                   'explicitly_deleted': deleted(flow), 'active_state': 'unknown_delta' if delta(flow) else 'observed_materialized',
                    'provenance': provenance(unit)}
             scopes[flow] = row
             scope_elements[scope] = (member, unit, flow)
             result['scopes'].append(row)
+            for view in unit.findall('ModelViews/Nodes/Item'):
+                engine = view.find('Component/Engine')
+                result['view_nodes'].append({'locator': loc(member, view), 'module': module, 'scope': scope,
+                                             'guid': view.get('Guid'), 'label': view.get('DisplayName') or view.get('Name'),
+                                             'engine_type': engine.get(XSI, '') if engine is not None else '',
+                                             'active_state': 'unknown_delta' if delta(view) else 'observed_materialized',
+                                             'explicitly_deleted': deleted(view)})
             for container in ('Nodes', 'ServiceNodes', 'Visualizers'):
                 ids = set()
                 for node in flow.findall(container + '/Item'):
@@ -231,21 +243,15 @@ def inspect(source):
                     identity = loc(member, node)
                     engine = node.find('Component/Engine')
                     engine_type = engine.get(XSI, '') if engine is not None else ''
-                    component = node.find('Component')
-                    vendor_key = node.get('VendorGuid') or (component.get('ReferencedVendorGuid') if component is not None else '') or ''
                     record = {'id': identity, 'locator': identity, 'module': module, 'scope': scope, 'guid': guid,
                               'active_state': 'unknown_delta' if is_delta else 'observed_materialized',
                               'explicitly_deleted': deleted(node),
                               'kind': 'service' if container == 'ServiceNodes' else 'viewer' if container == 'Visualizers' else 'node',
                               'label': node.get('DisplayName'), 'service_name': node.get('Name'),
                               'engine_type': engine_type, 'provenance': provenance(node),
-                              'vendor_name': builtin_types.get(vendor_key.casefold()) or own_types.get(vendor_key.casefold()),
                               'generated_title': node.get('GenerateNodeTitle'),
-                              'demand': 'unknown', 'terminal_role': 'unknown', 'inputs': [], 'outputs': [], 'fields': []}
-                    if not record['vendor_name'] and node.find('Component/Engine/ModelUnit/WorkFlow') is not None:
-                        record['vendor_name'] = 'Подмодель'
-                    if not record['vendor_name'] and 'Reference' in engine_type:
-                        record['vendor_name'] = 'Узел-ссылка'
+                              'demand': 'unknown', 'terminal_role': 'unknown', 'inputs': [], 'outputs': [], 'fields': [],
+                              'incoming': [], 'outgoing': [], 'unresolved_incoming': False, 'unresolved_outgoing': False}
                     node_elements[node] = record
                     elements[identity] = node
                     result['nodes'].append(record)
@@ -306,7 +312,7 @@ def inspect(source):
         parent = next((p for p in flow.iterancestors() if p in scopes), None)
         row['owner'] = node_elements[owner]['id'] if owner is not None else None
         row['parent_scope'] = scopes[parent]['id'] if parent is not None else None
-        if delta(flow):
+        if row['active_state'] == 'unknown_delta':
             result['coverage'].append({'locator': row['locator'], 'reason': 'inherited/delta XML: active content not fully established'})
             row['variable_visibility'] = 'unknown'
         if row['variable_visibility'] != 'unknown' and any(v['scope'] == row['id'] for v in result['variables']):
@@ -341,34 +347,61 @@ def inspect(source):
                             targets.extend(node_elements[n]['id'] for n in target_flow.findall('Nodes/Item')
                                            if n in node_elements and node_elements[n]['active_state'] == 'observed_materialized'
                                            and n.get('Guid', '').casefold() == declaration.get('BaseNodeGuid').casefold())
+                item = declaration.getparent()
+                name = declaration.get('DisplayName') or item.get('DisplayName') or declaration.get('Name') or item.get('Name') or declaration.get('Caption')
                 if delta(declaration) or origin(declaration) != 'own_package':
                     targets = []
-                vendor_defs[alias.casefold()].append({'module': module, 'unit': unit, 'targets': targets, 'locator': declaration_loc})
+                    name = None
+                vendor_defs[alias.casefold()].append({'unit': unit, 'targets': targets, 'name': name, 'locator': declaration_loc})
                 relation('vendor_definition', declaration_loc, targets, declaration_loc, provenance=provenance(declaration), origin=origin(declaration))
 
+    def definitions_for(alias, unit):
+        definitions = vendor_defs.get(alias.casefold(), [])
+        return [d for d in definitions if d['unit'] is unit] or definitions
+
     for node, record in node_elements.items():
+        component = node.find('Component')
+        referenced = component.get('ReferencedVendorGuid') if component is not None else None
+        vendor = node.get('VendorGuid') or referenced or ''
+        owner_unit = next(p for p in node.iterancestors() if p.tag in ('Unit', 'ModelUnit'))
+        own_instance = origin(component if component is not None else node) == 'own_package'
+        record['vendor_name'] = builtin_types.get(vendor.casefold())
+        if not record['vendor_name']:
+            definitions = definitions_for(vendor, owner_unit)
+            if len(definitions) == 1 and own_instance:
+                record['vendor_name'] = definitions[0]['name']
+            elif not definitions:
+                if node.find('Component/Engine/ModelUnit/WorkFlow') is not None:
+                    record['vendor_name'] = 'Подмодель'
+                elif 'Reference' in record['engine_type']:
+                    record['vendor_name'] = 'Узел-ссылка'
         if record['active_state'] == 'unknown_delta':
             continue
-        member = record['module'].split('#', 1)[0]
+        member = record['module'].rsplit('#', 1)[0]
         engine = node.find('Component/Engine')
         if engine is not None and 'Reference' in engine.get(XSI, ''):
             targets = globals_index.get(engine.get('GlobalNodeID', '').casefold(), []) if origin(engine) == 'own_package' else []
             relation('node_reference', record['id'], targets, loc(member, engine), origin=origin(engine), provenance=provenance(engine))
-        component = node.find('Component')
-        alias = component.get('ReferencedVendorGuid') if component is not None else None
-        alias = alias or (node.get('VendorGuid') if node.get('VendorGuid', '').casefold() in vendor_defs else None)
+        alias = referenced or (vendor if vendor.casefold() in vendor_defs else None)
         if alias:
-            owner_unit = next(p for p in node.iterancestors() if p.tag in ('Unit', 'ModelUnit'))
-            definitions = vendor_defs.get(alias.casefold(), [])
-            local = [d for d in definitions if d['unit'] is owner_unit]
-            definitions = local or definitions
-            targets = [t for d in definitions for t in d['targets']] if origin(component if component is not None else node) == 'own_package' else []
+            definitions = definitions_for(alias, owner_unit)
+            targets = [t for d in definitions for t in d['targets']] if own_instance else []
             relation('vendor_instance', record['id'], targets, loc(member, component if component is not None else node),
                      declarations=[d['locator'] for d in definitions])
             if len(definitions) > 1:
                 result['relations'][-1]['status'] = 'ambiguous'
 
+    def matching_ports(nodes, direction, endpoint):
+        guid = endpoint.get('PortGuid', '').casefold()
+        if not guid:
+            return [], []
+        ports = [p for n in nodes for p in n[direction.lower() + 's'] if (p['guid'] or '').casefold() == guid]
+        services = [p.get('Name', '') for n in nodes for p in elements[n['id']].findall('Service' + direction + 'Ports/Item')
+                    if p.get('Guid', '').casefold() == guid]
+        return ports, services
+
     for scope, (member, unit, flow) in scope_elements.items():
+        adjacent = defaultdict(set)
         node_by_guid = defaultdict(list)
         for node in [n for n in result['nodes'] if n['scope'] == scope and n['active_state'] == 'observed_materialized']:
             node_by_guid[node['guid'].casefold()].append(node)
@@ -380,33 +413,42 @@ def inspect(source):
                     continue
                 sources = node_by_guid.get(start.get('NodeGuid', '').casefold(), [])
                 targets = node_by_guid.get(end.get('NodeGuid', '').casefold(), [])
+                outputs, source_names = matching_ports(sources, 'Output', start)
+                inputs, target_names = matching_ports(targets, 'Input', end)
                 kind = 'service_unknown' if container == 'ServiceLinks' else 'data'
                 if container == 'ServiceLinks':
-                    source_names = [p.get('Name', '') for n in sources for p in elements[n['id']].findall('ServiceOutputPorts/Item') if p.get('Guid') == start.get('PortGuid')]
-                    target_names = [p.get('Name', '') for n in targets for p in elements[n['id']].findall('ServiceInputPorts/Item') if p.get('Guid') == end.get('PortGuid')]
                     if any('Synchronization' in name for name in source_names + target_names):
                         kind = 'control'
                     elif 'NodeReference' in target_names:
                         kind = 'component_reference'
-                if any(p['guid'] == start.get('PortGuid') and p['kind'] == 'variables' for n in sources for p in n['outputs']):
+                if any(p['kind'] == 'variables' for p in outputs):
                     kind = 'variables'
-                result['links'].append({'locator': loc(member, link), 'scope': scope, 'kind': kind,
-                                        'sources': [n['id'] for n in sources], 'targets': [n['id'] for n in targets],
-                                        'source_port': start.get('PortGuid'), 'target_port': end.get('PortGuid'),
-                                        'status': 'resolved' if len(sources) == len(targets) == 1 else 'unresolved_or_ambiguous'})
-                if result['links'][-1]['status'] != 'resolved' or delta(link):
-                    if delta(link):
-                        result['links'][-1].update(status='unknown_delta', sources=[], targets=[])
-                    result['coverage'].append({'locator': loc(member, link), 'reason': 'link endpoints unresolved/ambiguous or inherited/delta'})
+                locator = loc(member, link)
+                if delta(link):
+                    status = 'unknown_delta'
+                elif len(sources) == len(targets) == 1 and (outputs or source_names) and (inputs or target_names):
+                    status = 'resolved'
+                else:
+                    status = 'unresolved_or_ambiguous'
+                result['links'].append({'locator': locator, 'scope': scope, 'kind': kind, 'status': status,
+                                        'sources': [] if status == 'unknown_delta' else [n['id'] for n in sources],
+                                        'targets': [] if status == 'unknown_delta' else [n['id'] for n in targets],
+                                        'source_port': start.get('PortGuid'), 'target_port': end.get('PortGuid')})
+                if status == 'resolved':
+                    source_node, target_node = sources[0], targets[0]
+                    source_node['outgoing'].append(locator)
+                    target_node['incoming'].append(locator)
+                    adjacent[source_node['id']].add(target_node['id'])
+                    adjacent[target_node['id']].add(source_node['id'])
+                else:
+                    result['coverage'].append({'locator': locator, 'reason': 'link endpoints unresolved/ambiguous or inherited/delta'})
+                    if not deleted(link):
+                        for node in sources:
+                            node['unresolved_outgoing'] = True
+                        for node in targets:
+                            node['unresolved_incoming'] = True
         # Connected groups are observations only; isolated/outputless groups retain unknown purpose.
         remaining = {n['id'] for n in result['nodes'] if n['scope'] == scope and n['active_state'] == 'observed_materialized'}
-        adjacent = defaultdict(set)
-        for edge in result['links']:
-            if edge['scope'] == scope:
-                for first in edge['sources']:
-                    for second in edge['targets']:
-                        adjacent[first].add(second)
-                        adjacent[second].add(first)
         while remaining:
             pending = [min(remaining)]
             group = set()
@@ -420,10 +462,14 @@ def inspect(source):
             result['groups'].append({'scope': scope, 'members': sorted(group), 'demand': 'unknown', 'terminal_role': 'unknown'})
     # Derived graph observations describe topology, never demand or business intent.
     for node in result['nodes']:
-        node['incoming'] = [e['locator'] for e in result['links'] if node['id'] in e['targets']]
-        node['outgoing'] = [e['locator'] for e in result['links'] if node['id'] in e['sources']]
         node['callers'] = [r['consumer'] for r in result['relations'] if r['kind'] in ('node_reference', 'vendor_instance') and node['id'] in r['targets']]
-        node['topology'] = 'unknown' if node['active_state'] == 'unknown_delta' else 'isolated' if not node['incoming'] and not node['outgoing'] else 'source' if not node['incoming'] else 'terminal' if not node['outgoing'] else 'intermediate'
+        if (node['active_state'] == 'unknown_delta' or not node['incoming'] and node['unresolved_incoming']
+                or not node['outgoing'] and node['unresolved_outgoing']):
+            node['topology'] = 'unknown'
+        elif node['incoming']:
+            node['topology'] = 'intermediate' if node['outgoing'] else 'terminal'
+        else:
+            node['topology'] = 'source' if node['outgoing'] else 'isolated'
     for scope in result['scopes']:
         scope['callers'] = [r['consumer'] for r in result['relations'] if r['kind'] in ('node_reference', 'vendor_instance') and scope['id'] in r['targets']]
     result['locators'] = sorted(known)
@@ -533,8 +579,9 @@ def check_assessment(assessment, evidence):
         require(not any(key in module for key in ('score', 'algorithm', 'agent_score')), 'Ready module scoring fields are forbidden')
         text_field(module, 'summary')
         criteria(module, next(m['criteria'] for m in calculated['modules'] if m['id'] == module['id']))
+        member = module['id'].rsplit('#', 1)[0]
         for criterion in module['criteria']:
-            require(any(v.startswith(module['id'].split('#', 1)[0] + '#') for v in criterion['evidence']), 'Module criterion needs own-module evidence')
+            require(any(v.rsplit('#', 1)[0] == member for v in criterion['evidence']), 'Module criterion needs own-module evidence')
         recommendations(module, module['id'])
 
 
@@ -670,7 +717,7 @@ def subject_objects(evidence):
     def resolved_scope(identity):
         scope = scopes[identity]
         owner = nodes.get(scope['owner'])
-        return (not scope['explicitly_deleted'] and materialized(scope)
+        return (scope['active_state'] == 'observed_materialized' and materialized(scope)
                 and (owner is None or (own(owner) and owner['active_state'] == 'observed_materialized'))
                 and (scope['parent_scope'] not in scopes or resolved_scope(scope['parent_scope'])))
 
@@ -788,7 +835,7 @@ def render(evidence, assessment):
         lines.append('| ' + LABELS[key] + ' | ' +
                      (rounded(weights[key]) + '%' if key in weights else '—') + ' | ' +
                      (rounded(contributions[key]) if key in contributions else '—') + ' | ' + score(row) + ' |')
-    lines += ['', 'Неоценённые направления не входят в итог; веса остальных приведены к 100%.', '', '## Заключение', '', prose(assessment['summary']), '']
+    lines += ['', 'Неоценённые направления не входят в итог; веса остальных приведены к 100%.', '', '## Заключение', '', prose(assessment['summary'].lstrip()), '']
     for title, key in [('Сильные стороны', 'strengths'), ('Слабые стороны', 'findings')]:
         lines += ['', '### ' + title, '']
         lines += ['- ' + prose(row['text']) for row in assessment[key]]
@@ -827,12 +874,26 @@ def report(source, assessment, output=None):
     require(output != source_path and not output.exists(), 'Output already exists or aliases source')
     require(output.suffix.lower() == '.md', 'Output must have .md extension')
     content = render(evidence, assessment)
-    require(hashlib.sha256(source_path.read_bytes()).hexdigest() == evidence['source']['sha256'], 'Source changed before report write')
+    require(hashlib.sha256(read_source(source_path)).hexdigest() == evidence['source']['sha256'], 'Source changed before report write')
+    staging = None
     try:
-        with output.open('x', encoding='utf-8', newline='\n') as stream:
+        staging = TemporaryDirectory(dir=output.parent, prefix='.package-linter-')
+        temporary = Path(staging.name) / 'report.md'
+        with temporary.open('x', encoding='utf-8', newline='\n') as stream:
             stream.write(content)
+        # Windows rename refuses to replace; on POSIX an exclusive hard link does the same.
+        if os.name == 'nt':
+            temporary.rename(output)
+        else:
+            os.link(temporary, output)
     except OSError as exc:
         raise ValueError('Cannot create new report: ' + str(exc)) from exc
+    finally:
+        if staging is not None:
+            try:
+                staging.cleanup()
+            except OSError as exc:
+                print('package-linter: cannot remove temporary report: ' + str(exc), file=sys.stderr)
     return output
 
 

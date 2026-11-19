@@ -4,7 +4,9 @@
 
 ## Данные оператора
 
-`inspect` возвращает source path/SHA256/bytes, собственные modules, scopes, nodes, notes, variables, links, relations, coverage и `calculated`. В calculated отдельные package и modules[].criteria. Для каждого направления доступны algorithm (строка Decimal или null), metrics, forced, limitations. Это результаты оператора, не поля для заполнения агентом. `report` заново читает исходник и пересчитывает их.
+`inspect` возвращает source path/SHA256/bytes, собственные modules, scopes, nodes, view_nodes, notes, variables, links, relations, coverage, declared_references и `calculated`. В calculated отдельные package и modules[].criteria. Для каждого направления доступны algorithm (строка Decimal или null), metrics, forced, limitations. Это результаты оператора, не поля для заполнения агентом. `report` заново читает исходник и пересчитывает их.
+
+В `view_nodes` находятся визуализаторы из `ModelViews` с адресами свидетельств. Они не входят в число узлов сценария. В `declared_references` поля `package_guid` и `package_name` описывают целевой пакет из `Item/Name`. Порядок `modules` следует индексу пакета, если он содержит список модулей.
 
 Source-bound id модуля — точная строка `Unit.xml#/Unit` с именем ZIP-member. Понятное имя и GUID уточняются соседним Info.xml. PackageInfo и References содержат только ограниченную metadata; HintPath показан безопасным basename и не открывается. Внешний BasePackageGuid не связывается с собственным модулем. Каталоги и вложенные ModelUnit раздельны; сырые наследованные записи/удаления не доказывают активную модель. Для показа наблюдаемых полей материализованный Guid может учитываться с ограничением; записи без него и явные tombstone не входят в расчёт элементов.
 
