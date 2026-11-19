@@ -260,10 +260,8 @@ function start() {
           }
           pending = task.then(refresh, refresh)
         }
-        const path = element("span", target.packagePath)
-        title.after(path)
         if (lookup.currentVersion) {
-          path.after(element("span", "Версия " + lookup.currentVersion.name.slice(0, -5)))
+          title.after(element("span", "Версия " + lookup.currentVersion.name.slice(0, -5)))
         }
         available.forEach(parameter => {
           const label = element("label", parameter.name + " ")

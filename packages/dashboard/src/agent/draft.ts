@@ -26,6 +26,7 @@ export async function draftDashboard(input: { work: string; resources: Dashboard
     hash: build.hash,
     data: {
       nodeName: saved.control.nodeName,
+      packagePath: saved.control.binding.packagePath,
       created: saved.snapshot.created,
       parameters: saved.snapshot.parameters.map(p => ({ name: p.name, value: typeof p.value === "number" ? p.value : null })),
       sample: saved.sample,

@@ -14,6 +14,7 @@ const key = "a".repeat(64)
 const hash = "b".repeat(64)
 const data = {
   nodeName: "Fixture node", created: "2026-11-12T12:00:00.000Z",
+  packagePath: "/user/fixture/campaign.lgp",
   parameters: [{ name: "MinBudget", value: 7 }],
   sample: { schema: [{ name: "n", type: 3 }], rows: [[1], [2]] },
 }

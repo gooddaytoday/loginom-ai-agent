@@ -31,7 +31,7 @@ async function fixture(t, app = "recorder") {
   t.after(() => server.close())
   const url = server.publish({
     key: "a".repeat(64), hash, builds: root,
-    data: { nodeName: "Fixture node", created: "2026-11-12T12:00:00Z", parameters: [], sample: { schema: [{ name: "n", type: 3 }], rows: [[1]] } },
+    data: { nodeName: "Fixture node", packagePath: "/user/fixture/campaign.lgp", created: "2026-11-12T12:00:00Z", parameters: [], sample: { schema: [{ name: "n", type: 3 }], rows: [[1]] } },
   })
   return { root, dir, url }
 }

@@ -296,7 +296,7 @@ test("numeric fields in the trusted header send queued busy and completed states
   const initial = await app.settled()
   const input = app.page.getByLabel("MinBudget", { exact: true })
   await input.waitFor()
-  assert.match(await app.page.locator("header").textContent(), /user\/fixture\/campaign\.lgp/)
+  assert.doesNotMatch(await app.page.locator("#dashboard-tab-overlay header").textContent(), /user\/fixture\/campaign\.lgp/)
   await app.page.evaluate(() => { window.fixture.wait = true })
   await input.fill("10")
   await input.press("Enter")
@@ -317,19 +317,17 @@ test("numeric fields in the trusted header send queued busy and completed states
   assert.deepEqual(app.errors, [])
 })
 
-test("the trusted header renders node, package and parameter names as text", async t => {
+test("the trusted header renders node and parameter names as text", async t => {
   const payload = "<img src=x onerror=alert(1)>"
   const app = await fixture(t, { published: true, variables: [{ name: payload, type: 3, value: 1 }] })
   await app.page.evaluate(payload => {
     const form = window.Ext.ComponentQuery.query("panel#pnlModelForm")[0].Controller
     form.GetOneSelectedNode(false).GetData().get_DisplayName = async () => payload
-    window.bg.ScopeFindObject = () => ({ FileName: payload })
   }, payload)
   await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
   await app.settled()
   assert.equal(await app.page.locator("header strong").textContent(), payload)
-  assert.equal(await app.page.locator("header").getByText("/" + payload, { exact: true }).count(), 1)
-  assert.equal(await app.page.locator("header").getByText("Версия 20261115T120000Z", { exact: true }).count(), 1)
+  assert.equal(await app.page.locator("header strong + span").textContent(), "Версия 20261115T120000Z")
   assert.equal(await app.page.getByLabel(payload, { exact: true }).count(), 1)
   assert.equal(await app.page.locator("header img").count(), 0)
   assert.deepEqual(app.dialogs, [])

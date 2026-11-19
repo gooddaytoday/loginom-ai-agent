@@ -3,6 +3,7 @@ import { mountDashboard, sandboxFrame } from "../shell/frame"
 
 type Data = {
   nodeName: string
+  packagePath: string
   created: string
   hash: string
   appUrl: string
@@ -18,6 +19,7 @@ async function main() {
   const header = document.createElement("header")
   header.style.cssText = "display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:6px 16px;background:#393744;color:white"
   header.append(Object.assign(document.createElement("strong"), { textContent: data.nodeName }))
+  header.append(Object.assign(document.createElement("span"), { textContent: data.packagePath }))
   const stamp = new Date(data.created).toLocaleString("ru-RU")
   header.append(Object.assign(document.createElement("span"), {
     textContent: `Черновик — доступен только с этого компьютера. Данные: пример из ${data.sample.rows.length} строк от ${stamp}`,

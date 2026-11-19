@@ -44,6 +44,7 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   assert.equal((await fetch(url)).status, 200)
   const data = await (await fetch(url + "data")).json()
   assert.equal(data.nodeName, "Узел")
+  assert.equal(data.packagePath, "/user/fixture/campaign.lgp")
   assert.deepEqual(data.sample.rows, [[42], [43]])
   assert.deepEqual(data.parameters, [{ name: "Count", value: 2 }, { name: "Label", value: null }])
   const again = await draftDashboard({ work: prepared.directory, resources })

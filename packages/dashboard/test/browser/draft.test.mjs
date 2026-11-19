@@ -13,6 +13,7 @@ const key = "a".repeat(64)
 const hash = "b".repeat(64)
 const data = {
   nodeName: "Fixture node", created: "2026-11-12T12:00:00.000Z",
+  packagePath: "/user/fixture/campaign.lgp",
   parameters: [{ name: "MinBudget", value: 7 }, { name: "Empty", value: null }],
   sample: { schema: [{ name: "n", type: 3 }], rows: [[1], [2]] },
 }
@@ -85,11 +86,13 @@ test("the draft shows its sample and disabled parameters through the real sandbo
   assert.deepEqual(dialogs, [])
 })
 
-test("node and parameter names in a draft stay literal text", async t => {
+test("the draft shows names and the package path as literal text", async t => {
   const name = "<img src=x onerror=alert(1)>"
-  const { page, dialogs } = await fixture(t, "recorder", { ...data, nodeName: name, parameters: [{ name, value: 7 }] })
+  const packagePath = `/user/fixture/${name} & обзор.lgp`
+  const { page, dialogs } = await fixture(t, "recorder", { ...data, nodeName: name, packagePath, parameters: [{ name, value: 7 }] })
   await page.waitForFunction(() => document.body.dataset.state === "ready")
   assert.equal(await page.locator("header strong").textContent(), name)
+  assert.equal(await page.locator("header strong + span").textContent(), packagePath)
   assert.equal(await page.locator("header label").textContent(), name + " ")
   assert.equal(await page.locator("header img").count(), 0)
   assert.deepEqual(dialogs, [])
