@@ -39,10 +39,10 @@ isProject: false
 
 ## Что получится
 
-- Главный документ [docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md](docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md).
-- Заметка [docs/research/2026-11-11-dashboard-browser-isolation-check.md](docs/research/2026-11-11-dashboard-browser-isolation-check.md) с проверкой плана изоляции по первоисточникам. Заметка по документации Loginom уже есть: [docs/research/2026-11-11-loginom-deployment-for-dashboards.md](docs/research/2026-11-11-loginom-deployment-for-dashboards.md).
-- Обновлённый [docs/security/dashboard-isolation.md](docs/security/dashboard-isolation.md). Без обновления он будет противоречить новым решениям: Chromium 152 и отдельный домен в нём обязательны.
-- Одна строка со ссылкой в [dashboard/AGENTS.md](dashboard/AGENTS.md). Код не меняется.
+- Главный документ [docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md](../../docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md).
+- Заметка [docs/research/2026-11-11-dashboard-browser-isolation-check.md](../../docs/research/2026-11-11-dashboard-browser-isolation-check.md) с проверкой плана изоляции по первоисточникам. Заметка по документации Loginom уже есть: [docs/research/2026-11-11-loginom-deployment-for-dashboards.md](../../docs/research/2026-11-11-loginom-deployment-for-dashboards.md).
+- Обновлённый [docs/security/dashboard-isolation.md](../../docs/security/dashboard-isolation.md). Без обновления он будет противоречить новым решениям: Chromium 152 и отдельный домен в нём обязательны.
+- Одна строка со ссылкой в [dashboard/AGENTS.md](../../dashboard/AGENTS.md). Код не меняется.
 
 Требования к тексту:
 
@@ -65,7 +65,7 @@ isProject: false
 - **Сборка гибридная.**
   - Черновик собирается на компьютере пользователя.
   - Зрители получают только контрольную сборку стенда.
-  - Node.js 24.19.0 уже входит в поставку Desktop и CLI: его кладёт [stage-resources.ts](packages/loginom-host/script/stage-resources.ts) для рантайма Loginom. Ставить или скачивать Node не нужно.
+  - Node.js 24.19.0 уже входит в поставку Desktop и CLI: его кладёт [stage-resources.ts](../../packages/loginom-host/script/stage-resources.ts) для рантайма Loginom. Ставить или скачивать Node не нужно.
   - Набор шаблона (React, Recharts, Vite, TypeScript) тоже входит в поставку: так же, как зависимости рантайма. Без загрузок, работает офлайн.
 - **Данные для черновика** — из снимка. Оболочка сама читает порт выполненного узла в сессии пользователя и передаёт небольшую порцию: до 100 строк и 512 КиБ, как у штатного чтения порта.
 - **Компоненты dashboard на стенде работают в контейнерах:** один образ, три контейнера.
@@ -196,7 +196,7 @@ flowchart LR
 
 | Скрипт | Для чего | Приоритет |
 |---|---|---|
-| `dev-master.sh` | Артефакты сборки Loginom master; заменяет [dashboard/install.sh](dashboard/install.sh) | 1 |
+| [dev-master.sh](../../packages/dashboard/deploy/dev-master.sh) | Артефакты сборки Loginom master. Заменяет `dashboard/install.sh` | 1 |
 | `containers.sh` | Release-версия Loginom в контейнерах: Podman или Docker, `/var/opt/loginom-docker` или `$HOME/loginom` | 2 |
 | `native.sh` | Loginom прямо в Linux: службы `loginomd`, Apache на хосте | backlog |
 
@@ -225,11 +225,11 @@ flowchart LR
   - `deploy/`.
 - **Сборка** через Bun.build:
   - IIFE для оболочки;
-  - один `.mjs` для Node 24.19 по образцу [build-node-host.ts](packages/loginom-host/script/build-node-host.ts);
+  - один `.mjs` для Node 24.19 по образцу [build-node-host.ts](../../packages/loginom-host/script/build-node-host.ts);
   - сервер на `node:http`, без Effect HttpApi.
 - **Тесты.**
   - `bun test` на реальных HTTP-портах и временных каталогах.
-  - Браузерные тесты — на Chromium 154 из [packages/loginom-runtime/client](packages/loginom-runtime/client). e2e-Playwright приложения не подходит: в нём Chromium 147.
+  - Браузерные тесты — на Chromium 154 из [packages/loginom-runtime/client](../../packages/loginom-runtime/client). e2e-Playwright приложения не подходит: в нём Chromium 147.
   - Набор вредоносных dashboard из плана изоляции.
   - Скрипты проверяются shellcheck и прогоном на dev-стенде.
 - **Покрытие.** Порог задаётся в `packages/dashboard/bunfig.toml`, например 90% строк и функций для contract, web, publisher и builder. Это новая политика, только для этого пакета. Для оболочки покрытие задаёт чек-лист браузерных сценариев.
