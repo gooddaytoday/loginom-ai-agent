@@ -1,5 +1,7 @@
-// Fixed diagnostic labels only: browser errors can embed page text, URLs,
-// script sources or credentials. Never forward those strings into model/logs.
+import {createRedactor} from './redact.mjs';
+
+// Public failures use fixed labels. Original causes belong only in the
+// redacted private execution journal, never in a model-facing receipt.
 export function browserFailureCategory(response){
  const text=(response?.content??[]).filter(b=>b.type==='text'&&typeof b.text==='string').map(b=>b.text.slice(0,16384)).join('\n');
  const known=[
@@ -26,17 +28,40 @@ export function browserFailureDetails(response){
 }
 
 // Private journals retain the original fixed failure before cancellation can
-// replace it with upload uncertainty. Raw bounded causes are opt-in for the
-// upload journal only, whose existing redactor runs before persistence.
-export function operationFailureDiagnostic(error,{uploadCause=false}={}){
+// replace it with uncertainty. Original causes are opt-in for the upload
+// journal or the path-masked private download diagnostic.
+export function operationFailureDiagnostic(error,{uploadCause=false,downloadCause=false,redactor}={}){
  const message=String(error?.message??'');
  const pinned=/^Pinned browser capability call failed \[([A-Z][A-Z0-9_]{1,100})\](?: \((reason=(?:owner|dialog|attempted|capacity|awaiting_original_attempt)|exception=(?:ReferenceError|TypeError|SyntaxError|RangeError))\))?$/.exec(message);
  const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error?.code??'')?error.code
   :/^[A-Z][A-Z0-9_]{1,100}$/.test(message)?message:'UNCLASSIFIED_ERROR';
  const diagnostic={code:pinned?.[1]??code,detail:pinned?.[2]??null,
   exception:['Error','AbortError','TypeError','ReferenceError','SyntaxError','RangeError'].includes(error?.name)?error.name:'Error'};
+ if(downloadCause)return {...diagnostic,...downloadFailureDiagnostic({
+  name:String(error?.name??'Error'),message:String(error?.message??error),stack:error?.stack??null,
+  original_message:typeof error?.cause?.message==='string'?error.cause.message:null,
+  original_stack:typeof error?.cause?.stack==='string'?error.cause.stack:null,
+ },redactor)};
  if(!uploadCause)return diagnostic;
  return {...diagnostic,name:String(error?.name??'Error').slice(0,80),
   message:String(error?.message??error).slice(0,2048),
   original_message:typeof error?.cause?.message==='string'?error.cause.message.slice(0,2048):null};
+}
+
+// Redact BEFORE bounding: truncating a secret first defeats exact-value
+// masking. Omit complete URLs and local paths, including paths with spaces.
+export function downloadFailureDiagnostic(value,redactor=createRedactor()){
+ const cleaned=redactor.redact(value);
+ const clean=item=>{
+  if(typeof item==='string')return redactor.text(item)
+   .replace(/(?:https?|file|blob):[^\s<>"'`]+/gi,'[url]')
+   .replace(/[A-Za-z]:[\\/][^\r\n"']*|\\\\[^\r\n"']*/g,'[path]')
+   .replace(/(["'])\/[^\r\n]*?\1/g,'[path]')
+   .replace(/\/(?:[^\s<>"'`()]+\/)*[^\s<>"'`()]+/g,'[path]')
+   .split('\n').slice(0,6).join('\n').slice(0,2048);
+  if(Array.isArray(item))return item.slice(0,3).map(clean);
+  if(item&&typeof item==='object')return Object.fromEntries(Object.entries(item).map(([key,v])=>[key,clean(v)]));
+  return item;
+ };
+ return clean(cleaned);
 }

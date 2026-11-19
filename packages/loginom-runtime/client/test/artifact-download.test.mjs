@@ -248,9 +248,33 @@ test('download failure preserves bounded stage and cause flags without URLs or p
  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
  const failure=result.trace.find(e=>e.event==='download_browser_failure');
  assert.equal(failure.step,'download.saveAs');assert.equal(failure.page_closed,true);assert.equal(failure.causes[1].target_closed,true);
+ // The runtime consumes this field into its private journal before returning
+ // the fixed receipt, including when the browser ledger is inspected later.
+ delete failure.private_download;
  assert.equal(result.trace.find(e=>e.event==='download_cleanup_failure').step,'download.cancel');
  assert.ok(!JSON.stringify(result).includes('secret=hidden'));assert.ok(!JSON.stringify(result).includes('private cancellation'));
  assert.deepEqual(f.calls,['listen','click']);
+});
+
+test('saveAs failure captures download and native receipt before cancellation',async()=>{
+ const f=fixture();let cancelled=false;
+ f.download.saveAs=async()=>{throw Error('download.saveAs: canceled password=PRIVATE');};
+ f.download.failure=async()=>{assert.equal(cancelled,false);return 'canceled';};
+ f.download.cancel=async()=>{cancelled=true;f.calls.push('cancel');};
+ const evaluate=f.page.evaluate.bind(f.page);
+ f.page.evaluate=async(fn,arg)=>{
+  if(fn.name==='downloadFailureReceipt'){
+   assert.equal(cancelled,false);
+   return {state:'observed',expected_bytes:34,received_bytes:34};
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await f.run(),failure=result.trace.find(e=>e.event==='download_browser_failure');
+ assert.equal(failure.private_download.download_failure,'canceled');
+ assert.equal(failure.private_download.cancelled,true);
+ assert.equal(failure.private_download.native_receipt.received_bytes,34);
+ assert.match(failure.private_download.message,/download.saveAs: canceled/);
+ assert.ok(cancelled);
 });
 
 test('download refuses a different file label, formatted-name collision or package before the browser',()=>{

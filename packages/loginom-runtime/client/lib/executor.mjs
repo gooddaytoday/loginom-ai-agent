@@ -1,5 +1,6 @@
-import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
+import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic,downloadFailureDiagnostic} from './browser-failure.mjs';
 import {createRedactor} from './redact.mjs';
+import {browserDownloadsPath} from './browser-downloads.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {readSavedPackageState} from './package-persistence.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
@@ -311,6 +312,42 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   };
   let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false,progress,retained=false;
   const trace=[],destination=task.server_source_binding??task.output_binding??task.artifact.upload;
+  const captureFailure=async error=>{
+    const causes=[],seen=new Set();
+    for(let current=error;current&&causes.length<3&&!seen.has(current);current=current.cause){
+      seen.add(current);causes.push({name:String(current.name??'Error'),message:String(current.message??current),stack:current.stack??null});
+    }
+    let failure={state:'missing'},native={state:'unavailable'};
+    if(download)try{
+      // failure() waits for completion. A broken copy/transport must not leave
+      // diagnostics waiting on a still-running download before cancellation.
+      failure=await Promise.race([
+        download.failure().then(value=>({state:'read',value})),
+        page.waitForTimeout(100).then(()=>({state:'pending'})),
+      ]);
+    }catch{failure={state:'unavailable'};}
+    try{native=await page.evaluate(function downloadFailureReceipt(task){
+      if(location.origin!==task.origin)return {state:'owner_changed'};
+      const identity=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+      if(identity&&identity.document!==document)return {state:'owner_changed'};
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      const tab=main?.Items?.Workspace?.getActiveTab?.();
+      const loaders=tab?.Controller?.FController?.FFileSenderManager?.FDownloadViewController?.FFileLoaders;
+      if(!Array.isArray(loaders))return {state:'unavailable'};
+      const matching=loaders.filter(l=>l.FFullFileName===task.destination);
+      if(matching.length!==1)return {state:matching.length?'ambiguous':'missing'};
+      const loader=matching[0],blobs=loader.FFileBlobs;
+      if(loader.FFileName!==task.name||!Array.isArray(blobs)
+        ||blobs.some(blob=>!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<0))return {state:'unverified'};
+      const bytes=blobs.reduce((sum,blob)=>sum+blob.size,0);
+      return {state:'observed',expected_bytes:Number.isSafeInteger(loader.FFileSize)?loader.FFileSize:null,
+        received_bytes:Number.isSafeInteger(bytes)?bytes:null,chunks:blobs.length};
+    },{origin:task.expected_origin,destination:destination.destination,name:task.artifact.name});}catch{}
+    return {operation_id:task.operation_id,...causes[0],causes,
+      failure_state:failure.state,download_failure:failure.value??null,
+      cancelled:/cancel|abort/i.test(failure.value??'')||causes.some(c=>/cancel|abort/i.test(c.message)),
+      received_bytes:progress?.bytes??native.received_bytes??null,native_receipt:native};
+  };
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
     error:code?{code,message:code}:null,trace});
@@ -503,7 +540,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
         if(retainedJob.cancel_requested){await download.cancel();completed=true;return result('AMBIGUOUS','DOWNLOAD_CANCELLED');}
         await download.saveAs(task.download_path);
         completed=true;
-        if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        if(await download.failure()!==null){
+          trace.push({event:'download_browser_failure',step:browserStep,private_download:await captureFailure()});
+          return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        }
         return result('SUCCEEDED',null,{download_completed:true});
       }
       if(retainedJob)throw Error('Server download already started');
@@ -514,7 +554,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       // host registry owns the original deadline and drains this job on abort.
       entry.completion=(async()=>{
         try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
-        catch(error){entry.failed=true;entry.failure={reason:'save_failed',
+        catch(error){entry.failed=true;entry.failure={reason:'save_failed',private_download:await captureFailure(error),
           ...( ['EACCES','EPERM','ENOSPC','ENOENT','EISDIR'].includes(error.code)?{code:error.code}:{})};}
         finally{
           try{await progress?.close();}catch{entry.failed=true;}
@@ -526,7 +566,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     }
     await download.saveAs(task.download_path);
     browserStep='download.failure';
-    if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+    if(await download.failure()!==null){
+      trace.push({event:'download_browser_failure',step:browserStep,private_download:await captureFailure()});
+      return result('AMBIGUOUS','DOWNLOAD_FAILED');
+    }
     completed=true;
     browserStep='post_download_observation';
     let after=await observe(page),toastRefused=false;
@@ -642,10 +685,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       suggested_name:name,download_completed:true,bytes_verification_required:true,
       file_ref:task.file_ref,observation_id:task.observation_id});
   } catch(error) {
-    trace.push({event:'download_browser_failure',...failureEvidence(error)});
+    const evidence={event:'download_browser_failure',...failureEvidence(error)};
     // An unexpected gesture exception may have emitted a download already.
     // Drain the bounded listener and cancel any captured transfer before exit.
     if(event && !download)try{download=await event;}catch{}
+    evidence.private_download=await captureFailure(error);trace.push(evidence);
     if(download && !completed)try{await download.cancel();completed=true;}catch(error){
       browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
     }
@@ -2068,12 +2112,12 @@ export function withBrowserReceipt(body, options) {
 export function parseCapabilityResult(response,{redactor}={}) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
-    // Keep the original cause private; upload journals it through its
-    // redactor while callers retain the fixed public refusal.
+    // Keep the original cause private while callers retain the fixed public
+    // refusal. Mask before bounding so a cut cannot expose a secret prefix.
     const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
-      .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
+      .map(block=>block.text.replace(/(?:^|\n)### Ran Playwright code\n[\s\S]*?(?=\n### |$)/g,'')).join('\n');
     throw Object.assign(new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
-      {cause:new Error(message)}),{code:browserFailureCategory(response)});
+      {cause:new Error(Buffer.from((redactor??createRedactor()).text(message)).subarray(0,2048).toString().replace(/�$/, ''))}),{code:browserFailureCategory(response)});
   }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
@@ -2095,6 +2139,31 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
+  const executeBrowser=execute;
+  execute=async(...args)=>{
+    let result;
+    try{result=await executeBrowser(...args);}
+    catch(error){
+      // Export and delivery callers can replace the exception during recovery.
+      // Persist its cause here while the original transport error still exists.
+      try{await onRecord({phase:'browser_capability_failed',cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});}catch{}
+      throw error;
+    }
+    const diagnostics=[];
+    const consume=value=>{
+      if(!value||typeof value!=='object')return;
+      if((value.event==='download_browser_failure'||value.reason==='save_failed')&&Object.hasOwn(value,'private_download')){
+        const cause=value.private_download;delete value.private_download;
+        diagnostics.push({phase:'download_browser_diagnostic',operation_id:cause?.operation_id,step:value.step,
+          cause:downloadFailureDiagnostic(cause,redactor)});
+      }
+      // Receipt inspection can return an earlier download nested in output.
+      for(const child of Object.values(value))consume(child);
+    };
+    consume(result);
+    for(const diagnostic of diagnostics)try{await onRecord(diagnostic);}catch{}
+    return result;
+  };
   let pending = null;
   let running = false;
   const operations = new Map();
@@ -2145,7 +2214,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!file)throw Error('LOGINOM_FILE_CHANGED');
       const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
         server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
-        download_path:path,browser_downloads_path:join(cacheDirectory,'..','browser-downloads'),
+        download_path:path,browser_downloads_path:browserDownloadsPath(join(cacheDirectory,'..')),
         deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
@@ -3850,7 +3919,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const dispatched=withBrowserReceipt(`(${code})(page)`,receipt);
           onDispatched?.();
           raw=await execute(dispatched,{timeout:65000});
-        } catch {
+        } catch(error) {
+          try{await onRecord({phase:'artifact_download_transport_failed',operation_id:verificationId,
+            cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});}catch{}
           operation.transportUncertain=true;operation.cleanupConfirmed=false;
           attempt.outcome=failed(attempt,'BROWSER_CALL_UNCERTAIN','Inspect the original upload before any repeated download');
           await remember(attempt,'download_transport_uncertain',attempt.outcome);
