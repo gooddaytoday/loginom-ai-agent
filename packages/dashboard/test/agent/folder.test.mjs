@@ -7,7 +7,7 @@ import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } fro
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
-import { folderName, prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
+import { folderName, prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "../../src/agent/folder.ts"
 import { bindingKey } from "../../src/contract/snapshot.ts"
 import { dashboardServer } from "../../src/web/server.ts"
 
@@ -474,4 +474,32 @@ test("base update cannot replace changed bytes under the same name or a differen
   updatePublicationBase(first.directory, readDashboardSnapshot(first.directory).control, versionA)
   assert.deepEqual(readDashboardSnapshot(first.directory).control.base, other)
   await assert.rejects(async () => updatePublicationBase(first.directory, { ...current, origin: "http://other.localhost" }, versionB), /DASHBOARD_BINDING_CONFLICT/)
+})
+
+test("a filesystem failure after detaching the folder leaves the binding usable for a retry", {
+  skip: process.platform === "win32" || process.getuid?.() === 0,
+}, async t => {
+  const app = await fixture(t)
+  const target = await prepareDashboard(await app.create())
+  const captured = await readDashboardBinding(target.directory, app.dashboards)
+  const blocked = "control/draft"
+  const path = join(target.directory, "..", blocked)
+  await mkdir(path)
+  await writeFile(join(path, "index.html"), "preview")
+  await chmod(path, 0o500)
+  try {
+    assert.throws(() => removeDashboard(target.directory, app.dashboards, captured), { code: "EACCES" })
+    assert.deepEqual(await readDashboardBinding(target.directory, app.dashboards), captured)
+    assert.ok((await stat(target.directory)).isDirectory())
+  } finally {
+    for (const name of await readdir(app.dashboards)) {
+      if (name.startsWith(".delete-") || target.directory === join(app.dashboards, name, "work"))
+        await chmod(join(app.dashboards, name, blocked), 0o700)
+    }
+  }
+  const neighbourBinding = { ...binding, nodeGuid: "33c145b1-6ce3-458f-aa36-e6afdab2a930" }
+  const neighbour = await prepareDashboard(await app.create({ ...snapshot, binding: neighbourBinding }))
+  removeDashboard(target.directory, app.dashboards, await readDashboardBinding(target.directory, app.dashboards))
+  await assert.rejects(stat(target.directory), { code: "ENOENT" })
+  assert.deepEqual((await readDashboardBinding(neighbour.directory, app.dashboards)).binding, neighbourBinding)
 })

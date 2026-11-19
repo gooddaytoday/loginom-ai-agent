@@ -88,10 +88,11 @@ function fixture(move = (files, part, final) => {
   }] }
   return {
     files,
+    connection,
     locks,
     publish: () => dashboardStorage(context, { binding, content: '{"title":"Draft"}', expected: null }, "dashboardPublish"),
-    versions: () => dashboardStorage(context, { binding }, "dashboardVersions"),
-    deleteVersions: expected => dashboardStorage(context, { binding, expected }, "dashboardDelete"),
+    versions: (target = binding) => dashboardStorage(context, { binding: target }, "dashboardVersions"),
+    deleteVersions: (expected, target = binding) => dashboardStorage(context, { binding: target, expected }, "dashboardDelete"),
   }
 }
 
@@ -171,4 +172,113 @@ test("deletion removes only the two approved versions through FileStorage", asyn
 test("deletion without a browser page reports storage unavailable and zero removals", async () => {
   const result = await dashboardStorage({ pages: () => [] }, { binding, expected: [] }, "dashboardDelete")
   assert.deepEqual(result, { status: "failed", reason: "DASHBOARD_STORAGE_UNAVAILABLE", confirmedRemoved: 0 })
+})
+
+test("replacement under the same publication name changes the approved set before any delete", async () => {
+  const f = fixture(undefined, () => assert.fail("unapproved versions must not be removed"))
+  const directory = dashboardRequest({ binding }).directory
+  const path = directory + "/20261119T090000Z.json"
+  f.files.set(path, JSON.stringify({ binding, revision: "original" }))
+  const expected = await f.versions()
+  const replacement = JSON.stringify({ binding, revision: "replacement" })
+  f.files.set(path, replacement)
+  assert.deepEqual(await f.deleteVersions(expected), {
+    status: "changed",
+    remaining: [{ name: expected[0].name, sourceHash: createHash("sha256").update(replacement).digest("hex") }],
+    confirmedRemoved: 0,
+  })
+  assert.equal(f.files.get(path), replacement)
+  assert.equal(f.locks.size, 0)
+})
+
+test("an active node deletion excludes another client and preserves versions published during deletion", async () => {
+  const other = { ...binding, nodeGuid: "33333333-3333-4333-8333-333333333333" }
+  const directory = dashboardRequest({ binding }).directory
+  const first = "20261119T090000Z.json"
+  const second = "20261119T090001Z.json"
+  const latest = "20261119T090002Z.json"
+  const firstPath = directory + "/" + first
+  const otherPath = dashboardRequest({ binding: other }).directory + "/" + first
+  const changed = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  const deleted = []
+  const f = fixture(undefined, async (files, path) => {
+    deleted.push(path)
+    const removed = files.delete(path)
+    if (path === firstPath) {
+      changed.resolve()
+      await resume.promise
+    }
+    return removed
+  })
+  const original = JSON.stringify({ binding })
+  const replacement = JSON.stringify({ binding, revision: "new publication" })
+  f.files.set(firstPath, original)
+  f.files.set(directory + "/" + second, original)
+  f.files.set(otherPath, JSON.stringify({ binding: other }))
+  const expected = await f.versions()
+  const deleting = f.deleteVersions(expected)
+  try {
+    await Promise.race([changed.promise, deleting.then(() => assert.fail("deletion did not reach FileStorage"))])
+    assert.deepEqual(await f.deleteVersions(expected), {
+      status: "failed", reason: "DASHBOARD_DELETE_BUSY", confirmedRemoved: 0,
+    })
+    assert.deepEqual(await f.deleteVersions(await f.versions(other), other), { status: "empty" })
+    f.files.set(firstPath, replacement)
+    f.files.set(directory + "/" + latest, replacement)
+  } finally {
+    resume.resolve()
+  }
+  const sourceHash = createHash("sha256").update(replacement).digest("hex")
+  assert.deepEqual(await deleting, {
+    status: "changed", confirmedRemoved: 2, remaining: [{ name: first, sourceHash }, { name: latest, sourceHash }],
+  })
+  assert.deepEqual(deleted, [firstPath, otherPath, directory + "/" + second])
+  assert.equal(f.files.get(firstPath), replacement)
+  assert.equal(f.files.get(directory + "/" + latest), replacement)
+  assert.equal(f.locks.size, 0)
+})
+
+test("losing the connection after DeleteFile preserves its receipt but leaves the final set unknown", async () => {
+  const deleted = []
+  const f = fixture(undefined, (files, path) => {
+    deleted.push(path)
+    f.connection.Connected = false
+    return files.delete(path)
+  })
+  const path = dashboardRequest({ binding }).directory + "/20261119T090000Z.json"
+  f.files.set(path, JSON.stringify({ binding }))
+  assert.deepEqual(await f.deleteVersions(await f.versions()), {
+    status: "failed", reason: "DASHBOARD_DELETE_UNKNOWN", confirmedRemoved: 1,
+  })
+  assert.deepEqual(deleted, [path])
+  f.connection.Connected = true
+  assert.deepEqual(await f.versions(), [])
+  assert.equal(f.locks.size, 0)
+})
+
+test("a node without a publication directory is confirmed empty without creating a lock file", async () => {
+  const f = fixture(undefined, () => assert.fail("an empty node has no files to remove"))
+  const expected = await f.versions()
+  assert.deepEqual(expected, [])
+  assert.deepEqual(await f.deleteVersions(expected), { status: "empty" })
+  assert.equal(f.files.size, 0)
+  assert.equal(f.locks.size, 0)
+})
+
+test("an absent version after a lost DeleteFile reply does not count as confirmed", async () => {
+  const deleted = []
+  const f = fixture(undefined, (files, path) => {
+    deleted.push(path)
+    files.delete(path)
+    throw Error("Connection unavailable")
+  })
+  const path = dashboardRequest({ binding }).directory + "/20261119T090000Z.json"
+  f.files.set(path, JSON.stringify({ binding }))
+  assert.deepEqual(await f.deleteVersions(await f.versions()), {
+    status: "failed", reason: "DASHBOARD_DELETE_UNKNOWN", confirmedRemoved: 0, remaining: [],
+  })
+  assert.deepEqual(deleted, [path])
+  assert.equal(f.files.has(path), false)
+  assert.equal(f.locks.size, 0)
 })

@@ -222,7 +222,13 @@ export async function dashboardStorage(context, input, operation = "dashboardRea
         }
       }
       const remaining = await versions().catch(error => error)
-      if (!Array.isArray(remaining)) return { status: "failed", reason: reason ?? deleteFailure(remaining), confirmedRemoved }
+      if (!Array.isArray(remaining)) {
+        const failure = reason ?? deleteFailure(remaining)
+        return {
+          status: "failed", confirmedRemoved,
+          reason: confirmedRemoved > 0 && failure === "DASHBOARD_STORAGE_UNAVAILABLE" ? "DASHBOARD_DELETE_UNKNOWN" : failure,
+        }
+      }
       if (reason) return { status: "failed", reason, confirmedRemoved, remaining }
       return remaining.length ? { status: "changed", remaining, confirmedRemoved } : { status: "empty" }
     } finally {

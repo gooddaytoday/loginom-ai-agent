@@ -13,9 +13,10 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
+const version = { name: "20261115T000000Z.json", sourceHash: "a".repeat(64) }
 const binding = { packagePath: "/user/example.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" }
 
-async function fixture(hold: boolean | "start" = false, closeFailure = false) {
+async function fixture(hold: boolean | "start" = false, closeFailure = false, deleteReply: unknown = { status: "empty" }) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "dashboard-host-"))
@@ -32,6 +33,8 @@ async function fixture(hold: boolean | "start" = false, closeFailure = false) {
     process.on('message', m => {
       appendFileSync(${JSON.stringify(join(directory, 'runtime.jsonl'))}, JSON.stringify({operation:m.operation,pid:process.pid,...(m.operation==='start'?{headless:m.input.headless,validation:m.input.validation}:{})})+'\\n');
       if(m.operation==='start' && ${JSON.stringify(hold)}!=='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,...(m.input.validation?{checked:true}:{ready:true})}});
+      if(m.operation==='dashboardVersions') process.send({id:m.id,result:[${JSON.stringify(version)}]});
+      if(m.operation==='dashboardDelete') process.send({id:m.id,result:${JSON.stringify(deleteReply)}});
       if(m.operation==='dashboardRead') { if(${JSON.stringify(hold)}) reading=m.id; else process.send({id:m.id,result:null}); }
       if(m.operation==='dashboardPublish' && m.input.content==='\"malformed-reply\"') {process.send({id:m.id,result:{status:'written'}});return;}
       if(m.operation==='dashboardPublish' && m.input.content==='\"lose-reply\"') {process.send({id:m.id,error:'LOGINOM_RUNTIME_FAILED'});return;}
@@ -190,6 +193,42 @@ test("connection settings stay pending until the short runtime closes and releas
 })
 
 
+test("a previously listed generation cannot delete after a same-origin connection change", async () => {
+  const f = await fixture()
+  try {
+    LoginomHost.connect(f.backendPort)
+    const input = { origin: "http://example.test", binding }
+    const scope = Schema.decodeUnknownSync(HostTaskScope.Info)({ taskMessageID: "msg_dashboard", profile: "loginom-dashboard" })
+    const first = await LoginomHost.acquire("dashboard-delete")
+    if (!first) throw Error("No run")
+    await first.scope("bind", scope)
+    const listed = await first.dashboardVersions(input)
+    expect(listed).toEqual({ generation: 1, versions: [version] })
+    await first.release()
+    const checked = await f.host.api.check({
+      revision: 1, url: "http://example.test/app/", username: "other",
+      apiKey: { operation: "preserve" }, password: { operation: "preserve" },
+    })
+    await f.host.api.save({ revision: 1, validationId: checked.validationId })
+    await f.host.settled()
+    expect(await f.host.api.status()).toMatchObject({ generation: 2, state: "ready" })
+
+    const run = await LoginomHost.acquire("dashboard-delete")
+    if (!run) throw Error("No run")
+    await run.scope("bind", scope)
+    await expect(run.dashboardDelete({ ...input, generation: listed.generation, expected: listed.versions }))
+      .rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
+    const events = async () => (await readFile(join(f.directory, "runtime.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line).operation)
+    expect(await events()).not.toContain("dashboardDelete")
+
+    const fresh = await run.dashboardVersions(input)
+    expect(fresh).toEqual({ generation: 2, versions: [version] })
+    expect(await run.dashboardDelete({ ...input, generation: fresh.generation, expected: fresh.versions })).toEqual({ status: "empty" })
+    expect((await events()).filter(operation => operation === "dashboardDelete")).toHaveLength(1)
+    await run.release()
+  } finally { LoginomHost.disconnect(); await f.close() }
+})
+
 test("cancellation during runtime login closes startup before releasing the operation", async () => {
   const f = await fixture("start")
   const controller = new AbortController()
@@ -262,5 +301,13 @@ test("a malformed publication result is unknown after one dispatch and confirmed
     const events = (await readFile(join(f.directory, "runtime.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line))
     expect(events.map(event => event.operation)).toEqual(["start", "dashboardPublish", "close"])
     expect(() => process.kill(events[0].pid, 0)).toThrow()
+  } finally { await f.close() }
+})
+
+test("an ambiguous successful runtime reply cannot authorize draft cleanup", async () => {
+  const f = await fixture(false, false, { status: "empty", remaining: [version] })
+  try {
+    await expect(f.host.deleteDashboard({ origin: "http://example.test", generation: 1, binding, expected: [version] }))
+      .rejects.toThrow("DASHBOARD_DELETE_UNKNOWN")
   } finally { await f.close() }
 })

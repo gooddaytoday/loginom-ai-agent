@@ -104,34 +104,47 @@ export const DashboardDeleteTool = Tool.define(
           const listed = yield* dashboardDeleteRequest(ctx, host => host.dashboardVersions(input, ctx.abort))
           if ("error" in listed) return deleteOutput(listed.error)
 
-          yield* Effect.raceFirst(ctx.ask({
-            permission: "dashboard_delete",
-            patterns: [control.nodeName, control.binding.packagePath],
-            always: [],
-            metadata: { publicationCount: listed.versions.length },
-          }), dashboardCancellation(ctx.abort))
-          ctx.abort.throwIfAborted()
-          return yield* Effect.uninterruptible(Effect.gen(function* () {
-            const result = yield* dashboardDeleteRequest(ctx, host => host.dashboardDelete({
-              ...input, generation: listed.generation, expected: listed.versions,
-            }, ctx.abort))
-            if ("error" in result) return deleteOutput(result.error)
-            if (result.status !== "empty") {
-              const progress = `Подтверждено удаление версий: ${result.confirmedRemoved}.`
-              const remaining = result.remaining ? ` Текущий список содержит версий: ${result.remaining.length}.` : ""
-              const reason = result.status === "failed" ? hostErrorText(result.reason) : "Набор опубликованных версий изменился."
-              return deleteOutput(`${reason} ${progress}${remaining} Локальный черновик сохранён.`)
+          return yield* Effect.uninterruptibleMask(restore => Effect.gen(function* () {
+            let expected = listed.versions
+            let confirmedRemoved = 0
+            while (true) {
+              yield* restore(Effect.raceFirst(ctx.ask({
+                permission: "dashboard_delete",
+                patterns: [control.nodeName, control.binding.packagePath],
+                always: [],
+                metadata: {
+                  publicationCount: expected.length,
+                  ...(confirmedRemoved > 0 ? { confirmedRemoved } : {}),
+                },
+              }), dashboardCancellation(ctx.abort)))
+              ctx.abort.throwIfAborted()
+              const result = yield* dashboardDeleteRequest(ctx, host => host.dashboardDelete({
+                ...input, generation: listed.generation, expected,
+              }, ctx.abort))
+              if ("error" in result) return deleteOutput(confirmedRemoved
+                ? `${result.error} Подтверждено удаление версий: ${confirmedRemoved}. Локальный черновик сохранён.`
+                : result.error)
+              if (result.status === "changed") {
+                confirmedRemoved += result.confirmedRemoved
+                expected = result.remaining
+                continue
+              }
+              if (result.status === "failed") {
+                const progress = `Подтверждено удаление версий: ${confirmedRemoved + result.confirmedRemoved}.`
+                const remaining = result.remaining ? ` Текущий список содержит версий: ${result.remaining.length}.` : ""
+                return deleteOutput(`${hostErrorText(result.reason)} ${progress}${remaining} Локальный черновик сохранён.`)
+              }
+              const cleaned = yield* Effect.try({
+                try: () => {
+                  ctx.abort.throwIfAborted()
+                  removeDashboard(session.directory, root, control)
+                },
+                catch: () => undefined,
+              }).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
+              return deleteOutput(cleaned
+                ? "Дашборд удалён. Опубликованных версий и локального черновика больше нет."
+                : "На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
             }
-            const cleaned = yield* Effect.try({
-              try: () => {
-                ctx.abort.throwIfAborted()
-                removeDashboard(session.directory, root, control)
-              },
-              catch: () => undefined,
-            }).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
-            return deleteOutput(cleaned
-              ? "Дашборд удалён. Опубликованных версий и локального черновика больше нет."
-              : "На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
           }))
         }).pipe(Effect.orDie),
     }
