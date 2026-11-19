@@ -2947,7 +2947,9 @@ class Runner:
                     assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
             answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
                            if event.get('type') == 'text'), (None, ''))
-            assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            # Seasonal empty-input refusals describe a reason, not a fixed phrase.
+            assert (re.search(r'\bпуст\w*\s+вход\w*\b', answer[1], re.I)
+                    if refusal['text'] == 'устой вход' else refusal['text'] in answer[1]), 'REFUSAL_NOT_REPORTED'
             if spec.get('excel_xls_refusal'):
                 assert re.search('xlsx',answer[1],re.I) and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
                 assert not any(p.is_file() for ext in ['*.xls','*.xlsx'] for p in profile.rglob(ext)), 'XLS_REFUSAL_CREATED_WORKBOOK'
