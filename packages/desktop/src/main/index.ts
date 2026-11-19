@@ -10,7 +10,7 @@ import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
 import { app, BrowserWindow, dialog, safeStorage, session } from "electron"
-import { dashboardDataRoot, isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
+import { dashboardDataRoot, isDashboardWorkDirectoryAsync } from "@loginom-ai-agent/product/dashboard-root"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -439,7 +439,7 @@ const main = Effect.gen(function* () {
         template: join(loginomResources(), "dashboard", "template"),
       }),
     checkDashboardTarget: (id) => checkDashboardTarget(id, dashboardDataRoot(process.env)),
-    isDashboardWork: (directory) => isDashboardWorkDirectory(directory, dashboardDataRoot(process.env)),
+    isDashboardWork: (directory) => isDashboardWorkDirectoryAsync(directory, dashboardDataRoot(process.env)),
     consumeDeepLinks: deepLinks.take,
     getDefaultServerUrl: () => getDefaultServerUrl(),
     setDefaultServerUrl: (url) => setDefaultServerUrl(url),

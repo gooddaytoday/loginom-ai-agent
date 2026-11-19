@@ -67,6 +67,12 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
     return worktree ?? directory
   }
 
+  const captureOriginWithTimeout = (conn: ServerConnection.Any) => {
+    const deadline = Promise.withResolvers<null>()
+    const timer = setTimeout(deadline.resolve, 1_000, null)
+    return Promise.race([captureOrigin(conn).catch(() => null), deadline.promise]).finally(() => clearTimeout(timer))
+  }
+
   const receive = async (link: NonNullable<ReturnType<typeof parseDashboardDeepLink>>, cold: boolean) => {
     if (!platform.getDashboardTarget) return
     const path = location.pathname
@@ -85,7 +91,7 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
     const route = dashboardRoute(key, "/")
     requests.set(route, link)
     try {
-      const origin = settings.general.newLayoutDesigns() ? captureOrigin(conn).catch(() => null) : null
+      const origin = settings.general.newLayoutDesigns() ? captureOriginWithTimeout(conn) : null
       const [snapshot, dashboardOrigin] = await Promise.all([
         platform.getDashboardTarget(link.id),
         origin,

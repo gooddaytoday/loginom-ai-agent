@@ -1,4 +1,5 @@
 import { existsSync, realpathSync, statSync } from "node:fs"
+import { realpath, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { profilePaths } from "./cli-profile"
@@ -21,4 +22,9 @@ export function isDashboardWorkDirectory(directory: string, root: string) {
   if (!existsSync(directory) || !existsSync(root)) return false
   const work = realpathSync(directory)
   return statSync(work).isDirectory() && basename(work) === "work" && dirname(dirname(work)) === realpathSync(root)
+}
+
+export async function isDashboardWorkDirectoryAsync(directory: string, root: string) {
+  const work = await realpath(directory)
+  return basename(work) === "work" && dirname(dirname(work)) === (await realpath(root)) && (await stat(work)).isDirectory()
 }

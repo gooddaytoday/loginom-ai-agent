@@ -44,7 +44,7 @@ type Deps = {
     id: string,
   ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
   checkDashboardTarget: (id: string) => Promise<boolean>
-  isDashboardWork: (directory: string) => boolean
+  isDashboardWork: (directory: string) => Promise<boolean>
   consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
@@ -88,10 +88,10 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("consume-deep-links", (event) => deps.consumeDeepLinks(event.sender))
   ipcMain.handle("get-dashboard-target", (_event, id: string) => deps.getDashboardTarget(id))
   ipcMain.handle("check-dashboard-target", (_event, id: string) => deps.checkDashboardTarget(id))
-  ipcMain.handle("is-dashboard-work", (_event, directory: unknown) => {
+  ipcMain.handle("is-dashboard-work", async (_event, directory: unknown) => {
     if (typeof directory !== "string" || !isAbsolute(directory)) return false
     try {
-      return deps.isDashboardWork(directory)
+      return await deps.isDashboardWork(directory)
     } catch {
       // The directory can disappear between the filesystem checks.
       return false

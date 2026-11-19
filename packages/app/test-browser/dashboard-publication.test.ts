@@ -110,3 +110,75 @@ test("opening a local draft displays the new-publication toast", async () => {
     } finally { dispose(); delete window.__LOGINOM_AI_AGENT__ }
   }
 })
+
+test("opens the dashboard with no source project when the active session lookup stalls", async () => {
+  const { ServerConnection } = await import("@/context/server")
+  const local = { type: "sidecar", variant: "base", http: { url: "http://127.0.0.1:17080" } } as const
+  const server = ServerConnection.key(local)
+  const source = new Promise<never>(() => {})
+  const opened = Promise.withResolvers<unknown>()
+  let snapshotRequests = 0
+
+  await mockExports("@solidjs/router", {
+    useLocation: () => ({ pathname: "/" }),
+    useNavigate: () => () => {},
+    useParams: () => ({}),
+    useSearchParams: () => [{}],
+  })
+  await mockExports("@/context/layout", {
+    useLayout: () => ({
+      route: () => ({ type: "session", server, sessionId: "previous" }),
+      projects: { open: () => {} },
+    }),
+  })
+  await mockExports("@/context/global", {
+    useGlobal: () => ({
+      ensureServerCtx: () => ({
+        projects: { list: () => [] },
+        sync: { session: { peek: () => undefined, resolve: () => source } },
+      }),
+    }),
+  })
+  await mockExports("@/context/tabs", {
+    useTabs: () => ({
+      store: [],
+      ready: () => true,
+      newDraft: async (draft: unknown) => {
+        opened.resolve(draft)
+        return { draftID: "dashboard" }
+      },
+    }),
+  })
+  await mockExports("@/context/settings", { useSettings: () => ({ general: { newLayoutDesigns: () => true } }) })
+  await mockExports("@/context/server", { useServer: () => ({ key: server, list: [local] }) })
+  await mockExports("@/context/platform", {
+    usePlatform: () => ({
+      getDashboardTarget: async () => {
+        snapshotRequests++
+        return { directory: "/fixture/dashboard/work", nodeName: "Заказы", fresh: true, action: "create" }
+      },
+    }),
+  })
+  const { useDashboardDeepLinks } = await import("../src/pages/layout/dashboard-links")
+  window.__LOGINOM_AI_AGENT__ = {
+    deepLinks: ["loginom-ai-agent://dashboard?id=77015e88-b7dd-408f-b09d-fb67dbad931d&action=create"],
+  }
+  const dispose = createRoot((dispose) => {
+    useDashboardDeepLinks()
+    return dispose
+  })
+  const deadline = Promise.withResolvers<string>()
+  const timer = setTimeout(deadline.resolve, 2_500, "Dashboard did not open")
+  try {
+    expect(await Promise.race([opened.promise, deadline.promise])).toEqual({
+      server,
+      directory: "/fixture/dashboard/work",
+      dashboardOrigin: null,
+    })
+    expect(snapshotRequests).toBe(1)
+  } finally {
+    clearTimeout(timer)
+    dispose()
+    delete window.__LOGINOM_AI_AGENT__
+  }
+})

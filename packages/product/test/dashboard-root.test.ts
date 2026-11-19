@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
-import { dashboardDataRoot, isDashboardWorkDirectory } from "../src/dashboard-root"
+import { dashboardDataRoot, isDashboardWorkDirectory, isDashboardWorkDirectoryAsync } from "../src/dashboard-root"
 
 test("Desktop dashboard data follows the backend XDG channel directory", () => {
   expect(dashboardDataRoot({ XDG_DATA_HOME: "/fixture/data", LOGINOM_AI_AGENT_CHANNEL: "prod" })).toBe(
@@ -43,6 +43,10 @@ test("only real work directories within the dashboard root identify dashboard ch
     expect(isDashboardWorkDirectory(alias, root)).toBe(true)
     expect(isDashboardWorkDirectory(ordinary, root)).toBe(false)
     expect(isDashboardWorkDirectory(join(root, "missing", "work"), root)).toBe(false)
+
+    expect(await isDashboardWorkDirectoryAsync(work, root)).toBe(true)
+    expect(await isDashboardWorkDirectoryAsync(alias, root)).toBe(true)
+    expect(await isDashboardWorkDirectoryAsync(ordinary, root)).toBe(false)
   } finally {
     await rm(fixture, { recursive: true, force: true })
   }
