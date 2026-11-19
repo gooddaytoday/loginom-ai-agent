@@ -194,6 +194,48 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   }
  }
  if(error)throw error;
+ // A new far-away position has no drawing to extend native scroll bounds.
+ // Loginom binds right-drag to canvas navigation even in cursor mode. Pan the
+ // view through an empty owned canvas point, retaining every graph setting.
+ for(let pans=0;!within(view,point)&&pans<12;pans++){
+  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+  if(within(view,point))break;
+  const b=nodeId===undefined?{...point,width:0,height:0}:view.node_bounds;
+  const delta={x:(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2-b.x-b.width/2,
+   y:(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2-b.y-b.height/2};
+  const plan=await root.evaluate((e,{v,delta})=>{
+   const g=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram?.FmxGraph;
+   if(g?.container!==e||g.panningHandler?.ignoreCell!==true||g.panningHandler.useLeftButtonForPanning!==true
+    ||typeof g.panningHandler.isForcePanningEvent!=='function'||typeof g.getCellAt!=='function')return null;
+   const box=e.getBoundingClientRect();
+   if(box.x!==v.x||box.y!==v.y||box.width!==v.width||box.height!==v.height||g.view.scale!==v.scale
+    ||g.view.translate.x!==v.translate.x||g.view.translate.y!==v.translate.y||e.scrollLeft!==v.scroll.x||e.scrollTop!==v.scroll.y)throw Error('Canvas changed before native pan');
+   const left=Math.max(box.x,0)+16,right=Math.min(box.x+box.width,innerWidth)-16,
+    top=Math.max(box.y,0)+16,bottom=Math.min(box.y+box.height,innerHeight)-16;
+   let best=null,score=0;
+   for(const x of [right,left,(left+right)/2])for(const y of [bottom,top,(top+bottom)/2]){
+    const hit=document.elementFromPoint(x,y);
+    if(!hit||!(hit===e||e.contains(hit))||hit.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg')
+     ||g.getCellAt(x-box.x+e.scrollLeft,y-box.y+e.scrollTop))continue;
+    const to={x:Math.max(left,Math.min(right,x+delta.x)),y:Math.max(top,Math.min(bottom,y+delta.y))};
+    const progress=Math.hypot(delta.x,delta.y)-Math.hypot(delta.x-(to.x-x),delta.y-(to.y-y));
+    if(progress>score&&Math.hypot(to.x-x,to.y-y)>8){best={from:{x,y},to};score=progress;}
+   }
+   return best;
+  },{v:view,delta});
+  if(!plan?.from||!plan?.to)break;
+  await guard();const before=view;
+  await gesture(async()=>{
+   try{await page.mouse.move(plan.from.x,plan.from.y);await page.mouse.down({button:'right'});
+    await page.mouse.move(plan.to.x,plan.to.y,{steps:12});}
+   finally{await page.mouse.up({button:'right'});}
+  },'pan');
+  try{await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+   if(view.scale!==before.scale)throw Error('Native pan changed scale');}
+  catch(e){e.placement_navigation_unverified=true;throw e;}
+  if(view.translate.x===before.translate.x&&view.translate.y===before.translate.y
+   &&view.scroll.x===before.scroll.x&&view.scroll.y===before.scroll.y)break;
+ }
  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
  return {view,point,zoom_steps:steps,outline_closed:opened,fully_visible:within(view,point),navigation_steps:navigationSteps};
 }
