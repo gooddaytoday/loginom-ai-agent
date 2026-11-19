@@ -95,6 +95,17 @@ const user = {
 const session = { id: sessionID } as never
 
 describe("turnLifecycle", () => {
+  test("quality reviews select package-linter while scenario documentation keeps package-docs", async () => {
+    connect()
+    const { run } = acquire()
+    const system = await Effect.runPromise(Effect.scoped(run.pipe(Effect.map((turn) => turn.system()))))
+    const prompt = system.join("\n")
+    expect(prompt).toContain("use package-linter if available")
+    expect(prompt).toContain("If package-linter is unavailable, report that it is missing; do not substitute package-docs")
+    expect(prompt).toContain("Do not activate package-docs or loginom-automation merely to produce a quality review")
+    expect(prompt).toContain("other than quality assessment or linting, always activate package-docs")
+  })
+
   test("the Host lease is released when the run's scope closes, however it ends", async () => {
     for (const end of ["success", "failure"] as const) {
       const requests = connect()
