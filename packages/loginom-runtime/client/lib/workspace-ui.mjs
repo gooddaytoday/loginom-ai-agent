@@ -719,6 +719,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const controlCodeIdentity = element => {
       const tid=getTid(element),stem=workflow?.prefix+';FileStorageForm;colName_';
       let controlTid=tid??'';
+      // Native graph types own this permission; the caption embedded in a
+      // verified non-script node's tid is data. Keep name/id and editor guards.
+      if(nativeGraphControl(element)?.status==='non_script')controlTid=graphPrefix;
       // colName_<filename> is data in a readonly storage cell, not an editor
       // identity. Keep name/id and all other dangerous-control guards intact.
       if(workflow&&element.tagName==='TD'&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')&&tid?.startsWith(stem)){
