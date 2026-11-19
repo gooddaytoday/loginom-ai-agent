@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false,selectionMasks=0,maskSelectionChanged=false,toolbarOffscreen=false,toolbarDisabled=false,toolbarCovered=false}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false,selectionMasks=0,maskSelectionChanged=false,toolbarOffscreen=false,toolbarDisabled=false,toolbarCovered=false,toolbarHidden=false}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0,masked=0,deleteKeys=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
@@ -40,7 +40,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
     locator:selector=>({
       locator:child=>page.locator(child),
       count:async()=>selector.includes(';Graph;source|')&&!selector.includes(tid)?0:selector.includes('TargetBend')&&duplicate?2:1,
-      isVisible:async()=>selector.includes('TargetBend')?bend:true,
+      isVisible:async()=>selector.includes('TargetBend')?bend:selector.includes('btnRemoveSelected')?!toolbarHidden:true,
       isEnabled:async()=>!(toolbarDisabled&&selector.includes('btnRemoveSelected')),
       evaluate:async fn=>{
         if(selector.includes('btnRemoveSelected')){
@@ -102,13 +102,13 @@ test('offscreen link-delete toolbar uses native Delete on the exact selected gra
   assert.equal(f.receipt.deletion.via,'delete_key');assert.equal(f.receipt.deletion.button_geometry.viewport.width,1024);
   assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
 });
-for(const fault of ['wrongSelection','selectionGuidChanged','toolbarDisabled'])test('offscreen link-delete shortcut retains '+fault+' guard',async()=>{
+for(const fault of ['wrongSelection','selectionGuidChanged'])test('offscreen link-delete shortcut retains '+fault+' guard',async()=>{
   const f=await run({toolbarOffscreen:true,[fault]:true});assert.equal(f.receipt.status,'AMBIGUOUS');
   assert.equal(f.stats().deleteKeys,0);assert.equal(f.stats().deleted,0);
 });
-test('covered in-viewport link-delete toolbar does not authorize the offscreen shortcut',async()=>{
-  const f=await run({toolbarCovered:true});assert.equal(f.receipt.status,'AMBIGUOUS');
-  assert.equal(f.stats().deleteKeys,0);assert.equal(f.stats().deleted,0);
+for(const fault of ['toolbarHidden','toolbarCovered'])test('native selected-link Delete is independent of '+fault,async()=>{
+  const f=await run({[fault]:true});assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);
+  assert.equal(f.stats().deleteKeys,1);assert.equal(f.stats().deleted,1);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
 });
 test('D31 native removal resolves the typed service edge rather than tabular port 0',async()=>{
   const f=await run({service:true});assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);
