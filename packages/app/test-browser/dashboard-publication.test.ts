@@ -71,6 +71,37 @@ test("conflict is readable before a decision, keeps node/package, and offers no 
   } finally { dispose(); host.remove() }
 })
 
+test("deletion shows the bound node, package and loss of local edits before explicit approval", async () => {
+  const { SessionPermissionDock } = await import("../src/pages/session/composer/session-permission-dock")
+  const { autoRespondsPermission } = await import("../src/context/permission-auto-respond")
+  const request: PermissionRequest = {
+    id: "delete", sessionID: "session", permission: "dashboard_delete",
+    patterns: ["Заказы", "/fixture/archive/orders.lgp"], always: ["*"],
+    metadata: { publicationCount: 2, confirmedRemoved: 1 },
+  }
+  expect(autoRespondsPermission({ session: true }, [], request, "/fixture/work")).toBe(false)
+  const decisions: string[] = []
+  const host = document.createElement("div")
+  document.body.append(host)
+  const dispose = render(() => createComponent(SessionPermissionDock, {
+    request, responding: false, onDecide: value => decisions.push(value),
+  }), host)
+  try {
+    expect(host.textContent).toContain("Заказы")
+    expect(host.textContent).toContain("/fixture/archive/orders.lgp")
+    expect(host.textContent).toContain("Опубликованных версий к удалению: 2")
+    expect(host.textContent).toContain("Уже подтверждено удаление версий: 1")
+    expect(host.textContent).toContain("Локальный черновик и неопубликованные правки будут удалены")
+    const buttons = [...host.querySelectorAll("button")]
+    expect(buttons.map(button => button.textContent)).toEqual(["Отмена", "Удалить"])
+    expect(decisions).toEqual([])
+    buttons[0].click()
+    expect(decisions).toEqual(["reject"])
+    buttons[1].click()
+    expect(decisions).toEqual(["reject", "once"])
+  } finally { dispose(); host.remove() }
+})
+
 test("opening a local draft displays the new-publication toast", async () => {
   const toasts: { title: string }[] = []
   const opened: string[] = []
