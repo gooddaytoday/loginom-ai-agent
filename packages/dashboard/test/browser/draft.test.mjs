@@ -88,14 +88,23 @@ test("the draft shows its sample and disabled parameters through the real sandbo
 
 test("the draft shows names and the package path as literal text", async t => {
   const name = "<img src=x onerror=alert(1)>"
-  const packagePath = `/user/fixture/${name} & обзор.lgp`
+  const packagePath = `/user/fixture/${name} &  обзор.lgp`
   const { page, dialogs } = await fixture(t, "recorder", { ...data, nodeName: name, packagePath, parameters: [{ name, value: 7 }] })
   await page.waitForFunction(() => document.body.dataset.state === "ready")
   assert.equal(await page.locator("header strong").textContent(), name)
-  assert.equal(await page.locator("header strong + span").textContent(), packagePath)
+  assert.equal(await page.locator("header strong + span").innerText(), packagePath)
   assert.equal(await page.locator("header label").textContent(), name + " ")
   assert.equal(await page.locator("header img").count(), 0)
   assert.deepEqual(dialogs, [])
+})
+
+test("a long package path fits within the draft window", async t => {
+  const packagePath = `/user/fixture/${"campaign_".repeat(15)}roi.lgp`
+  const { page } = await fixture(t, "recorder", { ...data, packagePath })
+  await page.setViewportSize({ width: 800, height: 700 })
+  await page.waitForFunction(() => document.body.dataset.state === "ready")
+  assert.equal(await page.locator("header strong + span").innerText(), packagePath)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 800)
 })
 
 test("a new published draft hash reloads the page and shows the new app", async t => {
