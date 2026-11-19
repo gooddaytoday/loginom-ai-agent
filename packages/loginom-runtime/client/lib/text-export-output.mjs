@@ -339,8 +339,15 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     return {viewport:{width:innerWidth,height:innerHeight},ancestors};
    },${JSON.stringify({tid:refresh.tid,ref:refresh.ref})})`);
    await record('export_file_refresh_geometry',{geometry});
-  }
-  await act(details,refresh);await inDirectory(directory);
+   // Files keeps its minimum width in a narrow window. Re-enter the same
+   // assigned directory through visible native navigation to reload its list.
+   const current=await inDirectory(directory);
+   await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+   await inDirectory('/',current);
+   await navigateExportDirectory({directory,inDirectory,row,act});
+   await record('export_file_directory_refreshed',{directory,via:'native_directory_navigation'});
+  }else await act(details,refresh);
+  await inDirectory(directory);
   s=await row(name);need(s.file_storage?.directory===directory,'Export file directory differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
