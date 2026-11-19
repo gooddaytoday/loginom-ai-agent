@@ -87,14 +87,21 @@ export async function releaseRefusedExportRead({operationId,binding,navigationOn
 }
 // A virtual file row may not exist in the DOM until its page is rendered.
 // Search only the observed folder, through bounded native scroll gestures.
-const EXPORT_SEARCH_SCROLLS=40;
+// A gesture moves at most 1000 px. The budget follows the observed extent:
+// an approach plus both directions is at most three folder lengths
+// (LAB-1897: 1794 entries needed more than a fixed 40). Loginom 7.4.2 rows
+// are ~24 px (1714 entries, max_top 40465); the cap covers the 10000-entry
+// FileStore inventory at up to 32 px per row. The deadline bounds it all.
+const EXPORT_SEARCH_STEP=1000,EXPORT_SEARCH_SCROLLS=3*Math.ceil(10000*32/EXPORT_SEARCH_STEP)+4;
+const exportSearchBudget=scroll=>Math.min(EXPORT_SEARCH_SCROLLS,3*Math.ceil(Math.max(0,scroll.max_top)/EXPORT_SEARCH_STEP)+4);
 // Loginom 7.4.2 Files orders file rows as this collation does (LAB-1843:
 // 0 inversions over 2361 observed names). It only picks the first direction;
 // absence still needs both directions from the kept scroll position.
 const NATIVE_FILE_ORDER=new Intl.Collator('ru',{numeric:true});
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
- let binding=null,owner=null,lastTop=null,direction=null,reversed=false;
+ let binding=null,owner=null,lastTop=null,direction=null,reversed=false,budget=null;
+ const exhausted=()=>Object.assign(Error('Export file search scroll budget exhausted'),{code:'EXPORT_SEARCH_BUDGET_EXHAUSTED'});
  const unavailable=(s,reason)=>Object.assign(new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory)),
   {code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason}});
  const bind=s=>{
@@ -124,6 +131,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(!anchors.length||!files.length)break;
   const e=anchors[0],scroll=e.scroll;
   need(anchors.every(a=>a.scroll.ref===scroll.ref),'Export search scroll owner ambiguous');
+  budget??=exportSearchBudget(scroll);if(jumps>=budget)break;
   if(top!==null)need(dir==='up'?scroll.top<top:scroll.top>top,'Export search scroll did not advance');
   const below=NATIVE_FILE_ORDER.compare(name,files.at(-1).label)>0,above=NATIVE_FILE_ORDER.compare(name,files[0].label)<0;
   dir??=below?'down':above?'up':null;
@@ -159,12 +167,13 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){if(reversed)throw unavailable(s,'folder_end');direction='down';lastTop=null;reversed=true;}
   if(direction==='down'&&scroll.top>=scroll.max_top){if(reversed||scroll.top===0)throw unavailable(s,'folder_end');direction='up';lastTop=null;reversed=true;}
-  need(step<EXPORT_SEARCH_SCROLLS,'Export file search scroll budget exhausted');
+  budget??=exportSearchBudget(scroll);if(step>=budget)throw exhausted();
   const delta=direction==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top);
   lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});
  }
- throw Error('Export file search exhausted');
+ throw exhausted();
 }
+const EXPORT_RETURN_RESERVE_MS=60000;
 // Navigates only the assigned storage path using the existing observed UI
 // controls. Downloads use the shared artifact primitive, never a network API.
 export async function readNativeExportFile(options,ctx,configuration,execution){
@@ -181,6 +190,10 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
  let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null,readStep='storage_navigation';
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
+ // The file search stops early enough for the refusal path to return to the
+ // quiet graph and release the lease (LAB-1897: that return took <=1.8 s).
+ const reserve=Math.min(EXPORT_RETURN_RESERVE_MS,Math.floor((ctx.deadline-Date.now())/2));
+ const searchGuard=()=>{guard();if(Date.now()>=ctx.deadline-reserve)throw Object.assign(Error('Export file search time exhausted'),{code:'EXPORT_SEARCH_TIME_EXHAUSTED'});};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async options=>{
@@ -268,7 +281,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const inDirectory=(expected,previous)=>ready(async()=>{const r=await roots(),e=r.ui.elements.find(e=>e.tid===r.workflow_ref?.prefix+';NavigationBar;NavigationPanel');return e?read({root_ref:e.ref}):r;},s=>s.file_storage?.status==='observed'
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
- const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
+ const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard:searchGuard});
  const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
   readStep='return_node_context';
   const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
@@ -325,7 +338,29 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   let s=await navigateExportDirectory({directory,inDirectory,row,act});
   r=await roots();const refreshRoot=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
   const details=await read({root_ref:refreshRoot.ref}),refresh=one(details.ui.elements.filter(e=>e.tid===details.workflow_ref.prefix+';FileStorageForm;btnRefresh'));
-  await act(details,refresh);await inDirectory(directory);
+  if(refresh.interaction?.state==='outside_viewport'){
+   const geometry=await execute(`async page=>page.evaluate(({tid,ref})=>{
+    const elements=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+    const element=elements.length===1?elements[0]:null;
+    if(!element||globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(element)!==ref)return null;
+    const ancestors=[];
+    for(let p=element;p&&ancestors.length<24;p=p.parentElement){
+     const r=p.getBoundingClientRect(),s=getComputedStyle(p);
+     ancestors.push({tag:p.tagName,tid:p.getAttribute('data-tid'),box:{x:r.x,y:r.y,width:r.width,height:r.height},
+      client_width:p.clientWidth,scroll_width:p.scrollWidth,scroll_left:p.scrollLeft,overflow_x:s.overflowX,min_width:s.minWidth});
+    }
+    return {viewport:{width:innerWidth,height:innerHeight},ancestors};
+   },${JSON.stringify({tid:refresh.tid,ref:refresh.ref})})`);
+   await record('export_file_refresh_geometry',{geometry});
+   // Files shrinks, but toolbar children overflow its hidden body. Re-enter the same
+   // assigned directory through visible native navigation to reload its list.
+   const current=await inDirectory(directory);
+   await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+   await inDirectory('/',current);
+   await navigateExportDirectory({directory,inDirectory,row,act});
+   await record('export_file_directory_refreshed',{directory,via:'native_directory_navigation'});
+  }else await act(details,refresh);
+  await inDirectory(directory);
   s=await row(name);need(s.file_storage?.directory===directory,'Export file directory differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');

@@ -824,24 +824,49 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
             self.assertNotIn('не поддерживается', (folder / 'task.md').read_text())
 
-    def test_seasonal_refusal_accepts_observed_input_reason_with_either_initial_case(self):
+    def test_seasonal_refusal_accepts_observed_input_reason_and_word_forms(self):
+        # ab-1892-c05/ungroup-seasonal-empty-totals/ungroup-seasonal-empty-totals/model.stdout:106
+        observed = '''**Импорт выполнен, подготовленный пакет сохранён. Сезонная Разгруппировка заблокирована пустым входом итогов.**
+
+| Источник | Записей после импорта |
+|---|---:|
+| `seasonal-empty-totals.csv` | 0 |
+| `seasonal-constant-support.csv` | 72 |
+
+Типы заданы по запросу: `Group` и `Item` — строки; `Period` — дата/время; `Total` и `Weight` — целые, непрерывные. Маркер неизвестного значения — `?`. Даты опорных данных распознаны корректно.
+
+В `seasonal-empty-totals.csv` отсутствуют строки группы `G` с прогнозом за январь и февраль 2026. Правила доступного штатного сезонного режима требуют остановки при пустом входе. Поэтому узел Разгруппировки не настроен и не выполнен; выходы деталей, качества модели и сезонных индексов не получены. Файлы `seasonal-details.csv` и `seasonal-quality.csv` не созданы и не скачаны; повторное выполнение Разгруппировки также не состоялось.
+
+Пакет с двумя настроенными импортами сохранён на сервере:
+
+`/lab-73-monkey-47274bad-b33b-4a2a-bf2d-60b0c951c36e/ab-1892-c05-ungroup-seasonal-empty-totals.lgp`
+
+Для продолжения нужен заполненный файл итогов со значениями `Total` для `G` за январь и февраль 2026.'''
         node = runner.REPO / 'docs/node-development/nodes/transform-ungroupdata/acceptance'
         for kind in ['support', 'totals']:
             expected = runner.read(node / ('expected-seasonal-empty-' + kind + '.json'))['refusal']['text']
-            for reason in ['пустой вход', 'Пустой вход']:
+            for reason in ['пустой вход', 'Пустой вход', 'ПУСТЫМ ВХОДОМ', observed]:
                 with self.subTest(kind=kind, reason=reason), tempfile.TemporaryDirectory() as directory:
                     result, _, _ = self.refusal_run(Path(directory), expected_text=expected,
-                                                   answer=reason + ': seasonal-empty-' + kind + '.csv')
+                                                   answer=reason)
                     self.assertEqual(result['status'], 'PASS', result)
 
     def test_seasonal_refusal_rejects_input_read_error_without_empty_reason(self):
         for kind in ['support', 'totals']:
             expected = runner.expected_for(runner.scenario('ungroup-seasonal-empty-' + kind), '/test/refusal.lgp')
-            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
-                result, _, _ = self.refusal_run(Path(directory), expected_text=expected['refusal']['text'],
-                                               answer='входной файл не прочитан')
-                self.assertEqual(result['status'], 'FAIL', result)
-                self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
+            for answer in ['входной файл не прочитан', 'непустой вход', 'пустые выходы']:
+                with self.subTest(kind=kind, answer=answer), tempfile.TemporaryDirectory() as directory:
+                    result, _, _ = self.refusal_run(Path(directory), expected_text=expected['refusal']['text'],
+                                                   answer=answer)
+                    self.assertEqual(result['status'], 'FAIL', result)
+                    self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
+
+    def test_other_refusal_text_still_requires_exact_phrase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, _, _ = self.refusal_run(Path(directory), expected_text='Пустой вход запрещён',
+                                           answer='Отказ из-за пустого входа')
+            self.assertEqual(result['status'], 'FAIL', result)
+            self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
 
     def test_private_refusal_allows_only_declared_input_imports(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -3137,7 +3162,7 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
     def test_arguments_and_load_boundary(self):
         args = runner.arguments(['start', '--head', 'abc123', '--scenarios', 'n1,q7', '--pair', '/pair', '--cold'])
         self.assertEqual((args.host_load_max, args.spacing, args.cold), (8, 60, True))
-        for viewport in ['1280x665', '1280x800', '1920x945']:
+        for viewport in ['1024x633', '1366x633', '1280x665', '1280x800', '1920x945']:
             args = runner.arguments(['start', '--head', 'abc123', '--scenarios', 's1', '--pair', '/pair', '--viewport', viewport])
             self.assertEqual(args.viewport, viewport)
         self.assertTrue(runner.load_ready((8, 8, 100), 8))

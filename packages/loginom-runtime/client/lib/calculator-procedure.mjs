@@ -169,7 +169,13 @@ export async function configureCalculator(channel,parameters,{newNode=false,crea
   await channel.perform({condition:'delete only this new Calculator untouched template',initialObservation:s,
    ready:s=>ready(s)&&row(s,original.record_id)?.selected===true&&same(semantic(row(s,original.record_id)),semantic(original)),
    identity:()=>({record_id:original.record_id,template:semantic(original)}),
-   resolve:s=>({verb:'click',ref:control(s,';CalcDataWizard;btnDelExpr','click').ref})});
+   resolve:s=>{
+    const button=control(s,';CalcDataWizard;btnDelExpr','click');
+    // At 1024px the editor toolbar covers Delete. Loginom documents Delete
+    // on the expression list; retain the exact selected template and readback.
+    return button.interaction?.state==='point_observed'?{verb:'click',ref:button.ref}
+     :{verb:'press',ref:control(s,';CalcDataWizard;colExpressionName_'+original.name,'press').ref,key:'Delete'};
+   }});
   const after=await observe('new Calculator template deleted');
   requireValue(!row(after,original.record_id)&&after.node_calculator.expressions.length===retained.length
    &&retained.every(e=>same(semantic(row(after,e.record_id)),semantic(e))),'Template deletion changed another expression');

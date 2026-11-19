@@ -765,6 +765,38 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       && c.fields.every((f, i) => f.status === 'observed' && f.index === i), 'Configured columns are not completely visible');
     return c.fields;
   };
+  const revealPreview=async(s,ready)=>{
+    const tid=s.wizard.root_tid+';ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl';
+    const grid=s.ui.elements.find(e=>e.tid===tid),box=grid?.bounding_box;
+    if(!grid?.scroll||grid.allowed_actions.includes('scroll_horizontal')||!box||!(box.height>0)
+      ||!(box.y+box.height>s.geometry?.viewport?.height))return s;
+    const fieldRefs=new Set(columns(s).flatMap(c=>Object.values(c.cell_refs??{})));
+    const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.wizard.root_tid+';ImportTextFileParamsWizard;')
+      &&(e.scroll?.ref===grid.scroll.ref||fieldRefs.has(e.ref))
+      &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
+    requireValue(new Set(anchors.map(e=>e.scroll.ref)).size<=1,'Import preview vertical scroll owner ambiguous');
+    const anchor=one(anchors.slice(0,1),
+      'Import preview vertical scroll anchor unavailable');
+    const describe=state=>{
+      const view=one(state.ui.elements.filter(e=>e.tid===tid),'Import preview disappeared');
+      const a=one(state.ui.elements.filter(e=>e.tid===anchor.tid&&e.allowed_actions.includes('scroll')
+        &&e.interaction?.state==='point_observed'),'Import preview anchor changed');
+      requireValue(state.wizard.stage==='text_import_format'&&view.scroll?.ref===grid.scroll.ref
+        &&a.scroll?.ref===anchor.scroll.ref,'Import preview scroll owner changed');
+      return {owner:identity(state.wizard.owner_context),root:state.wizard.root_ref,page:state.wizard.import_columns.page,
+        fields:columns(state).map(c=>Object.fromEntries(['index','name','label','type','data_kind','used'].map(k=>[k,c[k]]))),scroll:a.scroll};
+    };
+    const before=describe(s),delta=Math.min(1000,before.scroll.max_top-before.scroll.top);
+    requireValue(delta>0,'Import preview vertical scroll boundary reached');
+    await channel.perform({condition:'reveal import preview above wizard footer',initialObservation:s,
+      ready:state=>same(describe(state),before),identity:describe,
+      resolve:state=>({verb:'scroll',ref:one(state.ui.elements.filter(e=>e.tid===anchor.tid),'Import preview anchor changed').ref,delta_y:delta})});
+    const fresh=await read('text_import_format','import preview vertically revealed',ready),after=describe(fresh);
+    requireValue(after.scroll.top>before.scroll.top,'Import preview vertical scroll made no progress');
+    requireValue(after.scroll.ref===before.scroll.ref&&after.scroll.max_top===before.scroll.max_top
+      &&same({...after,scroll:before.scroll},before),'Import preview changed during vertical reveal');
+    return fresh;
+  };
   const scrollField=async(s,c,scroller,delta)=>{
     const describe=state=>{
       const field=state.wizard?.import_columns?.fields?.find(f=>f.index===c.index);
@@ -798,6 +830,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
         'Column names, labels or selection differ; this candidate only changes type and data kind');
       if (c[property] === wanted[property]) continue;
       if(fieldsOnly) {
+        s=await revealPreview(s,definitionReady);c=columns(s).find(f=>f.index===i);
         // Scroll only through Loginom's observed shared preview scroller.
         // Each bounded move gets a fresh page before selecting a field.
         for(let moves=0;moves<200;moves++) {
@@ -850,6 +883,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       const ready=s=>s.wizard.import_columns?.page?.status==='complete_definition_page';
       let s=await read('text_import_format','field metadata ready',ready),c=columns(s).find(f=>f.index===i);
       if(c[property]===wanted[property])continue;
+      s=await revealPreview(s,ready);c=columns(s).find(f=>f.index===i);
       const before={name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:c.used};
       const associated=c.label_associated===true;
       for(let moves=0;moves<200;moves++) {

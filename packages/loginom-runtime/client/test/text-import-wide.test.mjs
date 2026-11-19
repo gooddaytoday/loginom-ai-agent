@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta,ImportColumnCountError,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,dateFormat=null,dateValue='Не задано (dd/mm/yyyy)',editorChange=null,fillChange=null,verticalClip=false,previewOwnScroll=false}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -15,11 +15,11 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  let date=dateValue,dateOpened=false;
  if(dateFormat!==null)parameters.format.date_format=dateFormat;
  const request={target:{kind:'new'},parameters:{settings:parameters},mappings:[]},budget=textImportStepBudget(request);
- let stage='text_import_file',steps=0,editor,initialSweep=false,gestures=0;
+ let stage='text_import_file',steps=0,editor,initialSweep=false,gestures=0,verticalTop=0;
  const reads=[],performed=[];
  const check=()=>{assert.ok(++steps<=budget,'fixed procedure exhausted its schema allowance');};
  const values=o=>Object.fromEntries(Object.entries(o).map(([k,value])=>[k,{status:'observed',truncated:false,value}]));
- const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
+ const state=(offset=0)=>({...(verticalClip?{geometry:{viewport:{width:1024,height:633}}}:{}),wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
   import_source:{fields:values({...parameters.source,encoding:'UTF-8 (65001)',rows_to_skip:'0'})},settings:{fields:{...values(parameters.format),null_marker:{status:'observed',truncated:false,value:marker,owner_ref:'marker-owner',input_ref:selected&&optionMode==='replaced_input'?'foreign-input':'marker-input'},
    ...(dateFormat===null?{}:{date_format:{status:'observed',truncated:false,value:date,enabled:true,read_only:false,owner_ref:'date-owner',input_ref:'date-input',native_max_length_utf16:null}})}},
   ...(editor?{import_column_editor:{...editor}}:{}),
@@ -28,7 +28,9 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   ui:{elements:[...(dateFormat===null?[]:[
    {ref:'date-picker',wizard_combo:{kind:'picker',field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:'date-input',root_ref:'wizard-ref'}}},
    ...(dateOpened?[{ref:'date-option',wizard_combo:{kind:'option',label:dateFormat,field:{scope:'import_format',name:'date_format',owner_ref:'date-owner',input_ref:optionMode==='foreign_input'?'foreign-input':'date-input',root_ref:'wizard-ref'}}}]:[])
-  ]),...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:['scroll_horizontal'],bounding_box:{x:0,width:800}}, {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'}})))]}});
+  ]),...(nullMarker===null?[]:[{ref:'marker-input',tid:'marker-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}]),...(nullMarker===null?[]:[{ref:'marker-picker',wizard_combo:{kind:'picker',field:{name:'null_marker',owner_ref:'marker-owner',root_ref:'wizard-ref'}}},...(opened?['null','NULL',...(optionMode==='duplicate'?['NULL']:[])].filter(label=>optionMode!=='wrong_case'||label!=='NULL').map(label=>({ref:'option-'+label,wizard_combo:{kind:'option',label,field:{name:'null_marker',owner_ref:optionMode==='foreign_owner'?'foreign':'marker-owner',root_ref:optionMode==='foreign_root'?'foreign':'wizard-ref'}}})):[])]),{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdData;grd-1;tbl',ref:'scroll',allowed_actions:verticalClip&&!verticalTop?[]:['scroll_horizontal'],bounding_box:{x:0,width:800,...(verticalClip?{y:589-verticalTop,height:119}:{})},...(verticalClip?{scroll:previewOwnScroll?{ref:'scroll',top:0,max_top:2}:{ref:'body',top:verticalTop,max_top:141}}:{})},
+   ...(verticalClip?[{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshData',ref:'vertical-anchor',allowed_actions:['scroll'],interaction:{state:'point_observed'},scroll:{ref:'body',top:verticalTop,max_top:141}}]:[]),
+   {tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},...columns.slice(offset,offset+8).flatMap(c=>Object.values(c.cell_refs).map(ref=>({ref,bounding_box:{x:0,width:135},interaction:{state:'point_observed'},...(previewOwnScroll?{tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;'+ref,allowed_actions:['scroll'],scroll:{ref:'body',top:verticalTop,max_top:141}}:{})})))]}});
  const channel={observe:async options=>{
   check();const offset=options.importColumnPage?.offset??0;reads.push({condition:options.condition,offset});
   if(options.condition==='complete import definition page at 0'&&initialSweep&&drift)columns.at(-1).used=false;
@@ -38,6 +40,12 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  },act:async action=>{
   check();gestures++;
   if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
+  if(action.verb==='scroll'){
+   assert.equal(action.ref,previewOwnScroll?'name:0':'vertical-anchor');assert.equal(action.delta_y,141);
+   if(verticalClip!=='stalled')verticalTop+=action.delta_y;
+   if(verticalClip==='changed')columns[0].type='integer';
+   return;
+  }
   if(action.verb==='click'&&action.ref==='date-picker'){dateOpened=true;return;}
   if(action.verb==='select_wizard_option'&&action.ref==='date-option'){date=dateFormat;dateOpened=false;return;}
   if(action.verb==='click'&&action.ref==='marker-picker'){opened=true;return;}
@@ -79,6 +87,12 @@ test('metadata commit resolves a fresh editor reference with the same draft',asy
  const f=fixture(1,{editLabels:true});
  const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
  assert.equal(result.columns[0].label,'Label0');
+});
+for(const previewOwnScroll of [false,true])for(const verticalClip of [true,'stalled','changed'])test('import preview below the wizard footer is revealed through its own vertical owner: '+verticalClip+', nested='+previewOwnScroll,async()=>{
+ const f=fixture(5,{editLabels:true,verticalClip,previewOwnScroll});
+ const run=()=>configureTextImportFields(f.channel,f.parameters,f.owner);
+ if(verticalClip===true){const result=await run();assert.deepEqual(result.columns.map(c=>c.label),f.parameters.columns.map(c=>c.label));}
+ else await assert.rejects(run(),/Import preview/);
 });
 for(const [name,editorChange] of Object.entries({
  owner:s=>s.wizard.owner_context.node.tid='foreign',

@@ -1612,7 +1612,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
-    start.add_argument('--viewport', choices=['1280x665', '1280x800', '1920x945'], default='1280x800')
+    start.add_argument('--viewport', choices=['1024x633', '1366x633', '1280x665', '1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
@@ -2947,7 +2947,9 @@ class Runner:
                     assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
             answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
                            if event.get('type') == 'text'), (None, ''))
-            assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            # Seasonal empty-input refusals describe a reason, not a fixed phrase.
+            assert (re.search(r'\bпуст\w*\s+вход\w*\b', answer[1], re.I)
+                    if refusal['text'] == 'устой вход' else refusal['text'] in answer[1]), 'REFUSAL_NOT_REPORTED'
             if spec.get('excel_xls_refusal'):
                 assert re.search('xlsx',answer[1],re.I) and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
                 assert not any(p.is_file() for ext in ['*.xls','*.xlsx'] for p in profile.rglob(ext)), 'XLS_REFUSAL_CREATED_WORKBOOK'
