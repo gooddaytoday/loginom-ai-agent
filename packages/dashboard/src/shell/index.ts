@@ -119,6 +119,19 @@ function start() {
         const target = await studio.binding(owner, form, node)
         const find = (signal?: AbortSignal) => post("lookup", target, signal).then(lookupResponse)
         let lookup = await find()
+        const initialHash = lookup.hash
+        const failure = status()
+        failure.style.cssText += ";max-height:6em;overflow:auto"
+        section.append(failure)
+        function reportFailure() {
+          const latest = lookup.latest
+          const text = latest?.status === "failed"
+            ? `Новая публикация ${latest.name} не собрана. ${lookup.hash ? "Открыта предыдущая версия. " : ""}${latest.error ?? ""}`
+            : ""
+          if (failure.textContent !== text) failure.textContent = text
+          failure.hidden = !text
+        }
+        reportFailure()
         async function checkHost() {
           if (lookup.mode !== "strict" || !lookup.hash) return
           const result = supported ?? (await probe(lookup.appOrigin, document.body))
@@ -127,24 +140,27 @@ function start() {
             ? "Хост dashboard недоступен"
             : "Dashboard открывается в Chrome, Edge или Яндекс Браузере на Chromium 152 и новее")
         }
-        await checkHost()
-        await pending
-        if (overlay !== section) return
-        busy++
-        const task = pending.then(async () => {
-          if (!(await studio.active(node)) || errors.has(lookup.key)) {
-            note.textContent = calculating
-            try {
-              await studio.execute(node)
-              errors.delete(lookup.key)
-            } catch (e: unknown) {
-              errors.set(lookup.key, message(e))
-              throw nodeError(e)
+        function prepare(after?: () => Promise<void>) {
+          const task = pending.then(async () => {
+            if (overlay !== section) return
+            if (!(await studio.active(node)) || errors.has(lookup.key)) {
+              if (!after) note.textContent = calculating
+              try {
+                await studio.execute(node)
+                errors.delete(lookup.key)
+              } catch (e: unknown) {
+                errors.set(lookup.key, message(e))
+                throw nodeError(e)
+              }
             }
-          }
-        })
-        pending = task.then(finish, finish)
-        await task
+            if (overlay === section) await after?.()
+          })
+          busy++
+          pending = task.then(finish, finish)
+          return task
+        }
+        await checkHost()
+        await prepare()
         if (overlay !== section) return
         const parameters = () => studio.parameters(form)
         const available = await parameters()
@@ -225,13 +241,14 @@ function start() {
         async function poll() {
           try {
             const next = await find(AbortSignal.timeout(5_000)).catch(() => null)
-            if (overlay !== section || !next?.hash || next.key !== lookup.key ||
+            if (overlay !== section || !next || next.key !== lookup.key ||
               next.mode !== lookup.mode || next.appOrigin !== lookup.appOrigin) return
             lookup = next
+            reportFailure()
             if (refresh) return refresh()
+            if (!lookup.hash || errors.has(lookup.key)) return
             await checkHost()
-            await pending
-            if (overlay === section) await show(await parameters())
+            await prepare(async () => show(await parameters()))
           } catch (e) {
             if (overlay === section && note.firstChild) note.firstChild.textContent = message(e) + " "
           } finally {
@@ -262,14 +279,25 @@ function start() {
           let current = await state()
           if (overlay !== section) return
           back.before(chat)
-          let frame: HTMLIFrameElement
-          let dashboard: ReturnType<typeof mountDashboard>
+          let dashboard: ReturnType<typeof mountDashboard> | undefined
+          let loading: typeof dashboard
+          let silentUrl: string | undefined
+          function discard() {
+            loading?.stop()
+            loading?.frame.remove()
+            loading = undefined
+          }
+          stopFrame = () => {
+            discard()
+            dashboard?.stop()
+          }
           const run = (update: Update) => {
             busy++
             offset = 0
             renderData()
             const task = pending.then(async () => {
-              dashboard.send({ ...current, busy: true })
+              current = { ...current, busy: true }
+              dashboard?.send(current)
               try {
                 await studio.parameters(form, update)
                 await studio.execute(node)
@@ -280,7 +308,7 @@ function start() {
               current = await parameters().then(state).catch((e: unknown) => ({
                 type: "state" as const, parameters: [], table: null, error: message(e), busy: false,
               }))
-              dashboard.send(current)
+              dashboard?.send(current)
             })
             const refresh = () => {
               finish()
@@ -367,43 +395,55 @@ function start() {
           }
           toggle.onclick = () => {
             data.hidden = !data.hidden
-            frame.hidden = !data.hidden
+            const visible = dashboard ?? loading
+            if (visible) visible.frame.hidden = !data.hidden
             toggle.textContent = data.hidden ? dataLabel : "К dashboard"
             renderData()
           }
           chat.before(toggle)
-          const failure = status()
-          failure.style.cssText += ";max-height:6em;overflow:auto"
-          section.append(failure, truncation, data)
-          refresh = () => {
+          section.append(truncation, data)
+          const stamp = () => {
             version.textContent = lookup.currentVersion ? "Версия " + lookup.currentVersion.name.slice(0, -5) : ""
-            failure.textContent = lookup.latest?.status === "failed"
-              ? `Новая публикация ${lookup.latest.name} не собрана. Открыта предыдущая версия. ${lookup.latest.error ?? ""}`
-              : ""
-            failure.hidden = !failure.textContent
-            const src = lookup.appOrigin + "/apps/" + lookup.key + "/" + lookup.hash + "/"
-            if (frame?.src === src) return
-            stopFrame?.()
-            frame?.remove()
-            note.remove()
-            frame = sandboxFrame(src)
+          }
+          refresh = () => {
+            const src = lookup.hash && lookup.appOrigin + "/apps/" + lookup.key + "/" + lookup.hash + "/"
+            if (loading && loading.frame.src !== src) discard()
+            if (src !== silentUrl) silentUrl = undefined
+            if (!src) return
+            if (dashboard?.frame.src === src) return stamp()
+            if (loading || silentUrl === src) return
+            const frame = sandboxFrame(src)
             frame.title = dashboardLabel
             frame.style.cssText = "border:0;flex:1;width:100%;min-height:0"
-            frame.hidden = !data.hidden
-            dashboard = mountDashboard(frame, {
-              close,
+            frame.hidden = !!dashboard || !data.hidden
+            const candidate = mountDashboard(frame, {
+              close: () => dashboard && dashboard !== candidate ? discard() : close(),
+              ready: () => {
+                const focused = document.activeElement
+                if (dashboard?.frame === focused || note.contains(focused)) back.focus()
+                dashboard?.stop()
+                dashboard?.frame.remove()
+                loading = undefined
+                dashboard = candidate
+                frame.hidden = !data.hidden
+                candidate.send(current)
+                note.remove()
+                stamp()
+              },
               silent: () => {
+                discard()
+                if (dashboard) return
+                if (lookup.hash === initialHash) silentUrl = src
                 note.textContent = "Dashboard не ответил"
                 if (studioHttpsPort) {
                   const link = element("a", "Открыть Studio по HTTPS")
                   link.href = `https://${location.hostname}:${studioHttpsPort}/app/`
                   note.append(". ", link)
                 }
-                frame.replaceWith(note)
+                data.before(note)
               },
             })
-            stopFrame = dashboard.stop
-            dashboard.send(busy ? { ...current, busy: true } : current)
+            loading = candidate
             data.before(frame)
           }
           refresh()

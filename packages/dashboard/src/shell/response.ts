@@ -1,37 +1,24 @@
 // Effect's browser decoder adds 367 KB; these checks cover only fields consumed by the shell.
 // Conformance against the service schemas is checked in shell-contract.test.mjs.
 export function lookupResponse(value: unknown) {
-  if (!isLookup(value)) throw Error("Некорректный ответ службы dashboard (lookup).")
-  return { key: value.key, exists: value.exists, hash: value.hash, appOrigin: value.appOrigin, mode: value.mode, cliButton: value.cliButton,
-    currentVersion: value.currentVersion && { name: value.currentVersion.name },
-    latest: value.latest && { name: value.latest.name, status: value.latest.status, ...("error" in value.latest ? { error: value.latest.error } : {}) },
+  if (!isObject(value)) return invalid("lookup")
+  const { key, exists, hash, appOrigin, mode, cliButton, currentVersion, latest } = value
+  if (
+    typeof key !== "string" || typeof exists !== "boolean" || typeof cliButton !== "boolean" ||
+    (hash !== null && (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash))) ||
+    typeof appOrigin !== "string" || !httpOrigin(appOrigin) ||
+    (mode !== "normal" && mode !== "strict") ||
+    (currentVersion !== null && !hasVersionName(currentVersion))
+  ) return invalid("lookup")
+  if (latest !== null) {
+    if (!hasVersionName(latest) || typeof latest.status !== "string" ||
+        !["pending", "building", "ready", "failed"].includes(latest.status)) return invalid("lookup")
+    if (latest.error !== undefined && typeof latest.error !== "string") return invalid("lookup")
   }
-}
-
-function isLookup(value: unknown): value is {
-  key: string
-  exists: boolean
-  hash: string | null
-  appOrigin: string
-  mode: "normal" | "strict"
-  cliButton: boolean
-  currentVersion: null | { name: string }
-  latest: null | { name: string; status: "pending" | "building" | "ready" | "failed"; error?: string }
-} {
-  if (!isObject(value)) return false
-  if (typeof value.key !== "string" || typeof value.exists !== "boolean") return false
-  if (!(value.hash === null || (typeof value.hash === "string" && /^[a-f0-9]{64}$/.test(value.hash)))) return false
-  if (typeof value.appOrigin !== "string" || !httpOrigin(value.appOrigin)) return false
-  if (value.mode !== "normal" && value.mode !== "strict") return false
-  if (typeof value.cliButton !== "boolean") return false
-  if (value.currentVersion !== null && !hasVersionName(value.currentVersion)) return false
-  if (value.latest !== null) {
-    const latest = value.latest
-    if (!hasVersionName(latest)) return false
-    if (typeof latest.status !== "string" || !["pending", "building", "ready", "failed"].includes(latest.status)) return false
-    if (latest.error !== undefined && typeof latest.error !== "string") return false
+  return { key, exists, hash, appOrigin, mode, cliButton,
+    currentVersion: currentVersion && { name: currentVersion.name },
+    latest: latest && { name: latest.name, status: latest.status, ...("error" in latest ? { error: latest.error } : {}) },
   }
-  return true
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -54,6 +41,10 @@ export function snapshotResponse(value: unknown) {
     !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value.id) ||
     Object.keys(value).length !== 1
   )
-    throw Error("Некорректный ответ службы dashboard (snapshot).")
+    return invalid("snapshot")
   return { id: value.id }
+}
+
+function invalid(endpoint: string): never {
+  throw Error(`Некорректный ответ службы dashboard (${endpoint}).`)
 }

@@ -178,6 +178,44 @@ test("a failed newer publication reports its error while the previous dashboard 
   assert.deepEqual(app.errors, [])
 })
 
+test("a first publication failure appears while the create link stays available", async t => {
+  const app = await fixture(t)
+  await app.page.getByRole("button", { name: "Создать dashboard", exact: true }).click()
+  const link = app.page.getByRole("link", { name: "Открыть чат в Desktop", exact: true })
+  await link.waitFor()
+  await app.page.route(`${app.origin}/dashboard/lookup`, route => route.fulfill({ json: {
+    exists: false, key: "a".repeat(64), hash: null, appOrigin: app.appOrigin, mode: "normal", cliButton: false,
+    currentVersion: null, latest: { name: "20261115T120000Z.json", status: "failed", error: "Compiler error before first build" },
+  } }))
+  await app.page.getByRole("status").filter({ hasText: "Compiler error before first build" }).waitFor({ timeout: 7_000 })
+  assert.equal(await link.isVisible(), true)
+  assert.equal(await app.page.locator("iframe").count(), 0)
+  assert.equal(app.snapshots.length, 1)
+})
+
+test("an unchanged failed publication preserves the selected diagnostic text", async t => {
+  const app = await fixture(t, { published: true })
+  const lookup = `${app.origin}/dashboard/lookup`
+  await app.page.route(lookup, route => route.fulfill({ json: {
+    exists: true, key: "a".repeat(64), hash: "b".repeat(64), appOrigin: app.appOrigin, mode: "normal", cliButton: false,
+    currentVersion: { name: "20261115T120000Z.json" },
+    latest: { name: "20261115T120001Z.json", status: "failed", error: "Compiler error in the update" },
+  } }))
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  const diagnostic = app.page.getByRole("status").filter({ hasText: "Compiler error in the update" })
+  const selected = await diagnostic.evaluate(element => {
+    const selection = document.getSelection()
+    selection.selectAllChildren(element)
+    return selection.toString()
+  })
+  assert.match(selected, /Compiler error in the update/)
+  const lookupResponse = () => app.page.waitForResponse(response => response.url() === lookup, { timeout: 7_000 })
+  await lookupResponse()
+  await lookupResponse()
+  assert.equal(await app.page.evaluate(() => document.getSelection().toString()), selected)
+})
+
 test("an open dashboard follows ready publications and keeps its live header parameters", async t => {
   const app = await fixture(t)
   const key = "a".repeat(64)
@@ -228,6 +266,101 @@ test("an open dashboard follows ready publications and keeps its live header par
   assert.equal(await app.page.evaluate(() => window.fixture.calls), 1)
   assert.equal(app.snapshots.length, 1)
   assert.deepEqual(app.errors, [])
+})
+
+test("a first ready publication recalculates an inactive node and keeps Escape available", async t => {
+  const app = await fixture(t)
+  await app.page.getByRole("button", { name: "Создать dashboard", exact: true }).click()
+  const link = app.page.getByRole("link", { name: "Открыть чат в Desktop", exact: true })
+  await link.focus()
+  assert.equal(await link.evaluate(element => document.activeElement === element), true)
+  await app.page.evaluate(() => {
+    window.fixture.status = "inactive"
+    window.fixture.wait = true
+  })
+  app.publish()
+  await app.page.waitForFunction(() => window.fixture.calls === 1 && window.fixture.finish, undefined, { timeout: 7_000 })
+  await app.page.evaluate(() => {
+    window.fixture.rows = [[99]]
+    window.fixture.wait = false
+    window.fixture.finish()
+  })
+  assert.deepEqual((await app.settled()).table.rows, [[99]])
+  assert.equal(await app.page.evaluate(() => window.fixture.calls), 1)
+  assert.equal(app.snapshots.length, 1)
+  await app.page.keyboard.press("Escape")
+  await app.page.locator("#dashboard-tab-overlay").waitFor({ state: "detached" })
+})
+
+async function nextPublication(app, firstDocument) {
+  const key = "a".repeat(64)
+  const previous = `${app.appOrigin}/apps/${key}/${"b".repeat(64)}/`
+  const hash = "c".repeat(64)
+  const next = `${app.appOrigin}/apps/${key}/${hash}/`
+  let published = false
+  await app.page.route(`${app.origin}/dashboard/lookup`, route => published ? route.fulfill({ json: {
+    exists: true, key, hash, appOrigin: app.appOrigin, mode: "normal", cliButton: false,
+    currentVersion: { name: "20261115T120001Z.json" }, latest: null,
+  } }) : route.fallback())
+  await app.page.route(`${next}**`, async route => {
+    const asset = route.request().url().slice(next.length)
+    if (!asset && firstDocument) {
+      const body = firstDocument
+      firstDocument = undefined
+      return route.fulfill({ contentType: "text/html", body })
+    }
+    await route.fulfill({ response: await route.fetch({ url: previous + asset }) })
+  })
+  return { previous, next, publish: () => { published = true }, revert: () => { published = false } }
+}
+
+test("a replacement without SDK ready leaves the old dashboard usable and retries", async t => {
+  const app = await fixture(t, { published: true })
+  await app.page.clock.install()
+  const revision = await nextPublication(app, "<!doctype html><title>Silent replacement</title>")
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  const old = app.page.locator(`iframe[src="${revision.previous}"]`)
+  const candidate = app.page.locator(`iframe[src="${revision.next}"]`)
+  const oldFrame = app.frame()
+  revision.publish()
+  await candidate.waitFor({ state: "attached", timeout: 7_000 })
+  assert.equal(await candidate.isVisible(), false)
+  assert.equal(await old.isVisible(), true)
+  assert.equal(await app.page.getByText("Версия 20261115T120000Z", { exact: true }).isVisible(), true)
+
+  const input = app.page.getByLabel("MinBudget", { exact: true })
+  await input.fill("17")
+  await input.press("Enter")
+  await oldFrame.waitForFunction(() => window.states?.at(-1).parameters[0].value === 17)
+
+  await app.page.clock.runFor(10_000)
+  await candidate.waitFor({ state: "detached" })
+  assert.equal(await old.isVisible(), true)
+  await candidate.waitFor({ timeout: 7_000 })
+  await old.waitFor({ state: "detached" })
+  assert.deepEqual((await app.settled()).parameters, [{ name: "MinBudget", value: 17 }])
+  await app.page.getByText("Версия 20261115T120001Z", { exact: true }).waitFor()
+  assert.deepEqual(app.errors, [])
+})
+
+test("Escape works immediately after replacing a focused dashboard", async t => {
+  const app = await fixture(t, { published: true })
+  const revision = await nextPublication(app)
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  await app.frame().locator("body").evaluate(body => {
+    body.tabIndex = 0
+    body.focus()
+  })
+  const old = app.page.locator(`iframe[src="${revision.previous}"]`)
+  assert.equal(await old.evaluate(frame => document.activeElement === frame), true)
+  revision.publish()
+  await app.page.locator(`iframe[src="${revision.next}"]`).waitFor({ timeout: 7_000 })
+  await old.waitFor({ state: "detached" })
+  await app.settled()
+  await app.page.keyboard.press("Escape")
+  await app.page.locator("#dashboard-tab-overlay").waitFor({ state: "detached" })
 })
 
 test("dashboard tables retain at most ten thousand rows and report the full count", async t => {
@@ -386,14 +519,31 @@ test("the trusted header renders node and parameter names as text", async t => {
   assert.deepEqual(app.errors, [])
 })
 
-test("a dashboard without ready is replaced by the timeout message", async t => {
-  const app = await fixture(t, { published: true, app: "silent" })
+test("a dashboard without ready times out and remains selectable after a successful replacement", async t => {
+  const app = await fixture(t, { published: true })
+  const revision = await nextPublication(app)
+  await app.page.route(revision.previous, route => route.fulfill({
+    contentType: "text/html", body: "<!doctype html><title>Silent initial dashboard</title>",
+  }), { times: 1 })
+  await app.page.clock.install()
   await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
   await app.page.locator('iframe[title="Dashboard"]').waitFor()
+  await app.page.clock.runFor(10_000)
   await app.page.getByRole("status").filter({ hasText: "Dashboard не ответил" }).waitFor({ timeout: 12_000 })
+  const lookup = () => app.page.waitForResponse(response => response.url() === `${app.origin}/dashboard/lookup`)
+  await lookup()
+  await lookup()
   assert.equal(await app.page.locator("iframe").count(), 0)
   assert.equal(await app.page.evaluate(() => window.channels), 0)
   assert.equal(await app.page.getByRole("link", { name: "Открыть Studio по HTTPS", exact: true }).count(), 0)
+
+  revision.publish()
+  await app.page.locator(`iframe[src="${revision.next}"]`).waitFor({ timeout: 7_000 })
+  await app.settled()
+  revision.revert()
+  await app.page.locator(`iframe[src="${revision.previous}"]`).waitFor({ timeout: 7_000 })
+  await app.settled()
+  await app.page.getByText("Версия 20261115T120000Z", { exact: true }).waitFor()
   assert.deepEqual(app.errors, [])
 })
 

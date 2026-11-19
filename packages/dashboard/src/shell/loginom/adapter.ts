@@ -7,11 +7,8 @@ function missingMethod(...methods: unknown[]) {
 
 export function connect() {
   const runtime = window as Window & Partial<Studio>
-  const bg = runtime.bg
-  const mxEvent = runtime.mxEvent
-  const Out = runtime.Out
-  const ReleaseObject = runtime.ReleaseObject
-  if (!bg || !mxEvent || !Out || !ReleaseObject) return
+  if (!runtime.bg || !runtime.mxEvent || !runtime.Out || !runtime.ReleaseObject) return
+  const { bg, mxEvent, Out, ReleaseObject } = runtime
   if (
     missingMethod(
       Out,
@@ -25,31 +22,34 @@ export function connect() {
     )
   )
     return
+  const dataTypes = bg.TBGDataType
+  const activeStatus = bg.TBGModelNodeStatus?.mnsActive
+  const executeMode = bg.TBGProcessingMode?.pmExecute
+  const asyncMode = bg.TBGNodeActivateMode?.namAsynchronous
   if (
     [
       bg.IBGModelPackage,
       bg.IBGModelOutputSocket,
       bg.IBGDataSource,
       bg.IBGEditableVariablesOutputSocket,
-      bg.TBGDataType?.dtFloat,
-      bg.TBGDataType?.dtInteger,
-      bg.TBGDataType?.dtBoolean,
-      bg.TBGModelNodeStatus?.mnsActive,
-      bg.TBGProcessingMode?.pmExecute,
-      bg.TBGNodeActivateMode?.namAsynchronous,
+      dataTypes?.dtFloat,
+      dataTypes?.dtInteger,
+      dataTypes?.dtBoolean,
+      activeStatus,
+      executeMode,
+      asyncMode,
       mxEvent.CHANGE,
     ].some((value) => value == null)
   )
     return
-  const studio = { bg, Out, ReleaseObject }
   const guid = (value: string) => String(value).replace(/[{}]/g, "").toLowerCase()
   async function binding(tab: Tab, form: Form, node: Node): Promise<TargetBinding> {
     let filename: string | undefined
-    await studio.bg.selectAsyncValue(
+    await bg.selectAsyncValue(
       node,
-      () => studio.bg.ScopeFindObjectSelector(studio.bg.IBGModelPackage, (p) => [p.FileName]),
+      () => bg.ScopeFindObjectSelector(bg.IBGModelPackage, (p) => [p.FileName]),
       (n) => {
-        filename = studio.bg.ScopeFindObject(n, studio.bg.IBGModelPackage).FileName
+        filename = bg.ScopeFindObject(n, bg.IBGModelPackage).FileName
       },
     )
     let tree = tab.FNode
@@ -67,9 +67,9 @@ export function connect() {
     // RPC getters return proxies shared with Loginom; the runtime manages their lifetime.
     const port = await (await node.get_OutputPorts()).getItem(0)
     const base = await port.get_Socket()
-    const socket = await base.QueryInterface(studio.bg.IBGModelOutputSocket)
+    const socket = await base.QueryInterface(bg.IBGModelOutputSocket)
     const output = await socket.get_Output()
-    const source = await output.QueryInterface(studio.bg.IBGDataSource)
+    const source = await output.QueryInterface(bg.IBGDataSource)
     const cols = await source.get_Columns()
     const schema: { name: string; type: number }[] = []
     for (let i = 0, n = await cols.get_Count(); i < n; i++) {
@@ -85,14 +85,15 @@ export function connect() {
       for (let c = 0; c < schema.length; c++) {
         const raw = await source.AsVariant(r, c)
         const type = schema[c].type
-        if (raw == null) row.push(null)
-        else if (type === studio.bg.TBGDataType.dtFloat) row.push(Number(String(raw)))
-        else if (type === studio.bg.TBGDataType.dtInteger && Number.isSafeInteger(Number(String(raw))))
-          row.push(Number(String(raw)))
-        else if (type === studio.bg.TBGDataType.dtBoolean)
-          row.push(raw === true || String(raw).toLowerCase() === "true")
+        if (raw == null) {
+          row.push(null)
+          continue
+        }
+        const text = String(raw)
+        if (type === dataTypes.dtFloat || (type === dataTypes.dtInteger && Number.isSafeInteger(Number(text))))
+          row.push(Number(text))
+        else if (type === dataTypes.dtBoolean) row.push(text.toLowerCase() === "true")
         else {
-          const text = String(raw)
           row.push(limitSize ? text.slice(0, 10_000) : text)
           if (limitSize && text.length > 10_000) truncated = true
         }
@@ -110,18 +111,18 @@ export function connect() {
     return { schema, rows, truncated, totalRows }
   }
 
-  const active = async (node: Node) => (await node.get_Status()) === studio.bg.TBGModelNodeStatus.mnsActive
+  const active = async (node: Node) => (await node.get_Status()) === activeStatus
   async function execute(node: Node) {
-    const cancellation = new studio.Out()
+    const cancellation = new Out()
     try {
-      await studio.bg.AsyncInvoker(node, node.ActivateCancellable, null)(
-        studio.bg.TBGProcessingMode.pmExecute,
+      await bg.AsyncInvoker(node, node.ActivateCancellable, null)(
+        executeMode,
         cancellation,
-        studio.bg.TBGNodeActivateMode.namAsynchronous,
+        asyncMode,
       )
       if (!(await active(node))) throw Error("Узел не завершил расчёт.")
     } finally {
-      studio.ReleaseObject(cancellation.value)
+      ReleaseObject(cancellation.value)
     }
   }
 
@@ -147,8 +148,8 @@ export function connect() {
     table,
     active,
     execute,
-    parameters: (form: Form, update?: Update) => parameters(studio, form, update),
-    tab: () => studio.bg.app.Application.Instance.FMainForm.GetActiveTab(),
+    parameters: (form: Form, update?: Update) => parameters({ bg, Out }, form, update),
+    tab: () => bg.app.Application.Instance.FMainForm.GetActiveTab(),
     listen(view: View, update: () => void, remove: () => void) {
       const selection = view.Controller.FDiagram.GetMxGraph().getSelectionModel()
       selection.addListener(mxEvent.CHANGE, update)

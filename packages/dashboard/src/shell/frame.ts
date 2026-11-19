@@ -77,6 +77,7 @@ export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): vo
   }
   addEventListener("message", listen)
   return {
+    frame,
     send(state: DashboardState & { type: "state" }) {
       last = state
       port?.postMessage(state)
