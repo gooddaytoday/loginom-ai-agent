@@ -51,10 +51,11 @@ parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
 connection.response_content_type: application/json, text/html, text/plain, */* —
 допустимый MIME ответа. Response — строка; Content-Type запроса может иметь charset=UTF-8.
 GET без query: query_parameters:[], inputs:[], finish execute; без таблицы/URL-кодировщика.
-Query: string или integer (±9007199254740991); real/boolean запрещены.
-Integer limit/skip после variables.to_table — напрямую: обработчик кодирует
-query. Body — только string. Статусы/ошибки: read.ports:[1] —
-HttpStatusCode/ErrorCode/ErrorDesc; порт 0 — тело/разбор.
+Query: string or integer (±9007199254740991); no real/boolean. Bind integer
+limit/skip from variables.to_table directly; handler URL-encodes query. Body: string only.
+Keep JSON types: httpbin args.limit/skip echo as strings even with integer inputs;
+no coercion unless requested.
+Status/errors: read.ports:[1] — HttpStatusCode/ErrorCode/ErrorDesc; port 0 — body/parsing.
 200 ≠ тело; ограничь select, limit/skip по API, без gzip.
 Пустой Response: порт 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:
 «тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)».
