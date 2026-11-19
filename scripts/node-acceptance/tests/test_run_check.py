@@ -466,6 +466,63 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, 'TEXT_UPDATE'):
                 runner.check_text_update_ports(bad, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
 
+    def test_text_mask_unconfigured_read_replays_real_tool_responses(self):
+        # LAB-1896 lab1896-08: model.stdout:47,63; model-new-month.stdout:45,60.
+        # Only receipt fields needed by this check; GUIDs and paths anonymized.
+        replies = list(enumerate(runner.read(Path(__file__).parent / 'fixtures/text-mask-unconfigured.json')))
+        case = runner.scenario('text-mask')
+        stages = [runner.read(case['source'] / name)['outputs'][0]
+                  for name in [case['lgd_initial'], case['expected_name']]]
+        destinations = ['/own/initial.csv', '/own/final.csv']
+        runner.check_text_update_ports(replies, destinations, stages, same_node_id=True)
+
+        # An explicit type can identify a read even without earlier configuration.
+        typed = copy.deepcopy(replies)
+        for i in [0, 2]:
+            typed[i][1]['node']['type'] = 'imports.text'
+            typed[i][1]['configuration'] = dict(status='not_requested')
+        runner.check_text_update_ports(typed, destinations, stages, same_node_id=True)
+
+        for fault in ['other-node', 'unknown-type', 'wrong-type', 'configuration-requested',
+                      'failed', 'other-port', 'incomplete', 'row-count', 'schema', 'value',
+                      'after-export', 'missing-export', 'cleanup', 'stale', 'strict-context']:
+            bad = copy.deepcopy(replies)
+            final = bad[2][1]
+            port = final['output']['ports'][0]
+            if fault == 'other-node': final['node']['node_id'] = 'another-import'
+            if fault == 'unknown-type': bad[0][1]['configuration'] = dict(status='not_requested')
+            if fault == 'wrong-type': final['node']['type'] = 'transform.filter_data'
+            if fault == 'configuration-requested': final['configuration']['status'] = 'discarded'
+            if fault == 'failed': final['status'] = 'AMBIGUOUS'
+            if fault == 'other-port': port['port'] = 1
+            if fault == 'incomplete': port['sample_complete'] = False
+            if fault == 'row-count': port['row_count'] = 5
+            if fault == 'schema': port['schema'].reverse()
+            if fault == 'value': port['sample'][0][2]['value'] = 999
+            if fault == 'after-export': bad[2] = (4, final)
+            if fault == 'missing-export': bad.pop()
+            if fault == 'cleanup': final['cleanup_complete'] = False
+            if fault == 'stale': port['freshness_basis'] = 'unknown'
+            with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, 'TEXT_UPDATE'):
+                runner.check_text_update_ports(bad, destinations, stages, same_node_id=fault != 'strict-context')
+
+        # Caption comes from the latest earlier configured read of this GUID,
+        # never another node or a configuration observed after the selected read.
+        configured = copy.deepcopy(replies[0][1])
+        configured.pop('output')
+        configured['configuration']['readback']['node_title']['label'] = 'Обновлённые продажи'
+        renamed = copy.deepcopy(stages)
+        renamed[1].pop('label_any', None)
+        renamed[1]['output_node_label'] = 'Обновлённые продажи'
+        other = copy.deepcopy(configured)
+        other['node']['node_id'] = 'another-import'
+        other['configuration']['readback']['node_title']['label'] = 'Чужой узел'
+        later = copy.deepcopy(configured)
+        later['configuration']['readback']['node_title']['label'] = 'Поздняя подпись'
+        timeline = [(10, replies[0][1]), (20, replies[1][1]), (30, configured),
+                    (40, other), (50, replies[2][1]), (60, later), (70, replies[3][1])]
+        runner.check_text_update_ports(timeline, destinations, renamed, same_node_id=True)
+
     def test_variables_calculator_modes_use_three_expressions_and_two_execution_outputs(self):
         case = runner.scenario('variables-calculator-modes')
         self.assertTrue(case['variable_only'])
