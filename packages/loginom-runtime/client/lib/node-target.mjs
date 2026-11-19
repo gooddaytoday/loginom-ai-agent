@@ -353,6 +353,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
           if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
             &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
+            // LAB-1904: a replaced REST still feeds this consumer until it is deleted.
+            +(node(graph,occupied.source).type==='integration.rest_request'&&request.inputs.some(i=>i.source.node_id!==occupied.source&&node(graph,i.source.node_id).type==='integration.rest_request')
+              ?'. Input '+input.input+' is still fed by REST '+occupied.source+'. When the new REST replaces it, first dock_node_delete REST '+occupied.source+' and its generated URL encoder, then repeat this request with a NEW operation_id; nothing was changed.':'')
             +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. Keep this Export and its link: correct the existing upstream chain, or complete final formatting before the Export is first connected. Then reconfigure the same Export with inputs:[] and a NEW operation_id. Do not create a second Export for the same destination. If the result needs a new upstream node and the task names a different destination, add a new Export from that node to that destination and leave this one; otherwise report the connection limitation.':''));
         }
         state.targetId = existing.ref.node_id;

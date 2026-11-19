@@ -507,6 +507,23 @@ test('D19 lost disconnect reply remains uncertain and is never repeated',async()
  assert.deepEqual(f.calls,['remove_link']);assert.ok(f.operation.targetPhase.pending);
 });
 
+// LAB-1904 c-r5/model.stdout:82→87: the union was rewired to the new REST before
+// the replaced REST was deleted; the bare occupied-input refusal stopped the model.
+for(const occupant of ['integration.rest_request','imports.text'])test('LAB-1904 occupied union input names the replaced REST deletion first: '+occupant,async()=>{
+ const f=fixture();
+ f.graph.nodes.push({ref:ref('old'),type:occupant,label:'Old',position:{x:160,y:8},inputs:[],outputs:[0,1]},
+  {ref:ref('new'),type:'integration.rest_request',label:'New',position:{x:160,y:160},inputs:[],outputs:[0,1]},
+  {ref:ref('union'),type:'transform.col_union_data',label:'Union',position:{x:320,y:8},inputs:[0,1,2],outputs:[0]});
+ f.graph.links.push({source:'old',output:0,target:'union',input:0},{source:'old',output:1,target:'union',input:1},{source:'source',output:0,target:'union',input:2});
+ const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'transform.col_union_data',ref:ref('union')},
+  inputs:[{source:ref('new'),output:0,input:0},{source:ref('new'),output:1,input:1}]};
+ const before=structuredClone(f.graph),result=await f.run(r);
+ assert.equal(result.status,'NOT_APPLIED');assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
+ assert.match(result.error,/occupied by an unowned link/);
+ if(occupant==='integration.rest_request')assert.match(result.error,/first dock_node_delete REST old and its generated URL encoder, then repeat this request with a NEW operation_id/);
+ else assert.doesNotMatch(result.error,/dock_node_delete/);
+});
+
 for(const fault of ['none','y','ordinary','identity','port'])test('connect verifies native output boundary horizontal relayout: '+fault,()=>{
  const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[structuredClone(source),{ref:ref('boundary'),type:'control.supernode_output',boundary_role:'output',position:{x:906,y:272},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
  if(fault==='ordinary'){before.nodes[1].type='transform.calculator';delete before.nodes[1].boundary_role;}
