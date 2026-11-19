@@ -9,7 +9,6 @@ import test from "node:test"
 import { draftServer } from "../../src/draft/server.ts"
 import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
 
-const key = "a".repeat(64)
 const hash = "b".repeat(64)
 const data = {
   nodeName: "Fixture node", created: "2026-11-12T12:00:00.000Z",
@@ -26,12 +25,12 @@ async function fixture(t, app = "recorder", initial = data, childMode = false) {
   await mkdir(builds, { recursive: true })
   await cp(resolve(import.meta.dirname, "apps", app), join(builds, hash), { recursive: true })
   if (app === "recorder") await writeFile(join(builds, hash, "assets/loginom.js"), sdk)
-  const entry = { key, hash, builds, data: initial }
+  const entry = { key: "a".repeat(64), hash, builds, data: initial }
   const backend = childMode ? spawn(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, ["--input-type=module", "--eval", `
 import { draftServer } from ${JSON.stringify(new URL("../../src/draft/server.ts", import.meta.url).href)};
 const server = await draftServer(${JSON.stringify(resolve(import.meta.dirname, "../../dist/draft.js"))});
-server.publish(${JSON.stringify(entry)});
-console.log(JSON.stringify({pageOrigin:server.pageOrigin,appOrigin:server.appOrigin}));
+const url = server.publish(${JSON.stringify(entry)});
+console.log(JSON.stringify({url,appOrigin:server.appOrigin}));
 process.stdin.resume();
 `], { stdio: ["pipe", "pipe", "pipe"] }) : undefined
   const server = await (async () => {
@@ -56,17 +55,18 @@ process.stdin.resume();
   const page = await context.newPage()
   const dialogs = []
   page.on("dialog", async dialog => { dialogs.push(dialog.message()); await dialog.dismiss() })
-  const url = backend ? `${server.pageOrigin}/${key}/` : server.publish(entry)
+  const url = backend ? server.url : server.publish(entry)
+  const key = new URL(url).pathname.split("/")[1]
   if (childMode === "data") await page.route(`**/${key}/data`, async route => {
     backend.kill("SIGSTOP")
     await route.continue()
   })
   await page.goto(url)
-  return { root, server, page, entry, url, dialogs, backend }
+  return { root, server, page, entry, key, url, dialogs, backend }
 }
 
 test("the draft shows its sample and disabled parameters through the real sandbox handshake", async t => {
-  const { page, server, dialogs } = await fixture(t)
+  const { page, server, dialogs, key } = await fixture(t)
   await page.waitForFunction(() => document.body.dataset.state === "ready")
   assert.equal(await page.locator("header strong").textContent(), data.nodeName)
   const stamp = await page.evaluate(created => new Date(created).toLocaleString("ru-RU"), data.created)
@@ -109,7 +109,7 @@ test("a long package path fits within the draft window", async t => {
 })
 
 test("a new published draft hash reloads the page and shows the new app", async t => {
-  const { page, server, entry } = await fixture(t)
+  const { page, server, entry, key } = await fixture(t)
   await page.waitForFunction(() => document.body.dataset.state === "ready")
   const next = "c".repeat(64)
   await cp(join(entry.builds, hash), join(entry.builds, next), { recursive: true })
@@ -143,7 +143,7 @@ test("a silent app reports its existing ten-second handshake timeout", async t =
 
 test("an unresponsive backend stops the draft without overlapping hash requests", async t => {
   if (process.platform === "win32") return t.skip("SIGSTOP is unavailable on Windows")
-  const { page, backend } = await fixture(t, "recorder", data, true)
+  const { page, backend, key } = await fixture(t, "recorder", data, true)
   await page.waitForFunction(() => document.body.dataset.state === "ready")
   let requests = 0
   page.on("request", request => { if (new URL(request.url()).pathname === `/${key}/hash`) requests++ })

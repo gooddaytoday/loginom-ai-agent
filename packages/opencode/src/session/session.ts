@@ -427,6 +427,7 @@ export interface Interface {
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
+  readonly retireDashboard: (sessionID: SessionID) => Effect.Effect<void>
   readonly getForExecution: (id: SessionID) => Effect.Effect<Info, NotFound>
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
@@ -775,6 +776,11 @@ const layer: Layer.Layer<
       return adopted
     })
 
+    const retireDashboard = Effect.fn("Session.retireDashboard")(function* (sessionID: SessionID) {
+      const session = yield* get(sessionID).pipe(Effect.orDie)
+      yield* patch(sessionID, { metadata: { ...session.metadata, [DASHBOARD_SESSION_MARKER]: "deleted" } }).pipe(Effect.orDie)
+    })
+
     const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
       yield* patch(sessionID, { time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
@@ -793,7 +799,7 @@ const layer: Layer.Layer<
         metadata: DashboardSession.metadata(
           current.directory,
           input.metadata,
-          current.metadata?.[DASHBOARD_SESSION_MARKER] === true,
+          current.metadata?.[DASHBOARD_SESSION_MARKER],
         ),
         time: { updated: Date.now() },
       }).pipe(Effect.orDie)
@@ -948,6 +954,7 @@ const layer: Layer.Layer<
       touch,
       get,
       getForExecution,
+      retireDashboard,
       setTitle,
       setArchived,
       setMetadata,

@@ -1,5 +1,5 @@
 import path from "path"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { withSnapshot } from "@loginom-ai-agent/dashboard/agent/folder"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { DashboardSession } from "@/product/dashboard-session"
@@ -26,9 +26,10 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
 
   const ins = yield* InstanceState.context
   const denied = DashboardSession.dashboardPathError(
-    ins.directory,
+    ctx.dashboardWork ?? ins.directory,
     path.isAbsolute(target) ? target : `${ins.directory}${path.sep}${target}`,
     options?.write,
+    ctx.dashboardWork !== undefined,
   )
   if (denied)
     return yield* Effect.die(
@@ -36,7 +37,7 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
         ruleset: [{ permission: "dashboard_path", pattern: denied, action: "deny" }],
       }),
     )
-  if (options?.bypass || DashboardSession.isDashboardWork(ins.directory)) return false
+  if (ctx.dashboardWork || options?.bypass || DashboardSession.isDashboardWork(ins.directory)) return false
   const full = process.platform === "win32" ? FSUtil.normalizePath(target) : target
   if (containsPath(full, ins)) return false
 
@@ -61,20 +62,32 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
 
 export function workspaceWriter(fs: FSUtil.Interface, ctx: Tool.Context, directory: string) {
   const work = ctx.dashboardWork ?? (DashboardSession.isDashboardWork(directory) ? directory : undefined)
-  if (!work) return fs.writeWithDirs
-  return (file: string, content: string | Uint8Array) => Effect.sync(() => {
+  if (!work) return { write: fs.writeWithDirs, remove: fs.remove }
+  const snapshotId = (control: string) => {
+    const id: unknown = JSON.parse(readFileSync(path.join(control, "binding.json"), "utf8")).snapshotId
+    if (typeof id !== "string" || !id) throw Error("LOGINOM_SCOPE_DENIED")
+    return id
+  }
+  if (!DashboardSession.isDashboardWork(work)) throw Error("LOGINOM_SCOPE_DENIED")
+  const captured = withSnapshot(work, (_directory, control) => snapshotId(control))
+  const change = (file: string, apply: () => void) => Effect.sync(() => {
     if (!DashboardSession.isDashboardWork(work)) throw Error("LOGINOM_SCOPE_DENIED")
-    // The deletion can detach this folder while the edit permission is pending.
-    withSnapshot(work, current => {
-      if (!DashboardSession.isDashboardWork(current)) throw Error("LOGINOM_SCOPE_DENIED")
-      const denied = DashboardSession.dashboardPathError(current, file, true)
+    withSnapshot(work, (current, control) => {
+      if (snapshotId(control) !== captured) throw Error("LOGINOM_SCOPE_DENIED")
+      const denied = DashboardSession.dashboardPathError(current, file, true, true)
       if (denied) throw new PermissionV1.DeniedError({
         ruleset: [{ permission: "dashboard_path", pattern: denied, action: "deny" }],
       })
-      mkdirSync(path.dirname(file), { recursive: true })
-      writeFileSync(file, content)
+      apply()
     })
   })
+  return {
+    write: (file: string, content: string | Uint8Array) => change(file, () => {
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, content)
+    }),
+    remove: (file: string) => change(file, () => unlinkSync(file)),
+  }
 }
 
 export async function assertExternalDirectory(ctx: Tool.Context, target?: string, options?: Options) {

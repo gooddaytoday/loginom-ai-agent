@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs"
 import { dirname, join, parse, relative, resolve, sep } from "node:path"
-import { DASHBOARD_SESSION_MARKER, isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
+import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker, isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
 import { Global } from "@opencode-ai/core/global"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { TaskScope } from "@/session/task-scope"
@@ -18,8 +18,11 @@ export function isDashboardWork(directory: string) {
   return isDashboardWorkDirectory(directory, dashboardRoot())
 }
 
-export function dashboardPathError(directory: string, target: string, write = false) {
-  if (!isDashboardWork(directory)) return
+export function dashboardPathError(directory: string, target: string, write = false, required = false) {
+  if (!isDashboardWork(directory)) {
+    if (required) throw Error("LOGINOM_SCOPE_DENIED")
+    return
+  }
   const work = realpathSync(directory)
   const allowed = write ? join(work, "src") : work
   const entry = (path: string) => lstatSync(path, { throwIfNoEntry: false })
@@ -45,11 +48,12 @@ export function dashboardPathError(directory: string, target: string, write = fa
 export const baseProfile = (directory: string): TaskScope.Profile =>
   isDashboardWork(directory) ? "loginom-dashboard" : "default"
 
-export function metadata(directory: string, metadata?: Record<string, unknown>, marked = false) {
+export function metadata(directory: string, metadata?: Record<string, unknown>, marked?: unknown) {
   const clean = { ...metadata }
   delete clean[DASHBOARD_SESSION_MARKER]
-  return marked || isDashboardWork(directory)
-    ? { ...clean, [DASHBOARD_SESSION_MARKER]: true }
+  const marker = dashboardSessionMarker(marked, isDashboardWork(directory))
+  return marker
+    ? { ...clean, [DASHBOARD_SESSION_MARKER]: marker }
     : metadata
       ? clean
       : undefined
@@ -57,7 +61,8 @@ export function metadata(directory: string, metadata?: Record<string, unknown>, 
 
 export function profile(session: { directory: string; metadata?: Record<string, unknown> }) {
   const base = baseProfile(session.directory)
-  if (session.metadata?.[DASHBOARD_SESSION_MARKER] === true && base !== "loginom-dashboard")
+  const marker = session.metadata?.[DASHBOARD_SESSION_MARKER]
+  if (marker === "deleted" || (marker === true && base !== "loginom-dashboard"))
     throw Error("LOGINOM_SCOPE_DENIED")
   return base
 }

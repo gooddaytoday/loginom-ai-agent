@@ -38,7 +38,7 @@ export const WriteTool = Tool.define(
       execute: (params: { content: string; filePath: string }, ctx: Tool.Context) =>
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
-          const writeFile = workspaceWriter(fs, ctx, instance.directory)
+          const writer = workspaceWriter(fs, ctx, instance.directory)
           const filepath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
@@ -62,8 +62,8 @@ export const WriteTool = Tool.define(
             },
           })
 
-          yield* writeFile(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
+          yield* writer.write(filepath, Bom.join(contentNew, desiredBom))
+          if (!ctx.dashboardWork && (yield* format.file(filepath))) {
             yield* Bom.syncFile(fs, filepath, desiredBom)
           }
           yield* events.publish(FileSystem.Event.Edited, { file: filepath })

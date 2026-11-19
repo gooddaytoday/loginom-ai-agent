@@ -77,7 +77,7 @@ export const EditTool = Tool.define(
           }
 
           const instance = yield* InstanceState.context
-          const writeFile = workspaceWriter(afs, ctx, instance.directory)
+          const writer = workspaceWriter(afs, ctx, instance.directory)
           const filePath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
@@ -109,8 +109,8 @@ export const EditTool = Tool.define(
                     diff,
                   },
                 })
-                yield* writeFile(filePath, Bom.join(contentNew, desiredBom))
-                if (yield* format.file(filePath)) {
+                yield* writer.write(filePath, Bom.join(contentNew, desiredBom))
+                if (!ctx.dashboardWork && (yield* format.file(filePath))) {
                   contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
                 }
                 yield* events.publish(FileSystem.Event.Edited, { file: filePath })
@@ -153,8 +153,8 @@ export const EditTool = Tool.define(
                 },
               })
 
-              yield* writeFile(filePath, Bom.join(contentNew, desiredBom))
-              if (yield* format.file(filePath)) {
+              yield* writer.write(filePath, Bom.join(contentNew, desiredBom))
+              if (!ctx.dashboardWork && (yield* format.file(filePath))) {
                 contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
               }
               yield* events.publish(FileSystem.Event.Edited, { file: filePath })

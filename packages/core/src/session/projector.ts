@@ -1,6 +1,6 @@
 export * as SessionProjector from "./projector"
 
-import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
+import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker } from "@loginom-ai-agent/product/dashboard-root"
 import { and, desc, eq, gt, or, sql } from "drizzle-orm"
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
@@ -241,8 +241,8 @@ const layer = Layer.effectDiscard(
           .get()
           .pipe(Effect.orDie)
         const row = sessionRow(event.data.info)
-        if (current?.metadata?.[DASHBOARD_SESSION_MARKER] === true)
-          row.metadata = { ...row.metadata, [DASHBOARD_SESSION_MARKER]: true }
+        const marker = dashboardSessionMarker(current?.metadata?.[DASHBOARD_SESSION_MARKER], row.metadata?.[DASHBOARD_SESSION_MARKER])
+        if (marker) row.metadata = { ...row.metadata, [DASHBOARD_SESSION_MARKER]: marker }
         yield* db
           .update(SessionTable)
           .set(row)

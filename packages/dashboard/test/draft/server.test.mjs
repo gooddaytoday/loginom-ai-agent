@@ -11,7 +11,6 @@ import { createInterface } from "node:readline"
 import { appHeaders } from "../../src/web/apps.ts"
 import { draftServer } from "../../src/draft/server.ts"
 
-const key = "a".repeat(64)
 const hash = "b".repeat(64)
 const data = {
   nodeName: "Fixture node", created: "2026-11-12T12:00:00.000Z",
@@ -30,8 +29,10 @@ async function fixture(t) {
   await writeFile(join(builds, hash, "index.html"), "fixture-app")
   const server = await draftServer(script)
   t.after(() => server.close())
-  const entry = { key, hash, builds, data }
-  return { server, entry, root }
+  const entry = { key: "a".repeat(64), hash, builds, data }
+  const url = server.publish(entry)
+  const key = new URL(url).pathname.split("/")[1]
+  return { server, entry, root, url, key }
 }
 
 function send(origin, path, method = "GET", host = new URL(origin).host, body, agent, headers = {}) {
@@ -47,8 +48,7 @@ function send(origin, path, method = "GET", host = new URL(origin).host, body, a
 }
 
 test("a draft entry is served by separate loopback page and app sockets", async t => {
-  const { server, entry } = await fixture(t)
-  const url = server.publish(entry)
+  const { server, url, key } = await fixture(t)
   assert.equal(url, `${server.pageOrigin}/${key}/`)
   assert.equal(new URL(url).hostname, "localhost")
   assert.equal(new URL(server.appOrigin).hostname, "dashboards.localhost")
@@ -60,8 +60,7 @@ test("a draft entry is served by separate loopback page and app sockets", async 
 })
 
 test("draft data contains the captured sample and the platform app URL", async t => {
-  const { server, entry } = await fixture(t)
-  server.publish(entry)
+  const { server, key } = await fixture(t)
   const response = await send(server.pageOrigin, `/${key}/data`)
   assert.equal(response.status, 200)
   assert.deepEqual(JSON.parse(response.body), { ...data, hash, appUrl: `${server.appOrigin}/apps/${key}/${hash}/` })
@@ -73,8 +72,7 @@ test("draft data contains the captured sample and the platform app URL", async t
 })
 
 test("republishing an entry updates the hash endpoint", async t => {
-  const { server, entry } = await fixture(t)
-  server.publish(entry)
+  const { server, entry, key } = await fixture(t)
   assert.deepEqual(JSON.parse((await send(server.pageOrigin, `/${key}/hash`)).body), { hash })
   const next = "c".repeat(64)
   assert.equal(server.publish({ ...entry, hash: next }), `${server.pageOrigin}/${key}/`)
@@ -82,26 +80,26 @@ test("republishing an entry updates the hash endpoint", async t => {
 })
 
 test("revoking one draft removes its page, sample, hash and build while its neighbour stays live", async t => {
-  const { server, entry } = await fixture(t)
-  const neighbour = "c".repeat(64)
-  for (const key of [entry.key, neighbour]) server.publish({ ...entry, key })
+  const { server, entry, key } = await fixture(t)
+  const neighbour = new URL(server.publish({ ...entry, key: "c".repeat(64) })).pathname.split("/")[1]
   const routes = [
     [server.pageOrigin, key => `/${key}/`],
     [server.pageOrigin, key => `/${key}/data`],
     [server.pageOrigin, key => `/${key}/hash`],
     [server.appOrigin, key => `/apps/${key}/${hash}/`],
   ]
-  for (const [origin, path] of routes) assert.equal((await send(origin, path(entry.key))).status, 200)
+  for (const [origin, path] of routes) assert.equal((await send(origin, path(key))).status, 200)
   server.revoke(entry.key)
+  const fresh = new URL(server.publish(entry)).pathname.split("/")[1]
   for (const [origin, path] of routes) {
-    assert.equal((await send(origin, path(entry.key))).status, 404)
+    assert.equal((await send(origin, path(key))).status, 404)
     assert.equal((await send(origin, path(neighbour))).status, 200)
+    assert.equal((await send(origin, path(fresh))).status, 200)
   }
 })
 
 test("an asset already read before revocation cannot be served under a replacement entry", async t => {
-  const { server, entry } = await fixture(t)
-  server.publish(entry)
+  const { server, entry, key } = await fixture(t)
   const fs = (await import("node:fs/promises")).default
   const asset = join(entry.builds, hash, "assets/app.js")
   await mkdir(join(entry.builds, hash, "assets"))
@@ -120,17 +118,18 @@ test("an asset already read before revocation cannot be served under a replaceme
   syncBuiltinESMExports()
   t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
 
-  const route = `/apps/${entry.key}/${hash}/assets/app.js`
+  const route = `/apps/${key}/${hash}/assets/app.js`
   const pending = send(server.appOrigin, route)
   await read.promise
   server.revoke(entry.key)
   await writeFile(asset, "new bytes")
-  server.publish(entry)
+  const fresh = new URL(server.publish(entry)).pathname.split("/")[1]
   resume.resolve()
   const expired = await pending
   assert.equal(expired.status, 404)
   assert.doesNotMatch(expired.body, /old bytes/)
-  const active = await send(server.appOrigin, route)
+  assert.equal((await send(server.appOrigin, route)).status, 404)
+  const active = await send(server.appOrigin, `/apps/${fresh}/${hash}/assets/app.js`)
   assert.equal(active.body, "new bytes")
   assert.equal(active.headers["cache-control"], "no-store")
 })
@@ -144,8 +143,7 @@ function assertPageHeaders(response, server) {
 }
 
 test("every page response enforces Host and page isolation headers", async t => {
-  const { server, entry } = await fixture(t)
-  server.publish(entry)
+  const { server, key } = await fixture(t)
   const port = new URL(server.pageOrigin).port
   for (const [host, status] of [[`localhost:${port}`, 200], [`127.0.0.1:${port}`, 200], [`evil.test:${port}`, 403], [`dashboards.localhost:${port}`, 403]]) {
     const response = await send(server.pageOrigin, `/${key}/`, "GET", host)
@@ -165,8 +163,7 @@ test("every page response enforces Host and page isolation headers", async t => 
 })
 
 test("the app socket reuses enforced app headers and both page origins", async t => {
-  const { server, entry } = await fixture(t)
-  server.publish(entry)
+  const { server, key } = await fixture(t)
   const pagePort = new URL(server.pageOrigin).port
   const expected = appHeaders(server.appOrigin, [server.pageOrigin, `http://127.0.0.1:${pagePort}`])
   for (const [path, host, status] of [[`/apps/${key}/${hash}/`, new URL(server.appOrigin).host, 200], [`/apps/${key}/${"c".repeat(64)}/`, new URL(server.appOrigin).host, 404], [`/apps/${key}/${hash}/`, `localhost:${new URL(server.appOrigin).port}`, 403]]) {
@@ -192,8 +189,8 @@ test("draft reports stay off stdout and a keep-alive client cannot keep the back
   const child = spawn(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, ["--input-type=module", "--eval", `
 import { draftServer } from ${JSON.stringify(new URL("../../src/draft/server.ts", import.meta.url).href)};
 const server = await draftServer(${JSON.stringify(join(root, "draft.js"))});
-server.publish(${JSON.stringify(entry)});
-console.log(JSON.stringify({pageOrigin:server.pageOrigin,appOrigin:server.appOrigin}));
+const url = server.publish(${JSON.stringify(entry)});
+console.log(JSON.stringify({pageOrigin:server.pageOrigin,appOrigin:server.appOrigin,url}));
 process.stdin.once("data", () => process.stdin.pause());
 `], { stdio: ["pipe", "pipe", "pipe"] })
   t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill() })
@@ -205,6 +202,7 @@ process.stdin.once("data", () => process.stdin.pause());
   t.after(() => lines.close())
   const [line] = await once(lines, "line", { signal: AbortSignal.timeout(5_000) })
   const origins = JSON.parse(line)
+  const key = new URL(origins.url).pathname.split("/")[1]
   const agent = new Agent({ keepAlive: true })
   t.after(() => agent.destroy())
   const report = JSON.stringify({ "csp-report": {

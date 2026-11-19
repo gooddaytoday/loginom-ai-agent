@@ -15,8 +15,8 @@ import { AppProcess } from "@opencode-ai/core/process"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import type { DashboardBinding } from "@loginom-ai-agent/loginom-host/dashboard"
 import { createHash } from "node:crypto"
-import { dirname, join, resolve } from "node:path"
-import { lstat, mkdir, readdir, rm, symlink } from "node:fs/promises"
+import { join, resolve } from "node:path"
+import { mkdir, readdir, rm, symlink } from "node:fs/promises"
 import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
 import { draftServer } from "@loginom-ai-agent/dashboard/draft/server"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
@@ -143,13 +143,13 @@ it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
 }))
 
-const dashboardTools = Effect.fn(function* (session: Session.Info, work: string) {
+const dashboardTools = Effect.fn(function* (session: Session.Info, work: string, model = "test") {
   const agents = yield* Agent.Service
   const agent = yield* agents.get("build")
   const providerID = ProviderV2.ID.make("test")
   const modelID = ModelV2.ID.make("test")
   return yield* SessionTools.resolve({
-    agent, session, model: { providerID, api: { id: "test" } } as Provider.Model,
+    agent, session, model: { providerID, api: { id: model } } as Provider.Model,
     processor: {
       message: {
         id: MessageID.ascending(), sessionID: session.id, role: "assistant", parentID: MessageID.ascending(),
@@ -244,31 +244,39 @@ const deletionSession = Effect.fn(function* (work: string) {
   return { session, permissions, nextRequest, start }
 })
 
-it.instance("an approved edit cannot recreate a dashboard deleted while it awaited permission", () => Effect.gen(function* () {
-  const folder = yield* publicationFolder()
-  const root = dashboardDataRoot(process.env)
-  const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, root))
-  yield* Effect.gen(function* () {
-    const sessions = yield* Session.Service
-    const permissions = yield* Permission.Service
-    const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow", edit: "ask" }) })
-    const execute = (yield* dashboardTools(session, folder.work)).write?.execute
-    if (!execute) throw Error("write unavailable")
-    const writing = yield* Effect.promise(() => execute({ filePath: "src/new/draft.ts", content: "export {}" }, {
-      toolCallId: "write", abortSignal: new AbortController().signal, messages: [],
-    })).pipe(Effect.exit, Effect.forkScoped)
-    const request = yield* pollWithTimeout(
-      permissions.list().pipe(Effect.map(items => items.find(item => item.sessionID === session.id && item.permission === "edit"))),
-      "missing edit permission",
-    )
-    removeDashboard(folder.work, root, captured)
-    yield* permissions.reply({ requestID: request.id, reply: "once" })
-    const exit = yield* Fiber.join(writing)
-    expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
-    expect(yield* Effect.promise(() => lstat(dirname(folder.work)).catch(error => error.code))).toBe("ENOENT")
-  }).pipe(provideInstance(folder.work))
-}))
+for (const [tool, input] of [
+  ["write", { filePath: "src/main.tsx", content: "export {}" }],
+  ["apply_patch", { patchText: "*** Begin Patch\n*** Delete File: src/main.tsx\n*** End Patch" }],
+] as const) {
+  it.instance(tool + " approval belongs to the draft that requested permission", () => Effect.gen(function* () {
+    const folder = yield* publicationFolder()
+    const root = dashboardDataRoot(process.env)
+    const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, root))
+    yield* Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const permissions = yield* Permission.Service
+      const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow", edit: "ask" }) })
+      const execute = (yield* dashboardTools(session, folder.work, tool === "apply_patch" ? "gpt-fixture" : "test"))[tool]?.execute
+      if (!execute) throw Error(tool + " unavailable")
+      const writing = yield* Effect.promise(() => execute(input, {
+        toolCallId: tool, abortSignal: new AbortController().signal, messages: [],
+      })).pipe(Effect.exit, Effect.forkScoped)
+      const request = yield* pollWithTimeout(
+        permissions.list().pipe(Effect.map(items => items.find(item => item.sessionID === session.id && item.permission === "edit"))),
+        "missing edit permission",
+      )
+      removeDashboard(folder.work, root, captured)
+      expect((yield* folder.prepare(captured.binding)).work).toBe(folder.work)
+      const freshSource = Bun.file(join(folder.work, "src/main.tsx"))
+      const expected = yield* Effect.promise(() => freshSource.text())
+      yield* permissions.reply({ requestID: request.id, reply: "once" })
+      const exit = yield* Fiber.join(writing)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(yield* Effect.promise(() => freshSource.text())).toBe(expected)
+    }).pipe(provideInstance(folder.work))
+  }))
+}
 
 const deletionVersion = { name: publicationName, sourceHash: "a".repeat(64) }
 
@@ -513,6 +521,15 @@ it.instance("delete preserves a newly prepared snapshot and retries from a fresh
 
     const sessions = yield* Session.Service
     expect((yield* sessions.get(deletion.session.id)).id).toBe(deletion.session.id)
+    expect((yield* folder.prepare(binding)).work).toBe(folder.work)
+    yield* sessions.setMetadata({ sessionID: deletion.session.id, metadata: { note: "retained history" } })
+    const replacement = yield* sessions.create()
+    const read = (yield* dashboardTools(replacement, folder.work)).read?.execute
+    if (!read) throw Error("read unavailable")
+    const snapshot = yield* Effect.promise(() => read({ filePath: "snapshot.json" }, {
+      toolCallId: "read", abortSignal: new AbortController().signal, messages: [],
+    }))
+    expect(snapshot).toHaveProperty("output", expect.stringContaining("Заказы"))
     const denied = yield* sessions.getForExecution(deletion.session.id).pipe(Effect.exit)
     expect(Exit.isFailure(denied) && String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
   }).pipe(provideInstance(folder.work))

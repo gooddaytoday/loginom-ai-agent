@@ -57,6 +57,7 @@ const folder = Effect.acquireRelease(
     const root = await mkdtemp(path.join(DashboardSession.dashboardRoot(), "guard-"))
     await mkdir(path.join(root, "work", "src"), { recursive: true })
     await mkdir(path.join(root, "control"))
+    await Bun.write(path.join(root, "control/binding.json"), JSON.stringify({ snapshotId: crypto.randomUUID() }))
     return { root, work: path.join(root, "work") }
   }),
   (folder) => Effect.promise(() => rm(folder.root, { recursive: true, force: true })),
@@ -76,6 +77,23 @@ const context = (asks: string[]) => ({
     }),
 })
 
+it.live("a read with an expired dashboard context is denied before requesting permission", () =>
+  Effect.gen(function* () {
+    const dirs = yield* folder
+    const asks: string[] = []
+    yield* Effect.gen(function* () {
+      const definition = yield* ReadTool
+      const read = yield* definition.init()
+      yield* Effect.promise(() => rm(dirs.work, { recursive: true }))
+      const exit = yield* read.execute({ filePath: path.join(dirs.work, "sample.json") }, {
+        ...context(asks), dashboardWork: dirs.work,
+      }).pipe(Effect.exit)
+      expect(Exit.isFailure(exit) && String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(asks).toEqual([])
+    }).pipe(provideInstance(dirs.work))
+  }),
+)
+
 it.live("dashboard write refuses control files before asking permission", () =>
   Effect.gen(function* () {
     const dirs = yield* folder
@@ -87,7 +105,7 @@ it.live("dashboard write refuses control files before asking permission", () =>
       const info = yield* WriteTool
       const tool = yield* info.init()
       for (const target of [
-        "../control/binding.json",
+        "../control/new.json",
         path.join(outside, "absolute.json"),
         "src/link/x.json",
         "src/../sample.json",
@@ -372,7 +390,6 @@ it.live("dashboard reads work through an outside alias, while git and internal b
     yield* Effect.promise(async () => {
       await Bun.write(path.join(dirs.work, "sample.json"), "synthetic")
       await Bun.write(path.join(dirs.work, "src", "main.tsx"), "synthetic")
-      await Bun.write(path.join(dirs.root, "control", "binding.json"), "private synthetic")
       await symlink(dirs.work, alias, "dir")
       expect(Bun.spawnSync(["git", "init", dirs.root]).exitCode).toBe(0)
     })

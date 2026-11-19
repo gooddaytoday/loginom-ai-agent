@@ -53,7 +53,7 @@ export const ApplyPatchTool = Tool.define(
       }
 
       const instance = yield* InstanceState.context
-      const writeFile = workspaceWriter(afs, ctx, instance.directory)
+      const writer = workspaceWriter(afs, ctx, instance.directory)
 
       // Validate file paths and check permissions
       const fileChanges: Array<{
@@ -222,32 +222,32 @@ export const ApplyPatchTool = Tool.define(
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
         switch (change.type) {
           case "add":
-            yield* writeFile(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writer.write(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* writeFile(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writer.write(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "change" })
             break
 
           case "move":
             if (change.movePath) {
-                yield* writeFile(change.movePath!, Bom.join(change.newContent, change.bom))
-              yield* afs.remove(change.filePath)
+              yield* writer.write(change.movePath, Bom.join(change.newContent, change.bom))
+              yield* writer.remove(change.filePath)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
             }
             break
 
           case "delete":
-            yield* afs.remove(change.filePath)
+            yield* writer.remove(change.filePath)
             updates.push({ file: change.filePath, event: "unlink" })
             break
         }
 
         if (edited) {
-          if (yield* format.file(edited)) {
+          if (!ctx.dashboardWork && (yield* format.file(edited))) {
             yield* Bom.syncFile(afs, edited, change.bom)
           }
           yield* events.publish(FileSystem.Event.Edited, { file: edited })

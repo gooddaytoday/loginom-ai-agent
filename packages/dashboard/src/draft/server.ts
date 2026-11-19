@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import { once } from "node:events"
 import { readFile } from "node:fs/promises"
 import { createServer } from "node:http"
@@ -19,6 +20,7 @@ const page = '<!doctype html><html lang="ru"><meta charset="utf-8"><title>Чер
 
 export async function draftServer(pageScript: string) {
   const script = await readFile(pageScript)
+  const routes = new Map<string, string>()
   const entries = new Map<string, DraftEntry>()
   const pages = createServer({ requireHostHeader: false })
   const apps = createServer({ requireHostHeader: false })
@@ -56,7 +58,7 @@ export async function draftServer(pageScript: string) {
     if (!entry) return send(404, "text/plain; charset=utf-8", "Not found")
     if (match && match[3] === "hash") return send(200, "application/json", JSON.stringify({ hash: entry.hash }))
     if (match && match[3] === "data")
-      return send(200, "application/json", JSON.stringify({ ...entry.data, hash: entry.hash, appUrl: `${appOrigin}/apps/${entry.key}/${entry.hash}/` }))
+      return send(200, "application/json", JSON.stringify({ ...entry.data, hash: entry.hash, appUrl: `${appOrigin}/apps/${match[2]}/${entry.hash}/` }))
     return send(200, "text/html; charset=utf-8", page)
   })
   pages.on("checkExpectation", (_request, response) => {
@@ -70,10 +72,17 @@ export async function draftServer(pageScript: string) {
   apps.unref()
   return {
     publish(entry: DraftEntry) {
-      entries.set(entry.key, { ...entry })
-      return `${pageOrigins[0]}/${entry.key}/`
+      const route = routes.get(entry.key) ?? randomBytes(32).toString("hex")
+      routes.set(entry.key, route)
+      entries.set(route, { ...entry })
+      return `${pageOrigins[0]}/${route}/`
     },
-    revoke(key: string) { entries.delete(key) },
+    revoke(key: string) {
+      const route = routes.get(key)
+      if (!route) return
+      entries.delete(route)
+      routes.delete(key)
+    },
     pageOrigin: pageOrigins[0]!,
     appOrigin,
     close,

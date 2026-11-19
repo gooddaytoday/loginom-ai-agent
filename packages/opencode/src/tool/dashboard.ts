@@ -144,6 +144,7 @@ export const DashboardDeleteTool = Tool.define(
               if (!cleaned)
                 return deleteOutput("На стенде подтверждено отсутствие опубликованных версий. Локальную папку черновика удалить не удалось.")
               yield* Effect.promise(() => revokeDashboardDraft(control.key))
+              yield* sessions.retireDashboard(ctx.sessionID)
               return {
                 ...deleteOutput("Дашборд удалён. Опубликованных версий и локального черновика больше нет."),
                 metadata: { truncated: false, dashboardDeleted: true },

@@ -1,4 +1,4 @@
-import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
+import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker } from "@loginom-ai-agent/product/dashboard-root"
 import { DashboardSession } from "@/product/dashboard-session"
 import { eq } from "drizzle-orm"
 import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
@@ -84,8 +84,7 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
           metadata: DashboardSession.metadata(
             info.directory,
             current ? (current.metadata ?? undefined) : info.metadata,
-            current?.metadata?.[DASHBOARD_SESSION_MARKER] === true ||
-              info.metadata?.[DASHBOARD_SESSION_MARKER] === true,
+            dashboardSessionMarker(current?.metadata?.[DASHBOARD_SESSION_MARKER], info.metadata?.[DASHBOARD_SESSION_MARKER]),
           ),
         })
         yield* db

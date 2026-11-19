@@ -7,6 +7,12 @@ import { productChannel, productSlug } from "./index"
 
 export const DASHBOARD_SESSION_MARKER = "loginom_dashboard"
 
+// Import and replay can add a restriction, but must preserve a completed deletion.
+export function dashboardSessionMarker(previous: unknown, incoming: unknown) {
+  if (previous === "deleted" || incoming === "deleted") return "deleted"
+  if (previous === true || incoming === true) return true
+}
+
 // Desktop and CLI must create folders under the same data root as the backend.
 export function dashboardDataRoot(env: NodeJS.ProcessEnv) {
   const data = env.LOGINOM_AI_AGENT_CLI_ROOT
