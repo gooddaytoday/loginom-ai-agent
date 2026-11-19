@@ -270,7 +270,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const title=task.types[p.type].title.replace(/\s/g,'_');
       const palette=task.request.workflow_ref.prefix+';ModelForm;colVendors_Компоненты>'+task.types[p.type].palette_group+'>'+title+';TreeText';
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
-      placementNavigation=await revealPosition({page,root:canvas,position:p.position,prefix:task.request.workflow_ref.prefix,
+      placementNavigation=await revealPosition({page,root:canvas,position:p.position,prefix:task.request.workflow_ref.prefix,scrollNode:true,
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during placement navigation');}});
       gestureBefore=await read(page,task);
       if(!sameGraph(before,gestureBefore))throw Error('Graph changed after placement navigation');
@@ -879,11 +879,13 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
         const grids=[[160,128]];
         if(${value.target.kind==='new'&&value.target.type==='programming.javascript'&&!value.target.position})grids.push([40,40]);
         grids.push([32,32]);
+        let canvasReady=false;
         for(const [dx,dy] of grids)for(let y=80;y<height-80;y+=dy)for(let x=80;x<width-96;x+=dx){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
-          if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
+          if(px<0||py<0||!hit||!(hit===e||e.contains(hit))||hit.closest?.('[role="dialog"],.x-window,.x-mask,.x-mask-msg'))continue;
+          canvasReady=true;
           if(${clearance}?!(${nodePlacementGap.toString()})(view,screen,occupied):occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
@@ -897,6 +899,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
             return !!hit&&(hit===e||e.contains(hit))&&!hit.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg');
           });
           if(position)return position;
+          // A full viewport can still have a free native row below it. The
+          // journaled create procedure reveals and hit-tests this position
+          // before dragging; never relax the drawing clearance or model bound.
+          if(canvasReady&&(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied))return overflow;
         }
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);

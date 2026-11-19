@@ -146,9 +146,9 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  // Loginom allocates outline IDs per form (cnt, cnt-1, ...). A global
  // cnt lookup can select a hidden outline belonging to another workflow.
  try {
-  // Existing targets can already have native scrollable canvas space. Reveal
-  // that exact drawing before zooming, preserving model-grid drag coordinates.
-  if(scrollNode&&nodeId!==undefined&&!within(view,point))await scroll();
+  // Opted-in targets and new positions can already have native scroll space.
+  // Zooming first can shrink away the free overflow row.
+  if(scrollNode&&!within(view,point))await scroll();
   if(!within(view,point)) {
    await guard();remaining();
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
