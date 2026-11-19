@@ -173,6 +173,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  }
  throw exhausted();
 }
+const EXPORT_RETURN_RESERVE_MS=60000;
 // Navigates only the assigned storage path using the existing observed UI
 // controls. Downloads use the shared artifact primitive, never a network API.
 export async function readNativeExportFile(options,ctx,configuration,execution){
@@ -189,6 +190,10 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
  let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null,readStep='storage_navigation';
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
+ // The file search stops early enough for the refusal path to return to the
+ // quiet graph and release the lease (LAB-1897: that return took <=1.8 s).
+ const reserve=Math.min(EXPORT_RETURN_RESERVE_MS,Math.floor((ctx.deadline-Date.now())/2));
+ const searchGuard=()=>{guard();if(Date.now()>=ctx.deadline-reserve)throw Object.assign(Error('Export file search time exhausted'),{code:'EXPORT_SEARCH_TIME_EXHAUSTED'});};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async options=>{
@@ -276,7 +281,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const inDirectory=(expected,previous)=>ready(async()=>{const r=await roots(),e=r.ui.elements.find(e=>e.tid===r.workflow_ref?.prefix+';NavigationBar;NavigationPanel');return e?read({root_ref:e.ref}):r;},s=>s.file_storage?.status==='observed'
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
- const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
+ const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard:searchGuard});
  const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
   readStep='return_node_context';
   const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
