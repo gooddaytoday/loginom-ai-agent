@@ -78,6 +78,7 @@ test("opening a local draft displays the new-publication toast", async () => {
   const local = { type: "sidecar", variant: "base", http: { url: "http://127.0.0.1:17080" } } as const
   let failure: string | undefined
   await mockExports("@solidjs/router", { useLocation: () => ({ pathname: "/" }), useNavigate: () => () => {}, useParams: () => ({}), useSearchParams: () => [{}] })
+  await mockExports("@/context/global", { useGlobal: () => ({}) })
   await mockExports("@/context/layout", { useLayout: () => ({ projects: { open: (path: string) => opened.push(path) } }) })
   await mockExports("@/context/tabs", { useTabs: () => ({ store: [] }) })
   await mockExports("@/context/settings", { useSettings: () => ({ general: { newLayoutDesigns: () => false } }) })

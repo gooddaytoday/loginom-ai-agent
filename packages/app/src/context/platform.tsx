@@ -85,6 +85,7 @@ type PlatformBase = {
     id: string,
   ): Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
   checkDashboardTarget?(id: string): Promise<boolean>
+  isDashboardWork?(directory: string): Promise<boolean>
 
   /** Fetch override */
   fetch?: typeof fetch

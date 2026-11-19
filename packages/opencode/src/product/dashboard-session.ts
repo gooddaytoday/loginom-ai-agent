@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, realpathSync, statSync } from "node:fs"
-import { basename, dirname, join, parse, relative, resolve, sep } from "node:path"
-import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
+import { existsSync, lstatSync, realpathSync } from "node:fs"
+import { dirname, join, parse, relative, resolve, sep } from "node:path"
+import { DASHBOARD_SESSION_MARKER, isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
 import { Global } from "@opencode-ai/core/global"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { TaskScope } from "@/session/task-scope"
@@ -12,10 +12,7 @@ export const dashboardRoot = () => join(Global.Path.data, "dashboards")
 
 // The profile follows the session directory chosen by Desktop or CLI, never model input.
 export function isDashboardWork(directory: string) {
-  const root = dashboardRoot()
-  if (!existsSync(directory) || !existsSync(root)) return false
-  const work = realpathSync(directory)
-  return statSync(work).isDirectory() && basename(work) === "work" && dirname(dirname(work)) === realpathSync(root)
+  return isDashboardWorkDirectory(directory, dashboardRoot())
 }
 
 export function dashboardPathError(directory: string, target: string, write = false) {

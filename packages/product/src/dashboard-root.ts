@@ -1,5 +1,6 @@
+import { existsSync, realpathSync, statSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { profilePaths } from "./cli-profile"
 import { productChannel, productSlug } from "./index"
 
@@ -14,4 +15,10 @@ export function dashboardDataRoot(env: NodeJS.ProcessEnv) {
         productSlug(productChannel(env.LOGINOM_AI_AGENT_CHANNEL ?? "prod")),
       )
   return join(data, "dashboards")
+}
+
+export function isDashboardWorkDirectory(directory: string, root: string) {
+  if (!existsSync(directory) || !existsSync(root)) return false
+  const work = realpathSync(directory)
+  return statSync(work).isDirectory() && basename(work) === "work" && dirname(dirname(work)) === realpathSync(root)
 }

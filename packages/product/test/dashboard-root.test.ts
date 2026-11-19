@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test"
-import { homedir } from "node:os"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
-import { dashboardDataRoot } from "../src/dashboard-root"
+import { dashboardDataRoot, isDashboardWorkDirectory } from "../src/dashboard-root"
 
 test("Desktop dashboard data follows the backend XDG channel directory", () => {
   expect(dashboardDataRoot({ XDG_DATA_HOME: "/fixture/data", LOGINOM_AI_AGENT_CHANNEL: "prod" })).toBe(
@@ -25,4 +26,24 @@ test("the guarded standalone CLI profile owns its dashboard data regardless of X
       LOGINOM_AI_AGENT_CHANNEL: "beta",
     }),
   ).toBe(join("/fixture/profile", "data", "dashboards"))
+})
+
+test("only real work directories within the dashboard root identify dashboard chats", async () => {
+  const fixture = await mkdtemp(join(tmpdir(), "dashboard-work-"))
+  const root = join(fixture, "profile", "dashboards")
+  const work = join(root, "campaign", "work")
+  const ordinary = join(fixture, "project", "dashboards", "campaign", "work")
+  const alias = join(fixture, "dashboard-alias")
+  try {
+    await mkdir(work, { recursive: true })
+    await mkdir(ordinary, { recursive: true })
+    await symlink(work, alias, process.platform === "win32" ? "junction" : "dir")
+
+    expect(isDashboardWorkDirectory(work, root)).toBe(true)
+    expect(isDashboardWorkDirectory(alias, root)).toBe(true)
+    expect(isDashboardWorkDirectory(ordinary, root)).toBe(false)
+    expect(isDashboardWorkDirectory(join(root, "missing", "work"), root)).toBe(false)
+  } finally {
+    await rm(fixture, { recursive: true, force: true })
+  }
 })
