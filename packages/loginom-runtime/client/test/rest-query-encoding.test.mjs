@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {restQueryEncoderRequest,createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
+import {restQueryEncoderRequest,createRestRequestNodeSupport,removeReplacedEncoder} from '../lib/rest-request-node.mjs';
 import {createJavascriptCodeNodeSupport} from '../lib/javascript-code-node.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {validateNodeApplyRequest,applyNode} from '../lib/node-apply.mjs';
@@ -175,4 +175,79 @@ test('D88 the explicitly confirmed connected source is preserved before connecti
  assert.equal(operation.restQueryEncoder,undefined,'the confirmed input must not get another encoder');
  assert.equal(operation.restQueryInput,undefined,'the existing data edge must not be authorized for replacement');
  assert.equal(events.some(e=>e.operation_id?.startsWith('rest-url-')),false);
+});
+
+// LAB-1904 r5/model.stdout:65→75: the continuation passed the import behind the
+// handler's own URL encoder; the refusal sent the model to a second REST chain.
+function ownedEncoderContinuation(label='URL query encoding '+'d'.repeat(32)){
+ const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
+  mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
+ r.parameters.connection={name:'Echo audience',base_url:'https://echo.test/anything/audience'};
+ const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,nodes:[
+  {ref:r.target.ref,type:'integration.rest_request',inputs:[0],outputs:[0,1]},
+  {ref:r.inputs[0].source,type:'imports.text',inputs:[],outputs:[0]},
+  {ref:{document_id:'doc',workflow_id:'flow',node_id:'old'},type:'programming.javascript',label,inputs:[0],outputs:[0]}],
+  links:[{source:'import',output:0,target:'old',input:0},{source:'old',output:0,target:'rest',input:0}]};
+ const calls=[],operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>{calls.push('observe');return structuredClone(graph);},
+  choosePosition:async()=>{calls.push('encoder placement');throw Error('encoder placement reached');}}};
+ const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+  execute:async()=>assert.fail('No browser mutation may start before the new encoder target')});
+ return {r,graph,calls,operation,drivers};
+}
+test('LAB-1904 existing REST fed by its own encoder builds a replacement encoder from the requested raw source',async()=>{
+ const f=ownedEncoderContinuation(),before=structuredClone(f.graph);
+ // The fake browser stops the child; only the refusal and its inputs matter here.
+ await assert.rejects(f.drivers.beforeTarget({deadline:Date.now()+60000}),/query encoder did not complete/);
+ const child=f.operation.restQueryEncoder?.operation.parameters;
+ assert.equal(child?.target.type,'programming.javascript','the replacement encoder must be prepared');
+ assert.deepEqual(child.inputs,f.r.inputs);assert.equal(f.operation.restQueryInput,undefined,'no swap before the new encoder succeeds');
+ assert.deepEqual(f.graph,before);
+});
+test('LAB-1904 a user JavaScript node at REST input 0 is still refused before effects',async()=>{
+ const f=ownedEncoderContinuation('Parse response');
+ await assert.rejects(f.drivers.beforeTarget({deadline:Date.now()+60000}),/different raw source/);
+ assert.deepEqual(f.calls,['observe']);assert.equal(f.operation.restQueryEncoder,undefined);
+});
+
+function swappedEncoderGraph(refuse=false){
+ const r=ownedEncoderContinuation().r,id=node_id=>({document_id:'doc',workflow_id:'flow',node_id});
+ let graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:r.workflow_ref,dom_epoch:1,foreign_links:[],nodes:[
+  {ref:id('rest'),type:'integration.rest_request',label:'REST',position:{x:400,y:100},inputs:[0],outputs:[0,1]},
+  {ref:id('import'),type:'imports.text',label:'Requests',position:{x:0,y:100},inputs:[],outputs:[0]},
+  {ref:id('old'),type:'programming.javascript',label:'URL query encoding '+'d'.repeat(32),position:{x:200,y:0},inputs:[0],outputs:[0]},
+  {ref:id('new'),type:'programming.javascript',label:'URL query encoding '+'e'.repeat(32),position:{x:200,y:200},inputs:[0],outputs:[0]}],
+  links:[{source:'import',output:0,target:'old',input:0},{source:'import',output:0,target:'new',input:0},{source:'new',output:0,target:'rest',input:0}]};
+ const calls=[],adapter={observe:async()=>structuredClone(graph),positionMatches:()=>true,reconcile:async()=>({verified:false}),
+  mutate:async effect=>{calls.push(effect.kind);
+   if(refuse)return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:'node is locked'};
+   const gone=effect.parameters.ref.node_id;
+   graph={...graph,nodes:graph.nodes.filter(n=>n.ref.node_id!==gone),links:graph.links.filter(e=>e.source!==gone&&e.target!==gone)};
+   return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};}};
+ const operation={id:'rest',parameters:r,nodeTargetAdapter:adapter,
+  restQueryInput:{edge:{source:'old',output:0,target:'rest',input:0},encoder:id('new'),replaced_encoder:id('old')}};
+ const options={operation,now:Date.now,onRecord:async e=>e};
+ return {calls,operation,run:()=>removeReplacedEncoder(options,{deadline:Date.now()+60000}),get graph(){return graph;}};
+}
+test('LAB-1904 the replaced encoder is deleted once after the verified swap, keeping the new chain',async()=>{
+ const f=swappedEncoderGraph();
+ await f.run();await f.run();
+ assert.deepEqual(f.calls,['delete_node'],'the deletion gesture is never repeated');
+ assert.deepEqual(f.graph.nodes.map(n=>n.ref.node_id),['rest','import','new']);
+ assert.deepEqual(f.graph.links,[{source:'import',output:0,target:'new',input:0},{source:'new',output:0,target:'rest',input:0}]);
+ assert.equal(f.operation.nodeEffectPossible,true);
+});
+test('LAB-1904 a refused encoder deletion stops the REST apply and is never retried',async()=>{
+ const f=swappedEncoderGraph(true);
+ await assert.rejects(f.run(),/replaced URL query encoder old was not deleted/);
+ await assert.rejects(f.run(),/was not deleted/);
+ assert.deepEqual(f.calls,['delete_node']);
+ assert.equal(f.graph.nodes.length,4);
+});
+test('LAB-1904 an encoder still connected to REST is never deleted',async()=>{
+ const f=swappedEncoderGraph();
+ f.graph.links.push({source:'old',output:0,target:'rest',input:0});f.graph.links.splice(2,1);
+ await assert.rejects(f.run(),/still connected; nothing was deleted/);
+ assert.deepEqual(f.calls,[]);
 });
