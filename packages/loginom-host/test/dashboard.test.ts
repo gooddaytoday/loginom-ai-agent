@@ -30,7 +30,7 @@ async function fixture(hold: boolean | "start" = false, closeFailure = false) {
     import { createHash } from 'node:crypto';
     let reading;
     process.on('message', m => {
-      appendFileSync(${JSON.stringify(join(directory, 'runtime.jsonl'))}, JSON.stringify({operation:m.operation,pid:process.pid})+'\\n');
+      appendFileSync(${JSON.stringify(join(directory, 'runtime.jsonl'))}, JSON.stringify({operation:m.operation,pid:process.pid,...(m.operation==='start'?{headless:m.input.headless,validation:m.input.validation}:{})})+'\\n');
       if(m.operation==='start' && ${JSON.stringify(hold)}!=='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,...(m.input.validation?{checked:true}:{ready:true})}});
       if(m.operation==='dashboardRead') { if(${JSON.stringify(hold)}) reading=m.id; else process.send({id:m.id,result:null}); }
       if(m.operation==='dashboardPublish' && m.input.content==='\"malformed-reply\"') {process.send({id:m.id,result:{status:'written'}});return;}
@@ -131,7 +131,7 @@ test("host shutdown cancels a pre-chat read before draining its owned runtime", 
 })
 
 
-test("acquired private adapter reads and publishes with typed replies", async () => {
+test("Desktop reads and publishes Dashboard in headless authenticated runtimes", async () => {
   const f = await fixture()
   LoginomHost.connect(f.backendPort)
   try {
@@ -141,6 +141,12 @@ test("acquired private adapter reads and publishes with typed replies", async ()
     expect(await run.dashboardRead({ origin: "http://example.test", binding })).toBeNull()
     expect(await run.dashboardPublish({ origin: "http://example.test", binding, content: "{}", expected: null })).toMatchObject({ status: "written", version: { name: "20261115T000000Z.json" } })
     await run.release()
+    const events = (await readFile(join(f.directory, "runtime.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line))
+    expect(events.map(event => event.operation)).toEqual(["start", "dashboardRead", "close", "start", "dashboardPublish", "close"])
+    expect(events.filter(event => event.operation === "start")).toEqual([
+      expect.objectContaining({ headless: true, validation: false }),
+      expect.objectContaining({ headless: true, validation: false }),
+    ])
   } finally { LoginomHost.disconnect(); await f.close() }
 })
 

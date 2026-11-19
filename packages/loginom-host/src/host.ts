@@ -365,11 +365,12 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    validation = false,
+    purpose: "validation" | "dashboard" | "chat",
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
   ) {
+    const validation = purpose === "validation"
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
     signal?.throwIfAborted()
     const timeout = AbortSignal.timeout(Math.max(1, startupDeadline - Date.now()))
@@ -465,9 +466,8 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         validationHttpCache: httpCache,
-        // CLI applies its explicit browser policy to validation too; Desktop
-        // retains quiet validation while Help readiness stays browser-free.
-        headless: validation ? (options.preflightHeadless ?? true) : options.headless === true,
+        // CLI supplies its explicit browser policy for background launches too.
+        headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
@@ -524,7 +524,7 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, true, signal, undefined, httpCache).catch((error: unknown) => {
+          const child = await launch(connection, chat, "validation", signal, undefined, httpCache).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
@@ -607,7 +607,7 @@ export async function createLoginomHost(options: {
     if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
     try {
       if (lease.generation !== request.generation) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
-      const child = await retain(current, chat, launch(current.connection, chat, false, signal)).catch((error: unknown) => {
+      const child = await retain(current, chat, launch(current.connection, chat, "dashboard", signal)).catch((error: unknown) => {
         if (signal?.aborted && error instanceof RuntimeStartupError && error.cleanupConfirmed)
           throw new Error("DASHBOARD_CANCELLED")
         throw error
@@ -825,7 +825,7 @@ export async function createLoginomHost(options: {
       return retain(
         current,
         chat,
-        launch(current.connection, chat, false, startup?.signal, startup?.deadline).then(
+        launch(current.connection, chat, "chat", startup?.signal, startup?.deadline).then(
           (child) => {
             service.browserStatus(generation, { state: "verified" })
             return child
