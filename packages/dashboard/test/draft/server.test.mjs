@@ -3,6 +3,7 @@ import { spawn } from "node:child_process"
 import { once } from "node:events"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { Agent, request } from "node:http"
+import { syncBuiltinESMExports } from "node:module"
 import { networkInterfaces, tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -78,6 +79,60 @@ test("republishing an entry updates the hash endpoint", async t => {
   const next = "c".repeat(64)
   assert.equal(server.publish({ ...entry, hash: next }), `${server.pageOrigin}/${key}/`)
   assert.deepEqual(JSON.parse((await send(server.pageOrigin, `/${key}/hash`)).body), { hash: next })
+})
+
+test("revoking one draft removes its page, sample, hash and build while its neighbour stays live", async t => {
+  const { server, entry } = await fixture(t)
+  const neighbour = "c".repeat(64)
+  for (const key of [entry.key, neighbour]) server.publish({ ...entry, key })
+  const routes = [
+    [server.pageOrigin, key => `/${key}/`],
+    [server.pageOrigin, key => `/${key}/data`],
+    [server.pageOrigin, key => `/${key}/hash`],
+    [server.appOrigin, key => `/apps/${key}/${hash}/`],
+  ]
+  for (const [origin, path] of routes) assert.equal((await send(origin, path(entry.key))).status, 200)
+  server.revoke(entry.key)
+  for (const [origin, path] of routes) {
+    assert.equal((await send(origin, path(entry.key))).status, 404)
+    assert.equal((await send(origin, path(neighbour))).status, 200)
+  }
+})
+
+test("an asset already read before revocation cannot be served under a replacement entry", async t => {
+  const { server, entry } = await fixture(t)
+  server.publish(entry)
+  const fs = (await import("node:fs/promises")).default
+  const asset = join(entry.builds, hash, "assets/app.js")
+  await mkdir(join(entry.builds, hash, "assets"))
+  await writeFile(asset, "old bytes")
+  const readFile = fs.readFile
+  const read = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  t.mock.method(fs, "readFile", async (...args) => {
+    const bytes = await readFile(...args)
+    if (args[0] === asset && String(bytes) === "old bytes") {
+      read.resolve()
+      await resume.promise
+    }
+    return bytes
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+
+  const route = `/apps/${entry.key}/${hash}/assets/app.js`
+  const pending = send(server.appOrigin, route)
+  await read.promise
+  server.revoke(entry.key)
+  await writeFile(asset, "new bytes")
+  server.publish(entry)
+  resume.resolve()
+  const expired = await pending
+  assert.equal(expired.status, 404)
+  assert.doesNotMatch(expired.body, /old bytes/)
+  const active = await send(server.appOrigin, route)
+  assert.equal(active.body, "new bytes")
+  assert.equal(active.headers["cache-control"], "no-store")
 })
 
 function assertPageHeaders(response, server) {

@@ -65,14 +65,15 @@ export async function draftServer(pageScript: string) {
   })
   pages.on("clientError", (_error, socket) => socket.destroy())
   // Backend stdout belongs to the CLI output, rather than stand diagnostics.
-  appHost({ server: apps, builds: key => entries.get(key)?.builds, appOrigin, clientOrigins: pageOrigins, mode: "normal", log: () => undefined })
+  appHost({ server: apps, builds: key => entries.get(key), appOrigin, clientOrigins: pageOrigins, mode: "normal", log: () => undefined })
   pages.unref()
   apps.unref()
   return {
     publish(entry: DraftEntry) {
-      entries.set(entry.key, entry)
+      entries.set(entry.key, { ...entry })
       return `${pageOrigins[0]}/${entry.key}/`
     },
+    revoke(key: string) { entries.delete(key) },
     pageOrigin: pageOrigins[0]!,
     appOrigin,
     close,

@@ -10,6 +10,7 @@ let commits = Promise.resolve()
 
 export async function buildDashboard(input: Parameters<typeof buildSources>[0] & {
   publication?: { operation: string; sample: { rows: readonly (readonly unknown[])[] } }
+  draftStagingRoot?: string
 }): Promise<Build> {
   if (input.publication) {
     const listed = await sourceFiles(input.work)
@@ -23,9 +24,9 @@ export async function buildDashboard(input: Parameters<typeof buildSources>[0] &
     const found = embeddedValues(input.publication.sample, files)
     if (found.length) return { ok: false, output: outputText(Buffer.from("Опубликованная сборка будет публичной. Удалите из src/ данные образца: " + found.slice(0, 5).join(", "))) }
   }
-  await mkdir(input.out, { recursive: true, mode: 0o700 })
+  if (!input.draftStagingRoot) await mkdir(input.out, { recursive: true, mode: 0o700 })
   // A concurrent draft may prune shared hashes before this build commits.
-  const staging = await mkdtemp(join(input.out, ".pending-"))
+  const staging = await mkdtemp(join(input.draftStagingRoot ?? input.out, ".pending-"))
   try {
     const build = await buildSources({ ...input, work: input.publication?.operation ?? input.work, out: staging })
     if (!build.ok) return build

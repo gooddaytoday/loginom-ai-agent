@@ -73,7 +73,7 @@ parent.postMessage({ type: "loginom-dashboard/ready", version: 1 }, "*")
 
 export function appHost(options: {
   server?: Server
-  builds: (key: string) => string | undefined
+  builds: (key: string) => string | { builds: string } | undefined
   verifyHash?: boolean
   appOrigin: string
   clientOrigins: string[]
@@ -153,16 +153,19 @@ export function appHost(options: {
         return send(404, "Not found")
       }
       const type = asset ? assetContentType(asset) : "text/html; charset=utf-8"
-      const dir = options.builds(app[1]!)
+      const key = app[1]!
+      const entry = options.builds(key)
+      const dir = typeof entry === "string" ? entry : entry?.builds
       const name = asset ? "assets/" + asset : "index.html"
       const data = type && dir && (options.verifyHash
         ? await verifiedBuildFile(join(dir, app[2]!), app[2]!, name)
         : await buildFile(dir, app[2]!, name))
-      if (!data) return send(404, "Not found")
+      // A local draft may be revoked while its build file is being read.
+      if (!data || (typeof entry === "object" && options.builds(key) !== entry)) return send(404, "Not found")
       if (!asset) return send(200, data, { "content-type": type })
       return send(200, data, {
         "content-type": type,
-        "cache-control": "public, max-age=31536000, immutable",
+        ...(typeof entry === "string" && { "cache-control": "public, max-age=31536000, immutable" }),
         "access-control-allow-origin": "*",
       })
     } catch {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import test from "node:test"
-import { createRequire } from "node:module"
-import { prepareDashboard } from "../../src/agent/folder.ts"
+import { createRequire, syncBuiltinESMExports } from "node:module"
+import { prepareDashboard, readDashboardBinding, removeDashboard } from "../../src/agent/folder.ts"
 import { dashboardResources } from "../../src/agent/resources.ts"
 import { draftDashboard, NO_SAMPLE } from "../../src/agent/draft.ts"
 
@@ -49,6 +49,59 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   assert.deepEqual(data.parameters, [{ name: "Count", value: 2 }, { name: "Label", value: null }])
   const again = await draftDashboard({ work: prepared.directory, resources })
   assert.equal(again.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0], url)
+})
+
+test("a build that completed before deletion cannot publish after local cleanup", { timeout: 15_000 }, async t => {
+  const prepared = await fixture(t)
+  const root = dirname(dirname(prepared.directory))
+  const captured = await readDashboardBinding(prepared.directory, root)
+  const selfcheck = join(root, "selfcheck.mjs")
+  await writeFile(selfcheck, 'console.log(JSON.stringify({ ok: true, state: "ready", errors: [] }))')
+  const fs = (await import("node:fs/promises")).default
+  const rm = fs.rm
+  const built = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  t.mock.method(fs, "rm", async (path, options) => {
+    if (basename(path).startsWith(".pending-")) {
+      built.resolve()
+      await resume.promise
+    }
+    return rm(path, options)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+  const pending = draftDashboard({ work: prepared.directory, resources: { ...resources, selfcheck } })
+  await Promise.race([built.promise, pending.then(output => assert.fail(output))])
+  removeDashboard(prepared.directory, root, captured)
+  resume.resolve()
+  const output = await pending
+  assert.doesNotMatch(output, /Черновик: http:/)
+  await assert.rejects(stat(dirname(prepared.directory)), { code: "ENOENT" })
+})
+
+test("a running draft compiler cannot recreate the deleted dashboard folder", { timeout: 15_000 }, async t => {
+  const prepared = await fixture(t)
+  const root = dirname(dirname(prepared.directory))
+  const captured = await readDashboardBinding(prepared.directory, root)
+  const fs = (await import("node:fs/promises")).default
+  const cp = fs.cp
+  const copying = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  t.mock.method(fs, "cp", async (from, to, options) => {
+    if (from === join(template, "index.html")) {
+      copying.resolve()
+      await resume.promise
+    }
+    return cp(from, to, options)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+  const pending = draftDashboard({ work: prepared.directory, resources })
+  await Promise.race([copying.promise, pending.then(output => assert.fail(output))])
+  removeDashboard(prepared.directory, root, captured)
+  resume.resolve()
+  assert.match(await pending, /^Черновик остановлен/)
+  await assert.rejects(stat(dirname(prepared.directory)), { code: "ENOENT" })
 })
 
 test("type errors return compiler diagnostics without a draft link", async t => {

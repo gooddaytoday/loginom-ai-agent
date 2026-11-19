@@ -52,7 +52,8 @@ process.stdin.resume();
   })()
   const browser = await chromium.launch({ channel: "chromium", headless: true, chromiumSandbox: true })
   t.after(() => browser.close())
-  const page = await browser.newPage()
+  const context = await browser.newContext()
+  const page = await context.newPage()
   const dialogs = []
   page.on("dialog", async dialog => { dialogs.push(dialog.message()); await dialog.dismiss() })
   const url = backend ? `${server.pageOrigin}/${key}/` : server.publish(entry)
@@ -121,11 +122,15 @@ test("a new published draft hash reloads the page and shows the new app", async 
 })
 
 test("a stopped draft replaces the page within one polling interval", async t => {
-  const { page, server } = await fixture(t)
+  const { page, server, entry } = await fixture(t)
   await page.waitForFunction(() => document.body.dataset.state === "ready")
-  await server.close()
+  const neighbour = await page.context().newPage()
+  await neighbour.goto(server.publish({ ...entry, key: "d".repeat(64) }))
+  await neighbour.waitForFunction(() => document.body.dataset.state === "ready")
+  server.revoke(entry.key)
   await page.getByText("Черновик остановлен. Попросите агента показать его снова", { exact: true }).waitFor({ timeout: 3_000 })
   assert.equal(await page.locator("iframe").count(), 0)
+  assert.equal(await neighbour.evaluate(() => document.body.dataset.state), "ready")
 })
 
 test("a silent app reports its existing ten-second handshake timeout", async t => {
