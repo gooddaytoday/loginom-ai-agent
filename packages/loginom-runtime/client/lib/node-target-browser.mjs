@@ -479,13 +479,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         return d.FmxGraph.getSelectionCells().map(c=>({edge:c.edge===true,tid:d.FmxGraph.view.getState(c)?.shape?.node?.getAttribute('data-tid')}));});
       if(selected.length!==1 || selected[0].edge!==true || selected[0].tid!==linkTid)throw new Error('Deletion selection includes another object');
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
-      const toolbar={count:await remove.count()};
-      if(toolbar.count===1){
-        toolbar.visible=await remove.isVisible();toolbar.enabled=await remove.isEnabled();
-        toolbar.geometry=await remove.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
-          return {outside_viewport:x<0||y<0||x>=innerWidth||y>=innerHeight,
-            box:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight}};});
-      }
+      await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
       // A loading mask may appear after the owned selection click. Read only
       // until it clears; never replay selection or accept changed graph/GUIDs.
       const selectedGraph=await wait('owned_link_selection_graph_ready',async()=>{
@@ -499,17 +493,13 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       // Selection redraws node bodies. Rebind only after the complete graph,
       // native link GUIDs and exact single-edge selection have been preserved.
       gestureBefore=selectedGraph;
-      deletion={via:'delete_key',toolbar,button_geometry:toolbar.geometry};transient='delete';
-      // Loginom documents Delete for selected graph objects, independently of
-      // toolbar overflow. Preserve the exact edge and single-link confirmation.
-      await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').press('Delete',{timeout:remaining()});
+      await remove.click({timeout:remaining()});transient='delete';
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Exact single-link confirmation unavailable');
       const yes=find('msgbox;tlb;yes');
       await wait('single_link_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
-      deletion.confirmation_text='Удалить выделенную связь?';
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
       // Select exactly this node cell by a body pixel owned by it (never its

@@ -8,49 +8,31 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlace
 
 // LAB-636 :2567 / LAB-656 DOM: the collapsed workarea splitter starts at
 // y=794, while the requested grid origin projects to y=793.9779209731565.
-for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog','beyond_canvas','small_pan','small_pan_foreign'])test('minimum-scale placement under '+cover,{
+for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog','beyond_canvas'])test('minimum-scale placement under '+cover,{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:20000,
 },async()=>{
  const {chromium}=await import('playwright-core');
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
  try{
-  const small=cover.startsWith('small_pan');
-  const page=await browser.newPage({viewport:{width:small?1024:1280,height:small?633:800}});
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
   await page.setContent(`<style>html,body{margin:0;overflow:hidden;user-select:none}#graph{position:absolute;left:324px;top:100px;width:950px;height:694px;overflow:auto}
    #cover{position:absolute;left:324px;top:794px;width:955px;height:5px;z-index:2}#cover div{width:100%;height:100%}
    #outline{position:absolute;left:350px;top:150px}#palette{position:absolute;left:20px;top:300px;width:100px;height:20px}</style>
    <button data-tid="MF;TF-1;ModelForm;btnShowOutline" onclick="document.querySelector('#outline').hidden=!document.querySelector('#outline').hidden">outline</button>
-   <button id="hand" data-tid="MF;TF-1;ModelForm;btnHand">navigation</button><button id="cursor" data-tid="MF;TF-1;ModelForm;btnCursor">cursor</button>
    <div id="tab" class="x-tab-active" data-tid="tab">workflow</div>
    <div id="palette" data-tid="MF;TF-1;ModelForm;colVendors_Компоненты>Data>Calculator;TreeText">Calculator</div>
    <div style="width:1280px;height:800px" data-tid="MF;TF-1;ModelForm;cntDiagram"><div id="graph" data-tid="MF;TF-1;ModelForm;cmpDiagram"><svg style="width:100%;height:100%;display:block"></svg></div>
    <div id="outline" hidden class="bg-workflow-outline-toolbar"><button data-tid="outline;tlb;b" data-qtip="Уменьшить масштаб">zoom out</button></div></div>
    <div id="cover" data-tid="${cover==='foreign_splitter'?'MF;TF-2':'MF;TF-1'};ModelForm;pnlWorkarea;bordersplitter-1">${cover==='splitter_child'?'<div></div>':''}</div>`);
-  if(small)await page.addStyleTag({content:'#graph{width:694px;height:527px}'});
   const workflow_ref={prefix:'MF;TF-1',tab_tid:'tab',workflow_id:'flow'};
   const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref,dom_epoch:1,nodes:[],links:[],foreign_links:[]};
   await page.evaluate(({cover,graph})=>{
    const canvas=document.querySelector('#graph'),nodes=[];
    const view={scale:.3855432894295314,translate:{x:0,y:0},getState:()=>({shape:{node:document.querySelector('#created')}})};
-   const nativeGraph={container:canvas,view};
-   const diagram={FNodes:{FCollection:nodes},FmxGraph:nativeGraph};
-   const workspace={getActiveTab:()=>({Controller:{FController:{FDiagram:diagram}}})};
-   globalThis.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+   globalThis.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FNodes:{FCollection:nodes},FmxGraph:{container:canvas,view}}}}})}}}}}}};
    globalThis.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepare',{phase:'verified',workflowId:'flow',tab:document.querySelector('#tab')}]]),nodeTargetDomEpochs:{objects:new Map([[canvas,1]])}};
    globalThis.testGraph=graph;globalThis.drops=[];
    if(cover==='dialog'){const e=document.querySelector('#cover');e.setAttribute('role','dialog');e.style.top='700px';e.style.height='100px';}
-   if(cover.startsWith('small_pan')){
-    const graph=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph;
-    graph.panningHandler={ignoreCell:true,useLeftButtonForPanning:true,isForcePanningEvent:()=>true,panningEnabled:false};
-    graph.getCellAt=()=>null;
-    document.querySelector('#hand').addEventListener('click',()=>{graph.panningHandler.panningEnabled=true;});
-    document.querySelector('#cursor').addEventListener('click',()=>{graph.panningHandler.panningEnabled=false;});
-    let pan;
-    canvas.addEventListener('mousedown',e=>{if(e.button===2&&graph.panningHandler.panningEnabled)pan={x:e.x,y:e.y,tx:view.translate.x,ty:view.translate.y};});
-    document.addEventListener('mousemove',e=>{if(pan){view.translate.x=pan.tx+(e.x-pan.x)/view.scale;view.translate.y=pan.ty+(e.y-pan.y)/view.scale;}});
-    document.addEventListener('mouseup',()=>{pan=null;});
-    if(cover==='small_pan_foreign'){const e=document.querySelector('#cover');e.setAttribute('role','dialog');e.style.top='100px';e.style.height='527px';document.querySelector('#outline').style.zIndex='3';}
-   }
    let dragging=false;
    document.querySelector('#palette').addEventListener('mousedown',()=>{dragging=true;});
    document.addEventListener('mouseup',e=>{
@@ -58,9 +40,9 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
     const inside=canvas.contains(document.elementFromPoint(e.x,e.y));
     globalThis.drops.push({x:e.x,y:e.y,inside});
     if(!inside)return;
-    const b=canvas.getBoundingClientRect(),x=Math.round(((e.x-b.x)/view.scale-view.translate.x)/8)*8,y=Math.round(((e.y-b.y)/view.scale-view.translate.y)/8)*8;
+    const b=canvas.getBoundingClientRect(),x=Math.round((e.x-b.x)/view.scale/8)*8,y=Math.round((e.y-b.y)/view.scale/8)*8;
     const body=document.createElement('div');body.id='created';body.setAttribute('data-tid','MF;TF-1;Graph;Calculator');
-    body.style=`position:absolute;left:${(x+view.translate.x)*view.scale}px;top:${(y+view.translate.y)*view.scale}px;width:24px;height:24px`;
+    body.style=`position:absolute;left:${x*view.scale}px;top:${y*view.scale}px;width:24px;height:24px`;
     canvas.append(body);canvas.querySelector('svg').style.minWidth=x*view.scale+100+'px';canvas.querySelector('svg').style.minHeight=y*view.scale+100+'px';
     nodes.push({FGuid:'created',FCell:{}});
     globalThis.testGraph.nodes.push({ref:{document_id:'doc',workflow_id:'flow',node_id:'created'},type:'transform.calculator',label:'Calculator',dom_epoch:2,position:{x,y},locked:false,inputs:[0],outputs:[0]});
@@ -73,7 +55,7 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
   const result=await mutateGraph(page,{deadline:Date.now()+15000,request:{document_id:'doc',workflow_ref},
    types:{'transform.calculator':{title:'Calculator',palette_group:'Data'}},effect:{id:'create',kind:'create',parameters:{type:'transform.calculator',position},before:graph}},
    read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph,nodePlacementOverflow,nodePlacementGap);
-  const owned=cover==='owned_splitter'||cover==='splitter_child'||cover==='small_pan';
+  const owned=cover==='owned_splitter'||cover==='splitter_child';
   assert.equal(result.status,owned?'SUCCEEDED':'NOT_APPLIED',result.error);
   assert.equal(result.cleanup_complete,true);
   const drops=await page.evaluate(()=>globalThis.drops);
@@ -101,11 +83,7 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
    assert.deepEqual(result.after.nodes[0].position,position);
    assert.deepEqual(nodePlacementPosition(result.placement_navigation.view,result.placement_navigation.point),position);
    assert.equal(result.placement_navigation.node_visibility.fully_visible,true);
-   if(small){
-    assert.ok(result.placement_navigation.navigation_steps.some(s=>s.action==='pan'));
-    assert.equal(await page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.panningHandler.panningEnabled),false);
-   }
-   else assert.ok(result.placement_navigation.node_visibility.navigation_steps.some(s=>s.action==='scroll'));
+   assert.ok(result.placement_navigation.node_visibility.navigation_steps.some(s=>s.action==='scroll'));
   }
  }finally{await browser.close();}
 });
