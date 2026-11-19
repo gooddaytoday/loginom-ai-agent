@@ -49,10 +49,7 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 Цикл «профиль → выборка → сценарий → полный расчёт → Save» ниже применяй только
 к запросу построить или выполнить расчёт.
 
-After a disconnected Save, follow next_steps: repeat `loginom_dock_operation_inspect`
-with the SAME operation_id. Each inspect waits up to 10 s; continue within the
-original deadline until Save and cleanup settle. Never repeat Save or use
-workspace observe/restore_control while this step is offered.
+[Save retry](references/browser.md).
 
 ## Загрузка данных для расчёта
 
