@@ -9,6 +9,8 @@
 по явной просьбе пользователя. BOM — `bom:true/false` (для CP1251 Loginom 7.4.2 BOM
 игнорирует: `bom:false`); CRLF — `line_ending:"CRLF"`.
 Символы вне CP1251 заменяются байтом `0x1A` (SUB): предупреди пользователя об этой потере.
+ISO: `date_format:"yyyy/mm/dd",date_separator:"-",time_format:"hh:mm:ss",time_separator:":"`.
+On refusal fix only the rejected value; keep other requested settings. Check readback.
 
 Если в выгружаемых данных есть NULL и пустые строки, а пользователь не задал маркер выгрузки,
 явно передай в параметре `null_marker` непустой маркер,
