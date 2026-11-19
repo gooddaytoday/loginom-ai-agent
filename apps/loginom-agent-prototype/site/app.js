@@ -1882,14 +1882,15 @@ function replaceRefs() {
     <li class="bad">${icon('alert',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». В копии этого узла нет — ссылаться будет не на что.</span></li></ul>
     <p>Если «Города — неделя.lgp» нужен, отмените замену и сохраните изменения новой версией: исходный останется как есть.</p></div>`
 }
-// В-72: the agent edits a copy it saved in Loginom (Save As) — so the copy, like any package there, can be looked at in
-// Loginom itself. In the product the button opens a Loginom window (the browser the agent uses, signed in with this
-// connection) with the package opened by its path; the window takes one Loginom session while it is open. The prototype
-// shows the package's nodes instead.
-// Each improvement turn has its own copy, named when the turn starts.
+// В-72: the agent's copy is a package in Loginom («Копии агента»), so it can be looked at in Loginom itself, like any
+// other. In the product the button opens a separate Loginom window (not the conversation's agent browser, which is
+// signed out after the answer), signs in with this connection and opens the package by its path; while open, the
+// window takes one Loginom session. Editing a copy instead of the original needs a change to the agent's skill (ux-spec,
+// iteration 7). The prototype shows the package's nodes instead.
+// Each improvement turn has its own copy, named when the turn starts; the number never repeats.
 function newAgentCopy() {
-  const taken = state.sessions.flatMap(entry => [...(entry.history || []), entry]).filter(turn => turn.copy).length
-  return {name:'Продажи — правка агента' + (taken ? ' ' + (taken + 1) : '') + '.lgp', folder:packageFolder('personal') + '/Копии агента'}
+  state.copyCount = (state.copyCount || 0) + 1
+  return {name:'Продажи — правка агента' + (state.copyCount > 1 ? ' ' + state.copyCount : '') + '.lgp', folder:packageFolder('personal') + '/Копии агента'}
 }
 function agentCopy(turn) {
   return {...(turn?.copy || {name:'Продажи — правка агента.lgp', folder:packageFolder('personal') + '/Копии агента'}), view:'sales-v2', copy:true}
@@ -1902,7 +1903,7 @@ function turnAt(session, at) {
 function replaceSource() {
   const turn = state.replaceTurn && turnAt(state.replaceTurn.session, state.replaceTurn.at)
   const saved = turn && changeState(turn) === 'saved' && savedVersion(turn)
-  if (saved) return {target:saved.id, what:`новой версией «${esc(saved.name)}»`, label:`Посмотреть «${esc(saved.name)}» в Loginom`}
+  if (saved) return {target:saved.id, what:`новой версией «${esc(saved.name)}»`, label:'Посмотреть новую версию в Loginom'}
   return {target:state.replaceTurn ? `copy:${state.replaceTurn.session}:${state.replaceTurn.at}` : '', what:`копией агента «${esc(agentCopy(turn).name)}»`, label:'Посмотреть копию в Loginom'}
 }
 function loginomButton(target, label = 'Посмотреть в Loginom') {
