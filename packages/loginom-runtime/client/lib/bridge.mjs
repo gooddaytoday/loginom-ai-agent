@@ -604,17 +604,18 @@ export async function createBridge(config, session, { browserTransport: managedB
               if(confirmedSave.output?.reopened===true)
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
             }
+            const savedOutcome = confirmedSave ?? outcome;
             let normalizedWorkspace = null;
             let workspaceBindingAdvice = null;
-            const saveContinuations = outcome.output?.workflow_continuations
-              ?? outcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
-            if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
-                && outcome.output?.reopened === true
-                && outcome.trace?.some(e => e.event === 'save_continuations_observed' && e.reopened === true && e.native_identity_verified === true)) {
+            const saveContinuations = savedOutcome.output?.workflow_continuations
+              ?? savedOutcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
+            if (savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)
+                && savedOutcome.output?.reopened === true
+                && savedOutcome.trace?.some(e => e.event === 'save_continuations_observed' && e.reopened === true && e.native_identity_verified === true)) {
               const beforeBinding = Object.fromEntries(['workspacePreparation','workspaceReady','targetIdentity','workflowRef']
                 .map(key => [key,session.metadata[key]]));
               const previous = beforeBinding.workspacePreparation?.state;
-              const bindingRequest = {intent:'open_package',package_path:outcome.output.package_ref.path,operation_id:'rest-save-bind-'+randomUUID()};
+              const bindingRequest = {intent:'open_package',package_path:savedOutcome.output.package_ref.path,operation_id:'rest-save-bind-'+randomUUID()};
               try {
                 normalizedWorkspace = await prepareWorkspaceSession({metadata:session.metadata,request:bindingRequest,signal:extra.signal,
                   assertAllowed:() => actionRuntime.assertPreparationAllowed(),
@@ -638,13 +639,13 @@ export async function createBridge(config, session, { browserTransport: managedB
                 normalizedWorkspace = null;
                 const continuation = saveContinuations.find(c => c.document_id === previous?.document_id
                   && c.workflow_ref.workflow_id === previous?.workflow_ref.workflow_id);
-                workspaceBindingAdvice = {kind:'dock_saved_package_workspace',state:'unbound',package_ref:outcome.output.package_ref,
+                workspaceBindingAdvice = {kind:'dock_saved_package_workspace',state:'unbound',package_ref:savedOutcome.output.package_ref,
                   instruction:'Save succeeded. Do not repeat Save. Use dock_prepare existing_workflow to bind the saved workflow before continuing.',
                   next_step:{tool:'dock_prepare',arguments:{intent:'existing_workflow',operation_id:'rest-save-prepare-'+randomUUID(),
                     workflow_ref:{document_id:previous?.document_id,...(continuation?.workflow_ref??previous?.workflow_ref)}}}};
               }
             }
-            if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
+            if (userProfile && savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key))
               for (const continuation of saveContinuations) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
@@ -653,28 +654,28 @@ export async function createBridge(config, session, { browserTransport: managedB
               document_id:normalizedWorkspace.document_id,workflow_ref:normalizedWorkspace.workflow_ref,package_ref:normalizedWorkspace.package_ref,
               instruction:'Save rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(workspaceBindingAdvice)reply.content.push({type:'text',text:JSON.stringify(workspaceBindingAdvice)});
-            if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
+            if(savedOutcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)&&savedOutcome.output?.package_ref?.path){
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
               try{
                 const prepared=session.metadata.workspacePreparation?.state;
                 const options={sessionId:session.metadata.sessionId,documentId:prepared?.document_id,
-                  account:prepared?.loginom_account??config.replayLoginUser,packagePath:outcome.output.package_ref.path,
+                  account:prepared?.loginom_account??config.replayLoginUser,packagePath:savedOutcome.output.package_ref.path,
                   loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
                 const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
-                const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,outcome);
-                await recordExecution({phase:'saved_package_state_observed',operation_id:outcome.operation_id,state,advice});
+                const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,savedOutcome);
+                await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
                 reply.content.push({type:'text',text:JSON.stringify(advice)});
               }catch{
                 // A read failure must not erase the completed save or invite
                 // a retry of an uncertain save gesture.
-                if(recovery.enabled)saveRecoveries.set(outcome.operation_id,{path:outcome.output.package_ref.path,
+                if(recovery.enabled)saveRecoveries.set(savedOutcome.operation_id,{path:savedOutcome.output.package_ref.path,
                   document_id:session.metadata.workspacePreparation?.state?.document_id});
-                reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_state',save_operation_id:outcome.operation_id,
-                  package_path:outcome.output.package_ref.path,modified:null,state:'unavailable',
+                reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_state',save_operation_id:savedOutcome.operation_id,
+                  package_path:savedOutcome.output.package_ref.path,modified:null,state:'unavailable',
                   instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
-                  ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:outcome.operation_id},
+                  ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:savedOutcome.operation_id},
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
               }
             }

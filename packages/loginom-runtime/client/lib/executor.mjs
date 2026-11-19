@@ -1516,7 +1516,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const prefix = await ensureReady();
     const tab = await resolve('workspace.active_tab', {}, { stable: false });
     return { workflow_ref: { ...workflow }, path: normalizedPackagePath(),
-      identity: (await tab.innerText()).trim(), package_identity: await packageIdentity(), graph: await graphSnapshot(prefix) };
+      identity: (await tab.innerText()).trim(), package_identity: await packageIdentity(), graph: await graphSnapshot(prefix),
+      continuations: await packageContinuations(workflow) };
   };
   const verifyReopenedPackage = async before => {
     const prefix = await ensureReady();
@@ -1545,6 +1546,41 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await interact(() => page.keyboard.type(value, { delay: 10 }));
     await interact(timeout => input.press('Tab', { timeout }));
     if (await input.inputValue() !== value) throw new Error('Loginom file name editor did not commit the requested path');
+  };
+  const rebindSavedContinuations = async (before, previous, recovery = false) => {
+    return page.evaluate(({previous,current,path,nativeNodes,binding,recovery})=>{
+      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      if(prep?.document!==document||prep.id!==binding.document_id
+        ||app?.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName!==binding.loginom_account)throw Error('Saved workflow document/account changed');
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+      const tabs=exact(current.tab_tid),card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+      const diagram=card.Controller.FController.FDiagram,graph=exact(current.prefix+';ModelForm;cmpDiagram');
+      const observed=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graph.length!==1||diagram.FmxGraph.container!==graph[0]
+        ||JSON.stringify(observed)!==JSON.stringify(nativeNodes))throw Error('Saved workflow native graph changed');
+      let node=card.Controller.Node.data.node,workflowNode,packageNode;const seen=new Set();
+      while(node&&!seen.has(node)&&seen.size<32){seen.add(node);
+        if(!workflowNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+        if(node instanceof app.PackageTreeNode){packageNode=node;break;}node=node.ParentNode;}
+      if(!workflowNode||!packageNode||'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '')!==path)throw Error('Saved workflow package changed');
+      const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(current.prefix+';cnrNaviMode;b.s_')+']')];
+      const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
+      if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
+      const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
+      const rebound=[];
+      for(const prior of previous){
+        const old=exact(prior.workflow_ref.tab_tid);
+        if(prior.document_id!==prep.id||old.length&&(!recovery||old.length!==1||old[0]!==tabs[0]))throw Error('Saved workflow close was not confirmed');
+        const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
+        if(!records.length)throw Error('Original saved workflow receipt unavailable');
+        for(const r of records){r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
+          delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}
+        rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
+          workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
+      }
+      return rebound;
+    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,recovery});
   };
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
@@ -1782,42 +1818,58 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     // Only our verified Save roundtrip may replace native objects behind an
     // issued logical workflow. Node GUID/type and complete graph checks above
     // preserve source ownership; subsequent operations still observe fresh links.
-    const continuations=await page.evaluate(({previous,current,path,nativeNodes,binding})=>{
-      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
-      if(prep?.document!==document||prep.id!==binding.document_id
-        ||app?.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName!==binding.loginom_account)throw Error('Saved workflow document/account changed');
-      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-      const tabs=exact(current.tab_tid),card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
-      const diagram=card.Controller.FController.FDiagram,graph=exact(current.prefix+';ModelForm;cmpDiagram');
-      const observed=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graph.length!==1||diagram.FmxGraph.container!==graph[0]
-        ||JSON.stringify(observed)!==JSON.stringify(nativeNodes))throw Error('Saved workflow native graph changed');
-      let node=card.Controller.Node.data.node,workflowNode,packageNode;const seen=new Set();
-      while(node&&!seen.has(node)&&seen.size<32){seen.add(node);
-        if(!workflowNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
-        if(node instanceof app.PackageTreeNode){packageNode=node;break;}node=node.ParentNode;}
-      if(!workflowNode||!packageNode||'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '')!==path)throw Error('Saved workflow package changed');
-      const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(current.prefix+';cnrNaviMode;b.s_')+']')];
-      const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
-      if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
-      const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
-      const rebound=[];
-      for(const prior of previous){
-        if(prior.document_id!==prep.id||exact(prior.workflow_ref.tab_tid).length)throw Error('Saved workflow close was not confirmed');
-        const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
-        if(!records.length)throw Error('Original saved workflow receipt unavailable');
-        for(const r of records){r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
-          delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}
-        rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
-          workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
-      }
-      return rebound;
-    },{previous:continuationsBefore,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding});
+    const continuations=await rebindSavedContinuations(before,continuationsBefore);
     record('save_continuations_observed',{continuations,reopened:true,native_identity_verified:true});
     if(normalizeRest)record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
     return keepOpen ? result('SUCCEEDED', { ...verified.output, workflow_preserved: false, save_completed: true,
       persisted_content_verified: false, workflow_continuations: continuations }) : verified;
+  };
+  const reconcilePackageSave = async () => {
+    const before = task.checkpoint, receipt = task.save_receipt, binding = task.storage_binding;
+    if (!binding || receipt?.status !== 'AMBIGUOUS' || receipt.effect_possible !== true
+        || !receipt.trace?.some(e => e.event === 'save_requested' && e.path === before?.path)
+        || !before?.continuations?.length || !Array.isArray(before.package_identity.native_nodes)
+        || before.package_identity.native_nodes.some(n => typeof n[0] !== 'string' || !n[0])
+        || new Set(before.package_identity.native_nodes.map(n => n[0])).size !== before.package_identity.native_nodes.length)
+      return result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'The original Save request and native workflow proof are required; no Save was repeated' });
+    await page.evaluate(b => {
+      const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
+      const c = app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
+      if (location.origin !== b.origin || app?.Version !== b.loginom_build || prep?.document !== document
+          || prep.id !== b.document_id || c?.Connected !== true || c.UserName !== b.loginom_account)
+        throw Error('Saved workflow document/account changed');
+    }, binding);
+    // Only this admitted Save may replace the tab/native objects. Reuse the
+    // normal Save As proof before rebinding any previously issued identities.
+    workflow = null; graphBinding = null;
+    const prefix = await ensureReady(), actual = await packageIdentity(), graph = await graphSnapshot(prefix);
+    const pathMatches = normalizeStoredPath(actual.path) === before.path;
+    const graphMatches = same(graph, before.graph) && same(actual.native_nodes, before.package_identity.native_nodes);
+    record('save_result_observed', { requested_path: before.path, actual_path: normalizeStoredPath(actual.path),
+      path_matches: pathMatches, graph_matches: graphMatches });
+    if (!pathMatches || !graphMatches) {
+      phase = 'verified';
+      return result('NOT_APPLIED', { reason: 'Saved destination or graph does not match the original request' },
+        { code: 'SAVE_RESULT_MISMATCH', message: 'The requested saved result was not confirmed; no Save was repeated' });
+    }
+    if (await resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false })
+        || await resolve('message.text', {}, { cardinality: 'zeroOrOne', stable: false })
+        || await resolve('message.error', {}, { cardinality: 'zeroOrOne', stable: false }))
+      return result('AMBIGUOUS', {}, { code: 'SAVE_UI_UNSETTLED', message: 'The original Save UI is still open; no Save was repeated' });
+    const state = await page.evaluate(readSavedState, { sessionId: binding.session_id, documentId: binding.document_id,
+      account: binding.loginom_account, packagePath: before.path, origin: binding.origin, loginomBuild });
+    if (state.modified !== false)
+      return result('AMBIGUOUS', {}, { code: 'SAVE_RESULT_UNVERIFIED', message: 'The package still has unsaved changes; no Save was repeated' });
+    if (!same(await graphSnapshot(prefix), before.graph)) throw Error('Saved graph changed during reconciliation');
+    const continuations = await rebindSavedContinuations(before, before.continuations, true);
+    const reopened = workflow.tab_tid !== before.workflow_ref.tab_tid;
+    record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
+    phase = 'verified'; effectPossible = true;
+    record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
+    const output = { package_ref: { kind: 'package', path: before.path, active_identity: before.path }, reopened };
+    return result('SUCCEEDED', task.handler === 'packageSaveCheckpoint'
+      ? { ...output, workflow_preserved: !reopened, save_completed: true, persisted_content_verified: false, workflow_continuations: continuations }
+      : output);
   };
   const observe = async () => {
     const prefix = await ensureReady();
@@ -1847,9 +1899,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       nodeAdd: { prepare: nodeCheckpoint, apply: runNodeAdd, reconcile: () => reconcileNode(task.checkpoint) },
       linkCreate: { prepare: linkCheckpoint, apply: runLinkCreate, reconcile: () => reconcileLink(task.checkpoint), recover_link: recoverLink },
       packageSaveCheckpoint: { prepare: packageCheckpoint, apply: () => runPackageSaveAs({ keepOpen: true }),
-        reconcile: () => result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'An open package does not prove completion of an unknown save' }) },
+        reconcile: reconcilePackageSave },
       packageSaveAs: { prepare: packageCheckpoint, apply: runPackageSaveAs,
-        reconcile: () => result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'A lost save response cannot prove close/reopen from a read-only DOM snapshot' }) },
+        reconcile: reconcilePackageSave },
     };
     let outcome;
     try {
@@ -1889,6 +1941,16 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         if (await transientEditor.isVisible()) await transientEditor.press('Escape', { timeout: 3000 });
       });
       if (transientDialog) await cleanup('transient_dialog', async () => {
+        const title = page.locator('[data-tid="msgbox;p.h;p.t"]');
+        if (['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler)
+            && await title.count() === 1 && await title.isVisible()
+            && (await title.innerText()).trim() === 'Восстановление сессии') {
+          // Escape answers No to this native prompt and logs out the account.
+          // Leave it to the original-session guard on the next inspection.
+          outcome.output.connection_recovery_pending = true;
+          record('cleanup_deferred', { resource: 'connection_recovery' });
+          return;
+        }
         await page.keyboard.press('Escape');
         if (['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler)) {
           await poll(async () => !(await resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }))
@@ -1898,7 +1960,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       });
       if (restoreViewport) await cleanup('viewport', restoreViewport);
     }
-    outcome.cleanup_complete = !trace.some(entry => entry.event === 'cleanup_failed');
+    outcome.cleanup_complete = !trace.some(entry => ['cleanup_failed', 'cleanup_deferred'].includes(entry.event));
     return outcome;
   })();
 }
@@ -2175,6 +2237,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
     }
     const mutation = ['apply', 'recover_link'].includes(mode);
+    const saveReconciliation = mode === 'reconcile' && ['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key);
+    if (saveReconciliation) operation.saveReceipt ??= structuredClone(operation.outcome);
     const receipt = mutation ? receiptOptions(operation, receiptId ?? operation.id, operation.action.action_key,
       fingerprint(mode, [operation.action.action_key, operation.parameters, operation.checkpoint])) : {};
     // Recovery receipts retain the original action identity; their storage ID is
@@ -2182,13 +2246,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (mutation) operation.lastReceipt.operation_id = operation.id;
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
+      ...(saveReconciliation ? { save_receipt: operation.saveReceipt } : {}),
       ...(operation.action.effect?.destination_policy==='session_storage'||['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
         ?{storage_binding:getStorageBinding()}:{}),
       ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
         : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
     }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
       ? Math.max(1, Math.min(operation.action.timeout_ms, operation.deadline - now())) + 5000
-      : operation.action.timeout_ms + 5000, ...options });
+      : operation.action.timeout_ms + 5000, ...options, ...(saveReconciliation ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(outcome);
     if (outcome.action_key !== operation.action.action_key || outcome.action_revision !== operation.action.revision) {
       throw new Error('Dock capability outcome identity does not match the pinned action');
@@ -2206,7 +2271,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000 });
+    const value = await execute(code, { timeout: 10000,
+      ...(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key) ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(value);
     const state = value.output;
     if (state?.state === 'completed') {
@@ -2440,7 +2506,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
           && operation.outcome?.error && operation.outcome.output?.cleanup_error)
         return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
-      if (operation.cleanupConfirmed === false) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
+      if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
+          && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
       if (['ui.act','artifact.upload'].includes(operation.action.capability)) {
         await remember(operation, 'reconciled', operation.outcome);
@@ -2451,6 +2518,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const outcome = await invoke(operation, 'reconcile');
       await remember(operation, 'reconciled', outcome);
       operation.outcome = outcome;
+      operation.cleanupConfirmed = outcome.cleanup_complete === true;
       if (outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') {
         pending = null;
         operation.outcome = outcome;

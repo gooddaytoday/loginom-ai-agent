@@ -8,6 +8,80 @@ import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeCapabilityCode} from '../lib/executor.mjs';
 import {activatePreparedWorkflow} from '../lib/node-workflow-activation.mjs';
+import {withStorageIdentity} from '../lib/storage-policy.mjs';
+
+for(const action of ['package.save_checkpoint','package.save_as'])
+for(const fault of ['none','reopened','path','graph','guid','type','account','document','native-session','dirty'])
+test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
+ const page=await restSavePage([fault==='dirty'],false),binding={...page.storageBinding,loginom_build:build};
+ const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
+ connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
+ const engine=runtime(page,{getStorageBinding:()=>binding,
+  execute:(code,options)=>page.execute(withStorageIdentity(code,binding,options?.storageSession))});
+ const path='/user/data/packages/lost-save.lgp',click=page.click.bind(page);
+ page.click=async item=>{
+  await click(item);
+  if(item.symbol==='file_dialog.confirm'&&page.saveWrites===1){
+   // The native application has committed Save As; its response is lost and
+   // the connection prompt replaces the file dialog before the action reads it.
+   page.conflict=true;page.conflictText='Обнаружен разрыв связи. Восстановить сессию?';
+   connection.Connected=false;form.FReconnecting=true;
+  }
+ };
+ const press=page.keyboard.press.bind(page.keyboard);let cancelledRecovery=0,restores=0;
+ page.keyboard.press=async key=>{
+  if(key==='Escape'&&form.FReconnecting){cancelledRecovery++;connection.UserName='';}
+  return press(key);
+ };
+ const locator=page.locator.bind(page);
+ page.locator=query=>{
+  if(query==='[data-tid="msgbox;p.h;p.t"]')return {count:async()=>form.FReconnecting?1:0,isVisible:async()=>form.FReconnecting,
+   innerText:async()=>form.FReconnecting?'Восстановление сессии':'',waitFor:async()=>{}};
+  if(query==='[data-tid="msgbox;cnt"]')return {innerText:async()=>page.conflictText};
+  if(query==='[data-tid="msgbox;tlb;yes"]'&&form.FReconnecting)return {count:async()=>1,isVisible:async()=>true,
+   innerText:async()=>'Восстановить',click:async()=>{restores++;connection.Connected=true;form.FReconnecting=false;page.conflict=false;}};
+  return locator(query);
+ };
+ page.waitForFunction=async fn=>assert.equal(await page.evaluate(fn),true);
+ const stopped=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+ assert.equal(stopped.status,'AMBIGUOUS',JSON.stringify(stopped));
+ assert.equal(cancelledRecovery,0,'cleanup must not cancel the native recovery prompt and log out');
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared'),oldPackage=original.packageNode;
+ if(fault==='reopened'){
+  page.prefix='MF;TF-2';page.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';page.onReopen();
+ }
+ if(fault==='path')page.packagePath='/user/data/packages/other.lgp';
+ if(fault==='graph')page.nodes.pop();
+ if(fault==='guid')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign-guid';
+ if(fault==='type')page.model.FDiagram.FNodes.FCollection[0].FIconCls='foreign-type';
+ if(fault==='account')connection.UserName='foreign-account';
+ if(fault==='document')page.context.__loginomDockPreparationV1.id='foreign-document';
+ if(fault==='native-session')connection.FSession={};
+ const inspected=await engine.inspect({operationId:'lost-save'});
+ const mismatch=['path','graph','guid','type'].includes(fault);
+ const protectedIdentity=['account','document','native-session','dirty'].includes(fault);
+ if(mismatch||protectedIdentity){
+  assert.equal(inspected.output.state,protectedIdentity?'pending':'resolved',JSON.stringify(inspected));
+  assert.equal(inspected.output.outcome.status,protectedIdentity?'AMBIGUOUS':'NOT_APPLIED');
+  if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
+  assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
+  if(fault==='dirty'){
+   connection.Session.IsPackageModified=async()=>false;
+   const settled=await engine.inspect({operationId:'lost-save'});
+   assert.equal(settled.output.state,'resolved',JSON.stringify(settled));
+   assert.equal(settled.output.outcome.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+  }
+  return;
+ }
+ assert.equal(inspected.output.state,'resolved',JSON.stringify(inspected));
+ assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+ assert.equal(inspected.output.outcome.output.package_ref.path,path);
+ assert.equal(page.saveWrites,1);assert.equal(restores,1);
+ assert.equal(page.context.__loginomDockPreparationV1.receipts.get('prepared').packageNode,
+  form.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode);
+ const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+ assert.equal(repeated.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+});
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
