@@ -108,9 +108,37 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const issued=initial.ui.elements.filter(e=>e.tid===initial.workflow_ref?.prefix+suffix);need(issued.length<=1,'Export file row is ambiguous');
  if(issued.length){const found=await read({root_ref:issued[0].ref,storage_name:name});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
  let s=await table();bind(s);
+ // Loginom 7.4.2 Files has no name filter (LAB-1872). Approach the target's
+ // native place without the per-step row lookup: each gesture is issued from
+ // the previous gesture's own settled post-scroll observation (or one roots +
+ // table read when it is unsettled) until its file rows reach the target name.
+ // The search below then reads there and, on a miss, still covers both
+ // directions before folder_end. The approach shares its gesture budget.
+ let jumps=0;
+ for(let j=s,dir=null,top=null;jumps<EXPORT_SEARCH_SCROLLS;){
+  guard();
+  // The target already rendered in this observation: inspect it below.
+  if(j.ui.elements.some(e=>e.tid===j.workflow_ref?.prefix+suffix))break;
+  const anchors=j.ui.elements.filter(e=>e.tid?.startsWith(j.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions?.includes('scroll')&&e.interaction?.state==='point_observed');
+  const files=j.ui.elements.filter(r=>r.tid?.startsWith(j.workflow_ref.prefix+';FileStorageForm;colName_')&&r.storage_entry?.kind==='file'&&typeof r.label==='string');
+  if(!anchors.length||!files.length)break;
+  const e=anchors[0],scroll=e.scroll;
+  need(anchors.every(a=>a.scroll.ref===scroll.ref),'Export search scroll owner ambiguous');
+  if(top!==null)need(dir==='up'?scroll.top<top:scroll.top>top,'Export search scroll did not advance');
+  const below=NATIVE_FILE_ORDER.compare(name,files.at(-1).label)>0,above=NATIVE_FILE_ORDER.compare(name,files[0].label)<0;
+  dir??=below?'down':above?'up':null;
+  if(dir==='down'?!below||scroll.top>=scroll.max_top:dir!=='up'||!above||scroll.top===0)break;
+  top=scroll.top;jumps++;
+  const next=await act(j,e,'scroll',{delta_y:dir==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top)});
+  // A settled post-scroll observation issues the next gesture; otherwise
+  // (rows not yet hit-testable, or no observation) read roots and the table.
+  if(next?.ui?.elements){bind(next);need(next.dom_epoch?.document===s.dom_epoch?.document,'Export search owner changed');}
+  const settled=next?.ui?.elements?.some(e=>e.tid?.startsWith(next.workflow_ref?.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions?.includes('scroll')&&e.interaction?.state==='point_observed');
+  j=settled?next:await table();bind(j);
+ }
  // Shared storage folders grow with every export; t11 needed ~19600 px.
  // The operation deadline still bounds the whole search through guard().
- for(let step=0;step<=EXPORT_SEARCH_SCROLLS;step++){
+ for(let step=jumps;step<=EXPORT_SEARCH_SCROLLS;step++){
   guard();
   const r=await read({discover_roots:true,storage_name:name});
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
@@ -233,7 +261,8 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    return;
   }
   need(r.status==='SUCCEEDED'&&!uncertain,'Export storage gesture requires inspection');
-  return;
+  // A confirmed scroll's own observation issues the next search gesture (LAB-1872).
+  return verb==='scroll'&&r.output?.ui&&quiet(r.output)?r.output:undefined;
   }
  };
  const inDirectory=(expected,previous)=>ready(async()=>{const r=await roots(),e=r.ui.elements.find(e=>e.tid===r.workflow_ref?.prefix+';NavigationBar;NavigationPanel');return e?read({root_ref:e.ref}):r;},s=>s.file_storage?.status==='observed'

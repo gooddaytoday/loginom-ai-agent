@@ -2872,8 +2872,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         : operation.outcome?.resolution ? 'observed_unverified' : 'verified',
       ...recoveryAdvice(operation),
     } });
-  const retainObservation = outcome => {
-    try { return observations.retain(outcome); }
+  const retainObservation = (outcome, options) => {
+    try { return observations.retain(outcome, options); }
     catch {
       // Delivery failure after a gesture must not become a pre-action rejection.
       // The immutable browser receipt remains in the journal/operation record.
@@ -3043,9 +3043,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Scrolling detaches virtual rows. Preserve the original grid root
           // so the post-gesture observation can confirm this one scroll.
           if(verb==='scroll'){
-            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            // Retained whole, like its reads (LAB-1843): the settled in-view rows
+            // that issue the next gesture follow the buffer rows above them.
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline,whole:true});
             if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
-            return;
+            // Its retained post-scroll observation issues the next gesture (LAB-1872).
+            return result.output;
           }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
@@ -3419,7 +3422,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       outcome.output.operation = view(pending).output;
       return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope, whole:whole===true }) : observations.next(cursor, outcome);
     },
-    async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt } = {}) {
+    // `whole` is internal (storage navigation); dock_ui_action never passes it.
+    async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt, whole = false } = {}) {
       signal?.throwIfAborted(); checkId(operationId);
       const signature = fingerprint('ui.act', [observationId, action, recoveryOperationId ?? null]);
       if (auxiliary.has(operationId)) {
@@ -3514,7 +3518,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const resolved = await reconcilePending();
           outcome.output.recovery = view(original, resolved).output;
         } else if (!original && !owner.transportUncertain && owner.cleanupConfirmed && outcome.status !== 'AMBIGUOUS') pending = null;
-        outcome = retainObservation(outcome);
+        outcome = retainObservation(outcome, whole ? { whole: true } : undefined);
         auxiliary.set(operationId, { signature, outcome: structuredClone(outcome) });
         return outcome;
       } finally { running = false; }
