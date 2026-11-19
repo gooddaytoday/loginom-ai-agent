@@ -195,9 +195,22 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  }
  if(error)throw error;
  // A new far-away position has no drawing to extend native scroll bounds.
- // Loginom binds right-drag to canvas navigation even in cursor mode. Pan the
- // view through an empty owned canvas point, retaining every graph setting.
- for(let pans=0;!within(view,point)&&pans<12;pans++){
+ // Enable Loginom's navigation mode through its toolbar, pan through an empty
+ // owned canvas point, then restore cursor mode without changing graph data.
+ let panModeChanged=false;
+ const panMode=()=>root.evaluate(e=>{
+  const g=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram?.FmxGraph;
+  if(g?.container!==e||typeof g.panningHandler?.panningEnabled!=='boolean')throw Error('Native pan mode unavailable');
+  return g.panningHandler.panningEnabled;
+ });
+ const setPanMode=async enabled=>{
+  const button=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;'+(enabled?'btnHand':'btnCursor'))+']');
+  await guard();remaining();
+  if(await button.count()!==1||!await button.isVisible()||!await button.isEnabled())throw Error('Native pan mode button unavailable');
+  await gesture(()=>button.click({timeout:remaining()}),enabled?'pan_mode_on':'pan_mode_restore');
+  await guard();if(await panMode()!==enabled)throw Error('Native pan mode did not settle');
+ };
+ try{for(let pans=0;!within(view,point)&&pans<12;pans++){
   await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
   if(within(view,point))break;
   const b=nodeId===undefined?{...point,width:0,height:0}:view.node_bounds;
@@ -224,6 +237,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    return best;
   },{v:view,delta});
   if(!plan?.from||!plan?.to)break;
+  if(await panMode()===false){panModeChanged=true;await setPanMode(true);}
   await guard();const before=view;
   await gesture(async()=>{
    try{await page.mouse.move(plan.from.x,plan.from.y);await page.mouse.down({button:'right'});
@@ -235,7 +249,9 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   catch(e){e.placement_navigation_unverified=true;throw e;}
   if(view.translate.x===before.translate.x&&view.translate.y===before.translate.y
    &&view.scroll.x===before.scroll.x&&view.scroll.y===before.scroll.y)break;
- }
+ }}catch(e){error=e;}
+ finally{if(panModeChanged){try{await setPanMode(false);}catch(e){e.placement_navigation_unverified=true;error=e;}}}
+ if(error)throw error;
  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
  return {view,point,zoom_steps:steps,outline_closed:opened,fully_visible:within(view,point),navigation_steps:navigationSteps};
 }

@@ -20,6 +20,7 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
    #cover{position:absolute;left:324px;top:794px;width:955px;height:5px;z-index:2}#cover div{width:100%;height:100%}
    #outline{position:absolute;left:350px;top:150px}#palette{position:absolute;left:20px;top:300px;width:100px;height:20px}</style>
    <button data-tid="MF;TF-1;ModelForm;btnShowOutline" onclick="document.querySelector('#outline').hidden=!document.querySelector('#outline').hidden">outline</button>
+   <button id="hand" data-tid="MF;TF-1;ModelForm;btnHand">navigation</button><button id="cursor" data-tid="MF;TF-1;ModelForm;btnCursor">cursor</button>
    <div id="tab" class="x-tab-active" data-tid="tab">workflow</div>
    <div id="palette" data-tid="MF;TF-1;ModelForm;colVendors_Компоненты>Data>Calculator;TreeText">Calculator</div>
    <div style="width:1280px;height:800px" data-tid="MF;TF-1;ModelForm;cntDiagram"><div id="graph" data-tid="MF;TF-1;ModelForm;cmpDiagram"><svg style="width:100%;height:100%;display:block"></svg></div>
@@ -40,10 +41,12 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
    if(cover==='dialog'){const e=document.querySelector('#cover');e.setAttribute('role','dialog');e.style.top='700px';e.style.height='100px';}
    if(cover.startsWith('small_pan')){
     const graph=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph;
-    graph.panningHandler={ignoreCell:true,useLeftButtonForPanning:true,isForcePanningEvent:()=>true};
+    graph.panningHandler={ignoreCell:true,useLeftButtonForPanning:true,isForcePanningEvent:()=>true,panningEnabled:false};
     graph.getCellAt=()=>null;
+    document.querySelector('#hand').addEventListener('click',()=>{graph.panningHandler.panningEnabled=true;});
+    document.querySelector('#cursor').addEventListener('click',()=>{graph.panningHandler.panningEnabled=false;});
     let pan;
-    canvas.addEventListener('mousedown',e=>{if(e.button===2)pan={x:e.x,y:e.y,tx:view.translate.x,ty:view.translate.y};});
+    canvas.addEventListener('mousedown',e=>{if(e.button===2&&graph.panningHandler.panningEnabled)pan={x:e.x,y:e.y,tx:view.translate.x,ty:view.translate.y};});
     document.addEventListener('mousemove',e=>{if(pan){view.translate.x=pan.tx+(e.x-pan.x)/view.scale;view.translate.y=pan.ty+(e.y-pan.y)/view.scale;}});
     document.addEventListener('mouseup',()=>{pan=null;});
     if(cover==='small_pan_foreign'){const e=document.querySelector('#cover');e.setAttribute('role','dialog');e.style.top='100px';e.style.height='527px';document.querySelector('#outline').style.zIndex='3';}
@@ -98,7 +101,10 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
    assert.deepEqual(result.after.nodes[0].position,position);
    assert.deepEqual(nodePlacementPosition(result.placement_navigation.view,result.placement_navigation.point),position);
    assert.equal(result.placement_navigation.node_visibility.fully_visible,true);
-   if(small)assert.ok(result.placement_navigation.navigation_steps.some(s=>s.action==='pan'));
+   if(small){
+    assert.ok(result.placement_navigation.navigation_steps.some(s=>s.action==='pan'));
+    assert.equal(await page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.panningHandler.panningEnabled),false);
+   }
    else assert.ok(result.placement_navigation.node_visibility.navigation_steps.some(s=>s.action==='scroll'));
   }
  }finally{await browser.close();}
