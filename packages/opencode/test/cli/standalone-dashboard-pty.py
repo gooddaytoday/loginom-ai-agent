@@ -2,6 +2,7 @@ import fcntl
 import json
 import os
 import pty
+import re
 import selectors
 import signal
 import subprocess
@@ -9,7 +10,7 @@ import sys
 import termios
 import time
 
-choice, *command = sys.argv[1:]
+choice, queued, *command = sys.argv[1:]
 master, slave = pty.openpty()
 piped = choice in ("no-tty", "pipe-delete")
 
@@ -25,8 +26,11 @@ child = subprocess.Popen(
 os.close(slave)
 output = {"stdout": bytearray(), "stderr": bytearray()}
 cwd = None
+phrase = None
 
 try:
+    if queued:
+        os.write(master, (queued + "\n").encode())
     if piped:
         child.stdin.write("Удалить\n".encode())
         child.stdin.close()
@@ -41,17 +45,22 @@ try:
                     selector.unregister(key.fileobj)
                     continue
                 output[key.data].extend(chunk)
-                if cwd is None and 'Введите «Удалить»'.encode() in output["stderr"]:
+                if cwd is None:
+                    prompt = re.search(r'Введите «(Удалить [0-9a-f]{8})»', output["stderr"].decode(errors="ignore"))
+                    if prompt is None:
+                        continue
+                    phrase = prompt[1]
                     cwd = os.readlink(f"/proc/{child.pid}/cwd")
                     answers = {
-                        "delete": "Удалить\n", "pipe-delete": "Удалить\n", "cancel": "Отмена\n",
-                        "eof": "\x04", "interrupt": "\x03", "incomplete": "Удалить\x04",
+                        "delete": phrase + "\n", "pipe-delete": phrase + "\n", "cancel": "Отмена\n",
+                        "eof": "\x04", "interrupt": "\x03", "incomplete": phrase + "\x04",
                     }
-                    os.write(master, answers[choice].encode())
+                    if choice in answers:
+                        os.write(master, answers[choice].encode())
             if time.monotonic() >= deadline:
-                raise TimeoutError(output)
+                raise TimeoutError(choice, output)
     exit_code = child.wait(timeout=2)
-    print(json.dumps({**{key: value.decode() for key, value in output.items()}, "cwd": cwd, "exit": exit_code}))
+    print(json.dumps({**{key: value.decode() for key, value in output.items()}, "cwd": cwd, "phrase": phrase, "exit": exit_code}))
 finally:
     if child.poll() is None:
         os.killpg(child.pid, signal.SIGKILL)

@@ -49,7 +49,7 @@ export const DashboardPublishTool = Tool.define(
           const resources = dashboardResources(flags.loginomResources)
           const work = yield* Effect.promise(() => realpath(session.directory))
           const result = yield* Effect.acquireUseRelease(
-            Effect.promise(() => mkdtemp(join(work, "../control/.publish-"))),
+            Effect.promise(() => mkdtemp(join(work, "../../.publish-"))),
             operation => Effect.gen(function* () {
               const prepared = yield* Effect.uninterruptible(Effect.promise(() =>
                 preparePublish({ work, operation, resources, signal: ctx.abort }),

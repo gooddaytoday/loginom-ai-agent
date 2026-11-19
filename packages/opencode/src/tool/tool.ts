@@ -40,6 +40,7 @@ export type Context<M extends Metadata = Metadata> = {
   agent: string
   abort: AbortSignal
   callID?: string
+  dashboardWork?: string
   extra?: { [key: string]: unknown }
   messages: SessionV1.WithParts[]
   /** Supplied only to the backend-owned skill implementation. */

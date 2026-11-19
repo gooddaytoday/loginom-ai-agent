@@ -398,13 +398,16 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
   const deleteWork = join(fixture.profile, "data/dashboards", "delete-" + (await bindingKey(deleteBinding)).slice(0, 8), "work")
   const operations = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
   let deletions = 0
+  let previousPhrase = ""
   for (const [choice, auto] of [
+    ["pretyped", ""],
     ["cancel", "--auto"],
     ["eof", "--yolo"],
     ["incomplete", "--dangerously-skip-permissions"],
     ["interrupt", ""],
     ["no-tty", "--auto"],
     ["delete", ""],
+    ["stale", ""],
     ["pipe-delete", ""],
   ] as const) {
     const success = choice === "delete" || choice === "pipe-delete"
@@ -423,7 +426,8 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
       ...(auto ? [auto] : []), "--", "Удали дашборд.",
     ], undefined, false)
     const args = human ? command.argv.filter(arg => arg !== "--format=json") : command.argv
-    const child = Bun.spawn(["python3", join(import.meta.dir, "standalone-dashboard-pty.py"), choice, ...args], {
+    const queued = choice === "pretyped" ? "Удалить" : choice === "stale" ? previousPhrase : ""
+    const child = Bun.spawn(["python3", join(import.meta.dir, "standalone-dashboard-pty.py"), choice, queued, ...args], {
       cwd: command.cwd, env: command.env, stdout: "pipe", stderr: "inherit",
     })
     const [output, code] = await Promise.all([new Response(child.stdout).json(), child.exited])
@@ -454,7 +458,9 @@ test.skipIf(process.platform !== "linux")("ordinary dashboard run waits for a se
         type: "error", error: expect.objectContaining({ name: choice === "interrupt" ? "CLI_CANCELLED" : "CLI_PERMISSION_REJECTED" }),
       }))
     }
+    if (choice === "stale") expect(output.phrase).not.toBe(previousPhrase)
     if (success) {
+      previousPhrase = output.phrase
       deletions++
       expect(await provider.runPromise(llm.calls)).toBe(1)
     }

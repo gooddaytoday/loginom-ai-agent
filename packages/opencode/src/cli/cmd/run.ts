@@ -22,6 +22,7 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
 import { stat } from "node:fs/promises"
+import { randomBytes } from "node:crypto"
 import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Cause, Effect, Exit } from "effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -914,9 +915,10 @@ export const RunCommand = effectCmd({
               if (permission.permission === "dashboard_delete") {
                 const confirmationSignal = standaloneCancellation()
                 const replySignal = confirmationSignal ? AbortSignal.any([confirmationSignal, signal]) : signal
+                const choice = "Удалить " + randomBytes(4).toString("hex")
                 const once = await readTerminalConfirmation(
-                  [...dashboardDeletionLines(permission), "Введите «Удалить» для подтверждения или «Отмена» для отказа.", ""].join(EOL),
-                  "Удалить",
+                  [...dashboardDeletionLines(permission), `Введите «${choice}» для подтверждения или «Отмена» для отказа.`, ""].join(EOL),
+                  choice,
                   replySignal,
                 )
                 await client.permission.reply({

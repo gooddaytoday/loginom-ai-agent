@@ -1,4 +1,6 @@
 import path from "path"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { withSnapshot } from "@loginom-ai-agent/dashboard/agent/folder"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { DashboardSession } from "@/product/dashboard-session"
 import { Effect } from "effect"
@@ -56,6 +58,24 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   })
   return true
 })
+
+export function workspaceWriter(fs: FSUtil.Interface, ctx: Tool.Context, directory: string) {
+  const work = ctx.dashboardWork ?? (DashboardSession.isDashboardWork(directory) ? directory : undefined)
+  if (!work) return fs.writeWithDirs
+  return (file: string, content: string | Uint8Array) => Effect.sync(() => {
+    if (!DashboardSession.isDashboardWork(work)) throw Error("LOGINOM_SCOPE_DENIED")
+    // The deletion can detach this folder while the edit permission is pending.
+    withSnapshot(work, current => {
+      if (!DashboardSession.isDashboardWork(current)) throw Error("LOGINOM_SCOPE_DENIED")
+      const denied = DashboardSession.dashboardPathError(current, file, true)
+      if (denied) throw new PermissionV1.DeniedError({
+        ruleset: [{ permission: "dashboard_path", pattern: denied, action: "deny" }],
+      })
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, content)
+    })
+  })
+}
 
 export async function assertExternalDirectory(ctx: Tool.Context, target?: string, options?: Options) {
   return Effect.runPromise(assertExternalDirectoryEffect(ctx, target, options))

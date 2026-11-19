@@ -15,9 +15,9 @@ import { AppProcess } from "@opencode-ai/core/process"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import type { DashboardBinding } from "@loginom-ai-agent/loginom-host/dashboard"
 import { createHash } from "node:crypto"
-import { join, resolve } from "node:path"
-import { mkdir, readdir, rm, symlink } from "node:fs/promises"
-import { prepareDashboard, readDashboardSnapshot } from "@loginom-ai-agent/dashboard/agent/folder"
+import { dirname, join, resolve } from "node:path"
+import { lstat, mkdir, readdir, rm, symlink } from "node:fs/promises"
+import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
 import { draftServer } from "@loginom-ai-agent/dashboard/draft/server"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { Config } from "@/config/config"
@@ -220,7 +220,7 @@ for (const reply of ["reject", "abort", "once"] as const) {
       expect(lookups).toEqual(reply === "once" ? [{ ...binding.binding, publication: publicationName }] : [])
       expect((yield* permissions.list()).filter(item => item.sessionID === session.id)).toEqual([])
       expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(reply !== "once")
-      expect((yield* Effect.promise(() => readdir(join(folder.work, "../control")))).filter(item => item.startsWith(".publish-"))).toEqual([])
+      expect((yield* Effect.promise(() => readdir(join(folder.work, "../..")))).filter(item => item.startsWith(".publish-"))).toEqual([])
     }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
   }), 20_000)
 }
@@ -243,6 +243,32 @@ const deletionSession = Effect.fn(function* (work: string) {
   })).pipe(Effect.exit, Effect.forkScoped)
   return { session, permissions, nextRequest, start }
 })
+
+it.instance("an approved edit cannot recreate a dashboard deleted while it awaited permission", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const root = dashboardDataRoot(process.env)
+  const captured = yield* Effect.promise(() => readDashboardBinding(folder.work, root))
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const permissions = yield* Permission.Service
+    const session = yield* sessions.create({ permission: Permission.fromConfig({ "*": "allow", edit: "ask" }) })
+    const execute = (yield* dashboardTools(session, folder.work)).write?.execute
+    if (!execute) throw Error("write unavailable")
+    const writing = yield* Effect.promise(() => execute({ filePath: "src/new/draft.ts", content: "export {}" }, {
+      toolCallId: "write", abortSignal: new AbortController().signal, messages: [],
+    })).pipe(Effect.exit, Effect.forkScoped)
+    const request = yield* pollWithTimeout(
+      permissions.list().pipe(Effect.map(items => items.find(item => item.sessionID === session.id && item.permission === "edit"))),
+      "missing edit permission",
+    )
+    removeDashboard(folder.work, root, captured)
+    yield* permissions.reply({ requestID: request.id, reply: "once" })
+    const exit = yield* Fiber.join(writing)
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+    expect(yield* Effect.promise(() => lstat(dirname(folder.work)).catch(error => error.code))).toBe("ENOENT")
+  }).pipe(provideInstance(folder.work))
+}))
 
 const deletionVersion = { name: publicationName, sourceHash: "a".repeat(64) }
 
@@ -548,17 +574,20 @@ it.instance("interruption joins an active publication build before removing its 
       sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
       abort: new AbortController().signal, metadata: () => Effect.void, ask: () => Effect.never,
     }).pipe(Effect.forkScoped)
-    const control = join(folder.work, "../control")
-    const draft = join(control, "draft")
-    yield* pollWithTimeout(Effect.promise(async () => {
-      const pending = (await readdir(draft).catch(() => [])).find(name => name.startsWith(".pending-"))
-      if (pending) return (await readdir(join(draft, pending)).catch(() => [])).find(name => name.startsWith(".build-"))
+    const root = join(folder.work, "../..")
+    const draft = join(folder.work, "../control/draft")
+    const operation = yield* pollWithTimeout(Effect.promise(async () => {
+      for (const name of (await readdir(root)).filter(name => name.startsWith(".publish-"))) {
+        const path = join(root, name)
+        const pending = (await readdir(path).catch(() => [])).find(name => name.startsWith(".pending-"))
+        if (pending && (await readdir(join(path, pending)).catch(() => [])).some(name => name.startsWith(".build-")))
+          return path
+      }
     }), "publication never entered the filesystem build")
     yield* Fiber.interrupt(fiber)
     const hash = (yield* Effect.promise(() => Bun.file(join(draft, "current")).text())).trim()
     expect(hash).toMatch(/^[a-f0-9]{64}$/)
-    expect((yield* Effect.promise(() => readdir(draft))).filter(name => /^\.(pending|build)-/.test(name))).toEqual([])
-    expect((yield* Effect.promise(() => readdir(control))).filter(name => name.startsWith(".publish-"))).toEqual([])
+    expect(yield* Effect.promise(() => readdir(operation).then(() => true, () => false))).toBe(false)
     expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
 }))

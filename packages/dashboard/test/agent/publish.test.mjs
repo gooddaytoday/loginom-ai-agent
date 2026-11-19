@@ -5,13 +5,13 @@ import { syncBuiltinESMExports } from "node:module"
 import { once } from "node:events"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { basename, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import test from "node:test"
 import { setTimeout } from "node:timers/promises"
 import { buildDashboard } from "../../src/agent/build.ts"
 import { treeHash } from "../../src/builder/build.ts"
 import { NO_SAMPLE } from "../../src/agent/draft.ts"
-import { prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
+import { prepareDashboard, readDashboardBinding, readDashboardSnapshot, removeDashboard } from "../../src/agent/folder.ts"
 import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/publish.ts"
 import { dashboardServer } from "../../src/web/server.ts"
 
@@ -42,7 +42,7 @@ async function fixture(t) {
     return prepareDashboard({ readPublication: async () => null, id, origin, dashboards: join(root, "dashboards"), template: resources.template })
   }
   const work = (await refresh()).directory
-  const operation = await mkdtemp(join(work, "../control/.publish-"))
+  const operation = await mkdtemp(join(work, "../../.publish-"))
   return { work, resources, operation, builds, server, refresh, lookup: () => post("lookup", binding).then(response => response.json()) }
 }
 
@@ -175,6 +175,37 @@ test("approved sources survive concurrent draft installation and later pruning",
   assert.equal(transferredContent, prepared.publication.content)
   assert.equal(result.status, "pending")
   assert.ok(await readFile(join(input.work, "sample.json")))
+})
+
+test("concurrent publication preparation cannot block reopening a deleted dashboard", { timeout: 15_000 }, async t => {
+  for (const part of ["publication operation", "retained local build"]) {
+    await t.test(part, async t => {
+      const input = await fixture(t)
+      const root = dirname(dirname(input.work))
+      const captured = await readDashboardBinding(input.work, root)
+      const blocked = part === "publication operation" ? input.operation : join(input.work, "../control/draft")
+      const mkdir = fs.mkdir
+      const preparing = Promise.withResolvers()
+      const resume = Promise.withResolvers()
+      t.mock.method(fs, "mkdir", async (path, options) => {
+        if (path === blocked) {
+          preparing.resolve()
+          await resume.promise
+        }
+        return mkdir(path, options)
+      })
+      syncBuiltinESMExports()
+      t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+
+      const pending = preparePublish(input)
+      await Promise.race([preparing.promise, pending.then(result => assert.fail(JSON.stringify(result)))])
+      removeDashboard(input.work, root, captured)
+      resume.resolve()
+      assert.equal(await pending.then(result => result.ok, () => false), false)
+      await rm(input.operation, { recursive: true, force: true })
+      assert.equal((await input.refresh()).fresh, true)
+    })
+  }
 })
 
 test("missing sample stops preparation before building", async t => {
