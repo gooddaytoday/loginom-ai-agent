@@ -80,6 +80,8 @@ N и типы — из порта. По умолчанию без скачива
 обычный импорт по его `server_source_ref`; 2–16 файлов одной структуры — один
 `imports.text` на папку с маской: [список файлов](references/nodes/imports.text.md#file-list).
 Поля, типы и число строк каждого импорта бери из readback и порта.
+Before Export/report compare port types with task/source values: decimals must be real, not numeric strings.
+Preview can infer string from a NULL token; set null_marker, fix SAME Import `settings.columns`, reread types/values/NULL.
 
 При ошибке локального файла сообщи причину и путь из результата инструмента.
 Только при отклонённом запросе разрешения добавляй: «приложите файл — `--file`
