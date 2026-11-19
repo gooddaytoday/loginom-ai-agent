@@ -1461,6 +1461,68 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     }
     return [...result.values()];
   },binding);
+  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
+      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      if(!binding)return [];
+      const pending=prep?.savedPackageReopen;
+      if(mode==='recover'){
+        if(!pending)return [];
+        if(JSON.stringify(binding)!==JSON.stringify(pending.binding)||path!==pending.path
+          ||current.tab_tid!==pending.current.tab_tid||current.prefix!==pending.current.prefix)
+          throw Error('Saved reopen binding changed');
+        previous=pending.previous;nativeNodes=pending.nativeNodes;
+      }
+      if(location.origin!==binding.origin||prep?.document!==document||prep.id!==binding.document_id
+        ||app?.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName!==binding.loginom_account)throw Error('Saved workflow document/account changed');
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+      const tabs=exact(current.tab_tid),card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+      const diagram=card.Controller.FController.FDiagram,graph=exact(current.prefix+';ModelForm;cmpDiagram');
+      const observed=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graph.length!==1||diagram.FmxGraph.container!==graph[0]
+        ||JSON.stringify(observed)!==JSON.stringify(nativeNodes))throw Error('Saved workflow native graph changed');
+      let node=card.Controller.Node.data.node,workflowNode,packageNode;const seen=new Set();
+      while(node&&!seen.has(node)&&seen.size<32){seen.add(node);
+        if(!workflowNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+        if(node instanceof app.PackageTreeNode){packageNode=node;break;}node=node.ParentNode;}
+      if(!workflowNode||!packageNode||'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '')!==path)throw Error('Saved workflow package changed');
+      const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(current.prefix+';cnrNaviMode;b.s_')+']')];
+      const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
+      if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
+      const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
+      const connection=app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+      if(mode==='remember'&&(!connection.Session||connection.Connected!==true))throw Error('Saved reopen session unavailable');
+      if(mode==='recover'&&(pending.packageNode!==packageNode||pending.workflowNode!==workflowNode
+        ||pending.tab!==tabs[0]||pending.connection!==connection||pending.serverSession!==connection.Session
+        ||pending.records.some(p=>![...prep.receipts.values()].includes(p.record)||p.record.tab!==p.tab
+          ||p.record.packageNode!==p.packageNode||p.record.request!==p.request
+          ||p.record.nodeTargetWorkflowNode!==p.workflowNode)))throw Error('Saved reopen native owner changed');
+      const recordsBefore=[];
+      for(const prior of previous){
+        if(prior.document_id!==prep.id||exact(prior.workflow_ref.tab_tid).length)throw Error('Saved workflow close was not confirmed');
+        const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
+        if(!records.length||records.some(r=>JSON.parse(r.request).session!==binding.session_id))throw Error('Original saved workflow receipt unavailable');
+        if(mode==='recover'&&records.some(r=>!pending.records.some(p=>p.record===r)))throw Error('Saved reopen receipt inventory changed');
+        for(const record of records)recordsBefore.push({record,tab:record.tab,packageNode:record.packageNode,request:record.request,workflowNode:record.nodeTargetWorkflowNode});
+      }
+      if(mode==='remember'){
+        // Evidence only: an ambiguous Save cannot transfer the issued ownership.
+        prep.savedPackageReopen={previous,current,path,nativeNodes,binding,packageNode,workflowNode,tab:tabs[0],
+          connection,serverSession:connection.Session,records:recordsBefore};
+        return [];
+      }
+      const rebound=[];
+      for(const prior of previous){
+        for(const {record:r} of recordsBefore.filter(p=>p.record.workflowId===prior.workflow_ref.workflow_id)){
+          r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
+          delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}
+        rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
+          workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
+      }
+      delete prep.savedPackageReopen;
+      return rebound;
+    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode});
+
   const refreshSavedNavigation = async current => {
     const crumbs=current.workflow_ref.navigation_path, binding=current.workflow_ref;
     const parent=crumbs.at(-2),last=crumbs.at(-1);
@@ -1678,6 +1740,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         graph_matches: graphMatches, graph });
       if (!workflowMatches || !pathMatches || !graphMatches)
         return result('AMBIGUOUS', { reason: 'Saved destination, workflow or graph changed' });
+      let recovered=[];
+      try { recovered=await bindSavedContinuations(before,[],'recover'); }
+      catch { record('saved_reopen_recovery_refused'); }
       let continuationsAfter = await packageContinuations(before.workflow_ref);
       if(continuationsBefore.length && continuationsAfter.length
           && !same(continuationsBefore[0].workflow_ref.navigation_path,continuationsAfter[0].workflow_ref.navigation_path)) {
@@ -1688,9 +1753,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       const identity = value => ({document_id:value.document_id,workflow_id:value.workflow_ref.workflow_id,
         tab_tid:value.workflow_ref.tab_tid,prefix:value.workflow_ref.prefix});
-      if(!same(continuationsBefore.map(identity),continuationsAfter.map(identity)))throw new Error('Saved continuation identities changed');
-      const continuations=continuationsAfter.map((value,i)=>({...value,previous_workflow_ref:continuationsBefore[i].workflow_ref}));
-      record('save_continuations_observed', { continuations });
+      if(!recovered.length&&!same(continuationsBefore.map(identity),continuationsAfter.map(identity)))throw new Error('Saved continuation identities changed');
+      const continuations=recovered.length?recovered:continuationsAfter.map((value,i)=>({...value,previous_workflow_ref:continuationsBefore[i].workflow_ref}));
+      record('save_continuations_observed', { continuations,...(recovered.length?{recovered_reopen:true,native_identity_verified:true}:{}) });
       transientDialog = false; phase = 'verified';
       record('postcondition_verified', { proof: 'awaited_save_flow_same_open_workflow', package_path: actualPath,
         workflow_ref: workflow, graph, reopened: false, persisted_content_verified: false });
@@ -1747,6 +1812,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await waitForNoMask(60000);
     transientDialog = false;
     const verified = await verifyReopenedPackage(before);
+    // Keep the native relationship even if graph verification or normalization
+    // subsequently remains ambiguous. It authorizes no action until another Save.
+    if(continuationsBefore.length)try { await bindSavedContinuations(before,continuationsBefore,'remember'); }
+    catch { record('saved_reopen_binding_refused'); }
     if (verified.status !== 'SUCCEEDED' || !continuationsBefore.length || !normalizeRest&&!task.storage_binding) return verified;
     let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
     if(normalizeRest)try {
@@ -1782,38 +1851,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     // Only our verified Save roundtrip may replace native objects behind an
     // issued logical workflow. Node GUID/type and complete graph checks above
     // preserve source ownership; subsequent operations still observe fresh links.
-    const continuations=await page.evaluate(({previous,current,path,nativeNodes,binding})=>{
-      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
-      if(prep?.document!==document||prep.id!==binding.document_id
-        ||app?.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName!==binding.loginom_account)throw Error('Saved workflow document/account changed');
-      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-      const tabs=exact(current.tab_tid),card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
-      const diagram=card.Controller.FController.FDiagram,graph=exact(current.prefix+';ModelForm;cmpDiagram');
-      const observed=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graph.length!==1||diagram.FmxGraph.container!==graph[0]
-        ||JSON.stringify(observed)!==JSON.stringify(nativeNodes))throw Error('Saved workflow native graph changed');
-      let node=card.Controller.Node.data.node,workflowNode,packageNode;const seen=new Set();
-      while(node&&!seen.has(node)&&seen.size<32){seen.add(node);
-        if(!workflowNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
-        if(node instanceof app.PackageTreeNode){packageNode=node;break;}node=node.ParentNode;}
-      if(!workflowNode||!packageNode||'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '')!==path)throw Error('Saved workflow package changed');
-      const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(current.prefix+';cnrNaviMode;b.s_')+']')];
-      const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
-      if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
-      const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
-      const rebound=[];
-      for(const prior of previous){
-        if(prior.document_id!==prep.id||exact(prior.workflow_ref.tab_tid).length)throw Error('Saved workflow close was not confirmed');
-        const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
-        if(!records.length)throw Error('Original saved workflow receipt unavailable');
-        for(const r of records){r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
-          delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}
-        rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
-          workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
-      }
-      return rebound;
-    },{previous:continuationsBefore,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding});
+    const continuations=await bindSavedContinuations(before,continuationsBefore,'rebind');
     record('save_continuations_observed',{continuations,reopened:true,native_identity_verified:true});
     if(normalizeRest)record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
     return keepOpen ? result('SUCCEEDED', { ...verified.output, workflow_preserved: false, save_completed: true,
