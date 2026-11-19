@@ -255,8 +255,15 @@ stock=$bundle/$enterprise
 export no_proxy="${no_proxy:-${NO_PROXY:-}},127.0.0.1,localhost,$public_host"
 export NO_PROXY="$no_proxy"
 
+ownership=$store/.enterprise-$tag
+check_enterprise_ownership() {
+  [[ -f $ownership && ! -L $ownership && $(stat -c '%u:%a' -- "$ownership") == 0:600 &&
+     -d $base && ! -L $base && -d $data && ! -L $data &&
+     $(stat -c '%d:%i' -- "$base" "$data") == "$(< "$ownership")" ]] ||
+    die 'Каталоги Enterprise принадлежат другой установке.'
+}
+
 if [[ $phase == enterprise ]]; then
-  ownership=$store/.enterprise-$tag
   if ! has_path "$ownership"; then
     if has_path "$base" || has_path "$data"; then
       die 'Происхождение каталогов Enterprise не подтверждено. Сохраните их и проверьте перед новым запуском.'
@@ -265,10 +272,7 @@ if [[ $phase == enterprise ]]; then
     stat -c '%d:%i' -- "$base" "$data" > "$ownership.new"
     mv -fT -- "$ownership.new" "$ownership"
   fi
-  [[ -f $ownership && ! -L $ownership && $(stat -c '%u:%a' -- "$ownership") == 0:600 &&
-     -d $base && ! -L $base && -d $data && ! -L $data &&
-     $(stat -c '%d:%i' -- "$base" "$data") == "$(< "$ownership")" ]] ||
-    die 'Каталоги Enterprise принадлежат другой установке.'
+  check_enterprise_ownership
   [[ -z $(find "$base" "$data" -type l -print -quit) ]] ||
     die 'В каталогах Enterprise обнаружена символическая ссылка. Штатная установка остановлена.'
 
@@ -301,8 +305,8 @@ if [[ $phase == enterprise ]]; then
   save_state
 fi
 
-[[ -d $base && ! -L $base && -d $data && ! -L $data &&
-   -f $base/.env && ! -L $base/.env ]] || die 'Не найдены каталоги штатной установки.'
+check_enterprise_ownership
+[[ -f $base/.env && ! -L $base/.env ]] || die 'Не найдены каталоги штатной установки.'
 cmp -s -- "$stock/compose.yaml" "$base/compose.yaml" || die 'Конфигурация Compose отличается от комплекта.'
 get_setting() { sed -n "s/^$1=//p" "$base/.env"; }
 [[ $(get_setting RELEASE_TAG) == "$tag" && $(get_setting DATA_DIR) == "$data" &&
@@ -312,6 +316,7 @@ studio_mapping() { docker port loginom-release-http 80/tcp; }
 base_compose=(docker compose -p loginom-release --project-directory "$base" --env-file "$base/.env" -f "$base/compose.yaml")
 apply_bind() {
   local address=$1 env_file
+  check_enterprise_ownership
   env_file=$(mktemp -- "$base/.env.XXXXXXXX") || return 1
   if ! sed "s/^HTTP_BIND=.*/HTTP_BIND=$address/" "$base/.env" > "$env_file" ||
     ! mv -fT -- "$env_file" "$base/.env"; then

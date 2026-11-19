@@ -94,7 +94,11 @@ exit "${TEST_VENDOR_EXIT:-0}"
 INSTALL
 cat > "$scratch/fixture/$enterprise/verify.sh" <<'VERIFY'
 #!/usr/bin/env bash
-exit 0
+set -euo pipefail
+if [[ ${TEST_REPLACE_DATA_ON_VERIFY:-0} == 1 && $* == '--wait 300' ]]; then
+  mv -- "$TEST_ROOT/host/data" "$TEST_ROOT/host/owned-data"
+  cp -a -- "$TEST_ROOT/host/owned-data" "$TEST_ROOT/host/data"
+fi
 VERIFY
 cat > "$scratch/fixture/$enterprise/sp-key.sh" <<'GUARDANT'
 sp_normalize_serial() {
@@ -184,6 +188,24 @@ echo 'PASS: ответ без смены пароля не публикует St
 
 printf '%s\n' '<Users><Item Name="admin" IsAdmin="true" Password="changed" /></Users>' \
   > "$scratch/host/data/workdir/Users.cfg"
+expect_no_studio_publication() {
+  if printf 'да\n' | run_installer "$@"; then
+    echo 'Opened Studio after adopting replacement data during password phase' >&2
+    exit 1
+  fi
+  grep -Fq 'Каталоги Enterprise принадлежат другой установке' "$scratch/output"
+  [[ $(< "$scratch/bind") == '127.0.0.1:18080' && $(< "$scratch/events") == $'enterprise\nenterprise' ]]
+  rm -r -- "$scratch/host/data"
+  mv -- "$scratch/host/owned-data" "$scratch/host/data"
+}
+mv -- "$scratch/host/data" "$scratch/host/owned-data"
+cp -a -- "$scratch/host/owned-data" "$scratch/host/data"
+expect_no_studio_publication
+echo 'PASS: после подмены каталога данных возобновление не публикует Studio'
+
+expect_no_studio_publication TEST_REPLACE_DATA_ON_VERIFY=1
+echo 'PASS: подмена каталога данных во время смены пароля не публикует Studio'
+
 if printf 'да\n' | run_installer TEST_INSTALL_EXIT=2; then
   echo 'Ignored a failed Dashboard install' >&2
   exit 1
