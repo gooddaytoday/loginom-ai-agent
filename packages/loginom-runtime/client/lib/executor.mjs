@@ -1826,6 +1826,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   };
   const reconcilePackageSave = async () => {
     const before = task.checkpoint, receipt = task.save_receipt, binding = task.storage_binding;
+    effectPossible = receipt?.effect_possible === true;
     if (!binding || receipt?.status !== 'AMBIGUOUS' || receipt.effect_possible !== true
         || !receipt.trace?.some(e => e.event === 'save_requested' && e.path === before?.path)
         || !before?.continuations?.length || !Array.isArray(before.package_identity.native_nodes)
@@ -1850,7 +1851,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (!pathMatches || !graphMatches) {
       phase = 'verified';
       return result('NOT_APPLIED', { reason: 'Saved destination or graph does not match the original request' },
-        { code: 'SAVE_RESULT_MISMATCH', message: 'The requested saved result was not confirmed; no Save was repeated' });
+        { code: 'SAVE_RESULT_MISMATCH', message: 'The saved result does not match the original request. Do not repeat this Save.' });
     }
     if (await resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false })
         || await resolve('message.text', {}, { cardinality: 'zeroOrOne', stable: false })

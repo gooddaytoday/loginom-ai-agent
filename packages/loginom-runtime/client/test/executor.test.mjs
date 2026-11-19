@@ -58,6 +58,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  if(fault==='document')page.context.__loginomDockPreparationV1.id='foreign-document';
  if(fault==='native-session')connection.FSession={};
  const inspected=await engine.inspect({operationId:'lost-save'});
+ assert.equal(inspected.output.outcome.effect_possible,true,'Inspection must retain the original possible Save effect');
  const mismatch=['path','graph','guid','type'].includes(fault);
  const protectedIdentity=['account','document','native-session','dirty'].includes(fault);
  if(mismatch||protectedIdentity){
@@ -65,6 +66,10 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   assert.equal(inspected.output.outcome.status,protectedIdentity?'AMBIGUOUS':'NOT_APPLIED');
   if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
   assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
+  if(mismatch){
+   const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+   assert.equal(repeated.status,'NOT_APPLIED');assert.equal(repeated.effect_possible,true);assert.equal(page.saveWrites,1);
+  }
   if(fault==='dirty'){
    connection.Session.IsPackageModified=async()=>false;
    const settled=await engine.inspect({operationId:'lost-save'});
