@@ -1574,8 +1574,12 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         if(prior.document_id!==prep.id||old.length&&(!recovery||old.length!==1||old[0]!==tabs[0]))throw Error('Saved workflow close was not confirmed');
         const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
         if(!records.length)throw Error('Original saved workflow receipt unavailable');
-        for(const r of records){r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
-          delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}
+        for(const r of records){
+          const replaced=r.tab!==tabs[0]||r.packageNode!==packageNode||r.nodeTargetWorkflowNode!==workflowNode;
+          r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
+          // Same-session Save recovery keeps the attested variable-port cells.
+          // Only a native replacement invalidates those cached identities.
+          if(replaced){delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}}
         rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
           workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
       }

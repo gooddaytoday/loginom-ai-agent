@@ -14,6 +14,9 @@ for(const action of ['package.save_checkpoint','package.save_as'])
 for(const fault of ['none','reopened','path','graph','guid','type','account','document','native-session','dirty'])
 test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
  const page=await restSavePage([fault==='dirty'],false),binding={...page.storageBinding,loginom_build:build};
+ const prepared=page.context.__loginomDockPreparationV1.receipts.get('prepared'),nativePort={};
+ const portIdentity={tid:'MF;TF-1;Graph;Vars;Output_Var-4'};
+ prepared.nodeTargetPortIdentities=new WeakMap([[nativePort,portIdentity]]);
  const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
  connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
  const engine=runtime(page,{getStorageBinding:()=>binding,
@@ -75,6 +78,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
    const settled=await engine.inspect({operationId:'lost-save'});
    assert.equal(settled.output.state,'resolved',JSON.stringify(settled));
    assert.equal(settled.output.outcome.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+   assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
   }
   return;
  }
@@ -84,6 +88,8 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  assert.equal(page.saveWrites,1);assert.equal(restores,1);
  assert.equal(page.context.__loginomDockPreparationV1.receipts.get('prepared').packageNode,
   form.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode);
+ if(fault==='none')assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
+ if(fault==='reopened')assert.equal(prepared.nodeTargetPortIdentities,undefined);
  const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
  assert.equal(repeated.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
 });
