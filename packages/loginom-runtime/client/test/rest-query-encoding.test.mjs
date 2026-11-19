@@ -202,6 +202,8 @@ test('LAB-1904 refusal names the replaced REST, its generated encoder and each c
  assert.match(error.message,/transform\.col_union_data union inputs:\[\{output:0,input:0\},\{output:1,input:1\}\]/);
  assert.doesNotMatch(error.message,/calc|import inputs|existing REST and its input are preserved/);
  assert.match(error.message,/Do not duplicate the union, Calculator or Export/);
+ // ab-1904-f r5/model.stdout:70→161: an unlabeled new REST took 'REST-запрос@0' beside the old one and the Save graph check failed.
+ assert.match(error.message,/NEW integration.rest_request target with a NEW unique target.label/);
  assert.deepEqual(graph,before);
  graph.nodes[2].label='Parse response';
  const user=await createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation:{...operation,restQueryEncoder:undefined},now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),execute:async()=>assert.fail('no effect')})

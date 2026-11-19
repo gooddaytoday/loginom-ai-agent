@@ -114,7 +114,7 @@ export function restReplacementStep(graph,restId,input){
  const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
   +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
  return 'This REST keeps its saved connection: a new URL or query list needs a replacement REST, not a second chain. next_step: '
-  +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs and query_parameters and finish:"execute". '
+  +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target with a NEW unique target.label, the requested raw inputs and query_parameters and finish:"execute". '
   +'If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. '
   +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')+'. '
   +(consumers.length?'3) Reconnect each former consumer to the new REST with dock_node_apply on the SAME existing target, the new REST as source of these inputs, parameters:{} and finish:"execute": '+consumers.join('; ')+'. '
