@@ -184,6 +184,11 @@ const state = {
   localPackage:null, packageError:'',
   calculationChanged:false, versionName:'', versionError:'',
 }
+// For evaluators' briefs (agent-review): a console line makes the free model spend its daily limit at the next task.
+if (read('model-limit', false)) {
+  state.failModel = true
+  try { localStorage.removeItem('loginom-demo-model-limit') } catch {}
+}
 const route = () => {
   const key = location.hash.slice(1).split('/')[0]
   if (key === 'runner' && !hubHasInstalled(state,state.solution)) {
