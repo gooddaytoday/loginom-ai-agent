@@ -574,3 +574,9 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .model-menu small{display:block;color:var(--muted);font-size:12px}
 .model-menu [aria-checked="true"]{font-weight:600}
 @media(max-width:410px){.composer-model:not(.off) .icon:first-child{display:inline-block}}
+/* Run 3 of the review: the copy's check is the application's, from the run receipts */
+.change-check{display:block;color:var(--ink)}
+.change-check>strong{color:var(--success)}
+.change-check ul{display:grid;gap:3px;margin:5px 0 0;padding:0;list-style:none}
+.change-check li{display:flex;gap:6px;align-items:flex-start;color:var(--success)}
+.change-check li .icon{flex:none;margin-top:3px}

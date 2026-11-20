@@ -352,8 +352,8 @@ function improveInChat(pkg) {
 function runAction(actionId, pkg, from) {
   if (actionId === 'improve') return improveInChat(pkg)
   const action = packageActions[actionId]
-  // Only documenting a file from the computer works without Loginom.
-  if (!state.settings.connection.connected && hubHasInstalled(state, action.solution) && !(actionId === 'document' && pkg?.source === 'local')) {
+  // Documenting and checking a file from the computer work without Loginom: the file is read where it is.
+  if (!state.settings.connection.connected && hubHasInstalled(state, action.solution) && !(['document','check'].includes(actionId) && pkg?.source === 'local')) {
     state.overlay = 'loginom-status'
     return render()
   }
@@ -585,7 +585,7 @@ function composer() {
       </div>
       <div class="composer-options">
         ${loginomChip()}
-        ${modelName ? `<button class="filter-btn composer-model" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}">${icon('cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
+        ${modelName ? `<button class="filter-btn composer-model" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? `, облако — данные уходят в «${esc(model.where)}»` : ''}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? ` · облако: данные уходят в «${esc(model.where)}»` : ''}">${icon(model.kind === 'cloud' ? 'globe' : 'cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
           : `<button class="filter-btn composer-model lgm-chip off" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">Выберите модель</span> ${icon('down',12)}</button>`}
         ${state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase) ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
         <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
@@ -732,6 +732,7 @@ function result(item) {
   if (item.kind === 'skilltrial') return trialResult(item)
   if (['improve','keep'].includes(item.kind)) return changeCard(item)
   if (item.kind === 'more') return `<div class="answer-block"><p>Улучшения уже внесены в копию «${esc(item.about || 'Продажи — правка агента.lgp')}» — она в карточке выше. ${item.aboutKeep ? 'Скажите, что поменять ещё.' : `Скажите, что поменять ещё, например: «${esc(keepPrompt)}».`}</p>${item.aboutKeep ? '' : `<button class="btn" data-action="fill-keep">${icon('compose',15)} Подставить этот запрос</button>`}</div>`
+  if (item.kind === 'pick') return `<div class="answer-block"><p>Какой пакет описать? Выберите его: «+» → «Пакет из Loginom…» или файл с компьютера. Над полем появится «Документировать» — там можно выбрать и формат: Word, PDF или Markdown.</p><button class="btn" data-overlay="plus">${icon('plus',15)} Выбрать пакет</button></div>`
   if (item.kind === 'nocopy') {
     const why = item.nocopy || {why:'none'}
     const said = {saved:`Изменения из копии «${esc(why.name)}» уже сохранены новой версией — эту копию я больше не правлю.`, replaced:`Копия «${esc(why.name)}» уже заменила исходный «Продажи.lgp» — эту копию я больше не правлю.`, discarded:`Изменения в копии «${esc(why.name)}» отменены.`, fork:`Копия «${esc(why.name)}» принадлежит разговору «${esc(why.title)}» — здесь я её не правлю.`, partial:`Прошлая правка копии «${esc(why.name)}» остановлена на середине — улучшения внесены не все.`, none:'Сейчас в этом разговоре нет копии пакета, которую я правлю.'}[why.why] || 'Сейчас в этом разговоре нет копии пакета, которую я правлю.'
@@ -747,7 +748,7 @@ function result(item) {
   if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
-    <dl class="result-metrics"><div><dt>Узлов описано</dt><dd>12</dd></div><div><dt>Входные данные</dt><dd>2 таблицы</dd></div><div><dt>Изменено</dt><dd>ничего</dd></div></dl>
+    <dl class="result-metrics"><div><dt>Узлов описано</dt><dd>${(item.files?.[0] || '') === 'Продажи.lgp' ? 6 : 14}</dd></div><div><dt>Входные данные</dt><dd>2 таблицы</dd></div><div><dt>Изменено</dt><dd>ничего</dd></div></dl>
     <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>${esc((item.files[0] || 'Пакет.lgp').replace(/\.lgp$/i,''))} — описание.md</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button><button class="btn" data-action="download-result">Скачать ${icon('download',14)}</button></div></div>`
   const info = item.kind === 'quality'
     ? ['Проверка данных завершена','Обнаружены 12 пропусков и 3 дубликата. В отчёте отмечены столбцы, которые нужно проверить перед загрузкой.',[['Строки','2 400'],['Пропуски','12'],['Дубликаты','3']]]
@@ -830,6 +831,14 @@ function draftCopy(turns) {
   return {copy:turns[at].copy, turn:turns[at], partial:head < at, keep:turns.some(turn => own(turn) && turn.kind === 'keep' && turn.phase === 'done')}
 }
 // A stopped edit cannot go on once the user did something with its copy (saved, replaced, discarded) meanwhile.
+// Where the original was replaced from, for a card that can no longer replace it.
+function replacedWhere(session) {
+  const by = state.replacedBy
+  if (!by) return 'раньше'
+  if (by.session === session) return `в этом разговоре${by.copy ? ` — «${esc(by.copy)}»` : ''}`
+  const other = state.sessions.find(entry => entry.id === by.session)
+  return other ? `в разговоре «${esc(other.title)}»` : 'в другом разговоре'
+}
 function copySettled(item) {
   if (!item?.copy || item.forkOf) return null
   const head = (item.history || []).findLast(turn => turn.copy?.name === item.copy.name && !turn.forkOf && turn.phase === 'done')
@@ -838,6 +847,14 @@ function copySettled(item) {
 }
 function settledNote(done) {
   return `Копию вы уже ${{saved:'сохранили новой версией', replaced:'использовали для замены исходного', discarded:'отменили'}[done]} — этот ответ её не продолжит. Попросите новую правку.`
+}
+// The last copy of the conversation, if it is saved as a new version (not replaced, discarded or forked).
+function savedCopy(turns) {
+  const last = turns.findLast(turn => turn.copy && turn.step > 0)
+  if (!last || last.forkOf) return null
+  const head = turns.findLast(turn => turn.copy?.name === last.copy.name && !turn.forkOf && turn.phase === 'done')
+  const saved = head && changeState(head) === 'saved' && savedVersion(head)
+  return saved ? {name:saved.name, turn:head} : null
 }
 function noCopyReason(turns) {
   const last = turns.findLast(turn => turn.copy && turn.step > 0)
@@ -877,8 +894,8 @@ function changeCard(turn) {
   const where = local ? 'Файл «Продажи.lgp» на компьютере не менялся' : '«Продажи.lgp» в Loginom не менялся'
   const status = {
     continued:`Правка продолжена ниже: следующий ответ изменил ту же копию «${esc(agentCopy(turn).name)}». Что с ней делать — в последней карточке.`,
-    draft:elsewhere ? `Изменения — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». Исходный «Продажи.lgp» уже заменён в другом разговоре — эти изменения можно сохранить новой версией рядом с ним.`
-      : `${turn.kind === 'keep' ? 'Изменения этого и прошлых ответов' : 'Изменения'} — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». ${where}: ${local ? 'скачайте изменённый пакет на компьютер или сохраните его в Loginom.' : 'сохраните изменения новой версией рядом с ним или замените исходный.'}`,
+    draft:elsewhere ? `Изменения — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». Исходный «Продажи.lgp» уже заменён ${replacedWhere(state.session)} — эти изменения можно сохранить новой версией рядом с ним.`
+      : `${turn.from ? `Копия сделана из новой версии «${esc(turn.from)}». ` : ''}${turn.kind === 'keep' ? 'Изменения этого и прошлых ответов' : 'Изменения'} — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». ${where}: ${local ? 'скачайте изменённый пакет на компьютер или сохраните его в Loginom.' : 'сохраните изменения новой версией рядом с ним или замените исходный.'}`,
     saved:local ? `Сохранено в Loginom: «${esc(saved?.name || '')}» в ${esc(packageFolder('personal'))}. Файл на компьютере не менялся.` : `Сохранено новой версией «${esc(saved?.name || '')}» в ${esc(packageFolder('personal'))}. Исходный «Продажи.lgp» не изменён.`,
     replaced:'Исходный «Продажи.lgp» в Loginom заменён этими изменениями. Прежняя версия сохранена как «Продажи — до правки.lgp» — её можно вернуть.',
     discarded:`Изменения отменены: копия удалена из Loginom, ${local ? 'файл на компьютере' : '«Продажи.lgp»'} не менялся. Приложение хранит снимок копии в этом разговоре — изменения можно вернуть.`,
@@ -887,7 +904,7 @@ function changeCard(turn) {
   const download = `<button class="btn${current === 'draft' ? ' primary' : ''}" data-change="download:${at}">${icon('download',15)} Скачать на компьютер…</button>`
   const actions = {
     continued:'',
-    draft:local ? `${download}<button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${view}${loginomButton(`copy:${state.session}:${at}`)}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`
+    draft:local ? `${download}<button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${view}${loginomButton(`copy:${state.session}:${at}`)}<button class="link-btn discard-link" data-change="discard:${at}">${turn.change?.downloaded ? 'Удалить копию из Loginom' : 'Отменить изменения'}</button>`
       : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${view}${loginomButton(`copy:${state.session}:${at}`)}${elsewhere ? '' : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`,
     saved:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «${esc(saved?.name || '')}»</button>${view}${loginomButton(saved?.id)}${local ? download : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="unsave:${at}">${local ? 'Удалить из Loginom' : 'Удалить новую версию'}</button>`,
     replaced:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «Продажи.lgp»</button>${view}${loginomButton('sales')}<button class="link-btn discard-link" data-change="restore:${at}">Вернуть прежнюю версию</button>`,
@@ -899,7 +916,7 @@ function changeCard(turn) {
       <div class="change-head">${icon('flow',17)}<strong>${esc(current === 'saved' ? saved.name : ['draft','continued'].includes(current) ? agentCopy(turn).name : 'Продажи.lgp')}</strong><span class="badge">${{draft:'копия агента', continued:'продолжено ниже', saved:local ? 'в Loginom' : 'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.filter(([,count]) => count).map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
       ${turn.kind === 'keep' ? `<p class="change-scope">Вся копия против исходного «Продажи.lgp»; этот ответ изменил одну строку — она отмечена.</p>` : ''}
       <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details></div></li>`).join('')}</ul>
-      <p class="change-check">${icon('check',14)} Агент сверил копию с исходным запуском на данных: в результате 120 строк, как раньше; 12 строк без цены или региона в расчёт больше не попадают</p>
+      <div class="change-check"><strong>Проверено приложением</strong> — по квитанциям запуска копии в Loginom:<ul><li>${icon('check',13)} результат — 120 строк, как у исходного</li><li>${icon('check',13)} у «Проверка пустых значений» на выходе «Не соответствуют условию» — 12 строк: без цены или региона, в расчёт не попадают</li><li>${icon('check',13)} ${local ? 'файл на компьютере' : '«Продажи.lgp» в Loginom'} не изменён</li></ul></div>
     </div>`}
     <div class="change-actions">${actions}</div>
     ${current === 'draft' ? `<p class="change-note">${local ? `В Loginom — как «${esc(next)}» в ${esc(packageFolder('personal'))}; на компьютер — куда выберете.` : `Новая версия появится рядом с исходным: ${esc(packageFolder('personal'))}/${esc(next)}`}</p>` : ''}
@@ -1042,8 +1059,9 @@ const scripts = {
   ]},
   more:{steps:[]},
   nocopy:{steps:[]},
+  pick:{steps:[]},
   document:{plan:['Прочитать пакет','Описать узлы','Собрать документ'], steps:[
-    {plan:0, icon:'flow', live:'Читаю пакет', done:'Прочитал пакет «{pkg}»: 12 узлов, 3 подмодели', short:'прочитал пакет', time:3},
+    {plan:0, icon:'flow', live:'Читаю пакет', done:'Прочитал пакет «{pkg}»: {nodes}', short:'прочитал пакет', time:3},
     {plan:1, icon:'book', live:'Ищу описания узлов в справке Loginom', done:'Нашёл в справке Loginom описания 9 типов узлов', short:'нашёл описания в справке', time:5},
     {plan:2, icon:'file', live:'Пишу документ', done:'Написал «{doc}»', short:'написал описание', detail:'{folder}', time:12},
   ]},
@@ -1066,15 +1084,21 @@ function appliedRules(projectId) {
   if (skill) return {step:`Применил навык «${skill.name}»`, short:`применил навык «${skill.name}»`, skill:skill.name, detail:'Навык включён — агент выбрал его сам по строке «Когда агент его применяет»', by:`по навыку «${skill.name}»`}
   return null
 }
+// Keeping the node after the copy was saved: the agent copies the saved version first.
+scripts.keepFrom = {...scripts.keep, steps:[
+  {plan:0, icon:'flow', live:'Делаю копию «{from}»', done:'Сделал копию «{copy}» из новой версии «{from}»', short:'сделал копию новой версии', detail:'Новая версия и исходный не меняются', time:3},
+  ...scripts.keep.steps.slice(1)]}
 // A package from the computer: the first step uploads the agent's own copy, the rest is the same edit.
 scripts.improveLocal = {...scripts.improve, steps:[
   {plan:0, icon:'upload', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
+// Kinds the agent answers in words, without steps in Loginom.
+const answerOnly = ['chat','more','nocopy','pick']
 function scriptOf(turn) {
-  return turn.kind === 'improve' && turn.local ? scripts.improveLocal : scripts[turn.kind] || scripts.chat
+  return turn.kind === 'improve' && turn.local ? scripts.improveLocal : turn.kind === 'keep' && turn.from ? scripts.keepFrom : scripts[turn.kind] || scripts.chat
 }
 function followed(text, turn) {
-  if (!turn.instruction) return text
+  if (!turn.instruction) return atHome(text)
   const how = ` — по вашему указанию: «${turn.instruction}»`
   return / в \/\S+$/.test(atHome(text)) ? atHome(text).replace(/ в \/\S+$/, how) : atHome(text) + how
 }
@@ -1084,7 +1108,7 @@ function atHome(text) {
 }
 function stepText(text, turn) {
   const pkg = (turn.files?.[0] || 'Продажи.lgp')
-  return text.replaceAll('{folder}', chatFolder(state.sessions.find(item => item.id === state.session) || turn).label.replace(/^в/,'В')).replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '').replaceAll('{home}', packageFolder('personal')).replace('{count}', turn.rules ? 4 : 3).replaceAll('{copy}', turn.copy?.name || '')
+  return text.replaceAll('{folder}', chatFolder(state.sessions.find(item => item.id === state.session) || turn).label.replace(/^в/,'В')).replaceAll('{skill}', turn.trial?.name || '').replaceAll('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '').replaceAll('{home}', packageFolder('personal')).replace('{count}', turn.rules ? 4 : 3).replaceAll('{copy}', turn.copy?.name || '').replaceAll('{from}', turn.from || '').replace('{nodes}', pkg === 'Продажи.lgp' ? '6 узлов' : '14 узлов, 3 подмодели')
 }
 function turnTime(turn) {
   const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time + (step.think?.[0] || 0), 0) + (turn.errors?.length || 0) * 33
@@ -1106,6 +1130,18 @@ function runSteps(item) {
   if (item.step >= script.steps.length) return writeAnswer(item, 'done')
   const step = script.steps[item.step]
   const asked = (item.cleared || []).includes(item.step)
+  // Run 3 of the review: «Разрешения» → «Сохранять пакеты в Loginom» decides first — «Разрешено» saves without asking,
+  // «Запрещено» does not save and the agent says so; «Спрашивать» asks here.
+  const rule = step.ask === 'permission' && !asked ? state.settings.permissions?.save : null
+  if (rule === 'allow') {
+    item.decisions.push({at:item.step, choice:'setting'})
+    item.cleared.push(item.step)
+  }
+  if (rule === 'deny') {
+    item.decisions.push({at:item.step, choice:'forbidden'})
+    item.phase = 'denied'
+    return render()
+  }
   if (step.ask === 'permission' && !asked && (item.allowed || []).includes(script.permission.scope)) {
     item.decisions.push({at:item.step, choice:'auto'})
     item.cleared.push(item.step)
@@ -1202,13 +1238,13 @@ function writeAnswer(item, finalPhase) {
   }, 35)
 }
 function startRun(item) {
-  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !['chat','more','nocopy'].includes(item.kind) ? 1 : null,
-    modelFailAt:state.failModel && !['chat','more','nocopy'].includes(item.kind) ? 1 : null, modelError:null})
+  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !answerOnly.includes(item.kind) ? 1 : null,
+    modelFailAt:state.failModel && !answerOnly.includes(item.kind) ? 1 : null, modelError:null})
   state.failNext = false
   state.failModel = false
   // The free model whose daily limit the demo spent stops any turn at once until the page is reloaded («обновится в 03:00»).
   if (state.freeLimited && chatModel(item)?.source === 'free') return modelFailed(item)
-  if (['chat','more','nocopy'].includes(item.kind)) return writeAnswer(item, 'answer')
+  if (answerOnly.includes(item.kind)) return writeAnswer(item, 'answer')
   if (state.mode === 'Планирование' && item.kind !== 'document') {
     item.phase = 'plan'
     return render()
@@ -1259,6 +1295,7 @@ function answerText(turn) {
 }
 function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
+    if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
     return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
   }
   if (turn.phase === 'failed' && turn.modelError && !turn.modelError.resolved) {
@@ -1289,9 +1326,9 @@ function turnSteps(turn, live, turnIndex) {
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'retry')) rows.push(`<li class="step-trace">${icon('refresh',14)}<span>Вы повторили шаг</span></li>`)
     if (turn.modelError?.at === index) rows.push(modelErrorRow(turn))
     for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'continue')) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
-    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && !['retry','continue'].includes(entry.choice))) rows.push(decision.choice === 'instead'
+    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && !['retry','continue','forbidden'].includes(entry.choice))) rows.push(decision.choice === 'instead'
       ? `<li class="step-trace steer">${icon('message',14)}<span>Вы попросили иначе: «${esc(decision.text)}»</span></li>`
-      : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
+      : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз', setting:'Разрешено в «Разрешениях»'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
     if (step.ask === 'question') rows.push(`<li class="step-trace">${icon('help',14)}<span>${esc(script.question.text)} — <strong>${esc(turn.answer || '')}</strong></span></li>`)
     if (detailed && step.think) rows.push(`<li class="step think">${icon('spark',14)}<span>Думал ${step.think[0]} с<small>${esc(step.think[1])}</small></span></li>`)
     rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
@@ -1299,6 +1336,7 @@ function turnSteps(turn, live, turnIndex) {
   })
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
   if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(atHome(script.permission.trace))}</span></li>`)
+  if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(atHome(script.permission.trace))} — в «Разрешениях» это запрещено</span></li>`)
   errorRows(turn.step)
   if (turn.modelError?.at === turn.step && turn.step < script.steps.length) rows.push(modelErrorRow(turn))
   for (const decision of (turn.decisions || []).filter(entry => entry.at === turn.step && entry.choice === 'continue' && turn.step < script.steps.length)) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
@@ -1307,6 +1345,10 @@ function turnSteps(turn, live, turnIndex) {
   if (live && turn.phase === 'running') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>${esc(stepText(script.steps[turn.step].live, turn))}…</span></li>`)
   if (live && ['permission','question'].includes(turn.phase)) rows.push(`<li class="step waiting">${icon('alert',15)}<span>${turn.phase === 'permission' ? 'Жду вашего разрешения — внизу' : 'Жду вашего ответа — внизу'}</span></li>`)
   return `<ol class="turn-steps">${rows.join('')}</ol>`
+}
+function cloudNote(name) {
+  const model = availableModels(state).find(entry => entry.name === name)
+  return model?.kind === 'cloud' ? `, облачная модель: разговор уходит в «${esc(model.where)}»` : ''
 }
 // The models that answered in a turn: the one it started with and any it was continued with.
 function turnModels(turn) {
@@ -1332,7 +1374,7 @@ function turnView(item, turn, index, live) {
   const switched = before && turn.modelName && before !== turn.modelName
   const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved
   return `<div class="turn">
-    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}» — ${{switched:'модель сменили в поле ввода', back:'модель разговора снова доступна в этом режиме сети'}[turn.modelNote] || `«${esc(turn.model)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
+    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}»${cloudNote(turn.modelName)} — ${{switched:'модель сменили в поле ввода', back:'модель разговора снова доступна в этом режиме сети'}[turn.modelNote] || `«${esc(turn.model)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
       <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
@@ -1408,7 +1450,7 @@ function connectCard() {
     <strong>Подключиться к Loginom</strong>
     <dl><div><dt>Адрес</dt><dd>${esc(hostOf(c.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(c.username)}</dd></div></dl>
     <p class="muted">${stand ? 'Публичный стенд Loginom — чтобы попробовать, пароль не нужен. Для сервера вашей компании — «Свой сервер Loginom».' : c.empty || !c.hasPassword ? 'Пароль не нужен.' : 'Пароль сохранён.'}</p>
-    <div class="button-row"><button class="btn primary" data-action="connect-loginom" ${state.connecting ? 'disabled' : ''}>${state.connecting ? '<span class="spinner"></span> Подключаюсь…' : stand ? 'Подключить публичный стенд' : 'Подключить'}</button><button class="btn${stand ? '' : ' quiet'}" data-settings="loginom">${stand ? 'Свой сервер Loginom' : 'Изменить'}</button></div>
+    <div class="button-row"><button class="btn primary" data-action="connect-loginom" ${state.connecting ? 'disabled' : ''}>${state.connecting ? '<span class="spinner"></span> Подключаюсь…' : stand ? 'Подключить публичный стенд' : 'Подключить'}</button><button class="btn${stand ? '' : ' quiet'}" ${stand ? 'data-action="own-server"' : 'data-settings="loginom"'}>${stand ? 'Свой сервер Loginom' : 'Изменить'}</button></div>
   </div></div>`
 }
 function packageFolder(scope) {
@@ -1607,7 +1649,7 @@ function changedPackage(item) {
   const local = turn?.local
   const elsewhere = current === 'draft' && !local && salesState().replaced
   return `<div class="native-page packages-page">
-    <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : elsewhere ? 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» уже заменён в другом разговоре — эти изменения можно сохранить новой версией.' : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : elsewhere ? `Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» уже заменён ${replacedWhere(chat?.id)} — эти изменения можно сохранить новой версией.` : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span></div>
@@ -1667,8 +1709,12 @@ function review() {
     ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
   // Open owner questions, each with a recommended variant; empty when everything is decided.
-  const questions = []
+  const questions = [
+    '<strong>Агент пишет в Loginom без вопроса</strong> — так сказали 8 из 9 оценщиков третьего прогона. Копию в «Копии агента» и загрузку файла с компьютера агент делает сам, хотя в «Разрешениях» у «Сохранять пакеты в Loginom» стоит «Спрашивать». Предлагаю подчинить копию тому же правилу: «Спрашивать» — перед первой копией в разговоре вопрос «Сделать копию «…» в «Копии агента»?» с «Разрешать в этом разговоре»; «Разрешено» — без вопроса; «Запрещено» — агент в Loginom не правит и говорит об этом. «Копии агента» — обычной папкой в окне выбора пакетов, копии разговора — в «Контекст → Файлы». <em>Рекомендую так.</em>',
+    '<strong>Свои навыки под политикой администратора</strong> (В-70). Два оценщика-администратора считают их обходом запрета на навыки «Сообщество»: текст такого навыка можно вставить в свой. Предлагаю оставить В-70 по умолчанию и дать политике выключатель «Свои навыки: выключены» для строгих организаций; «Инструкции» не трогать — это тот же текст, что сообщение; какой навык применён, пишется в журнал действий. <em>Рекомендую так.</em>',
+  ]
   const changed = [
+    'По третьему прогону оценки (девять отчётов: Opus, Sonnet, Haiku): из сохранённой версии окно замены тоже предлагает «Попросить агента оставить узел» — агент делает копию новой версии; удаление из Loginom («Отменить изменения», «Удалить новую версию») спрашивает подтверждение; «Запрещено» и «Разрешено» у «Сохранять пакеты в Loginom» действуют; в карточке правки — «Проверено приложением» по квитанциям запуска; мастер «Проверить» учитывает «Инструкции» и называет те же три замечания, что разговор; проверка файла с компьютера — без Loginom; «Свой сервер Loginom» — пустая форма; после «Подключить модель» — назад в разговор; у облачной модели в поле ввода — значок облака; «Опиши пакет» без пакета — просьба выбрать пакет.',
     'Итерация 8 — сбои и повторы. Модель остановила ход: блок с причиной простыми словами, «Продолжить с другой моделью» или «Подключить модель»; в ленте — «Модель не ответила» и «Вы продолжили с моделью…», у ответа — какие модели работали. Модель в поле ввода — модель этого разговора (как в OpenCode 2), выбор из моделей этого режима сети.',
     'Итерация 8: вторая правка продолжает ту же копию; из окна замены — «Попросить агента оставить узел». Пакет с компьютера: копия агента в «Копии агента», «Скачать на компьютер…» и «Сохранить в Loginom»; у замечаний проверки — схема самого файла, без Loginom. При удалении разговора или проекта — «Удалить и копии агента в Loginom»; «Изменить» говорит, что станет с копией; в ветке («Ответвить») карточки правки ведут в исходный разговор.',
     'По вашему замечанию (В-72): «Посмотреть в Loginom» — в карточке правки, на схеме изменений, в окне замены и на странице пакета. Копия, которую правит агент, лежит в Loginom в папке «Копии агента», её тоже можно открыть. Проверено на стенде: пока пакет открыт в Loginom, заменить его нельзя — окно замены об этом говорит; окно Loginom открывается минуту-две.',
@@ -1720,7 +1766,7 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 8 — сбои и повторы</p><h1>Что решить</h1><p>Новое — что происходит, когда что-то идёт не по плану: модель остановила ход, правку нужно поправить, пакет пришёл с компьютера, разговор удаляют вместе с копиями агента. Около 5 минут. Открытых вопросов нет — решения ниже.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 8 — сбои и повторы</p><h1>Что решить</h1><p>Новое — что происходит, когда что-то идёт не по плану: модель остановила ход, правку нужно поправить, пакет пришёл с компьютера, разговор удаляют вместе с копиями агента. Около 5 минут. Ниже — два вопроса по третьему прогону оценки агентами.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>` : ''}
@@ -1828,7 +1874,8 @@ function overlay() {
     'replace-package': ['Заменить исходный пакет?', kind === 'replace-package' ? `<p class="dialog-desc">Пакет «Продажи.lgp» в ${esc(packageFolder('personal'))} будет перезаписан ${replaceSource().what}. Перед этим сохранится прежняя версия как «Продажи — до правки.lgp» — её можно будет вернуть.</p>${replaceRefs()}<p class="dialog-desc">Не проверено: пакеты в папках, к которым у вас нет доступа; подходит ли номер версии пакета к ссылкам — Loginom его сверяет; расписание запусков и кто сейчас открыл пакет — это знает только сервер Loginom. Если «Продажи.lgp» сейчас открыт в Loginom — у коллеги или у вас в окне Loginom, — заменить не получится, пока его не закроют: Loginom держит открытый пакет занятым. Запуски по расписанию после замены пойдут по изменённой версии.</p><div class="button-row"><button class="btn danger" data-action="confirm-replace-package">Заменить исходный</button>${loginomButton(replaceSource().target, replaceSource().label)}<button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'loginom-window': ['Окно Loginom', kind === 'loginom-window' ? loginomWindow() : ''],
     'download-copy': ['Скачать на компьютер', kind === 'download-copy' ? downloadCopyDialog() : ''],
-    'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'remove-copy': [state.removeTurn?.act === 'unsave' ? 'Удалить новую версию из Loginom?' : 'Удалить копию из Loginom?', kind === 'remove-copy' ? removeCopyDialog() : ''],
+    'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем. Журнал действий агента остаётся: что агент делал и что отправлял в модель, видит администратор.</p>${deleteChatFiles()}<div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}) и папкой проекта: инструкциями, источниками и файлами, которые сделал агент.</p>${copiesBox(state.sessions.filter(item => item.project === state.deleteId).flatMap(liveCopies), 'delete-project-copies')}<div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
     plus: ['Добавить',`<div class="dialog-options">
@@ -2046,6 +2093,8 @@ function send() {
     && (state.contour !== 'closed' ? 'так стоит в «Настройки» → «Разрешения»' : state.policy === 'set' ? 'так решил администратор вашей организации' : state.policy === 'broken' ? 'файл политики администратора с ошибкой, приложение работает без сети' : 'включён закрытый контур')
   // Mock routing by task words; «что можно сделать лучше?» asks for a review, not a change («улучшения» is a change).
   let kind = web ? 'chat' : /документ|описан|опиши/i.test(prompt) && withPackage ? 'document'
+    // Run 3: the mock cannot find a package by its name in the text — it asks to pick one instead of building ABC.
+    : /документ|описан|опиши/i.test(prompt) && !old?.files?.length ? 'pick'
     : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /провер|оптимиз|(?<![а-яё])лучше/i.test(prompt) ? 'refactor'
     : /внеси|улучш|объедин|исправ|переимен|измени|доработ|поправ/i.test(prompt) ? 'improve'
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
@@ -2064,7 +2113,10 @@ function send() {
   const draft = !web && !state.draftPackage ? draftCopy(kept) : null
   // A request, not a question that names the node.
   const keepAsk = /не удаля|оставь|оставить|верни|вернуть/i.test(prompt) && /фильтр|узел|узл/i.test(prompt) && !/\?\s*$/.test(prompt)
+  // From a saved version (В-73: a new copy after «Сохранить»): the agent copies the saved version and keeps the node.
+  const fromSaved = !draft && keepAsk && !state.draftPackage ? savedCopy(kept) : null
   if (draft && keepAsk && !draft.partial) kind = 'keep'
+  else if (fromSaved) kind = 'keep'
   else if (draft && kind === 'improve' && !draft.partial) kind = 'more'
   // Asked to keep the node with no copy to change: the copy was saved, replaced, discarded, belongs to another chat or
   // was left half-done by a stopped edit.
@@ -2074,7 +2126,7 @@ function send() {
   if (trialTurn) kind = state.trialSkill.kind
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
   // Iteration 8: checking a file from the computer reads it where it is, like documenting.
-  const needsLoginom = !['chat','more','nocopy'].includes(kind) && !(['document','refactor','clean'].includes(kind) && local)
+  const needsLoginom = !answerOnly.includes(kind) && !(['document','refactor','clean'].includes(kind) && local)
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
   if (old) {
     clearTimeout(old.timer)
@@ -2101,8 +2153,9 @@ function send() {
   if (!trialTurn && kind === 'refactor') next.rules = appliedRules(next.project)
   // В-73: a stopped edit left a partial copy — the next edit finishes it in the same copy.
   if (kind === 'improve') next.copy = draft?.partial ? draft.copy : newAgentCopy()
-  if (kind === 'keep') next.copy = draft.copy
-  if (['keep','more'].includes(kind)) Object.assign(next, {files:draft.turn.files, local:draft.turn.local, about:draft.copy.name, aboutKeep:draft.keep})
+  if (kind === 'keep' && fromSaved) Object.assign(next, {copy:newAgentCopy(), from:fromSaved.name, files:fromSaved.turn.files, local:fromSaved.turn.local})
+  else if (kind === 'keep') next.copy = draft.copy
+  if ((kind === 'keep' && !fromSaved) || kind === 'more') Object.assign(next, {files:draft.turn.files, local:draft.turn.local, about:draft.copy.name, aboutKeep:draft.keep})
   if (kind === 'nocopy') next.nocopy = draft?.partial ? {why:'partial', name:draft.copy.name} : noCopyReason(kept)
   if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
@@ -2155,12 +2208,19 @@ function changeAction(value, keyboard = false) {
     turn.change = {savedId:saved.id, downloaded:turn.change.downloaded}
     toast(`Сохранено: «${name}» в ${packageFolder('personal')}`)
   }
-  if (act === 'unsave') {
+  // Run 3: deleting from Loginom asks first, like replacing does.
+  if (act === 'unsave' || act === 'discard') {
+    state.removeTurn = {session:item.id, at:head, act}
+    state.overlay = 'remove-copy'
+    return render()
+  }
+  if (['unsave-ok','discard-ok'].includes(act)) state.overlay = null
+  if (act === 'unsave-ok') {
     state.importedPackages = state.importedPackages.filter(entry => entry.id !== turn.change.savedId)
     turn.change = {downloaded:turn.change.downloaded}
     toast('Новая версия удалена из Loginom — изменения снова в копии')
   }
-  if (act === 'discard') turn.change = {discarded:true}
+  if (act === 'discard-ok') turn.change = {discarded:true}
   if (act === 'undiscard') turn.change = {}
   if (act === 'restore') restoreSales()
   render()
@@ -2171,6 +2231,7 @@ function restoreSales() {
   const original = serverPackages.find(entry => entry.id === 'sales')
   original.view = 'sales'
   original.keep = false
+  state.replacedBy = null
   original.modified = '2026-11-16'
   state.importedPackages = state.importedPackages.filter(entry => entry.id !== 'sales-backup')
   state.sessions.flatMap(entry => [...(entry.history || []), entry]).forEach(turn => { if (turn.change) delete turn.change.replaced })
@@ -2190,8 +2251,7 @@ function replaceRefs() {
     <li>${icon('flow',15)}<span><b>«Отчёт директору.lgp»</b> · ${esc(packageFolder('shared'))} — узел-ссылка на узел «Выручка по регионам». Этот узел и его выход в копии есть. Цифры изменятся: строки без цены или региона в расчёт больше не попадают.</span></li>
     ${keep ? `<li>${icon('flow',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». Этот узел в копии оставлен: условие и вход те же, данные для ссылки не изменятся.</span></li>`
       : `<li class="bad">${icon('alert',15)}<span><b>«Города — неделя.lgp»</b> · ${esc(packageFolder('personal'))} — узел-ссылка на узел «Фильтр по дате (ветка «Города»)». В копии этого узла нет — ссылаться будет не на что.</span></li>`}</ul>
-    ${keep ? '' : saved ? '<p>Если «Города — неделя.lgp» нужен, не заменяйте исходный: новая версия уже сохранена рядом с ним, исходный останется как есть.</p>'
-      : `<p>Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел или сохраните изменения новой версией: исходный останется как есть.</p><div class="button-row"><button class="btn" data-action="ask-keep">${icon('message',15)} Попросить агента оставить узел</button></div>`}</div>`
+    ${keep ? '' : `<p>${saved ? `Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел: он сделает копию новой версии «${esc(saved.name)}» и вернёт узел. Или не заменяйте исходный — новая версия уже лежит рядом с ним.` : 'Если «Города — неделя.lgp» нужен, попросите агента оставить этот узел или сохраните изменения новой версией: исходный останется как есть.'}</p><div class="button-row"><button class="btn" data-action="ask-keep">${icon('message',15)} Попросить агента оставить узел</button></div>`}</div>`
 }
 // В-72: the agent's copy is a package in Loginom («Копии агента»), so it can be looked at in Loginom itself, like any
 // other. In the product the button opens a separate Loginom window (not the conversation's agent browser, which is
@@ -2235,6 +2295,16 @@ function viewInLoginom(target) {
 // Iteration 8: a package from the computer is never written by the agent; the user saves the result where they want.
 // Mechanism: the app downloads the copy from Loginom's file storage — to be made for .lgp (today only data files are
 // downloaded, `executor.mjs`), then the system save dialog (Electron `dialog.showSaveDialog`).
+function removeCopyDialog() {
+  const remove = state.removeTurn
+  const turn = remove && turnAt(remove.session, remove.at)
+  if (!turn) return ''
+  const unsave = remove.act === 'unsave'
+  const name = unsave ? savedVersion(turn)?.name : turn.copy?.name
+  return `<p class="dialog-desc">${unsave ? `«${esc(name)}» удалится из ${esc(packageFolder('personal'))}. Изменения останутся в копии агента — их можно сохранить снова.`
+      : `Копия «${esc(name)}» удалится из Loginom, из папки «Копии агента». ${turn.local ? 'Файл на компьютере' : '«Продажи.lgp»'} не меняется. Приложение сохранит снимок копии в разговоре — изменения можно будет вернуть.`}${turn.change?.downloaded ? ` Скачанный «${esc(turn.change.downloaded)}» на компьютере останется.` : ''}</p>
+    <div class="button-row"><button class="btn danger" data-change="${unsave ? 'unsave-ok' : 'discard-ok'}:${remove.at}">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>`
+}
 function downloadName() {
   const turn = state.downloadTurn && turnAt(state.downloadTurn.session, state.downloadTurn.at)
   const saved = turn && changeState(turn) === 'saved' && savedVersion(turn)
@@ -2264,6 +2334,7 @@ function replacePackage() {
   const turn = [...(item.history || []), item][state.replaceTurn.at]
   const saved = changeState(turn) === 'saved' && savedVersion(turn)
   turn.change = {...turn.change, replaced:true}
+  state.replacedBy = {session:item.id, copy:saved ? saved.name : turn.copy?.name}
   original.view = 'sales-v2'
   original.keep = saved ? Boolean(saved.keep) : chainKeep(item, state.replaceTurn.at)
   original.modified = new Date().toISOString().slice(0,10)
@@ -2310,7 +2381,7 @@ function feedAction(d) {
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
   return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, local:item.local, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, local:item.local, from:item.from, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -2571,6 +2642,14 @@ const actions = {
     toast(`Сохранено на компьютер: «${name}»`)
     render()
     ;(document.querySelector(`.turn [data-change="download:${state.downloadTurn.at}"]`) || document.querySelector('.package-save-bar [data-change^="download:"]'))?.focus()
+  },
+  // Run 3: «Свой сервер Loginom» opens an empty form, not the public stand's address and user.
+  'own-server':() => {
+    state.overlay = null
+    ensureSettings(state)
+    Object.assign(state.settings.draft, {url:'', username:'', password:'', empty:false})
+    state.settings.test = undefined
+    settingsTab('loginom')
   },
   'fill-keep':() => {
     state.draft = keepPrompt

@@ -172,7 +172,7 @@ function policyBanner(state) {
 function loginomLine(state, s) {
   const reason = loginomBlocked(state, s, s.connection.url)
   if (s.connection.url && reason) return status(closedMode(state, s) === "device" ? "Не на этом компьютере — не используется" : "Публичный стенд — не используется в закрытом контуре", "wait")
-  return s.connection.connected ? status("Подключён как " + s.connection.username + " · папка /" + s.connection.username, "good") : status("Не подключён", "wait")
+  return s.connection.connected ? status("Подключён как " + s.connection.username + " · папка /" + s.connection.username, "good") : status(s.test?.ok ? "Проверено, ещё не сохранено" : "Не подключён", "wait")
 }
 function loginomTab(state, s) {
   const draft = s.draft
@@ -370,6 +370,14 @@ export function renderSettings(state) {
       "</footer></dialog>" : "") + "</div>"
 }
 
+// Settings opened from a task («Подключиться к Loginom», «Подключить модель») return to it after a successful step.
+function backToTask(state, api) {
+  if (!state.returnTo) return false
+  const page = state.returnTo
+  state.returnTo = null
+  api.navigate(page)
+  return true
+}
 function isWebUrl(value) {
   try {
     const url = new URL(value)
@@ -381,6 +389,14 @@ function isWebUrl(value) {
 function isLocalUrl(value) {
   if (!isWebUrl(value)) return false
   return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(value).hostname)
+}
+// Run 3: in the closed contour a model address must look like the organization's network, not the internet. The
+// product's outbound guard blocks the rest anyway (stage F); the form says so before the user relies on it.
+function isOrgUrl(value) {
+  if (!isWebUrl(value)) return false
+  const host = new URL(value).hostname.replace(/^\[|\]$/g, "")
+  return isLocalUrl(value) || !host.includes(".") || /^(10|127)\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    || /\.(local|lan|internal|intranet|corp|home\.arpa|example|test)$/.test(host)
 }
 function connectionError(state, s) {
   const draft = s.draft
@@ -564,12 +580,7 @@ export function bindSettings(root, state, api) {
       s.test = undefined
       api.toast(s.pendingConnection ? "Сохранено — заработает после текущего хода агента" : "Loginom подключён: " + s.connection.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))
       // Back to the task only when settings were opened from it («Подключиться к Loginom», «Настроить Loginom»).
-      if (state.returnTo) {
-        const page = state.returnTo
-        state.returnTo = null
-        api.navigate(page)
-        return
-      }
+      if (backToTask(state, api)) return
     }
     if (action === "own-open") s.own = { open: true, url: "", key: "", found: null, pick: "", error: "" }
     if (action === "own-cancel") s.own.open = false
@@ -578,6 +589,7 @@ export function bindSettings(root, state, api) {
       const found = isWebUrl(url) ? foundModels(url) : null
       s.own.error = !isWebUrl(url) ? "Введите адрес, начиная с http:// или https://."
         : closedMode(state, s) === "device" && !isLocalUrl(url) ? "В режиме «" + deviceName + "» доступен только адрес на этом компьютере, например http://127.0.0.1:11434/v1."
+          : state.contour === "closed" && !isOrgUrl(url) ? "Адрес похож на интернет: в закрытом контуре модель должна быть в сети организации, например http://llm.local:11434/v1."
           : !found ? "Сервер не ответил. Проверьте адрес и запущены ли Ollama или LM Studio."
             : ""
       s.own.found = s.own.error ? null : found
@@ -591,6 +603,7 @@ export function bindSettings(root, state, api) {
       s.own.open = false
       ensureSettings(state)
       api.toast("Модель «" + model.name + "» добавлена и выбрана по умолчанию")
+      if (backToTask(state, api)) return
     }
     if (action === "cloud-open") s.cloud = { open: true, service: "OpenAI", key: "", error: "" }
     if (action === "cloud-cancel") s.cloud.open = false
@@ -599,7 +612,8 @@ export function bindSettings(root, state, api) {
       const model = { kind: "cloud", source: "cloud", name: cloudServices[s.cloud.service], where: s.cloud.service }
       s.models = [...s.models.filter((item) => item.name !== model.name), model]
       s.cloud.open = false
-      api.toast(s.cloud.service + " подключён: " + model.name + ". Выбрать её можно в «Модели по умолчанию» или в поле ввода разговора")
+      api.toast(s.cloud.service + " подключён: " + model.name + (state.returnTo === "chat" ? ". Продолжите разговор с ней" : ". Выбрать её можно в «Модели по умолчанию» или в поле ввода разговора"))
+      if (backToTask(state, api)) return
     }
     if (action === "free-add") s.models = [freeModel, ...s.models]
     if (action === "model-remove") {
