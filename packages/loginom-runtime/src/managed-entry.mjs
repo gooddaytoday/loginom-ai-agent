@@ -8,12 +8,12 @@ import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
+import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
-import { dashboardStorage } from "./dashboard-storage.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)

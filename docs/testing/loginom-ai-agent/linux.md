@@ -4,7 +4,7 @@
 
 ## Сборка
 
-Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node и полный Chromium; точные закреплённые хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
+Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node 24.19.0 и Chromium revision 1246; точные хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
 
 Из `packages/desktop`:
 
@@ -18,6 +18,8 @@ bun run package:linux --x64 --publish never
 bun typecheck
 bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifact.test.ts
 ```
+
+В `LOGINOM_AI_AGENT_BROWSER_SOURCE` укажите каталог с полным Chromium.
 
 Штатный installer зависимости Electron подготавливает её `dist`, необходимый release manifest. Упаковщик скачивает собственный Electron отдельно и не заменяет этот шаг.
 
