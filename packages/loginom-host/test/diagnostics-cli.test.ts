@@ -34,7 +34,9 @@ const planted = [
 async function platformCredentials(base: string, root: string) {
   const resources = join(base, "installed", "resources", "loginom")
   mkdirSync(root, { recursive: true, mode: 0o700 })
-  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+  // One helper per installed bundle: a second store of the same profile reuses it.
+  if (process.platform === "darwin" && !existsSync(join(resources, "bin", "loginom-keychain")))
+    await buildKeychain(join(resources, "bin"))
   return cliCredentials(process.platform, { root, resources })
 }
 
