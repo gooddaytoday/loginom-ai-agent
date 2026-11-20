@@ -107,6 +107,10 @@ function allowed(state, s, model) {
 function available(state, s) {
   return s.models.filter((model) => allowed(state, s, model))
 }
+// Iteration 8: the composer's model menu lists what this network mode allows.
+export function availableModels(state) {
+  return state.settings ? available(state, state.settings) : []
+}
 function closedMode(state, s) {
   return state.contour === "closed" ? s.closedMode : "online"
 }
@@ -205,7 +209,7 @@ function modelsTab(state, s) {
   const picker = list.length
     ? '<label class="st-field"><span>Модель по умолчанию</span><select data-st-input="model-default" aria-label="Модель по умолчанию">' +
       list.map((model) => option(model.name, model.name + " · " + model.where, s.model?.name)).join("") + "</select>" +
-      "<small>С ней начинается каждый разговор. Её имя видно в поле ввода.</small></label>"
+      "<small>С ней начинается каждый новый разговор. В разговоре модель меняют в поле ввода — для этого разговора.</small></label>"
     : notice("Нет доступной модели", "Без модели агент не ответит. Добавьте свою модель по адресу — ниже.", "error")
   const first = card("Модели", "Какая модель отвечает в разговорах и откуда модели берутся.",
     picker + '<div class="st-list st-space-top">' + rows + "</div>")
@@ -595,7 +599,7 @@ export function bindSettings(root, state, api) {
       const model = { kind: "cloud", source: "cloud", name: cloudServices[s.cloud.service], where: s.cloud.service }
       s.models = [...s.models.filter((item) => item.name !== model.name), model]
       s.cloud.open = false
-      api.toast(s.cloud.service + " подключён: " + model.name + ". Выбрать её можно в «Модели по умолчанию»")
+      api.toast(s.cloud.service + " подключён: " + model.name + ". Выбрать её можно в «Модели по умолчанию» или в поле ввода разговора")
     }
     if (action === "free-add") s.models = [freeModel, ...s.models]
     if (action === "model-remove") {

@@ -564,3 +564,13 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 /* The schema wraps by its own width, not the window's: with the side panel open a 700–1000px window leaves it narrow. */
 .package-frame{container-type:inline-size}
 @container (max-width:760px){.package-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.package-canvas .canvas-connector{display:none}.package-canvas .canvas-node{flex:1 1 40%;width:auto}}
+/* Iteration 8 — failures and edits in a row */
+.change-scope{margin:0;padding:8px 12px 0;color:var(--muted);font-size:13px}
+.change-list li.is-latest{background:var(--amber-soft)}
+.badge.latest{background:var(--amber-soft);color:var(--amber);border:1px solid currentColor;padding:1px 6px;font-size:11px}
+.feed-notice{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:var(--muted);font-size:13px}
+.model-menu{max-width:min(340px,calc(100vw - 16px))}
+.model-menu button>span:last-child{white-space:normal}
+.model-menu small{display:block;color:var(--muted);font-size:12px}
+.model-menu [aria-checked="true"]{font-weight:600}
+@media(max-width:410px){.composer-model:not(.off) .icon:first-child{display:inline-block}}
