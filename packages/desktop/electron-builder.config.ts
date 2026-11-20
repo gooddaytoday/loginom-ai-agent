@@ -93,6 +93,8 @@ const config: Configuration = {
       "/Contents/Resources/loginom/bin/",
       "/Contents/Resources/loginom/browsers/",
       "/Contents/Resources/loginom/ripgrep/",
+      // The dashboard kit's npm packages ship signed esbuild and rollup binaries.
+      "/Contents/Resources/loginom/dashboard/",
     ],
     notarize: false,
     target: [
