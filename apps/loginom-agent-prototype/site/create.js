@@ -142,7 +142,7 @@ function blockedFile(state, item) {
   return item.type === 'skill' && ((state.contour === 'closed' && item.origin === 'file') || ownSkillsOff(state));
 }
 function blockedFileText(state, item) {
-  if (ownSkillsOff(state) && item?.origin !== 'file') return 'Свои навыки выключил администратор вашей организации: агент их не применяет. «Инструкции» в настройках работают — агент следует им во всех разговорах. Если навык нужен — передайте его администратору.';
+  if (ownSkillsOff(state) && item?.origin !== 'file') return 'Свои навыки выключил администратор вашей организации: агент их не применяет. «Инструкции» в настройках работают — агент следует им во всех разговорах. Если навык нужен — сохраните его и передайте администратору: «Мои» → «Передать администратору…».';
   return state.policy === 'set' ? 'Администратор вашей организации не разрешил навыки, которые Loginom не проверял: из файла и «Сообщество». Если навык нужен — передайте файл администратору.'
     : 'В закрытом контуре навыки, которые Loginom не проверял, — из файла и «Сообщество» — выключены, пока их не разрешит администратор. Если навык нужен — передайте файл администратору.';
 }
@@ -277,7 +277,7 @@ export function renderMine(state) {
         (blocked ? '' : item.type === 'skill' ? (item.status === 'draft' ? '<button class="btn" data-own="enable:'+item.id+'">Включить</button>' : '<label class="own-toggle"><input type="checkbox" role="switch" data-own-toggle="'+item.id+'"'+(item.status === 'on' ? ' checked' : '')+'> Пользоваться</label>')
           +'<button class="btn quiet" data-own="try:'+item.id+'">Попробовать</button>' : '<button class="btn" data-own="run:'+item.id+'">Запустить '+icon('arrow',15)+'</button>')+
         '<button class="btn quiet" data-own="edit:'+item.id+'">Изменить</button>'+
-        (item.status === 'draft' ? '' : publishButton(state, item).replace('class="btn"','class="btn quiet"'))+confirm+
+        (item.status === 'draft' && !(blocked && ownSkillsOff(state)) ? '' : publishButton(state, item).replace('class="btn"','class="btn quiet"'))+confirm+
         (pub && ['community','verified'].includes(pub.stage) && !closed ? '<button class="btn quiet" data-own="withdraw:'+item.id+'">Снять с публикации</button>' : '')+
         (closed ? '' : '<button class="btn quiet" data-own="export:'+item.id+'">Сохранить в файл</button>')+
         (deleting ? '<span class="own-confirm">'+(pub && ['community','verified'].includes(pub.stage) ? 'Удалить у себя? Опубликованная версия останется в каталоге — снять её можно кнопкой «Снять с публикации».' : 'Удалить насовсем?')+

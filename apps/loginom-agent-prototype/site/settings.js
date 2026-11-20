@@ -432,7 +432,10 @@ export function beforeSettingsLeave(state, page, tab) {
   const s = state.settings
   if (state.page !== "settings" || s?.tab !== "loginom" || !s.draft || !s.connection) return true
   if (page === "settings" && (!tab || tab === "loginom")) return true
-  if (!isDirty(s)) return true
+  if (!isDirty(s)) {
+    if (!s.draft.url && !s.draft.username && !s.draft.password) s.draft = { ...s.connection, password: "" }
+    return true
+  }
   s.leaveTo = tab ? ["tab", tab] : ["goto", page]
   return false
 }
@@ -608,7 +611,7 @@ export function bindSettings(root, state, api) {
     }
     if (action === "own-add") {
       const local = isLocalUrl(s.own.url)
-      const cloud = !local && (isPublicModelUrl(s.own.url) || (state.contour !== "closed" && !isOrgUrl(s.own.url)))
+      const cloud = !local && isPublicModelUrl(s.own.url)
       const model = { kind: local ? "local" : cloud ? "cloud" : "intranet", source: "own", name: s.own.pick, url: s.own.url.trim(), where: local ? "Этот компьютер" : cloud ? new URL(s.own.url).hostname : "Сеть организации" }
       s.models = [...s.models.filter((item) => item.name !== model.name), model]
       s.preferred = model.name

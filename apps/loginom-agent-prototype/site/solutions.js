@@ -35,7 +35,7 @@ function escape(value) {
 
 function getState(state) {
   homeFolder = '/' + (state.settings?.connection?.username || 'analyst');
-  const rules = state.settings?.instructions || '';
+  const rules = (state.settings?.instructions || '') + ' ' + (state.projects?.find(project => project.id === state.project)?.instructions || '');
   rulesFollowed = /узл/i.test(rules) && /назыв/i.test(rules);
   state.solutions ??= {};
   state.solutions.runs ??= {};
@@ -440,7 +440,7 @@ export function bindSolutions(root,state,api) {
       case 'discuss': {
         const ok = run.outcome === 'success';
         const pkg = chosenPackage(run);
-        api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + (ok ? reportData(key, run.values, pkg).summary : outcomeView[run.outcome][2] + '. ' + outcomeText(key, run)) + ' Что стоит сделать дальше?', ok ? resultFiles(key, run).map(([file]) => file) : [], pkg.source ? {name:pkg.name, where:pkg.where, source:pkg.source} : null);
+        api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + (ok ? reportData(key, run.values, pkg).summary : outcomeView[run.outcome][2] + '. ' + outcomeText(key, run)) + ' Что стоит сделать дальше?', ok ? resultFiles(key, run).map(([file]) => file) : [], pkg.source && key !== 'migration' ? {name:pkg.name, where:pkg.where, source:pkg.source} : null);
         return;
       }
       case 'stop': clearInterval(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
