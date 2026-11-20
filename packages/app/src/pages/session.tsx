@@ -1,5 +1,6 @@
 import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { registerTool } from "@opencode-ai/session-ui/message-part"
+import { GenericTool } from "@opencode-ai/session-ui/basic-tool"
 import { PackageDocsTool } from "@/components/package-docs-tool"
 import { getFilename } from "@opencode-ai/core/util/path"
 
@@ -108,6 +109,17 @@ import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
 
 registerTool({ name: "package_docs_run", render: PackageDocsTool })
+registerTool({
+  name: "dashboard_delete",
+  render: (props) => (
+    <>
+      <GenericTool {...props} />
+      <Show when={props.status === "completed" && props.output}>
+        <p class="text-13-regular text-text-base whitespace-pre-wrap">{props.output}</p>
+      </Show>
+    </>
+  ),
+})
 
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">

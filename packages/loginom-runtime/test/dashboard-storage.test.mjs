@@ -89,8 +89,9 @@ function fixture(move = (files, part, final) => {
   return {
     files,
     connection,
+    storage,
     locks,
-    publish: () => dashboardStorage(context, { binding, content: '{"title":"Draft"}', expected: null }, "dashboardPublish"),
+    publish: (expected = null) => dashboardStorage(context, { binding, content: '{"title":"Draft"}', expected }, "dashboardPublish"),
     versions: (target = binding) => dashboardStorage(context, { binding: target }, "dashboardVersions"),
     deleteVersions: (expected, target = binding) => dashboardStorage(context, { binding: target, expected }, "dashboardDelete"),
   }
@@ -110,6 +111,24 @@ test("publication refused by storage removes its temporary upload", async () => 
   const f = fixture(() => { throw Error("System error, (OS Code 13): Permission denied") })
   await assert.rejects(f.publish(), { message: "DASHBOARD_ACCESS_DENIED" })
   assert.equal(f.files.size, 0)
+})
+
+test("a confirmed reader denial when creating the upload preserves the existing publication", async () => {
+  const f = fixture()
+  const directory = dashboardRequest({ binding }).directory
+  const name = "20261120T002011Z.json"
+  const content = '{"title":"Existing"}'
+  f.files.set(directory + "/" + name, content)
+  f.storage.CreateFile = path => { throw Error(`Невозможно создать файл: "${path}": Permission denied`) }
+  const expected = { name, sourceHash: createHash("sha256").update(content).digest("hex") }
+  await assert.rejects(f.publish(expected), { message: "DASHBOARD_ACCESS_DENIED" })
+  assert.deepEqual([...f.files.values()], [content])
+})
+
+test("an unrelated create failure remains an unknown publication outcome", async () => {
+  const f = fixture()
+  f.storage.CreateFile = path => { throw Error(`Невозможно создать файл: "${path}.other": Permission denied`) }
+  await assert.rejects(f.publish(), { message: "DASHBOARD_WRITE_UNKNOWN" })
 })
 
 test("unknown outcome removes the temporary upload and preserves a final file with different contents", async () => {

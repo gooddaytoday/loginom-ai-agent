@@ -48,6 +48,32 @@ test("trusted node data supports keyboard paging and closing with only the curre
   assert.equal(await table.count(), 0)
 })
 
+test("Escape closes the dashboard after a version label click during queued calculations", async t => {
+  const app = await fixture(t, { published: true })
+  app.page.setDefaultTimeout(30_000)
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  await app.page.getByRole("button", { name: "Данные узла", exact: true }).click()
+  const input = app.page.getByLabel("MinBudget", { exact: true })
+  await app.page.evaluate(() => { window.fixture.wait = true })
+  await input.fill("100000")
+  await input.press("Enter")
+  await app.page.waitForFunction(() => window.fixture.calls === 1 && window.fixture.finish)
+  await input.fill("10000")
+  await app.page.getByText("Версия 20261115T120000Z", { exact: true }).click()
+  assert.equal(await app.page.evaluate(() => document.activeElement === document.body), true)
+  await app.page.keyboard.press("Escape")
+  assert.equal(await app.page.locator("#dashboard-tab-overlay").count(), 0)
+  await app.page.evaluate(() => { window.fixture.wait = false; window.fixture.finish() })
+  await app.page.waitForFunction(() => window.fixture.writes.includes(10000))
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  assert.equal(await app.page.getByLabel("MinBudget", { exact: true }).inputValue(), "10000")
+  await app.page.keyboard.press("Escape")
+  const prevented = await app.page.evaluate(() => !document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })))
+  assert.equal(prevented, false)
+})
+
 test("trusted node data distinguishes an empty result from an absent result", async t => {
   const app = await fixture(t, { published: true, table: {
     schema: [{ name: "count", type: 1 }], rows: [],
@@ -393,6 +419,22 @@ test("dashboard tables crop long string cells and mark the result as truncated",
   await created
   assert.equal(app.snapshots[0].sample.rows[0][0].length, 10_001)
   assert.equal(app.snapshots[0].sample.rows[0][0].at(-1), "y")
+})
+
+test("exactly bounded strings do not produce a truncation warning", async t => {
+  const app = await fixture(t, { published: true, table: {
+    schema: [{ name: "text", type: 2 }], rows: [["short"], ["x".repeat(5_000)], ["y".repeat(10_000)]],
+  } })
+  app.page.setDefaultTimeout(30_000)
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  const { table } = await app.settled()
+  assert.equal(table.rows.length, 3)
+  assert.equal(table.truncated, false)
+  assert.deepEqual(table.rows.map(row => row[0].length), [5, 5_000, 10_000])
+  assert.equal(await app.page.getByRole("status").filter({ hasText: "Некоторые значения укорочены" }).count(), 0)
+  await app.page.getByRole("button", { name: "Данные узла", exact: true }).click()
+  assert.equal(await app.page.getByRole("table", { name: "Данные узла" }).getByRole("row").count(), 4)
+  assert.equal(await app.page.getByRole("status").filter({ hasText: "Некоторые значения укорочены" }).count(), 0)
 })
 
 test("the graph keeps its truncation warning during calculation", async t => {

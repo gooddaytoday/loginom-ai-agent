@@ -150,6 +150,7 @@ export async function dashboardStorage(context, input, operation = "dashboardRea
           || /^System error, \(OS Code (?:13|30)\):/.test(message)
           || (mode === "list" || mode === "lock") && message === "Ошибка доступа к файлу: " + packagePath
           || mode === "lock" && message === 'Невозможно открыть файл "' + directory + '/.delete.lock" на запись'
+          || mode === "upload" && message === 'Невозможно создать файл: "' + directory + "/" + values.part + '": Permission denied'
           || message.endsWith(" в директории только для чтения"))
           return { error: "DASHBOARD_ACCESS_DENIED" }
         return { error: mode === "finish" || mode === "upload" ? "DASHBOARD_WRITE_UNKNOWN"

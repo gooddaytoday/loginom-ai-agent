@@ -401,13 +401,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
-   need(identity&&value(identity,'$I')===(target.kind==='tree'?141:116)
+   const interfaceId=value(identity,'$I');
+   need(identity&&(target.kind==='tree'?interfaceId===141:interfaceId===116||interfaceId===71)
     &&(target.kind==='tree'||helper&&value(helper,'FBaseProxy')===dataSource),'source_binding');
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
-   return {helper,identity,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
+   const batchProxy=interfaceId===71?bg.rpc?.TIBGDataSourceRpcCachedInternal_Proxy:null;
+   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
-  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
+  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
    live();baseline=snapshot();
    output=await baseline.portData.get_Output();live();stable();
@@ -433,12 +435,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    columns=await dataSource.get_Columns();live();stable();
    const total=await columns.get_Count();live();stable();need(Number.isInteger(total)&&total>0&&total<=10000,'column_count');
    const schema=[],types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
+   const batchTypes=[];
    for(let index=0;index<total;index++){
     const column=await columns.getItem(index);items.push(column);live();stable();
     const name=await column.get_Name();live();stable();
     const label=await column.get_DisplayName();live();stable();
-    const type=types[await column.get_DataType()];live();stable();
-    need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&type,'column_metadata');
+    const typeId=await column.get_DataType();live();stable();
+    const type=types[typeId];
+    batchTypes.push(typeId);
+    need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&typeof type==='string','column_metadata');
     schema.push({index,name,label,type});
    }
    const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount-offset,q.sampleRows,Math.floor(10000/total));
@@ -451,6 +456,24 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
    if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
+   const direct=sourceBaseline.interfaceId===71;
+   const batch=direct&&requested>0?await (async()=>{
+    need(typeof sourceBaseline.getValues==='function','source_batch');
+    // This RPC reads the bound server object without the browser's cached blocks.
+    const out=Array.from({length:7},()=>new Out());
+    live();stable();await sourceBaseline.getValues.call(sourceBaseline.batchProxy,dataSource,offset,requested,...out);live();stable();
+    const matrices=out.map(item=>item.value);
+    const counts=[total,0,0,0,0,0,0];
+    for(const type of batchTypes)counts[type]++;
+    need(matrices.every((matrix,type)=>Array.isArray(matrix)&&matrix.length===counts[type]
+     &&matrix.every(cells=>Array.isArray(cells)&&cells.length===requested)),'source_batch_shape');
+    const indexes=[0,0,0,0,0,0,0];
+    return batchTypes.map((type,column)=>{
+     const mask=matrices[0][column],cells=matrices[type][indexes[type]++];
+     for(const flag of mask)need(typeof flag==='boolean','source_batch_shape');
+     return {mask,cells};
+    });
+   })():null;
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount-offset,q.sampleRows);
    for(let row=offset;row<offset+requested;row++){
@@ -468,6 +491,11 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
       }
       nativeCells[column]=adaptNative(cell,schema[column],{dateProfile:'loginom-7.4.2-native-oadate',civilTime:cell.civilTime},nativeDecode);
       rawValues.push(null);continue;
+     }
+     if(batch){
+      const values=batch[column],index=row-offset;
+      rawValues.push((quality&&column===8)||values.mask[index]?null:values.cells[index]);
+      continue;
      }
      live();stable();const raw=quality&&column===8?null:await dataSource.AsVariant(row,column);live();stable();
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');

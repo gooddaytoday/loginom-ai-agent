@@ -4,6 +4,7 @@ import { mountDashboard, sandboxFrame } from "./frame"
 import { probe } from "./probe"
 import type { Update, View } from "./loginom/types"
 
+const doc = document
 const message = (error: unknown) => String((error as { message?: unknown } | null)?.message ?? error)
 const nodeError = (error: unknown) => Error("Узел завершился с ошибкой: " + message(error) + ". Исправьте сценарий и нажмите ещё раз")
 const calculating = "Идёт расчёт"
@@ -12,7 +13,7 @@ const pageSize = 100
 const dataLabel = "Данные узла"
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string) {
-  const node = document.createElement(tag)
+  const node = doc.createElement(tag)
   if (text !== undefined) node.textContent = text
   return node
 }
@@ -33,7 +34,7 @@ function actionButton(text: string) {
 
 start()
 function start() {
-  const studioHttpsPort = document.currentScript?.getAttribute("data-dashboard-studio-https-port")
+  const studioHttpsPort = doc.currentScript?.getAttribute("data-dashboard-studio-https-port")
   let supported: boolean | undefined
   async function post(path: string, body: unknown, signal?: AbortSignal) {
     const res = await fetch(location.origin + "/dashboard/" + path, {
@@ -62,8 +63,15 @@ function start() {
     const tab = studio.tab
     let stopFrame: (() => void) | undefined
     let refreshTimer: ReturnType<typeof setTimeout> | undefined
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }
     const remove = () => {
       clearTimeout(refreshTimer)
+      doc.removeEventListener("keydown", escape, true)
       stopFrame?.()
       stopFrame = undefined
       overlay?.remove()
@@ -80,17 +88,11 @@ function start() {
       const owner = tab()
       const section = element("section")
       overlay = section
-      const escape = (event: KeyboardEvent) => {
-        if (event.key !== "Escape") return
-        event.preventDefault()
-        event.stopPropagation()
-        close()
-      }
-      section.addEventListener("keydown", escape, true)
+      doc.addEventListener("keydown", escape, true)
       section.id = "dashboard-tab-overlay"
       section.ariaLabel = dashboardLabel
       section.style.cssText =
-        "position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;background:#fff;font:14px system-ui;color:#242638"
+        "position:absolute;inset:0;z-index:100;display:flex;flex-flow:column;background:#fff;font:14px system-ui;color:#242638"
       const header = element("header")
       header.style.cssText =
         "display:flex;flex-wrap:wrap;gap:4px;align-items:center;justify-content:space-between;padding:2px 16px;background:#393744;color:white"
@@ -134,7 +136,7 @@ function start() {
         reportFailure()
         async function checkHost() {
           if (lookup.mode !== "strict" || !lookup.hash) return
-          const result = supported ?? (await probe(lookup.appOrigin, document.body))
+          const result = supported ?? (await probe(lookup.appOrigin, doc.body))
           if (result !== null) supported = result
           if (!result) throw Error(result === null
             ? "Хост dashboard недоступен"
@@ -419,7 +421,7 @@ function start() {
             const candidate = mountDashboard(frame, {
               close: () => dashboard && dashboard !== candidate ? discard() : close(),
               ready: () => {
-                const focused = document.activeElement
+                const focused = doc.activeElement
                 if (dashboard?.frame === focused || note.contains(focused)) back.focus()
                 dashboard?.stop()
                 dashboard?.frame.remove()

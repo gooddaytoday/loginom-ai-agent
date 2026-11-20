@@ -7,7 +7,7 @@ import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
-function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false}={}) {
+function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,batch}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const rpcCalls=[],uiCalls=[],disposed=[],elements=new Map();
  const el=tid=>{const e={id:tid,getAttribute:k=>k==='data-tid'?tid:null,classList:{contains:k=>k==='x-tab-active'},getBoundingClientRect:()=>({width:100,height:100}),contains:x=>e===x||e.children?.includes(x)};elements.set(tid,e);return e;};
@@ -22,6 +22,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const integerColumn=columnItems[0],columns=proxy('columns',{get_Count:async()=>types.length,getItem:async i=>columnItems[i]});
  const dataSource=proxy('dataSource',{$S:session,$:{$OW:0,$O:10,$I:116},$FHelper:helper,get_RowCount:async()=>rows.length,get_Columns:async()=>columns,
   AsVariant:async(row,col)=>{rpcCalls.push([row,col]);helper.$FCacheInitialized=true;helper.$FData??={};return rows[row][col];}});helper.FBaseProxy=dataSource;
+ if(batch)dataSource.$.$I=71;
  if(treeOutput){
   dataSource.$.$I=141;
   const scalar=proxy('leaf',{get_Name:async()=> 'flag',get_DisplayName:async()=> 'Flag',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>1});
@@ -43,7 +44,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{}},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -96,6 +97,28 @@ test('tree_io rejects a foreign completed process before acquiring the tree sour
  assert.equal((await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true})).verified,false);
  assert.deepEqual(f.disposed,[]);
 });
+test('reads a completed interface 71 table in one server batch at the requested offset',async()=>{
+ const integer={constructor:{name:'Int64'},toString:()=> '9007199254740993'};
+ const f=fixture({rows:[[],[],[]],types:[5,3,4,5,1],batch:async(source,offset,count,...out)=>{
+  assert.equal(source,f.dataSource);assert.equal(offset,1);assert.equal(count,2);
+  const values=[[[false,true],[false,false],[false,false],[false,false],[false,true]],[[true,false]],[],[[-0,1.2345678901234567]],[[integer,0]],[['one',''],['two','three']],[]];
+  out.forEach((result,index)=>{result.value=values[index];});
+ }});
+ const result=await f.run({port:0,execution,rowOffset:1,sampleRows:2,requireExactNumbers:true});
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.output.sample.map(row=>row.map(cell=>cell.value??null)),[['one',-0,'9007199254740993','two',true],[null,1.2345678901234567,'0','three',null]]);
+ assert.equal(result.output.sample[0][1].decimal,'-0');assert.deepEqual(f.rpcCalls,[]);
+});
+
+test('does not return a fresh table when the server batch omits a null flag',async()=>{
+ const f=fixture({rows:[[]],types:[5],batch:async(_source,_offset,_count,...out)=>{
+  const values=[[Array(1)],[],[],[],[],[['visible']],[]];
+  out.forEach((result,index)=>{result.value=values[index];});
+ }});
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.deepEqual(result,{verified:false,cleanup_complete:true,reason:'source_batch_shape'});
+});
+
 test('reads_bound_port_without_table',async()=>{
  const f=fixture(),result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
  assert.equal(result.verified,true);
