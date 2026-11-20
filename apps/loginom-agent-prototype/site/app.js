@@ -788,8 +788,9 @@ const packageChanges = [
   ['del','Фильтр по дате (ветка «Города»)','удалён — дублировал фильтр в ветке «Регионы»','Фильтр по дате (ветка «Города»)'],
   ['mod','Узел14 → «Выручка по городам»','переименован и получает данные от узла «Проверка пустых значений»','Выручка по городам'],
 ]
-function changeRows(keep) {
-  return keep ? packageChanges.map(row => row[0] === 'del' ? ['mod',keptCityFilter[1],'оставлен: на него ссылается «Города — неделя.lgp»; в этом пакете его результат больше не используется',keptCityFilter[1]] : row) : packageChanges
+function changeRows(keep, rules = null) {
+  const rows = keep ? packageChanges.map(row => row[0] === 'del' ? ['mod',keptCityFilter[1],'оставлен: на него ссылается «Города — неделя.lgp»; в этом пакете его результат больше не используется',keptCityFilter[1]] : row) : packageChanges
+  return rules ? [...rows, ['mod','Модуль','добавлена заметка: что делает модуль и кто за него отвечает — ' + rules.by, null]] : rows
 }
 // Iteration 8: edits in a row go to one copy while it is a draft — the agent opens the copy it made, not the original.
 // The copy's last turn holds its state and buttons; earlier cards say the edit went on. A fork's cards stay with the
@@ -886,7 +887,9 @@ function changeCard(turn) {
   const saved = savedVersion(turn)
   // Rows show what is in the copy, the saved version or the replaced original.
   const keep = head === at && item ? cardKeep(item, at) : false
-  const rows = changeRows(keep)
+  // The rules the copy was first edited under stay with it.
+  const rules = item ? [...(item.history || []), item][copyChain(item, at)[0] ?? at]?.rules : turn.rules
+  const rows = changeRows(keep, rules)
   // Another conversation already replaced the original with its copy: this one can only be saved as a new version.
   const elsewhere = current === 'draft' && !local && salesState().replaced
   const next = proposedVersionName(serverPackages.find(entry => entry.id === 'sales'))
@@ -915,7 +918,7 @@ function changeCard(turn) {
     ${current === 'discarded' ? '' : `<div class="change-card${['draft','continued'].includes(current) ? '' : ' is-' + current}">
       <div class="change-head">${icon('flow',17)}<strong>${esc(current === 'saved' ? saved.name : ['draft','continued'].includes(current) ? agentCopy(turn).name : 'Продажи.lgp')}</strong><span class="badge">${{draft:'копия агента', continued:'продолжено ниже', saved:local ? 'в Loginom' : 'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.filter(([,count]) => count).map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
       ${turn.kind === 'keep' ? `<p class="change-scope">Вся копия против исходного «Продажи.lgp»; этот ответ изменил одну строку — она отмечена.</p>` : ''}
-      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details></div></li>`).join('')}</ul>
+      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}${node ? `<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details>` : ''}</div></li>`).join('')}</ul>
       <div class="change-check"><strong>Проверено приложением</strong> — по квитанциям запуска копии в Loginom:<ul><li>${icon('check',13)} результат — 120 строк, как у исходного</li><li>${icon('check',13)} у «Проверка пустых значений» на выходе «Не соответствуют условию» — 12 строк: без цены или региона, в расчёт не попадают</li><li>${icon('check',13)} ${local ? 'файл на компьютере' : '«Продажи.lgp» в Loginom'} не изменён</li></ul></div>
     </div>`}
     <div class="change-actions">${actions}</div>
@@ -2150,7 +2153,8 @@ function send() {
   if (!old) state.nextModel = null
   state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
-  if (!trialTurn && kind === 'refactor') next.rules = appliedRules(next.project)
+  // Run 3: the rules apply to the edit as well as to the check — the edit adds the module note they ask for.
+  if (!trialTurn && ['refactor','improve'].includes(kind)) next.rules = appliedRules(next.project)
   // В-73: a stopped edit left a partial copy — the next edit finishes it in the same copy.
   if (kind === 'improve') next.copy = draft?.partial ? draft.copy : newAgentCopy()
   if (kind === 'keep' && fromSaved) Object.assign(next, {copy:newAgentCopy(), from:fromSaved.name, files:fromSaved.turn.files, local:fromSaved.turn.local})
