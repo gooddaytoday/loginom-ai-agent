@@ -287,3 +287,7 @@
 .st-connect-note, .st-connect-none { margin-top: 10px; color: var(--muted); font-size: 12px; }
 .st-connect-wait { margin: 12px 0; }
 .st-connect .st-notice { margin-top: 12px; }
+/* Iteration 9: an open permission row under a policy says whether its value is the default one */
+.st-perm { display: grid; justify-items: end; gap: 0; text-align: right; }
+.st-list-row .st-perm small { margin-top: 3px; font-size: 11px; }
+@media (max-width: 520px) { .st-perm { justify-items: start; text-align: left; } }

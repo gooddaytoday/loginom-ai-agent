@@ -337,12 +337,19 @@ function connectDialog(state, s) {
 
 function permissionsTab(state, s) {
   const closed = state.contour === "closed"
-  const rows = permissionKinds.map(([id, title, text]) => {
+  const rows = permissionKinds.map(([id, title, text, initial]) => {
+    // Iteration 9 (run 3, finding 22): under a policy every row says who set it — the lock names the administrator,
+    // an open row says whether its value is the default one.
+    const mark = !state.policy ? "" : s.permissions[id] === initial ? "<small>По умолчанию</small>"
+      : "<small>Вы изменили · по умолчанию «" + permissionLabels[initial] + "»</small>"
     const control = id === "web" && closed ? locked(permissionLabels.deny, lockReason(state))
-      : '<select data-st-input="perm:' + id + '" aria-label="' + esc(title) + '">' + Object.entries(permissionLabels).map(([key, label]) => option(key, label, s.permissions[id])).join("") + "</select>"
+      : '<span class="st-perm"><select data-st-input="perm:' + id + '" aria-label="' + esc(title) + '">' + Object.entries(permissionLabels).map(([key, label]) => option(key, label, s.permissions[id])).join("") + "</select>" + mark + "</span>"
     return listRow(title, id === "web" && state.policy === "set" ? text + " Если нужно — обратитесь к администратору." : text, control)
   }).join("")
-  return card("Разрешения", "Что агент делает сам без вопроса, что — спросив вас, а что не делает никогда. Кнопки, которые нажимаете вы, например «Сохранить новой версией», эти настройки не затрагивают: они работают по правам вашей учётной записи Loginom. Где стоит «Спрашивать», в разговоре можно разрешить «один раз» или «в этом разговоре». Строки с замком в разговоре не разрешить.",
+  const who = state.policy === "set" ? " Строки с замком задал администратор: «Открывать сайты» и терминал. Остальные он не задавал — у них написано, стоит ли значение по умолчанию."
+    : state.policy === "broken" ? " Строки с замком закрыты, пока администратор не исправит файл политики. У остальных написано, стоит ли значение по умолчанию."
+      : " Строки с замком в разговоре не разрешить."
+  return card("Разрешения", "Что агент делает сам без вопроса, что — спросив вас, а что не делает никогда. Кнопки, которые нажимаете вы, например «Сохранить новой версией», эти настройки не затрагивают: они работают по правам вашей учётной записи Loginom. Где стоит «Спрашивать», в разговоре можно разрешить «один раз» или «в этом разговоре»." + who,
     '<div class="st-list">' + rows + "</div>", btn("Как при установке", "perm-reset", "quiet")) +
     card("Терминал", "Команды на вашем компьютере: установка программ, работа с файлами вне проекта.",
       closed ? listRow("Команды в терминале", "Агент не выполняет команды на компьютере.", locked("Выключен", lockReason(state)))
@@ -692,6 +699,11 @@ export function bindSettings(root, state, api) {
     if (name.startsWith("perm:")) {
       s.permissions[name.split(":")[1]] = value
       api.toast("Сохранено")
+      // The «по умолчанию» mark follows the value.
+      if (state.policy) {
+        api.render()
+        document.querySelector('[data-st-input="' + name + '"]')?.focus()
+      }
     }
     if (name === "terminal") {
       s.terminal = value

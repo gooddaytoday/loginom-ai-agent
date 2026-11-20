@@ -1,6 +1,6 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
-import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab } from './hub.js'
+import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab, showHubDetail, installForDemo } from './hub.js'
 import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave, availableModels, usableModels, startConnect } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
 import { renderCreate, renderModeration, bindOwn, trialBanner, trialResult, startFromSession, ownActionsGroup, demoOwn } from './create.js'
@@ -63,10 +63,12 @@ const packageViews = {
     ['chart','ABC-анализ','Расчёт','Группировка по накопленной доле выручки'],
     ['file','Результат','Выход','120 товаров · 3 группы'],
   ],
+  // Iteration 9: «14 узлов, 3 подмодели», as the document and the action say — 5 here and 9 inside (packageSubmodels).
   quality:[
     ['database','Приём данных','Входные данные','Демонстрационная таблица · 2 400 строк'],
-    ['layers','Проверка полей','Преобразование','Проверяются обязательные поля и типы данных'],
-    ['shield','Поиск дублей','Контроль','Проверяются повторяющиеся ключи'],
+    ['layers','Проверка полей','Подмодель · 3 узла','Проверяются обязательные поля, типы и форматы дат'],
+    ['shield','Поиск дублей','Подмодель · 3 узла','Проверяются повторяющиеся ключи'],
+    ['chart','Сводка ошибок','Подмодель · 3 узла','Сколько ошибок и в каких полях'],
     ['file','Отчёт','Выход','Образец отчёта о качестве данных'],
   ],
   calculation:[
@@ -123,6 +125,27 @@ const packageViews = {
     ['flow','Обработка','Расчёт','Пример вычислительного узла'],
     ['file','Результат','Выход','Пример выходной таблицы'],
   ],
+}
+// The nodes inside each submodel of a view. In Loginom a submodel is a node that holds other nodes; «Войти» opens them,
+// «Выйти из подмодели» goes back up (help: processors/control/supernode). extract.ts reads them as `submodels`.
+const packageSubmodels = {
+  quality:{
+    'Проверка полей':[
+      ['shield','Обязательные поля','Фильтр строк','Строки без даты, товара или суммы — на выход «Не соответствуют условию»'],
+      ['layers','Типы и форматы','Преобразование','Суммы — числом, даты — датой в одном формате'],
+      ['chart','Счётчик ошибок','Расчёт','Сколько строк не прошло проверку'],
+    ],
+    'Поиск дублей':[
+      ['layers','Ключ записи','Преобразование','Дата, товар и номер документа в одном поле'],
+      ['chart','Повторы ключа','Группировка','Сколько раз встречается каждый ключ'],
+      ['shield','Дубликаты','Фильтр строк','Ключи, которые встречаются больше одного раза'],
+    ],
+    'Сводка ошибок':[
+      ['chart','Ошибки по полям','Группировка','Сколько ошибок в каждом поле'],
+      ['chart','Доля ошибок','Расчёт','Какая доля строк с ошибкой в каждом поле'],
+      ['file','Таблица для отчёта','Преобразование','Сводка в том виде, в каком её берёт отчёт'],
+    ],
+  },
 }
 // Iteration 8: a follow-up edit kept «Фильтр по дате (ветка «Города»)», which «Города — неделя.lgp» takes results from.
 // A copy, a saved version or a replaced original made with it carries keep:true; the views are the same otherwise.
@@ -755,6 +778,10 @@ function result(item) {
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>${item.local ? 'Файл «Продажи.lgp» с компьютера не менял' : 'Пакет «Продажи.lgp» не менял'}. Что можно сделать лучше:</p>
     <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">${item.local ? 'Агент загрузит копию в Loginom и изменит её; файл на компьютере не изменится.' : 'Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.'}</span></div></div>`
+  if (item.kind === 'enrich') return `<div class="answer-block"><h2>Таблица дополнена</h2><p>Example Data вернул население города и часовой пояс для 2 388 строк из 2 400; у 12 строк нет города — для них сервис ничего не нашёл. Исходная таблица не менялась, дополненная — отдельным файлом.</p>
+    <dl class="result-metrics"><div><dt>Отправлено</dt><dd>2 столбца</dd></div><div><dt>Дополнено</dt><dd>2 388 строк</dd></div><div><dt>Куда</dt><dd>Example Data</dd></div></dl>
+    <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>sales-demo — с данными Example Data.csv</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div></div>`
+  if (item.kind === 'noenrich') return `<div class="answer-block"><p>${item.nosend === 'closed' ? 'Подключение «Внешнее обогащение данных» работает через интернет, а сейчас закрытый контур — в Example Data ничего не отправлено.' : '«Внешнее обогащение данных» не установлено — без него я ничего не отправляю во внешний сервис. В каталоге видно, чей это сервис и что он получит.'}</p>${item.nosend === 'closed' ? '' : `<button class="btn" data-action="open-enrich">${icon('grid',15)} Открыть в каталоге</button>`}</div>`
   if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
@@ -1072,6 +1099,15 @@ const scripts = {
     {plan:1, icon:'layers', live:'Возвращаю «Фильтр по дате (ветка «Города»)»', done:'Вернул «Фильтр по дате (ветка «Города»)» как в исходном', short:'вернул узел', detail:'На узел ссылается «Города — неделя.lgp». «Выручка по городам» по-прежнему получает данные от «Проверка пустых значений»', time:5, think:[3,'Узел нужен только для ссылки из «Города — неделя.lgp»: верну его с тем же условием и входом, а «Выручка по городам» пусть берёт данные после проверки.']},
     {plan:2, icon:'check', live:'Сверяю результат с исходным пакетом', done:'Сверил результат с исходным пакетом', short:'сверил результат', detail:'В результате 120 строк, как в исходном; выход «Фильтр по дате (ветка «Города»)» — те же строки, что раньше', time:8},
   ]},
+  // Iteration 9 (run 3, finding 23): data goes to a third-party service only after the user says so — before the first
+  // send in a conversation. «Разрешения» do not rule it: the connection's tool asks (in OpenCode 2 — rule `ask` for the
+  // connection's MCP tools); «Разрешать в этом разговоре» covers the next sends. The question shows the call's arguments.
+  enrich:{plan:['Прочитать таблицу','Отправить в Example Data','Дополнить таблицу'], permission:{external:true, title:'Отправить данные в Example Data?', text:'Example Data — сторонний сервис, не Loginom. Подключение «Внешнее обогащение данных» отправит ему только эти столбцы; что сервис делает с данными, решают его условия.', args:[['Сервис','Example Data · api.example-data.example'],['Уйдёт','столбцы «Город» и «Регион», 2 400 строк из «sales-demo.csv»'],['Не уйдёт','остальные столбцы таблицы']], noInstead:true, trace:'отправить «Город» и «Регион» (2 400 строк) в Example Data', scope:'отправлять данные в Example Data (api.example-data.example)', denied:'Хорошо, в Example Data ничего не отправил. Без этого сервиса дополнить таблицу не могу.'}, steps:[
+    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк; сервису нужны столбцы «Город» и «Регион»', time:3},
+    {plan:1, icon:'upload', ask:'permission', live:'Отправляю «Город» и «Регион» в Example Data', done:'Отправил «Город» и «Регион» в Example Data', short:'отправил 2 столбца в Example Data', detail:'api.example-data.example · 2 400 строк; другие столбцы не отправлялись', time:6},
+    {plan:2, icon:'file', live:'Дополняю таблицу', done:'Дополнил таблицу столбцами «Население города» и «Часовой пояс»', short:'дополнил таблицу', detail:'{folder}', time:4},
+  ]},
+  noenrich:{steps:[]},
   more:{steps:[]},
   nocopy:{steps:[]},
   pick:{steps:[]},
@@ -1110,7 +1146,7 @@ scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permi
   {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
 // Kinds the agent answers in words, without steps in Loginom.
-const answerOnly = ['chat','more','nocopy','pick','discuss']
+const answerOnly = ['chat','more','nocopy','pick','discuss','noenrich']
 function scriptOf(turn) {
   return turn.kind === 'improve' && turn.local ? scripts.improveLocal : turn.kind === 'keep' && turn.from ? scripts.keepFrom : scripts[turn.kind] || scripts.chat
 }
@@ -1152,7 +1188,7 @@ function runSteps(item) {
   // An edit of a copy that exists (follow-up, finishing a stopped edit) does not ask again, but «Запрещено» stops it.
   const editsCopy = item.step === 0 && item.copy && (item.kind === 'keep' && !item.from || item.resumeCopy)
   if (editsCopy && step.ask === 'permission' && !asked) item.cleared.push(item.step)
-  const rule = step.ask === 'permission' && !asked && !editsCopy ? state.settings.permissions?.save : editsCopy && !asked && state.settings.permissions?.save === 'deny' ? 'deny' : null
+  const rule = step.ask === 'permission' && !asked && !editsCopy && !script.permission.external ? state.settings.permissions?.save : editsCopy && !asked && state.settings.permissions?.save === 'deny' ? 'deny' : null
   if (rule === 'allow') {
     item.decisions.push({at:item.step, choice:'setting'})
     item.cleared.push(item.step)
@@ -1496,6 +1532,7 @@ function openPackage(item, focus = null) {
   state.focus = focus
   rememberPackage(item.id, 'просмотр')
   state.node = item.view === 'calculation' ? 1 : null
+  state.sub = null
   if (state.page === 'loginom') dismiss()
   else navigate('loginom')
   $('.package-top strong')?.focus()
@@ -1662,6 +1699,77 @@ function nodeFactsHtml(facts, mode) {
     <tbody>${rows.map(([label,before,after]) => `<tr${before === after ? ' class="same"' : ''}><th scope="row">${esc(label)}</th>${before === after
       ? `<td colspan="2">${esc(before)} <span class="muted">· не менялось</span></td>` : `<td class="was" data-label="Было">${esc(before || '—')}</td><td class="now" data-label="Стало">${esc(after || '—')}</td>`}</tr>`).join('')}</tbody></table>`
 }
+// Iteration 9 (run 3, finding 10): the schema is a graph, as a Loginom scenario is — links go from an output port on
+// the right of a node to an input port on the left of the next, so branches and joins are visible. A node stands one
+// column right of the nodes it takes data from. Fixed steps let the links (SVG) and the nodes (CSS classes) agree
+// without measuring. In the product links and ports come from extract.ts; node positions from <Position Left Top> in
+// Unit.xml, which the parser does not read yet.
+const graphStep = {col:176, half:62, width:136, height:96, left:20, top:18}
+function schemaGraph(cards, links) {
+  const depth = cards.map(() => 0)
+  cards.forEach(() => links.forEach(link => { depth[link.to] = Math.max(depth[link.to], depth[link.from] + 1) }))
+  const count = depth.map(level => depth.filter(other => other === level).length)
+  const tall = Math.max(...count)
+  // Rows in half steps: a column with fewer nodes sits in the middle, as a source between its two branches.
+  const half = depth.map((level, i) => tall - count[i] + 2 * depth.slice(0, i).filter(other => other === level).length)
+  const width = (Math.max(...depth) + 1) * graphStep.col
+  const height = (tall - 1) * 2 * graphStep.half + graphStep.height + 2 * graphStep.top
+  const used = (i, side, k) => links.some(link => side === 'in' ? link.to === i && link.in === k : link.from === i && link.out === k)
+  const port = (i, side, k) => [graphStep.left + depth[i] * graphStep.col + (side === 'in' ? 0 : graphStep.width),
+    graphStep.top + half[i] * graphStep.half + graphStep.height * (k + 1) / (cards[i][side].length + 1)]
+  const paths = links.map(link => {
+    const [x1, y1] = port(link.from, 'out', link.out)
+    const [x2, y2] = port(link.to, 'in', link.in)
+    const bend = Math.min(60, (x2 - x1) / 2)
+    return `<path class="graph-link${link.status ? ' is-' + link.status : ''}" d="M${x1} ${y1}C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}"/>`
+  })
+  const ports = (i, side) => cards[i][side].map((name, k, all) => `<span class="graph-port ${side} p${k + 1}of${all.length}${used(i, side, k) ? '' : ' is-free'}" title="${esc(name + (used(i, side, k) ? '' : ' — не подключён'))}"></span>`).join('')
+  return `<div class="graph"><svg class="graph-links" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${paths.join('')}</svg>${cards.map((card, i) => {
+    const tag = card.index == null ? 'div' : 'button'
+    return `<${tag} class="canvas-node gx-${depth[i]} gy-${half[i]}${card.index != null && state.node === card.index ? ' active' : ''}${card.cls || ''}"${card.index == null ? '' : ` data-node="${card.index}" aria-pressed="${state.node === card.index}"`}>${card.mark ? `<span class="node-mark">${card.mark}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[card.glyph] || 'violet'}">${icon(card.glyph,19)}</span><strong>${esc(card.title)}</strong><small>${esc(card.small)}</small>${ports(i,'in')}${ports(i,'out')}</${tag}>`
+  }).join('')}</div>`
+}
+// A node's links are its «Вход «…» ← «узел»» rows (the «Настройки и связи» table), so the schema cannot disagree
+// with it; the source's output is the one whose row names the receiving node.
+function factLinks(names, facts, side) {
+  const value = row => row[side === 'before' ? 1 : 2] || ''
+  return facts.flatMap((rows, to) => (rows || []).filter(row => row[0].startsWith('Вход ')).flatMap((row, port) => {
+    const from = value(row).startsWith('← «') ? names.indexOf(value(row).slice(3, -1)) : -1
+    if (from < 0) return []
+    const out = (facts[from] || []).filter(other => other[0].startsWith('Выход ')).findIndex(other => value(other).includes(`«${names[to]}»`))
+    return [{from, out:Math.max(out, 0), to, in:port}]
+  }))
+}
+// The copy's links; one the original did not have is new. A removed node keeps its old links, dashed. A link that only
+// moved between kept nodes shows in the node's «Настройки и связи» («было → стало»).
+function diffLinks(nodes) {
+  const facts = nodes.map(node => node[6][1])
+  const before = factLinks(nodes.map(node => node[5] || node[1]), facts, 'before')
+  return [...factLinks(nodes.map(node => node[1]), facts, 'after').map(link => ({...link, status:before.some(old => old.from === link.from && old.to === link.to) ? '' : 'add'})),
+    ...before.filter(link => [link.from, link.to].some(i => nodes[i][4] === 'del')).map(link => ({...link, status:'del'}))]
+}
+// Inside a submodel its ports sit at the left and right edges, as in Loginom; here — as «Вход» and «Выход» of the chain.
+function submodelGraph(nodes, links, title, inner) {
+  const at = nodes.findIndex(node => node[1] === title)
+  const from = links.find(link => link.to === at)
+  const to = links.find(link => link.from === at)
+  const edge = (name, small, glyph, side) => ({glyph, title:name, small, cls:' is-io', in:side === 'out' ? ['Вход «Таблица данных»'] : [], out:side === 'in' ? ['Выход «Таблица данных»'] : []})
+  return schemaGraph([edge('Вход подмодели', from ? `← «${nodes[from.from][1]}»` : 'не подключён', 'download', 'in'),
+    ...inner.map(([glyph,name,kind],i) => ({glyph, title:name, small:kind, index:i, in:['Вход «Входной источник данных»'],
+      out:kind === 'Фильтр строк' ? ['Выход «Соответствуют условию»', 'Выход «Не соответствуют условию»'] : ['Выход «Выходной набор данных»']})),
+    edge('Выход подмодели', to ? `→ «${nodes[to.to][1]}»` : 'не подключён', 'upload', 'out')], chainLinks(inner.length + 2))
+}
+function chainLinks(count) {
+  return Array.from({length:Math.max(count - 1, 0)}, (_, i) => ({from:i, out:0, to:i + 1, in:0}))
+}
+// Ports named as in Loginom: from the facts when the demo has them; a submodel's ports are «Таблица данных».
+function portsOf(rows, glyph, links = [], i = -1, submodel = false) {
+  if (submodel) return {in:['Вход «Таблица данных»'], out:['Выход «Таблица данных»']}
+  const outs = (rows || []).filter(row => row[0].startsWith('Выход ')).map(row => row[0])
+  if (rows) return {in:rows.filter(row => row[0].startsWith('Вход ')).map(row => row[0]), out:outs.length ? outs : ['Выход «Выходной набор данных»']}
+  return {in:links.some(link => link.to === i) ? ['Вход «Входной источник данных»'] : [],
+    out:glyph === 'file' && !links.some(link => link.from === i) ? [] : ['Выход «Выходной набор данных»']}
+}
 // The working copy on the schema: added, changed and removed nodes marked; a selected node shows before → after.
 function changedPackage(item) {
   // The page can outlive its card (browser Back after a follow-up edit): it shows the copy's last card.
@@ -1681,8 +1789,10 @@ function changedPackage(item) {
     <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : elsewhere ? `Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» уже заменён ${replacedWhere(chat?.id)} — эти изменения можно сохранить новой версией.` : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
-    <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span></div>
-    <div class="package-canvas diff-canvas" aria-label="Схема пакета с изменениями">${shown.map(([glyph,title,kind,detail,status,before],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''} ${status && !showBefore ? 'is-' + status : ''}" data-node="${i}" aria-pressed="${state.node === i}">${status && !showBefore ? `<span class="node-mark">${mark[status]}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${showBefore && before ? before : title}</strong><small>${kind}</small></button>`).join('')}</div>
+    <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span>${showBefore ? '' : '<span class="c-link-add">— новая связь</span><span class="c-link-del">- - связь удалённого узла</span>'}</div>
+    <div class="package-canvas graph-canvas diff-canvas" aria-label="Схема пакета ${showBefore ? 'до изменений' : 'с изменениями'}">${schemaGraph(shown.map(([glyph,title,kind,,status,before,facts],i) => ({glyph, title:showBefore && before ? before : title, small:kind, index:i,
+      cls:status && !showBefore ? ' is-' + status : '', mark:status && !showBefore ? mark[status] : '', ...portsOf(facts[1], glyph)})), showBefore ? factLinks(shown.map(node => node[5] || node[1]), shown.map(node => node[6][1]), 'before') : diffLinks(shown))}</div>
+    <p class="graph-legend">Связь идёт от выхода узла (справа) ко входу следующего (слева); пустой кружок — порт не подключён.<span class="graph-scroll-hint"> Схема шире экрана — прокрутите её вбок.</span></p>
     <div class="package-foot" role="status">${node ? (node[4] && !showBefore ? `<strong>${mark[node[4]]}: ${esc(node[1])}.</strong> ${esc(node[3])}${nodeFactsHtml(node[6],'diff')}`
       : esc(node[2] + (showBefore && node[4] === 'mod' ? ' — до изменений' : '')) + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
     <div class="package-save-bar">
@@ -1708,12 +1818,19 @@ function packages() {
   const dirty = hasPackageEdits(item)
   const canDownload = dirty || Boolean(item.savedVersion)
   const focus = state.focus?.pkg === item.id && state.focus.view === item.view ? state.focus : null
-  const node = Number.isInteger(state.node) ? nodes[state.node] : null
+  const facts = nodes.map(node => nodeFacts(item.view, node[1], item.keep)?.[1])
+  const links = facts.some(Boolean) ? factLinks(nodes.map(node => node[1]), facts, item.view === 'sales' ? 'before' : 'after') : chainLinks(nodes.length)
+  const inner = packageSubmodels[item.view] || {}
+  const sub = state.sub?.pkg === item.id && inner[state.sub.title] ? state.sub.title : null
+  const node = Number.isInteger(state.node) ? (sub ? inner[sub] : nodes)[state.node] : null
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.localFile ? 'Файл на компьютере · схема прочитана из файла, Loginom не нужен' : item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.agentCopy ? `копия агента из разговора «${esc(item.agentCopy)}»` : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span>${item.isDraft || item.localFile ? '' : loginomButton(item.id)}</div>
-    <div class="package-canvas${focus ? ' focus-canvas' : ''}" aria-label="Схема пакета">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}${focus?.nodes.includes(i) ? ' is-focus' : ''}" data-node="${i}">${focus?.nodes.includes(i) ? '<span class="node-mark">Замечание</span>' : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
-    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${esc(node[3])}` + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
+    ${sub ? `<div class="graph-path">${icon('layers',16)}<span>${esc(item.name)} › подмодель «${esc(sub)}»</span><button class="btn quiet" data-action="leave-sub">Выйти из подмодели</button></div>` : ''}
+    <div class="package-canvas graph-canvas${focus ? ' focus-canvas' : ''}" aria-label="${sub ? `Схема подмодели «${esc(sub)}»` : 'Схема пакета'}">${sub ? submodelGraph(nodes, links, sub, inner[sub])
+      : schemaGraph(nodes.map(([glyph,title,kind],i) => ({glyph, title, small:kind, index:i, cls:(focus?.nodes.includes(i) ? ' is-focus' : '') + (inner[title] ? ' is-sub' : ''), mark:focus?.nodes.includes(i) ? 'Замечание' : '', ...portsOf(facts[i], glyph, links, i, Boolean(inner[title]))})), links)}</div>
+    <p class="graph-legend">Связь идёт от выхода узла (справа) ко входу следующего (слева); пустой кружок — порт не подключён.<span class="graph-scroll-hint"> Схема шире экрана — прокрутите её вбок.</span></p>
+    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${sub ? esc(node[2]) + ' · ' : ''}${esc(node[3])}` + (inner[node[1]] && !sub ? `<p class="graph-sub-note">Подмодель: внутри ${inner[node[1]].length} ${inner[node[1]].length > 4 ? 'узлов' : 'узла'}. <button class="btn" data-action="enter-sub">${icon('layers',15)} Войти в подмодель</button></p>` : '') + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
     <div class="package-save-bar">
       ${isCalculation ? `<span class="package-save-status${dirty ? ' dirty' : ''}" role="status">${icon(dirty ? 'circle' : 'check',15)} ${dirty ? 'Есть несохранённые изменения' : item.savedVersion ? 'Сохранено в Loginom · демо' : 'Исходная версия'}</span>`
         : ''}
@@ -1730,6 +1847,10 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
+    // Iteration 9 (В-77): findings 10, 22, 23 of the third review run.
+    ['Схема пакета — ветви и связи','Откроется «Продажи.lgp»: узлы стоят по ходу данных, связь идёт от выхода узла (справа) ко входу следующего (слева). У «Фильтр строк» два выхода, неподключённый — пустой кружок; ветки «Регионы» и «Города» сходятся в «Результат». «Подмодели» — «Качество данных.lgp»: «Войти в подмодель», назад — «Выйти из подмодели». «Схема правки» — отправьте запрос, в карточке правки — «Посмотреть на схеме»: новые связи зелёные, связи удалённого узла — пунктиром.',[['try-graph','Начать'],['try-submodel','Подмодели'],['try-improve','Схема правки']]],
+    ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Как при установке» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
+    ['Данные — стороннему сервису','Откроется «Внешнее обогащение данных» в каталоге: подключение подготовил Loginom, а сервис — Example Data, сторонняя компания; «Куда уходят данные». «Перед отправкой» — разговор: перед первой отправкой агент спросит «Отправить данные в Example Data?» и покажет, какие столбцы уйдут; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Подключение в прототипе поставится само; демо-политика, если включена, уберётся.',[['try-enrich','Начать'],['try-enrich-send','Перед отправкой']]],
     ['Модели — как в OpenCode 2','Откроется окно «Подключить провайдера», как в OpenCode 2 (В-82): популярные провайдеры и поиск, вход через ChatGPT, GitHub Copilot кодом, ключ API, свой сервер. Вход по подписке в прототипе подтверждаете сами. После «Подключено: … — выберите модель» приложение возвращается в новый разговор с этой моделью. Под демо-политикой администратора окно недоступно — модели задаёт он. В настройках — «Провайдеры» и «Модели», как в OpenCode 2; «Подключить модель» — в меню модели в поле ввода и в блоке «Модель остановила ход».',[['try-connect','Начать'],['try-model-failure','После лимита модели']]],
     ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Контекст → Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
     ['Замена из сохранённой версии','В карточке правки нажмите «Сохранить новой версией», затем «Заменить исходный…». Окно покажет, что «Города — неделя.lgp» сломается, и предложит «Попросить агента оставить узел»: агент сделает копию новой версии и вернёт узел — после этого обе ссылки рабочие.',[['try-improve','Начать']]],
@@ -1753,10 +1874,13 @@ function review() {
     ['Сбои','Отправьте запрос: шаг в Loginom не удастся — блок скажет, что случилось, с «Повторить шаг» и «Проверить подключение»; «Проверить снова» вернёт Loginom. «Лимит модели» — на втором шаге у бесплатной модели кончится дневной лимит: что случилось, что уже сделано, другая модель или «Подключить модель». После лимита бесплатная модель в прототипе молчит до перезагрузки страницы; в карточке 9 работает модель администратора.',[['try-failure','Начать'],['try-model-failure','Лимит модели']]],
     ['Закрытый контур','Включится политика администратора: только сеть организации, в настройках — «Задано администратором», модель — от администратора. Дополнение «Контроль полноты загрузок» администратор скачивает на сайте каталога и передаёт файлом: в приложении — «Каталог» → «Импорт из файла». Сайт откроется вместо приложения; после возврата разговоры, подключение Loginom и инструкции прототипа сбросятся, политика останется. Убрать политику — «убрать» внизу этой страницы.',[['policy-set','Начать'],['open-hub-site','Сайт каталога']]],
   ]
-  // Open owner questions, each with a recommended variant; empty when everything is decided.
   // Open owner questions, each with a recommendation; empty when everything is decided.
-  const questions = []
+  const questions = [
+    '<strong>Когда спрашивать перед отправкой стороннему сервису.</strong> Сейчас — перед первой отправкой в каждом разговоре: агент показывает сервис, какие столбцы и сколько строк уйдут; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Можно спрашивать при каждой отправке или один раз — при установке подключения. Рекомендую как сейчас: видно, что именно уходит, и вопрос не повторяется на каждом шаге.',
+    '<strong>Отметка у подключения к стороннему сервису.</strong> У «Внешнего обогащения данных» осталась отметка «Loginom» — кто подготовил подключение, а рядом новая: «Сервис: Example Data — сторонняя компания». Можно вместо «Loginom» завести четвёртый уровень, например «Сторонний сервис», но тогда уровни перестанут отвечать на один вопрос — кто подготовил. Рекомендую три уровня и отдельную отметку сервиса.',
+  ]
   const changed = [
+    'Итерация 9 (В-77), находки 10, 22, 23 третьего прогона оценки. Схема пакета — как сценарий Loginom: узлы по ходу данных, связи от выхода ко входу, порты (пустой кружок — не подключён), ветви и подмодели с «Войти в подмодель» и «Выйти из подмодели»; на схеме правки новые связи зелёные, связи удалённого узла — пунктиром. В «Разрешениях» под политикой у незапертых строк — «По умолчанию» или «Вы изменили». У «Внешнего обогащения данных» видно, чей сервис и куда уходят данные; перед первой отправкой в разговоре агент спрашивает.',
     'Модели и провайдеры — как в OpenCode 2 (В-82): окно «Подключить провайдера» (список, поиск, вход через ChatGPT, код GitHub Copilot, ключ API, свой сервер, «Подключено — выберите модель»), в настройках — «Провайдеры» и «Модели» с переключателями «показывать». Отдельной «модели по умолчанию» больше нет: новый разговор берёт последнюю выбранную.',
     'По третьему прогону оценки (девять отчётов: Opus, Sonnet, Haiku): из сохранённой версии окно замены тоже предлагает «Попросить агента оставить узел» — агент делает копию новой версии; удаление из Loginom («Отменить изменения», «Удалить новую версию») спрашивает подтверждение; «Запрещено» и «Разрешено» у «Сохранять пакеты в Loginom» действуют; в карточке правки — «Проверено приложением» по квитанциям запуска; мастер «Проверить» учитывает «Инструкции» и называет те же три замечания, что разговор; проверка файла с компьютера — без Loginom; «Свой сервер Loginom» — пустая форма; после «Подключить модель» — назад в разговор; у облачной модели в поле ввода — значок облака; «Опиши пакет» без пакета — просьба выбрать пакет.',
     'Итерация 8 — сбои и повторы. Модель остановила ход: блок с причиной простыми словами, «Продолжить с другой моделью» или «Подключить модель»; в ленте — «Модель не ответила» и «Вы продолжили с моделью…», у ответа — какие модели работали. Модель в поле ввода — модель этого разговора (как в OpenCode 2), выбор из моделей этого режима сети.',
@@ -1774,6 +1898,7 @@ function review() {
     'Консоль модерации (только для прототипа) — очередь, автоматические проверки, текст, решения; старый экран «Создать навык» убран.',
   ]
   const later = [
+    'Схема правки внутри подмодели: агент в прототипе правит только «Продажи.lgp», где подмоделей нет. Узлы на схеме стоят по ходу данных; в продукте — там, где их поставил автор пакета.',
     'Публикация, шаг 2 — сервис со входом по почте и историей версий; сейчас показан шаг 1.',
     'Отозванная версия у тех, кто её установил: в прототипе описано словами, без экрана.',
     'Журнал действий агента — в прототипе только строка в «Диагностике», без просмотра и выгрузки.',
@@ -1813,13 +1938,13 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · этап A принят, план этапа B решён</p><h1>Что решить</h1><p>Этап A принят (В-78), вопросы плана этапа B и окна моделей решены (В-83…В-91) — открытых вопросов нет. Ключевые сценарии 1–9 ниже — для повторного прохода; новое — карточка А «Модели — как в OpenCode 2». Дальше — итерация 9: схема пакета с ветвями, пометка «по умолчанию» в «Разрешениях», подтверждение отправки данных у «Подключений». Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 9</p><h1>Что решить</h1><p>Итерация 9 (В-77) — три находки третьего прогона оценки: схема пакета с ветвями, связями, портами и подмоделями; в «Разрешениях» под политикой видно, что задал администратор, а что стоит по умолчанию; у подключения к стороннему сервису видно, чей он, и перед первой отправкой данных агент спрашивает. Попробовать — карточки А–В в разделе «Новое», два вопроса — ниже ключевых сценариев. Ключевые сценарии 1–9 — для повторного прохода. Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
     <h2 class="rv-heading">Ключевые сценарии — приняты 20.11.2026</h2>
     <div class="rv-grid">${accept.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${index + 1}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ol class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ol>` : ''}
-    <h2 class="rv-heading">Новое: модели, третий прогон и итерация 8</h2>
-    <p class="rv-lead">Карточка А — модели и провайдеры как в OpenCode 2 (В-82); Б–Г — по третьему прогону оценки агентами и решениям В-75, В-76; дальше — итерация 8.</p>
-    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖЗИКЛМ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
+    <h2 class="rv-heading">Новое: итерация 9, модели, третий прогон</h2>
+    <p class="rv-lead">А–В — итерация 9 по находкам 10, 22, 23 третьего прогона оценки (В-77); Г — модели и провайдеры как в OpenCode 2 (В-82); Д–Ж — по третьему прогону и решениям В-75, В-76; дальше — итерация 8.</p>
+    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖЗИКЛМН'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     <h2 class="rv-heading">Решено по итерации 6</h2>
     <ul class="rv-changes">${decided6.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
@@ -2153,7 +2278,9 @@ function send() {
   const named = old?.kind === 'pick' && !withPackage && (/\.lgp$/i.test(bare) && bare.split(/\s+/).length <= 4 ? bare : prompt.match(/[«"]([^«»"]+\.lgp)[»"]/i)?.[1] || prompt.match(/[^\s«»"]+\.lgp/i)?.[0])
   // The package this conversation works with: attached, or «Продажи.lgp» that the mock's check and edit are about.
   const inChat = !withPackage && (old?.files?.find(file => /\.lgp$/i.test(file)) || (['refactor','clean','improve','keep','more'].includes(old?.kind) ? 'Продажи.lgp' : null))
-  let kind = web ? 'chat' : discussing ? 'discuss' : named ? 'document' : /документ|описан|опиши/i.test(prompt) && (withPackage || (inChat && !/замечани|шаг|подробн/i.test(prompt))) ? 'document'
+  // Iteration 9: a request to enrich data from the third-party service — only with the connection installed and online.
+  const enrich = /обогат|example data|внешн\S* сервис/i.test(prompt) && (!hubHasInstalled(state,'cloud') ? 'missing' : state.contour === 'closed' ? 'closed' : 'ok')
+  let kind = web ? 'chat' : enrich ? (enrich === 'ok' ? 'enrich' : 'noenrich') : discussing ? 'discuss' : named ? 'document' : /документ|описан|опиши/i.test(prompt) && (withPackage || (inChat && !/замечани|шаг|подробн/i.test(prompt))) ? 'document'
     // Run 3: the mock cannot find a package by its name in the text — it asks to pick one instead of building ABC.
     : /документ|описан|опиши/i.test(prompt) && !state.draftFiles.length ? 'pick'
     : /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /провер|оптимиз|(?<![а-яё])лучше/i.test(prompt) ? 'refactor'
@@ -2161,7 +2288,7 @@ function send() {
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
     // An edit or an answer about the copy is not repeated by «Спасибо».
-    : old && !['chat','improve','keep','more','nocopy','pick','discuss'].includes(old.kind) && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
+    : old && !['chat','improve','keep','more','nocopy','pick','discuss','enrich','noenrich'].includes(old.kind) && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
   // A package from the computer: the agent uploads its own copy to Loginom; the file itself never changes.
   const local = state.draftPackage ? state.draftPackage.source === 'local' : Boolean(old?.local)
   if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''), local)) kind = 'clean'
@@ -2187,7 +2314,7 @@ function send() {
   if (trialTurn) kind = state.trialSkill.kind
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
   // Iteration 8: checking a file from the computer reads it where it is, like documenting.
-  const needsLoginom = !answerOnly.includes(kind) && !(['document','refactor','clean'].includes(kind) && local)
+  const needsLoginom = !answerOnly.includes(kind) && kind !== 'enrich' && !(['document','refactor','clean'].includes(kind) && local)
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
   if (old) {
     clearTimeout(old.timer)
@@ -2200,7 +2327,7 @@ function send() {
     files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     history:kept, allowed:[...(old?.allowed || [])],
-    step:0, decisions:[], cleared:[], steer:[], web, local,
+    step:0, decisions:[], cleared:[], steer:[], web, local, nosend:kind === 'noenrich' ? enrich : undefined,
     // The conversation keeps the model it started with (OpenCode 2: the session's model), not the current default.
     model:old ? old.model || old.modelName : state.nextModel || currentModel(null),
   }
@@ -2446,7 +2573,7 @@ function feedAction(d) {
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
   return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, nosend:item.nosend, local:item.local, from:item.from, resumeCopy:item.resumeCopy, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -2518,6 +2645,33 @@ const actions = {
   'try-closed':() => { applyDemoPolicy('', null); settingsTab('contour') },
   'try-own-model':() => applyDemoPolicy('', 'models'),
   'try-permissions':() => applyDemoPolicy('', 'permissions'),
+  // Iteration 9: «Разрешения» under the demo policy — the lock or «по умолчанию» on every row.
+  'try-policy-permissions':() => applyDemoPolicy('set', 'permissions'),
+  // Iteration 9: the schema of «Продажи.lgp» with its branches; «Качество данных.lgp» with a submodel selected.
+  'try-graph':() => openPackage(serverPackages.find(entry => entry.id === 'sales')),
+  'try-submodel':() => {
+    openPackage(serverPackages.find(entry => entry.id === 'quality'))
+    state.node = 1
+    render()
+  },
+  // Iteration 9: the card of the connection to a third-party service, and the question before the first send.
+  'open-enrich':() => {
+    showHubDetail(state, 'cloud')
+    navigate('hub')
+  },
+  'try-enrich':() => {
+    applyDemoPolicy('')
+    showHubDetail(state, 'cloud')
+    navigate('hub')
+  },
+  'try-enrich-send':() => {
+    applyDemoPolicy('')
+    if (state.contour !== 'closed' && !hubHasInstalled(state, 'cloud')) {
+      installForDemo(state, 'cloud')
+      toast('Только для прототипа: подключение «Внешнее обогащение данных» установлено')
+    }
+    tryPrompt('Дополни таблицу «sales-demo.csv» данными о городах из Example Data')
+  },
   'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
   'try-check':() => tryPrompt('Проверь сценарий продаж'),
@@ -2638,6 +2792,23 @@ const actions = {
     render()
     $('.calculation-inspector button')?.focus()
   },
+  // Iteration 9: «Войти» into a submodel and «Выйти из подмодели», as in Loginom.
+  'enter-sub':() => {
+    const item = state.activePackage
+    const title = viewNodes(item.view, item.keep)[state.node]?.[1]
+    if (!packageSubmodels[item.view]?.[title]) return
+    state.sub = {pkg:item.id, title}
+    state.node = null
+    render()
+    $('.graph-path button')?.focus()
+  },
+  'leave-sub':() => {
+    const item = state.activePackage
+    state.node = viewNodes(item.view, item.keep).findIndex(node => node[1] === state.sub?.title)
+    state.sub = null
+    render()
+    $(`[data-node="${state.node}"]`)?.focus()
+  },
   'change-calculation':() => {
     state.calculationChanged = !state.calculationChanged
     render()
@@ -2647,7 +2818,7 @@ const actions = {
     const source = state.activePackage
     if (source.view === 'calculation') return startPackageEdit()
     newSession()
-    const node = Number.isInteger(state.node) ? viewNodes(source.view, source.keep)[state.node]?.[1] : null
+    const node = Number.isInteger(state.node) ? (state.sub?.pkg === source.id && packageSubmodels[source.view]?.[state.sub.title] || viewNodes(source.view, source.keep))[state.node]?.[1] : null
     chooseDraftPackage({name:source.name, where:packagePath(source), source:'loginom', item:source})
     state.draft = node ? `Проверь узел «${node}» и покажи, что можно улучшить` : 'Проверь сценарий и покажи, что можно улучшить'
     render()

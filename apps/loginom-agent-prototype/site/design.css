@@ -580,3 +580,32 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .change-check ul{display:grid;gap:3px;margin:5px 0 0;padding:0;list-style:none}
 .change-check li{display:flex;gap:6px;align-items:flex-start;color:var(--success)}
 .change-check li .icon{flex:none;margin-top:3px}
+/* Iteration 9 — the schema as a graph: fixed steps, so the SVG links and the nodes placed by class agree */
+.package-canvas.graph-canvas{display:block;overflow-x:auto;padding:10px 0;min-height:0}
+.graph{position:relative;width:max-content;margin:0 auto}
+.graph-links{display:block}
+.graph-link{fill:none;stroke:var(--accent);stroke-width:1.5;opacity:.55}
+.graph-link.is-add{stroke:var(--success);stroke-width:2;opacity:1}
+.graph-link.is-del{stroke-dasharray:5 4}
+.graph .canvas-node,.diff-canvas .graph .canvas-node,.focus-canvas .graph .canvas-node{position:absolute;width:136px;height:96px;min-height:0;flex:none;gap:2px;padding:7px 6px;align-content:center}
+.graph .canvas-node .glyph{width:30px;height:30px}
+.graph .canvas-node strong{font-size:13px}
+.graph .canvas-node small{display:block;font-size:11.5px}
+.graph .canvas-node.is-io{border-style:dashed;box-shadow:none;background:var(--soft)}
+.graph-port{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--paper);translate:0 -50%}
+.graph-port.in{left:-6px}.graph-port.out{right:-6px}
+.graph-port.is-free{background:var(--paper);border-color:var(--muted)}
+.p1of1{top:50%}.p1of2{top:33.333%}.p2of2{top:66.667%}.p1of3{top:25%}.p2of3{top:50%}.p3of3{top:75%}
+.gx-0{left:20px}.gx-1{left:196px}.gx-2{left:372px}.gx-3{left:548px}.gx-4{left:724px}.gx-5{left:900px}.gx-6{left:1076px}
+.gy-0{top:18px}.gy-1{top:80px}.gy-2{top:142px}.gy-3{top:204px}.gy-4{top:266px}
+.graph-legend{margin:0;padding:6px 14px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+.graph-scroll-hint{display:none}
+.graph-path{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.graph-path span{flex:1;min-width:0;overflow-wrap:anywhere}
+.graph-sub-note{margin:6px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.c-link-add{color:var(--success);font-weight:500}.c-link-del{color:var(--accent);font-weight:500}
+@container (max-width:760px){.graph-scroll-hint{display:inline}}
+.graph .canvas-node.is-sub{box-shadow:4px 4px 0 -1px var(--paper),4px 4px 0 0 var(--line),var(--shadow)}
+/* Iteration 9: a connection names the third-party service its data goes to */
+.hub-service{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;line-height:1.2;padding:2px 7px;border-radius:5px;border:1px solid var(--amber);color:var(--amber);background:var(--amber-soft)}
+.change-legend{flex-wrap:wrap;gap:4px 14px}.change-legend span{white-space:nowrap}

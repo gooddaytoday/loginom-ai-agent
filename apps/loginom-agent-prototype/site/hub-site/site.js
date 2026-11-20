@@ -1,7 +1,7 @@
 // Prototype of the Loginom Hub catalog site (В-51): pages built from the signed catalog, no accounts and no database.
 // An administrator reads the full text, downloads one item or an archive, and hands it to users in a closed network;
 // they install it through «Каталог» → «Импорт из файла», and the app checks the Loginom signature.
-import { catalog, tiers, kinds, tierBadge, evidenceLine } from '../catalog.js';
+import { catalog, kinds, tierBadge, evidenceLine, trustText, serviceBadge, serviceText } from '../catalog.js';
 import { createDemoArchive } from '../hub.js';
 import { icon } from '../icons.js';
 
@@ -75,7 +75,7 @@ function card(item) {
   const can = downloadable(item);
   return '<article class="hub-card hs-card"><div class="hub-card-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,23)+'</span><span class="hub-type">'+esc(item.kind)+'</span></div>'+
     '<button class="hub-card-title" data-open="'+item.id+'">'+esc(item.title)+'</button><p>'+esc(item.description)+'</p>'+
-    '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+esc(item.publisher)+'</span>' : '')+'</div>'+
+    '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+esc(item.publisher)+'</span>' : '')+serviceBadge(item)+'</div>'+
     '<div class="hub-evidence">'+evidenceLine(item)+'</div><p class="hs-meta">Версия '+esc(item.version)+' · '+esc(item.size || '')+'</p>'+
     (note ? '<p class="hs-note">'+icon(can ? 'help' : 'lock',14)+' '+note+'</p>' : '')+
     '<div class="hs-actions"><button class="btn quiet" data-open="'+item.id+'">Что внутри</button>'+
@@ -87,7 +87,8 @@ function detail(item) {
   const can = downloadable(item);
   return '<div class="hs-backdrop" data-close></div><section class="hs-detail" role="dialog" aria-labelledby="hs-detail-title"><header><div><span class="hub-type">'+esc(item.kind)+'</span><h2 id="hs-detail-title">'+esc(item.title)+'</h2></div><button class="hub-close" data-close aria-label="Закрыть">'+icon('close',19)+'</button></header>'+
     '<div class="hs-detail-main"><p>'+esc(item.description)+'</p>'+
-    '<h3>Кто подготовил</h3><p>'+tierBadge(item)+' '+esc(item.publisher || 'Loginom')+'. '+esc(tiers[item.tier].explain)+'</p>'+
+    '<h3>Кто подготовил</h3><p>'+tierBadge(item)+' '+esc(item.publisher || 'Loginom')+'. '+esc(trustText(item))+'</p>'+
+    (item.service ? '<h3>Куда уходят данные</h3><p>'+esc(serviceText(item))+'</p>' : '')+
     '<h3>Проверка на примерах</h3><p>'+evidenceLine(item, true)+'</p>'+
     '<h3>Что будет разрешено</h3><div class="hub-perms"><div><h4>'+icon('check',16)+' Сможет</h4><ul>'+(item.can.length ? item.can.map((text) => '<li>'+esc(text)+'</li>').join('') : '<li>Только подсказывать агенту</li>')+'</ul></div>'+
     (item.cannot.length ? '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+item.cannot.map((text) => '<li>'+esc(text)+'</li>').join('')+'</ul></div>' : '')+'</div>'+

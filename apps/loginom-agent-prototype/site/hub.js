@@ -1,4 +1,4 @@
-import { catalog, byId, tiers, kinds, tierBadge, evidenceLine } from './catalog.js';
+import { catalog, byId, tiers, kinds, tierBadge, evidenceLine, trustText, serviceBadge, serviceText } from './catalog.js';
 import { renderMine, ownCount } from './create.js';
 
 const tabs = [['catalog','Каталог'],['installed','Установленные'],['mine','Мои'],['updates','Обновления'],['history','История']];
@@ -175,6 +175,17 @@ function hubState(state) {
   };
 }
 
+// Iteration 9, review page: the card of one item, e.g. a connection to a third-party service.
+export function showHubDetail(state, id) {
+  Object.assign(hubState(state), {tab:'catalog', tier:'all', type:'Все', query:'', dialog:{kind:'detail', id}});
+}
+
+// Review page shortcut (prototype only): installs an item without the dialog; «История» records it as usual.
+export function installForDemo(state, id) {
+  const hub = hubState(state);
+  if (!hub.installed[id]) record(hub, 'install', [id], byId(id).title);
+}
+
 export function hubHasInstalled(state, id) {
   return Object.hasOwn(hubState(state).installed, id);
 }
@@ -219,7 +230,7 @@ function itemCard(item, hub, online, tab) {
     '<button class="hub-favorite" data-hub-favorite="'+item.id+'" aria-label="'+(hub.favorites.includes(item.id)?'Убрать из избранного':'В избранное')+'" aria-pressed="'+hub.favorites.includes(item.id)+'">'+icon('star',17)+'</button></div>'+
     '<button class="hub-card-title" data-hub-detail="'+item.id+'">'+item.title+'</button>'+
     '<p>'+item.description+'</p>'+
-    '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div>'+
+    '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+serviceBadge(item)+'</div>'+
     '<div class="hub-evidence">'+evidenceLine(item)+'</div>'+
     '<div class="hub-card-actions">'+primary+
     '<span class="hub-installed">'+status+(update ? ' · есть '+item.version : '')+'</span></div></article>';
@@ -286,11 +297,11 @@ function detailDialog(hub, online, current, byAdmin) {
   const installed = hub.installed[item.id];
   const update = installed && installed !== item.version && online;
   const blocked = blockedByPolicy(item, online, byAdmin);
-  const tier = tiers[item.tier];
   const needsAck = item.tier === 'community' && !installed;
   const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
     '<section class="hub-section"><h3>Как этим пользоваться</h3><p>'+kinds[item.kind].how+'</p></section>'+
-    '<section class="hub-section"><h3>Кто подготовил</h3><div class="hub-trust">'+tierBadge(item,'lg')+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div><p>'+tier.explain+'</p></section>'+
+    '<section class="hub-section"><h3>Кто подготовил</h3><div class="hub-trust">'+tierBadge(item,'lg')+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+serviceBadge(item)+'</div><p>'+trustText(item)+'</p></section>'+
+    (item.service ? '<section class="hub-section"><h3>Куда уходят данные</h3><p>'+serviceText(item)+'</p></section>' : '')+
     '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item,true)+'</p></section>'+
     '<section class="hub-section"><h3>Что будет разрешено</h3>'+permissionList(item)+
     (item.runner ? '<p class="hub-dialog-footnote">При каждом запуске приложение ещё раз покажет, к какому пакету и с какими правами получит доступ агент.</p>' : '')+'</section>'+
