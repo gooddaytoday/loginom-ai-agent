@@ -117,7 +117,9 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
     { ...input, environment: undefined, protocol: 1 },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
-    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,
+    // Windows browser/resource teardown can outlast 5s even after native Close/logout.
+    // Leave headroom for the exit grace inside the outer Host's 30s close budget.
+    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
   )
   const ready = runtime.ready
   if (
