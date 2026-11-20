@@ -992,6 +992,9 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
+    for (const method of ["dashboardRead", "dashboardPublish"])
+      await expect(client.request(method, { run: "one" })).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(await chatStarts()).toEqual([])
     await client.request("scope", {
       run: "one",
       mode: "bind",
@@ -1022,3 +1025,49 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     await rm(directory, { recursive: true, force: true })
   }
 }, 15000)
+
+test.each([
+  ["publish", "disconnect", "DASHBOARD_WRITE_UNKNOWN"],
+  ["publish", "malformed", "DASHBOARD_WRITE_UNKNOWN"],
+  ["publish", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_ACCESS_DENIED"],
+  ["publish", "DASHBOARD_VERSION_EXISTS", "DASHBOARD_VERSION_EXISTS"],
+  ["publish", "LOGINOM_RUNTIME_CLEANUP_FAILED", "LOGINOM_RUNTIME_CLEANUP_FAILED"],
+  ["publish", "LOGINOM_HOST_CLEANUP_FAILED", "LOGINOM_HOST_CLEANUP_FAILED"],
+  ["delete", "disconnect", "DASHBOARD_DELETE_UNKNOWN"],
+  ["delete", "malformed", "DASHBOARD_DELETE_UNKNOWN"],
+  ["delete", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_ACCESS_DENIED"],
+])("acquired dashboard %s classifies %s without replay", async (operation, outcome, expected) => {
+  const replies = new EventEmitter()
+  const calls: string[] = []
+  const method = operation === "delete" ? "dashboardDelete" : "dashboardPublish"
+  const malformed = operation === "delete" ? { status: "empty", confirmedRemoved: 1 } : { status: "written" }
+  LoginomHost.connect({
+    postMessage(value) {
+      const message = value as { id: string; method: string }
+      calls.push(message.method)
+      if (message.method === method && outcome === "disconnect") {
+        replies.emit("close")
+        return
+      }
+      replies.emit("message", { data: {
+        id: message.id,
+        ...(message.method === "acquire" ? { result: { generation: 1 } } : outcome === "malformed" ? { result: malformed } : { error: outcome }),
+      } })
+    },
+    on: replies.on.bind(replies),
+    onClose: listener => { replies.on("close", listener) },
+    start() {},
+  })
+  try {
+    const run = await LoginomHost.acquire("dashboard-uncertain")
+    if (!run) throw Error("No run")
+    const input = { origin: "http://example.test", binding: { packagePath: "/user/example.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" } }
+    const request = (signal?: AbortSignal) => operation === "delete"
+      ? run.dashboardDelete({ ...input, generation: 1, expected: [] }, signal)
+      : run.dashboardPublish({ ...input, content: "{}", expected: null }, signal)
+    await expect(request(AbortSignal.abort())).rejects.toThrow("DASHBOARD_CANCELLED")
+    expect(calls).toEqual(["acquire"])
+    await expect(request()).rejects.toThrow(expected)
+    expect(calls).toEqual(["acquire", method])
+  } finally { LoginomHost.disconnect() }
+})

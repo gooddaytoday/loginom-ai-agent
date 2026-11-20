@@ -123,3 +123,27 @@ describe("isDirectoryAutoAccepting", () => {
     expect(isDirectoryAutoAccepting(autoAccept, directory)).toBe(false)
   })
 })
+
+test("dashboard publication always requires an explicit response despite session and folder auto-accept", () => {
+  const directory = "/fixture/dashboard"
+  const sessions = [session({ id: "root" })]
+  const publish = { sessionID: "root", permission: "dashboard_publish" }
+  const edit = { ...publish, permission: "edit" }
+  for (const autoAccept of [{ root: true }, { [base64Encode(directory) + "/*"]: true }]) {
+    expect(autoRespondsPermission(autoAccept, sessions, publish, directory)).toBe(false)
+    expect(sessionAutoAccept(autoAccept, sessions, publish, directory)).toBe(false)
+    expect(autoRespondsPermission(autoAccept, sessions, edit, directory)).toBe(true)
+  }
+})
+
+test("dashboard deletion requires a response in the active and background chats", () => {
+  const directory = "/fixture/dashboard"
+  const sessions = [session({ id: "active" }), session({ id: "background" })]
+  const autoAccept = { active: true, [base64Encode(directory) + "/*"]: true }
+  for (const sessionID of ["active", "background"]) {
+    const request = { sessionID, permission: "dashboard_delete" }
+    expect(autoRespondsPermission(autoAccept, sessions, request, directory)).toBe(false)
+    expect(sessionAutoAccept(autoAccept, sessions, request, directory)).toBe(false)
+    expect(autoRespondsPermission(autoAccept, sessions, { ...request, permission: "edit" }, directory)).toBe(true)
+  }
+})

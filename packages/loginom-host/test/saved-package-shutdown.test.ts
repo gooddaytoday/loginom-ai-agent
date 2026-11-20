@@ -118,7 +118,7 @@ test("a runtime exit without requested closure cannot certify normal CLI shutdow
 })
 
 test.each([undefined, false, true].flatMap((policy) => [false, true].map((headless) => ({ policy, headless }))))(
-  "private CLI policies reach task and preflight runtimes: %j",
+  "private CLI policies reach task, validation and Dashboard runtimes: %j",
   async (input) => {
     const directory = await mkdtemp(join(fixture.directory, "profile-"))
     const resources = join(directory, "resources")
@@ -146,6 +146,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
           ?{protocol:1,generation:m.input.generation,checked:true}
           :{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       }
+      if(m.operation==='dashboardRead') process.send({id:m.id,result:null});
       if(m.operation==='call') process.send({id:m.id,result:{result:{ok:true},recoveryPending:false,activeWork:false}});
       if(m.operation==='interrupt') process.send({id:m.id,result:{interrupted:true}});
       if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
@@ -175,6 +176,15 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     })
     try {
       await host.request("connection.ready", {})
+      expect(await host.request("dashboard.read", {
+        origin: "http://example.test",
+        generation: 1,
+        binding: {
+          packagePath: "/user/example.lgp",
+          workflowGuid: "11111111-1111-4111-8111-111111111111",
+          nodeGuid: "22222222-2222-4222-8222-222222222222",
+        },
+      })).toBeNull()
       expect(
         await host.request("connection.check", {
           revision: 1,
@@ -206,18 +216,12 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line))
-    expect(starts).toHaveLength(2)
+    expect(starts).toMatchObject([
+      { headless: input.headless, validation: false, closeSavedPackageOnShutdown: input.policy === true },
+      { headless: input.headless, validation: true, closeSavedPackageOnShutdown: false },
+      { headless: input.headless, validation: false, closeSavedPackageOnShutdown: input.policy === true },
+    ])
     expect(starts.filter((value) => value.chat === "readiness")).toEqual([])
-    expect(starts.filter((value) => value.validation)).toHaveLength(1)
-    expect(starts.every((value) => value.headless === input.headless)).toBe(true)
-    expect(
-      starts
-        .filter((value) => value.validation || value.chat === "readiness")
-        .every((value) => value.closeSavedPackageOnShutdown === false),
-    ).toBe(true)
-    expect(starts.find((value) => !value.validation && value.chat !== "readiness").closeSavedPackageOnShutdown).toBe(
-      input.policy === true,
-    )
     expect(starts.every((value) => value.acceptancePath === null && value.environmentPolicy === null)).toBe(true)
   },
   15_000,

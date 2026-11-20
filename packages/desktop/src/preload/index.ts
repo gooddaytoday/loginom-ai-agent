@@ -72,7 +72,10 @@ const api: ElectronAPI = {
     install: () => ipcRenderer.invoke("updater-install"),
     setChannel: (channel) => ipcRenderer.invoke("updater-set-channel", channel),
   },
-  consumeInitialDeepLinks: () => ipcRenderer.invoke("consume-initial-deep-links"),
+  consumeDeepLinks: () => ipcRenderer.invoke("consume-deep-links"),
+  getDashboardTarget: (id) => ipcRenderer.invoke("get-dashboard-target", id),
+  checkDashboardTarget: (id) => ipcRenderer.invoke("check-dashboard-target", id),
+  isDashboardWork: (directory) => ipcRenderer.invoke("is-dashboard-work", directory),
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),
   setDefaultServerUrl: (url) => ipcRenderer.invoke("set-default-server-url", url),
   isFirstLaunchOnboardingPending: () => ipcRenderer.invoke("is-first-launch-onboarding-pending"),
@@ -102,7 +105,7 @@ const api: ElectronAPI = {
     return () => ipcRenderer.removeListener("menu-command", handler)
   },
   onDeepLink: (cb) => {
-    const handler = (_: unknown, urls: string[]) => cb(urls)
+    const handler = () => cb()
     ipcRenderer.on("deep-link", handler)
     return () => ipcRenderer.removeListener("deep-link", handler)
   },

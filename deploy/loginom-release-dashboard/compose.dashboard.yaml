@@ -1,0 +1,4 @@
+services:
+  http:
+    volumes:
+      - /opt/loginom-release-dashboard/apache-conf:/usr/local/apache2/conf:ro,Z

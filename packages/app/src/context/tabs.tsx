@@ -18,6 +18,7 @@ export type SessionTab = {
   type: "session"
   server: ServerConnection.Key
   sessionId: string
+  dashboardOrigin?: string | null
 }
 
 export type DraftTab = {
@@ -26,6 +27,7 @@ export type DraftTab = {
   server: ServerConnection.Key
   directory: string
   worktree?: string
+  dashboardOrigin?: string | null
 }
 
 export type Tab = SessionTab | DraftTab
@@ -220,11 +222,20 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         })
         return tab
       },
-      updateDraft(draftID: string, draft: Partial<Omit<DraftTab, "type" | "draftID">>) {
+      updateDraft(draftID: string, draft: Partial<Omit<DraftTab, "type" | "draftID" | "dashboardOrigin">>) {
         void startTransition(() => {
           setStore(
             (tab) => tab.type === "draft" && tab.draftID === draftID,
-            produce((tab) => Object.assign(tab, draft)),
+            produce((tab) => {
+              if (tab.type !== "draft") return
+              if (
+                (draft.directory !== undefined && draft.directory !== tab.directory) ||
+                (draft.server !== undefined && draft.server !== tab.server)
+              ) {
+                delete tab.dashboardOrigin
+              }
+              Object.assign(tab, draft)
+            }),
           )
         })
       },
@@ -237,7 +248,9 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
           setStore(
             produce((tabs) => {
               const index = tabs.findIndex((tab) => tab.type === "draft" && tab.draftID === draftID)
-              if (index !== -1) tabs[index] = next
+              if (index === -1) return
+              const origin = tabs[index].dashboardOrigin
+              tabs[index] = origin === undefined ? next : { ...next, dashboardOrigin: origin }
             }),
           )
           if (recent.key === `draft:${draftID}`) setRecentKey(tabKey(next))

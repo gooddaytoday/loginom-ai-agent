@@ -311,6 +311,97 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  dashboard-template:
+    name: dashboard-template (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(toJSON(inputs.macos) == 'false' && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install locked dashboard workspace dependencies
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile --ignore-scripts --filter @loginom-ai-agent/dashboard
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: |
+          node_dir=$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")
+          npm_cli=$node_dir/../lib/node_modules/npm/bin/npm-cli.js
+          [[ -f $npm_cli ]] || npm_cli=$node_dir/node_modules/npm/bin/npm-cli.js
+          "$LOGINOM_AI_AGENT_TEST_NODE" "$npm_cli" ci --ignore-scripts --no-audit --fund=false
+          du -sh node_modules
+
+      - name: Build the template and examples like dashboard_draft
+        working-directory: packages/dashboard
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/build.test.mjs test/build/resolver.test.mjs'
+
+  dashboard-browser:
+    name: dashboard-browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Check dashboard stand installer
+        run: |
+          bash -n packages/dashboard/deploy/dev-master.sh
+          bash -n packages/dashboard/deploy/containers.sh
+          bash -n packages/dashboard/deploy/mounts.sh
+          shellcheck packages/dashboard/deploy/dev-master.sh packages/dashboard/deploy/containers.sh packages/dashboard/deploy/mounts.sh
+          cat > "$RUNNER_TEMP/dashboard-invalid.json" <<'JSON'
+          {"server":"example-server","studio":"example-studio","network":"example-net","web":"invalid/name","project":"example-services","userstorage":"example-storage"}
+          JSON
+          if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --config "$RUNNER_TEMP/dashboard-invalid.json" 2>&1); then
+            echo "Expected invalid web name rejection" >&2
+            exit 1
+          fi
+          [[ $output == *'Error: Invalid web'* ]]
+          DASHBOARD_PROJECT=example-services DASHBOARD_IMAGE=example:local \
+            DASHBOARD_WEB=example-web DASHBOARD_WEB_USER=1000:1000 \
+            DASHBOARD_PUBLISHER_USER=1000:1000 DASHBOARD_OWNER_KEY=codex.owner \
+            DASHBOARD_JOB_GROUP=1000 DASHBOARD_STUDIO_PROXY=example-studio \
+            DASHBOARD_OWNER_VALUE=example DASHBOARD_STATE="$RUNNER_TEMP/dashboard" \
+            DASHBOARD_APP_PORT=32801 DASHBOARD_APP_ORIGIN=http://dashboards.localhost:32801 \
+            DASHBOARD_CLIENT_ORIGINS=http://127.0.0.1:32800 DASHBOARD_USERSTORAGE=example-storage \
+            DASHBOARD_NETWORK=example-net docker compose -f packages/dashboard/deploy/compose.yaml config --quiet
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install pinned Chromium system dependencies
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          # Keep the Chromium sandbox enabled, as in chromium-direct.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts'
+
+      - name: Verify dashboard browser behavior
+        working-directory: packages/dashboard
+        run: |
+          bun typecheck
+          bun run build
+          bun run check:size
+          bun run test:browser
+
   unit:
     name: unit
     runs-on: ubuntu-24.04
@@ -324,10 +415,14 @@ jobs:
         with:
           install-flags: --frozen-lockfile
 
-      # Exports LOGINOM_AI_AGENT_TEST_NODE (pinned Node) for the loginom-host process
-      # tests; turbo.json passes it through to `@loginom-ai-agent/loginom-host#test`.
+      # Exports LOGINOM_AI_AGENT_TEST_NODE for loginom-host and dashboard service
+      # tests; turbo.json passes the pinned executable through to both tasks.
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts'
 
       - name: Verify Loginom workspace address and native link contracts
         working-directory: packages/loginom-runtime

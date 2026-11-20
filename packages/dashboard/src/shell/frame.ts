@@ -1,0 +1,89 @@
+import type { DashboardState } from "../sdk/loginom"
+
+export const ALLOW = (
+  "camera microphone geolocation clipboard-read clipboard-write display-capture fullscreen payment " +
+  "publickey-credentials-get identity-credentials-get usb serial hid bluetooth"
+).split(" ").join(" 'none'; ") + " 'none'"
+
+export function isTwoFieldMessage(data: unknown): data is Record<string, unknown> {
+  return typeof data === "object" && data !== null && !Array.isArray(data) && Object.keys(data).length === 2
+}
+
+export function isMessage(data: unknown, type: string) {
+  return isTwoFieldMessage(data) && data.type === type && data.version === 1
+}
+
+export function sandboxFrame(src: string) {
+  const frame = document.createElement("iframe")
+  frame.setAttribute("sandbox", "allow-scripts")
+  frame.referrerPolicy = "no-referrer"
+  frame.allow = ALLOW
+  frame.src = src
+  return frame
+}
+
+export function connectFrame(frame: HTMLIFrameElement) {
+  const channel = new MessageChannel()
+  frame.contentWindow!.postMessage({ type: "loginom-dashboard/init", version: 1 }, "*", [channel.port2])
+  return channel.port1
+}
+
+export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): void; silent(): void; ready?(): void }) {
+  let port: MessagePort | undefined
+  let last: (DashboardState & { type: "state" }) | undefined
+  let loads = 0
+  let count = 0
+  let since = 0
+  const timer = setTimeout(() => {
+    stop()
+    handlers.silent()
+  }, 10_000)
+  function stop(reason?: string) {
+    if (reason) console.warn("Dashboard closed: " + reason)
+    clearTimeout(timer)
+    removeEventListener("message", listen)
+    frame.onload = null
+    port?.close()
+  }
+  const close = (reason?: string) => {
+    stop(reason)
+    handlers.close()
+  }
+  function admit() {
+    const now = performance.now()
+    if (now - since > 1000) {
+      since = now
+      count = 0
+    }
+    if (++count > 50) {
+      close("message flood")
+      return false
+    }
+    return true
+  }
+  function listen(event: MessageEvent) {
+    if (event.source !== frame.contentWindow || !admit()) return
+    if (isMessage(event.data, "loginom-dashboard/close")) return close()
+    if (!isMessage(event.data, "loginom-dashboard/ready")) return
+    if (port) return close("second ready")
+    clearTimeout(timer)
+    port = connectFrame(frame)
+    // Consume reverse messages so the port cannot retain an unbounded disabled queue.
+    port.onmessage = admit
+    if (last) port.postMessage(last)
+    handlers.ready?.()
+  }
+  // The first load may come before or after the first ready; any later document is foreign.
+  frame.onload = () => {
+    if (++loads > 1) close("frame navigated")
+  }
+  addEventListener("message", listen)
+  return {
+    frame,
+    send(state: DashboardState & { type: "state" }) {
+      last = state
+      port?.postMessage(state)
+    },
+    stop,
+  }
+}

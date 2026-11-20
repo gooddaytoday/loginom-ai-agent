@@ -5,6 +5,7 @@ declare global {
     api: ElectronAPI
     __LOGINOM_AI_AGENT__?: {
       deepLinks?: string[]
+      coldDashboard?: string
     }
   }
 }

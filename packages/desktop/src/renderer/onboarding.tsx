@@ -1,7 +1,7 @@
 import { ServerConnection, useServer, useSettings, useTabs } from "@opencode-ai/app"
 import { onMount } from "solid-js"
 
-export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {
+export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; dashboardLaunch: boolean; onLoaded: () => void }) {
   const server = useServer()
   const settings = useSettings()
   const tabs = useTabs()
@@ -18,7 +18,7 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
       const existingInstall = await window.api.isOldLayoutEligible()
       settings.general.setOldLayoutEligible(existingInstall)
       settings.general.initializeAgentVisibility(existingInstall)
-      if (!server.isLocal()) return
+      if (props.dashboardLaunch || !server.isLocal()) return
 
       const pending = await window.api.isFirstLaunchOnboardingPending()
       if (!pending) return

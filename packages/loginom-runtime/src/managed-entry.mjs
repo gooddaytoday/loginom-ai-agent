@@ -8,6 +8,7 @@ import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
+import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
@@ -203,6 +204,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
+      state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
@@ -275,6 +277,33 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
+      if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
+        if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+        if (message.input.origin !== state.owner.origin) throw Error("DASHBOARD_ORIGIN_MISMATCH")
+      }
+      if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+      const controller = new AbortController()
+      state.controller = controller
+      const cancellation = { close: undefined }
+      const cancel = () => {
+        cancellation.close ??= state.browser.close()
+        void cancellation.close.catch(() => undefined)
+      }
+      controller.signal.addEventListener("abort", cancel, { once: true })
+      try {
+        const result = await dashboardStorage(state.browser, message.input, message.operation, controller.signal)
+        send({ id: message.id, result })
+      } catch (error) {
+        if (controller.signal.aborted && (message.operation === "dashboardRead" || message.operation === "dashboardVersions")) throw Error("DASHBOARD_CANCELLED")
+        throw error
+      } finally {
+        controller.signal.removeEventListener("abort", cancel)
+        await cancellation.close
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,
@@ -376,7 +405,7 @@ async function handle(message) {
     }
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
-    const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
+    const code = /^(?:LOGINOM|DASHBOARD)_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, ...(artifactFailure(error) ?? { error: code }),
       ...(message.operation === "start" ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === "close")
     if (message.operation === "start") {

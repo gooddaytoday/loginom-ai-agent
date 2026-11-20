@@ -47,6 +47,8 @@ export type FatalRendererError = {
   os?: string
 }
 
+export type PendingDeepLinks = { urls: string[]; coldDashboard?: string }
+
 export type ElectronAPI = {
   loginom: Loginom.API
   killSidecar: () => Promise<void>
@@ -56,7 +58,12 @@ export type ElectronAPI = {
   onSystemProxyStatus: (callback: (status: SystemProxyStatus) => void) => () => void
   wslServers: WslServersAPI
   updater: UpdaterAPI
-  consumeInitialDeepLinks: () => Promise<string[]>
+  consumeDeepLinks: () => Promise<PendingDeepLinks>
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
+  isDashboardWork: (directory: string) => Promise<boolean>
   getDefaultServerUrl: () => Promise<string | null>
   setDefaultServerUrl: (url: string | null) => Promise<void>
   isFirstLaunchOnboardingPending: () => Promise<boolean>
@@ -80,7 +87,7 @@ export type ElectronAPI = {
 
   getWindowID: () => Promise<string>
   onMenuCommand: (cb: (id: string) => void) => () => void
-  onDeepLink: (cb: (urls: string[]) => void) => () => void
+  onDeepLink: (cb: () => void) => () => void
 
   openDirectoryPicker: (opts?: {
     multiple?: boolean

@@ -1,3 +1,4 @@
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { describe, expect } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -227,8 +228,9 @@ describe("Session", () => {
     Effect.gen(function* () {
       const session = yield* SessionNs.Service
       const meta = { source: "sdk", trace: { id: "abc" } }
-      const created = yield* Effect.acquireRelease(session.create({ title: "with-meta", metadata: meta }), (info) =>
-        session.remove(info.id).pipe(Effect.ignore),
+      const created = yield* Effect.acquireRelease(
+        session.create({ title: "with-meta", metadata: { ...meta, [DASHBOARD_SESSION_MARKER]: true } }),
+        (info) => session.remove(info.id).pipe(Effect.ignore),
       )
       const saved = yield* session.get(created.id)
       const fork = yield* Effect.acquireRelease(session.fork({ sessionID: created.id }), (info) =>
@@ -238,6 +240,11 @@ describe("Session", () => {
       expect(saved.metadata).toEqual(meta)
       expect(fork.metadata).toEqual(meta)
       expect(fork.metadata).not.toBe(meta)
+      yield* session.setMetadata({
+        sessionID: created.id,
+        metadata: { note: "replacement", [DASHBOARD_SESSION_MARKER]: true },
+      })
+      expect((yield* session.get(created.id)).metadata).toEqual({ note: "replacement" })
     }),
   )
 

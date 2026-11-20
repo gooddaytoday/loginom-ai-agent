@@ -7,6 +7,7 @@ import { InstanceState } from "@/effect/instance-state"
 import path from "path"
 import { mergeDeep } from "remeda"
 import { Config } from "@/config/config"
+import { DashboardSession } from "@/product/dashboard-session"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { errorMessage } from "@/util/error"
 import * as Formatter from "./formatter"
@@ -117,7 +118,7 @@ const layer = Layer.effect(
 
         const cfg = yield* config.get()
 
-        if (!cfg.formatter) {
+        if (!cfg.formatter || DashboardSession.isDashboardWork(ctx.directory)) {
           yield* Effect.logInfo("all formatters are disabled")
           yield* Effect.logInfo("init")
           return {

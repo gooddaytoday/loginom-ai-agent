@@ -7,8 +7,11 @@ export function migrateTabs(value: unknown, fallback: ServerConnection.Key): Tab
     if (!tab || typeof tab !== "object") return []
     if ("server" in tab && typeof tab.server !== "string") return []
     const server = ("server" in tab ? tab.server : fallback) as ServerConnection.Key
+    const origin = "dashboardOrigin" in tab && (tab.dashboardOrigin === null || typeof tab.dashboardOrigin === "string")
+      ? { dashboardOrigin: tab.dashboardOrigin }
+      : {}
     if (tab.type === "session" && typeof tab.sessionId === "string") {
-      return [{ type: tab.type, server, sessionId: tab.sessionId }]
+      return [{ type: tab.type, server, sessionId: tab.sessionId, ...origin }]
     }
     if (
       tab.type === "draft" &&
@@ -16,7 +19,7 @@ export function migrateTabs(value: unknown, fallback: ServerConnection.Key): Tab
       typeof tab.directory === "string" &&
       (tab.worktree === undefined || typeof tab.worktree === "string")
     ) {
-      return [{ type: tab.type, server, draftID: tab.draftID, directory: tab.directory, worktree: tab.worktree }]
+      return [{ type: tab.type, server, draftID: tab.draftID, directory: tab.directory, worktree: tab.worktree, ...origin }]
     }
     return []
   })

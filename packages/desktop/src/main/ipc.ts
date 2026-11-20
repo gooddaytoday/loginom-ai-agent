@@ -1,14 +1,14 @@
 import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { basename, isAbsolute, join } from "node:path"
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron"
-import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
+import type { IpcMainEvent, IpcMainInvokeEvent, WebContents } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
+import type { FatalRendererError, PendingDeepLinks, ServerReadyData, TitlebarTheme } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
@@ -40,7 +40,12 @@ type Deps = {
   killSidecar: () => Promise<void> | void
   relaunch: () => void
   awaitInitialization: () => Promise<ServerReadyData>
-  consumeInitialDeepLinks: () => Promise<string[]> | string[]
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
+  isDashboardWork: (directory: string) => Promise<boolean>
+  consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
   isFirstLaunchOnboardingPending: () => Promise<boolean> | boolean
@@ -80,7 +85,18 @@ export function registerIpcHandlers(deps: Deps) {
     getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
   })
-  ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
+  ipcMain.handle("consume-deep-links", (event) => deps.consumeDeepLinks(event.sender))
+  ipcMain.handle("get-dashboard-target", (_event, id: string) => deps.getDashboardTarget(id))
+  ipcMain.handle("check-dashboard-target", (_event, id: string) => deps.checkDashboardTarget(id))
+  ipcMain.handle("is-dashboard-work", async (_event, directory: unknown) => {
+    if (typeof directory !== "string" || !isAbsolute(directory)) return false
+    try {
+      return await deps.isDashboardWork(directory)
+    } catch {
+      // The directory can disappear between the filesystem checks.
+      return false
+    }
+  })
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
   ipcMain.handle("set-default-server-url", (_event: IpcMainInvokeEvent, url: string | null) =>
     deps.setDefaultServerUrl(url),
@@ -326,6 +342,6 @@ export function sendMenuCommand(win: BrowserWindow, id: string) {
   win.webContents.send("menu-command", id)
 }
 
-export function sendDeepLinks(win: BrowserWindow, urls: string[]) {
-  win.webContents.send("deep-link", urls)
+export function notifyDeepLinks(win: BrowserWindow) {
+  win.webContents.send("deep-link")
 }

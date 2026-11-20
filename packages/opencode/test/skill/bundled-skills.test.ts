@@ -31,7 +31,7 @@ test("the product has one canonical directory for each shipped skill", async () 
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .toSorted()
-  expect(directories).toEqual([...reservedSkillNames].toSorted())
+  expect(directories).toEqual(["loginom-automation", "loginom-dashboard", "package-docs"])
 })
 
 test("shipped skill metadata conforms to the Agent Skills specification", async () => {
@@ -310,7 +310,7 @@ it.live("the same skill realpath is discovered only once through two configured 
       )
       const skills = yield* Skill.Service
       expect((yield* skills.all()).filter((skill) => skill.name === "sample")).toHaveLength(1)
-      expect(yield* skills.dirs()).toHaveLength(3)
+      expect(yield* skills.dirs()).toHaveLength(4)
       expect((yield* skills.require("sample")).location).toBe(join(source, "sample/SKILL.md"))
     }),
     { git: true },
@@ -329,7 +329,7 @@ it.live("an ordinary project skill retains its source provenance", () =>
   ),
 )
 
-for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+for (const name of ["package-docs", "loginom-automation", "loginom-dashboard", "package_docs"]) {
   it.live(`a configured command cannot claim the reserved name ${name}`, () =>
     provideTmpdirInstance((directory) =>
       Effect.gen(function* () {

@@ -19,11 +19,16 @@ export NODE_OPTIONS=--max-old-space-size=6144
 export LOGINOM_AI_AGENT_CHANNEL=prod
 export LOGINOM_AI_AGENT_NODE_SOURCE=/absolute/cache/node-v24.19.0-linux-x64/bin/node
 export LOGINOM_AI_AGENT_BROWSER_SOURCE=/absolute/cache/browsers
+"$LOGINOM_AI_AGENT_NODE_SOURCE" node_modules/electron/install.js
 bun run build
 bun run package:linux --x64 --publish never
 bun typecheck
 bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifact.test.ts
 ```
+
+В `LOGINOM_AI_AGENT_BROWSER_SOURCE` укажите каталог с полным Chromium.
+
+Штатный installer зависимости Electron подготавливает её `dist`, необходимый release manifest. Упаковщик скачивает собственный Electron отдельно и не заменяет этот шаг.
 
 Результат: `dist/loginom-ai-agent-linux-amd64.deb` и `dist/loginom-ai-agent-linux-x86_64.AppImage`. Runtime вне ASAR включает собственные Node, Playwright/MCP, Chromium и исходники клиента Dock. Ресурсы проверяются по `resource-manifest.json`. При первом запуске не выполняется установка npm или браузера.
 
@@ -42,10 +47,13 @@ git archive --format=tar.gz --output=packages/desktop/dist/loginom-ai-agent-0.1.
 ```sh
 bun scripts/release/write-manifest.ts --target linux-x64 --version 0.1.0 --channel prod --dist dist --resources resources/loginom --output dist/release-manifest.json
 bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-amd64.deb --report dist/static-deb.json
-bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
+(
+  umask 022
+  bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
+)
 ```
 
-Статический verifier использует `dpkg-deb` и `unsquashfs`; извлечённый код не исполняется. Manifest для dirty tree намеренно не выпускается: незакоммиченные build inputs сначала должны получить воспроизводимый commit. Неподписанные локальные артефакты обозначаются `unsigned`.
+Статический verifier использует `dpkg-deb` и `unsquashfs`; извлечённый код не исполняется. Только проверка AppImage запускается с обычной маской: непривилегированный `unsquashfs` применяет текущую umask к извлечённым modes, поэтому 077 даёт ложный отказ public permissions. Временный каталог извлечения остаётся закрытым; упаковка и ключи этим не меняются. Manifest для dirty tree намеренно не выпускается: незакоммиченные build inputs сначала должны получить воспроизводимый commit. Неподписанные локальные артефакты обозначаются `unsigned`.
 
 ## Docker
 

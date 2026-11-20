@@ -5,7 +5,9 @@ export * as LoginomHost from "./adapter"
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 import { HostTaskScope } from "./task-scope"
-import { Schema } from "effect"
+import { DashboardDelete, DashboardDeleteResult, DashboardOperation, DashboardVersionList, PublicationRef, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
+import type { DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
+import { Option, Schema } from "effect"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 
 const state: { connection?: ReturnType<typeof transport> } = {}
@@ -49,7 +51,43 @@ export async function acquire(session: string) {
       next.resolve()
     }
   }
+  async function dashboard(method: DashboardStorageOperation, input: DashboardOperation | DashboardDelete | (DashboardOperation & { content: string; expected: PublicationRef | null }), signal?: AbortSignal) {
+    const abort = () => { void connection!.request("interrupt", { run }).catch(() => undefined) }
+    return queued(async () => {
+      if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
+      signal?.addEventListener("abort", abort, { once: true })
+      try { return await connection!.request(method, { ...input, run }, undefined, observe) }
+      catch (error) {
+        if (error instanceof Error && ["LOGINOM_HOST_CLOSED", "LOGINOM_HOST_TIMEOUT", "LOGINOM_REPLY_INVALID"].includes(error.message)) {
+          if (method === "dashboardDelete") throw new Error("DASHBOARD_DELETE_UNKNOWN")
+          if (method === "dashboardPublish" && error.message !== "LOGINOM_REPLY_INVALID") throw new Error("DASHBOARD_WRITE_UNKNOWN")
+        }
+        throw error
+      }
+      finally { signal?.removeEventListener("abort", abort) }
+    })
+  }
   return {
+    async dashboardRead(input: DashboardOperation, signal?: AbortSignal): Promise<PublicationSource | null> {
+      return Schema.decodeUnknownSync(Schema.NullOr(PublicationSource))(await dashboard("dashboardRead", input, signal))
+    },
+    async dashboardPublish(input: DashboardOperation & { content: string; expected: PublicationRef | null }, signal?: AbortSignal): Promise<PublicationWrite> {
+      const result = await dashboard("dashboardPublish", input, signal)
+      if (!Schema.is(PublicationWrite)(result)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+      return result
+    },
+    async dashboardVersions(input: DashboardOperation, signal?: AbortSignal): Promise<DashboardVersionList> {
+      const result = Schema.decodeUnknownOption(DashboardVersionList, { onExcessProperty: "error" })(
+        await dashboard("dashboardVersions", input, signal),
+      )
+      if (Option.isNone(result)) throw new Error("LOGINOM_REPLY_INVALID")
+      return result.value
+    },
+    async dashboardDelete(input: DashboardDelete, signal?: AbortSignal): Promise<DashboardDeleteResult> {
+      const result = decodeDashboardDeleteResult(await dashboard("dashboardDelete", input, signal), input.expected.length)
+      if (Option.isNone(result)) throw new Error("DASHBOARD_DELETE_UNKNOWN")
+      return result.value
+    },
     get generation() {
       return queue.generation
     },

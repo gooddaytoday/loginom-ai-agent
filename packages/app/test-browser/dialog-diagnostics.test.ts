@@ -15,7 +15,6 @@ afterAll(() => rmSync(compiled, { force: true }))
 
 beforeAll(async () => {
   const pass = (props: { children?: unknown }) => props.children
-  mock.module("@opencode-ai/ui/button", () => ({ Button: pass }))
   mock.module("@opencode-ai/ui/checkbox", () => ({ Checkbox: pass }))
   mock.module("@opencode-ai/ui/dialog", () => ({ Dialog: pass }))
   mock.module("@opencode-ai/ui/context/dialog", () => ({ useDialog: () => ({ close() {} }) }))

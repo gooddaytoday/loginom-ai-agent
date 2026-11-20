@@ -39,6 +39,7 @@ import type { PromptSession } from "@/context/prompt"
 import "./titlebar.css"
 import { newTabTooltipKeybind } from "./command-tooltip-keybind"
 import { normalizeSessionInfo } from "@/utils/session"
+import { useDirectoryPicker } from "./directory-picker"
 
 const legacyTitlebarHeight = 40
 const v2TitlebarHeight = 36
@@ -194,6 +195,7 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
           {(_) => {
             const layout = useLayout()
             const global = useGlobal()
+            const pickDirectory = useDirectoryPicker()
 
             const tabs = useTabs()
             const tabsStore = tabs.store
@@ -226,7 +228,7 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
                 )
                 if (main) return main
                 const s = session()
-                if (s?.parentID) {
+                if (s?.id === route.sessionId && s.parentID) {
                   const parentID = s.parentID
                   const parent = tabsStore.find(
                     (item) => item.type === "session" && item.server === route.server && item.sessionId === parentID,
@@ -262,21 +264,59 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
               tabsStoreActions.removeSessions(detail)
             })
 
-            const openNewTab = () => {
+            const openNewTab = async () => {
               const route = layout.route()
-              const activeSession = session()
-              if (route.type === "session" && activeSession) {
-                const sessionTab = {
-                  type: "session" as const,
-                  server: route.server ?? server.key,
-                  sessionId: activeSession.id,
+              const activeTab = currentTab()
+              const routeServer = route.type === "home" ? undefined : (route.server ?? server.key)
+              const conn = global.servers.list().find((item) => ServerConnection.key(item) === routeServer)
+              const sessionTab =
+                route.type === "session"
+                  ? { type: "session" as const, server: route.server ?? server.key, sessionId: route.sessionId }
+                  : undefined
+              const loaded = session()
+              let sessionDirectory = loaded?.id === sessionTab?.sessionId ? loaded?.directory : undefined
+              if (conn && ServerConnection.local(conn)) {
+                const isDashboardWork = platform.isDashboardWork
+                let origin = activeTab?.dashboardOrigin
+                if (origin === undefined && isDashboardWork) {
+                  if (sessionTab) {
+                    const sessions = global.ensureServerCtx(conn).sync.session
+                    sessionDirectory =
+                      sessions.peek(sessionTab.sessionId)?.directory ??
+                      tabs.info[tabKey(sessionTab)]?.directory ??
+                      (await sessions.resolve(sessionTab.sessionId).catch(() => undefined))?.directory
+                  }
+                  const directory = activeTab?.type === "draft" ? activeTab.directory : sessionDirectory
+                  if (directory ? await isDashboardWork(directory) : sessionTab !== undefined) origin = null
+                  if (layout.route() !== route) return
                 }
+                if (typeof origin === "string") {
+                  void tabs.newDraft({ server: ServerConnection.key(conn), directory: origin })
+                  return
+                }
+                if (origin === null) {
+                  pickDirectory({
+                    server: conn,
+                    title: language.t("command.project.open"),
+                    onSelect: async (result) => {
+                      const directory = Array.isArray(result) ? result[0] : result
+                      if (!directory || await isDashboardWork?.(directory) || layout.route() !== route) return
+                      const ctx = global.ensureServerCtx(conn)
+                      ctx.projects.open(directory)
+                      ctx.projects.touch(directory)
+                      void tabs.newDraft({ server: ServerConnection.key(conn), directory })
+                    },
+                  })
+                  return
+                }
+              }
+
+              if (sessionTab && sessionDirectory) {
                 const model = tabs.stateValue<PromptSession>(sessionTab, "prompt")?.model.current()
-                tabs.newDraft({ server: sessionTab.server, directory: activeSession.directory }, "", model)
+                tabs.newDraft({ server: sessionTab.server, directory: sessionDirectory }, "", model)
                 return
               }
 
-              const activeTab = currentTab()
               if (activeTab?.type === "draft") {
                 const model = tabs.stateValue<PromptSession>(activeTab, "prompt")?.model.current()
                 tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "", model)

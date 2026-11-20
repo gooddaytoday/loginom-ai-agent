@@ -36,6 +36,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/src/call-timeout.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/dashboard-storage.mjs": await readFile(
+      new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,

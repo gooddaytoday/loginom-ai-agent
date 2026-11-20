@@ -107,6 +107,19 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   try {
     expect(host.alive).toBe(true)
     expect(await host.request("connection.status", {})).toMatchObject({ state: "unconfigured", generation: 0 })
+    // Await IPC directly: the Bun rejection matcher can stall the Windows message loop.
+    const dashboardError = await host
+      .request("dashboard.read", {
+        origin: "http://example.test",
+        generation: 1,
+        binding: {
+          packagePath: "/user/example.lgp",
+          workflowGuid: "11111111-1111-4111-8111-111111111111",
+          nodeGuid: "22222222-2222-4222-8222-222222222222",
+        },
+      })
+      .catch((error: Error) => error.message)
+    expect(dashboardError).toBe("LOGINOM_GENERATION_UNAVAILABLE")
     const error = await host
       .request("connection.check", { apiKey: "private-sentinel" })
       .catch((error: Error) => error.message)

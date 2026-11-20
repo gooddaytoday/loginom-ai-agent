@@ -1,3 +1,12 @@
+## Защита приватных данных
+
+- Не добавляй в Git реальные credentials, личные пути, приватные адреса и данные локального окружения. Это относится к коду, документации, тестам, отчётам и архивам. Пользоваться настоящими путями для локальной работы можно.
+- В коде получай пути из окружения, настроек или расположения проекта. В документации используй относительные пути, `$HOME`, `%USERPROFILE%` и `<project-root>`; в примерах и тестах — явно искусственные значения. Запрещённые пути для тестов сканера собирай из частей.
+- Обезличивай диагностические материалы до записи в репозиторий. Сырые логи, локальные конфигурации и credentials храни вне Git.
+- Перед первым коммитом в новом checkout проверь подключение hooks и наличие закреплённой версии Gitleaks по канонической инструкции. Перед каждым коммитом проверяй именно подготовленные изменения: `bun run secrets staged`; не подготавливай чужие изменения ради проверки.
+- Не обходи hooks и не ослабляй правила или исключения ради прохождения проверки. Сначала исправь добавляемые данные и индекс. Исключения допустимы только для доказанно искусственного значения или необходимого системного пути, точечно и с объяснением. Реальные credentials и личные данные исключать нельзя.
+- Каноническая политика, установка и ограничения: [защита Git](docs/security/secret-protection.md).
+
 ## Node development
 
 Для разработки обработчиков читать [RUNBOOK](docs/node-development/RUNBOOK.md) и подплан узла.
@@ -184,5 +193,6 @@ const table = sqliteTable("session", {
 - [CI: release builds and test workflows](docs/testing/loginom-ai-agent/ci-release.md)
 - [Git secret protection, commands and audit](docs/security/secret-protection.md)
 - [Eval harness for Loginom scenarios](evals/AGENTS.md)
+- [Node dashboards: Desktop/CLI draft from a one-use snapshot, then explicit publication](packages/dashboard/AGENTS.md). Dashboard — недоверенный код: модель пишет только в `<данные бэкенда>/dashboards/*/work/src/`, привязка хранится рядом в `control/`. Резолвер ограничивает сборку, loopback-сервер показывает черновик. Интеграция и публикация не меняют `.lgp`; текущий порядок — [runbook M4](docs/testing/loginom-ai-agent/dashboard-m4.md).
 
 Before resuming release work, read the [canonical Linux checkpoint](docs/migration/linux-implementation-checkpoint.md) and [platform runbooks](docs/testing/loginom-ai-agent/README.md). Reports distinguish tested installed artifacts from source-only checks. Keep durable decisions here or in the owning module; keep secrets and raw diagnostic logs out of git. Historical release reports retain the paths/version that were actually tested.

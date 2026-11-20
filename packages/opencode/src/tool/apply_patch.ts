@@ -6,7 +6,7 @@ import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import { InstanceState } from "@/effect/instance-state"
 import { Patch } from "../patch"
 import { createTwoFilesPatch, diffLines } from "diff"
-import { assertExternalDirectoryEffect } from "./external-directory"
+import { assertExternalDirectoryEffect, workspaceWriter } from "./external-directory"
 import { trimDiff } from "./edit"
 import { LSP } from "@/lsp/lsp"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -53,6 +53,7 @@ export const ApplyPatchTool = Tool.define(
       }
 
       const instance = yield* InstanceState.context
+      const writer = workspaceWriter(afs, ctx, instance.directory)
 
       // Validate file paths and check permissions
       const fileChanges: Array<{
@@ -71,7 +72,7 @@ export const ApplyPatchTool = Tool.define(
 
       for (const hunk of hunks) {
         const filePath = path.resolve(instance.directory, hunk.path)
-        yield* assertExternalDirectoryEffect(ctx, filePath)
+        yield* assertExternalDirectoryEffect(ctx, filePath, { write: true })
 
         switch (hunk.type) {
           case "add": {
@@ -140,7 +141,7 @@ export const ApplyPatchTool = Tool.define(
             }
 
             const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
-            yield* assertExternalDirectoryEffect(ctx, movePath)
+            yield* assertExternalDirectoryEffect(ctx, movePath, { write: true })
 
             fileChanges.push({
               filePath,
@@ -221,36 +222,32 @@ export const ApplyPatchTool = Tool.define(
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
         switch (change.type) {
           case "add":
-            // Create parent directories (recursive: true is safe on existing/root dirs)
-
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writer.write(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* writer.write(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "change" })
             break
 
           case "move":
             if (change.movePath) {
-              // Create parent directories (recursive: true is safe on existing/root dirs)
-
-              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
-              yield* afs.remove(change.filePath)
+              yield* writer.write(change.movePath, Bom.join(change.newContent, change.bom))
+              yield* writer.remove(change.filePath)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
             }
             break
 
           case "delete":
-            yield* afs.remove(change.filePath)
+            yield* writer.remove(change.filePath)
             updates.push({ file: change.filePath, event: "unlink" })
             break
         }
 
         if (edited) {
-          if (yield* format.file(edited)) {
+          if (!ctx.dashboardWork && (yield* format.file(edited))) {
             yield* Bom.syncFile(afs, edited, change.bom)
           }
           yield* events.publish(FileSystem.Event.Edited, { file: edited })

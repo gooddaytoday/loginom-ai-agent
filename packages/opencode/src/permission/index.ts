@@ -67,10 +67,11 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
-      let needsAsk = false
+      const once = request.permission === "dashboard_delete"
+      let needsAsk = once
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = evaluate(request.permission, pattern, ruleset, once ? [] : approved)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           return yield* new PermissionV1.DeniedError({
@@ -90,7 +91,7 @@ const layer = Layer.effect(
         permission: request.permission,
         patterns: request.patterns,
         metadata: request.metadata,
-        always: request.always,
+        always: once ? [] : request.always,
         tool: request.tool,
       }
       yield* Effect.logInfo("asking", { id, permission: info.permission, patterns: info.patterns })
@@ -111,14 +112,15 @@ const layer = Layer.effect(
       const existing = pending.get(input.requestID)
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
+      const reply = input.reply === "always" && existing.info.permission === "dashboard_delete" ? "reject" : input.reply
       pending.delete(input.requestID)
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: input.reply,
+        reply,
       })
 
-      if (input.reply === "reject") {
+      if (reply === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message
@@ -126,6 +128,7 @@ const layer = Layer.effect(
             : new PermissionV1.RejectedError(),
         )
 
+        if (input.reply === "always") return
         for (const [id, item] of pending.entries()) {
           if (item.info.sessionID !== existing.info.sessionID) continue
           pending.delete(id)
@@ -140,7 +143,7 @@ const layer = Layer.effect(
       }
 
       yield* Deferred.succeed(existing.deferred, undefined)
-      if (input.reply === "once") return
+      if (reply === "once") return
 
       for (const pattern of existing.info.always) {
         approved.push({
@@ -152,6 +155,7 @@ const layer = Layer.effect(
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
+        if (item.info.permission === "dashboard_delete") continue
         const ok = item.info.patterns.every(
           (pattern) => evaluate(item.info.permission, pattern, approved).action === "allow",
         )

@@ -22,6 +22,7 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
 import { stat } from "node:fs/promises"
+import { randomBytes } from "node:crypto"
 import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Cause, Effect, Exit } from "effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -30,11 +31,17 @@ import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
-import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
+import { DashboardSession } from "@/product/dashboard-session"
+import { createOpencodeClient, type OpencodeClient, type PermissionRequest, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
-import { INTERACTIVE_INPUT_ERROR, readPromptStdin, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { INTERACTIVE_INPUT_ERROR, readPromptStdin, readTerminalConfirmation, resolveInteractiveStdin } from "./run/runtime.stdin"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
+
+let dashboardPart: string | undefined
+export function setRunDashboard(text?: string) {
+  dashboardPart = text
+}
 
 function pick(value: string | undefined): ModelInput | undefined {
   if (!value) return undefined
@@ -94,6 +101,21 @@ function formatRunError(error: unknown) {
   return FormatError(error) ?? FormatUnknownError(error)
 }
 
+function dashboardDeletionLines(request: PermissionRequest) {
+  const literal = (value: string | undefined) => JSON.stringify(value ?? "")
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, (char) => `\\u{${char.codePointAt(0)!.toString(16)}}`)
+  const count = request.metadata.publicationCount
+  const confirmed = request.metadata.confirmedRemoved
+  return [
+    `Узел: ${literal(request.patterns[0])}`,
+    `Пакет: ${literal(request.patterns[1])}`,
+    ...(Number.isSafeInteger(count) ? [`Опубликованных версий к удалению: ${count}`] : []),
+    ...(typeof confirmed === "number" && Number.isSafeInteger(confirmed) && confirmed > 0
+      ? [`Уже подтверждено удаление версий: ${confirmed}`] : []),
+    "Локальный черновик и неопубликованные правки будут удалены.",
+  ]
+}
+
 async function tool(part: ToolPart) {
   try {
     const { toolInlineInfo } = await import("./run/tool")
@@ -137,7 +159,7 @@ export const RunCommand = effectCmd({
   // default path runs an in-process server and needs the project instance.
   instance: (args) => !args.attach,
   // For --dir without --attach, load instance for the resolved target dir.
-  // The handler also chdirs (preserving the legacy order: chdir → file resolution).
+  // The handler also changes cwd before resolving relative attachments.
   directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
   builder: (yargs: Argv) =>
     yargs
@@ -371,11 +393,17 @@ export const RunCommand = effectCmd({
 
       const root = Filesystem.resolve(process.env.PWD ?? process.cwd())
       const directory = (() => {
-        if (!args.dir) return args.attach ? undefined : root
         if (args.attach) return args.dir
-
+        const target = !args.dir ? root : path.isAbsolute(args.dir) ? args.dir : path.join(root, args.dir)
         try {
-          process.chdir(path.isAbsolute(args.dir) ? args.dir : path.join(root, args.dir))
+          if (DashboardSession.isDashboardWork(target)) {
+            // The SDK keeps the project directory while the process survives removing it.
+            const work = Filesystem.resolve(target)
+            process.chdir(DashboardSession.dashboardRoot())
+            return work
+          }
+          if (!args.dir) return root
+          process.chdir(target)
           return process.cwd()
         } catch {
           UI.error("Failed to change directory to " + args.dir)
@@ -756,7 +784,11 @@ export const RunCommand = effectCmd({
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
-        async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
+        async function loop(
+          client: OpencodeClient,
+          events: Awaited<ReturnType<typeof sdk.event.subscribe>>,
+          signal: AbortSignal,
+        ) {
           const toggles = new Map<string, boolean>()
           const outcome = runToolOutcome()
           const sessions = new Set([sessionID])
@@ -880,6 +912,22 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
+              if (permission.permission === "dashboard_delete") {
+                const confirmationSignal = standaloneCancellation()
+                const replySignal = confirmationSignal ? AbortSignal.any([confirmationSignal, signal]) : signal
+                const choice = "Удалить " + randomBytes(4).toString("hex")
+                const once = await readTerminalConfirmation(
+                  [...dashboardDeletionLines(permission), `Введите «${choice}» для подтверждения или «Отмена» для отказа.`, ""].join(EOL),
+                  choice,
+                  replySignal,
+                )
+                await client.permission.reply({
+                  requestID: permission.id,
+                  reply: once && !replySignal.aborted ? "once" : "reject",
+                })
+                continue
+              }
+
               if (auto) {
                 await client.permission.reply({
                   requestID: permission.id,
@@ -893,7 +941,9 @@ export const RunCommand = effectCmd({
                 UI.println(
                   UI.Style.TEXT_WARNING_BOLD + "!",
                   UI.Style.TEXT_NORMAL +
-                    `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+                    (permission.permission === "dashboard_publish"
+                      ? `Публикация отклонена: dashboard_publish (${permission.patterns.join(", ")}) требует явного согласия. Для подтверждения в CLI укажите --auto.`
+                      : `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`),
                 )
                 await client.permission.reply({
                   requestID: permission.id,
@@ -924,7 +974,7 @@ export const RunCommand = effectCmd({
         if (!interactive) {
           const subscription = new AbortController()
           const events = await client.event.subscribe(undefined, { signal: subscription.signal })
-          const completed = loop(client, events).catch((e) => {
+          const completed = loop(client, events, subscription.signal).catch((e) => {
             if (subscription.signal.aborted) return
             console.error(e)
             process.exitCode = 1
@@ -977,7 +1027,11 @@ export const RunCommand = effectCmd({
               agent,
               model,
               variant: args.variant,
-              parts: [...files, { type: "text", text: message }],
+              parts: [
+                ...files,
+                { type: "text", text: message },
+                ...(dashboardPart ? [{ type: "text" as const, text: dashboardPart, synthetic: true }] : []),
+              ],
             })
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))

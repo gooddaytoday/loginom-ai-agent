@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { SessionV1 } from "@opencode-ai/schema/v1/session"
 
-export const Profile = Schema.Literals(["default", "package-docs", "loginom-automation"])
+export const Profile = Schema.Literals(["default", "package-docs", "loginom-automation", "loginom-dashboard"])
 export type Profile = typeof Profile.Type
 export const Info = Schema.Struct({ taskMessageID: SessionV1.MessageID, profile: Profile })
 export type Info = typeof Info.Type
@@ -9,6 +9,7 @@ export const Request = Schema.Struct({ mode: Schema.Literals(["bind", "request",
 export type Request = typeof Request.Type
 
 export function permits(from: Profile, next: Profile) {
+  if (from === "loginom-dashboard" || next === "loginom-dashboard") return false
   return !(from === "package-docs" && next === "loginom-automation")
 }
 
