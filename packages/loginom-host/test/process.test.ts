@@ -86,7 +86,8 @@ test("runtime cleanup requires both a close acknowledgement and a clean exit", a
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
-}, 15000)
+// Missing IPC replies may consume the 15s ACK allowance plus the 5s exit grace.
+}, 30000)
 
 test("IPC disconnect rejects in-flight requests even while the runtime stays alive", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
