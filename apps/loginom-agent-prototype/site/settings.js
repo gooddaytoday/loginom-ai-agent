@@ -340,17 +340,16 @@ function permissionsTab(state, s) {
   const rows = permissionKinds.map(([id, title, text, initial]) => {
     // Iteration 9 (run 3, finding 22): under a policy every row says who set it — the lock names the administrator,
     // an open row says whether its value is the default one.
-    const mark = !state.policy ? "" : s.permissions[id] === initial ? "<small>По умолчанию</small>"
-      : "<small>Вы изменили · по умолчанию «" + permissionLabels[initial] + "»</small>"
+    const mark = !state.policy ? "" : '<small id="perm-mark-' + id + '">' + (s.permissions[id] === initial ? "По умолчанию" : "Вы изменили · по умолчанию «" + permissionLabels[initial] + "»") + "</small>"
     const control = id === "web" && closed ? locked(permissionLabels.deny, lockReason(state))
-      : '<span class="st-perm"><select data-st-input="perm:' + id + '" aria-label="' + esc(title) + '">' + Object.entries(permissionLabels).map(([key, label]) => option(key, label, s.permissions[id])).join("") + "</select>" + mark + "</span>"
+      : '<span class="st-perm"><select data-st-input="perm:' + id + '" aria-label="' + esc(title) + '"' + (mark ? ' aria-describedby="perm-mark-' + id + '"' : "") + ">" + Object.entries(permissionLabels).map(([key, label]) => option(key, label, s.permissions[id])).join("") + "</select>" + mark + "</span>"
     return listRow(title, id === "web" && state.policy === "set" ? text + " Если нужно — обратитесь к администратору." : text, control)
   }).join("")
   const who = state.policy === "set" ? " Строки с замком задал администратор: «Открывать сайты» и терминал. Остальные он не задавал — у них написано, стоит ли значение по умолчанию."
     : state.policy === "broken" ? " Строки с замком закрыты, пока администратор не исправит файл политики. У остальных написано, стоит ли значение по умолчанию."
       : " Строки с замком в разговоре не разрешить."
   return card("Разрешения", "Что агент делает сам без вопроса, что — спросив вас, а что не делает никогда. Кнопки, которые нажимаете вы, например «Сохранить новой версией», эти настройки не затрагивают: они работают по правам вашей учётной записи Loginom. Где стоит «Спрашивать», в разговоре можно разрешить «один раз» или «в этом разговоре»." + who,
-    '<div class="st-list">' + rows + "</div>", btn("Как при установке", "perm-reset", "quiet")) +
+    '<div class="st-list">' + rows + "</div>", btn("Всё по умолчанию", "perm-reset", "quiet")) +
     card("Терминал", "Команды на вашем компьютере: установка программ, работа с файлами вне проекта.",
       closed ? listRow("Команды в терминале", "Агент не выполняет команды на компьютере.", locked("Выключен", lockReason(state)))
         : switchRow("Разрешить агенту терминал", s.terminal ? "Включён. Агент спросит про каждую команду и покажет её целиком." : "Выключен. Включите, только если понимаете, зачем агенту команды.", "terminal", s.terminal))
@@ -847,7 +846,7 @@ export function bindSettings(root, state, api) {
     if (action === "perm-reset") {
       s.permissions = Object.fromEntries(permissionKinds.map(([id, , , initial]) => [id, initial]))
       s.terminal = false
-      api.toast("Разрешения и терминал — как при установке")
+      api.toast("Разрешения и терминал — по умолчанию")
     }
     if (action === "theme") {
       s.theme = value

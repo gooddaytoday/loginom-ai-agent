@@ -57,25 +57,27 @@ const packageViews = {
     ['chart','Узел14','Расчёт','Сумма выручки по городам'],
     ['file','Результат','Выход','120 строк'],
   ],
+  // Iteration 9: the 3rd field of a node without facts is its Loginom component — the schema writes it under the name.
   abc:[
-    ['database','CSV продаж','Входные данные','Демонстрационный CSV · 2 400 строк'],
-    ['layers','Подготовка','Преобразование','Проверка пропусков и нормализация форматов'],
-    ['chart','ABC-анализ','Расчёт','Группировка по накопленной доле выручки'],
-    ['file','Результат','Выход','120 товаров · 3 группы'],
+    ['database','CSV продаж','Импорт из текстового файла','Демонстрационный CSV · 2 400 строк'],
+    ['layers','Подготовка','Заполнение пропусков','Проверка пропусков и нормализация форматов'],
+    ['chart','ABC-анализ','Группировка','Группировка по накопленной доле выручки'],
+    ['file','Результат','Экспорт в Excel-файл','120 товаров · 3 группы'],
   ],
   // Iteration 9: «14 узлов, 3 подмодели», as the document and the action say — 5 here and 9 inside (packageSubmodels).
+  // Field checks and duplicates are parallel branches; both feed «Сводка ошибок» (packageLinks).
   quality:[
-    ['database','Приём данных','Входные данные','Демонстрационная таблица · 2 400 строк'],
-    ['layers','Проверка полей','Подмодель · 3 узла','Проверяются обязательные поля, типы и форматы дат'],
-    ['shield','Поиск дублей','Подмодель · 3 узла','Проверяются повторяющиеся ключи'],
-    ['chart','Сводка ошибок','Подмодель · 3 узла','Сколько ошибок и в каких полях'],
-    ['file','Отчёт','Выход','Образец отчёта о качестве данных'],
+    ['database','Приём данных','Импорт из текстового файла','Демонстрационная таблица · 2 400 строк'],
+    ['layers','Проверка полей','Подмодель','Строки с пустыми обязательными полями и сколько их по каждому полю'],
+    ['shield','Поиск дублей','Подмодель','Записи, ключ которых встречается больше одного раза'],
+    ['chart','Сводка ошибок','Подмодель','Ошибки полей и дубликаты в одной таблице, с долей ошибок'],
+    ['file','Отчёт','Экспорт в Excel-файл','Образец отчёта о качестве данных'],
   ],
   calculation:[
-    ['database','JS: Category, amount','Входные данные','Три учебные строки с суммами 10, 20 и 25'],
+    ['database','JS: Category, amount','JavaScript','Три учебные строки с суммами 10, 20 и 25'],
     ['chart','amount_double','Калькулятор','Формула для расчётного поля'],
-    ['layers','Порядок колонок CSV','Подготовка','Столбцы Category, amount и amount_double'],
-    ['file','ExportCSV','Выход','Сохранение результата в CSV'],
+    ['layers','Порядок колонок CSV','Параметры полей','Столбцы Category, amount и amount_double'],
+    ['file','ExportCSV','Экспорт в текстовый файл','Сохранение результата в CSV'],
   ],
   // Iteration 4: the agent's working copy of «Продажи.lgp». 5th: what happened to the node, 6th: how it was.
   // 7th (В-67): the node's Loginom type and [setting or port, before, after] — the target product view; the parser reads
@@ -120,31 +122,36 @@ const packageViews = {
     ['file','Результат','Выход','120 строк'],
   ],
   local:[
-    ['database','Источник','Входные данные','Пример входного узла'],
-    ['layers','Подготовка','Преобразование','Пример обработки входной таблицы'],
-    ['flow','Обработка','Расчёт','Пример вычислительного узла'],
-    ['file','Результат','Выход','Пример выходной таблицы'],
+    ['database','Источник','Импорт из текстового файла','Пример входного узла'],
+    ['layers','Подготовка','Параметры полей','Пример обработки входной таблицы'],
+    ['flow','Обработка','Калькулятор','Пример вычислительного узла'],
+    ['file','Результат','Экспорт в текстовый файл','Пример выходной таблицы'],
   ],
+}
+// Links of a view without facts, [from, output, to, input]; a view not listed here is a chain.
+const packageLinks = {
+  quality:[[0,0,1,0],[0,0,2,0],[1,0,3,0],[2,0,3,1],[3,0,4,0]],
 }
 // The nodes inside each submodel of a view. In Loginom a submodel is a node that holds other nodes; «Войти» opens them,
 // «Выйти из подмодели» goes back up (help: processors/control/supernode). extract.ts reads them as `submodels`.
+// ins — the submodel's input ports; links as in packageLinks, 0 is «Вход подмодели», nodes.length + 1 — «Выход».
 const packageSubmodels = {
   quality:{
-    'Проверка полей':[
-      ['shield','Обязательные поля','Фильтр строк','Строки без даты, товара или суммы — на выход «Не соответствуют условию»'],
-      ['layers','Типы и форматы','Преобразование','Суммы — числом, даты — датой в одном формате'],
-      ['chart','Счётчик ошибок','Расчёт','Сколько строк не прошло проверку'],
-    ],
-    'Поиск дублей':[
-      ['layers','Ключ записи','Преобразование','Дата, товар и номер документа в одном поле'],
+    'Проверка полей':{ins:1, nodes:[
+      ['layers','Типы и форматы','Параметры полей','Суммы — числом, даты — датой; нечитаемое значение станет пустым'],
+      ['shield','Обязательные поля','Фильтр строк','Дата, товар и сумма не пустые; строки с пустым полем — на выход «Не соответствуют условию»'],
+      ['chart','Счётчик ошибок','Группировка','Сколько строк с пустым полем — по каждому полю'],
+    ], links:[[0,0,1,0],[1,0,2,0],[2,1,3,0],[3,0,4,0]]},
+    'Поиск дублей':{ins:1, nodes:[
+      ['layers','Ключ записи','Калькулятор','Дата, товар и номер документа в одном поле'],
       ['chart','Повторы ключа','Группировка','Сколько раз встречается каждый ключ'],
       ['shield','Дубликаты','Фильтр строк','Ключи, которые встречаются больше одного раза'],
-    ],
-    'Сводка ошибок':[
-      ['chart','Ошибки по полям','Группировка','Сколько ошибок в каждом поле'],
-      ['chart','Доля ошибок','Расчёт','Какая доля строк с ошибкой в каждом поле'],
-      ['file','Таблица для отчёта','Преобразование','Сводка в том виде, в каком её берёт отчёт'],
-    ],
+    ], links:[[0,0,1,0],[1,0,2,0],[2,0,3,0],[3,0,4,0]]},
+    'Сводка ошибок':{ins:2, nodes:[
+      ['layers','Все ошибки','Объединение','Ошибки полей и дубликаты — строками одной таблицы'],
+      ['chart','Доля ошибок','Калькулятор','Какая доля строк с ошибкой — по каждому виду ошибки'],
+      ['layers','Порядок для отчёта','Сортировка','Сначала ошибки с наибольшей долей'],
+    ], links:[[0,0,1,0],[0,1,1,1],[1,0,2,0],[2,0,3,0],[3,0,4,0]]},
   },
 }
 // Iteration 8: a follow-up edit kept «Фильтр по дате (ветка «Города»)», which «Города — неделя.lgp» takes results from.
@@ -779,10 +786,13 @@ function result(item) {
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>${item.local ? 'Файл «Продажи.lgp» с компьютера не менял' : 'Пакет «Продажи.lgp» не менял'}. Что можно сделать лучше:</p>
     <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
     <div class="button-row"><button class="btn primary" data-action="improve-from-check">${icon('wand',15)} Внести улучшения</button><span class="muted">${item.local ? 'Агент загрузит копию в Loginom и изменит её; файл на компьютере не изменится.' : 'Агент изменит копию; исходный пакет изменится, только если вы решите его заменить.'}</span></div></div>`
-  if (item.kind === 'enrich') return `<div class="answer-block"><h2>Таблица дополнена</h2><p>Example Data вернул население города и часовой пояс для 2 388 строк из 2 400; у 12 строк нет города — для них сервис ничего не нашёл. Исходная таблица не менялась, дополненная — отдельным файлом.</p>
-    <dl class="result-metrics"><div><dt>Отправлено</dt><dd>2 столбца</dd></div><div><dt>Дополнено</dt><dd>2 388 строк</dd></div><div><dt>Куда</dt><dd>Example Data</dd></div></dl>
+  if (item.kind === 'enrich') return `<div class="answer-block"><h2>Таблица дополнена</h2><p>Example Data вернул население региона и часовой пояс для 2 391 строки из 2 400; у 9 строк регион пустой — для них сервис ничего не нашёл. Исходная таблица не менялась, дополненная — отдельным файлом.</p>
+    <dl class="result-metrics"><div><dt>Отправлено</dt><dd>1 столбец</dd></div><div><dt>Дополнено</dt><dd>2 391 строка</dd></div><div><dt>Куда</dt><dd>Example Data</dd></div></dl>
     <div class="artifact-card"><span class="glyph green">${icon('file',19)}</span><span><strong>sales-demo — с данными Example Data.csv</strong><small>${chatFolder(item).label.replace(/^в/,'В')}</small></span><button class="btn quiet" data-action="open-chat-folder">Открыть папку</button></div></div>`
-  if (item.kind === 'noenrich') return `<div class="answer-block"><p>${item.nosend === 'closed' ? 'Подключение «Внешнее обогащение данных» работает через интернет, а сейчас закрытый контур — в Example Data ничего не отправлено.' : '«Внешнее обогащение данных» не установлено — без него я ничего не отправляю во внешний сервис. В каталоге видно, чей это сервис и что он получит.'}</p>${item.nosend === 'closed' ? '' : `<button class="btn" data-action="open-enrich">${icon('grid',15)} Открыть в каталоге</button>`}</div>`
+  // A question about the service, or a request it cannot serve: what the catalog card says, in words.
+  if (item.kind === 'noenrich') return `<div class="answer-block"><p>Подключение «Внешнее обогащение данных» отправляет выбранные столбцы таблицы в Example Data (api.example-data.example) — это сторонний сервис, не Loginom; что он делает с данными, решают его условия. Перед первой отправкой в разговоре я спрошу вас и покажу, какие столбцы и сколько строк уйдут.</p>
+    <p>${{closed:'Сейчас закрытый контур, а подключению нужен интернет — в Example Data ничего не отправлено.', missing:'Оно не установлено, поэтому я ничего не отправил. Посмотреть и установить — в каталоге.', 'info-missing':'Сейчас оно не установлено — посмотреть и установить можно в каталоге.', info:'Оно установлено: попросите, например, «Дополни таблицу «sales-demo.csv» данными о регионах из Example Data».'}[item.nosend] || ''}</p>
+    <button class="btn" data-action="open-enrich">${icon('grid',15)} Открыть в каталоге</button></div>`
   if (item.kind === 'chat' && item.web) return `<div class="answer-block"><p>Открывать сайты мне запрещено: ${item.web}. В разговоре это не разрешить.</p><p>По Loginom могу ответить по справке, которая встроена в приложение.</p></div>`
   if (item.kind === 'chat') return `<div class="answer-block"><p>Я помогаю работать в Loginom: собираю сценарии, разбираю и документирую пакеты, проверяю данные. Опишите задачу своими словами или выберите пакет через «+» — над полем появятся действия с ним.</p>${state.settings.connection.connected ? '' : '<p class="muted">Для работы с пакетами нужен Loginom — я предложу подключиться, когда он понадобится.</p>'}</div>`
   if (item.kind === 'document') return `<div class="answer-block"><h2>Пакет задокументирован</h2><p>Описаны назначение пакета, входные данные и каждый узел. Пакет не изменялся.</p>
@@ -1103,10 +1113,10 @@ const scripts = {
   // Iteration 9 (run 3, finding 23): data goes to a third-party service only after the user says so — before the first
   // send in a conversation. «Разрешения» do not rule it: the connection's tool asks (in OpenCode 2 — rule `ask` for the
   // connection's MCP tools); «Разрешать в этом разговоре» covers the next sends. The question shows the call's arguments.
-  enrich:{plan:['Прочитать таблицу','Отправить в Example Data','Дополнить таблицу'], permission:{external:true, title:'Отправить данные в Example Data?', text:'Example Data — сторонний сервис, не Loginom. Подключение «Внешнее обогащение данных» отправит ему только эти столбцы; что сервис делает с данными, решают его условия.', args:[['Сервис','Example Data · api.example-data.example'],['Уйдёт','столбцы «Город» и «Регион», 2 400 строк из «sales-demo.csv»'],['Не уйдёт','остальные столбцы таблицы']], noInstead:true, trace:'отправить «Город» и «Регион» (2 400 строк) в Example Data', scope:'отправлять данные в Example Data (api.example-data.example)', denied:'Хорошо, в Example Data ничего не отправил. Без этого сервиса дополнить таблицу не могу.'}, steps:[
-    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк; сервису нужны столбцы «Город» и «Регион»', time:3},
-    {plan:1, icon:'upload', ask:'permission', live:'Отправляю «Город» и «Регион» в Example Data', done:'Отправил «Город» и «Регион» в Example Data', short:'отправил 2 столбца в Example Data', detail:'api.example-data.example · 2 400 строк; другие столбцы не отправлялись', time:6},
-    {plan:2, icon:'file', live:'Дополняю таблицу', done:'Дополнил таблицу столбцами «Население города» и «Часовой пояс»', short:'дополнил таблицу', detail:'{folder}', time:4},
+  enrich:{plan:['Прочитать таблицу','Отправить в Example Data','Дополнить таблицу'], permission:{external:true, title:'Отправить данные в Example Data?', text:'Example Data — сторонний сервис, не Loginom. Подключение «Внешнее обогащение данных» отправит ему только этот столбец; что сервис делает с данными, решают его условия.', args:[['Сервис','Example Data · api.example-data.example'],['Уйдёт','столбец «Регион», 2 400 строк из «sales-demo.csv»'],['Не уйдёт','дата, товар, количество, цена, выручка']], noInstead:true, trace:'отправить столбец «Регион» (2 400 строк) в Example Data', scope:'отправлять данные в Example Data (api.example-data.example)', denied:'Хорошо, в Example Data ничего не отправил. Без этого сервиса дополнить таблицу не могу.'}, steps:[
+    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка; сервису нужен только «Регион»', time:3},
+    {plan:1, icon:'upload', ask:'permission', live:'Отправляю «Регион» в Example Data', done:'Отправил «Регион» в Example Data', short:'отправил столбец «Регион» в Example Data', detail:'api.example-data.example · 2 400 строк; другие столбцы не отправлялись', time:6},
+    {plan:2, icon:'file', live:'Дополняю таблицу', done:'Дополнил таблицу столбцами «Население региона» и «Часовой пояс»', short:'дополнил таблицу', detail:'{folder}', time:4},
   ]},
   noenrich:{steps:[]},
   more:{steps:[]},
@@ -1359,7 +1369,7 @@ function turnAnswer(turn, live = false) {
     const [title, reason] = modelErrorText(turn.modelError)
     const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !(state.freeLimited && model.source === 'free'))
     return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
-      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет: подключите провайдера: подписка, ключ API или свой сервер.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
+      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет — подключите модель: по подписке, по ключу API или свой сервер.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
       ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-action="provider-connect">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
   if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
@@ -1706,14 +1716,16 @@ function nodeFactsHtml(facts, mode) {
 // without measuring. In the product links and ports come from extract.ts; node positions from <Position Left Top> in
 // Unit.xml, which the parser does not read yet.
 const graphStep = {col:176, half:62, width:136, height:96, left:20, top:18}
-function schemaGraph(cards, links) {
+// The canvas, then the legend; the hint about scrolling shows when the frame is narrower than the graph (design.css).
+function schemaGraph(cards, links, canvas) {
   const depth = cards.map(() => 0)
   cards.forEach(() => links.forEach(link => { depth[link.to] = Math.max(depth[link.to], depth[link.from] + 1) }))
   const count = depth.map(level => depth.filter(other => other === level).length)
   const tall = Math.max(...count)
   // Rows in half steps: a column with fewer nodes sits in the middle, as a source between its two branches.
   const half = depth.map((level, i) => tall - count[i] + 2 * depth.slice(0, i).filter(other => other === level).length)
-  const width = (Math.max(...depth) + 1) * graphStep.col
+  const columns = Math.max(...depth) + 1
+  const width = columns * graphStep.col
   const height = (tall - 1) * 2 * graphStep.half + graphStep.height + 2 * graphStep.top
   const used = (i, side, k) => links.some(link => side === 'in' ? link.to === i && link.in === k : link.from === i && link.out === k)
   const port = (i, side, k) => [graphStep.left + depth[i] * graphStep.col + (side === 'in' ? 0 : graphStep.width),
@@ -1725,10 +1737,11 @@ function schemaGraph(cards, links) {
     return `<path class="graph-link${link.status ? ' is-' + link.status : ''}" d="M${x1} ${y1}C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}"/>`
   })
   const ports = (i, side) => cards[i][side].map((name, k, all) => `<span class="graph-port ${side} p${k + 1}of${all.length}${used(i, side, k) ? '' : ' is-free'}" title="${esc(name + (used(i, side, k) ? '' : ' — не подключён'))}"></span>`).join('')
-  return `<div class="graph"><svg class="graph-links" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${paths.join('')}</svg>${cards.map((card, i) => {
+  return `<div class="package-canvas graph-canvas${canvas.cls || ''}" aria-label="${canvas.label}"><div class="graph"><svg class="graph-links" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${paths.join('')}</svg>${cards.map((card, i) => {
     const tag = card.index == null ? 'div' : 'button'
     return `<${tag} class="canvas-node gx-${depth[i]} gy-${half[i]}${card.index != null && state.node === card.index ? ' active' : ''}${card.cls || ''}"${card.index == null ? '' : ` data-node="${card.index}" aria-pressed="${state.node === card.index}"`}>${card.mark ? `<span class="node-mark">${card.mark}</span>` : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[card.glyph] || 'violet'}">${icon(card.glyph,19)}</span><strong>${esc(card.title)}</strong><small>${esc(card.small)}</small>${ports(i,'in')}${ports(i,'out')}</${tag}>`
-  }).join('')}</div>`
+  }).join('')}</div></div>
+    <p class="graph-legend">Связь идёт от выхода узла (справа) ко входу следующего (слева); пустой кружок — порт не подключён.<span class="graph-scroll-hint wide-${columns}"> Схема шире окна — прокрутите её вбок.</span></p>`
 }
 // A node's links are its «Вход «…» ← «узел»» rows (the «Настройки и связи» table), so the schema cannot disagree
 // with it; the source's output is the one whose row names the receiving node.
@@ -1749,27 +1762,43 @@ function diffLinks(nodes) {
   return [...factLinks(nodes.map(node => node[1]), facts, 'after').map(link => ({...link, status:before.some(old => old.from === link.from && old.to === link.to) ? '' : 'add'})),
     ...before.filter(link => [link.from, link.to].some(i => nodes[i][4] === 'del')).map(link => ({...link, status:'del'}))]
 }
-// Inside a submodel its ports sit at the left and right edges, as in Loginom; here — as «Вход» and «Выход» of the chain.
-function submodelGraph(nodes, links, title, inner) {
+// Inside a submodel: its nodes between «Вход подмодели» and «Выход подмодели» — the prototype's labels; in Loginom the
+// ports sit at the left and right edges of the area.
+function submodelGraph(nodes, links, title, sub) {
   const at = nodes.findIndex(node => node[1] === title)
-  const from = links.find(link => link.to === at)
-  const to = links.find(link => link.from === at)
-  const edge = (name, small, glyph, side) => ({glyph, title:name, small, cls:' is-io', in:side === 'out' ? ['Вход «Таблица данных»'] : [], out:side === 'in' ? ['Выход «Таблица данных»'] : []})
-  return schemaGraph([edge('Вход подмодели', from ? `← «${nodes[from.from][1]}»` : 'не подключён', 'download', 'in'),
-    ...inner.map(([glyph,name,kind],i) => ({glyph, title:name, small:kind, index:i, in:['Вход «Входной источник данных»'],
-      out:kind === 'Фильтр строк' ? ['Выход «Соответствуют условию»', 'Выход «Не соответствуют условию»'] : ['Выход «Выходной набор данных»']})),
-    edge('Выход подмодели', to ? `→ «${nodes[to.to][1]}»` : 'не подключён', 'upload', 'out')], chainLinks(inner.length + 2))
+  const into = links.filter(link => link.to === at).sort((a, b) => a.in - b.in).map(link => `«${nodes[link.from][1]}»`)
+  const onward = links.filter(link => link.from === at).map(link => `«${nodes[link.to][1]}»`)
+  const ports = submodelPorts(sub)
+  return schemaGraph([
+    {glyph:'download', title:'Вход подмодели', small:into.length ? '← ' + into.join(', ') : 'не подключён', cls:' is-io', in:[], out:ports.in},
+    ...sub.nodes.map(([glyph,name,kind],i) => ({glyph, title:name, small:kind, index:i, ...componentPorts(kind)})),
+    {glyph:'upload', title:'Выход подмодели', small:onward.length ? '→ ' + onward.join(', ') : 'не подключён', cls:' is-io', in:ports.out, out:[]},
+  ], viewLinks(sub.links), {label:`Схема подмодели «${esc(title)}»`})
+}
+function viewLinks(rows) {
+  return rows.map(([from, out, to, port]) => ({from, out, to, in:port}))
 }
 function chainLinks(count) {
   return Array.from({length:Math.max(count - 1, 0)}, (_, i) => ({from:i, out:0, to:i + 1, in:0}))
 }
-// Ports named as in Loginom: from the facts when the demo has them; a submodel's ports are «Таблица данных».
-function portsOf(rows, glyph, links = [], i = -1, submodel = false) {
-  if (submodel) return {in:['Вход «Таблица данных»'], out:['Выход «Таблица данных»']}
-  const outs = (rows || []).filter(row => row[0].startsWith('Выход ')).map(row => row[0])
-  if (rows) return {in:rows.filter(row => row[0].startsWith('Вход ')).map(row => row[0]), out:outs.length ? outs : ['Выход «Выходной набор данных»']}
-  return {in:links.some(link => link.to === i) ? ['Вход «Входной источник данных»'] : [],
-    out:glyph === 'file' && !links.some(link => link.from === i) ? [] : ['Выход «Выходной набор данных»']}
+// Ports as Loginom names them; an import has only its output, an export only its input (service ports are not drawn).
+function componentPorts(kind) {
+  if (/^Импорт/.test(kind)) return {in:[], out:['Выход «Набор данных»']}
+  if (/^Экспорт/.test(kind)) return {in:['Вход «Источник данных»'], out:[]}
+  return {in:kind === 'Объединение' ? ['Вход «Главная таблица»', 'Вход «Присоединяемая таблица»'] : ['Вход «Входной источник данных»'],
+    out:kind === 'Фильтр строк' ? ['Выход «Соответствуют условию»', 'Выход «Не соответствуют условию»'] : ['Выход «Выходной набор данных»']}
+}
+// The demo's facts name a node's ports where it has them.
+function portsOf(facts, kind) {
+  const ports = componentPorts(facts?.[0] || kind)
+  if (!facts) return ports
+  const outs = facts[1].filter(row => row[0].startsWith('Выход ')).map(row => row[0])
+  return {in:facts[1].filter(row => row[0].startsWith('Вход ')).map(row => row[0]), out:outs.length ? outs : ports.out}
+}
+// A submodel's ports are made by its author; the demo numbers them (the type is «Таблица данных»).
+function submodelPorts(sub) {
+  const numbered = (side, count) => Array.from({length:count}, (_, i) => `${side} ${i + 1} · таблица данных`)
+  return {in:numbered('Вход', sub.ins), out:numbered('Выход', 1)}
 }
 // The working copy on the schema: added, changed and removed nodes marked; a selected node shows before → after.
 function changedPackage(item) {
@@ -1791,11 +1820,11 @@ function changedPackage(item) {
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span>${showBefore ? '' : '<span class="c-link-add">— новая связь</span><span class="c-link-del">- - связь удалённого узла</span>'}</div>
-    <div class="package-canvas graph-canvas diff-canvas" aria-label="Схема пакета ${showBefore ? 'до изменений' : 'с изменениями'}">${schemaGraph(shown.map(([glyph,title,kind,,status,before,facts],i) => ({glyph, title:showBefore && before ? before : title, small:facts?.[0] || kind, index:i,
-      cls:status && !showBefore ? ' is-' + status : '', mark:status && !showBefore ? mark[status] : '', ...portsOf(facts[1], glyph)})), showBefore ? factLinks(shown.map(node => node[5] || node[1]), shown.map(node => node[6][1]), 'before') : diffLinks(shown))}</div>
-    <p class="graph-legend">Связь идёт от выхода узла (справа) ко входу следующего (слева); пустой кружок — порт не подключён.<span class="graph-scroll-hint"> Схема шире экрана — прокрутите её вбок.</span></p>
+    ${schemaGraph(shown.map(([glyph,title,,,status,before,facts],i) => ({glyph, title:showBefore && before ? before : title, small:facts[0], index:i,
+      cls:status && !showBefore ? ' is-' + status : '', mark:status && !showBefore ? mark[status] : '', ...portsOf(facts)})), showBefore ? factLinks(shown.map(node => node[5] || node[1]), shown.map(node => node[6][1]), 'before') : diffLinks(shown),
+      {cls:' diff-canvas', label:`Схема пакета ${showBefore ? 'до изменений' : 'с изменениями'}`})}
     <div class="package-foot" role="status">${node ? (node[4] && !showBefore ? `<strong>${mark[node[4]]}: ${esc(node[1])}.</strong> ${esc(node[3])}${nodeFactsHtml(node[6],'diff')}`
-      : esc(node[2] + (showBefore && node[4] === 'mod' ? ' — до изменений' : '')) + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
+      : `<strong>${esc(showBefore ? node[5] || node[1] : node[1])}.</strong>${showBefore && node[4] === 'mod' ? ' До изменений.' : ''}` + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
     <div class="package-save-bar">
       ${current === 'draft' ? (local ? `<button class="btn primary" data-change="download:${at}">${icon('download',15)} Скачать на компьютер…</button><button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${inLoginom}<button class="link-btn discard-link" data-change="discard:${at}">${turn?.change?.downloaded ? 'Удалить копию из Loginom' : 'Отменить изменения'}</button>`
         : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${inLoginom}${elsewhere ? '' : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`) : inLoginom}
@@ -1819,19 +1848,20 @@ function packages() {
   const dirty = hasPackageEdits(item)
   const canDownload = dirty || Boolean(item.savedVersion)
   const focus = state.focus?.pkg === item.id && state.focus.view === item.view ? state.focus : null
-  const facts = nodes.map(node => nodeFacts(item.view, node[1], item.keep)?.[1])
-  const links = facts.some(Boolean) ? factLinks(nodes.map(node => node[1]), facts, item.view === 'sales' ? 'before' : 'after') : chainLinks(nodes.length)
+  const facts = nodes.map(node => nodeFacts(item.view, node[1], item.keep))
+  const links = facts.some(Boolean) ? factLinks(nodes.map(node => node[1]), facts.map(entry => entry?.[1]), item.view === 'sales' ? 'before' : 'after')
+    : packageLinks[item.view] ? viewLinks(packageLinks[item.view]) : chainLinks(nodes.length)
   const inner = packageSubmodels[item.view] || {}
   const sub = state.sub?.pkg === item.id && inner[state.sub.title] ? state.sub.title : null
-  const node = Number.isInteger(state.node) ? (sub ? inner[sub] : nodes)[state.node] : null
+  const node = Number.isInteger(state.node) ? (sub ? inner[sub].nodes : nodes)[state.node] : null
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.localFile ? 'Файл на компьютере · схема прочитана из файла, Loginom не нужен' : item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.agentCopy ? `копия агента из разговора «${esc(item.agentCopy)}»` : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span>${item.isDraft || item.localFile ? '' : loginomButton(item.id)}</div>
     ${sub ? `<div class="graph-path">${icon('layers',16)}<span>${esc(item.name)} › подмодель «${esc(sub)}»</span><button class="btn quiet" data-action="leave-sub">Выйти из подмодели</button></div>` : ''}
-    <div class="package-canvas graph-canvas${focus ? ' focus-canvas' : ''}" aria-label="${sub ? `Схема подмодели «${esc(sub)}»` : 'Схема пакета'}">${sub ? submodelGraph(nodes, links, sub, inner[sub])
-      : schemaGraph(nodes.map(([glyph,title,kind],i) => ({glyph, title, small:nodeFacts(item.view, title, item.keep)?.[0] || kind, index:i, cls:(focus?.nodes.includes(i) ? ' is-focus' : '') + (inner[title] ? ' is-sub' : ''), mark:focus?.nodes.includes(i) ? 'Замечание' : '', ...portsOf(facts[i], glyph, links, i, Boolean(inner[title]))})), links)}</div>
-    <p class="graph-legend">Связь идёт от выхода узла (справа) ко входу следующего (слева); пустой кружок — порт не подключён.<span class="graph-scroll-hint"> Схема шире экрана — прокрутите её вбок.</span></p>
-    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${sub ? esc(node[2]) + ' · ' : ''}${esc(node[3])}` + (inner[node[1]] && !sub ? `<p class="graph-sub-note">Подмодель: внутри ${inner[node[1]].length} ${inner[node[1]].length > 4 ? 'узлов' : 'узла'}. <button class="btn" data-action="enter-sub">${icon('layers',15)} Войти в подмодель</button></p>` : '') + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
+    ${sub ? submodelGraph(nodes, links, sub, inner[sub]) : schemaGraph(nodes.map(([glyph,title,kind],i) => ({glyph, title, small:inner[title] ? `Подмодель · ${inner[title].nodes.length} узла` : facts[i]?.[0] || kind, index:i,
+      cls:(focus?.nodes.includes(i) ? ' is-focus' : '') + (inner[title] ? ' is-sub' : ''), mark:focus?.nodes.includes(i) ? 'Замечание' : '', ...(inner[title] ? submodelPorts(inner[title]) : portsOf(facts[i], kind))})), links,
+      {cls:focus ? ' focus-canvas' : '', label:'Схема пакета'})}
+    ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${sub ? esc(node[2]) + ' · ' : ''}${esc(node[3])}` + (inner[node[1]] && !sub ? `<p class="graph-sub-note">Подмодель: внутри ${inner[node[1]].nodes.length} узла. <button class="btn" data-action="enter-sub">${icon('layers',15)} Войти в подмодель</button></p>` : '') + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
     <div class="package-save-bar">
       ${isCalculation ? `<span class="package-save-status${dirty ? ' dirty' : ''}" role="status">${icon(dirty ? 'circle' : 'check',15)} ${dirty ? 'Есть несохранённые изменения' : item.savedVersion ? 'Сохранено в Loginom · демо' : 'Исходная версия'}</span>`
         : ''}
@@ -1849,9 +1879,9 @@ function packages() {
 function review() {
   const look = [
     // Iteration 9 (В-77): findings 10, 22, 23 of the third review run.
-    ['Схема пакета — ветви и связи','Откроется «Продажи.lgp»: узлы стоят по ходу данных, связь идёт от выхода узла (справа) ко входу следующего (слева). У «Фильтр строк» два выхода, неподключённый — пустой кружок; ветки «Регионы» и «Города» сходятся в «Результат». «Подмодели» — «Качество данных.lgp»: «Войти в подмодель», назад — «Выйти из подмодели». «Схема правки» — отправьте запрос, в карточке правки — «Посмотреть на схеме»: новые связи зелёные, связи удалённого узла — пунктиром.',[['try-graph','Начать'],['try-submodel','Подмодели'],['try-improve','Схема правки']]],
-    ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Как при установке» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
-    ['Данные — стороннему сервису','Откроется «Внешнее обогащение данных» в каталоге: подключение подготовил Loginom, а сервис — Example Data, сторонняя компания; «Куда уходят данные». «Перед отправкой» — разговор: перед первой отправкой агент спросит «Отправить данные в Example Data?» и покажет, какие столбцы уйдут; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Подключение в прототипе поставится само; демо-политика, если включена, уберётся. В закрытом контуре агент ответит, что подключению нужен интернет.',[['try-enrich','Начать'],['try-enrich-send','Перед отправкой']]],
+    ['Схема пакета — ветви и связи','Откроется «Продажи.lgp»: узлы стоят по ходу данных, связь идёт от выхода узла (справа) ко входу следующего (слева). У «Фильтр строк» два выхода, неподключённый — пустой кружок; ветки «Регионы» и «Города» сходятся в «Результат». «Подмодели» — «Качество данных.lgp»: «Войти в подмодель», назад — «Выйти из подмодели». «Схема правки» — отправьте запрос, в карточке правки — «Посмотреть на схеме»: новые связи зелёные, связи удалённого узла — пунктиром. Если включена демо-политика (карточка 9), агент сначала попросит войти в Loginom организации — уберите её ссылкой «убрать» внизу страницы.',[['try-graph','Начать'],['try-submodel','Подмодели'],['try-improve','Схема правки']]],
+    ['«По умолчанию» в «Разрешениях»','Включится демо-политика администратора и откроются «Разрешения»: строки с замком задал администратор, у остальных — «По умолчанию» или «Вы изменили · по умолчанию «Спрашивать»». Поменяйте строку — пометка сменится; «Всё по умолчанию» вернёт всё. Убрать политику — «убрать» внизу этой страницы.',[['try-policy-permissions','Начать']]],
+    ['Данные — стороннему сервису','Откроется «Внешнее обогащение данных» в каталоге: подключение подготовил Loginom, а сервис — Example Data, сторонняя компания; «Куда уходят данные». «Перед отправкой» — разговор: перед первой отправкой агент спросит «Отправить данные в Example Data?» и покажет, что уйдёт и что нет; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Подключение в прототипе поставится само, демо-политика уберётся, лимит бесплатной модели сбросится. Спросите и словами: «Что за сервис Example Data?» — агент ответит, чей он, ничего не отправляя. «В закрытом контуре» включит демо-политику: агент ответит, что подключению нужен интернет.',[['try-enrich','Начать'],['try-enrich-send','Перед отправкой'],['try-enrich-closed','В закрытом контуре']]],
     ['Модели — как в OpenCode 2','Откроется окно «Подключить провайдера», как в OpenCode 2 (В-82): популярные провайдеры и поиск, вход через ChatGPT, GitHub Copilot кодом, ключ API, свой сервер. Вход по подписке в прототипе подтверждаете сами. После «Подключено: … — выберите модель» приложение возвращается в новый разговор с этой моделью. Под демо-политикой администратора окно недоступно — модели задаёт он. В настройках — «Провайдеры» и «Модели», как в OpenCode 2; «Подключить модель» — в меню модели в поле ввода и в блоке «Модель остановила ход».',[['try-connect','Начать'],['try-model-failure','После лимита модели']]],
     ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Контекст → Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
     ['Замена из сохранённой версии','В карточке правки нажмите «Сохранить новой версией», затем «Заменить исходный…». Окно покажет, что «Города — неделя.lgp» сломается, и предложит «Попросить агента оставить узел»: агент сделает копию новой версии и вернёт узел — после этого обе ссылки рабочие.',[['try-improve','Начать']]],
@@ -1877,11 +1907,11 @@ function review() {
   ]
   // Open owner questions, each with a recommendation; empty when everything is decided.
   const questions = [
-    '<strong>Когда спрашивать перед отправкой стороннему сервису.</strong> Сейчас — перед первой отправкой в каждом разговоре: агент показывает сервис, какие столбцы и сколько строк уйдут; «Разрешать в этом разговоре» снимает вопрос до конца разговора. Можно спрашивать при каждой отправке или один раз — при установке подключения. Рекомендую как сейчас: видно, что именно уходит, и вопрос не повторяется на каждом шаге.',
-    '<strong>Отметка у подключения к стороннему сервису.</strong> У «Внешнего обогащения данных» осталась отметка «Loginom» — кто подготовил подключение, а рядом новая: «Сервис: Example Data — сторонняя компания». Можно вместо «Loginom» завести четвёртый уровень, например «Сторонний сервис», но тогда уровни перестанут отвечать на один вопрос — кто подготовил. Рекомендую три уровня и отдельную отметку сервиса.',
+    '<strong>Когда спрашивать перед отправкой стороннему сервису.</strong> OpenCode 2 сам предлагает «Разрешить один раз» и «Разрешить всегда» — второе запоминается для проекта навсегда: после одного «да» данные уходят в Example Data из всех разговоров проекта без вопроса. «Разрешать в этом разговоре» в OpenCode 2 нет — делаем сами: правило на один разговор (событие <code>session.permissions</code>) и свой ответ на вопрос; та же доработка нужна остальным строкам «Спрашивать». Рекомендую «один раз» и «в этом разговоре», без «навсегда»: видно, что уходит, и согласие не переходит в другие разговоры.',
+    '<strong>Отметка у подключения к стороннему сервису.</strong> Подключения публикует только Loginom (В-59), так что отметка «Loginom» у них ничего не различает — различает отметка «Сервис: Example Data — сторонняя компания». Варианты: оставить обе, как сейчас; у подключений показывать только отметку сервиса; завести уровень «Сторонний сервис» — но уровни отвечают на вопрос «кто подготовил», и к ним добавится «Организация» (В-61). Рекомендую оставить обе: уровень — общий язык каталога и различит подключения, если они появятся в каталоге организации, а отметка сервиса говорит, куда уходят данные.',
   ]
   const changed = [
-    'Итерация 9 (В-77), находки 10, 22, 23 третьего прогона оценки. Схема пакета — как сценарий Loginom: узлы по ходу данных, связи от выхода ко входу, порты (пустой кружок — не подключён), ветви и подмодели с «Войти в подмодель» и «Выйти из подмодели»; на схеме правки новые связи зелёные, связи удалённого узла — пунктиром. В «Разрешениях» под политикой у незапертых строк — «По умолчанию» или «Вы изменили». У «Внешнего обогащения данных» видно, чей сервис и куда уходят данные; перед первой отправкой в разговоре агент спрашивает.',
+    'Итерация 9 (В-77), находки 10, 22, 23 третьего прогона оценки. Схема пакета — как сценарий Loginom: узлы по ходу данных, связи от выхода ко входу, порты (пустой кружок — не подключён), ветви и подмодели с «Войти в подмодель» и «Выйти из подмодели»; на схеме правки новые связи зелёные, связи удалённого узла — пунктиром. В «Разрешениях» под политикой у незапертых строк — «По умолчанию» или «Вы изменили». У «Внешнего обогащения данных» видно, чей сервис и куда уходят данные; перед первой отправкой в разговоре агент спрашивает, а на вопрос о сервисе отвечает словами и ничего не отправляет.',
     'Модели и провайдеры — как в OpenCode 2 (В-82): окно «Подключить провайдера» (список, поиск, вход через ChatGPT, код GitHub Copilot, ключ API, свой сервер, «Подключено — выберите модель»), в настройках — «Провайдеры» и «Модели» с переключателями «показывать». Отдельной «модели по умолчанию» больше нет: новый разговор берёт последнюю выбранную.',
     'По третьему прогону оценки (девять отчётов: Opus, Sonnet, Haiku): из сохранённой версии окно замены тоже предлагает «Попросить агента оставить узел» — агент делает копию новой версии; удаление из Loginom («Отменить изменения», «Удалить новую версию») спрашивает подтверждение; «Запрещено» и «Разрешено» у «Сохранять пакеты в Loginom» действуют; в карточке правки — «Проверено приложением» по квитанциям запуска; мастер «Проверить» учитывает «Инструкции» и называет те же три замечания, что разговор; проверка файла с компьютера — без Loginom; «Свой сервер Loginom» — пустая форма; после «Подключить модель» — назад в разговор; у облачной модели в поле ввода — значок облака; «Опиши пакет» без пакета — просьба выбрать пакет.',
     'Итерация 8 — сбои и повторы. Модель остановила ход: блок с причиной простыми словами, «Продолжить с другой моделью» или «Подключить модель»; в ленте — «Модель не ответила» и «Вы продолжили с моделью…», у ответа — какие модели работали. Модель в поле ввода — модель этого разговора (как в OpenCode 2), выбор из моделей этого режима сети.',
@@ -2030,9 +2060,10 @@ function modelMenu(menu) {
   const rows = availableModels(state).map((model, index) => [model, index]).filter(([model]) => !(failed && (model.name === failed.model || (state.freeLimited && model.source === 'free'))))
   return [...rows.map(([model, index]) => {
     const limited = state.freeLimited && model.source === 'free'
-    return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}<small>${limited ? 'лимит на сегодня исчерпан — обновится в 03:00' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
+    return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}${model.source === 'free' ? ' <span class="badge">Бесплатно</span>' : ''}<small>${limited ? 'лимит на сегодня исчерпан — обновится в 03:00' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
   }),
-    // В-82: as OpenCode's model dialog — connect a provider, manage which models are offered.
+    // В-82: as OpenCode's model dialog — connect a model, manage which models are offered. «Подключить модель…», not
+    // OpenCode's «Подключить провайдера»: the word «провайдер» stays in the settings and the window.
     ...(state.policy === 'set' ? [] : [`<button role="menuitem" data-menu-act="provider-connect">${icon('plus',16)}<span>Подключить модель…</span></button>`]),
     `<button role="menuitem" data-menu-act="models-settings">${icon('settings',16)}<span>Управлять моделями…</span></button>`]
 }
@@ -2279,8 +2310,11 @@ function send() {
   const named = old?.kind === 'pick' && !withPackage && (/\.lgp$/i.test(bare) && bare.split(/\s+/).length <= 4 ? bare : prompt.match(/[«"]([^«»"]+\.lgp)[»"]/i)?.[1] || prompt.match(/[^\s«»"]+\.lgp/i)?.[0])
   // The package this conversation works with: attached, or «Продажи.lgp» that the mock's check and edit are about.
   const inChat = !withPackage && (old?.files?.find(file => /\.lgp$/i.test(file)) || (['refactor','clean','improve','keep','more'].includes(old?.kind) ? 'Продажи.lgp' : null))
-  // Iteration 9: a request to enrich data from the third-party service — only with the connection installed and online.
-  const enrich = /обогат|example data|внешн\S* сервис/i.test(prompt) && (state.contour === 'closed' ? 'closed' : !hubHasInstalled(state,'cloud') ? 'missing' : 'ok')
+  // Iteration 9: only a request sends data to the third-party service, with the connection installed and online;
+  // a question about the service gets its catalog card in words.
+  const aboutEnrich = /обогащ|обогат|example data|внешн\S* сервис/i.test(prompt)
+  const sendAsked = /(?:^|[\s«"])(?:дополни|обогати|сделай обогащение)/i.test(prompt) && !/\?\s*$/.test(prompt)
+  const enrich = aboutEnrich && (state.contour === 'closed' ? 'closed' : !hubHasInstalled(state,'cloud') ? (sendAsked ? 'missing' : 'info-missing') : sendAsked ? 'ok' : 'info')
   let kind = web ? 'chat' : enrich ? (enrich === 'ok' ? 'enrich' : 'noenrich') : discussing ? 'discuss' : named ? 'document' : /документ|описан|опиши/i.test(prompt) && (withPackage || (inChat && !/замечани|шаг|подробн/i.test(prompt))) ? 'document'
     // Run 3: the mock cannot find a package by its name in the text — it asks to pick one instead of building ABC.
     : /документ|описан|опиши/i.test(prompt) && !state.draftFiles.length ? 'pick'
@@ -2662,16 +2696,23 @@ const actions = {
   },
   'try-enrich':() => {
     applyDemoPolicy('')
-    showHubDetail(state, 'cloud')
-    navigate('hub')
+    actions['open-enrich']()
   },
   'try-enrich-send':() => {
     applyDemoPolicy('')
-    if (state.contour !== 'closed' && !hubHasInstalled(state, 'cloud')) {
-      installForDemo(state, 'cloud')
-      toast('Только для прототипа: подключение «Внешнее обогащение данных» установлено')
-    }
-    tryPrompt('Дополни таблицу «sales-demo.csv» данными о городах из Example Data')
+    // Only for the prototype: the card is about the question before sending, so a free-model limit spent by card 8
+    // («Лимит модели») is reset, and the connection is installed without the catalog.
+    const reset = state.freeLimited || state.failModel
+    Object.assign(state, {freeLimited:false, failModel:false})
+    const install = state.contour !== 'closed' && !hubHasInstalled(state, 'cloud')
+    if (install) installForDemo(state, 'cloud')
+    if (reset || install) toast('Только для прототипа: ' + [install && 'подключение «Внешнее обогащение данных» установлено', reset && 'лимит бесплатной модели сброшен'].filter(Boolean).join(', '))
+    tryPrompt('Дополни таблицу «sales-demo.csv» данными о регионах из Example Data')
+  },
+  // The same request under the demo policy: a closed contour, the connection needs the internet.
+  'try-enrich-closed':() => {
+    applyDemoPolicy('set')
+    tryPrompt('Дополни таблицу «sales-demo.csv» данными о регионах из Example Data')
   },
   'try-diagnostics':() => applyDemoPolicy('', 'diagnostics'),
   'try-run':() => tryPrompt('Построй ABC-анализ товаров по выручке'),
@@ -2819,7 +2860,7 @@ const actions = {
     const source = state.activePackage
     if (source.view === 'calculation') return startPackageEdit()
     newSession()
-    const node = Number.isInteger(state.node) ? (state.sub?.pkg === source.id && packageSubmodels[source.view]?.[state.sub.title] || viewNodes(source.view, source.keep))[state.node]?.[1] : null
+    const node = Number.isInteger(state.node) ? (state.sub?.pkg === source.id && packageSubmodels[source.view]?.[state.sub.title]?.nodes || viewNodes(source.view, source.keep))[state.node]?.[1] : null
     chooseDraftPackage({name:source.name, where:packagePath(source), source:'loginom', item:source})
     state.draft = node ? `Проверь узел «${node}» и покажи, что можно улучшить` : 'Проверь сценарий и покажи, что можно улучшить'
     render()

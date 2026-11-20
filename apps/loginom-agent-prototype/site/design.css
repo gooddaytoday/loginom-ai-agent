@@ -604,8 +604,14 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .graph-path span{flex:1;min-width:0;overflow-wrap:anywhere}
 .graph-sub-note{margin:6px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .c-link-add{color:var(--success);font-weight:500}.c-link-del{color:var(--accent);font-weight:500}
-@container (max-width:760px){.graph-scroll-hint{display:inline}}
+/* The hint shows when the frame is narrower than the graph: wide-N — N columns of 176px */
+@container (max-width:1055.98px){.graph-scroll-hint.wide-6{display:inline}}
+@container (max-width:879.98px){.graph-scroll-hint.wide-5{display:inline}}
+@container (max-width:703.98px){.graph-scroll-hint.wide-4{display:inline}}
+@container (max-width:527.98px){.graph-scroll-hint.wide-3{display:inline}}
+@container (max-width:351.98px){.graph-scroll-hint.wide-2{display:inline}}
 .graph .canvas-node.is-sub{box-shadow:4px 4px 0 -1px var(--paper),4px 4px 0 0 var(--line),var(--shadow)}
 /* Iteration 9: a connection names the third-party service its data goes to */
 .hub-service{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;line-height:1.2;padding:2px 7px;border-radius:5px;border:1px solid var(--amber);color:var(--amber);background:var(--amber-soft)}
 .change-legend{flex-wrap:wrap;gap:4px 14px}.change-legend span{white-space:nowrap}
+.model-menu .badge{margin-left:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
