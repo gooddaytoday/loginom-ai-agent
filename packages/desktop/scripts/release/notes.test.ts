@@ -74,10 +74,11 @@ test("0.4.0 release notes require all platforms, matching provenance, checksums 
     const notes = await Bun.file(join(dir, "notes.md")).text()
     expect(notes).toContain("Pre-release")
     const manual =
-      "Users of 0.3.9 on any platform must install 0.4.0 manually over the existing installation; 0.3.9 has its update feed disabled. Keep the existing profile; do not uninstall or delete application data first."
+      "Users of 0.3.9 or 0.3.10 on any platform must install 0.4.0 manually over the existing installation; these versions have their update feed disabled. Keep the existing profile; do not uninstall or delete application data first."
     expect(notes).toContain(manual)
     expect(notes).not.toContain("Windows 0.3.9 users")
     expect(notes).toContain("Recommended screen resolution: 1280×800 or higher.")
+    expect(notes).toContain("New (preview): node dashboards opened from Loginom Studio")
     expect(notes).toContain("silently drops connections, a session can wait up to about 970 s")
     for (const name of [...updateAssets, ...macUpdateAssets]) {
       expect(await Bun.file(join(dir, "notes.md")).text()).toContain(name)
