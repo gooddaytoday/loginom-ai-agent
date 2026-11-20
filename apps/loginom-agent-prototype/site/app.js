@@ -594,9 +594,15 @@ function editCopyNote() {
   const item = currentItem()
   if (!item || state.editTurn?.session !== item.id) return ''
   const turns = [...(item.history || []), item]
-  const live = liveCopies(item)
-  const notes = [...new Set(turns.slice(state.editTurn.index).filter(turn => turn.copy && !turn.forkOf && live.includes(turn.copy.name)).map(turn => turn.copy.name))]
-    .map(name => turns.findIndex(turn => turn.copy?.name === name && !turn.forkOf) >= state.editTurn.index ? `копию агента «${esc(name)}» приложение удалит` : `копия агента «${esc(name)}» вернётся к виду до этого сообщения`)
+  const from = state.editTurn.index
+  const notes = [...new Set(turns.slice(from).filter(turn => turn.copy && !turn.forkOf && turn.step > 0).map(turn => turn.copy.name))].map(name => {
+    const head = turns.findLast(turn => turn.copy?.name === name && !turn.forkOf && turn.phase === 'done')
+    const made = turns.findIndex(turn => turn.copy?.name === name && !turn.forkOf) >= from
+    const done = head && changeState(head)
+    if (done === 'discarded') return `копия агента «${esc(name)}» уже удалена — так и останется`
+    if (done === 'replaced') return `исходный «Продажи.lgp» останется заменённым${made ? '' : `, копия агента «${esc(name)}» вернётся к виду до этого сообщения`}`
+    return made ? `копию агента «${esc(name)}» приложение удалит` : `копия агента «${esc(name)}» вернётся к виду до этого сообщения`
+  })
   return notes.length ? '; ' + notes.join('; ') : ''
 }
 // A chosen package: its chip and «Что сделать с пакетом» right above the input.
@@ -666,7 +672,7 @@ function turnFiles(item) {
   if (item.kind === 'document') return [stepText('{doc}', item)]
   if (item.kind === 'abc') return ['ABC-анализ.lgp']
   if (item.kind === 'quality') return ['Качество выгрузки.html']
-  if (item.kind === 'improve') return savedVersion(item) ? [savedVersion(item).name] : []
+  if (['improve','keep'].includes(item.kind)) return savedVersion(item) ? [savedVersion(item).name] : []
   return []
 }
 // What the agent follows in this chat: the general and project instructions always, a skill when it was applied.
@@ -720,7 +726,12 @@ function showFinding(index, local = false) {
 function result(item) {
   if (item.kind === 'skilltrial') return trialResult(item)
   if (['improve','keep'].includes(item.kind)) return changeCard(item)
-  if (item.kind === 'more') return `<div class="answer-block"><p>Все три улучшения из проверки уже в копии «${esc(item.about || 'Продажи — правка агента.lgp')}» — она в прошлом ответе. Скажите, что поменять ещё, например: «${esc(keepPrompt)}».</p><button class="btn" data-action="fill-keep">${icon('compose',15)} Подставить этот запрос</button></div>`
+  if (item.kind === 'more') return `<div class="answer-block"><p>Улучшения уже внесены в копию «${esc(item.about || 'Продажи — правка агента.lgp')}» — она в карточке выше. ${item.aboutKeep ? 'Скажите, что поменять ещё.' : `Скажите, что поменять ещё, например: «${esc(keepPrompt)}».`}</p>${item.aboutKeep ? '' : `<button class="btn" data-action="fill-keep">${icon('compose',15)} Подставить этот запрос</button>`}</div>`
+  if (item.kind === 'nocopy') {
+    const why = item.nocopy || {why:'none'}
+    const said = {saved:`Изменения из копии «${esc(why.name)}» уже сохранены новой версией — эту копию я больше не правлю.`, replaced:`Копия «${esc(why.name)}» уже заменила исходный «Продажи.lgp» — эту копию я больше не правлю.`, discarded:`Изменения в копии «${esc(why.name)}» отменены.`, fork:`Копия «${esc(why.name)}» принадлежит разговору «${esc(why.title)}» — здесь я её не правлю.`, none:'Сейчас в этом разговоре нет копии пакета, которую я правлю.'}[why.why] || 'Сейчас в этом разговоре нет копии пакета, которую я правлю.'
+    return `<div class="answer-block"><p>${said} Чтобы поменять пакет, попросите «Внеси улучшения в сценарий продаж» — я начну новую копию, а потом можно попросить оставить узел.</p></div>`
+  }
   if (item.kind === 'clean') return `<div class="answer-block"><h2>Замечаний нет</h2><p>Проверил «${esc(item.files?.[0] || 'Продажи.lgp')}»: повторов, непонятных имён и пропущенных проверок не нашёл. Пакет не менял.</p>${(item.files?.[0] || 'Продажи.lgp') === 'Продажи.lgp' && salesState().replaced ? `<p class="muted">«Продажи.lgp» уже заменён улучшенной версией. Прежняя версия сохранена как «Продажи — до правки.lgp».</p><button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}</div>`
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>${item.local ? 'Файл «Продажи.lgp» с компьютера не менял' : 'Пакет «Продажи.lgp» не менял'}. Что можно сделать лучше:</p>
     <ol class="findings">${salesFindings.map(([title,text],i) => `<li><strong>${esc(title)}</strong>${esc(text)} <button class="link-btn finding-link" data-finding="${i}${item.local ? ':local' : ''}">${icon('flow',14)} Показать на схеме</button></li>`).join('')}${item.rules ? `<li><strong>В модуле нет заметки</strong> о том, что он делает и кто за него отвечает, — ${esc(item.rules.by)}.</li>` : ''}</ol>
@@ -777,19 +788,55 @@ function changeRows(keep) {
 function copyChain(item, at) {
   const turns = [...(item.history || []), item]
   const name = turns[at]?.copy?.name
-  return turns.flatMap((turn, index) => name && turn.copy?.name === name && !turn.forkOf ? [index] : [])
+  return turns.flatMap((turn, index) => name && turn.copy?.name === name && !turn.forkOf && (inChain(turn) || index === at) ? [index] : [])
 }
 function chainHead(item, at) {
   return copyChain(item, at).at(-1) ?? at
 }
+// What a card shows: the replaced original or the saved version as they were written, otherwise the copy now.
+function cardKeep(item, at) {
+  const turn = [...(item.history || []), item][at]
+  const current = turn && changeState(turn)
+  if (current === 'replaced') return Boolean(serverPackages.find(entry => entry.id === 'sales').keep)
+  if (current === 'saved') return Boolean(savedVersion(turn)?.keep)
+  return chainKeep(item, at)
+}
 function chainKeep(item, at) {
   const turns = [...(item.history || []), item]
-  return copyChain(item, at).some(index => turns[index].kind === 'keep')
+  return copyChain(item, at).some(index => turns[index].kind === 'keep' && turns[index].phase === 'done')
 }
-// The copy a follow-up edit continues: the last copy of the conversation, while it is a draft.
-function draftCopyAt(turns) {
-  const at = turns.findLastIndex(turn => turn.copy && !turn.forkOf)
-  return at >= 0 && changeState(turns[at]) === 'draft' ? at : null
+// A turn holds a card of its copy once it finished; a running one takes over (the earlier cards lose their buttons).
+// A stopped or failed one leaves the copy partly changed but no card.
+function inChain(turn) {
+  return turn.phase === 'done' || ['running','retrying','permission','question','writing'].includes(turn.phase)
+}
+// The copy a follow-up edit continues (В-73): the conversation's last copy the agent started, while it is a draft.
+// partial: the turn that last changed it stopped before its card.
+function draftCopy(turns) {
+  const at = turns.findLastIndex(turn => turn.copy && !turn.forkOf && turn.step > 0)
+  if (at < 0) return null
+  const name = turns[at].copy.name
+  const own = turn => turn.copy?.name === name && !turn.forkOf
+  const head = turns.findLastIndex(turn => own(turn) && turn.phase === 'done')
+  if (head >= 0 && changeState(turns[head]) !== 'draft') return null
+  return {copy:turns[at].copy, turn:turns[at], partial:head < at, keep:turns.some(turn => own(turn) && turn.kind === 'keep' && turn.phase === 'done')}
+}
+function noCopyReason(turns) {
+  const last = turns.findLast(turn => turn.copy && turn.step > 0)
+  if (!last) return {why:'none'}
+  if (last.forkOf) return {why:'fork', name:last.copy.name, title:state.sessions.find(entry => entry.id === last.forkOf.session)?.title || last.forkOf.title}
+  const head = turns.findLast(turn => turn.copy?.name === last.copy.name && !turn.forkOf && turn.phase === 'done')
+  return {why:head ? changeState(head) : 'none', name:last.copy.name}
+}
+// «Изменить» drops the copy's last turns. What the user did with the copy — saved it, replaced the original, discarded
+// it — happened in Loginom and stays; the copy's new last card takes that state over.
+function carryCopyState(turns, from) {
+  for (const name of new Set(turns.slice(from).filter(turn => turn.copy && !turn.forkOf).map(turn => turn.copy.name))) {
+    const own = turn => turn.copy?.name === name && !turn.forkOf && turn.phase === 'done'
+    const gone = turns.slice(from).findLast(own)
+    const stays = turns.slice(0, from).findLast(own)
+    if (gone && stays && changeState(gone) !== 'draft') stays.change = {...gone.change}
+  }
 }
 function changeCard(turn) {
   const at = turn.index
@@ -800,16 +847,20 @@ function changeCard(turn) {
       : `Эта правка сделана в разговоре «${esc(turn.forkOf.title)}», которого больше нет. Копия «${esc(turn.copy.name)}» осталась в «Копии агента», если её не удалили вместе с ним.`}</p>
     ${owner ? `<div class="change-actions"><button class="btn" data-session="${esc(owner.id)}">${icon('message',15)} Открыть разговор</button></div>` : ''}</div>`
   const head = item ? chainHead(item, at) : at
-  const keep = item ? chainKeep(item, at) : false
-  const rows = changeRows(head === at && keep)
   const current = head === at ? changeState(turn) : 'continued'
   const saved = savedVersion(turn)
+  // Rows show what is in the copy, the saved version or the replaced original.
+  const keep = head === at && item ? cardKeep(item, at) : false
+  const rows = changeRows(keep)
+  // Another conversation already replaced the original with its copy: this one can only be saved as a new version.
+  const elsewhere = current === 'draft' && !local && salesState().replaced
   const next = proposedVersionName(serverPackages.find(entry => entry.id === 'sales'))
   const counts = [['add','новый'],['mod','изменено'],['del','удалён']].map(([kind,label]) => [kind, rows.filter(([type]) => type === kind).length, label])
   const where = local ? 'Файл «Продажи.lgp» на компьютере не менялся' : '«Продажи.lgp» в Loginom не менялся'
   const status = {
-    continued:`Правка продолжена ниже: следующий ответ изменил ту же копию «${esc(agentCopy(turn).name)}». Сохранить её или ${local ? 'скачать' : 'заменить исходный'} — в последней карточке.`,
-    draft:`${turn.kind === 'keep' ? 'Изменения этого и прошлого ответа' : 'Изменения'} — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». ${where}: ${local ? 'скачайте изменённый пакет на компьютер или сохраните его в Loginom.' : 'сохраните изменения новой версией рядом с ним или замените исходный.'}`,
+    continued:`Правка продолжена ниже: следующий ответ изменил ту же копию «${esc(agentCopy(turn).name)}». Что с ней делать — в последней карточке.`,
+    draft:elsewhere ? `Изменения — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». Исходный «Продажи.lgp» уже заменён в другом разговоре — эти изменения можно сохранить новой версией рядом с ним.`
+      : `${turn.kind === 'keep' ? 'Изменения этого и прошлых ответов' : 'Изменения'} — в копии «${esc(agentCopy(turn).name)}» в папке «Копии агента». ${where}: ${local ? 'скачайте изменённый пакет на компьютер или сохраните его в Loginom.' : 'сохраните изменения новой версией рядом с ним или замените исходный.'}`,
     saved:local ? `Сохранено в Loginom: «${esc(saved?.name || '')}» в ${esc(packageFolder('personal'))}. Файл на компьютере не менялся.` : `Сохранено новой версией «${esc(saved?.name || '')}» в ${esc(packageFolder('personal'))}. Исходный «Продажи.lgp» не изменён.`,
     replaced:'Исходный «Продажи.lgp» в Loginom заменён этими изменениями. Прежняя версия сохранена как «Продажи — до правки.lgp» — её можно вернуть.',
     discarded:`Изменения отменены: копия удалена из Loginom, ${local ? 'файл на компьютере' : '«Продажи.lgp»'} не менялся. Приложение хранит снимок копии в этом разговоре — изменения можно вернуть.`,
@@ -819,7 +870,7 @@ function changeCard(turn) {
   const actions = {
     continued:'',
     draft:local ? `${download}<button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${view}${loginomButton(`copy:${state.session}:${at}`)}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`
-      : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${view}${loginomButton(`copy:${state.session}:${at}`)}<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`,
+      : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${view}${loginomButton(`copy:${state.session}:${at}`)}${elsewhere ? '' : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`,
     saved:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «${esc(saved?.name || '')}»</button>${view}${loginomButton(saved?.id)}${local ? download : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="unsave:${at}">${local ? 'Удалить из Loginom' : 'Удалить новую версию'}</button>`,
     replaced:`<button class="btn" data-change="open:${at}">${icon('folder',15)} Открыть «Продажи.lgp»</button>${view}${loginomButton('sales')}<button class="link-btn discard-link" data-change="restore:${at}">Вернуть прежнюю версию</button>`,
     discarded:`<button class="link-btn" data-change="undiscard:${at}">Вернуть изменения</button>`,
@@ -829,7 +880,7 @@ function changeCard(turn) {
     ${current === 'discarded' ? '' : `<div class="change-card${['draft','continued'].includes(current) ? '' : ' is-' + current}">
       <div class="change-head">${icon('flow',17)}<strong>${esc(current === 'saved' ? saved.name : ['draft','continued'].includes(current) ? agentCopy(turn).name : 'Продажи.lgp')}</strong><span class="badge">${{draft:'копия агента', continued:'продолжено ниже', saved:local ? 'в Loginom' : 'новая версия', replaced:'заменён в Loginom'}[current]}</span><span class="change-counts">${counts.filter(([,count]) => count).map(([kind,count,label]) => `<b class="c-${kind}">${{add:'+',mod:'~',del:'−'}[kind]}${count} ${label}</b>`).join('')}</span></div>
       ${turn.kind === 'keep' ? `<p class="change-scope">Вся копия против исходного «Продажи.lgp»; этот ответ изменил одну строку — она отмечена.</p>` : ''}
-      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,head === at && keep),'diff')}</details></div></li>`).join('')}</ul>
+      <ul class="change-list">${rows.map(([kind,name,what,node]) => `<li class="c-${kind}${turn.kind === 'keep' && node === keptCityFilter[1] ? ' is-latest' : ''}"><span class="mark" aria-label="${{add:'добавлен',mod:'изменён',del:'удалён'}[kind]}">${{add:'+',mod:'~',del:'−'}[kind]}</span><div><strong>${esc(name)}</strong>${turn.kind === 'keep' && node === keptCityFilter[1] ? ' <span class="badge latest">в этом ответе</span>' : ''} — ${esc(what)}<details class="change-facts" data-facts="${esc(state.session + ':' + at + ':' + node)}"${state.openFacts?.has(state.session + ':' + at + ':' + node) ? ' open' : ''}><summary>Настройки и связи</summary>${nodeFactsHtml(nodeFacts('sales-improve',node,keep),'diff')}</details></div></li>`).join('')}</ul>
       <p class="change-check">${icon('check',14)} Агент сверил копию с исходным запуском на данных: в результате 120 строк, как раньше; 12 строк без цены или региона в расчёт больше не попадают</p>
     </div>`}
     <div class="change-actions">${actions}</div>
@@ -967,11 +1018,12 @@ const scripts = {
   ]},
   // Iteration 8: a follow-up edit opens the copy the previous one made — the original is not touched again.
   keep:{plan:['Открыть копию','Вернуть узел','Сверить результат'], steps:[
-    {plan:0, icon:'flow', live:'Открываю копию «{copy}»', done:'Открыл копию «{copy}» — ту же, что в прошлом ответе', short:'открыл ту же копию', detail:'Исходный пакет не меняется; прошлые изменения в копии остаются', time:2},
+    {plan:0, icon:'flow', live:'Открываю копию «{copy}»', done:'Открыл копию «{copy}» — ту же, что правил раньше', short:'открыл ту же копию', detail:'Исходный пакет не меняется; прошлые изменения в копии остаются', time:2},
     {plan:1, icon:'layers', live:'Возвращаю «Фильтр по дате (ветка «Города»)»', done:'Вернул «Фильтр по дате (ветка «Города»)» как в исходном', short:'вернул узел', detail:'На узел ссылается «Города — неделя.lgp». «Выручка по городам» по-прежнему получает данные от «Проверка пустых значений»', time:5, think:[3,'Узел нужен только для ссылки из «Города — неделя.lgp»: верну его с тем же условием и входом, а «Выручка по городам» пусть берёт данные после проверки.']},
     {plan:2, icon:'check', live:'Сверяю результат с исходным пакетом', done:'Сверил результат с исходным пакетом', short:'сверил результат', detail:'В результате 120 строк, как в исходном; выход «Фильтр по дате (ветка «Города»)» — те же строки, что раньше', time:8},
   ]},
   more:{steps:[]},
+  nocopy:{steps:[]},
   document:{plan:['Прочитать пакет','Описать узлы','Собрать документ'], steps:[
     {plan:0, icon:'flow', live:'Читаю пакет', done:'Прочитал пакет «{pkg}»: 12 узлов, 3 подмодели', short:'прочитал пакет', time:3},
     {plan:1, icon:'book', live:'Ищу описания узлов в справке Loginom', done:'Нашёл в справке Loginom описания 9 типов узлов', short:'нашёл описания в справке', time:5},
@@ -1091,6 +1143,7 @@ function modelFailed(item) {
   const model = chatModel(item)
   const kind = model?.source === 'free' ? 'free-limit' : model?.kind === 'cloud' ? 'quota' : 'unreachable'
   item.modelError = {at:item.step, kind, model:model?.name || 'модель', where:model?.where || '', blocked:kind !== 'unreachable'}
+  if (kind === 'free-limit') state.freeLimited = true
   item.modelFailAt = null
   item.phase = 'failed'
   render()
@@ -1131,11 +1184,12 @@ function writeAnswer(item, finalPhase) {
   }, 35)
 }
 function startRun(item) {
-  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !['chat','more'].includes(item.kind) ? 1 : null,
-    modelFailAt:state.failModel && !['chat','more'].includes(item.kind) ? 1 : null, modelError:null})
+  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !['chat','more','nocopy'].includes(item.kind) ? 1 : null,
+    // The free model whose daily limit the demo spent fails again at once until the page is reloaded («обновится в 03:00»).
+    modelFailAt:['chat','more','nocopy'].includes(item.kind) ? null : state.failModel ? 1 : state.freeLimited && chatModel(item)?.source === 'free' ? 0 : null, modelError:null})
   state.failNext = false
   state.failModel = false
-  if (['chat','more'].includes(item.kind)) return writeAnswer(item, 'answer')
+  if (['chat','more','nocopy'].includes(item.kind)) return writeAnswer(item, 'answer')
   if (state.mode === 'Планирование' && item.kind !== 'document') {
     item.phase = 'plan'
     return render()
@@ -1190,10 +1244,10 @@ function turnAnswer(turn, live = false) {
   }
   if (turn.phase === 'failed' && turn.modelError && !turn.modelError.resolved) {
     const [title, reason] = modelErrorText(turn.modelError)
-    const others = availableModels(state).filter(model => !(turn.modelError.blocked && model.name === turn.modelError.model))
-    return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.</p>
-      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : 'Другой модели в этом режиме сети нет: подключите её в «Модели» — облачный сервис по ключу или свою модель по адресу.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : ''}</p>
-      ${live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : `<button class="btn primary" data-settings="models">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+    const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !(state.freeLimited && model.source === 'free'))
+    return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
+      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет: подключите её в «Модели» — облачный сервис по ключу или свою модель по адресу.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
+      ${live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-settings="models">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
   if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   if (turn.phase === 'writing') {
@@ -1253,13 +1307,13 @@ function turnView(item, turn, index, live) {
   const finished = ['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase)
   const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed'].includes(turn.phase))
   const brief = state.detail !== 'full'
-  const objects = [...(turn.rules ? [turn.rules.short] : []), ...script.steps.slice(0, turn.step).map(step => stepText(step.short, turn)), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : []), ...(turn.modelError?.resolved ? ['продолжил с другой моделью после остановки'] : [])]
+  const objects = [...(turn.rules ? [turn.rules.short] : []), ...script.steps.slice(0, turn.step).map(step => stepText(step.short, turn)), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : []), ...(turn.modelError?.resolved ? [(turn.decisions || []).some(entry => entry.choice === 'continue' && entry.model !== turn.modelError.model) ? 'продолжил с другой моделью после остановки' : 'продолжил после остановки модели'] : [])]
   const unresolved = (turn.errors || []).some(entry => entry.at >= turn.step) || Boolean(turn.modelError && !turn.modelError.resolved)
   const before = index ? turnModels([...(item.history || []), item][index - 1]).at(-1) : null
   const switched = before && turn.modelName && before !== turn.modelName
   const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved
   return `<div class="turn">
-    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}» — модель сменили в поле ввода</p>` : ''}
+    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}» — ${turn.modelNote === 'switched' ? 'модель сменили в поле ввода' : `«${esc(before)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
       <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
@@ -1267,9 +1321,9 @@ function turnView(item, turn, index, live) {
       ${turn.phase === 'plan' ? `<div class="answer-block"><h2>План работы</h2><p>Проверьте шаги — и я начну.</p>${turnPlan(turn)}<button class="btn primary" data-action="run-plan">Выполнить ${icon('arrow',16)}</button></div>` : ''}
       ${live && ['running','retrying','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
-      ${hasSteps && !summary ? `${finished && brief && !unresolved ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
+      ${hasSteps && !summary ? `${finished && brief && !unresolved ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished && turn.step ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index, index}, live) : ''}
-      ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${hasSteps ? turnTime(turn) + ' · ' : ''}${esc(turnModels(turn).join(' → ') || currentModel() || 'модель')}</span></div>` : ''}
+      ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${esc([hasSteps && turn.step ? turnTime(turn) : '', turnModels(turn).join(' → ') || (live ? currentModel() : '')].filter(Boolean).join(' · '))}</span></div>` : ''}
     </div></div>
   </div>`
 }
@@ -1520,17 +1574,18 @@ function nodeFactsHtml(facts, mode) {
 }
 // The working copy on the schema: added, changed and removed nodes marked; a selected node shows before → after.
 function changedPackage(item) {
-  const nodes = viewNodes('sales-improve', item.keep)
+  // The page can outlive its card (browser Back after a follow-up edit): it shows the copy's last card.
+  const chat = state.sessions.find(entry => entry.id === item.changeOf?.session)
+  const at = chat ? chainHead(chat, item.changeOf.at) : item.changeOf?.at
+  const turn = chat && [...(chat.history || []), chat][at]
+  const nodes = viewNodes('sales-improve', chat ? cardKeep(chat, at) : item.keep)
   const showBefore = state.showBefore
   const shown = showBefore ? nodes.filter(node => node[4] !== 'add') : nodes
-  const chat = state.sessions.find(entry => entry.id === item.changeOf?.session)
-  const turn = chat && [...(chat.history || []), chat][item.changeOf.at]
   const current = turn ? changeState(turn) : 'draft'
   const node = Number.isInteger(state.node) ? shown[state.node] : null
   const mark = {add:'Новый', mod:'Изменён', del:'Удалён'}
-  const inLoginom = turn ? loginomButton({draft:`copy:${item.changeOf.session}:${item.changeOf.at}`, saved:savedVersion(turn)?.id, replaced:'sales'}[current]) : ''
+  const inLoginom = turn ? loginomButton({draft:`copy:${item.changeOf.session}:${at}`, saved:savedVersion(turn)?.id, replaced:'sales'}[current]) : ''
   const local = turn?.local
-  const at = item.changeOf?.at
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
@@ -1697,9 +1752,10 @@ function deleteChatFiles() {
 // Iteration 8: the agent's copies a conversation still has in Loginom — one per copy, unless the user discarded it.
 function liveCopies(chat) {
   const turns = [...(chat.history || []), chat]
-  const heads = new Map()
-  turns.forEach((turn, index) => { if (turn.copy && !turn.forkOf) heads.set(turn.copy.name, index) })
-  return [...heads].filter(([, at]) => changeState(turns[at]) !== 'discarded').map(([name]) => name)
+  return [...new Set(turns.filter(turn => turn.copy && !turn.forkOf && turn.step > 0).map(turn => turn.copy.name))].filter(name => {
+    const head = turns.findLast(turn => turn.copy?.name === name && !turn.forkOf && turn.phase === 'done')
+    return !head || changeState(head) !== 'discarded'
+  })
 }
 // Deleting a conversation offers to delete its copies too (ticked): they are the agent's drafts, nobody else's.
 function copiesBox(copies, id) {
@@ -1729,8 +1785,11 @@ function rowMenu() {
 function modelMenu(menu) {
   const failed = menu.id === 'continue' ? currentItem()?.modelError : null
   const current = currentModel()
-  const rows = availableModels(state).map((model, index) => [model, index]).filter(([model]) => !(failed?.blocked && model.name === failed.model))
-  return [...rows.map(([model, index]) => `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}<small>${esc(model.where)}${model.kind === 'cloud' ? ' — данные уйдут туда' : ''}</small></span></button>`),
+  const rows = availableModels(state).map((model, index) => [model, index]).filter(([model]) => !(failed && (model.name === failed.model || (state.freeLimited && model.source === 'free'))))
+  return [...rows.map(([model, index]) => {
+    const limited = state.freeLimited && model.source === 'free'
+    return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}<small>${limited ? 'лимит на сегодня исчерпан — обновится в 03:00' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
+  }),
     `<button role="menuitem" data-menu-act="models-settings">${icon('settings',16)}<span>Настроить модели…</span></button>`]
 }
 function overlay() {
@@ -1843,8 +1902,12 @@ function render(resetScroll = false) {
   state.freshPackage = false
   const menu = $('#row-menu')
   if (menu) {
-    menu.style.left = Math.max(8, Math.min(state.menu.x, innerWidth - menu.offsetWidth - 8)) + 'px'
-    menu.style.top = Math.max(8, Math.min(state.menu.up ? state.menu.y - menu.offsetHeight : state.menu.y, innerHeight - menu.offsetHeight - 8)) + 'px'
+    // Render may scroll the feed (it follows the agent): take the opener where it is now.
+    const rect = menuOpener(state.menu)?.getBoundingClientRect()
+    const x = rect ? rect.left : state.menu.x
+    const y = rect ? (state.menu.up ? rect.top - 4 : rect.bottom + 4) : state.menu.y
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + 'px'
+    menu.style.top = Math.max(8, Math.min(state.menu.up ? y - menu.offsetHeight : y, innerHeight - menu.offsetHeight - 8)) + 'px'
     if (state.menu.keyboard) menu.querySelector('button')?.focus()
   }
   const dialog = $('#app-dialog')
@@ -1907,7 +1970,7 @@ function chooseModel(index) {
   const model = availableModels(state)[index]
   if (!model) return
   const item = state.page === 'chat' ? currentItem() : null
-  if (item) item.model = model.name
+  if (item) Object.assign(item, {model:model.name, modelSwitched:true})
   else state.nextModel = model.name
   toast(`${item ? 'В этом разговоре дальше отвечает' : 'Новый разговор начнёт'} «${model.name}»${model.kind === 'cloud' ? ` — данные разговора уйдут в «${model.where}»` : ''}`)
   render()
@@ -1966,7 +2029,8 @@ function send() {
     : /внеси|улучш|объедин|исправ|переимен|измени|доработ|поправ/i.test(prompt) ? 'improve'
     : /abc|сценари|loginom|пакет|узл|данн|таблиц|lgp/i.test(prompt) || withPackage ? 'abc'
     // A follow-up without a task word continues the previous task («Собери такой же для регионов»); a question is answered.
-    : old && old.kind !== 'chat' && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
+    // An edit or an answer about the copy is not repeated by «Спасибо».
+    : old && !['chat','improve','keep','more','nocopy'].includes(old.kind) && !/\?\s*$/.test(prompt) ? old.kind : 'chat'
   // A package from the computer: the agent uploads its own copy to Loginom; the file itself never changes.
   const local = state.draftPackage ? state.draftPackage.source === 'local' : Boolean(old?.local)
   if (['refactor','improve'].includes(kind) && !improvable(state.draftPackage?.name || (old ? old.files?.[0] : ''), local)) kind = 'clean'
@@ -1975,14 +2039,19 @@ function send() {
   const editAt = old && state.editTurn?.session === old.id ? state.editTurn.index : null
   const earlier = old ? [...(old.history || []), turnSnapshot(old)] : []
   const kept = editAt === null ? earlier : earlier.slice(0, editAt)
-  const draftAt = !web && !state.draftPackage ? draftCopyAt(kept) : null
-  if (draftAt !== null && /город|недел|ссыла|не удаля|оставь|верни/i.test(prompt)) kind = 'keep'
-  else if (draftAt !== null && kind === 'improve') kind = 'more'
+  const draft = !web && !state.draftPackage ? draftCopy(kept) : null
+  const keepAsk = /город|недел|ссыла|не удаля|оставь|верни/i.test(prompt) && /фильтр|узел|узл/i.test(prompt)
+  if (draft && keepAsk) kind = 'keep'
+  else if (draft && kind === 'improve' && !draft.partial) kind = 'more'
+  // Asked to keep the node with no copy to change: the copy was saved, replaced, discarded or belongs to another chat.
+  else if (!draft && keepAsk && !state.draftPackage) kind = 'nocopy'
+  if (editAt !== null) carryCopyState(earlier, editAt)
   // The trial applies to the trial task; another request is answered as usual.
   const trialTurn = state.trialSkill && !old && prompt === state.trialSkill.prompt
   if (trialTurn) kind = state.trialSkill.kind
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
-  const needsLoginom = !['chat','more'].includes(kind) && !(kind === 'document' && state.draftPackage?.source === 'local')
+  // Iteration 8: checking a file from the computer reads it where it is, like documenting.
+  const needsLoginom = !['chat','more','nocopy'].includes(kind) && !(['document','refactor','clean'].includes(kind) && local)
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
   if (old) {
     clearTimeout(old.timer)
@@ -1996,15 +2065,19 @@ function send() {
     project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     history:kept, allowed:[...(old?.allowed || [])],
     step:0, decisions:[], cleared:[], steer:[], web, local,
-    model:old ? old.model : state.nextModel, modelName:currentModel(old),
+    // The conversation keeps the model it started with (OpenCode 2: the session's model), not the current default.
+    model:old ? old.model || old.modelName : state.nextModel || currentModel(null), modelNote:old?.modelSwitched ? 'switched' : 'fallback',
   }
-  state.nextModel = null
+  next.modelName = currentModel(next)
+  if (!old) state.nextModel = null
   state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
   if (!trialTurn && kind === 'refactor') next.rules = appliedRules(next.project)
-  if (kind === 'improve') next.copy = newAgentCopy()
-  if (kind === 'keep') next.copy = kept[draftAt].copy
-  if (['keep','more'].includes(kind)) Object.assign(next, {files:kept[draftAt].files, local:kept[draftAt].local, about:kept[draftAt].copy.name})
+  // В-73: a stopped edit left a partial copy — the next edit finishes it in the same copy.
+  if (kind === 'improve') next.copy = draft?.partial ? draft.copy : newAgentCopy()
+  if (kind === 'keep') next.copy = draft.copy
+  if (['keep','more'].includes(kind)) Object.assign(next, {files:draft.turn.files, local:draft.turn.local, about:draft.copy.name, aboutKeep:draft.keep})
+  if (kind === 'nocopy') next.nocopy = noCopyReason(kept)
   if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
@@ -2031,7 +2104,7 @@ function changeAction(value, keyboard = false) {
   // A card the edit went on from has no buttons; the schema and dialogs opened from it act on the copy's last turn.
   const head = chainHead(item, Number(at))
   const turn = turns[head]
-  const keep = chainKeep(item, head)
+  const keep = cardKeep(item, head)
   if (!turn || turn.forkOf) return
   turn.change = turn.change || {}
   if (act === 'view') return openPackage({id:'draft-' + item.id + '-' + head, name:'Продажи.lgp', scope:'personal', folder:'', view:'sales-improve', keep, isDraft:true, project:item.project, changeOf:{session:item.id, at:head}})
@@ -2211,7 +2284,7 @@ function feedAction(d) {
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
   return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, local:item.local, about:item.about, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || [], change:item.change, copy:item.copy, rules:item.rules, web:item.web, local:item.local, about:item.about, aboutKeep:item.aboutKeep, nocopy:item.nocopy, modelNote:item.modelNote, forkOf:item.forkOf, model:item.model, modelName:item.modelName, modelError:item.modelError})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -2471,7 +2544,7 @@ const actions = {
     state.overlay = null
     toast(`Сохранено на компьютер: «${name}»`)
     render()
-    document.querySelector(`.turn [data-change="download:${state.downloadTurn.at}"]`)?.focus()
+    ;(document.querySelector(`.turn [data-change="download:${state.downloadTurn.at}"]`) || document.querySelector('.package-save-bar [data-change^="download:"]'))?.focus()
   },
   'fill-keep':() => {
     state.draft = keepPrompt
