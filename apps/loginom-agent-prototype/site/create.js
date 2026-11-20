@@ -131,10 +131,16 @@ function permsBlock(state, item) {
     (item.type === 'action' ? '<p class="own-note">'+icon('help',15)+' Перед каждым запуском — шаг «Доступ», как у встроенного действия.</p>' : '');
 }
 // В-62: in the closed contour a skill from a file works only if the administrator allowed unverified skills.
-function blockedFile(state, item) {
-  return state.contour === 'closed' && item.type === 'skill' && item.origin === 'file';
+// В-76: a strict organization's policy can turn own skills off altogether; by default they work (В-70). The demo
+// policy of the prototype has the switch on, so the lock can be seen; «Инструкции» are not affected.
+function ownSkillsOff(state) {
+  return state.policy === 'set';
 }
-function blockedFileText(state) {
+function blockedFile(state, item) {
+  return item.type === 'skill' && ((state.contour === 'closed' && item.origin === 'file') || ownSkillsOff(state));
+}
+function blockedFileText(state, item) {
+  if (ownSkillsOff(state) && item?.origin !== 'file') return 'Свои навыки выключил администратор вашей организации: агент их не применяет. «Инструкции» в настройках работают — агент следует им во всех разговорах. Если навык нужен — передайте его администратору.';
   return state.policy === 'set' ? 'Администратор вашей организации не разрешил навыки, которые Loginom не проверял: из файла и «Сообщество». Если навык нужен — передайте файл администратору.'
     : 'В закрытом контуре навыки, которые Loginom не проверял, — из файла и «Сообщество» — выключены, пока их не разрешит администратор. Если навык нужен — передайте файл администратору.';
 }
@@ -163,7 +169,7 @@ export function renderCreate(state) {
     '<div class="own-choose">'+
       '<button type="button" class="own-choice" data-own="new-skill"><span class="hub-tile hub-sage">'+icon('book',24)+'</span><strong>Навык</strong><small>Как агенту делать задачу: правила, порядок, термины. Агент применяет его сам, когда задача подходит. Правила для всех разговоров — в «Настройки» → «Инструкции».</small></button>'+
       '<button type="button" class="own-choice" data-own="new-action"><span class="hub-tile hub-lilac">'+icon('layers',24)+'</span><strong>Своё действие</strong><small>Встроенное действие с вашими настройками, например «Документировать» по шаблону отдела. Появится среди действий с пакетом.</small></button>'+
-    '</div><p class="own-note">'+icon('help',16)+' Подключения к внешним сервисам и программы создать нельзя: в навыке может быть только текст.</p></div>';
+    '</div>'+(ownSkillsOff(state) ? '<p class="own-note">'+icon('lock',16)+' Свои навыки выключил администратор: навык можно составить и передать ему, но агент его не применит. «Инструкции» в настройках работают.</p>' : '')+'<p class="own-note">'+icon('help',16)+' Подключения к внешним сервисам и программы создать нельзя: в навыке может быть только текст.</p></div>';
   return edit.type === 'action' ? renderActionEditor(state, edit) : renderSkillEditor(state, edit);
 }
 
@@ -193,7 +199,7 @@ function renderSkillEditor(state, edit) {
     (item.origin === 'file' ? '<label class="own-consent"><input type="checkbox" data-own-ack'+(item.ack ? ' checked' : '')+'> Понимаю: Loginom этот навык не проверял, а агент будет следовать его указаниям. Результат проверю сам</label>' : '')+
     leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие.')+
     '<div class="sl-actions"><button type="submit" class="btn">'+(saved ? 'Сохранить' : 'Сохранить черновик')+'</button>'+
-    (blockedFile(state, item) ? '</div><div class="sl-note sl-note-warn">'+icon('lock',16)+' '+blockedFileText(state)+'</div></form></section>'
+    (blockedFile(state, item) ? '</div><div class="sl-note sl-note-warn">'+icon('lock',16)+' '+blockedFileText(state, item)+'</div></form></section>'
       : '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
         (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>') : '';
   return '<div class="sl-page own-page"><button type="button" class="sl-back-link" data-own="to-mine">← Мои</button>'+
@@ -529,6 +535,7 @@ function bindScope(root, state, api) {
     }
     if (action === 'enable') {
       const item = value ? itemById(state, value) : item0();
+      if (blockedFile(state, item)) return api.toast(blockedFileText(state, item), 'alert');
       if (!ready(item, true)) return;
       if (!own.items.includes(item)) own.items.unshift(item);
       item.status = 'on';
@@ -540,6 +547,7 @@ function bindScope(root, state, api) {
     }
     if (action === 'try') {
       const item = value ? itemById(state, value) : item0();
+      if (blockedFile(state, item)) return api.toast(blockedFileText(state, item), 'alert');
       if (!ready(item)) return;
       if (!own.items.includes(item)) own.items.unshift(item);
       own.editing = null;

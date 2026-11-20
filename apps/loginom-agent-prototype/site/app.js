@@ -651,7 +651,7 @@ function rightPanel(item) {
   return `<aside class="review-panel" aria-label="Проверка результатов">
     <div class="review-heading"><h2>Контекст разговора</h2><button class="icon-btn" data-action="review" aria-label="Закрыть панель">${icon('close',17)}</button></div>
     <div class="review-switch">${[['plan','План'],['files','Файлы'],['log','Журнал']].map(([id,label]) => `<button class="${active === id ? 'active':''}" data-review="${id}" aria-pressed="${active === id}">${label}</button>`).join('')}</div>
-    ${active === 'plan' ? plan(item) : active === 'files' ? `<div class="review-stack">${fileList('Приложено', attached) + fileList('Создано', created) || '<p class="muted">Файлов пока нет.</p>'}</div>` : `<div class="review-stack">${journal(item)}</div>`}
+    ${active === 'plan' ? plan(item) : active === 'files' ? `<div class="review-stack">${fileList('Приложено', attached) + fileList('Создано', created) + fileList('Копии агента в Loginom · ' + packageFolder('personal') + '/Копии агента', edit ? [] : liveCopies(item)) || '<p class="muted">Файлов пока нет.</p>'}</div>` : `<div class="review-stack">${journal(item)}</div>`}
     ${followedNow(item)}
   </aside>`
 }
@@ -1046,8 +1046,9 @@ const scripts = {
     {plan:2, icon:'file', live:'Собираю замечания', done:'Собрал {count} замечания', short:'собрал {count} замечания', time:3},
   ]},
   // Changes go to a working copy; the package in Loginom changes only when the user saves (iteration 4).
-  improve:{plan:['Открыть копию','Внести изменения','Сверить результат'], steps:[
-    {plan:0, icon:'flow', live:'Открываю копию «Продажи.lgp»', done:'Открыл копию «Продажи.lgp» для правки', short:'открыл копию пакета', detail:'Исходный пакет не меняется — вы решите, что делать с изменениями', time:2},
+  // В-75: the copy is a write to Loginom — «Сохранять пакеты в Loginom» decides; asked once per conversation.
+  improve:{plan:['Открыть копию','Внести изменения','Сверить результат'], permission:{title:'Сделать копию «{pkg}» в «Копии агента»?', text:'Агент правит копию, а не исходный пакет: исходный не изменится, пока вы не решите. Копия появится в вашей папке Loginom.', args:[['Пакет','{pkg}'],['Папка','{home}/Копии агента'],['Изменится','появится копия «{copy}»']], trace:'сделать копию «{pkg}» в {home}/Копии агента', scope:'делать копии пакетов в {home}/Копии агента', denied:'Хорошо, копию не делаю. Без копии я не правлю пакет в Loginom — могу его проверить: «Проверь сценарий».', forbidden:'Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Без копии в Loginom я не правлю пакет — могу его проверить.'}, steps:[
+    {plan:0, icon:'flow', ask:'permission', live:'Открываю копию «Продажи.lgp»', done:'Открыл копию «Продажи.lgp» для правки', short:'открыл копию пакета', detail:'Исходный пакет не меняется — вы решите, что делать с изменениями', time:2},
     {plan:1, icon:'layers', live:'Переношу «Фильтр по дате»', done:'Вынес «Фильтр по дате» до разветвления', short:'вынес фильтр', detail:'Раньше он стоял отдельно в каждой ветке', time:6, think:[4,'Фильтр одинаковый в обеих ветках: поставлю его один раз перед разветвлением, второй удалю.']},
     {plan:1, icon:'close', live:'Удаляю повтор фильтра', done:'Удалил повторный «Фильтр по дате»', short:'удалил повтор', detail:'Он дублировал первый', time:2},
     {plan:1, icon:'compose', live:'Переименовываю узел', done:'Переименовал «Узел14» → «Выручка по городам»', short:'переименовал узел', time:2},
@@ -1083,17 +1084,18 @@ function appliedRules(projectId) {
   const project = projectById(projectId)
   if (hasRules(project?.instructions)) return {step:`Учёл инструкции проекта «${project.name}»`, short:'учёл инструкции проекта', detail:'Агент читает их в каждом разговоре проекта', by:'по инструкциям проекта'}
   if (hasRules(state.settings.instructions)) return {step:'Учёл ваши инструкции для агента', short:'учёл ваши инструкции', detail:'«Настройки» → «Инструкции»: агент следует им во всех разговорах', by:'по вашим инструкциям'}
-  const skill = state.own?.items.find(entry => entry.type === 'skill' && entry.status === 'on' && hasRules(entry.body))
+  // В-76: under the demo policy own skills are off; «Инструкции» still apply.
+  const skill = state.policy !== 'set' && state.own?.items.find(entry => entry.type === 'skill' && entry.status === 'on' && hasRules(entry.body))
   if (skill) return {step:`Применил навык «${skill.name}»`, short:`применил навык «${skill.name}»`, skill:skill.name, detail:'Навык включён — агент выбрал его сам по строке «Когда агент его применяет»', by:`по навыку «${skill.name}»`}
   return null
 }
 // Keeping the node after the copy was saved: the agent copies the saved version first.
-scripts.keepFrom = {...scripts.keep, steps:[
-  {plan:0, icon:'flow', live:'Делаю копию «{from}»', done:'Сделал копию «{copy}» из новой версии «{from}»', short:'сделал копию новой версии', detail:'Новая версия и исходный не меняются', time:3},
+scripts.keepFrom = {...scripts.keep, permission:{...scripts.improve.permission, title:'Сделать копию «{from}» в «Копии агента»?', text:'Агент сделает копию новой версии и вернёт в ней узел. Новая версия и исходный не изменятся.', args:[['Пакет','{from}'],['Папка','{home}/Копии агента'],['Изменится','появится копия «{copy}»']], trace:'сделать копию «{from}» в {home}/Копии агента'}, steps:[
+  {plan:0, icon:'flow', ask:'permission', live:'Делаю копию «{from}»', done:'Сделал копию «{copy}» из новой версии «{from}»', short:'сделал копию новой версии', detail:'Новая версия и исходный не меняются', time:3},
   ...scripts.keep.steps.slice(1)]}
 // A package from the computer: the first step uploads the agent's own copy, the rest is the same edit.
-scripts.improveLocal = {...scripts.improve, steps:[
-  {plan:0, icon:'upload', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
+scripts.improveLocal = {...scripts.improve, permission:{...scripts.improve.permission, title:'Загрузить копию «{pkg}» в Loginom?', text:'Чтобы править пакет, агент загрузит его копию с компьютера в вашу папку Loginom. Файл на компьютере не изменится.', trace:'загрузить копию «{pkg}» с компьютера в {home}/Копии агента'}, steps:[
+  {plan:0, icon:'upload', ask:'permission', live:'Загружаю копию «{pkg}» с компьютера в Loginom', done:'Загрузил копию «{pkg}» с компьютера в «Копии агента»', short:'загрузил копию пакета', detail:'Файл на компьютере не меняется — вы решите, куда сохранить изменённый пакет', time:4},
   ...scripts.improve.steps.slice(1)]}
 // Kinds the agent answers in words, without steps in Loginom.
 const answerOnly = ['chat','more','nocopy','pick']
@@ -1101,9 +1103,9 @@ function scriptOf(turn) {
   return turn.kind === 'improve' && turn.local ? scripts.improveLocal : turn.kind === 'keep' && turn.from ? scripts.keepFrom : scripts[turn.kind] || scripts.chat
 }
 function followed(text, turn) {
-  if (!turn.instruction) return atHome(text)
+  if (!turn.instruction) return stepText(text, turn)
   const how = ` — по вашему указанию: «${turn.instruction}»`
-  return / в \/\S+$/.test(atHome(text)) ? atHome(text).replace(/ в \/\S+$/, how) : atHome(text) + how
+  return / в \/\S+$/.test(stepText(text, turn)) ? stepText(text, turn).replace(/ в \/\S+$/, how) : stepText(text, turn) + how
 }
 // Script texts name the personal Loginom folder as {home}: it follows the user who connected.
 function atHome(text) {
@@ -1298,7 +1300,7 @@ function answerText(turn) {
 }
 function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
-    if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
+    if (turn.decisions?.some(entry => entry.choice === 'forbidden')) return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.forbidden || 'Сохранять пакеты в Loginom мне запрещено: так стоит в «Настройки» → «Разрешения». Сценарий собран и проверен — он остался в этом разговоре.')}</p>${live ? `<button class="btn" data-settings="permissions">${icon('shield',15)} Открыть «Разрешения»</button>` : ''}</div>`
     return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
   }
   if (turn.phase === 'failed' && turn.modelError && !turn.modelError.resolved) {
@@ -1338,8 +1340,8 @@ function turnSteps(turn, live, turnIndex) {
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
-  if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(atHome(script.permission.trace))}</span></li>`)
-  if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(atHome(script.permission.trace))} — в «Разрешениях» это запрещено</span></li>`)
+  if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(stepText(script.permission.trace, turn))}</span></li>`)
+  if (turn.decisions?.some(entry => entry.choice === 'forbidden')) rows.push(`<li class="step-trace denied">${icon('lock',14)}<span>Не сделал: ${esc(stepText(script.permission.trace, turn))} — в «Разрешениях» это запрещено</span></li>`)
   errorRows(turn.step)
   if (turn.modelError?.at === turn.step && turn.step < script.steps.length) rows.push(modelErrorRow(turn))
   for (const decision of (turn.decisions || []).filter(entry => entry.at === turn.step && entry.choice === 'continue' && turn.step < script.steps.length)) rows.push(`<li class="step-trace">${icon('play',14)}<span>Вы продолжили с моделью «${esc(decision.model)}»</span></li>`)
@@ -1397,11 +1399,11 @@ function chatDock(item) {
   if (item.phase === 'permission') {
     const ask = script.permission
     return `<section class="dock" aria-labelledby="dock-title">
-      <div class="dock-head">${icon('shield',20)}<h2 id="dock-title" tabindex="-1">${esc(ask.title)}</h2></div>
+      <div class="dock-head">${icon('shield',20)}<h2 id="dock-title" tabindex="-1">${esc(stepText(ask.title, item))}</h2></div>
       <p>${esc(ask.text)}</p>
-      <dl class="dock-args">${ask.args.map(([key,value]) => `<div><dt>${key}</dt><dd>${esc(item.instruction && key === 'Папка' ? 'по вашему указанию' : atHome(value))}</dd></div>`).join('')}${item.instruction ? `<div class="dock-instruction"><dt>Ваше указание</dt><dd>«${esc(item.instruction)}»</dd></div>` : ''}</dl>
+      <dl class="dock-args">${ask.args.map(([key,value]) => `<div><dt>${key}</dt><dd>${esc(item.instruction && key === 'Папка' ? 'по вашему указанию' : stepText(value, item))}</dd></div>`).join('')}${item.instruction ? `<div class="dock-instruction"><dt>Ваше указание</dt><dd>«${esc(item.instruction)}»</dd></div>` : ''}</dl>
       <div class="dock-actions"><button class="btn primary" data-permit="once">Разрешить один раз</button><button class="btn" data-permit="session" aria-describedby="dock-scope">Разрешать в этом разговоре</button><button class="btn" data-permit="deny">Отклонить</button></div>
-      <p class="dock-scope" id="dock-scope">«В этом разговоре» — больше не спрашивать только об одном: ${esc(atHome(ask.scope))}.</p>
+      <p class="dock-scope" id="dock-scope">«В этом разговоре» — больше не спрашивать только об одном: ${esc(stepText(ask.scope, item))}.</p>
       ${item.insteadOpen ? `<form class="dock-instead" id="instead-form"><label for="instead-text">Что сделать иначе</label><div><input id="instead-text" name="text" value="${esc(item.dockDraft?.['instead-text'] || '')}" placeholder="Например: сохрани в папку «Продажи»" autocomplete="off"><button class="btn">Отправить</button></div></form>`
         : `<button class="link-btn dock-more" data-action="open-instead">${icon('message',14)} Сказать, что сделать иначе</button>`}
     </section>`
@@ -1463,7 +1465,15 @@ function packagePath(item) {
   return packageFolder(item.scope) + (item.folder ? '/' + item.folder : '')
 }
 function packageEntries() {
-  return [...serverPackages,...state.importedPackages]
+  return [...serverPackages,...state.importedPackages,...agentCopyEntries()]
+}
+// В-75: the agent's copies are packages in «/<login>/Копии агента», like any other — the picker lists them.
+function agentCopyEntries() {
+  return state.sessions.flatMap(chat => liveCopies(chat).map(name => {
+    const turns = [...(chat.history || []), chat]
+    const at = turns.findLastIndex(turn => turn.copy?.name === name && !turn.forkOf && turn.step > 0)
+    return {id:`copy:${chat.id}:${at}`, name, scope:'personal', folder:'Копии агента', modified:'2026-11-20', size:'1,2 МБ', view:'sales-v2', keep:chainKeep(chat, at), agentCopy:chat.title, editSessionId:chat.id}
+  }))
 }
 function openPackage(item, focus = null) {
   state.activePackage = item
@@ -1685,7 +1695,7 @@ function packages() {
   const node = Number.isInteger(state.node) ? nodes[state.node] : null
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
-    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.localFile ? 'Файл на компьютере · схема прочитана из файла, Loginom не нужен' : item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span>${item.isDraft || item.localFile ? '' : loginomButton(item.id)}</div>
+    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.localFile ? 'Файл на компьютере · схема прочитана из файла, Loginom не нужен' : item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.id === 'sales' && salesState().replaced ? 'заменён в разговоре; прежняя версия — «Продажи — до правки.lgp»' : item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.agentCopy ? `копия агента из разговора «${esc(item.agentCopy)}»` : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span>${item.isDraft || item.localFile ? '' : loginomButton(item.id)}</div>
     <div class="package-canvas${focus ? ' focus-canvas' : ''}" aria-label="Схема пакета">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}${focus?.nodes.includes(i) ? ' is-focus' : ''}" data-node="${i}">${focus?.nodes.includes(i) ? '<span class="node-mark">Замечание</span>' : ''}<span class="glyph ${{database:'blue',chart:'red',file:'green',shield:'green',flow:'red'}[glyph] || 'violet'}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
     ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${focus ? `<p class="focus-note"><strong>Замечание агента:</strong> ${esc(focus.text)} <button class="link-btn" data-session="${focus.session}">${icon('message',15)} Вернуться к разговору</button></p>` : ''}${node ? `<strong>${esc(node[1])}.</strong> ${esc(node[3])}` + nodeFactsHtml(nodeFacts(item.view, node[1], item.keep), item.view === 'sales' ? 'before' : 'after') : focus ? '' : 'Выберите узел, чтобы увидеть сведения.'}</div>`}
     <div class="package-save-bar">
@@ -1712,10 +1722,7 @@ function review() {
     ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
   // Open owner questions, each with a recommended variant; empty when everything is decided.
-  const questions = [
-    '<strong>Агент пишет в Loginom без вопроса</strong> — так сказали 8 из 9 оценщиков третьего прогона. Копию в «Копии агента» и загрузку файла с компьютера агент делает сам, хотя в «Разрешениях» у «Сохранять пакеты в Loginom» стоит «Спрашивать». Предлагаю подчинить копию тому же правилу: «Спрашивать» — перед первой копией в разговоре вопрос «Сделать копию «…» в «Копии агента»?» с «Разрешать в этом разговоре»; «Разрешено» — без вопроса; «Запрещено» — агент в Loginom не правит и говорит об этом. «Копии агента» — обычной папкой в окне выбора пакетов, копии разговора — в «Контекст → Файлы». <em>Рекомендую так.</em>',
-    '<strong>Свои навыки под политикой администратора</strong> (В-70). Два оценщика-администратора считают их обходом запрета на навыки «Сообщество»: текст такого навыка можно вставить в свой. Предлагаю оставить В-70 по умолчанию и дать политике выключатель «Свои навыки: выключены» для строгих организаций; «Инструкции» не трогать — это тот же текст, что сообщение; какой навык применён, пишется в журнал действий. <em>Рекомендую так.</em>',
-  ]
+  const questions = []
   const changed = [
     'По третьему прогону оценки (девять отчётов: Opus, Sonnet, Haiku): из сохранённой версии окно замены тоже предлагает «Попросить агента оставить узел» — агент делает копию новой версии; удаление из Loginom («Отменить изменения», «Удалить новую версию») спрашивает подтверждение; «Запрещено» и «Разрешено» у «Сохранять пакеты в Loginom» действуют; в карточке правки — «Проверено приложением» по квитанциям запуска; мастер «Проверить» учитывает «Инструкции» и называет те же три замечания, что разговор; проверка файла с компьютера — без Loginom; «Свой сервер Loginom» — пустая форма; после «Подключить модель» — назад в разговор; у облачной модели в поле ввода — значок облака; «Опиши пакет» без пакета — просьба выбрать пакет.',
     'Итерация 8 — сбои и повторы. Модель остановила ход: блок с причиной простыми словами, «Продолжить с другой моделью» или «Подключить модель»; в ленте — «Модель не ответила» и «Вы продолжили с моделью…», у ответа — какие модели работали. Модель в поле ввода — модель этого разговора (как в OpenCode 2), выбор из моделей этого режима сети.',
@@ -1740,6 +1747,7 @@ function review() {
     'Свои навыки и действия живут до перезагрузки страницы.',
   ]
   const chosen = [
+    'По третьему прогону оценки: <strong>копия агента — под правилом «Сохранять пакеты в Loginom»</strong>: при «Спрашивать» — вопрос перед первой копией в разговоре, «Копии агента» — папка в окне выбора, копии разговора — в «Контекст → Файлы» (В-75). <strong>Политика может выключить свои навыки</strong>; по умолчанию они работают, «Инструкции» не выключаются (В-76).',
     'По итерации 8: <strong>правки подряд продолжают черновик копии агента</strong>; новая копия — после «Сохранить», «Заменить» или «Отменить изменения» (В-73). <strong>Родные страницы настроек OpenCode 2</strong> — «Проекты», «Рабочие пространства», «Экспериментальное», «Расширения» — в продукте спрятаны (В-74).',
     '<strong>«Посмотреть в Loginom»</strong> — там, где решается, что делать с пакетом: увидеть его в самом Loginom и решить по нему (В-72).',
     'По оценкам экспертами и администраторами: <strong>следующая итерация — глубина Loginom</strong>: замечание ведёт к узлу на схеме, в правке — настройки и порты «было / стало», перед заменой — узлы-ссылки из других пакетов (В-67). <strong>«Терминал»</strong> остаётся у пользователя в «Разрешениях» (В-68). <strong>«Разрешения»</strong> — только про то, что агент делает сам; ваши кнопки работают по правам учётной записи Loginom, а запрет администратора держит сервер продукта, в том числе в разговоре (В-69). <strong>Политика</strong> ограничивает источник того, что ставится; свои навыки не запрещает (В-70). <strong>Журнал действий агента</strong> — в этапе F, в «Диагностике» — строка о нём (В-71).',
@@ -1769,7 +1777,7 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 8 — сбои и повторы</p><h1>Что решить</h1><p>Новое — что происходит, когда что-то идёт не по плану: модель остановила ход, правку нужно поправить, пакет пришёл с компьютера, разговор удаляют вместе с копиями агента. Около 5 минут. Ниже — два вопроса по третьему прогону оценки агентами.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 8 — сбои и повторы</p><h1>Что решить</h1><p>Новое — что происходит, когда что-то идёт не по плану: модель остановила ход, правку нужно поправить, пакет пришёл с компьютера, разговор удаляют вместе с копиями агента. Около 5 минут. Открытых вопросов нет — решения ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>` : ''}
