@@ -64,7 +64,7 @@ function render() {
     '<div class="hub-filters" aria-label="Кто подготовил">'+tierFilters.map(([id, label]) => '<button data-tier="'+id+'" aria-pressed="'+(state.tier === id)+'">'+label+'</button>').join('')+'</div>'+
     '<div class="hub-filters" aria-label="Тип">'+types.map((type) => '<button data-type="'+esc(type)+'" aria-pressed="'+(state.type === type)+'"'+(kinds[type] ? ' title="'+esc(kinds[type].how)+'"' : '')+'>'+(kinds[type]?.plural || type)+'</button>').join('')+'</div></div>'+
     (list.length ? '<div class="hs-grid">'+list.map(card).join('')+'</div>' : '<div class="hub-empty"><h3>Ничего не нашлось</h3><p>Измените запрос или фильтры.</p></div>')+
-    '<p class="hs-foot">Каталог подписан Loginom · обновлён 18.11.2026 · Только для прототипа: файлы демонстрационные, их можно импортировать в прототип приложения.</p></main>'+
+    '<p class="hs-foot">Подпись Loginom подтверждает, что файлы каталога не менялись; навыки с отметкой «Сообщество» Loginom не проверял · обновлён 18.11.2026 · Только для прототипа: файлы демонстрационные, их можно импортировать в прототип приложения.</p></main>'+
     (state.picked.size ? '<div class="hs-bar"><span>'+icon('archive',17)+' В архиве: <strong>'+state.picked.size+'</strong></span><button class="btn quiet" data-clear>Очистить</button><button class="btn primary" data-archive>'+icon('download',16)+' Скачать архив</button></div>' : '')+
     (state.open ? detail(items.find((item) => item.id === state.open)) : '');
   bind();
