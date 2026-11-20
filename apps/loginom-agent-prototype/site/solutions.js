@@ -344,7 +344,7 @@ function renderRunner(state, model) {
       <div><h3>✕ Агент не сможет</h3><ul>${access.cannot.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div></div>
       ${access.warn ? `<div class="sl-note sl-note-warn">${icon('alert',16)} ${escape(access.warn)}</div>` : ''}
       ${modelName ? `<div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>`
-        : `<div class="sl-note sl-note-warn">${icon('alert',16)} Модель не выбрана — без неё действие не запустится. <button type="button" class="btn quiet" data-settings="models">Выбрать модель</button></div>`}
+        : `<div class="sl-note sl-note-warn">${icon('alert',16)} Модель не выбрана — без неё действие не запустится. <button type="button" class="btn quiet" data-settings="providers">Выбрать модель</button></div>`}
       <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start" ${modelName ? '' : 'disabled'}>Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
       <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
   }

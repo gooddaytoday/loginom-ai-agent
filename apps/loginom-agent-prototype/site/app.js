@@ -1,7 +1,7 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType, showHubTab } from './hub.js'
-import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave, availableModels } from './settings.js'
+import { renderSettings, bindSettings, ensureSettings, beforeSettingsLeave, availableModels, usableModels, startConnect } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
 import { renderCreate, renderModeration, bindOwn, trialBanner, trialResult, startFromSession, ownActionsGroup, demoOwn } from './create.js'
 import { actions as packageActions, byId, tierBadge } from './catalog.js'
@@ -438,6 +438,11 @@ function openSession(id) {
   state.scrollToEnd = true
   navigate('chat')
 }
+// В-82: the OpenCode 2 connect window opens over «Провайдеры»; after «Продолжить» the app returns to the task.
+function openConnect(id = '') {
+  startConnect(state, id)
+  settingsTab('providers')
+}
 function settingsTab(tab) {
   if (!canNavigate('settings',tab)) return
   if (state.page !== 'settings') state.returnTo = state.page
@@ -590,7 +595,7 @@ function composer() {
       <div class="composer-options">
         ${loginomChip()}
         ${modelName ? `<button class="filter-btn composer-model" type="button" data-menu="model:" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && !state.menu.id}" aria-label="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? `, облако — данные уходят в «${esc(model.where)}»` : ''}" title="Модель${state.page === 'chat' ? ' этого разговора' : ''}: ${esc(modelName)}${model.kind === 'cloud' ? ` · облако: данные уходят в «${esc(model.where)}»` : ''}">${icon(model.kind === 'cloud' ? 'globe' : 'cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>`
-          : `<button class="filter-btn composer-model lgm-chip off" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">Выберите модель</span> ${icon('down',12)}</button>`}
+          : `<button class="filter-btn composer-model lgm-chip off" type="button" data-action="provider-connect" title="Модель">${icon('cpu',15)} <span class="filter-label">Выберите модель</span> ${icon('down',12)}</button>`}
         ${state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase) ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
         <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
       </div>
@@ -1317,8 +1322,8 @@ function turnAnswer(turn, live = false) {
     const [title, reason] = modelErrorText(turn.modelError)
     const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !(state.freeLimited && model.source === 'free'))
     return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
-      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет: подключите её в «Модели» — облачный сервис по ключу или свою модель по адресу.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
-      ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-settings="models">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+      <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет: подключите провайдера: подписка, ключ API или свой сервер.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
+      ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-action="provider-connect">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
   if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   if (turn.phase === 'writing') {
@@ -1362,7 +1367,7 @@ function turnSteps(turn, live, turnIndex) {
   return `<ol class="turn-steps">${rows.join('')}</ol>`
 }
 function cloudNote(name) {
-  const model = availableModels(state).find(entry => entry.name === name)
+  const model = usableModels(state).find(entry => entry.name === name)
   return model?.kind === 'cloud' ? `, облачная модель: разговор уходит в «${esc(model.where)}»` : ''
 }
 // The models that answered in a turn: the one it started with and any it was continued with.
@@ -1725,6 +1730,7 @@ function packages() {
 // Owner review page: iteration 4 (a package in the conversation) — what to try, questions with a recommendation.
 function review() {
   const look = [
+    ['Модели — как в OpenCode 2','Откроется окно «Подключить провайдера», как в OpenCode 2 (В-82): популярные провайдеры и поиск, вход через ChatGPT, GitHub Copilot кодом, ключ API, свой сервер. Вход по подписке в прототипе подтверждаете сами. После «Подключено: … — выберите модель» приложение возвращается в новый разговор с этой моделью. Под демо-политикой администратора окно недоступно — модели задаёт он. В настройках — «Провайдеры» и «Модели», как в OpenCode 2; «Подключить модель» — в меню модели в поле ввода и в блоке «Модель остановила ход».',[['try-connect','Начать'],['try-model-failure','После лимита модели']]],
     ['Копия агента — с вопросом','Агент правит «Продажи». Перед первой копией в разговоре он спросит «Сделать копию «Продажи.lgp» в «Копии агента»?»; «Разрешать в этом разговоре» снимает вопрос и для следующих копий. Копии видны в «+» → «Пакет из Loginom…» → папка «Копии агента» и в «Контекст → Файлы». «С «Запрещено»» — то же, когда в «Разрешениях» сохранение в Loginom запрещено: агент пакет не правит (В-75).',[['try-improve','Начать'],['try-forbid-save','С «Запрещено»']]],
     ['Замена из сохранённой версии','В карточке правки нажмите «Сохранить новой версией», затем «Заменить исходный…». Окно покажет, что «Города — неделя.lgp» сломается, и предложит «Попросить агента оставить узел»: агент сделает копию новой версии и вернёт узел — после этого обе ссылки рабочие.',[['try-improve','Начать']]],
     ['Свои навыки под политикой','Включится демо-политика администратора и откроется «Создать своё»: свой навык можно составить и передать администратору, но агент его не применит; «Инструкции» работают (В-76). Убрать политику — ссылкой «убрать» внизу этой страницы.',[['try-policy-skills','Начать']]],
@@ -1757,8 +1763,11 @@ function review() {
     '<strong>Служба после закрытия приложения.</strong> Рекомендую как в 0.4: служба останавливается вместе с приложением, ничего не остаётся работать. Расписание OpenCode 2, которому нужна живая служба, — отдельным решением, если понадобится.',
     '<strong>Оценка — пересмотр В-81.</strong> По плану этапа B выходит 45–75 агенто-дней, без дашбордов — 41,5–70: к таблице spike (30–49) добавились ранние проверки, Bun 1.4.4, процедура синхронизации, разрешения на сервере и дашборды. Это больше прежних 37–62. Число уточню после перемера объёма в начале этапа.',
     '<strong>SDK провайдеров из npm.</strong> OpenCode 2 при подключении части провайдеров скачивает их пакет из npm — это сторонний код. Рекомендую в режиме «Интернет» оставить как в OpenCode 2, иначе часть провайдеров не подключится (В-82); в сети организации и в закрытом контуре — только встроенные в сборку (этап F).',
+    '<strong>«Модели»: свой сервер.</strong> В OpenCode 2 OpenAI-совместимый сервер задаётся только в файле настроек. Организациям нужна модель в своей сети, поэтому в списке провайдеров есть «Свой сервер»: адрес, ключ, «Найти модели». Рекомендую оставить — это главное отличие от OpenCode 2. Остальное в прототипе упрощено (аккаунты, GitHub Enterprise, поиск в выборе модели): в продукте будет родное окно OpenCode 2.',
+    '<strong>«Модели»: подписка OpenCode Go.</strong> Когда кончается бесплатный лимит, OpenCode 2 предлагает подписку OpenCode Go за $10 в месяц. Рекомендую без такого предложения: OpenCode Go остаётся в списке провайдеров, как остальные, а при лимите — наш блок «Модель остановила ход».',
   ]
   const changed = [
+    'Модели и провайдеры — как в OpenCode 2 (В-82): окно «Подключить провайдера» (список, поиск, вход через ChatGPT, код GitHub Copilot, ключ API, свой сервер, «Подключено — выберите модель»), в настройках — «Провайдеры» и «Модели» с переключателями «показывать». Отдельной «модели по умолчанию» больше нет: новый разговор берёт последнюю выбранную.',
     'По третьему прогону оценки (девять отчётов: Opus, Sonnet, Haiku): из сохранённой версии окно замены тоже предлагает «Попросить агента оставить узел» — агент делает копию новой версии; удаление из Loginom («Отменить изменения», «Удалить новую версию») спрашивает подтверждение; «Запрещено» и «Разрешено» у «Сохранять пакеты в Loginom» действуют; в карточке правки — «Проверено приложением» по квитанциям запуска; мастер «Проверить» учитывает «Инструкции» и называет те же три замечания, что разговор; проверка файла с компьютера — без Loginom; «Свой сервер Loginom» — пустая форма; после «Подключить модель» — назад в разговор; у облачной модели в поле ввода — значок облака; «Опиши пакет» без пакета — просьба выбрать пакет.',
     'Итерация 8 — сбои и повторы. Модель остановила ход: блок с причиной простыми словами, «Продолжить с другой моделью» или «Подключить модель»; в ленте — «Модель не ответила» и «Вы продолжили с моделью…», у ответа — какие модели работали. Модель в поле ввода — модель этого разговора (как в OpenCode 2), выбор из моделей этого режима сети.',
     'Итерация 8: вторая правка продолжает ту же копию; из окна замены — «Попросить агента оставить узел». Пакет с компьютера: копия агента в «Копии агента», «Скачать на компьютер…» и «Сохранить в Loginom»; у замечаний проверки — схема самого файла, без Loginom. При удалении разговора или проекта — «Удалить и копии агента в Loginom»; «Изменить» говорит, что станет с копией; в ветке («Ответвить») карточки правки ведут в исходный разговор.',
@@ -1813,12 +1822,12 @@ function review() {
     '<strong>Отдельного сайта Hub нет</strong>: каталог — подписанные файлы, публикация — из приложения, сначала на проверку сотруднику (В-38); вход автора по почте (В-39); поддомен loginom.ai (В-40).',
   ]
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · этап A принят, план этапа B</p><h1>Что решить</h1><p>Этап A принят (В-78): ключевые сценарии 1–9 ниже — для повторного прохода. Вопросы — к подробному плану этапа B, переезда на OpenCode 2 (план — в kit, проект loginom-newapp: plans/2026-11-20-stage-b-plan.md); ответ — мне в рабочем чате, не в прототипе. После одобрения плана — работа по нему и итерация 9: схема пакета с ветвями, пометка «по умолчанию» в «Разрешениях», подтверждение отправки данных у «Подключений». Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · этап A принят, план этапа B</p><h1>Что решить</h1><p>Этап A принят (В-78): ключевые сценарии 1–9 ниже — для повторного прохода. Вопросы 1–7 — к подробному плану этапа B, переезда на OpenCode 2 (план — в kit, проект loginom-newapp: plans/2026-11-20-stage-b-plan.md), 8–9 — к новому окну моделей (карточка А); ответ — мне в рабочем чате, не в прототипе. После одобрения плана — работа по нему и итерация 9: схема пакета с ветвями, пометка «по умолчанию» в «Разрешениях», подтверждение отправки данных у «Подключений». Вернуться сюда — «Прототип 2 · что решить» внизу левой панели.</p></div></div>
     <h2 class="rv-heading">Ключевые сценарии — приняты 20.11.2026</h2>
     <div class="rv-grid">${accept.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${index + 1}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ol class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ol>` : ''}
-    <h2 class="rv-heading">Новое: третий прогон и итерация 8</h2>
-    <p class="rv-lead">Карточки А–В — по третьему прогону оценки агентами и решениям В-75, В-76; дальше — итерация 8.</p>
+    <h2 class="rv-heading">Новое: модели, третий прогон и итерация 8</h2>
+    <p class="rv-lead">Карточка А — модели и провайдеры как в OpenCode 2 (В-82); Б–Г — по третьему прогону оценки агентами и решениям В-75, В-76; дальше — итерация 8.</p>
     <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖЗИКЛМ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     <h2 class="rv-heading">Решено по итерации 6</h2>
     <ul class="rv-changes">${decided6.map(text => `<li>${text}</li>`).join('')}</ul>
@@ -1906,7 +1915,9 @@ function modelMenu(menu) {
     const limited = state.freeLimited && model.source === 'free'
     return `<button role="menuitemradio" aria-checked="${model.name === current && !failed}" data-menu-act="model:${index}">${icon(model.name === current && !failed ? 'check' : 'cpu',16)}<span>${esc(model.name)}<small>${limited ? 'лимит на сегодня исчерпан — обновится в 03:00' : esc(model.where) + (model.kind === 'cloud' ? ' — данные уйдут туда' : '')}</small></span></button>`
   }),
-    `<button role="menuitem" data-menu-act="models-settings">${icon('settings',16)}<span>Настроить модели…</span></button>`]
+    // В-82: as OpenCode's model dialog — connect a provider, manage which models are offered.
+    ...(state.policy === 'set' ? [] : [`<button role="menuitem" data-menu-act="provider-connect">${icon('plus',16)}<span>Подключить модель…</span></button>`]),
+    `<button role="menuitem" data-menu-act="models-settings">${icon('settings',16)}<span>Управлять моделями…</span></button>`]
 }
 function overlay() {
   const kind = state.overlay
@@ -2077,7 +2088,7 @@ function currentModel(item = state.page === 'chat' ? currentItem() : null) {
 // Iteration 8: the model belongs to the conversation, as in OpenCode 2 (`session.switchModel`, «for subsequent provider
 // turns»); «Модель по умолчанию» is for new ones. A model this network mode does not allow falls back to the default.
 function chatModel(item = state.page === 'chat' ? currentItem() : null) {
-  const list = availableModels(state)
+  const list = usableModels(state)
   const wanted = item ? item.model : state.page === 'chat' ? null : state.nextModel
   const model = list.find(entry => entry.name === wanted) || state.settings?.model
   if (!model?.name || (state.contour === 'closed' && model.kind === 'cloud')) return null
@@ -2089,6 +2100,8 @@ function chooseModel(index) {
   const item = state.page === 'chat' ? currentItem() : null
   if (item) Object.assign(item, {model:model.name, modelSwitched:true})
   else state.nextModel = model.name
+  state.settings.preferred = model.name
+  ensureSettings(state)
   toast(`${item ? 'В этом разговоре дальше отвечает' : 'Новый разговор начнёт'} «${model.name}»${model.kind === 'cloud' ? ` — данные разговора уйдут в «${model.where}»` : ''}`)
   render()
   $('#prompt')?.focus()
@@ -2115,7 +2128,7 @@ function send() {
   }
   if (!currentModel()) {
     toast('Сначала выберите модель — без неё агент не ответит', 'alert')
-    return settingsTab('models')
+    return openConnect()
   }
   const old = state.page === 'chat' ? state.sessions.find(x => x.id === state.session) : null
   if (old?.kind === 'package-edit') {
@@ -2544,6 +2557,8 @@ const actions = {
     render()
   },
   'try-instructions':() => settingsTab('instructions'),
+  'provider-connect':() => openConnect(),
+  'try-connect':() => { newSession(); openConnect() },
   'try-question':() => tryPrompt('Проверь выгрузку на пропуски и дубликаты'),
   'try-detail':() => {
     if (stage === 'used' && state.sessions.some(item => item.id === 'seed-sales')) return openSession('seed-sales')
@@ -2796,6 +2811,7 @@ function menuAction(act) {
   if (act === 'download') return downloadResult()
   if (act.startsWith('model:')) return menu.id === 'continue' ? continueTurn(Number(act.slice(6))) : chooseModel(Number(act.slice(6)))
   if (act === 'models-settings') return settingsTab('models')
+  if (act === 'provider-connect') return openConnect()
   if (act.startsWith('dest:')) {
     state.project = act.slice(5) || null
     render()
