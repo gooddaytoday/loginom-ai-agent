@@ -172,6 +172,7 @@ test("CLI setup writes the Host cache before saving; check and the next process 
   await mkdir(join(resources, "bin"), { recursive: true })
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await copyFile(fixture.node, join(resources, binary), constants.COPYFILE_FICLONE)
+  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
   await writeFile(join(resources, "browser"), "controlled browser payload")
   await writeFile(
     join(resources, "runtime/src/knowledge-entry.mjs"),

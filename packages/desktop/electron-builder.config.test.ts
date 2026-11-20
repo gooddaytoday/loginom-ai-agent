@@ -73,6 +73,7 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
     "/Contents/Resources/loginom/bin/",
     "/Contents/Resources/loginom/browsers/",
     "/Contents/Resources/loginom/ripgrep/",
+    "/Contents/Resources/loginom/dashboard/",
   ])
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
 })

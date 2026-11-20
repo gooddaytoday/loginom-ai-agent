@@ -169,11 +169,14 @@ function buildProvenance(installed: string) {
 }
 
 // The chat in the `opencode export` shape `{ info, messages: [{ info, parts }] }`,
-// read through a separate read-only connection: the running CLI keeps writing.
+// read through a separate query-only connection: the running CLI keeps writing.
+// Not `readonly`: on macOS bun:sqlite uses the system SQLite, where a read-only
+// connection fails on a WAL database whose -wal and -shm do not exist yet.
 async function openSessions(file: string) {
   if (!lstatSync(file, { throwIfNoEntry: false })?.isFile()) return
   const { Database } = await import("bun:sqlite")
-  const db = new Database(file, { readonly: true })
+  const db = new Database(file, { readwrite: true, create: false })
+  db.run("PRAGMA query_only = ON")
   // The running CLI holds write locks briefly (checkpoint, commit): wait for them,
   // within a bound, so a hung writer still cannot hang diagnostics.
   db.run(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`)
