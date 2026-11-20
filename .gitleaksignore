@@ -412,3 +412,16 @@ b827bfef5028019fc4b27b326d8f14f73b2f530e/packages/loginom-host/licenses/bun/nati
 b827bfef5028019fc4b27b326d8f14f73b2f530e/packages/loginom-host/licenses/bun/native/1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a.tar.gz!src/jsc/bindings/sqlite/sqlite3.c:generic-api-key:142870
 b827bfef5028019fc4b27b326d8f14f73b2f530e/packages/loginom-host/licenses/bun/native/1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a.tar.gz!src/jsc/bindings/sqlite/sqlite3.c:generic-api-key:258834
 e3dfb7de6815026de3faf2d7984739df4be6a0b7/packages/loginom-host/licenses/bun/native/ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f.tar.gz!include/node/v8-internal.h:generic-api-key:187
+
+# Redaction fixtures from #1231: synthetic private paths that the tests prove are removed.
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
+fc33a9ce01da0e6f04c1b0bf31cf0f3f78bef34d:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:55
