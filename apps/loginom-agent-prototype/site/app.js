@@ -729,8 +729,11 @@ function result(item) {
   if (item.kind === 'more') return `<div class="answer-block"><p>Улучшения уже внесены в копию «${esc(item.about || 'Продажи — правка агента.lgp')}» — она в карточке выше. ${item.aboutKeep ? 'Скажите, что поменять ещё.' : `Скажите, что поменять ещё, например: «${esc(keepPrompt)}».`}</p>${item.aboutKeep ? '' : `<button class="btn" data-action="fill-keep">${icon('compose',15)} Подставить этот запрос</button>`}</div>`
   if (item.kind === 'nocopy') {
     const why = item.nocopy || {why:'none'}
-    const said = {saved:`Изменения из копии «${esc(why.name)}» уже сохранены новой версией — эту копию я больше не правлю.`, replaced:`Копия «${esc(why.name)}» уже заменила исходный «Продажи.lgp» — эту копию я больше не правлю.`, discarded:`Изменения в копии «${esc(why.name)}» отменены.`, fork:`Копия «${esc(why.name)}» принадлежит разговору «${esc(why.title)}» — здесь я её не правлю.`, none:'Сейчас в этом разговоре нет копии пакета, которую я правлю.'}[why.why] || 'Сейчас в этом разговоре нет копии пакета, которую я правлю.'
-    return `<div class="answer-block"><p>${said} Чтобы поменять пакет, попросите «Внеси улучшения в сценарий продаж» — я начну новую копию, а потом можно попросить оставить узел.</p></div>`
+    const said = {saved:`Изменения из копии «${esc(why.name)}» уже сохранены новой версией — эту копию я больше не правлю.`, replaced:`Копия «${esc(why.name)}» уже заменила исходный «Продажи.lgp» — эту копию я больше не правлю.`, discarded:`Изменения в копии «${esc(why.name)}» отменены.`, fork:`Копия «${esc(why.name)}» принадлежит разговору «${esc(why.title)}» — здесь я её не правлю.`, partial:`Прошлая правка копии «${esc(why.name)}» остановлена на середине — улучшения внесены не все.`, none:'Сейчас в этом разговоре нет копии пакета, которую я правлю.'}[why.why] || 'Сейчас в этом разговоре нет копии пакета, которую я правлю.'
+    const next = why.why === 'partial' ? 'Сначала попросите «Внеси улучшения в сценарий продаж» — я доделаю её, потом можно попросить оставить узел.'
+      : salesState().replaced ? 'Исходный «Продажи.lgp» уже заменён: чтобы править заново, верните прежнюю версию кнопкой в карточке правки.'
+      : 'Чтобы поменять пакет, попросите «Внеси улучшения в сценарий продаж» — я начну новую копию, а потом можно попросить оставить узел.'
+    return `<div class="answer-block"><p>${said} ${next}</p></div>`
   }
   if (item.kind === 'clean') return `<div class="answer-block"><h2>Замечаний нет</h2><p>Проверил «${esc(item.files?.[0] || 'Продажи.lgp')}»: повторов, непонятных имён и пропущенных проверок не нашёл. Пакет не менял.</p>${(item.files?.[0] || 'Продажи.lgp') === 'Продажи.lgp' && salesState().replaced ? `<p class="muted">«Продажи.lgp» уже заменён улучшенной версией. Прежняя версия сохранена как «Продажи — до правки.lgp».</p><button class="btn" data-action="restore-sales">${icon('refresh',15)} Вернуть прежнюю версию</button>` : ''}</div>`
   if (item.kind === 'refactor') return `<div class="answer-block"><h2>Нашёл ${item.rules ? 4 : 3} улучшения</h2><p>${item.local ? 'Файл «Продажи.lgp» с компьютера не менял' : 'Пакет «Продажи.lgp» не менял'}. Что можно сделать лучше:</p>
@@ -820,6 +823,16 @@ function draftCopy(turns) {
   const head = turns.findLastIndex(turn => own(turn) && turn.phase === 'done')
   if (head >= 0 && changeState(turns[head]) !== 'draft') return null
   return {copy:turns[at].copy, turn:turns[at], partial:head < at, keep:turns.some(turn => own(turn) && turn.kind === 'keep' && turn.phase === 'done')}
+}
+// A stopped edit cannot go on once the user did something with its copy (saved, replaced, discarded) meanwhile.
+function copySettled(item) {
+  if (!item?.copy || item.forkOf) return null
+  const head = (item.history || []).findLast(turn => turn.copy?.name === item.copy.name && !turn.forkOf && turn.phase === 'done')
+  const done = head && changeState(head)
+  return done && done !== 'draft' ? done : null
+}
+function settledNote(done) {
+  return `Копию вы уже ${{saved:'сохранили новой версией', replaced:'использовали для замены исходного', discarded:'отменили'}[done]} — этот ответ её не продолжит. Попросите новую правку.`
 }
 function noCopyReason(turns) {
   const last = turns.findLast(turn => turn.copy && turn.step > 0)
@@ -1185,10 +1198,11 @@ function writeAnswer(item, finalPhase) {
 }
 function startRun(item) {
   Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && !['chat','more','nocopy'].includes(item.kind) ? 1 : null,
-    // The free model whose daily limit the demo spent fails again at once until the page is reloaded («обновится в 03:00»).
-    modelFailAt:['chat','more','nocopy'].includes(item.kind) ? null : state.failModel ? 1 : state.freeLimited && chatModel(item)?.source === 'free' ? 0 : null, modelError:null})
+    modelFailAt:state.failModel && !['chat','more','nocopy'].includes(item.kind) ? 1 : null, modelError:null})
   state.failNext = false
   state.failModel = false
+  // The free model whose daily limit the demo spent stops any turn at once until the page is reloaded («обновится в 03:00»).
+  if (state.freeLimited && chatModel(item)?.source === 'free') return modelFailed(item)
   if (['chat','more','nocopy'].includes(item.kind)) return writeAnswer(item, 'answer')
   if (state.mode === 'Планирование' && item.kind !== 'document') {
     item.phase = 'plan'
@@ -1247,14 +1261,14 @@ function turnAnswer(turn, live = false) {
     const others = availableModels(state).filter(model => model.name !== turn.modelError.model && !(state.freeLimited && model.source === 'free'))
     return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Ход остановлен: ${esc(title.toLocaleLowerCase('ru'))}</h2><p>${esc(reason)} ${turn.modelError.at ? 'Сделанные шаги выше остались в разговоре: если продолжить, агент начнёт с того же места.' : 'Агент ещё ничего не успел сделать.'}</p>
       <p>${others.length ? 'Продолжить можно с другой моделью — она увидит весь разговор.' : state.policy === 'set' ? 'Другой модели нет: модели задаёт администратор вашей организации — обратитесь к нему.' : 'Другой модели в этом режиме сети нет: подключите её в «Модели» — облачный сервис по ключу или свою модель по адресу.'}${turn.modelError.kind === 'free-limit' ? ' Или дождитесь обновления лимита.' : turn.modelError.blocked ? '' : ' Или продолжите с этой же, когда она заработает.'}</p>
-      ${live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-settings="models">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+      ${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<div class="button-row">${others.length ? `<button class="btn primary" type="button" data-menu="model:continue" data-menu-up aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'model' && state.menu.id === 'continue'}">${icon('play',15)} Продолжить с другой моделью ${icon('down',12)}</button>` : state.policy === 'set' ? '' : `<button class="btn primary" data-settings="models">${icon('cpu',15)} Подключить модель</button>`}${turn.modelError.blocked ? '' : `<button class="btn" data-action="continue-turn">${icon('refresh',15)} Продолжить с этой же</button>`}<button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   }
   if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
   if (turn.phase === 'writing') {
     const text = turn.writeText || '', title = turn.writeTitle || 0
     return `<div class="answer-block answer-stream">${title ? `<h2>${esc(text.slice(0, Math.min(turn.written, title)))}</h2>` : ''}<p>${esc(text.slice(title, Math.max(title, turn.written)))}<span class="stream-caret" aria-hidden="true"></span></p></div>`
   }
-  if (turn.phase === 'stopped') return `<div class="answer-block"><p>${turn.step ? 'Остановлено по вашей команде. Сделанные шаги не отменяются — они перечислены выше.' : 'Остановлено по вашей команде до первого шага.'}</p>${live ? `<button class="btn" data-action="resume">${icon('play',15)} Продолжить</button>` : ''}</div>`
+  if (turn.phase === 'stopped') return `<div class="answer-block"><p>${turn.step ? 'Остановлено по вашей команде. Сделанные шаги не отменяются — они перечислены выше.' : 'Остановлено по вашей команде до первого шага.'}</p>${live && copySettled(currentItem()) ? `<p class="muted">${esc(settledNote(copySettled(currentItem())))}</p>` : live ? `<button class="btn" data-action="resume">${icon('play',15)} Продолжить</button>` : ''}</div>`
   if (turn.phase === 'interrupted') return `<div class="answer-block"><p class="muted">${turn.step ? 'Не закончено — вы отправили новое сообщение. Сделанные шаги выше.' : 'Не начато — вы отправили новое сообщение.'}</p></div>`
   const steer = turn.steer?.length ? `<p class="steer-note">Учёл вашу поправку: «${esc(turn.steer.at(-1).text)}». <span class="muted">В прототипе цифры не меняются.</span></p>` : ''
   return steer + result(turn)
@@ -1313,7 +1327,7 @@ function turnView(item, turn, index, live) {
   const switched = before && turn.modelName && before !== turn.modelName
   const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved
   return `<div class="turn">
-    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}» — ${turn.modelNote === 'switched' ? 'модель сменили в поле ввода' : `«${esc(before)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
+    ${switched ? `<p class="feed-notice">${icon('cpu',14)} Дальше отвечает «${esc(turn.modelName)}» — ${{switched:'модель сменили в поле ввода', back:'модель разговора снова доступна в этом режиме сети'}[turn.modelNote] || `«${esc(turn.model)}» недоступна в этом режиме сети, отвечает модель по умолчанию`}</p>` : ''}
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
       <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
@@ -1323,7 +1337,7 @@ function turnView(item, turn, index, live) {
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
       ${hasSteps && !summary ? `${finished && brief && !unresolved ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished && turn.step ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index, index}, live) : ''}
-      ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${esc([hasSteps && turn.step ? turnTime(turn) : '', turnModels(turn).join(' → ') || (live ? currentModel() : '')].filter(Boolean).join(' · '))}</span></div>` : ''}
+      ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${esc([hasSteps && turn.step ? turnTime(turn) : '', turnModels(turn).join(' → ')].filter(Boolean).join(' · '))}</span></div>` : ''}
     </div></div>
   </div>`
 }
@@ -1586,8 +1600,9 @@ function changedPackage(item) {
   const mark = {add:'Новый', mod:'Изменён', del:'Удалён'}
   const inLoginom = turn ? loginomButton({draft:`copy:${item.changeOf.session}:${at}`, saved:savedVersion(turn)?.id, replaced:'sales'}[current]) : ''
   const local = turn?.local
+  const elsewhere = current === 'draft' && !local && salesState().replaced
   return `<div class="native-page packages-page">
-    <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Loginom · копия агента</p><h1>Изменения в «Продажи.lgp»${local ? ' с компьютера' : ''}</h1><p>${{draft:local ? 'Так будет выглядеть пакет с изменениями. Файл «Продажи.lgp» на компьютере не менялся.' : elsewhere ? 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» уже заменён в другом разговоре — эти изменения можно сохранить новой версией.' : 'Так будет выглядеть пакет с изменениями. Исходный «Продажи.lgp» в Loginom пока не менялся.', saved:local ? 'Изменения сохранены в Loginom; файл на компьютере не менялся.' : 'Изменения сохранены новой версией рядом с исходным; «Продажи.lgp» не менялся.', replaced:'Исходный «Продажи.lgp» в Loginom уже заменён этими изменениями; прежняя версия — «Продажи — до правки.lgp».', discarded:'Изменения отменены; «Продажи.lgp» не менялся.'}[current]}</p></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">Продажи.lgp</strong><small>${{draft:`Копия агента · ${esc(turn ? agentCopy(turn).folder + '/' + agentCopy(turn).name : '')}`, saved:'Копия · сохранена новой версией', replaced:'Заменил исходный в Loginom', discarded:'Изменения отменены'}[current]}</small></div>
       <div class="detail-toggle" role="group" aria-label="Что показать"><button data-show-before="0" aria-pressed="${!showBefore}">Изменения</button><button data-show-before="1" aria-pressed="${Boolean(showBefore)}">Как было</button></div></div>
     <div class="change-legend"><span class="c-add">+ новый</span><span class="c-mod">~ изменён</span><span class="c-del">− удалён</span></div>
@@ -1596,7 +1611,7 @@ function changedPackage(item) {
       : esc(node[2] + (showBefore && node[4] === 'mod' ? ' — до изменений' : '')) + nodeFactsHtml(node[6], showBefore ? 'before' : 'after')) : 'Выберите узел, чтобы увидеть, что в нём изменилось.'}</div>
     <div class="package-save-bar">
       ${current === 'draft' ? (local ? `<button class="btn primary" data-change="download:${at}">${icon('download',15)} Скачать на компьютер…</button><button class="btn" data-change="save:${at}">${icon('plus',15)} Сохранить в Loginom</button>${inLoginom}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`
-        : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${inLoginom}<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button><button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`) : inLoginom}
+        : `<button class="btn primary" data-change="save:${at}">${icon('plus',15)} Сохранить новой версией</button>${inLoginom}${elsewhere ? '' : `<button class="btn quiet" data-change="replace:${at}">Заменить исходный…</button>`}<button class="link-btn discard-link" data-change="discard:${at}">Отменить изменения</button>`) : inLoginom}
       ${chat ? `<button class="link-btn" data-session="${chat.id}">${icon('message',16)} Вернуться к разговору</button>` : ''}
     </div></section>
   </div>`
@@ -1982,6 +1997,7 @@ function continueTurn(index) {
   const item = currentItem()
   const model = index === null ? chatModel(item) : availableModels(state)[index]
   if (!item || !item.modelError || !model) return
+  if (copySettled(item)) return toast(settledNote(copySettled(item)), 'alert')
   item.model = model.name
   item.decisions.push({at:item.step, choice:'continue', model:model.name})
   item.modelError.resolved = true
@@ -2039,13 +2055,15 @@ function send() {
   const editAt = old && state.editTurn?.session === old.id ? state.editTurn.index : null
   const earlier = old ? [...(old.history || []), turnSnapshot(old)] : []
   const kept = editAt === null ? earlier : earlier.slice(0, editAt)
-  const draft = !web && !state.draftPackage ? draftCopy(kept) : null
-  const keepAsk = /город|недел|ссыла|не удаля|оставь|верни/i.test(prompt) && /фильтр|узел|узл/i.test(prompt)
-  if (draft && keepAsk) kind = 'keep'
-  else if (draft && kind === 'improve' && !draft.partial) kind = 'more'
-  // Asked to keep the node with no copy to change: the copy was saved, replaced, discarded or belongs to another chat.
-  else if (!draft && keepAsk && !state.draftPackage) kind = 'nocopy'
   if (editAt !== null) carryCopyState(earlier, editAt)
+  const draft = !web && !state.draftPackage ? draftCopy(kept) : null
+  // A request, not a question that names the node.
+  const keepAsk = /не удаля|оставь|оставить|верни|вернуть/i.test(prompt) && /фильтр|узел|узл/i.test(prompt) && !/\?\s*$/.test(prompt)
+  if (draft && keepAsk && !draft.partial) kind = 'keep'
+  else if (draft && kind === 'improve' && !draft.partial) kind = 'more'
+  // Asked to keep the node with no copy to change: the copy was saved, replaced, discarded, belongs to another chat or
+  // was left half-done by a stopped edit.
+  else if (keepAsk && !state.draftPackage && (!draft || draft.partial)) kind = 'nocopy'
   // The trial applies to the trial task; another request is answered as usual.
   const trialTurn = state.trialSkill && !old && prompt === state.trialSkill.prompt
   if (trialTurn) kind = state.trialSkill.kind
@@ -2066,9 +2084,12 @@ function send() {
     history:kept, allowed:[...(old?.allowed || [])],
     step:0, decisions:[], cleared:[], steer:[], web, local,
     // The conversation keeps the model it started with (OpenCode 2: the session's model), not the current default.
-    model:old ? old.model || old.modelName : state.nextModel || currentModel(null), modelNote:old?.modelSwitched ? 'switched' : 'fallback',
+    model:old ? old.model || old.modelName : state.nextModel || currentModel(null),
   }
   next.modelName = currentModel(next)
+  // Why the model differs from the previous turn's, if it does: switched in the input, not allowed in this network
+  // mode (the default answers), or allowed again.
+  next.modelNote = old?.modelSwitched ? 'switched' : next.modelName === next.model ? 'back' : 'fallback'
   if (!old) state.nextModel = null
   state.editTurn = null
   if (trialTurn) next.trial = state.trialSkill
@@ -2077,7 +2098,7 @@ function send() {
   if (kind === 'improve') next.copy = draft?.partial ? draft.copy : newAgentCopy()
   if (kind === 'keep') next.copy = draft.copy
   if (['keep','more'].includes(kind)) Object.assign(next, {files:draft.turn.files, local:draft.turn.local, about:draft.copy.name, aboutKeep:draft.keep})
-  if (kind === 'nocopy') next.nocopy = noCopyReason(kept)
+  if (kind === 'nocopy') next.nocopy = draft?.partial ? {why:'partial', name:draft.copy.name} : noCopyReason(kept)
   if (!old) state.trialSkill = null
   // Examples stop showing once the user has started three conversations of their own.
   if (!old && !state.templateTitle) state.progress.ownChats++
@@ -2403,7 +2424,7 @@ const actions = {
     render()
     $('#prompt')?.focus()
   },
-  resume:() => runSteps(currentItem()),
+  resume:() => copySettled(currentItem()) ? toast(settledNote(copySettled(currentItem())), 'alert') : runSteps(currentItem()),
   // The demo's Loginom «comes back» on the next check.
   'recheck-loginom':() => {
     state.loginomDown = false
