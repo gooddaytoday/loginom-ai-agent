@@ -14,7 +14,7 @@ import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 
 for(const action of ['package.save_checkpoint','package.save_as'])
-for(const fault of ['none','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
+for(const fault of ['none','retry-restore','recover-owner','recover-awaiting','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
 test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
  const page=await restSavePage([fault==='dirty'],false),binding={...page.storageBinding,loginom_build:build};
  page.staleSavedNavigation=fault==='stale-navigation';
@@ -23,9 +23,11 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  prepared.nodeTargetPortIdentities=new WeakMap([[nativePort,portIdentity]]);
  const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
  connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
+ if(fault==='retry-restore')page.context.Ext.Msg={cfg:{}};
  const engine=runtime(page,{getStorageBinding:()=>binding,
   execute:(code,options)=>page.execute(withStorageIdentity(code,binding,options?.storageSession))});
- const path='/user/data/packages/lost-save.lgp',click=page.click.bind(page);
+ const path='/user/data/packages/lost-save.lgp',click=page.click.bind(page),initialPath=page.packagePath;
+ let restoring=fault.startsWith('recover-');
  page.click=async item=>{
   await click(item);
   if(item.symbol==='file_dialog.confirm'&&page.saveWrites===1){
@@ -46,7 +48,14 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
    innerText:async()=>form.FReconnecting?'Восстановление сессии':'',waitFor:async()=>{}};
   if(query==='[data-tid="msgbox;cnt"]')return {innerText:async()=>page.conflictText};
   if(query==='[data-tid="msgbox;tlb;yes"]'&&form.FReconnecting)return {count:async()=>1,isVisible:async()=>true,
-   innerText:async()=>'Восстановить',click:async()=>{restores++;connection.Connected=true;form.FReconnecting=false;page.conflict=false;}};
+   innerText:async()=>'Восстановить',click:async()=>{
+    restores++;
+    if(restoring)return;
+    if(fault==='retry-restore'&&restores===1){
+     page.context.Ext.Msg.cfg={};page.conflictText='Ошибка при попытке восстановить сессию\nВосстановить сессию?';return;
+    }
+    connection.Connected=true;form.FReconnecting=false;page.conflict=false;
+   }};
   return locator(query);
  };
  page.waitForFunction=async fn=>assert.equal(await page.evaluate(fn),true);
@@ -64,6 +73,28 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  if(fault==='account')connection.UserName='foreign-account';
  if(fault==='document')page.context.__loginomDockPreparationV1.id='foreign-document';
  if(fault==='native-session')connection.FSession={};
+ if(fault==='retry-restore'){
+  const waiting=await engine.inspect({operationId:'lost-save'});
+  assert.equal(waiting.output.state,'pending');assert.equal(page.saveWrites,1);
+ }
+ if(restoring){
+  // The same native Save can update its displayed path before reconnect,
+  // or leave the old path until reconnect completes (LAB-1921 r35b/r35c).
+  if(fault==='recover-awaiting')page.packagePath=initialPath;
+  const waiting=await engine.inspect({operationId:'lost-save'});
+  assert.equal(waiting.output.state,'pending');
+  assert.deepEqual(waiting.output.next_steps.map(s=>s.tool),['dock_operation_inspect']);
+  assert.match(waiting.output.next_steps[0].instruction,/SAME operation_id.*10 seconds/);
+  const recovery=await engine.recover('lost-save',{strategy:'restore_control',recoveryOperationId:'restore-lost-save'});
+  assert.equal(recovery.status,'AMBIGUOUS');assert.equal(recovery.effect_possible,true);
+  assert.equal(cancelledRecovery,0);assert.equal(page.saveWrites,1);
+  restoring=false;connection.Connected=true;form.FReconnecting=false;page.conflict=false;page.packagePath=path;
+  const settled=await engine.inspect({operationId:'lost-save'});
+  assert.equal(settled.output.state,'resolved',JSON.stringify({recovery,settled}));
+  assert.equal(settled.output.outcome.status,'SUCCEEDED');
+  assert.equal(settled.output.outcome.effect_possible,true);assert.equal(page.saveWrites,1);
+  return;
+ }
  const inspected=await engine.inspect({operationId:'lost-save'});
  assert.equal(inspected.output.outcome.effect_possible,true,'Inspection must retain the original possible Save effect');
  const mismatch=['path','graph','guid','type'].includes(fault);
@@ -89,7 +120,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  assert.equal(inspected.output.state,'resolved',JSON.stringify(inspected));
  assert.equal(inspected.output.outcome.status,'SUCCEEDED');
  assert.equal(inspected.output.outcome.output.package_ref.path,path);
- assert.equal(page.saveWrites,1);assert.equal(restores,1);
+ assert.equal(page.saveWrites,1);assert.equal(restores,fault==='retry-restore'?2:1);
  assert.equal(page.context.__loginomDockPreparationV1.receipts.get('prepared').packageNode,
   form.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode);
  if(fault==='none')assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);

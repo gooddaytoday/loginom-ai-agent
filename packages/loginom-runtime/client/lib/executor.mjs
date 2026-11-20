@@ -2700,12 +2700,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return structuredClone(returned);
     }finally{running=false;}
   };
+  const saveConnectionPending=operation=>!operation?.transportUncertain
+    &&['package.save_as','package.save_checkpoint'].includes(operation?.action.action_key)
+    &&operation.outcome?.output?.connection_recovery_pending===true;
   const dockRecoveryAdvice = operation => {
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
+    if(saveConnectionPending(operation))return {recovery_options:[],next_steps:[{...base[0],
+      instruction:'The original Save awaits native session recovery. Repeat dock_operation_inspect with this SAME operation_id; each inspection waits up to 10 seconds for the original reconnect. Continue inspecting while connection recovery is pending within the original operation deadline. Do not repeat Save, use workspace observation or stop after the first reconnect timeout. Save completion and cleanup must be reconciled from the original receipt.'}]};
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='open'
       &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function'&&!operation.transportUncertain){
       // Release stays available if the opening proof is refused on resume.
@@ -3442,8 +3447,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (running) throw new Error('Another Dock action is still running');
       running = true;
       try {
-        await reconcilePending();
+        const reconciled=await reconcilePending();
         if (!pending) return { ...structuredClone(operation.outcome), recovery_operation_id: recoveryOperationId };
+        if(strategy==='restore_control'&&saveConnectionPending(operation)){
+          // A connection guard refusal happens before restore_control exists in
+          // the browser. Keep the original Save receipt and its known effects;
+          // replacing it with that missing recovery receipt makes pending final.
+          const returned={...structuredClone(reconciled),recovery_operation_id:recoveryOperationId};
+          await remember({...operation,id:recoveryOperationId,parameters:{original_operation_id:operationId,strategy}},'recovery_completed',reconciled);
+          auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
+          return returned;
+        }
         if (operation.transportUncertain) throw new Error('The browser operation has not confirmed completion; inspect before recovery');
         if (strategy !== 'restore_control' && !operation.cleanupConfirmed) throw new Error('Restore browser control before repairing the graph');
         if (strategy === 'accept_observed_state' || strategy === 'abandon_operation') {
