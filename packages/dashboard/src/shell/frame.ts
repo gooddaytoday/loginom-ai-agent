@@ -5,10 +5,12 @@ export const ALLOW = (
   "publickey-credentials-get identity-credentials-get usb serial hid bluetooth"
 ).split(" ").join(" 'none'; ") + " 'none'"
 
+export function isTwoFieldMessage(data: unknown): data is Record<string, unknown> {
+  return typeof data === "object" && data !== null && !Array.isArray(data) && Object.keys(data).length === 2
+}
+
 export function isMessage(data: unknown, type: string) {
-  if (typeof data !== "object" || data === null || Array.isArray(data) || Object.keys(data).length !== 2) return false
-  const message = data as Record<string, unknown>
-  return message.type === type && message.version === 1
+  return isTwoFieldMessage(data) && data.type === type && data.version === 1
 }
 
 export function sandboxFrame(src: string) {

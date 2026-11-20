@@ -74,6 +74,27 @@ test("Escape closes the dashboard after a version label click during queued calc
   assert.equal(prevented, false)
 })
 
+test("Escape closes the foreground dialog before the dashboard", async t => {
+  const app = await fixture(t, { published: true })
+  app.page.setDefaultTimeout(30_000)
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  await app.page.evaluate(() => {
+    const dialog = document.createElement("dialog")
+    dialog.append(document.createElement("input"))
+    document.body.append(dialog)
+    dialog.showModal()
+  })
+
+  await app.page.keyboard.press("Escape")
+  await app.page.getByRole("dialog").waitFor({ state: "hidden" })
+  const dashboard = app.page.locator("#dashboard-tab-overlay")
+  await dashboard.waitFor()
+  await dashboard.getByRole("button", { name: "Вернуться к сценарию" }).focus()
+  await app.page.keyboard.press("Escape")
+  await dashboard.waitFor({ state: "detached" })
+})
+
 test("trusted node data distinguishes an empty result from an absent result", async t => {
   const app = await fixture(t, { published: true, table: {
     schema: [{ name: "count", type: 1 }], rows: [],

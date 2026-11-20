@@ -1,4 +1,4 @@
-import { connectFrame, isMessage, sandboxFrame } from "./frame"
+import { connectFrame, isMessage, isTwoFieldMessage, sandboxFrame } from "./frame"
 
 export function probe(appOrigin: string, container: HTMLElement) {
   return new Promise<boolean | null>((resolve) => {
@@ -19,9 +19,7 @@ export function probe(appOrigin: string, container: HTMLElement) {
       port = connectFrame(frame)
       port.onmessage = (answer) => {
         const data: unknown = answer.data
-        if (typeof data !== "object" || data === null || Array.isArray(data) || Object.keys(data).length !== 2) return
-        const reply = data as Record<string, unknown>
-        if (reply.type === "probe" && typeof reply.ok === "boolean") done(reply.ok)
+        if (isTwoFieldMessage(data) && data.type === "probe" && typeof data.ok === "boolean") done(data.ok)
       }
     }
     addEventListener("message", listen)

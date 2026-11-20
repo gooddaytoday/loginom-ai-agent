@@ -65,6 +65,8 @@ function start() {
     let refreshTimer: ReturnType<typeof setTimeout> | undefined
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
+      const target = event.target as Node | null
+      if (target !== doc.body && !overlay?.contains(target)) return
       event.preventDefault()
       event.stopPropagation()
       close()
