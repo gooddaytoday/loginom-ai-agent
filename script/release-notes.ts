@@ -127,7 +127,8 @@ const notes = [
   "- Desktop updates use signed GitHub Release metadata with a private cloud.ru S3 fallback using read-only SigV4 GET. Build-time endpoints remain disabled until signature acceptance on the exact source SHA; publication and mirror checks are required.",
   ...(version === "0.4.0"
     ? [
-        "- Users of 0.3.9 on any platform must install 0.4.0 manually over the existing installation; 0.3.9 has its update feed disabled. Keep the existing profile; do not uninstall or delete application data first.",
+        "- Users of 0.3.9 or 0.3.10 on any platform must install 0.4.0 manually over the existing installation; these versions have their update feed disabled. Keep the existing profile; do not uninstall or delete application data first.",
+        "- New (preview): node dashboards opened from Loginom Studio in Desktop or CLI. The agent builds a local draft; publishing needs a separate confirmation and the Dashboard service for Loginom Enterprise 7.4.2. The installed end-to-end dashboard flow was not verified for this release.",
         "- Recommended screen resolution: 1280×800 or higher. On smaller screens such as 1366×768, a node requested at an explicit position far outside the visible workflow may be refused; automatic placement works.",
         "- Known limitation: with a local OpenCode plugin configured and an npm registry that silently drops connections, a session can wait up to about 970 s before it continues.",
         ...(withoutMacos ? [] : ["- Known limitation: macOS automatic update (notify mode) was not verified on a live Mac for this release."]),
