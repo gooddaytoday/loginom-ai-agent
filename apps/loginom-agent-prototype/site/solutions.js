@@ -197,7 +197,7 @@ function logFor(key, run) {
   const pkg = chosenPackage(run);
   const lines = {
     document: [`Прочитан файл «${pkg.name}»: ${nodeCount(pkg.name)} узлов${pkg.name === 'Продажи.lgp' ? '' : ', 3 подмодели'}`, 'Справка Loginom: найдены описания 9 типов узлов', run.values.depth === 'custom' ? 'Написан черновик по вашему описанию' : 'Написан черновик документа', `Созданы файлы: ${docNames(run).join(', ')}`],
-    'refactor:review': [pkg.source === 'local' ? `Прочитан файл «${pkg.name}» на компьютере` : `Открыта копия «${pkg.name}» только для чтения`, ...(rulesFollowed ? ['Учтены ваши инструкции для агента'] : []), `Прочитаны настройки ${nodeCount(pkg.name)} узлов`, `Найдено ${reportData(key, run.values, pkg).rows.length} улучшения`, 'Отчёт сохранён в папку проекта'],
+    'refactor:review': [pkg.source === 'local' ? `Прочитан файл «${pkg.name}» на компьютере` : `Открыта копия «${pkg.name}» только для чтения`, `Прочитаны настройки ${nodeCount(pkg.name)} узлов${run.values.rules ? ', учтены ваши инструкции' : ''}`, `Найдено ${reportData(key, run.values, pkg).rows.length} улучшения`, 'Отчёт сохранён в папку проекта'],
     'refactor:copy': [`Открыта копия «${pkg.name}»`, 'Объединены фильтры в узлах 04 и 08', 'Переименован узел 14', `Копия сохранена как «${run.values.target}»`],
     regression: ['Подготовлена тестовая копия', `Запуск на ${run.values.data}: 245 строк`, 'Сравнение с эталоном: 3 проверки', 'Отчёт сохранён'],
     tournament: ['Подготовлены копии двух вариантов', 'Результаты совпали по значениям и типам', `Выполнено ${run.values.repeats} замеров`, 'Отчёт сохранён'],
@@ -217,9 +217,9 @@ function reportData(key, values, pkg = {}) {
     const sales = pkg.name === 'Продажи.lgp'
     const rows = sales ? [['Повторяющийся фильтр','«Фильтр по дате» в ветках «Регионы» и «Города»','Один фильтр до разветвления'],['Неясное название','«Узел14»','Назвать по смыслу: «Выручка по городам»'],['Нет проверки пустых значений','Перед «Выручка по регионам» и «Узел14»','Строки без цены или региона — до расчёта']]
       : [['Повторяющийся фильтр','Узлы 04 и 08','Объединить фильтрацию в одном узле'],['Неясное название','Узел 14','Назвать по смыслу']]
-    if (rulesFollowed) rows.push(['Нет заметки в модуле — по вашим инструкциям','Модуль целиком','Заметка: что делает и кто отвечает'])
+    if (values.rules) rows.push(['Нет заметки в модуле — по вашим инструкциям','Модуль целиком','Заметка: что делает и кто отвечает'])
     return {
-      summary: `Найдены ${rows.length === 2 ? 'два места' : rows.length === 3 ? 'три места' : 'четыре места'} для улучшения. Пакет не изменялся.${rulesFollowed ? ' Учтены ваши инструкции для агента.' : ''}`,
+      summary: `Найдены ${rows.length === 2 ? 'два места' : rows.length === 3 ? 'три места' : 'четыре места'} для улучшения. Пакет не изменялся.${values.rules ? ' Учтены ваши инструкции для агента.' : ''}`,
       checks: [`Прочитаны ${nodeCount(pkg.name)} из ${nodeCount(pkg.name)} узлов`, 'Исходный пакет не изменён'],
       columns:['Наблюдение','Где','Что можно сделать'], rows,
     };
@@ -263,7 +263,7 @@ function outcomeText(key, run) {
     success: reportData(key,run.values,chosenPackage(run)).summary,
     inconclusive: 'Агент сообщил о завершении, но приложение не нашло подтверждения, что результат сохранён. Проверьте файлы или запустите ещё раз.',
     recovery: `Связь с Loginom прервалась во время сохранения. Действие могло выполниться. Не запускайте повторно, пока не проверите «${pkg.name}» в Loginom.`,
-    failed: pkg.source === 'local' ? `Не удалось прочитать файл «${pkg.name}». Ничего не изменено — можно запустить ещё раз.` : 'Loginom не ответил при открытии пакета. Ничего не изменено — можно запустить ещё раз.',
+    failed: pkg.source === 'local' ? `Не удалось разобрать «${pkg.name}»: файл повреждён или это не пакет Loginom. Ничего не изменено — можно запустить ещё раз.` : 'Loginom не ответил при открытии пакета. Ничего не изменено — можно запустить ещё раз.',
     cancelled: 'Агент остановлен. Уже выполненные действия не отменяются — они перечислены в подробностях.',
   }[run.outcome];
 }
@@ -439,12 +439,15 @@ export function bindSolutions(root,state,api) {
       // Run 3: a failed run is discussed as failed, with only the files the result lists.
       case 'discuss': {
         const ok = run.outcome === 'success';
-        api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + (ok ? reportData(key, run.values, chosenPackage(run)).summary : outcomeView[run.outcome][2] + '. ' + outcomeText(key, run)) + ' Что стоит сделать дальше?', ok ? resultFiles(key, run).map(([file]) => file) : []);
+        const pkg = chosenPackage(run);
+        api.discuss(titles[key][0] + ' · ' + run.values.package, 'Разберём результат запуска «' + titles[key][0] + '»: ' + (ok ? reportData(key, run.values, pkg).summary : outcomeView[run.outcome][2] + '. ' + outcomeText(key, run)) + ' Что стоит сделать дальше?', ok ? resultFiles(key, run).map(([file]) => file) : [], pkg.source ? {name:pkg.name, where:pkg.where, source:pkg.source} : null);
         return;
       }
       case 'stop': clearInterval(run.timer); run.step = 'result'; run.outcome = 'cancelled'; api.render(); return;
       case 'start': {
         run.step = 'running';
+        // The rules in «Инструкции» are taken when the run starts: a later change does not rewrite this result.
+        run.values.rules = rulesFollowed;
         run.folder = runFolder(key, state.projects.find(entry => entry.id === state.project)?.name);
         // A run started from «Что сделать с пакетом» took the package and the request, as sending a message does:
         // a new conversation starts empty. A draft left on another screen stays.

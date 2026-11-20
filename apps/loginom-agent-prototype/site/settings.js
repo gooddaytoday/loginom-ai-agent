@@ -394,6 +394,13 @@ function isLocalUrl(value) {
 }
 // Run 3: in the closed contour a model address must look like the organization's network, not the internet. The
 // product's outbound guard blocks the rest anyway (stage F); the form says so before the user relies on it.
+// The closed contour refuses a model address of a known internet service up front; any other address may be in the
+// organization's network — the product's outbound guard decides (stage F). In «Интернет» an own model on a public host
+// is a cloud model: data leaves the organization, and the closed contour later drops it.
+const publicModelHosts = /(^|\.)(openai\.com|anthropic\.com|googleapis\.com|mistral\.ai|openrouter\.ai|deepseek\.com|groq\.com|together\.xyz|x\.ai|cohere\.(ai|com)|opencode\.ai)$/
+function isPublicModelUrl(value) {
+  return isWebUrl(value) && publicModelHosts.test(new URL(value).hostname)
+}
 function isOrgUrl(value) {
   if (!isWebUrl(value)) return false
   const host = new URL(value).hostname.replace(/^\[|\]$/g, "")
@@ -416,6 +423,7 @@ function savedConnection(state, draft) {
   return { ...saved, url: state.policy === "set" ? adminPolicy.loginomUrl : saved.url, username: saved.username.trim(), hasPassword: Boolean(!saved.empty && (password || saved.hasPassword)), connected: true, parked: false }
 }
 function isDirty(s) {
+  if (!s.draft.url && !s.draft.username && !s.draft.password) return false
   const saved = s.pendingConnection?.connection ?? s.connection
   const url = s.draft.url || (s.hiddenUrl === saved.url ? saved.url : "")
   return url !== saved.url || s.draft.username !== saved.username || s.draft.empty !== saved.empty || Boolean(s.draft.password)
@@ -484,6 +492,7 @@ export function bindSettings(root, state, api) {
       s.draft[key] = value
       s.test = undefined
       panel.querySelector(".st-content .st-space-top .st-notice")?.remove()
+      panel.querySelectorAll(".st-status").forEach((el) => { if (el.textContent === "Проверено, ещё не сохранено") el.lastChild.textContent = "Не подключён" })
       if (key === "empty") {
         if (value) s.draft.password = ""
         api.render()
@@ -591,7 +600,7 @@ export function bindSettings(root, state, api) {
       const found = isWebUrl(url) ? foundModels(url) : null
       s.own.error = !isWebUrl(url) ? "Введите адрес, начиная с http:// или https://."
         : closedMode(state, s) === "device" && !isLocalUrl(url) ? "В режиме «" + deviceName + "» доступен только адрес на этом компьютере, например http://127.0.0.1:11434/v1."
-          : state.contour === "closed" && !isOrgUrl(url) ? "Адрес похож на интернет: в закрытом контуре модель должна быть в сети организации, например http://llm.local:11434/v1."
+          : state.contour === "closed" && isPublicModelUrl(url) ? "Это облачный сервис в интернете: в закрытом контуре модель должна быть в сети организации, например http://llm.local:11434/v1."
           : !found ? "Сервер не ответил. Проверьте адрес и запущены ли Ollama или LM Studio."
             : ""
       s.own.found = s.own.error ? null : found
@@ -599,7 +608,8 @@ export function bindSettings(root, state, api) {
     }
     if (action === "own-add") {
       const local = isLocalUrl(s.own.url)
-      const model = { kind: local ? "local" : "intranet", source: "own", name: s.own.pick, url: s.own.url.trim(), where: local ? "Этот компьютер" : "Сеть организации" }
+      const cloud = !local && (isPublicModelUrl(s.own.url) || (state.contour !== "closed" && !isOrgUrl(s.own.url)))
+      const model = { kind: local ? "local" : cloud ? "cloud" : "intranet", source: "own", name: s.own.pick, url: s.own.url.trim(), where: local ? "Этот компьютер" : cloud ? new URL(s.own.url).hostname : "Сеть организации" }
       s.models = [...s.models.filter((item) => item.name !== model.name), model]
       s.preferred = model.name
       s.own.open = false
