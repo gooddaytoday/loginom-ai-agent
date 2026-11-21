@@ -21,13 +21,14 @@ import subprocess
 import sys
 
 SOURCES = re.compile(
-    r"^(packages/(opencode|core|desktop|loginom-host|loginom-runtime|product|app|cli|server|schema|tui|ui|session-ui|sdk|enterprise)/(src|script|scripts|test|tests|e2e|test-browser|bin)/"
+    r"^(packages/(ai|app|cli|client|core|desktop|gui-plugins|loginom-host|loginom-runtime|plugin[^/]*|product|schema|script|server|session-ui|"
+    r"simulation|sdk|tui|ui|util)/(src|script|scripts|test|tests|e2e|test-browser|bin)/"
     r"|packages/[^/]+/(package\.json|[^/]*\.config\.ts)$|script/|\.github/)"
 )
 TEXT = re.compile(r"\.(ts|tsx|js|mjs|cjs|json|jsonc|yml|yaml|ps1|sh|txt|md)$")
 PROVIDER_KEYS = ("OPENCODE_API_KEY", "OPENCODE_GO_API_KEY")
 # Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose.
-EXCLUDED = (".github/archived/", "packages/core/test/flag-identity.test.ts", "scripts/upstream-sync/")
+EXCLUDED = (".github/archived/", "packages/cli/test/flag-identity.test.ts", "scripts/upstream-sync/")
 
 
 def wants(path):

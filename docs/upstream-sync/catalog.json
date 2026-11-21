@@ -48,6 +48,15 @@
       "paths": ["packages/opencode/src/provider/**", "packages/opencode/src/plugin/**", "packages/opencode/test/provider/**", "packages/opencode/test/plugin/**"]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": ["packages/opencode/**"] },
+    {
+      "id": "CAT-13",
+      "title": "Product storage root and own background service (U5)",
+      "paths": [
+        "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
+        "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/native/logging.ts"
+      ]
+    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

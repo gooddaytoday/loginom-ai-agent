@@ -37,7 +37,7 @@ function fail(message: string) {
 
 /** The default registration file. */
 export function fallback() {
-  return join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), "opencode", "service.json")
+  return join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), "loginom-ai-agent", "service.json")
 }
 
 /** Whether two registrations describe the same service instance. */
