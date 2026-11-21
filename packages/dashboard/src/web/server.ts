@@ -26,7 +26,7 @@ function normalizeIp(address: string) {
   if (family === 6) return new SocketAddress({ address, family: "ipv6" }).address.replace(/^::ffff:(?=\d+\.)/, "")
 }
 
-const decodeJson = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
+const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
 async function body(request: IncomingMessage, max: number) {
   if (request.headers["content-type"]?.split(";")[0] !== "application/json") return Option.none()
