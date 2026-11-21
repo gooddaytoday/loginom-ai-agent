@@ -196,21 +196,41 @@ test("without a pin file upstream history and files are scanned as before", asyn
   expect(report(result.output).summary).not.toHaveProperty("upstream_findings")
 })
 
-test.each(["tag", "abbreviated", "unknown"])("a %s pin blocks the scan", async (kind) => {
+test.each(["ref name", "abbreviated SHA", "tag object", "blob"])("a %s pin blocks the scan", async (kind) => {
   const root = await repo()
   const base = git(root, "rev-parse", "HEAD")
   await Bun.write(join(root, "notes.md"), "safe\n")
   git(root, "add", "notes.md")
   git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "safe")
-  git(root, "tag", "v1.0.0", base)
-  const pin = { tag: "v1.0.0", abbreviated: base.slice(0, 12), unknown: "1".repeat(40) }[kind]
+  git(root, "tag", "-a", "-m", "release", "v1.0.0", base)
+  const pin = {
+    "ref name": "v1.0.0",
+    "abbreviated SHA": base.slice(0, 12),
+    "tag object": git(root, "rev-parse", "v1.0.0"),
+    blob: git(root, "rev-parse", "HEAD:notes.md"),
+  }[kind]
   await Bun.write(join(root, ".gitleaks-upstream"), `${pin}\n`)
   const result = run(root, "range", base, "HEAD")
   expect(result.code).toBe(1)
   expect(result.output).toContain("incomplete")
 })
 
-test("a merge beyond Git's default rename limit completes the scan", async () => {
+test("a pinned commit missing from the repository is not applied and the scan continues", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, "config.txt"), `token=${upstreamKey}\n`)
+  git(root, "add", "config.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "added")
+  const head = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, ".gitleaks-upstream"), `${"1".repeat(40)}\n`)
+  const result = run(root, "range", base, head)
+  expect(result.code).toBe(2)
+  expect(report(result.output).findings).toEqual([{ file: "config.txt", line: 1, rule: "github-pat", commit: head }])
+  expect(report(result.output).summary).toMatchObject({ upstream_missing: 1, upstream_findings: 0 })
+  expect(result.output).not.toContain(upstreamKey)
+})
+
+test("a merge beyond Git's default rename limit completes range and audit scans", async () => {
   const root = await repo()
   // Git 2.43 skips exhaustive rename detection above 1000 x 1000 unmatched files and warns.
   const files = Array.from({ length: 1001 }, (_, index) => index)
@@ -230,6 +250,9 @@ test("a merge beyond Git's default rename limit completes the scan", async () =>
   const result = run(root, "range", fork, "HEAD")
   expect(result.code).toBe(0)
   expect(report(result.output).summary).toMatchObject({ status: "clean", commits: 2 })
+  const audit = run(root, "audit")
+  expect(audit.code).toBe(0)
+  expect(report(audit.output).summary).toMatchObject({ status: "clean", commits: 5, current_files: 1002 })
 })
 
 test("staged scan blocks a secret without printing its value", async () => {
