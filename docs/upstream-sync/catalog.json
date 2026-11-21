@@ -31,7 +31,8 @@
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
-        "packages/desktop/src/main/native/logging.ts"
+        "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
+        "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs"
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"], "pending": "B4" },
