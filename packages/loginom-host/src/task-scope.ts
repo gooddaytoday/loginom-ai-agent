@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { SessionV1 } from "@opencode-ai/schema/v1/session"
+import { SessionV1 } from "./session-v1"
 
 export const Profile = Schema.Literals(["default", "package-docs", "loginom-automation", "loginom-dashboard"])
 export type Profile = typeof Profile.Type

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
-import { Loginom } from "@opencode-ai/schema/loginom"
+import { Loginom } from "../loginom"
 import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
