@@ -1,0 +1,2 @@
+# Frozen evidence: its sha256 is pinned in frozen-v2/manifest.json, and the snippet does not parse.
+services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v2/full-change.mjs
