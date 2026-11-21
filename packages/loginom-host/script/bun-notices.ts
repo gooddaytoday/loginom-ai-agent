@@ -2,7 +2,7 @@ import { $ } from "bun"
 import { Database } from "bun:sqlite"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { lstat, mkdir, readdir, rename, rm } from "node:fs/promises"
+import { lstat, mkdir, readdir, rename } from "node:fs/promises"
 import { isAbsolute, join, resolve } from "node:path"
 import { createGunzip } from "node:zlib"
 import release from "../../product/loginom-release.json"
@@ -302,7 +302,7 @@ export async function verifyBundle(dir: string, companion?: string, current: Run
   const webkit = await Bun.file(join(dir, "webkit-source.json")).json()
   const catalog = await Bun.file(join(dir, "source-companion.json")).json()
   requireRuntime(source.version, source.commit, current)
-  const components = native.components as Record<string, Component & { files: Notice[] }>
+  const components = native.components as Record<string, Component>
   const archives = catalog.archives as (Archive & { version?: string })[]
   const pinned = {
     commit: source.commit,
