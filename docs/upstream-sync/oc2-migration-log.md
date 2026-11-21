@@ -411,14 +411,17 @@ B1.1). `bun install --frozen-lockfile` — код 0, 1600 пакетов; `.husk
 - **Effect** — `effect: catalog:` (4.1.0) был уже с B1.2a. Поменялись имена API, по образцу кода v2.3.0:
   `Schema.isStartsWith` → `Schema.isStartingWith`; `Schema.UnknownFromJsonString` →
   `Schema.fromJsonString(Schema.Unknown)` (`loginom-host/src/cli-manifest.ts` ×2, `dashboard/src/web/server.ts` ×1).
-  Других вхождений старых имён в коде форка (`.ts`, `.mjs`, `.js`) нет.
+  `git grep` по всему дереву, кроме `docs` и `*.md`, после правки находит старые имена только в
+  `script/ast-grep/rule-tests/no-json-parse-cast-test.yml`; ещё одно — в `AGENTS.md`. Оба файла — v2.3.0 как есть,
+  не трогал.
 - **TypeScript**, `loginom-host`, как в `packages/schema` v2.3.0:
   - devDependencies: `@typescript/native-preview` (пин форка `7.0.0-dev.20251207.1`) → `@typescript/native` и
     `typescript` из catalog;
   - скрипты: `typecheck` `tsgo --noEmit` → `bun check --no-script`; добавлен `typecheck:tsc` `tsc --noEmit`.
   - В v2.3.0 `typescript` — это `@typescript/typescript6` 6.0.2 с командой `tsc6` (сам сообщает `Version 6.0.3`), а
-    `tsc` — из `@typescript/native` (`Version 7.1.0-beta`). `loginom-host` проверен всеми: `bun check`, `tsc`,
-    `tsc6` и прежним `tsgo` — 0 ошибок.
+    `tsc` — из `@typescript/native` (`Version 7.1.0-beta`). Ни один скрипт v2.3.0 не вызывает `tsc6`. Поэтому
+    «TS 6» здесь — зависимость `typescript` из catalog плюс ручной прогон `tsc6`. `loginom-host` проверен всеми:
+    `bun check`, `tsc`, `tsc6` и прежним `tsgo` — 0 ошибок.
   - `tsconfig.json` (база `@tsconfig/node22`) не менялся, кроме `exclude` (ниже).
 - **Bun** — `@types/bun: catalog:` (1.4.3) и override `bun-types` 1.4.4 уже как в v2.3.0. Сторонние материалы
   `loginom-host/licenses/bun` ещё на 1.3.14 — это B1.6.
@@ -507,6 +510,10 @@ errors`.
   - 3 — `bundled-ripgrep.test.ts`: сверяет текст `packages/core/src/ripgrep/binary.ts` и импортирует
     `packages/core/src/effect/layer-node.ts`. В v2.3.0 формат первого другой, второго файла нет. Это не Effect и не
     TS, в B1.5 не чинилось.
+- Текст ошибок после правки прочитан у всех 38, причины — перечисленные выше. `cli-manifest` «…private umask» падает
+  потому, что `verifyCliManifest` не отклоняет архив (`Received promise that resolved`), а не на разборе JSON. Оба
+  места с `fromJsonString` проходят тесты `CLI manifest verifies complete payload…` и `Windows manifest requires
+  matching resources…` (ветки `LOGINOM_MANIFEST_RESOURCE_INVALID` и `LOGINOM_MANIFEST_INVALID`).
 
 `loginom-runtime`:
 - Команды как в CI форка, `--test-concurrency=3` вместо значения по умолчанию из-за соседнего агента. Браузер для
@@ -560,15 +567,18 @@ Cached:    0 cached, 38 total
 
 ### Где решал сам и что не проверено
 
-- **Инструменты TS** в `loginom-host` заменены на инструменты `packages/schema`, а не просто добавлен `typescript` к
-  `tsgo`. Так пакет форка проверяется тем же `bun check`, что и пакеты upstream. Меньший вариант — оставить `tsgo` и
-  пин `native-preview`. Он тоже даёт 0 ошибок, но тогда «TS 6» осталось бы только строкой в манифесте.
+- **Инструменты TS.** В `loginom-host` взяты инструменты `packages/schema`. Это больший вариант: меньший — оставить
+  `tsgo` с пином `native-preview` и добавить только `typescript` из catalog, он тоже даёт 0 ошибок. Выигрыш —
+  пакет форка проверяется тем же `bun check` (и в CI — тем же `tsc`), что и пакеты upstream, а в манифесте
+  остаются только версии из catalog. TS 6 в обоих вариантах — зависимость и ручной `tsc6`. Коммит `9b47f3d861`
+  несёт и `exclude` для TS2307, поэтому замену инструментов не откатить одним `git revert`.
 - **`.eslintignore`** вместо строки в `ignorePatterns`: задание запрещает менять конфиг lint upstream. Это новый
   корневой файл форка. При синхронизации его нужно учесть в `catalog.json` (B1.7).
 - **Подавление `Reflect`** в `tools` — одно на файл, а не на строку: так код, уходящий на страницу, не меняется.
   Цена — правило выключено на весь файл.
 - **Не чинил, записываю**:
-  - `bundled-ripgrep.test.ts` (3 падения) завязан на внутренности `packages/core` v2.2.x;
+  - `bundled-ripgrep.test.ts` (3 падения) завязан на внутренности `packages/core`, изменившиеся в v2.3.0: в
+    `binary.ts` другой формат записи целей, `effect/layer-node.ts` удалён;
   - падения от отсутствующих файлов `packages/opencode` (B2) и `packages/desktop` (B4);
   - материалы `licenses/bun` на 1.3.14 (B1.6);
   - хэш `client/test/artifact-download.test.mjs` в `docs/migration/source-transforms.json` устарел ещё до B1.5:
@@ -577,5 +587,7 @@ Cached:    0 cached, 38 total
   было бы заменить импортом, но это пересмотр решения B1.2a. Оставлено как есть.
 - **Не проверено**:
   - браузерные тесты клиента с закреплённым Chromium и `desktop/test/loginom` (B4);
-  - `turbo typecheck:tsc` по всему дереву (CI v2.3.0) — только `typecheck:tsc` в `loginom-host`;
+  - `turbo typecheck:tsc` по всему дереву (CI v2.3.0), в который теперь входит и `loginom-host`, — только
+    `typecheck:tsc` в самом `loginom-host`;
+  - тесты `packages/dashboard`: правка там только для typecheck;
   - Windows и macOS.
