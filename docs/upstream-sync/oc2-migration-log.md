@@ -1299,3 +1299,152 @@ CAT-13: 6 → 10, CAT-12: 10 → 11. До правки `catalog.json` прове
   (`daemon/windows.rs`, `transport/windows.rs`) не компилировался — B5.1.
 - MDM-plist на настоящем macOS (`plutil`) не проверялся.
 - Собранный CLI со своим бинарником `process-daemon` — не собирался (выше).
+
+## B1.6 Генератор комплекта сторонних материалов Bun
+
+21.11.2026. Ветка `b16-bun-notices` от `oc2-migration` (`04ac42625f`), отдельное рабочее дерево. Решение В-84, правило —
+запись LAB-306 в `catalog.md`. Bun 1.4.4 переносной, первым в `PATH` только для своих команд, глобальный 1.4.3 не
+менялся. `bun install --frozen-lockfile` — 1600 пакетов, `.husky/_` есть, хук `pre-commit` срабатывал на каждом
+коммите.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `da295943b1` `feat(loginom-host): generate the Bun third-party bundle from upstream pins` | `script/bun-notices.ts`, строка в `loginom-host/AGENTS.md` | `clean` |
+| `3a16e95b28` `chore(loginom-host): regenerate the Bun third-party bundle for 1.4.4` | `licenses/bun` (56 файлов), `test/bun-notices.test.ts`, `.gitleaksignore` +51 | `clean`, архивов 5 |
+| `2232acf6c3` `refactor(loginom-host): drop an unused import from bun-notices` | одна строка импорта | `clean` |
+| `2e5e67a99d` `docs(migration): record B1.6 Bun notice generator and its acceptance` | этот раздел, запись в конце `catalog.md` | `clean` |
+| `2349b5481a` `fix(loginom-host): keep Bun notice files byte-exact on every checkout` | `licenses/.gitattributes` (`bun/** -text`), таймауты 30 с трём тестам | `clean` |
+| последний `docs` | уточнения раздела после ревью | |
+
+`bun run secrets range 04ac42625f 2349b5481a` — `clean`, 5 коммитов, 5 архивов.
+
+### Генератор
+
+`bun script/bun-notices.ts generate <версия> <кэш> <новый каталог>`, Linux, Bun той же версии. Скачанный код только
+читается как текст, не запускается.
+
+1. Тег `bun-v1.4.4` → `38afee6c84fcf48c0edb2466aa4b27d287a59c30` (GitHub API). Если запущенный Bun другой версии или
+   ревизии — `LOGINOM_BUN_NOTICE_REVISION_MISMATCH` до скачиваний.
+2. Архив Bun (codeload). Из него читаются рецепты `scripts/build/deps/*.ts` (24 файла), `ci-images/spec.ts`,
+   `rust-toolchain.toml`, `Cargo.lock`, `sqlite3_local.h`. Незнакомая форма рецепта — `LOGINOM_BUN_RECIPE_UNKNOWN`.
+   Пины сверяются с `process.versions`: 12 зависимостей, `uwebsockets`/`usockets`, `node`, `icu`, `sqlite`; ещё
+   `sqlite_source_id()`. Расхождение — `LOGINOM_BUN_PIN_RUNTIME_MISMATCH`.
+3. 21 архив зависимостей с `github-archive` (codeload). Тексты лицензий берутся из архива: корневые
+   LICENSE/COPYING/COPYRIGHT/NOTICE/AUTHORS/PATENTS и пути, отобранные вручную в первом комплекте
+   (`picohttpparser.c`, два файла WebKit). Каждый текст сверяется с raw.githubusercontent, если тот его отдаёт.
+4. WebKit `d6375c72…`: `git fetch --depth 1` в голый репозиторий, затем `git archive` с отключёнными атрибутами. Каждый
+   из 470 896 файлов и ссылок сверен с деревом `26b64acb…` по blob и режиму.
+5. ICU 78.3: версия и sha256 взяты из `icu/source.json` дерева WebKit, `LICENSE` побайтно равен тегу `release-78.3`.
+6. Node 26.3.0: headers и исходник (из него берётся `LICENSE`) сверены по `SHASUMS256.txt` и пину в `spec.ts`. Исключения
+   openssl/uv — по рецепту.
+7. rust-src nightly-2026-09-15 сверен по `.sha256`. Крейты: 31 из его `library/Cargo.lock` и 180 из `Cargo.lock` Bun,
+   с static.crates.io, sha256 по lock.
+8. Из архива Bun собираются `src/js`, sqlite и остальной `src`: USTAR и gzip, детерминированно, с инвентарями.
+   Sha baseline-zip берутся из `SHASUMS256.txt` релиза.
+
+Перед переименованием каталога результат проверяется `verify`. `verify [<комплект>] [<входы companion>]` работает без
+сети:
+- ревизия и `process.versions` текущего Bun;
+- согласованность коммитов во всех файлах;
+- хэши `native/`, лишних файлов там нет;
+- состав каждого архива `native/` по его инвентарю;
+- размер, sha256 и число записей каждого архива companion, тексты лицензий внутри них, крейты по `Cargo.lock`.
+
+Формат сверен со старым комплектом:
+- tar-слой генератора пересобирает tar четырёх старых архивов `native/` байт в байт;
+- записи companion пяти неизменных пинов (highway, libspng, libwebp, zlib, zstd) и 44 общих крейта совпали со старыми
+  побайтно, включая `entries` и `verifiedNoticeFiles` (у libwebp 0: raw отвечает 404).
+
+### Размеры
+
+- Оценка до скачивания: WebKit — около 2 ГБ pack плюс около 2 ГБ архива (старый — 1,98 ГБ), остальное — около 0,5 ГБ.
+  Пик около 5 ГБ, свободно было 31 ГБ.
+- Скачано 2,26 ГБ:
+  - shallow pack WebKit — 1,86 ГБ;
+  - 25 архивов companion — 243 МБ;
+  - исходник Node — 122,5 МБ;
+  - 211 крейтов — 29 МБ.
+- Кэш на диске — 4,3 ГБ, вместе с архивом WebKit (1,99 ГБ), собранным здесь.
+- Companion — 28 архивов, 2 265 703 936 байт. В git его нет, как и прежде.
+- Закоммичено: `licenses/bun` вырос с 14,2 до 26,1 МБ, 56 файлов. Самый большой — `src-native.tar.gz`, 19,4 МБ (`src`
+  Bun стал Rust, 109 МБ без сжатия).
+
+### Приёмка
+
+| Проверка | Linux (здесь) | Windows (`winstand`, `C:\lab\b16-bun-notices`, удалена) | macOS |
+|---|---|---|---|
+| Генерация | PASS, 5 мин; повтор без сети (`unshare -n`) после коммита — `git diff --exit-code` чистый. Архив WebKit повтор берёт из кэша; отдельный `git archive` даёт тот же sha256 `02e8c4dd…` | — | — |
+| `verify` комплекта и 28 архивов, без сети | PASS: notices 49, archives 28, crates 211, 29 с | PASS, 47 с | не проверено |
+| `build-bun-source-companion.ts` | PASS, 28 архивов | PASS, 41 с | не проверено |
+| `build-webkit-source-companion.ts` | PASS | PASS, 63 с | не проверено |
+| Независимая проверка `SHA256SUMS` | `sha256sum -c`: 28/28 и 1/1 OK | `Get-FileHash`: 28/28 и 1/1 | не проверено |
+| sha baseline-zip из `source.json` | linux и windows совпали (тесты `native-resource-candidates` с архивами: 7/7) | zip сверен, Bun `1.4.4+38afee6c8` | — |
+| `test/bun-notices.test.ts` | 5/5 | 5/5 | не проверено |
+| Отказ на чужой ревизии | генератор с тегом 1.3.14; `verify`, `build-cli.ts` под Bun 1.4.3; тест — генератор, verify, оба сборщика | тест 5/5 | не проверено |
+
+Офлайн: на Linux команды шли в сетевом namespace без сети. На Windows сеть стенда не отключалась: у команд был мёртвый
+прокси `127.0.0.1:9`, и они сеть не используют. На стенд файлы попали через scp, байт в байт. Checkout с
+`core.autocrlf=true` превращал `LICENSE.md` в CRLF, и `verify` на нём падал бы. Поэтому `licenses/.gitattributes`
+снимает `text` с `bun/**`. После этого такой checkout побайтно равен индексу (56 файлов), `verify` на нём проходит.
+
+`loginom-host`, `bun test`: 505 / 12 / 38, 555 тестов. В B1.5 было 500 / 12 / 38 из 550. Пять новых тестов проходят;
+38 падений те же по файлам и причинам: skills-acceptance 24, skills-acceptance-turns 8, bundled-ripgrep 3,
+package-docs 1, cli-manifest 1, managed-work-entry 1. `bun typecheck` и `typecheck:tsc` — 0 ошибок.
+
+### Сборка CLI
+
+```sh
+cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROWSER_SOURCE=x bun script/build-cli.ts <новый каталог>
+# до правки (1.3.14): error: LOGINOM_BUN_NOTICE_REVISION_MISMATCH  at build-cli.ts:44:9
+# после: проверка ревизии пройдена, baseline-zip скачан и сверен, дочерний baseline Bun снова прошёл проверку;
+#   затем: error: No such file or directory  path: ".../packages/opencode"
+# под глобальным Bun 1.4.3: error: LOGINOM_BUN_NOTICE_REVISION_MISMATCH
+```
+
+До конца CLI на этом дереве не собирается: `build-cli.ts` вызывает `packages/opencode/script/build.ts`, а
+`packages/opencode` в v2.3.0 нет. Это не B1.6. Перед запуском нужен `npm ci` клиента `loginom-runtime`, иначе импорт
+`yaml` падает раньше проверки ревизии. Копирование notices в артефакт (`build-cli.ts`, строки 117–135) не выполнялось;
+`verify` проверяет те же поля `source.json`, `native/sources.json` и `webkit-source.json`.
+
+### Где решал сам
+
+- **`lolhtml-crates.json` → `bun-crates.json`.** В 1.4.4 lol-html — форк `oven-sh/lol-html`, cargo path-зависимость Bun.
+  c-api не собирается, его крейты закреплены в корневом `Cargo.lock` Bun. Формат прежний; компонент `bun-crates`
+  (180 крейтов) заменил `lolhtml-crates`. Код эти файлы не читает.
+- **README сборщика** (`build-bun-source-companion.ts`) говорит о «lol-html crate bundle». Теперь это неточно, но
+  сборщики не правились: они принимают результат как есть.
+- **`.gitleaksignore` +51 — общий файл защиты, файл upstream; правка в рамках CAT-02.** Хук `secrets staged` нашёл
+  53 совпадения в трёх новых архивах `native/`:
+  - примеры домашних каталогов в комментариях Bun и SQLite;
+  - идентификаторы SQLite и V8, похожие на ключи.
+
+  Каждое прочитано, все ложные. По образцу старого комплекта отпечатки привязаны к blob архива, пути внутри, правилу и
+  строке.
+- **«Офлайн-проверка на трёх ОС»** здесь — `verify`, оба сборщика, `SHA256SUMS` и тест. Офлайн-проверка Desktop+CLI из
+  `catalog.md` не делалась: CLI на дереве не собирается, Desktop — B4.
+- **Сжатие.** tar старого формата воспроизводится байт в байт. Сжатые байты другие: старые архивы сжаты zlib 1.3
+  (Python), новые — zlib-ng закреплённого Bun. Поэтому повтор детерминирован на том же Bun. Архив WebKit зависит от
+  версии git (2.43.0), она записана в `generation`.
+- **Тексты лицензий** берутся из проверенных архивов, а не по raw-ссылкам. В записях появилось поле `archivePath`,
+  `url` пишется, только если raw отдал те же байты.
+- **`remaining` companion.** Строка «Upstream test submodules are not included» заменена списком архивов с
+  `.gitmodules`: hdrhistogram, lolhtml, lsquic, picohttpparser. Генератор не может проверить, что это только тесты.
+- **`catalog.md`.** Слова «генератора нет» устарели. Сама запись LAB-306 не правилась: в конец файла добавлен раздел
+  B1.6 (рядом B1.7 переделывает каталог). `catalog.json` не менялся.
+- **Тест `bun-notices` требует Bun 1.4.4 `38afee6c`**, как и `build-cli.ts`. Под другим Bun первый тест падает с
+  `LOGINOM_BUN_NOTICE_REVISION_MISMATCH`.
+
+### Найдено, не чинил
+
+- `windows-native-check.yml` и `secrets.yml` закреплены на Bun 1.3.14. `check-test.yml` берёт версию из
+  `package.json`.
+- `build-cli.ts` ссылается на отсутствующий `packages/opencode` (см. выше).
+
+### Не проверено
+
+- macOS: машины нет.
+- Сборка CLI до конца и офлайн-проверка Desktop+CLI.
+- `verify` не считает записи `rust-src` (`.tar.xz`) ни на одной ОС: их считает генератор, `verify` проверяет размер и sha256.
+- Rebuild/relink и юридический аудит. `status: incomplete` и `remaining` сохранены.

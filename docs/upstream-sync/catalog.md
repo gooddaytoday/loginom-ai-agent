@@ -102,3 +102,12 @@
 - **Проверка при обновлении.** `packages/cli/test/flag-identity.test.ts` (унаследованные `OPENCODE_*` не меняют каталоги продукта; две проверки — `test.failing` до B1.4), `packages/product/test/names.test.ts` (проверка чтений `OPENCODE_*` — `test.failing` до B1.4); `bun test` в `packages/cli`, `packages/core`, `packages/server`, `packages/util`.
 - **Политика.** `merge`; после B1.4 — `merge` + `apply-identity.py` для нового кода.
 - **Не перенесено из 0.4.** Флаги `LOGINOM_AI_AGENT_*` вместо `OPENCODE_*` (в 0.4 — `core/src/flag/flag.ts`), имена файлов БД и конфига — B1.4.
+
+## B1.6: генератор комплекта Bun
+
+Запись B1.6 (21.11.2026) к решению «подъём Bun upstream (LAB-306)» выше. Слова «штатного генератора комплекта нет»
+устарели: генератор — `packages/loginom-host/script/bun-notices.ts`, команды `generate <версия> <кэш> <новый каталог>`
+и `verify [<комплект>] [<входы companion>]`. Остальное в записи действует. После генерации нужны сборщики companion,
+независимая проверка `SHA256SUMS`, сборка CLI на целевом Bun, отказ на чужой ревизии и офлайн-проверка на трёх ОС.
+`incomplete` и `remaining` остаются. Из файлов upstream изменён только `.gitleaksignore`: +51 отпечаток для архивов
+комплекта, правку покрывает CAT-02. `catalog.json` не менялся.

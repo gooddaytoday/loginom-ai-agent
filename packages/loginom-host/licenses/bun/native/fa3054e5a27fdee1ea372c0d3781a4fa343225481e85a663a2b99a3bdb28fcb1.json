@@ -1,41 +1,41 @@
 {
-  "scope": "Bun Node 24.3.0 compatibility headers after its documented openssl/uv exclusions, plus exact Node source LICENSE; separate from the Node 24.19.0 host",
+  "scope": "Bun Node 26.3.0 compatibility headers after its documented openssl/uv exclusions, plus exact Node source LICENSE; separate from the Node 24.19.0 host",
   "sourceArchives": [
     {
-      "url": "https://nodejs.org/dist/v24.3.0/node-v24.3.0-headers.tar.gz",
-      "sha256": "045e9bf477cd5db0ec67f8c1a63ba7f784dedfe2c581e3d0ed09b88e9115dd07"
+      "url": "https://nodejs.org/dist/v26.3.0/node-v26.3.0-headers.tar.gz",
+      "sha256": "fca113c5d5add8bfb1aa31129a24acb8d49aa69ab3c22a2cc569aec88960526d"
     },
     {
-      "url": "https://nodejs.org/dist/v24.3.0/node-v24.3.0.tar.gz",
-      "sha256": "f8cc1dcde9b76fa380765204fefbb98e51123e52c919ba4adcf4ccd235bbf70b"
+      "url": "https://nodejs.org/dist/v26.3.0/node-v26.3.0.tar.gz",
+      "sha256": "a3350c1adda81e921c1dae03cbdf0547c29b5ec43b5e00ac66f043a5c76bc74c"
     }
   ],
-  "checksumUrl": "https://nodejs.org/dist/v24.3.0/SHASUMS256.txt",
-  "checksumSha256": "814f49e510b0f72dda1b4a23d537c6d85aeac0c56d728e1544337f331b71300c",
-  "buildScript": "https://raw.githubusercontent.com/oven-sh/bun/0d9b296af33f2b851fcbf4df3e9ec89751734ba4/scripts/build/deps/nodejs-headers.ts",
-  "reportedNodeVersion": "24.3.0",
-  "archiveSha256": "ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f",
+  "checksumUrl": "https://nodejs.org/dist/v26.3.0/SHASUMS256.txt",
+  "checksumSha256": "77508a2192b9a80cdd5c0fd36cc423799db92d791703651a9afabe738797effb",
+  "buildScript": "https://raw.githubusercontent.com/oven-sh/bun/38afee6c84fcf48c0edb2466aa4b27d287a59c30/scripts/build/deps/nodejs-headers.ts",
+  "reportedNodeVersion": "26.3.0",
+  "archiveSha256": "6e0aca4a9f647f5608873c98c8da574b6d62468d22c17106981bbe396f2e3bc4",
   "transform": "Sorted USTAR regular files, uid/gid/mtime=0, mode=0644, gzip mtime=0; contents unchanged",
   "entries": [
     {
       "path": "LICENSE",
-      "bytes": 142088,
-      "sha256": "4da25aaf0146d7f16c275f93306ce7e88d5e6fbe7d29eb1ba00067868021dee6"
+      "bytes": 157606,
+      "sha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5"
     },
     {
       "path": "include/node/common.gypi",
-      "bytes": 26606,
-      "sha256": "c65e0163ee2420931e0f2ae6ca73451ed4ad77bbe725bb3c49fd16bbd09cf7f8"
+      "bytes": 29346,
+      "sha256": "761e431bfe261beb71216238e678d6635a29a5a7bb2aeb9064919fde64bfa64e"
     },
     {
       "path": "include/node/config.gypi",
-      "bytes": 32438,
-      "sha256": "6b56c718df13d2f353b26c7398049165863bd3d895924ec2011c0ee2000dd10d"
+      "bytes": 20426,
+      "sha256": "3f899d92cf587d454b141d95439f9efc8989593444d6533da8fce565553cab25"
     },
     {
       "path": "include/node/cppgc/allocation.h",
-      "bytes": 11610,
-      "sha256": "c694f793b748b67e8c3869f05ee7ae83aaed1c59e01a1bf6891e9c921d4255a9"
+      "bytes": 11534,
+      "sha256": "68ab91824ec63d5b7a3d679eefca271d0679a1a44f56a5bf0ba20cc0ad10fc2f"
     },
     {
       "path": "include/node/cppgc/common.h",
@@ -44,8 +44,8 @@
     },
     {
       "path": "include/node/cppgc/cross-thread-persistent.h",
-      "bytes": 15170,
-      "sha256": "35cb3964217662a99e9c3cefaf75127a049fb50160cd6292cb1f09039df8c936"
+      "bytes": 15185,
+      "sha256": "f022a640cee07780b3d42d1c22c1da1d260a87d73cbca435e59f32f155b1ca73"
     },
     {
       "path": "include/node/cppgc/custom-space.h",
@@ -84,8 +84,8 @@
     },
     {
       "path": "include/node/cppgc/heap-statistics.h",
-      "bytes": 4095,
-      "sha256": "5dd7fe151cc31777d88418f7ccfd44e9affe3570ef04fd59f34a568100147313"
+      "bytes": 4284,
+      "sha256": "cca7a1c2d5aec04b3029055444a77701590592cafcd3efb9ebdab0f8395d531c"
     },
     {
       "path": "include/node/cppgc/heap.h",
@@ -94,8 +94,8 @@
     },
     {
       "path": "include/node/cppgc/internal/api-constants.h",
-      "bytes": 2537,
-      "sha256": "74cb3158b7013379627b3740ab7d077fc4eb240c8b944106e1d8c0e7f5bbbe2d"
+      "bytes": 2543,
+      "sha256": "89e1a1f72924384af58eec1d3a7937aaec17773490f47b135d54f2daaa8a8260"
     },
     {
       "path": "include/node/cppgc/internal/atomic-entry-flag.h",
@@ -129,18 +129,18 @@
     },
     {
       "path": "include/node/cppgc/internal/finalizer-trait.h",
-      "bytes": 2656,
-      "sha256": "249dc1add987c14d9f94d342828d3341192656557a5603eb3259bde07e808b80"
+      "bytes": 2638,
+      "sha256": "83620e9d7059fda204238f13200ee466125f0882de7ba9807e5319a83fca99ff"
     },
     {
       "path": "include/node/cppgc/internal/gc-info.h",
-      "bytes": 6394,
-      "sha256": "250ea5b06fb3198dc86b8678896311a06bf73d21e0f54bac7db922e586484797"
+      "bytes": 6379,
+      "sha256": "75ec6700a9e34905cf764f031743b83c4b4c4fea0bc8e483cb0fbeb733707e40"
     },
     {
       "path": "include/node/cppgc/internal/logging.h",
-      "bytes": 1732,
-      "sha256": "e36812e64ebf940bc427894397121e261867d6088d6573635b0fc78a1a5e8381"
+      "bytes": 1718,
+      "sha256": "3255ec56f149e5380f6e4757103c78c20e3bfb44ceda26f4bdba19f5ace4463d"
     },
     {
       "path": "include/node/cppgc/internal/member-storage.h",
@@ -149,8 +149,8 @@
     },
     {
       "path": "include/node/cppgc/internal/name-trait.h",
-      "bytes": 4442,
-      "sha256": "84c247ea3a06588574a5f78bf6191e381dfbb4b10fcf5294704b1d713a118e67"
+      "bytes": 4437,
+      "sha256": "3b80428a4bedce448e6741ccadc4354d00e7f681763b03e81d089eb59d040a3f"
     },
     {
       "path": "include/node/cppgc/internal/persistent-node.h",
@@ -159,8 +159,8 @@
     },
     {
       "path": "include/node/cppgc/internal/pointer-policies.h",
-      "bytes": 10016,
-      "sha256": "8e059e6804edde2e17df758345c4c968a12956f2f5c7bfa8fcc37c2542cdefdb"
+      "bytes": 9995,
+      "sha256": "af8521e1b21ac5bae17596a2d5757283e823f2103a2c3bb779d8e7b535f3f959"
     },
     {
       "path": "include/node/cppgc/internal/write-barrier.h",
@@ -179,8 +179,8 @@
     },
     {
       "path": "include/node/cppgc/member.h",
-      "bytes": 25552,
-      "sha256": "3533e2b31b6bae4cf7280ee34675a69e80d4477f594b1bf65081b8c3f1d32dc4"
+      "bytes": 25782,
+      "sha256": "51cf046fc73fce7a5ded42bf305d84c27bfcec57131b697deaec2c634a943c28"
     },
     {
       "path": "include/node/cppgc/name-provider.h",
@@ -194,13 +194,13 @@
     },
     {
       "path": "include/node/cppgc/persistent.h",
-      "bytes": 13937,
-      "sha256": "4c02f981125fd501d7f58d841da94cbb8015ebe1847966c2339db4e311b50dce"
+      "bytes": 13859,
+      "sha256": "ea638e558367dc9102b2c7311d907fa4cf0bb01a2ad06cf297cee7074fb5af34"
     },
     {
       "path": "include/node/cppgc/platform.h",
-      "bytes": 6368,
-      "sha256": "1b965dd49cf734030909913a27d8a9da4f4a8ed6638e1b511fdaedd330b06b5f"
+      "bytes": 6361,
+      "sha256": "8ae503ba7bd7ea8e73c80fc8b92af71b6d8a272db349351f8e814300a33d581f"
     },
     {
       "path": "include/node/cppgc/prefinalizer.h",
@@ -229,8 +229,8 @@
     },
     {
       "path": "include/node/cppgc/trace-trait.h",
-      "bytes": 3479,
-      "sha256": "950993565adb04dba8c6a991c62f5f4878325258b3801853577b4f44e97a5aec"
+      "bytes": 3452,
+      "sha256": "ed7b74bcb3e5a706f511d27aae21d37c31605e42223339ae66596c910f547f9a"
     },
     {
       "path": "include/node/cppgc/type-traits.h",
@@ -239,18 +239,18 @@
     },
     {
       "path": "include/node/cppgc/visitor.h",
-      "bytes": 19114,
-      "sha256": "1089fc76f82b5791c9add90a58b71dd5d6aaf92f76e6198c3beff3c0e7c247ad"
+      "bytes": 19280,
+      "sha256": "3e7c1e187e39e59627e3eaaa05a990fa02d28a8cce941f4c34b803ae03fda616"
     },
     {
       "path": "include/node/js_native_api.h",
-      "bytes": 32028,
-      "sha256": "048b4efdcd823f30afd323d61c8aba5be285077f9d790feb52a6fa6382df2541"
+      "bytes": 33158,
+      "sha256": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788"
     },
     {
       "path": "include/node/js_native_api_types.h",
-      "bytes": 7033,
-      "sha256": "0410c31e227f81e2981363c4d543f4832ac3df785343ec64cee621742ff8a034"
+      "bytes": 8335,
+      "sha256": "c12406a8c0036aefdb66b98065fc88e2e7a053c1f274deef33af6c26c099b933"
     },
     {
       "path": "include/node/libplatform/libplatform-export.h",
@@ -264,23 +264,23 @@
     },
     {
       "path": "include/node/libplatform/v8-tracing.h",
-      "bytes": 11054,
-      "sha256": "57c1d3c4ea4db2e0af7790105a82c21719dd48cbc4b17232981645ab981dfccc"
+      "bytes": 11335,
+      "sha256": "c49cabb408699379e58f7da92ab1b4638ca3ce3d657612c0f13f0dc964ee1077"
     },
     {
       "path": "include/node/node.h",
-      "bytes": 70233,
-      "sha256": "2dcd893941993db78a571da3953fc0249e1950d2ce182cdba504693951c8148e"
+      "bytes": 73097,
+      "sha256": "2b3f750ca425cfe15003b7881733d8a4e07428cc7dc3fd9bf41253ecb73d1f6e"
     },
     {
       "path": "include/node/node_api.h",
-      "bytes": 10592,
-      "sha256": "d14db85d16f182045c42745a6e44b96e932dfe6e3bfcaac7a1096fae8412c579"
+      "bytes": 10370,
+      "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a"
     },
     {
       "path": "include/node/node_api_types.h",
-      "bytes": 1603,
-      "sha256": "8d5d854088d5725fec9775510e0aeeeb790a41ad083c49bb721d950b86e6bd61"
+      "bytes": 1930,
+      "sha256": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00"
     },
     {
       "path": "include/node/node_buffer.h",
@@ -289,23 +289,23 @@
     },
     {
       "path": "include/node/node_object_wrap.h",
-      "bytes": 3867,
-      "sha256": "c16090af77c11039e6982761b71ad555f08cceb9bf800791048d4311bd839e99"
+      "bytes": 3951,
+      "sha256": "c10ba86018cbac83d05fdff6fde3e98df369dad3dc2efaa66cbb1c1ed52ccc42"
     },
     {
       "path": "include/node/node_version.h",
       "bytes": 4239,
-      "sha256": "a57193a0c6fb1ff6682b9ff2ae2c2496c34baf6c35d4d6f7dd3166f5dfd6d1f3"
+      "sha256": "6591d501dd62aaf87c9e80c670036c6ca318179c6a5a162fa1385e4f9889e84c"
     },
     {
       "path": "include/node/v8-array-buffer.h",
-      "bytes": 22006,
-      "sha256": "5ab664c31420db10083db3efb9712666eb0fa1c14c71f4bbbf9c11f9e3ae991e"
+      "bytes": 22199,
+      "sha256": "db3a060e19d552e536aa33f4c46812a517556ac4bc7ad13591f58d5822dc434a"
     },
     {
       "path": "include/node/v8-callbacks.h",
-      "bytes": 19515,
-      "sha256": "8fe95d3b62906b8b5ff5c7c7cfb02d10dcc71e1a8328728422d3887634926eb4"
+      "bytes": 19787,
+      "sha256": "7a2f65e19cbf4ff06f2f79e15d4055372d1237371f984094bce290233aacfff5"
     },
     {
       "path": "include/node/v8-container.h",
@@ -314,8 +314,8 @@
     },
     {
       "path": "include/node/v8-context.h",
-      "bytes": 19737,
-      "sha256": "8059e175eea93b622aae4d4dbd796b39fcdd5d15fa502bfb2aa86019fa5a8e8e"
+      "bytes": 22337,
+      "sha256": "3d1c6dc951e53ddf2a54a2d8f14628325654c2448fdbfa26396791214c2cd08b"
     },
     {
       "path": "include/node/v8-cppgc.h",
@@ -324,8 +324,8 @@
     },
     {
       "path": "include/node/v8-data.h",
-      "bytes": 1725,
-      "sha256": "e2755bf6e3ddab5fd36176b0c79ff3ac9cf01c85502a74f2973b60ff1d8d910f"
+      "bytes": 1924,
+      "sha256": "76ebd7d3820d867df031e8a2c9c8301da4036d2e558b4eba3543db6ce87463fc"
     },
     {
       "path": "include/node/v8-date.h",
@@ -334,8 +334,8 @@
     },
     {
       "path": "include/node/v8-debug.h",
-      "bytes": 5384,
-      "sha256": "2c5776228c8a010d10e920e153c4368d35dec80a97a671c2789cca6321ab6ea8"
+      "bytes": 6761,
+      "sha256": "29434eafa8400eb4497531862746419e4229b72b335058e581469855e51bbf59"
     },
     {
       "path": "include/node/v8-embedder-heap.h",
@@ -349,18 +349,18 @@
     },
     {
       "path": "include/node/v8-exception.h",
-      "bytes": 9744,
-      "sha256": "a56b9a825bd5a95e3a091f16e1f49c9e56b0aa7392fd584d34e3bf3452b4f6f3"
+      "bytes": 9831,
+      "sha256": "79437751a7eae34557bcbb7f0f9a1f6f4f3498811d8d97243fa84908294ce208"
     },
     {
       "path": "include/node/v8-extension.h",
-      "bytes": 1870,
-      "sha256": "ad2783655342544e49ad5323e04aefd112facbf5f6630d2f3050fbee1da4bcd0"
+      "bytes": 1745,
+      "sha256": "f4544e1de79a8bc29f09271f6de3d5d7be415c23bae8205f23a5858e7bd9c9f4"
     },
     {
       "path": "include/node/v8-external.h",
-      "bytes": 924,
-      "sha256": "234042362502bc29d2e5fa652b3ca50aeff60bbacbb045a3e9e4ca10b3bb59fd"
+      "bytes": 2367,
+      "sha256": "2d55e22f7ea23be3b9fff16ac23c844d6a8509b675527b2a94258868c8891e68"
     },
     {
       "path": "include/node/v8-forward.h",
@@ -369,13 +369,13 @@
     },
     {
       "path": "include/node/v8-function-callback.h",
-      "bytes": 24413,
-      "sha256": "0a04fb5fe15f0956db82c286cee3ab21a5630b37b1c89249a5beda79358a5064"
+      "bytes": 22927,
+      "sha256": "bded059ecaec1d5b5dd1c72fd93b461130baf3a3f36e84428ec0c4a5837dfd0d"
     },
     {
       "path": "include/node/v8-function.h",
-      "bytes": 4879,
-      "sha256": "335c745cdc90804e34ea3694da3bd5db88492e73c4e94c5169c55b67a8604b74"
+      "bytes": 4866,
+      "sha256": "9989f4e0e94400326afe09da4d253a9646ed1c2cf80a98ef705dea4d0cd41783"
     },
     {
       "path": "include/node/v8-handle-base.h",
@@ -384,28 +384,28 @@
     },
     {
       "path": "include/node/v8-initialization.h",
-      "bytes": 11287,
-      "sha256": "734f5c485554509a9fa62d8aea6a548d3439cb0be26d7f90f6574b486bf505af"
+      "bytes": 12680,
+      "sha256": "7c88a037f0b4396f8e285ff3e62fc4c1b34ea4d8e7d5c7f149d8d1f1316df533"
     },
     {
       "path": "include/node/v8-internal.h",
-      "bytes": 70804,
-      "sha256": "eb74fc0740b7f858a03e319e077c1698d2083325f3154c67771b120fb48f8520"
+      "bytes": 75313,
+      "sha256": "73db93bad8c49dd348aa3aa1f3778e4110be5a00474e992be5cb2154a51ca909"
     },
     {
       "path": "include/node/v8-isolate.h",
-      "bytes": 66966,
-      "sha256": "db213aa2a3c1e381588583ab3fbae8c282be4384d57fa498863a0065f1c8aa29"
+      "bytes": 70050,
+      "sha256": "6b25c2c7e642c599833912bac078bb9945a7694aff0721247990bac311b61c2c"
     },
     {
       "path": "include/node/v8-json.h",
-      "bytes": 1356,
-      "sha256": "7ac22ac74ebac312a5901478e398ef1d3a29f0ef56accb6d6736d47e0dbb4cdc"
+      "bytes": 1695,
+      "sha256": "be6f2e7b3edd001801cbc75cc87653005024c8030c13852c1694d71b20276b5b"
     },
     {
       "path": "include/node/v8-local-handle.h",
-      "bytes": 24937,
-      "sha256": "f2d45e5b71ebde65715bd08460ca1a19ac7d096f95257df33e15cea23694ba4d"
+      "bytes": 28468,
+      "sha256": "8c4d900245fe55f6c78630032d2e4f90a2656418d7ae3ffc0025e1452cbb92a7"
     },
     {
       "path": "include/node/v8-locker.h",
@@ -414,18 +414,18 @@
     },
     {
       "path": "include/node/v8-maybe.h",
-      "bytes": 4725,
-      "sha256": "4b34196e6643c7b0757ea2fb1179a15c031ac2961ea6f99bbeab2df816b11b00"
+      "bytes": 5389,
+      "sha256": "1b7bc542c626b7da0354ae36ec4d223290c429b93485b64c0f1ba0d9ccd24e15"
     },
     {
       "path": "include/node/v8-memory-span.h",
-      "bytes": 10756,
-      "sha256": "294c6c5271329d65fcc1253f4a6c72b36fbada6eb8ac85b407ae5e583c3ba824"
+      "bytes": 8865,
+      "sha256": "341439dc5f96d40f8064df3c745733145eef198e9400c1d3fd9d8a05c3332618"
     },
     {
       "path": "include/node/v8-message.h",
-      "bytes": 6685,
-      "sha256": "ce6fcfeeafa8d6528e7be5c5b9d58f09927b88a110a0bfacb5fbb0dc9ad0aa96"
+      "bytes": 6587,
+      "sha256": "6609bb62f62e9c8874cc901482e35f596c7035964c76fab9556ee2a68bc6845c"
     },
     {
       "path": "include/node/v8-microtask-queue.h",
@@ -439,18 +439,18 @@
     },
     {
       "path": "include/node/v8-object.h",
-      "bytes": 41059,
-      "sha256": "fa891650c8d9279a552136e76d416ef6fafbbc73dca9db4d981644b0d42fca15"
+      "bytes": 44114,
+      "sha256": "d0fba4db8ee994b3d431ba3a432dfcb3d6cea832fe0013e79d2dd4a51ad515a0"
     },
     {
       "path": "include/node/v8-persistent-handle.h",
-      "bytes": 17502,
-      "sha256": "0e1ac75d57c93f27c979a0b4378f78104a69764d5b315842511fb3401f755300"
+      "bytes": 17480,
+      "sha256": "d19d6beeab7f6a0ea583589708da017dbd03ead53f5bde29a19983ec9a0db486"
     },
     {
       "path": "include/node/v8-platform.h",
-      "bytes": 50231,
-      "sha256": "44a7fb139483b65dd5e962665d79d25fdf632910690632222991bda5e063f326"
+      "bytes": 56727,
+      "sha256": "933c956a15b5c6afb4f7c6298a6da6a529eb5340385e209397e7c5a629854a55"
     },
     {
       "path": "include/node/v8-primitive-object.h",
@@ -459,18 +459,18 @@
     },
     {
       "path": "include/node/v8-primitive.h",
-      "bytes": 37462,
-      "sha256": "aef8a95a8e40e6a6045332f9043d22cdcd02b5e0845fede076c54d1a3c405629"
+      "bytes": 36149,
+      "sha256": "2bb059cc74a8da39494ea841aa6c11ea81f46fc42db79e8e67c9ee0ba73838d2"
     },
     {
       "path": "include/node/v8-profiler.h",
-      "bytes": 44311,
-      "sha256": "5e4e427164d4c886edcd978100a9b43851cf754a28576a3884b9a853d43eecf6"
+      "bytes": 47100,
+      "sha256": "2894702c63bd4af00e359c4ffdc8d6c56518a7d2f206ed8eb63e56df3196c819"
     },
     {
       "path": "include/node/v8-promise.h",
-      "bytes": 5287,
-      "sha256": "d9e1d89bde1ba8998d3d9aea60f1c5635ad9b36714b91a48bf0bde9b14410908"
+      "bytes": 5780,
+      "sha256": "e0777d731441a6215d3d1dc1990b8426fd8e9f91ba027e4026fee81cd153dbc0"
     },
     {
       "path": "include/node/v8-proxy.h",
@@ -484,13 +484,13 @@
     },
     {
       "path": "include/node/v8-sandbox.h",
-      "bytes": 7647,
-      "sha256": "e3831b68766d59f1bfeeed2f629b1d0085c02fe2543175b1acdee63dcd1aeb82"
+      "bytes": 7406,
+      "sha256": "227a0798de95325b2ec8c19d0292872b050b6ef085bff7e6a9d95e33c1bbe7fa"
     },
     {
       "path": "include/node/v8-script.h",
-      "bytes": 33138,
-      "sha256": "d753f702cf724070eaa683a8314313995535384dd74ca7b5a54a3f06152d5b0a"
+      "bytes": 34546,
+      "sha256": "c554c8b02849b3852c7d42f602f9823769af60b52f88a6158b59fa888bfdb276"
     },
     {
       "path": "include/node/v8-snapshot.h",
@@ -499,23 +499,23 @@
     },
     {
       "path": "include/node/v8-source-location.h",
-      "bytes": 2722,
-      "sha256": "4e7890937c1d3de89bce3ff8749f9e6560994251385acf927b599f1f77a66a66"
+      "bytes": 2370,
+      "sha256": "0bab350f3e007565d2812444982b56a35f3ac06a6755816be85c87a5cd26bf00"
     },
     {
       "path": "include/node/v8-statistics.h",
-      "bytes": 7627,
-      "sha256": "f9547cff9044e7a8a518287ff20867a29a2c198a87ec070fd8b252825d997dac"
+      "bytes": 7913,
+      "sha256": "1c3fffc15ca553e462b393131defff8314b86ea4d93b874e5793bbe0e95b2141"
     },
     {
       "path": "include/node/v8-template.h",
-      "bytes": 42988,
-      "sha256": "3527a7124e8fdb555102f1d9616a6010aa8de2bd94cfbb07496332b6afaacbc7"
+      "bytes": 39833,
+      "sha256": "943a11abb83a84c3f31452f4b41e609910bff28ee45ca05146238ef18b34736c"
     },
     {
       "path": "include/node/v8-traced-handle.h",
-      "bytes": 12332,
-      "sha256": "c190953ea39cdfed8058e67b23c74255376c065c8c565c9f821fa467997756f8"
+      "bytes": 12302,
+      "sha256": "f46f46662b656f0073ac6ad6f5128df8439bcd373faa5077b3ad81c9b6cb93ee"
     },
     {
       "path": "include/node/v8-typed-array.h",
@@ -524,8 +524,8 @@
     },
     {
       "path": "include/node/v8-unwinder.h",
-      "bytes": 4763,
-      "sha256": "2e27b3e40167e2eeb3d2ba53ad4723ed41d12dd5a1fe2d572344ab0062ca7756"
+      "bytes": 5216,
+      "sha256": "eabdc3e4f5953e2d81a54fa2059f2a545a672bcd36d9d6d2e0a34848323e1d29"
     },
     {
       "path": "include/node/v8-value-serializer.h",
@@ -540,12 +540,12 @@
     {
       "path": "include/node/v8-version.h",
       "bytes": 773,
-      "sha256": "9252bc587d72e52343b4dc65ae9f9617310d411b74cd5012ace543ec7ad09ec7"
+      "sha256": "ce7ce832371e2ffd6e56bd51f3b3f819262a01366074c660f6ea8e0d8e3b5ba3"
     },
     {
       "path": "include/node/v8-wasm.h",
-      "bytes": 6992,
-      "sha256": "f6e41223234a00ea662b8706cc080acccca476a9c5d253e9ad2347eb3fcf12c1"
+      "bytes": 10628,
+      "sha256": "65710b8da97f436b660c42b899695859575f688594163e498c291a0a1d09dab9"
     },
     {
       "path": "include/node/v8-weak-callback-info.h",
@@ -559,8 +559,8 @@
     },
     {
       "path": "include/node/v8config.h",
-      "bytes": 35211,
-      "sha256": "7454d35a34b52b23a50f9ef2742dc0c57025cd9eb1f85c27b7618fe2b269bacf"
+      "bytes": 37285,
+      "sha256": "8c5863fa045d38345f0702b11b8307423b942044198dd9bad5989476775c3d38"
     },
     {
       "path": "include/node/zconf.h",

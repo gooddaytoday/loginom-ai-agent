@@ -1,0 +1,2 @@
+# Notice texts and inventories are hashed byte for byte: no line-ending conversion on any checkout.
+bun/** -text
