@@ -14,14 +14,13 @@ async function main() {
   const mode = Bun.argv[2]
   if (!["staged", "range", "push", "audit"].includes(mode))
     throw new ScanFailure("Usage: bun run secrets <staged|push REMOTE|range BASE HEAD|audit>")
-  if (mode !== "audit") {
-    // A large merge must not cut rename detection short: gitleaks relays Git's warning and the scan stops.
-    const count = Number(process.env.GIT_CONFIG_COUNT || 0)
-    process.env[`GIT_CONFIG_KEY_${count}`] = "diff.renameLimit"
-    process.env[`GIT_CONFIG_VALUE_${count}`] = "0"
-    process.env.GIT_CONFIG_COUNT = String(count + 1)
-  }
-  const pins = mode === "audit" ? [] : await upstreamPins()
+  // A large merge must not cut rename detection short: gitleaks relays Git's warning and the scan stops.
+  const count = Number(process.env.GIT_CONFIG_COUNT || 0)
+  process.env[`GIT_CONFIG_KEY_${count}`] = "diff.renameLimit"
+  process.env[`GIT_CONFIG_VALUE_${count}`] = "0"
+  process.env.GIT_CONFIG_COUNT = String(count + 1)
+  const listed = mode === "audit" ? [] : await upstreamPins()
+  const pins = listed.filter((pin) => pin.present).map((pin) => pin.sha)
   const references =
     mode === "audit"
       ? git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/remotes", "refs/tags")
@@ -211,7 +210,8 @@ async function main() {
         current_files: current.length,
         skipped,
         references,
-        upstream_findings: pins.length ? upstreamFindings.length : undefined,
+        upstream_findings: listed.length ? upstreamFindings.length : undefined,
+        upstream_missing: listed.length ? listed.length - pins.length : undefined,
         elapsed_ms: Math.round(performance.now() - started),
       }),
     )
@@ -342,9 +342,14 @@ async function upstreamPins() {
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => {
       // Anyone who can push a ref can move it; only a full commit SHA pins OpenCode.
-      if (!/^([a-f0-9]{40}|[a-f0-9]{64})$/.test(line) || commit(line) !== line)
+      if (!/^([a-f0-9]{40}|[a-f0-9]{64})$/.test(line))
         throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
-      return line
+      // An absent commit cannot be in the range or a merge parent; leaving it out only makes the scan stricter.
+      const type = Bun.spawnSync(["git", "cat-file", "-t", line], { stderr: "ignore" })
+      if (type.exitCode) return { sha: line, present: false }
+      if (type.stdout.toString().trim() !== "commit")
+        throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
+      return { sha: line, present: true }
     })
 }
 
