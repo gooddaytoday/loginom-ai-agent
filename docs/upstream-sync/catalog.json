@@ -1,53 +1,30 @@
 {
-  "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. Checked by scripts/upstream-sync/catalog-check.py.",
-  "against": "810c0eba1a7348036f8bdf61e6632d0c36c6876c",
+  "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. An entry with `pending` names the stage B task or stage that brings its 0.4 change to OpenCode 2; until then it has no divergent files. Checked by scripts/upstream-sync/catalog-check.py.",
+  "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
     { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
     {
       "id": "CAT-02",
       "title": "CI, build, release and repository hygiene",
       "paths": [
-        ".github/**", "github/**", ".husky/**", "script/**", "nix/**", "infra/**", "patches/**", "perf/**",
-        "turbo.json", ".gitignore", ".gitleaksignore", ".gitattributes", ".dockerignore", "install",
-        "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
-        "packages/opencode/bin/**", "packages/cli/bin/**"
+        ".github/**", ".husky/**", "script/**", "nix/**", "patches/**", "turbo.json", ".gitignore", ".gitleaksignore",
+        ".gitattributes", ".dockerignore", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
+        "packages/cli/bin/**"
       ]
     },
     {
       "id": "CAT-03",
-      "title": "Brand: documentation, translations, icons, dictionaries, repository dotdirs",
+      "title": "Brand: documentation, icons, repository dotdirs",
       "paths": [
-        "packages/web/**", "packages/desktop/icons/**", "packages/desktop/resources/**", "packages/app/src/i18n/**",
-        "packages/app/public/**", "docs/upstream/**", ".loginom-ai-agent/**", ".opencode/**", "specs/**", "sdks/**",
-        "packages/opencode/specs/**", "*.md", "packages/*/*.md", "packages/*/README*"
+        "packages/desktop/icons/**", "packages/desktop/resources/**", "packages/app/public/**", ".loginom-ai-agent/**", ".opencode/**",
+        "specs/**", "sdks/**", "*.md", "packages/*/*.md", "packages/*/README*"
       ]
     },
-    {
-      "id": "CAT-04",
-      "title": "Upstream endpoints: updates, installer, sharing",
-      "paths": [
-        "packages/opencode/src/installation/**", "packages/opencode/src/cli/upgrade.ts", "packages/opencode/test/installation/**",
-        "packages/opencode/src/share/**", "packages/opencode/test/share/**", "packages/desktop/src/main/updater*"
-      ]
-    },
-    {
-      "id": "CAT-05",
-      "title": "Session, tools, attachments, permissions, server",
-      "paths": [
-        "packages/opencode/src/session/**", "packages/opencode/src/tool/**", "packages/opencode/src/effect/**",
-        "packages/opencode/src/server/**", "packages/opencode/src/permission/**", "packages/opencode/src/mcp/**",
-        "packages/opencode/src/util/**", "packages/opencode/test/session/**", "packages/opencode/test/tool/**",
-        "packages/opencode/test/effect/**", "packages/opencode/test/server/**", "packages/opencode/test/permission/**",
-        "packages/opencode/test/mcp/**", "packages/opencode/test/util/**"
-      ]
-    },
-    { "id": "CAT-06", "title": "Skills and commands", "paths": ["packages/opencode/src/skill/**", "packages/opencode/src/command/**", "packages/opencode/test/skill/**", "packages/opencode/test/command/**"] },
-    {
-      "id": "CAT-07",
-      "title": "Providers, plugins, proxy",
-      "paths": ["packages/opencode/src/provider/**", "packages/opencode/src/plugin/**", "packages/opencode/test/provider/**", "packages/opencode/test/plugin/**"]
-    },
-    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": ["packages/opencode/**"] },
+    { "id": "CAT-04", "title": "Upstream endpoints: updates, installer, sharing", "paths": [], "pending": "B2.7d, B4.1" },
+    { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.2, B2.3, B2.5, B2.6, B2.9" },
+    { "id": "CAT-06", "title": "Skills and commands", "paths": [], "pending": "B2.4" },
+    { "id": "CAT-07", "title": "Providers, plugins, proxy", "paths": [], "pending": "B2.1, B2.7a, B4.1" },
+    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7, B2.8, B3.2" },
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
@@ -57,9 +34,9 @@
         "packages/desktop/src/main/native/logging.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
-    { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
-    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**", "AGENTS.md", "CONTEXT.md"] }
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"], "pending": "B4" },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"], "pending": "stage C" },
+    { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"], "pending": "B1.4, B2.3, B2.5d" },
+    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]
 }
