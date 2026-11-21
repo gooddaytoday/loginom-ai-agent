@@ -1,14 +1,14 @@
 {
   "repo": "https://github.com/oven-sh/WebKit",
-  "commit": "5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b",
-  "tree": "a7212e5d3aeb41afb46db3f955fb77b60900cfd6",
-  "bunCommit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
-  "file": "webkit-5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b-source.tar.gz",
-  "bytes": 1976235831,
-  "sha256": "19b89496c4d39570ecad80ca6ac99c37a77c95179a0463f8a1b85fc48a276df1",
-  "entries": 464897,
-  "symlinks": 40,
-  "generation": "git archive --format=tar.gz HEAD with .git/info/attributes: * -text -eol -filter -ident -working-tree-encoding -export-subst -export-ignore",
+  "commit": "d6375c72affe0f70222cdcb45012b10f0bf3a9d5",
+  "tree": "26b64acb953715409b4b484443baec30789eee75",
+  "bunCommit": "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+  "file": "webkit-d6375c72affe0f70222cdcb45012b10f0bf3a9d5-source.tar.gz",
+  "bytes": 1993375594,
+  "sha256": "02e8c4ddf04b2a171ad8d9093bc25c49c4bc3c54897c6b752700c2b04adf022c",
+  "entries": 470896,
+  "symlinks": 45,
+  "generation": "git archive --format=tar.gz d6375c72affe0f70222cdcb45012b10f0bf3a9d5 (git 2.43.0) with info/attributes: * -text -eol -filter -ident -working-tree-encoding -export-subst -export-ignore",
   "verification": "Every file and link matched the pinned Git tree's blob hash and executable mode",
   "scope": "Complete WebKit source tree; not proof of rebuild or relinking"
 }
