@@ -1,3 +1,4 @@
+/* oxlint-disable no-restricted-globals -- Genuine reflection: these serialized page probes count own string and symbol keys of native Loginom objects. */
 import {createHash} from 'node:crypto';
 
 // Serialized, read-only local-cache proof. No count fallback, helper init or RPC.

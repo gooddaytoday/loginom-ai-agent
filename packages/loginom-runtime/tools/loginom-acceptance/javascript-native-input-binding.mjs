@@ -1,3 +1,4 @@
+/* oxlint-disable no-restricted-globals -- Genuine reflection: these serialized page probes count own string and symbol keys of native Loginom objects. */
 import {createHash} from 'node:crypto';
 import {collectNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs';
 

@@ -1,3 +1,4 @@
+/* oxlint-disable no-restricted-globals -- Genuine reflection: these serialized page probes count own string and symbol keys of native Loginom objects. */
 import {javascriptWizardTextClassification} from '../../client/lib/javascript-wizard-error-details.mjs';
 // Operator-only, bounded read-only discovery. Never calls UI handlers/getters,
 // reveals hidden exception text, or authorizes a gesture.

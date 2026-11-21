@@ -96,7 +96,7 @@ test('server event and RPC consume the original operation deadline instead of th
   execute:async(code,options)=>{
    if(code.includes('"download_path":')){
     rpc=options;rpcStarted=f.page.clock;f.page.clock+=5000;
-    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:target[key]});
     return structuredClone(await vm.runInContext(`(${code})`,f.page.context)(page));
    }
    return f.page.execute(code);
@@ -164,7 +164,7 @@ for(const fault of ['restored','midstream','session','mtime','bytes','partial','
    // Playwright page, connection and Chromium byte events are deterministic.
    try{
     if(!f.page.context)await f.page.execute('async page=>null');
-    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:Reflect.get(target,key)});
+    const page=new Proxy(f.page,{get:(target,key)=>key==='context'?context:target[key]});
     const result=structuredClone(await vm.runInContext('('+withStorageIdentity(code,binding,options?.storageSession)+')',f.page.context)(page));
     if(code.includes('"mode":"status"')){
      if(fault==='midstream'&&!connection.Connected)f.page.clock+=30000;
