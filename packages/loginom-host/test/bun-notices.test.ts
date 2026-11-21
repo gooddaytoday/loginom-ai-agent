@@ -23,6 +23,7 @@ test("the generator refuses a Bun runtime of another revision or version", () =>
   )
 })
 
+// Each case below starts Bun children or unpacks the bundle; Windows runners are several times slower.
 test("the generator stops before any download when the release tag names another revision", async () => {
   await using dir = await temporary()
   // The cache stores each response under the SHA-256 of its URL, which also makes this run offline.
@@ -41,7 +42,7 @@ test("the generator stops before any download when the release tag names another
   expect(result.stderr).toContain("LOGINOM_BUN_NOTICE_REVISION_MISMATCH")
   expect(result.exitCode).not.toBe(0)
   expect(await Bun.file(join(dir.path, "out/source.json")).exists()).toBe(false)
-})
+}, 30_000)
 
 test("verification refuses a bundle whose files disagree on the Bun revision or a notice", async () => {
   await using dir = await temporary()
@@ -55,7 +56,7 @@ test("verification refuses a bundle whose files disagree on the Bun revision or 
   const notice = native.components.zstd.files[0].file
   await Bun.write(join(dir.path, "bun/native", notice), "changed\n")
   await expect(verifyBundle(join(dir.path, "bun"))).rejects.toThrow("LOGINOM_BUN_NATIVE_NOTICE_HASH_MISMATCH")
-})
+}, 30_000)
 
 test("companion builders accept the committed revision and refuse another before creating output", async () => {
   await using dir = await temporary()
@@ -86,7 +87,7 @@ test("companion builders accept the committed revision and refuse another before
   ])
   expect(await Bun.file(join(dir.path, "refused-0/SHA256SUMS")).exists()).toBe(false)
   expect(await Bun.file(join(dir.path, "refused-1/SHA256SUMS")).exists()).toBe(false)
-})
+}, 30_000)
 
 async function run(script: string, args: string[]) {
   const child = Bun.spawn([process.execPath, script, ...args], { stdout: "pipe", stderr: "pipe" })
