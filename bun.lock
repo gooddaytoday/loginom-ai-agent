@@ -519,6 +519,9 @@
     "packages/loginom-runtime": {
       "name": "@loginom-ai-agent/runtime",
       "version": "0.1.0",
+      "dependencies": {
+        "acorn": "8.15.0",
+      },
     },
     "packages/merman": {
       "name": "@opencode/merman",
