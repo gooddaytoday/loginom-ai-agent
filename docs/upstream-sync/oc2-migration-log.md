@@ -1160,7 +1160,7 @@ $ cd packages/product && bun test                                  # без clie
 Bun 1.4.4 переносной (`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`) —
 первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, 1600 пакетов, `.husky/_`
 появился, хук `pre-commit` срабатывал на каждом коммите. Для Rust: `rustup` поставил пин пакета 1.90.0 в `~/.rustup`
-(и сам обновился 1.29.1 → 1.29.3), Zig 0.16.0 (версия из `check-process-daemon.yml`, sha256 сверен с ziglang.org) —
+(и сам обновился 1.29.1 → 1.29.3, `rustup --version` — 1.29.3), Zig 0.16.0 (версия из `check-process-daemon.yml`, sha256 сверен с ziglang.org) —
 в scratchpad, в `PATH` только для `cargo`. Ghostty `build.rs` берёт с GitHub сам. В репозиторий из этого ничего не попало.
 
 ### Коммиты
@@ -1279,11 +1279,17 @@ CAT-13: 6 → 10, CAT-12: 10 → 11. До правки `catalog.json` прове
 
 - **Продукт пока запускает бинарник `opencode-pty` из npm `@opencode/pty@0.5.2`**, а не из `packages/process-daemon`:
   `core/src/persistent-pty/pty-binding.ts` (`binaryPath`), сборка CLI — `cli/script/opencode-pty.ts`, свой бинарник
-  только через `OPENCODE_PTY_BIN`. Правка Rust дойдёт до продукта, когда форк соберёт свой бинарник (B5.1: Rust-часть
-  в `loginom-windows.yml`; сборка CLI — B2.7a). До того сокеты продукта — в `/tmp/opencode-pty-<uid>`, общем с
-  OpenCode каталоге, и переменная — `OPENCODE_PTY_SOCKET_DIR`. Смягчение: каталог состояния продукт задаёт сам
+  только через `OPENCODE_PTY_BIN`. Правка Rust действует только в своём бинарнике. План собирает Rust-часть только
+  для Windows (B5.1, `loginom-windows.yml`), а каталог сокетов и переменная живут в `daemon/unix.rs`; на Windows —
+  именованный канал. Сборки своего бинарника для Linux и macOS нет ни в одной задаче плана, поэтому требование «каталог
+  сокетов не совпадает с OpenCode» до поставляемого продукта не доходит: сокеты продукта — в `/tmp/opencode-pty-<uid>`,
+  общем с OpenCode каталоге, переменная — `OPENCODE_PTY_SOCKET_DIR`. Смягчение: каталог состояния продукт задаёт сам
   (`--runtime-dir <state>/pty` из `Global`, после B1.3a — `loginom-ai-agent`), а имя сокета — хеш этого каталога, так что
-  файлы не совпадают.
+  файлы не совпадают. **Вопрос владельцу:** собирать `process-daemon` для Linux и macOS (B2.7a или B5) или принять
+  общий каталог сокетов с бинарником upstream.
+- Другого источника управляемой политики нет: `core/src/config/managed.ts` — только класс документа, источники —
+  `sources.system` и `sources.preferences` из `discovery.ts` (`config.ts`). `git grep "opencode-pty-"` в `.ts`/`.mjs` —
+  только временные каталоги тестов и скрипты сборки npm, путь сокетов нигде не зашит.
 - Бинарник ставится в `<bin>/opencode-pty/` (`core/src/persistent-pty/binary.bun.ts`) — каталог `Global.bin` уже
   продукта, имя подкаталога — бренд, B1.4.
 
