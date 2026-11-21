@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "bun check --no-script",
+    "typecheck:tsc": "tsc --noEmit"
   },
   "dependencies": {
     "@loginom-ai-agent/product": "workspace:*",
@@ -26,6 +27,7 @@
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "@typescript/native": "catalog:",
+    "typescript": "catalog:"
   }
 }

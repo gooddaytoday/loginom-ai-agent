@@ -512,7 +512,8 @@
         "@tsconfig/node22": "catalog:",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",
-        "@typescript/native-preview": "catalog:",
+        "@typescript/native": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/loginom-runtime": {

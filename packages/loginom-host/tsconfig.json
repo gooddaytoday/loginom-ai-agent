@@ -1,5 +1,7 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
   "compilerOptions": { "module": "ESNext", "moduleResolution": "bundler", "types": ["bun"], "noEmit": true, "allowImportingTsExtensions": true },
-  "include": ["src", "test", "script"]
+  "include": ["src", "test", "script"],
+  // Until B4 carries their packages/desktop imports (release/manifest, main/proxy-env).
+  "exclude": ["script/skills-acceptance.ts", "script/system-proxy-smoke.ts"]
 }
