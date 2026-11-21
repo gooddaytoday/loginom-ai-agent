@@ -6,8 +6,12 @@ the files that exist in the upstream revision (--against) and differ in the work
 deleted or renamed; files the fork added, copies included, are fork-owned and out of scope). The working tree, not HEAD, so that the check also covers a resolved merge
 before its commit, staged or not, new files included; the repository's own index is not touched (a temporary copy of it, with its own file time, is used), assigns each to an entry and fails when:
   * a divergent file matches no entry          (new divergence nobody has described: add or extend an entry);
-  * an entry matches no divergent file          (stale entry: remove or narrow it);
+  * an entry matches no divergent file          (stale entry: remove or narrow it), unless it is pending;
+  * a pending entry matches a divergent file    (the change has arrived: describe it and drop `pending`);
+  * `pending` is not a non-empty string;
   * an entry id is missing from catalog.md, or catalog.md describes an id that catalog.json does not have.
+An entry with `pending` names the task or stage that brings a fork change back after the move to OpenCode 2 (for example
+"B2.4" or "stage C"); until then it has no divergent files, and the summary prints the task next to it.
 
 Usage: catalog-check.py [--repo DIR] [--catalog docs/upstream-sync/catalog.json] [--against REV] [--summary]
 `--against` defaults to the revision recorded in catalog.json ("against"); after an upstream update it moves to the
@@ -70,6 +74,7 @@ def main():
             i += 1
 
     entries = [(e["id"], [glob_regex(p) for p in e["paths"]]) for e in spec["entries"]]
+    pending = {e["id"]: e["pending"] for e in spec["entries"] if "pending" in e}
     hits = collections.defaultdict(list)
     unmatched = []
     for path in sorted(set(divergent)):
@@ -83,9 +88,15 @@ def main():
     problems = []
     if unmatched:
         problems.append(f"{len(unmatched)} divergent files match no catalog entry, e.g.: " + ", ".join(unmatched[:8]))
-    stale = [entry_id for entry_id, _ in entries if not hits[entry_id]]
+    stale = [entry_id for entry_id, _ in entries if not hits[entry_id] and entry_id not in pending]
     if stale:
         problems.append("entries without divergent files: " + ", ".join(stale))
+    unnamed = [entry_id for entry_id, task in pending.items() if not (isinstance(task, str) and task.strip())]
+    if unnamed:
+        problems.append("pending must name a task or stage: " + ", ".join(unnamed))
+    arrived = [entry_id for entry_id in pending if hits[entry_id]]
+    if arrived:
+        problems.append("pending entries with divergent files (describe the change, drop pending): " + ", ".join(arrived))
     doc = open(os.path.join(repo, os.path.dirname(a.catalog), "catalog.md"), encoding="utf-8").read()
     ids = {entry_id for entry_id, _ in entries}
     documented = set(re.findall(r"^##+ (CAT-\d+)\b", doc, re.M))
@@ -97,7 +108,7 @@ def main():
     if a.summary or not problems:
         print(f"against {against[:12]}: {len(set(divergent))} divergent upstream files")
         for entry_id, _ in entries:
-            print(f"  {entry_id}: {len(hits[entry_id])}")
+            print(f"  {entry_id}: {len(hits[entry_id])}" + (f" (pending: {pending[entry_id]})" if entry_id in pending else ""))
     for problem in problems:
         print("PROBLEM:", problem, file=sys.stderr)
     sys.exit(1 if problems else 0)

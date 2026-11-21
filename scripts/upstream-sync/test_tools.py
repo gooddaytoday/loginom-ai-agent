@@ -528,7 +528,7 @@ class OracleIsMechanical(FixtureCase):
         self.assertEqual(o.entries["packages/core/src/a.ts"], mo.tree_entries(str(fx.dir), fx.fork)["packages/core/src/a.ts"])
 
 
-class CatalogCheckUncommittedMerge(FixtureCase):
+class CatalogCase(FixtureCase):
     def seed(self):
         """Upstream has a.txt, b.txt, x.txt; the fork committed a change to a.txt and describes only that in the catalog."""
         fx = self.fx
@@ -549,6 +549,8 @@ class CatalogCheckUncommittedMerge(FixtureCase):
                            capture_output=True, text=True, env=ENV)
         return p.returncode, p.stdout + p.stderr
 
+
+class CatalogCheckUncommittedMerge(CatalogCase):
     def test_passes_when_every_divergence_is_described(self):
         self.seed()
         self.assertEqual(self.check()[0], 0)
@@ -590,6 +592,41 @@ class CatalogCheckUncommittedMerge(FixtureCase):
         fx.write("untracked.txt", "new\n")
         self.check()
         self.assertEqual(fx.git("diff", "--cached", "--name-only"), "")
+
+
+class CatalogCheckPending(CatalogCase):
+    """After the move to OpenCode 2 a fork change of 0.4 may not be back yet: its entry names the task (`pending`) instead of files."""
+
+    def entries(self, *extra):
+        self.fx.write("docs/upstream-sync/catalog.json", json.dumps(
+            {"against": self.upstream, "entries": [{"id": "CAT-01", "paths": ["a.txt"]}, *extra]}))
+        self.fx.write("docs/upstream-sync/catalog.md", "".join(f"## {e} x\n" for e in ["CAT-01", *(x["id"] for x in extra)]))
+
+    def test_an_entry_without_files_is_stale_unless_it_is_pending(self):
+        self.seed()
+        self.entries({"id": "CAT-02", "paths": ["b.txt"]})
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("entries without divergent files: CAT-02", out)
+        self.entries({"id": "CAT-02", "paths": ["b.txt"], "pending": "B2.4"})
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+        self.assertIn("CAT-02: 0 (pending: B2.4)", out)
+
+    def test_a_pending_entry_must_name_its_task(self):
+        self.seed()
+        self.entries({"id": "CAT-02", "paths": [], "pending": " "})
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("pending must name a task or stage: CAT-02", out)
+
+    def test_a_pending_entry_that_gets_a_divergent_file_fails(self):
+        fx = self.seed()
+        self.entries({"id": "CAT-02", "paths": ["b.txt"], "pending": "B4"})
+        fx.write("b.txt", lines_with(2, "fork 2"))
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("pending entries with divergent files (describe the change, drop pending): CAT-02", out)
 
 
 class CheckCompatAllow(FixtureCase):
