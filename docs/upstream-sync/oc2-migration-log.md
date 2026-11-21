@@ -883,3 +883,273 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
 - Собранный CLI: S5 и каталоги проверены из исходников (канал `local`); канал `latest` — только `bun --define` в
   тесте переноса.
 - Вызовы в `sidecar-probe.ts` и `background-service.ts` под Electron: только typecheck. Окно Desktop с U5 — B4.
+
+## B1.7 Процедура синхронизации на v2
+
+21.11.2026. Ветка `b17-sync` от `oc2-migration` (`04ac42625f`), отдельное рабочее дерево. Bun 1.4.4 переносной
+(`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`) и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; глобальный Bun 1.4.3 не менялся. `bun install --frozen-lockfile`: код 0,
+1600 пакетов, `.husky/_` появился, хук `pre-commit` срабатывал на каждом коммите.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `6be6bf1ed7` `feat(upstream-sync): let a catalog entry name the task that brings it back` | `catalog-check.py`, `test_tools.py` | `clean` |
+| `b39e433f40` `fix(upstream-sync): run the sync procedure on the OpenCode 2 tree` | `sync-upstream.sh`, `selftest.sh` | `clean` |
+| `7cd383f9de` `docs(upstream-sync): move the catalog to OpenCode v2.3.0` | `catalog.json`, `catalog.md` | `clean` |
+| `d2a13173d4` `docs(upstream-sync): move guarantees, procedure, contract and ADR to OpenCode 2` | `guarantees.md`, `procedure.md`, `acceptance-contract.md`, `adr-0001-modular-integration.md` | `clean` |
+| `05374fa0bb` `fix(loginom-runtime): resolve acorn for client code loaded from the workspace` | `packages/loginom-runtime/package.json`, `bun.lock` (+3 строки) | `clean` |
+| `f9f3dd7d3a` `docs(upstream-sync): set the test Node first and state when the pin moves` | `guarantees.md`, `procedure.md` (правки после ревью) | `clean` |
+| следующий | Этот журнал | `clean` |
+
+Файлы OpenCode не менялись, кроме `bun.lock` (CAT-01). Изменены скрипты и документы `upstream-sync`, манифест пакета форка
+`loginom-runtime` и этот журнал.
+
+### Каталог
+
+- `against` — `a6b15d33daf6ab7d35569f6d711fdb630b9f04e7` (v2.3.0).
+- Записи с расхождениями на v2: CAT-01 (3 файла), CAT-02 (5), CAT-03 (1, `AGENTS.md`), CAT-12 (10), CAT-13 (6) — всего
+  25 файлов. Маски — пути v2. Маски 0.4, которых нет ни в v2, ни в дереве (`packages/web/**`, `packages/opencode/**`,
+  `docs/upstream/**`, `github/**`, `infra/**`, `perf/**`, `CONTEXT.md`, `packages/app/src/i18n/**`), убраны.
+- Записи CAT-04…CAT-11 — правки 0.4, которых на v2 ещё нет. Каждая несёт поле `pending` с задачей или этапом. Маски —
+  пакеты v2, где они уже есть (`desktop`, `app`, `ui`, `session-ui`, `tui`), иначе `[]`.
+- `catalog-check.py`: запись с `pending` может не иметь расхождений; `pending` — непустая строка; запись с `pending` и
+  расхождениями — ошибка (правка пришла: опиши её, сними `pending`). Сводка печатает задачу рядом с записью. Три теста
+  `CatalogCheckPending` в `test_tools.py`. Клетка контракта «fork adds a file / described» не меняется: у такой записи
+  нет `pending`, и она по-прежнему пустая.
+- `catalog.md` описывает состояние v2. Полный текст записей 0.4 — `git show a080f7725c:docs/upstream-sync/catalog.md`.
+  Правило подъёма Bun (на него ссылается B1.6) оставлено в CAT-02 дословно, с поправкой на В-84.
+- CAT-13 из B1.3a сохранена. `apply-identity.py` (`SOURCES` B1.3a) и `verify-accepted.py` не менялись: для v2 в них
+  нечего править. Как шлюз читает коммит переноса — в документах, ниже.
+
+### Каждая запись CAT → задача B или этап
+
+«0.4» — файлов форка в файлах upstream на точке отсечения против `810c0eba1a` (масками `catalog.json` точки отсечения;
+совпадает с таблицей 2b B1.2b). «v2» — файлов против v2.3.0 сейчас.
+
+| Запись | 0.4 | v2 | Куда |
+|---|---|---|---|
+| CAT-01 Манифесты | 10 | 3 | Корень и `packages/script` — B1.2a, сделано. Версия, лицензия и автор Desktop — B4; манифест пакета агента (`bin.loginom-ai-agent`, `dev:cli`, `prepare:release`) — B2.7a, B5.2; `app` — C |
+| CAT-02 CI, сборка | 47 | 5 | Workflows форка, задачи turbo с `passThroughEnv`, `release.yml`, блок `LOGINOM_NODE_WORKFLOW` в `pre-push` — B5.1, B5.2. Комплект сторонних материалов Bun — B1.6. Сборка CLI (standalone, метаданные, `User-Agent`) — B2.7a. Скрипты и `electron-builder.config.ts` Desktop — B4. Скрипт `install` — B1.4 |
+| CAT-03 Бренд | 669 | 1 | Бренд файлов upstream, `.opencode` → `.loginom-ai-agent`, README — B1.4. Значки и ресурсы Desktop — B4. Словари и `public` — C. Документация сайта (451 файл `packages/web` переехал в `services/site`) не брендируется — решение плана |
+| CAT-04 Каналы upstream | 6 | 0, `pending` | `installationNode`, `update-notifier` — B2.7d; обновление Desktop — B4.1 |
+| CAT-05 Сессия, инструменты | 89 | 0, `pending` | B2.2 (G1), B2.3 (G3, G4), B2.5, B2.6, B2.9. Правки дашбордов в `session` и `tool` без задачи (256 строк, B1.2b) — **предложение** B2.9 |
+| CAT-06 Скиллы, команды | 4 | 0, `pending` | B2.4 (G6, U3) |
+| CAT-07 Провайдеры, плагины, прокси | 22 | 0, `pending` | Встроенные плагины и U1 — B2.1. Прокси CLI `standalone-proxy.ts` — B2.7a. Системный прокси службы — B4.1. Исправления 0.4 в `transform.ts`, кодах OAuth, WebSocket план не называет — **предложение** B2.1: проверить по тестам 0.4, нужны ли они на v2.3.0 |
+| CAT-08 CLI, воркер, конфиг | 89 | 0, `pending` | B2.7a–d, B2.8 (U4), B3.2 (конфиг 0.4) |
+| CAT-09 Desktop | 97 | 0, `pending` | B4 (правки U5 — в CAT-13) |
+| CAT-10 App, UI | 141 | 0, `pending` | Этап C |
+| CAT-11 TUI | 35 | 0, `pending` | Слово-знак, имя продукта в обновлении, тема — B1.4. `local-attachment.ts` — B2.5d. `cli/tui/loginom-bridge.ts` (мост порта Host воркера TUI) — B2.3: Host живёт в плагине службы. Задачи на TUI в плане нет — **предложение** |
+| CAT-12 Ядро | 53 | 10 | `OPENCODE_*` → `LOGINOM_AI_AGENT_*`, имена файлов БД и конфига — B1.4 |
+| CAT-13 U5 (новая) | — | 6 | B1.3a, сделано. Identity и порт в Desktop и профилях CLI — B4, B2.7c; каталоги по каналу — B1.4 |
+
+Итого: 5 записей с расхождениями на v2 (CAT-01, 02, 03, 12, 13), 8 — `pending`: в B2 — 5 (CAT-04…08), в B4 — 1 (CAT-09),
+этап C — 1 (CAT-10), B1.4 и B2 — 1 (CAT-11). Без задачи по плану было три куска — CAT-07 (исправления провайдеров),
+CAT-11 (TUI), дашборд-правки CAT-05; им назначены задачи с пометкой «предложение». Новые правки upstream этапа B,
+предложение, куда записывать: U1 — CAT-07, U3 — CAT-06, U4 — CAT-08, мягкая остановка службы (B2.3b) — CAT-13.
+
+### Процедура и скрипты
+
+- **Уже слитый тег.** `prepare` на v2.3.0 падал: `measure-conflicts.sh` честно отказывает без `MERGE_HEAD` («после merge
+  нет MERGE_HEAD — измерение недействительно», код 1). Теперь `prepare` проверяет `git merge-base --is-ancestor` и на
+  таком теге слияния не начинает: 0 путей, `rehearsal/` — сам коммит форка, код 0. Защиту `MERGE_HEAD` в
+  `measure-conflicts.sh` не трогал. Новый случай в `selftest.sh`: синтетический форк после слияния `v1.1.0`.
+- **`check` на v2.** Убраны шаги `httpapi` (`packages/opencode`, `test:httpapi` в v2 нет) и `tests-desktop` (в v2
+  `turbo test` включает `desktop#test`; `draft-store.test.ts` нет). Добавлены `npm ci` шаблона дашбордов в `install`,
+  `check-generated-protocol` (как `check-test.yml`) и `build-cli` до `build-desktop`: сборка Desktop v2 без
+  `packages/cli/dist` скачивает опубликованный CLI. Куча V8 по умолчанию — 4096 МБ, как `release.yml` v2. Имена шагов
+  сохраняют префиксы `--skip`.
+- **`procedure.md`.** Bun 1.4.4 (В-84); тег по умолчанию `v2.3.0`; случай «тег уже в форке»; правила классов
+  конфликтов — 0.4; до B1.4 синхронизация с новым тегом не идёт (решение 10), потому что `apply-identity` на части
+  файлов не замкнёт имена; блок `identity-docs` убран (документация — `services/site`, не брендируется); `pending` в
+  правиле каталога; шаги `check` v2; ложные падения `tests-turbo` до B5.1.
+- **Правило В-93** — пункт 8 шага 2 и компенсация в шаге 5: `secrets range` с кодом 0 считается только с закреплением
+  нового тега; SHA сверяют `git ls-remote https://github.com/anomalyco/opencode.git 'refs/tags/vX.Y.Z*'`; смена — с
+  ревью владельца и попадает в `loginom` раньше PR синхронизации (PR-проверка читает файл из базовой ветки); правка в
+  коммите слияния — `deviation` с записью `PROCEDURE-2`. Сверка текущего закрепления:
+
+```text
+$ git ls-remote https://github.com/anomalyco/opencode.git 'refs/tags/v2.3.0*'
+a6b15d33daf6ab7d35569f6d711fdb630b9f04e7	refs/tags/v2.3.0
+```
+
+  Тег лёгкий, SHA совпадает с `.gitleaks-upstream`.
+- **`acceptance-contract.md`** — раздел «Коммит переноса на OpenCode 2»: родители ровно форк и upstream — первый
+  `43b449d65a` (точка отсечения `a080f7725c`, правка сканера B1.2s, коммиты переноса B1.2a), второй `v2.3.0`
+  (`a6b15d33da`). Прогон шлюза на нём:
+
+```text
+$ python3 -I scripts/upstream-sync/verify-accepted.py --repo . --fork 43b449d65adb383d5b1e8a11b07fb5ccd243c021 \
+    --upstream a6b15d33daf6ab7d35569f6d711fdb630b9f04e7 --merge 3e6a995f9a253b85aba9e819b3bae0a1b2ad78c6
+merge 3e6a995f9a253b85aba9e819b3bae0a1b2ad78c6  oracle tree abc7f98d7f2936d3104d74c9ca07ec7e64c42409
+| conflict | 13 | 2 |
+| deviation | 0 | 0 |
+| equal to the oracle | 24865 | |
+… 11 × FAIL conflict, 22 × FAIL stale-record
+RESULT: REJECTED          # код 1, 41 с; база слияния 055d95bb7e
+```
+
+  Записан как факт: коммит принят В-83 и приёмкой B1.2, не шлюзом. Не чинил: `merge-decisions.json` в дереве — от
+  синхронизации 0.4 с v1.19.4, при следующей синхронизации его пишут заново (сказано в процедуре).
+- **ADR-0001** — раздел «Перенос на OpenCode 2»: что из решений 1–8 действует на v2; путь `flag-identity.test.ts` —
+  `packages/cli/test` (решения 2 и 7); решение 5 — исключение `pending`; Bun — пересмотрено В-84.
+
+### `guarantees.md`
+
+- Таблица G1–G6 по дереву v2: код и тесты, которые есть (`loginom-host`, `product`, `cli`), задача, которая переносит
+  остальное, мутация 0.4 с пометкой «на v2 не перемерялась». Пути `packages/opencode/...` из документа убраны: тест
+  `repo-paths` проверяет каждый путь в обратных кавычках. Версия 0.4 — `git show a080f7725c:docs/upstream-sync/guarantees.md`.
+- `flag-identity.test.ts` — `packages/cli/test/flag-identity.test.ts`.
+- «Как запускать»: `export LOGINOM_AI_AGENT_TEST_NODE` первой строкой, `npm ci` шаблона дашбордов,
+  `LOGINOM_AI_AGENT_TEST_NODE` для `loginom-host` и `dashboard` (205 падений вместо 38 — по B1.5, не перемерял), тесты
+  `dashboard`. `bun turbo test` переменную не передаёт до B5.1.
+- Тесты дашбордов на дереве v2, `bun run test` в `packages/dashboard`, Node 24.19.0:
+
+| Шаблон | `test:coverage:web` | `test:coverage:workers` | `node --test` (8 файлов) |
+|---|---|---|---|
+| без `npm ci` | 50 / 0 | 17 / 19, скрипт останавливается | не запускался |
+| с `npm ci` | 50 / 0 | 36 / 0 | 92 / 3 / 1 пропущен |
+
+  Три падения — `folder.test.mjs` «a partial source copy is retried completely…» и два его подтеста: под root
+  `chmod 0` не даёт `EACCES` (базовое падение стенда, записано в документе).
+
+### Приёмка
+
+Все три — на `d2a13173d4`; на итоговом `f9f3dd7d3a` повторены (ниже), Bun 1.4.4 и Node 24.19.0 первыми в `PATH`, из корня рабочего дерева.
+
+1. **`catalog-check.py` с новым каталогом — зелёный.**
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 25 divergent upstream files
+  CAT-01: 3
+  CAT-02: 5
+  CAT-03: 1
+  CAT-04: 0 (pending: B2.7d, B4.1)
+  CAT-05: 0 (pending: B2.2, B2.3, B2.5, B2.6, B2.9)
+  CAT-06: 0 (pending: B2.4)
+  CAT-07: 0 (pending: B2.1, B2.7a, B4.1)
+  CAT-08: 0 (pending: B2.7, B2.8, B3.2)
+  CAT-13: 6
+  CAT-09: 0 (pending: B4)
+  CAT-10: 0 (pending: stage C)
+  CAT-11: 0 (pending: B1.4, B2.3, B2.5d)
+  CAT-12: 10
+```
+
+   До правки, на `04ac42625f`, против v2.3.0: `PROBLEM: entries without divergent files: CAT-04, CAT-05, CAT-06,
+   CAT-07, CAT-08, CAT-09, CAT-10, CAT-11`, код 1; против `against` 0.4 (`810c0eba1a`) — 646 файлов без записи.
+
+2. **`selftest.sh` на новом дереве — зелёный.** `TMPDIR` — каталог в scratchpad; под root, поэтому самотест проверяет
+   и отказ `check` под root.
+
+```text
+$ scripts/upstream-sync/selftest.sh
+SELFTEST PASS                    # код 0, 2 мин; до правок на 04ac42625f — тоже PASS
+```
+
+   Внутри: `test_tools.py` (в том числе три новых теста `CatalogCheckPending`), `test_acceptance.py` (клетки контракта
+   и мутации шлюза), `test_stand.sh`, док-тест `procedure.md` от `pin` до `accepted` (`RESULT: ACCEPTED`; шагов `env`,
+   `pin`, `prepare`, `resolve`, `load`, `identity`, `catalog`, `commit`, `check`, `accepted`) и новый случай уже
+   слитого тега.
+
+3. **Пробная синхронизация на v2.3.0 без изменений — пустой результат.** Оба адреса — локальный репозиторий, тег
+   `v2.3.0` есть в нём.
+
+```text
+$ scripts/upstream-sync/sync-upstream.sh pin --tag v2.3.0 --upstream-url <repo>
+UPSTREAM_TAG=v2.3.0
+UPSTREAM_SHA=a6b15d33daf6ab7d35569f6d711fdb630b9f04e7
+$ scripts/upstream-sync/sync-upstream.sh prepare --fork-sha d2a13173d4b38d31db7c8988b9105386de74c9e3 --tag v2.3.0 \
+    --upstream-sha a6b15d33daf6ab7d35569f6d711fdb630b9f04e7 --out <scratchpad>/b17-trial2 --fork-url <repo> --upstream-url <repo>
+unmerged paths: 0 (v2.3.0 is already in the fork, nothing to merge)
+next: nothing; v2.3.0 is already merged, so there is no merge commit to check or accept      # код 0
+$ wc -l < measure/unmerged-paths.txt                       # 0
+$ git -C rehearsal rev-parse HEAD                          # d2a13173d4b38d31db7c8988b9105386de74c9e3
+$ git -C rehearsal status --porcelain | wc -l              # 0
+$ git -C rehearsal rev-parse -q --verify MERGE_HEAD        # код 1: слияния нет
+$ python3 -I scripts/upstream-sync/catalog-check.py --repo rehearsal --against a6b15d33da…   # код 0, 25 файлов
+$ python3 -I scripts/upstream-sync/verify-accepted.py --repo rehearsal --fork d2a13173d4… --upstream a6b15d33da…
+ERROR: d2a13173d4… has parents ['7cd383f9de…'], not exactly the fork … and upstream …     # код 2: принимать нечего
+```
+
+   До правки `prepare` на том же входе (`--fork-sha 04ac42625f…`) завершался кодом 1: `ОШИБКА: после merge нет
+   MERGE_HEAD — измерение недействительно`.
+
+Полный `bun run check` из корня, один раз, на `d2a13173d4`: код 0, 13 с. `Found 522 warnings and 0 errors`, `sdk-docs`
+— 0 problem(s), `turbo typecheck` — `Tasks: 38 successful, 38 total`, все 38 из кэша turbo (TS эта задача не меняла).
+
+### `packages/product`: до и после
+
+`bun test` в `packages/product`. До — `04ac42625f`: 53 pass, 8 fail. После — `f9f3dd7d3a`: 56 pass, 5 fail, без `npm ci` клиента `loginom-runtime` (каталог `client/node_modules` убран на время
+прогона). На `d2a13173d4`, до правки манифеста: 56/5 с `npm ci` клиента и 55/6 без него.
+
+| Падение | Итог | Чьё |
+|---|---|---|
+| `catalog.json describes every file in which the fork differs from upstream` | **зелёное** | B1.7: каталог против v2.3.0 |
+| `files named in guarantees.md and the scripts it relies on exist` | **зелёное** | B1.7: документ по дереву v2 |
+| `every installed node handler has one routing row and one bounded reference` (`acorn`) | **зелёное** | B1.7: `"acorn": "8.15.0"` в `packages/loginom-runtime/package.json` (workspace). Тест грузит `client/lib` из workspace; `acorn` объявлен в `client/package.json` и его npm-замке, но в 0.4 пакет лежал в корневом `node_modules`, а на дереве v2 Bun его туда не кладёт. Версия — как в замке клиента; манифест `loginom-runtime` не копируется в ресурсы (`stage-resources.ts` берёт `client/package.json` и ставит замок `npm ci`) |
+| `workspace packages > the agent package keeps the upstream directory` | красное | B1.4: тест ждёт `opencode` в `packages/opencode`, на v2 пакет агента — `@opencode/cli` в `packages/cli` |
+| `workspace packages > turbo task keys name existing workspace packages` | красное | B1.4: `turbo.json` v2 с комментариями (JSONC), `JSON.parse` падает. Задачи форка в `turbo.json` — B5.1 |
+| `workspace packages > --filter arguments …` | красное | B1.4: синтаксис turbo `@opencode/cli^...` и ложное `--filter name]` в `packages/codemode/script/bench.ts`; B5.1: `loginom-macos.yml` (`loginom-ai-agent`, `@opencode-ai/desktop`), `secrets.yml` (`@opencode-ai/script`) |
+| `CI triggers > path filters match tracked files …` | красное | B5.1: `loginom-windows.yml`, `windows-native-check.yml` (пути `packages/opencode`, `desktop/src/main/apps*`) |
+| `path literals in build and CI code > …` | красное | B5.1: `loginom-windows.yml`, `windows-native-check.yml`, `script/test-windows-profile.ps1`. B2.7a: `evals/src/{cli,profile}.ts`, `evals/test/cli.test.ts`, `loginom-host/script/build-cli.ts`, `scripts/node-acceptance/tests/required-checks.test.mjs`. B2.7a и B4: `loginom-host/script/skills-acceptance.ts`. B1.4: устаревшие пути в файлах самого v2.3.0 (`patches/install-korean-ime-fix.sh` → `packages/opencode`, `script/release.ts` → `packages/console`) — исключения теста |
+
+B6.3 (пути в модульных `AGENTS.md`) из этих падений не получил ни одного: `repo-paths` `AGENTS.md` не проверяет.
+
+### Где решал сам
+
+- **`pending` вместо удаления записей.** Задание просит «запись с задачей или этапом». Меньший вариант без правки
+  скрипта — таблица в `catalog.md` без записей в `catalog.json` — не давал бы записи. С `pending` ослаблено правило
+  ADR «пустая запись — ошибка»: пустой может быть только запись с задачей, и она краснеет, как только правка придёт.
+  **Спорное**, для владельца.
+- **Описания 0.4 убраны из `catalog.md` и `guarantees.md`**, вместо них — ссылка на точку отсечения. Они описывали
+  файлы, которых в v2 нет. Оставлено правило подъёма Bun: на него ссылается приёмка B1.6.
+- **`acorn` — зависимость пакета форка `loginom-runtime`**, а не шаг стенда и не корневой `package.json` (файл OpenCode).
+  Сначала был выбран шаг стенда (`npm ci` клиента); по ревью проверен манифест workspace — тест зелёный на чистой
+  установке, `bun install --frozen-lockfile` проходит. Цена: версия `acorn` записана в двух манифестах (`loginom-runtime`
+  и `client`), при подъёме — обе.
+- **`check` правлен по v2** (шаги выше), хотя `check` не запускался: под root он отказывает, полный прогон — тяжёлый.
+- **`turbo.json` не правил.** `passThroughEnv` для `loginom-host` и `dashboard` — B5.1 (B1.2a записала это входом
+  B1.7/B5). Цена до B5.1: `tests-turbo` в `check` даёт ложные падения этих пакетов; процедура и `guarantees.md` это
+  называют.
+- **Синхронизация с новым тегом — после B1.4**, выведено из решения 10 и B1.3a, записано в процедуре.
+- **Противоречие плана**: приёмка B1.4 — «`repo-paths.test.ts` зелёный», а три из пяти оставшихся падений лечат B5.1 и
+  B2.7a. Предложение владельцу: в приёмке B1.4 — проверки самого теста (каталог пакета агента, JSONC, `^...`, исключения
+  путей v2.3.0), остальное — в приёмке B5.1 и B2.7a.
+
+**Итоговый повтор на `f9f3dd7d3a`** (после правки манифеста `loginom-runtime` и формулировок):
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary     # код 0
+against a6b15d33daf6: 25 divergent upstream files                  # состав по записям — как выше
+$ scripts/upstream-sync/sync-upstream.sh prepare --fork-sha f9f3dd7d3ae3b400fd4bfb29e0b0e157fb0def3c --tag v2.3.0 …
+unmerged paths: 0 (v2.3.0 is already in the fork, nothing to merge)   # код 0; rehearsal = f9f3dd7d3a, чистое, MERGE_HEAD нет
+$ scripts/upstream-sync/selftest.sh
+SELFTEST PASS                                                       # код 0, 2 мин
+$ cd packages/product && bun test                                  # без client/node_modules
+ 56 pass
+ 5 fail
+```
+
+### Найдено, не чинил
+
+- `conflict-classes.py`: правила классов — пути 0.4; на v2 почти любой конфликт попадёт в `unclassified` (код 4, в
+  `prepare` не роняет). Дополнить после первой настоящей синхронизации.
+- `compat-snapshot.ts` на дереве v2 работает (38 имён `LOGINOM_AI_AGENT_*`, 26 workflow), но `agentDir` падает на
+  `packages/agent`, которого нет. Для сравнения двух снимков v2 это одинаково с обеих сторон.
+- `stand.sh` убирает пустой `packages/sdk/js/openapi.json` — в v2 такого каталога нет, правило мёртвое и безвредное.
+- `apply-identity.py` переименовывает `opencode.db`, но не `opencode-<канал>.db` v2 — это B1.4 (массовый прогон).
+- `.gitignore` форка держит `/packages/opencode/config.json` для пакета, которого в v2 нет (B5.1 или B2).
+
+### Не проверено
+
+- `sync-upstream.sh check` на дереве v2 целиком: под root отказывает, шаги правлены по `check-test.yml`, `check.yml` и
+  `release.yml` v2 без прогона. Шаг `build-cli` не запускался.
+- `loginom-host` без `LOGINOM_AI_AGENT_TEST_NODE` (205 падений) — число из B1.5, не перемерялось.
+- Мутации G1–G6 на дереве v2 не перемерялись: в документе числа 0.4 с пометкой.
+- Хук `pre-push` целиком (`secrets push`): push не делался. `bun run check` — код 0 на `d2a13173d4`, typecheck из кэша
+  turbo; после него менялись только документы и манифест `loginom-runtime` (+3 строки, `bun install --frozen-lockfile` — код 0).
+- Строгий `pending` покраснит `catalog-check`, если параллельная ветка до слияния внесёт правку в `desktop`, `app`, `ui`,
+  `session-ui` или `tui`: такой ветке нужно снять `pending` у CAT-09, CAT-10 или CAT-11 и описать правку.
