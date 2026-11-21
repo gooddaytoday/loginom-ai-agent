@@ -1153,3 +1153,143 @@ $ cd packages/product && bun test                                  # без clie
   turbo; после него менялись только документы и манифест `loginom-runtime` (+3 строки, `bun install --frozen-lockfile` — код 0).
 - Строгий `pending` покраснит `catalog-check`, если параллельная ветка до слияния внесёт правку в `desktop`, `app`, `ui`,
   `session-ui` или `tui`: такой ветке нужно снять `pending` у CAT-09, CAT-10 или CAT-11 и описать правку.
+
+## B1.3b Системные каталоги и `process-daemon`
+
+21.11.2026. Ветка `b13b-system` от `oc2-migration` (`10ea14e6f6`: B1.7 и B1.3a уже влиты), отдельное рабочее дерево.
+Bun 1.4.4 переносной (`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`) —
+первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, 1600 пакетов, `.husky/_`
+появился, хук `pre-commit` срабатывал на каждом коммите. Для Rust: `rustup` поставил пин пакета 1.90.0 в `~/.rustup`
+(и сам обновился 1.29.1 → 1.29.3), Zig 0.16.0 (версия из `check-process-daemon.yml`, sha256 сверен с ziglang.org) —
+в scratchpad, в `PATH` только для `cargo`. Ghostty `build.rs` берёт с GitHub сам. В репозиторий из этого ничего не попало.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `e1d07cf418` | `core`: системный каталог и MDM продукта, тесты | код 0, `clean` |
+| `d2d7275d1b` | `process-daemon`: каталог состояния, сокетов и переменная продукта | код 0, `clean` |
+| `a03ca6fd23` | Каталог: CAT-13 и CAT-12 | код 0, `clean` |
+| следующий | Этот журнал | |
+
+### Правки файлов upstream
+
+Исходники — в **CAT-13** явными путями (иначе их забрала бы CAT-12 по `packages/**`), тест upstream — в CAT-12.
+
+| Файл | Строк | Что |
+|---|---|---|
+| `core/src/config/discovery.ts` | +12 −7 | `const app = "loginom-ai-agent"`, `const preferenceDomain = "com.loginom.aiagent.managed"`: `/etc/<app>`, `%ProgramData%\<app>`, `/Library/Application Support/<app>`, `/Library/Managed Preferences[/<user>]/<preferenceDomain>.plist` |
+| `core/test/config/config.test.ts` | +6 −6 | Ожидания двух тестов upstream (`systemDirectory`, `preferencePaths`) — на пути продукта |
+| `process-daemon/src/daemon.rs` | +6 −5 | Корень состояния по умолчанию `<state>/loginom-ai-agent/pty`; юнит-тест |
+| `process-daemon/src/daemon/unix.rs` | +8 −7 | `LOGINOM_AI_AGENT_PTY_SOCKET_DIR` вместо `OPENCODE_PTY_SOCKET_DIR` (чтение, две ошибки, комментарий), каталог сокетов `loginom-ai-agent-pty-<uid>`; юнит-тесты |
+| `process-daemon/src/client.rs` | +1 −1 | Справка `help`: путь по умолчанию |
+
+Новый файл форка (в каталог не входит): `core/test/config/product-system.test.ts`, 3 теста.
+
+**`.rs` и `apply-identity`: правило в каталоге, не шаг скрипта.** Скрипт переименовал бы только `OPENCODE_*`, а пути
+`opencode/pty` и `opencode-pty-<uid>` — литералы, их всё равно править руками. Расширение `SOURCES` и `TEXT` сдвинуло
+бы `--check` и `merge_oracle.py` (он берёт `wants()` из скрипта). Правило — в CAT-13: файлы, что переименовано и что
+нет, проверка `cargo test`, новые пути и `OPENCODE_*` в коде `process-daemon` upstream приводить вручную.
+
+### Тесты
+
+`product-system.test.ts`:
+- `systemDirectory` для `linux`, `win32` (`ProgramData`), `darwin` — пути продукта, сегмента `opencode` нет;
+- `preferencePaths` — `com.loginom.aiagent.managed.plist`, без `opencode`;
+- настоящие файлы: во временном `ProgramData` лежат `opencode/opencode.json` (deny `shell:opencode-policy`) и
+  `loginom-ai-agent/opencode.json` (deny `shell:product-policy`). `Config` с `system` из
+  `systemDirectory("win32", { ProgramData })` загружает только политику продукта. Подменить корень `discovery`
+  позволяет только на Windows (`ProgramData`); `/etc` и `/Library` — литералы, для них проверка по функции путей.
+
+На `discovery.ts` upstream (файл подменялся на время прогона и возвращался) все три красные:
+
+```text
+Expected: "/etc/loginom-ai-agent"
+Received: "/etc/opencode"
+Expected to contain: "shell:product-policy"
+Received: [ "shell:opencode-policy" ]
+ 0 pass
+ 3 fail
+```
+
+После правки:
+
+```text
+$ cd packages/core && bun test test/config/product-system.test.ts
+ 3 pass
+ 0 fail
+ 8 expect() calls
+```
+
+`process-daemon` (`cargo test`, toolchain 1.90.0) до и после — одинаково: lib 82, `ghostty-effects` 5, `ownership` 12,
+`pipe` 23, `playground` 3, `rows` 1, `runtime` 8 (+1 ignored), `service` 12, `transport-retained` 1; Windows-тесты на
+Linux пустые. Итого 147 passed, 0 failed, 1 ignored. Изменённые проверки:
+`runtime_root_avoids_temporary_directories`, `socket_root_preserves_default_uid_directory`,
+`socket_root_uses_dedicated_child_of_explicit_directory`.
+
+```text
+$ cargo fmt --check                                            # код 0
+$ cargo clippy --all-targets --all-features -- -D warnings     # код 0
+$ cargo test                                                   # код 0
+$ cargo build                                                  # код 0
+$ HOME=<tmp> target/debug/opencode-pty daemon --name probe     # без XDG_STATE_HOME, 4 с
+<tmp>/.local/state/loginom-ai-agent/pty/probe
+/tmp/loginom-ai-agent-pty-0/a2ba983bd34cf46418e676ba6adb79d4.sock
+```
+
+`core` полностью, `bun run script/test.ts` на `a03ca6fd23`: 7118 pass, 3 fail (`Ran 7475 tests across 323 files`).
+На `oc2-migration` — 7115 pass, 3 fail (B1.3a выше); +3 — новые тесты. Падения те же:
+`ShellParse > extracts static directory targets…`, `util.effect-flock > fails on unwritable lock roots`,
+`util.flock > fails clearly on unwritable lock roots` (прогон под root). Новый файл по навыку `unit-tests`:
+`bun run script/test.ts test/config/product-system.test.ts --rerun-each 10` — 30 pass, 0 fail. `bun typecheck` в
+`packages/core` — `No type errors in 1,980 files across 2 projects`, код 0.
+
+`names.test.ts` и `flag-identity.test.ts` эти имена не ловят (`.rs` и системные каталоги не сканируют) и не менялись:
+`packages/product` `bun test test/names.test.ts` — 9 pass, 0 fail; `packages/cli` `bun test test/flag-identity.test.ts`
+— 3 pass, 0 fail. Пометки `test.failing` на месте. `packages/product` `bun test` — 56 pass, 5 fail, те же пять, что в
+разборе B1.7 выше (`repo-paths`: B1.4, B5.1, B2.7a).
+
+`bun run check` из корня на `a03ca6fd23` (документы журнала не проверяет) — код 0: `oxlint` `Found 522 warnings and 0
+errors` (в новых и изменённых файлах предупреждений нет), `Tasks: 38 successful, 38 total`, `Cached: 32 cached`.
+
+`python3 -I scripts/upstream-sync/catalog-check.py --summary` — код 0, 30 расходящихся файлов (на `10ea14e6f6` — 25),
+CAT-13: 6 → 10, CAT-12: 10 → 11. До правки `catalog.json` проверка тоже давала код 0, но CAT-12: 15 — маска
+`packages/**` молча забирала исходники; поэтому пути явные.
+
+### Где решал сам
+
+- **Литералы, не импорт `Product`.** `core` не зависит от `@loginom-ai-agent/product`; импорт добавил бы правку
+  манифеста и `bun.lock` (CAT-01). Как в `util/src/global.ts` B1.3a: литерал с комментарием `Fork (CAT-13)`. Значения —
+  `Product.slug` и `Product.channels.prod`.
+- **Идентификатор MDM — `com.loginom.aiagent.managed`.** У OpenCode приложение `ai.opencode.desktop`, политика —
+  `ai.opencode.managed`; у продукта единственный reverse-DNS — канал prod `com.loginom.aiagent`, к нему тот же суффикс.
+  **Спорное**: сам `com.loginom.aiagent` — домен настроек Desktop, поэтому отдельный суффикс. Каналы beta и dev — B1.4.
+- **Имя файла в системном каталоге осталось `opencode.json(c)`** (`names`): это B1.4, вместе с остальными чтениями.
+- **В `process-daemon` переименовано только то, что видно продукту во время работы:** каталог состояния, каталог
+  сокетов, переменная `…_PTY_SOCKET_DIR`. Не менялись: имя crate и бинарника `opencode-pty` (его ищут `core`, сборка
+  CLI и `CARGO_BIN_EXE_opencode-pty` в тестах), именованный канал Windows `\\.\pipe\opencode-pty-<instance>` (уникален
+  по 128-битному id экземпляра, на Linux не компилируется), `OPENCODE_ZIG_CPU` в `build.rs` (его задаёт
+  `release-process-daemon.yml`: правка только в `build.rs` молча сняла бы baseline CPU; workflows — B5), тестовые
+  `OPENCODE_PTY_*_TEST_CHILD` и тексты сообщений.
+- **`README.md` пакета не правил** — он в CAT-03 (`packages/*/*.md`), бренд документов — B1.4. Сейчас README описывает
+  `OPENCODE_PTY_SOCKET_DIR` и пути `opencode`.
+- Название CAT-13 в `catalog.json` не менял, раздел дополнен.
+
+### Найдено, не чинил
+
+- **Продукт пока запускает бинарник `opencode-pty` из npm `@opencode/pty@0.5.2`**, а не из `packages/process-daemon`:
+  `core/src/persistent-pty/pty-binding.ts` (`binaryPath`), сборка CLI — `cli/script/opencode-pty.ts`, свой бинарник
+  только через `OPENCODE_PTY_BIN`. Правка Rust дойдёт до продукта, когда форк соберёт свой бинарник (B5.1: Rust-часть
+  в `loginom-windows.yml`; сборка CLI — B2.7a). До того сокеты продукта — в `/tmp/opencode-pty-<uid>`, общем с
+  OpenCode каталоге, и переменная — `OPENCODE_PTY_SOCKET_DIR`. Смягчение: каталог состояния продукт задаёт сам
+  (`--runtime-dir <state>/pty` из `Global`, после B1.3a — `loginom-ai-agent`), а имя сокета — хеш этого каталога, так что
+  файлы не совпадают.
+- Бинарник ставится в `<bin>/opencode-pty/` (`core/src/persistent-pty/binary.bun.ts`) — каталог `Global.bin` уже
+  продукта, имя подкаталога — бренд, B1.4.
+
+### Не проверено
+
+- Windows и macOS: всё на Linux. Ветка `win32` и `darwin` в `discovery` — по функциям путей; Rust на Windows
+  (`daemon/windows.rs`, `transport/windows.rs`) не компилировался — B5.1.
+- MDM-plist на настоящем macOS (`plutil`) не проверялся.
+- Собранный CLI со своим бинарником `process-daemon` — не собирался (выше).
