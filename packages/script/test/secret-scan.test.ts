@@ -146,6 +146,36 @@ test("staged scan skips only an indexed blob identical to the pinned commit at t
   expect(changed.output).not.toContain(upstreamKey)
 })
 
+test("a pinned archive is skipped only at its pinned path", async () => {
+  for (const copy of [false, true]) {
+    const root = await repo()
+    const start = git(root, "rev-parse", "HEAD")
+    git(root, "checkout", "-qb", "upstream")
+    await Bun.write(join(root, "settings.xml"), `<token>${upstreamKey}</token>`)
+    expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+    git(root, "add", "package.lgp")
+    git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "upstream tag")
+    await Bun.write(join(root, ".gitleaks-upstream"), `${git(root, "rev-parse", "HEAD")}\n`)
+    git(root, "checkout", "-qb", "fork", start)
+    git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork", "--allow-empty")
+    const fork = git(root, "rev-parse", "HEAD")
+    git(root, "merge", "--no-ff", "--no-commit", "upstream")
+    if (copy) {
+      await Bun.write(join(root, "fork", "package.lgp"), Bun.file(join(root, "package.lgp")))
+      git(root, "add", "fork/package.lgp")
+    }
+    git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "merge upstream tag")
+    const merge = git(root, "rev-parse", "HEAD")
+    const result = run(root, "range", fork, merge)
+    expect(result.code).toBe(copy ? 2 : 0)
+    expect(report(result.output).findings).toEqual(
+      copy ? [{ file: "fork/package.lgp!settings.xml", line: 1, rule: "github-pat", commit: merge }] : [],
+    )
+    expect(report(result.output).summary).toMatchObject({ archives: 1, upstream_findings: copy ? 0 : 1 })
+    expect(result.output).not.toContain(upstreamKey)
+  }
+})
+
 test("without a pin file upstream history and files are scanned as before", async () => {
   const root = await repo()
   const fixture = await upstreamMerge(root)
