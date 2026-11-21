@@ -39,7 +39,9 @@ export async function writeCliManifest(root: string, info: typeof metadata.Type)
 }
 
 export async function verifyCliManifest(root: string, expected: { platform: string; arch: string; version?: string }) {
-  const decoded = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(await readFile(join(root, filename), "utf8"))
+  const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(
+    await readFile(join(root, filename), "utf8"),
+  )
   if (Option.isNone(decoded)) throw new Error("LOGINOM_MANIFEST_INVALID")
   const value = Schema.decodeUnknownOption(manifest, { onExcessProperty: "error" })(decoded.value)
   if (Option.isNone(value)) throw new Error("LOGINOM_MANIFEST_INVALID")
@@ -85,7 +87,7 @@ export async function verifyCliManifest(root: string, expected: { platform: stri
 }
 
 async function verifyWindowsPayload(root: string, entries: Map<string, typeof file.Type>) {
-  const decoded = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(
+  const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(
     await readFile(join(root, "resources/loginom/resource-manifest.json"), "utf8"),
   )
   if (Option.isNone(decoded) || !decoded.value || typeof decoded.value !== "object")
