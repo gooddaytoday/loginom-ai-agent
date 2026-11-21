@@ -45,9 +45,22 @@ async function main() {
           .trim()
           .split("\n")
           .filter(Boolean)
-  if (mode === "staged" ? !git("diff", "--staged", "--name-only", "-z") : mode !== "audit" && !commits.length) {
+  const upstreamCommits =
+    pins.length && selected.length ? Number(git("rev-list", "--count", ...selected).trim()) - commits.length : 0
+  if (
+    mode === "staged"
+      ? !git("diff", "--staged", "--name-only", "--no-renames", "-z")
+      : mode !== "audit" && !commits.length
+  ) {
     console.log(
-      JSON.stringify({ status: "clean", commits: 0, archives: 0, elapsed_ms: Math.round(performance.now() - started) }),
+      JSON.stringify({
+        status: "clean",
+        commits: 0,
+        archives: 0,
+        upstream_commits: listed.length ? upstreamCommits : undefined,
+        upstream_missing: listed.length ? listed.length - pins.length : undefined,
+        elapsed_ms: Math.round(performance.now() - started),
+      }),
     )
     return 0
   }
@@ -210,6 +223,7 @@ async function main() {
         current_files: current.length,
         skipped,
         references,
+        upstream_commits: listed.length ? upstreamCommits : undefined,
         upstream_findings: listed.length ? upstreamFindings.length : undefined,
         upstream_missing: listed.length ? listed.length - pins.length : undefined,
         elapsed_ms: Math.round(performance.now() - started),
@@ -228,6 +242,7 @@ function archiveOrigin(archive: Archive, revisions: string[]) {
     "--diff-merges=first-parent",
     "--reverse",
     "--format=%H",
+    "--no-renames",
     `--find-object=${archive.oid}`,
     ...revisions,
   )
@@ -345,7 +360,11 @@ async function upstreamPins() {
       if (!/^([a-f0-9]{40}|[a-f0-9]{64})$/.test(line))
         throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
       // An absent commit cannot be in the range or a merge parent; leaving it out only makes the scan stricter.
-      const type = Bun.spawnSync(["git", "cat-file", "-t", line], { stderr: "ignore" })
+      // A partial clone must not fetch the pin from its promisor; Git before 2.44 ignores this variable.
+      const type = Bun.spawnSync(["git", "cat-file", "-t", line], {
+        stderr: "ignore",
+        env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+      })
       if (type.exitCode) return { sha: line, present: false }
       if (type.stdout.toString().trim() !== "commit")
         throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
