@@ -72,6 +72,8 @@
 
 - `collect-build-notices.ts` copies package and nested npm license/notice texts for positive Bun output contributions into CLI licenses/bundled-npm. Its inventory remains explicitly incomplete for full attribution/source/relinking release audit, which the user deferred outside the technical Linux goal. Do not treat metadata license declarations or successful copying as compliance approval.
 
+- `script/bun-notices.ts generate <version> <cache> <new-output>` rebuilds `licenses/bun` from the exact upstream pins of one Bun release (B1.6); run it on Linux with that pinned Bun and replace the directory with the output. Recipes are parsed as data, never executed, and checked against `process.versions`; another Bun revision is refused. The cache keeps every download, so a rerun works offline, and its top level is the input of `build-bun-source-companion.ts`. `verify [<bundle>] [<companion-input>]` checks the bundle and the archives offline. The result stays `incomplete`: it is not a legal or relinking audit.
+
 - Private supervisor shutdown diagnostics are `runtime-close-<pid>-<uuid>.json` under the runtime state directory (0600): bounded request error class, ACK boolean and actual exit code/signal only. Never serialize remote replies or error messages. Diagnostic write failure must not change cleanup outcome; these records do not replace native package cleanup or process acceptance.
 
 ## Уточнение области ветки node-javascript (2026-10-14)
