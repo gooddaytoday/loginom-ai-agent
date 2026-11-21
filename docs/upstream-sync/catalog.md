@@ -143,4 +143,5 @@
 устарели: генератор — `packages/loginom-host/script/bun-notices.ts`, команды `generate <версия> <кэш> <новый каталог>`
 и `verify [<комплект>] [<входы companion>]`. Остальное в записи действует. После генерации нужны сборщики companion,
 независимая проверка `SHA256SUMS`, сборка CLI на целевом Bun, отказ на чужой ревизии и офлайн-проверка на трёх ОС.
-`incomplete` и `remaining` остаются. Файлы OpenCode не менялись, `catalog.json` тоже.
+`incomplete` и `remaining` остаются. Из файлов upstream изменён только `.gitleaksignore`: +51 отпечаток для архивов
+комплекта, правку покрывает CAT-02. `catalog.json` не менялся.

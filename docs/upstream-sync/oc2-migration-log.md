@@ -898,7 +898,11 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
 | `da295943b1` `feat(loginom-host): generate the Bun third-party bundle from upstream pins` | `script/bun-notices.ts`, строка в `loginom-host/AGENTS.md` | `clean` |
 | `3a16e95b28` `chore(loginom-host): regenerate the Bun third-party bundle for 1.4.4` | `licenses/bun` (56 файлов), `test/bun-notices.test.ts`, `.gitleaksignore` +51 | `clean`, архивов 5 |
 | `2232acf6c3` `refactor(loginom-host): drop an unused import from bun-notices` | одна строка импорта | `clean` |
-| следующий за ним `docs` | этот раздел, запись в конце `catalog.md` | |
+| `2e5e67a99d` `docs(migration): record B1.6 Bun notice generator and its acceptance` | этот раздел, запись в конце `catalog.md` | `clean` |
+| `2349b5481a` `fix(loginom-host): keep Bun notice files byte-exact on every checkout` | `licenses/.gitattributes` (`bun/** -text`), таймауты 30 с трём тестам | `clean` |
+| последний `docs` | уточнения раздела после ревью | |
+
+`bun run secrets range 04ac42625f 2349b5481a` — `clean`, 5 коммитов, 5 архивов.
 
 ### Генератор
 
@@ -911,7 +915,7 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
    `rust-toolchain.toml`, `Cargo.lock`, `sqlite3_local.h`. Незнакомая форма рецепта — `LOGINOM_BUN_RECIPE_UNKNOWN`.
    Пины сверяются с `process.versions`: 12 зависимостей, `uwebsockets`/`usockets`, `node`, `icu`, `sqlite`; ещё
    `sqlite_source_id()`. Расхождение — `LOGINOM_BUN_PIN_RUNTIME_MISMATCH`.
-3. 22 архива зависимостей с `github-archive` (codeload). Тексты лицензий берутся из архива: корневые
+3. 21 архив зависимостей с `github-archive` (codeload). Тексты лицензий берутся из архива: корневые
    LICENSE/COPYING/COPYRIGHT/NOTICE/AUTHORS/PATENTS и пути, отобранные вручную в первом комплекте
    (`picohttpparser.c`, два файла WebKit). Каждый текст сверяется с raw.githubusercontent, если тот его отдаёт.
 4. WebKit `d6375c72…`: `git fetch --depth 1` в голый репозиторий, затем `git archive` с отключёнными атрибутами. Каждый
@@ -955,7 +959,7 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
 
 | Проверка | Linux (здесь) | Windows (`winstand`, `C:\lab\b16-bun-notices`, удалена) | macOS |
 |---|---|---|---|
-| Генерация | PASS, 5 мин; повтор без сети (`unshare -n`) после коммита — `git diff --exit-code` чистый | — | — |
+| Генерация | PASS, 5 мин; повтор без сети (`unshare -n`) после коммита — `git diff --exit-code` чистый. Архив WebKit повтор берёт из кэша; отдельный `git archive` даёт тот же sha256 `02e8c4dd…` | — | — |
 | `verify` комплекта и 28 архивов, без сети | PASS: notices 49, archives 28, crates 211, 29 с | PASS, 47 с | не проверено |
 | `build-bun-source-companion.ts` | PASS, 28 архивов | PASS, 41 с | не проверено |
 | `build-webkit-source-companion.ts` | PASS | PASS, 63 с | не проверено |
@@ -965,7 +969,9 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
 | Отказ на чужой ревизии | генератор с тегом 1.3.14; `verify`, `build-cli.ts` под Bun 1.4.3; тест — генератор, verify, оба сборщика | тест 5/5 | не проверено |
 
 Офлайн: на Linux команды шли в сетевом namespace без сети. На Windows сеть стенда не отключалась: у команд был мёртвый
-прокси `127.0.0.1:9`, и они сеть не используют.
+прокси `127.0.0.1:9`, и они сеть не используют. На стенд файлы попали через scp, байт в байт. Checkout с
+`core.autocrlf=true` превращал `LICENSE.md` в CRLF, и `verify` на нём падал бы. Поэтому `licenses/.gitattributes`
+снимает `text` с `bun/**`. После этого такой checkout побайтно равен индексу (56 файлов), `verify` на нём проходит.
 
 `loginom-host`, `bun test`: 505 / 12 / 38, 555 тестов. В B1.5 было 500 / 12 / 38 из 550. Пять новых тестов проходят;
 38 падений те же по файлам и причинам: skills-acceptance 24, skills-acceptance-turns 8, bundled-ripgrep 3,
@@ -993,7 +999,8 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
   (180 крейтов) заменил `lolhtml-crates`. Код эти файлы не читает.
 - **README сборщика** (`build-bun-source-companion.ts`) говорит о «lol-html crate bundle». Теперь это неточно, но
   сборщики не правились: они принимают результат как есть.
-- **`.gitleaksignore` +51.** Хук `secrets staged` нашёл 53 совпадения в трёх новых архивах `native/`:
+- **`.gitleaksignore` +51 — общий файл защиты, файл upstream; правка в рамках CAT-02.** Хук `secrets staged` нашёл
+  53 совпадения в трёх новых архивах `native/`:
   - примеры домашних каталогов в комментариях Bun и SQLite;
   - идентификаторы SQLite и V8, похожие на ключи.
 
@@ -1010,6 +1017,8 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
   `.gitmodules`: hdrhistogram, lolhtml, lsquic, picohttpparser. Генератор не может проверить, что это только тесты.
 - **`catalog.md`.** Слова «генератора нет» устарели. Сама запись LAB-306 не правилась: в конец файла добавлен раздел
   B1.6 (рядом B1.7 переделывает каталог). `catalog.json` не менялся.
+- **Тест `bun-notices` требует Bun 1.4.4 `38afee6c`**, как и `build-cli.ts`. Под другим Bun первый тест падает с
+  `LOGINOM_BUN_NOTICE_REVISION_MISMATCH`.
 
 ### Найдено, не чинил
 
