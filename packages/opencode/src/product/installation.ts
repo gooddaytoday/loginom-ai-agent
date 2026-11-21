@@ -40,3 +40,27 @@ export function installationNode<Id>(binding: Binding<Id>) {
 export function pluginDependency() {
   return { name: "@opencode-ai/plugin", version: "1.19.5" }
 }
+
+export async function pluginDependencyRequired(dir: string, configured: boolean) {
+  if (configured) return true
+  const { stat } = await import("node:fs/promises")
+  const { join } = await import("node:path")
+  // Keep Npm.install's existing lock/dirty checks for profiles that already have dependencies.
+  if (
+    await stat(join(dir, "node_modules")).then(
+      (entry) => entry.isDirectory(),
+      () => false,
+    )
+  )
+    return true
+  const { Glob } = await import("@opencode-ai/core/util/glob")
+  return (
+    (
+      await Glob.scan("{plugin,plugins,tool,tools}/*.{js,ts}", {
+        cwd: dir,
+        dot: true,
+        symlink: true,
+      })
+    ).length > 0
+  )
+}

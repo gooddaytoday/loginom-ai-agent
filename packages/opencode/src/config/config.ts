@@ -11,7 +11,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
 import { applyEdits, modify } from "jsonc-parser"
-import { pluginDependency } from "@/product/installation"
+import { pluginDependency, pluginDependencyRequired } from "@/product/installation"
 import { existsSync } from "fs"
 import { Account } from "@/account/account"
 import { isRecord } from "@/util/record"
@@ -449,18 +449,29 @@ const layer = Layer.effect(
 
           yield* ensureGitignore(dir).pipe(Effect.orDie)
 
-          const dep = yield* npmSvc
-            .install(dir, { add: [pluginDependency()] })
-            .pipe(
-              Effect.exit,
-              Effect.tap((exit) =>
-                Exit.isFailure(exit)
-                  ? Effect.logWarning("background dependency install failed", { dir, error: String(exit.cause) })
-                  : Effect.void,
-              ),
-              Effect.asVoid,
-              Effect.forkDetach,
-            )
+          const dep = yield* Effect.gen(function* (): Effect.fn.Return<
+            void,
+            Npm.InstallFailedError | EffectFlock.LockError
+          > {
+            if (process.env.LOGINOM_AI_AGENT_CLI_ROOT || process.env.LOGINOM_AI_AGENT_RESOURCES) {
+              // Wait for all sources, including inline/managed config and discovered plugins.
+              const configured = yield* InstanceState.use<State, never, never, boolean>(
+                state,
+                (s) => !!s.config.plugin?.length,
+              )
+              if (!(yield* Effect.promise(() => pluginDependencyRequired(dir, configured)))) return
+            }
+            yield* npmSvc.install(dir, { add: [pluginDependency()] })
+          }).pipe(
+            Effect.exit,
+            Effect.tap((exit) =>
+              Exit.isFailure(exit)
+                ? Effect.logWarning("background dependency install failed", { dir, error: String(exit.cause) })
+                : Effect.void,
+            ),
+            Effect.asVoid,
+            Effect.forkDetach,
+          )
           deps.push(dep)
 
           result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => ConfigCommand.load(dir)))
