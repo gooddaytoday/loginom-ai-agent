@@ -401,7 +401,8 @@ OpenCode (`/etc/opencode`, `%ProgramData%\opencode`, MDM-plist) — B1.3b, зд�
 | `7ba8671268` | Шов U5 в CLI и Desktop, тесты, запись каталога CAT-13 | код 0, `clean` |
 | `b86a3b1997` | `names.test.ts` на новых путях, `flag-identity.test.ts` возвращён в `cli` | код 0, `clean` |
 | `dfc697f765` | Правило о службе в `AGENTS.md` | код 0, `clean` |
-| этот журнал | | |
+| `4eaa299b4b` | Этот журнал | код 0, `clean` |
+| следующие два | Правки после ревью: тесты по навыку `unit-tests`; В-87 в `AGENTS.md` как требование; дополнения журнала | |
 
 ### Правки файлов upstream
 
@@ -446,6 +447,10 @@ CLI). Сейчас шов включается только окружением
 `python3 -I scripts/upstream-sync/apply-identity.py --repo . --check`: до правки `would change: 298 files`, после —
 `335` (+37: `gui-plugins` 21, `client` 5, `simulation` 4, `plugin` 3, `script` 2, `util` 2; в `ai` только ключ
 провайдера).
+
+`merge_oracle.py` берёт `wants()` из этого же скрипта. Тесты процедуры на `oc2-migration` и на ветке одинаковы:
+`python3 -I scripts/upstream-sync/test_tools.py` — `Ran 60 tests`, `OK`; `python3 -I scripts/upstream-sync/test_acceptance.py`
+— `Ran 12 tests`, `OK` (109 и 107 с).
 
 **Прогон скрипта по файлам: ни одного файла.** Каталоги данных скрипт не меняет вовсе — это константа `app`, правка
 вручную. Остальное он менял бы во всём файле сразу, а набор не замыкается ни по одному имени:
@@ -544,6 +549,20 @@ processes elect one server».
 Две службы поднимаются за 2–3 с, весь файл — 7–9 с. Без шва регистрация называлась бы `service-local.json`, а
 `identity()` и тест переноса до правки падали (проверено: 0 pass, 3 fail).
 
+Защита от переноса проверена мутациями, каждая откатывалась `git checkout`:
+- убрано `&& !identity()` в `paths` — падают оба случая, `latest` и `preview-a`;
+- убрано `service ||` в `legacyFilename` — падает `preview-a`.
+
+После ревью тесты приведены к навыку `.opencode/skills/unit-tests`: опрос ограничен сроком 30 с, а не числом попыток;
+оба порта выбираются, пока заняты оба, иначе второй мог совпасть с только что освобождённым первым; таймауты тестов с
+двумя службами — 60 с с комментарием; пробы `flag-identity` идут параллельно.
+
+Для B2.7c:
+- в сценарии «общие каталоги» у двух служб одна БД `opencode-local.db`. Тест доказывает, что службы не подхватывают
+  друг друга, а не то, что профилям можно делить каталоги;
+- identity и порт наследуют дочерние процессы службы. CLI, запущенный из терминала Desktop, получит identity Desktop,
+  поэтому загрузчик профиля должен задавать обе переменные всегда, а не «если пусто».
+
 ### Каталоги и пароль службы
 
 В тесте S5 рекурсивный обход изолированного корня не находит ни одного каталога `opencode` или `.opencode`. В `data`,
@@ -596,7 +615,8 @@ $ ls <root>/state/loginom-ai-agent
 Было: «Desktop and CLI own independent backend v1 processes and profiles. … do not introduce service discovery, client
 leases, or Desktop profile migration». Стало: профили раздельные; на OpenCode 2 у каждого продукта и профиля своя
 фоновая служба с U5 (В-79, CAT-13) — свой `service-<identity>.json` и явный порт, клиент находит только службу своей
-identity; служба останавливается вместе с приложением (В-87); не вводить службу, общую для Desktop и CLI, аренды
+identity; служба должна останавливаться вместе с приложением (В-87; v2.3.0 этого пока не делает, добавят B2.3b и
+B4); не вводить службу, общую для Desktop и CLI, аренды
 клиентов и перенос профиля Desktop. Первое предложение (проект `standalone CLI`, `c37913ab5`) не менялось.
 
 ### Заметки по Windows для B4.1
@@ -634,13 +654,20 @@ identity; служба останавливается вместе с прило
 
 - `guarantees.md` (G2, «Как запускать»), `adr-0001-modular-integration.md` и раздел CAT-12 в `catalog.md` ссылаются на
   `packages/core/test/flag-identity.test.ts`. Перевод этих документов — B1.7.
-- `repo-paths.test.ts`: 6 падений на `oc2-migration`, в том числе «the agent package keeps the upstream directory»
+- `repo-paths.test.ts`: 7 падений на `oc2-migration`, в том числе «the agent package keeps the upstream directory»
   (`packages/opencode`) — B1.4, B1.7. `automation-routing.test.ts`: 1 падение там же.
 - `core/src/project.ts` и `core/src/git.ts`: кэш id проекта — файл `.git/opencode` в репозитории пользователя (B1.4).
 - `tui/src/theme/assets/opencode.json` — тема, на неё ссылаются по имени. Массовый `apply-identity` заменит ссылки на
   `loginom-ai-agent.json`, а файл темы останется прежним — B1.4.
 - `desktop/perf/startup.bench.ts` ищет службу в `opencode/service*.json` — бенчмарк не правился.
 - В `XDG_CACHE_HOME` при запуске из исходников появляется `bun` — кэш самого Bun, не продукта.
+- `desktop/src/main/storage/install-state.ts` считает onboarding пройденным, если в userData Electron есть каталог
+  `opencode` или `opencode.settings`. Это след прежней установки OpenCode Desktop, а не корень хранилища CLI. Служба
+  пишет в userData только в режиме разработки `OPENCODE_DESKTOP_ISOLATED_SERVER`, и теперь в `loginom-ai-agent`.
+  Onboarding и userData — B4, не правилось.
+- Остальные пакеты (`gui-plugins`, `sdk`, `app`, `plugin`, `session-ui`, `simulation`, `ai`, `schema`, `script`):
+  grep по путям `opencode` находит только фикстуры и id провайдера. Чтений каталога `Global` с литералом нет, их тесты
+  не запускались.
 
 ### Не проверено
 
