@@ -4,7 +4,7 @@ import { homedir, tmpdir } from "node:os"
 import { basename, dirname, join, posix } from "node:path"
 
 type Finding = { File: string; StartLine: number; RuleID: string; Commit?: string }
-type Archive = { oid: string; file: string; current?: boolean; blob?: Uint8Array }
+type Archive = { oid: string; file: string; current?: boolean; blob?: Uint8Array; upstream?: boolean }
 class ScanFailure extends Error {}
 const archivePaths = ["lgp", "zip", "tgz", "gz", "tar", "7z", "xz", "bz2", "zst"].map((ext) => `:(icase)*.${ext}`)
 const archivePattern = /\.(lgp|zip|tgz|tar\.gz|gz|tar|7z|xz|bz2|zst)$/i
@@ -14,6 +14,14 @@ async function main() {
   const mode = Bun.argv[2]
   if (!["staged", "range", "push", "audit"].includes(mode))
     throw new ScanFailure("Usage: bun run secrets <staged|push REMOTE|range BASE HEAD|audit>")
+  if (mode !== "audit") {
+    // A large merge must not cut rename detection short: gitleaks relays Git's warning and the scan stops.
+    const count = Number(process.env.GIT_CONFIG_COUNT || 0)
+    process.env[`GIT_CONFIG_KEY_${count}`] = "diff.renameLimit"
+    process.env[`GIT_CONFIG_VALUE_${count}`] = "0"
+    process.env.GIT_CONFIG_COUNT = String(count + 1)
+  }
+  const pins = mode === "audit" ? [] : await upstreamPins()
   const references =
     mode === "audit"
       ? git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/remotes", "refs/tags")
@@ -21,7 +29,7 @@ async function main() {
           .split("\n")
           .filter(Boolean)
       : undefined
-  const revisions =
+  const selected =
     mode === "audit"
       ? [...new Set([commit("HEAD"), ...references!.map((reference) => reference.split(" ")[1])])]
       : mode === "range"
@@ -29,6 +37,8 @@ async function main() {
         : mode === "push"
           ? pushRevisions(await Bun.stdin.text(), Bun.argv[3])
           : []
+  // History reachable from a pinned OpenCode commit is upstream code, not a fork change (В-93).
+  const revisions = selected.length ? [...selected, ...pins.map((pin) => `^${pin}`)] : selected
   const commits =
     mode === "staged" || !revisions.length
       ? []
@@ -63,7 +73,22 @@ async function main() {
         : join(process.cwd(), ".gitleaks.toml")
     const ignore =
       mode !== "audit" && existsSync(".gitleaksignore") ? join(process.cwd(), ".gitleaksignore") : join(temp, "ignore")
-    const findings = await scan(
+    // В-93: only a blob identical to a pinned commit's blob at the same path is upstream code.
+    const upstream = pins.map((pin) => blobs("ls-tree", "-r", "-z", "--full-tree", pin))
+    const pinned = (file: string, oid: string | undefined) =>
+      oid !== undefined && upstream.some((files) => files.get(file) === oid)
+    const snapshots = new Map<string, ReturnType<typeof blobs>>()
+    const snapshot = (revision: string) => {
+      if (!snapshots.has(revision))
+        snapshots.set(
+          revision,
+          revision ? blobs("ls-tree", "-r", "-z", "--full-tree", revision) : blobs("ls-files", "--stage", "-z"),
+        )
+      return snapshots.get(revision)!
+    }
+    const findings: Finding[] = []
+    const upstreamFindings: Finding[] = []
+    for (const finding of await scan(
       binary,
       mode === "staged"
         ? ["git", "--staged"]
@@ -72,7 +97,14 @@ async function main() {
       "history",
       config,
       ignore,
-    )
+    )) {
+      const revision = mode === "staged" ? "" : finding.Commit
+      const upstreamFile =
+        revision !== undefined &&
+        upstream.some((files) => files.has(finding.File)) &&
+        pinned(finding.File, snapshot(revision).get(finding.File))
+      ;(upstreamFile ? upstreamFindings : findings).push(finding)
+    }
     const archives = new Map<string, Archive>()
     const raw = (
       mode === "staged"
@@ -96,7 +128,11 @@ async function main() {
       if (/^0+$/.test(oid)) continue
       if (!/^[a-f0-9]{40,64}$/.test(oid))
         throw new ScanFailure("Secret scan incomplete: invalid Git archive inventory.")
-      archives.set(oid, { oid, file: raw[i + 1] })
+      const known = archives.get(oid)
+      const upstreamArchive = pinned(raw[i + 1], oid)
+      // One blob is unpacked once; a copy outside its pinned path keeps the findings reported.
+      if (!known || known.upstream || !upstreamArchive)
+        archives.set(oid, { oid, file: raw[i + 1], upstream: upstreamArchive })
     }
     const skipped: { file: string; reason: string }[] = []
     const current =
@@ -146,6 +182,10 @@ async function main() {
         const oid = finding.File.split("/")[0]
         const archive = oid ? archives.get(oid) : undefined
         if (!archive) throw new ScanFailure("Secret scan incomplete: archive report cannot be mapped.")
+        if (archive.upstream) {
+          upstreamFindings.push(finding)
+          continue
+        }
         findings.push({
           ...finding,
           File: finding.File.slice(oid.length + 1),
@@ -171,6 +211,7 @@ async function main() {
         current_files: current.length,
         skipped,
         references,
+        upstream_findings: pins.length ? upstreamFindings.length : undefined,
         elapsed_ms: Math.round(performance.now() - started),
       }),
     )
@@ -291,6 +332,39 @@ async function indexSnapshot(directory: string, env: NodeJS.ProcessEnv) {
   // Disable repository-supplied filters and diff drivers in this private snapshot.
   await Bun.write(join(directory, ".git", "info", "attributes"), "* -filter -text diff\n")
   gitInput(undefined, ["-C", directory, "-c", "core.autocrlf=false", "add", "--all", "--force"], env)
+}
+
+async function upstreamPins() {
+  if (!existsSync(".gitleaks-upstream")) return []
+  return (await Bun.file(".gitleaks-upstream").text())
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => {
+      // Anyone who can push a ref can move it; only a full commit SHA pins OpenCode.
+      if (!/^([a-f0-9]{40}|[a-f0-9]{64})$/.test(line) || commit(line) !== line)
+        throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
+      return line
+    })
+}
+
+function blobs(...args: string[]) {
+  // ls-tree and ls-files --stage print "<mode> <fields> TAB <path>"; the object ID is the hex field.
+  return new Map(
+    git(...args)
+      .split("\0")
+      .filter(Boolean)
+      .map((entry) => {
+        const tab = entry.indexOf("\t")
+        return [
+          entry.slice(tab + 1),
+          entry
+            .slice(0, tab)
+            .split(" ")
+            .find((field) => /^[a-f0-9]{40,64}$/.test(field)),
+        ] as const
+      }),
+  )
 }
 
 function commit(ref: string) {

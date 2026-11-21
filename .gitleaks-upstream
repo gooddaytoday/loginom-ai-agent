@@ -1,0 +1,6 @@
+# Pinned OpenCode release commits for the fork secret scan (decision В-93).
+# One full commit SHA per line; ref names are rejected because a push can move them.
+# See docs/security/secret-protection.md.
+
+# OpenCode v2.3.0
+a6b15d33daf6ab7d35569f6d711fdb630b9f04e7
