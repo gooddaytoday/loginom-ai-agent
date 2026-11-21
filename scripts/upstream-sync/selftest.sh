@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline self-test of the sync procedure on a synthetic upstream and fork (no network, no bun).
-# Covers: pin refuses pre-releases, prepare reports the expected conflicts and refuses a reused directory,
+# Covers: pin refuses pre-releases, prepare reports the expected conflicts, refuses a reused directory and gives an empty result
+# for a tag the fork already contains,
 # accepted rejects a merge without decision records and accepts the same merge with records committed in it; test_tools.py covers
 # the gate, the oracle and apply-identity on synthetic merges; test_acceptance.py runs every cell of
 # docs/upstream-sync/acceptance-contract.md as a Git merge and mutates the gate to prove the cells see its exit code and verdict;
@@ -77,6 +78,15 @@ git -C "$R" add -A; git -C "$R" commit -q -m "merge (with records)"
 "$HERE/sync-upstream.sh" accepted --out "$OUT" >"$W/good.log" 2>&1 || fail "accepted rejected a merge with records: $(cat "$W/good.log")"
 grep -q 'RESULT: ACCEPTED' "$W/good.log" || fail "no ACCEPTED result"
 grep -q '| conflict | 2 | 2 |' "$W/good.log" || fail "expected two recorded conflicts: $(cat "$W/good.log")"
+# --- a tag the fork already contains: an empty result (0 paths, no merge), not a refused measurement
+MERGED=$(git -C "$R" rev-parse HEAD); OUT2=$W/rehearsal-merged
+"$HERE/sync-upstream.sh" prepare --fork-sha "$MERGED" --tag v1.1.0 --upstream-sha "$UP" --out "$OUT2" --fork-url "$OUT/clone" --upstream-url "$U" \
+  >"$W/prepare-merged.log" 2>&1 || fail "prepare refused a tag the fork already contains: $(cat "$W/prepare-merged.log")"
+expect "paths of a merged tag" "$(wc -l <"$OUT2/measure/unmerged-paths.txt" | tr -d ' ')" 0
+[ -z "$(git -C "$OUT2/rehearsal" rev-parse -q --verify MERGE_HEAD || true)" ] || fail "prepare left a merge in progress for a merged tag"
+expect "rehearsal of a merged tag" "$(git -C "$OUT2/rehearsal" rev-parse HEAD)" "$MERGED"
+[ -z "$(git -C "$OUT2/rehearsal" status --porcelain)" ] || fail "the rehearsal of a merged tag is not the fork commit"
+grep -q 'already contains upstream' "$OUT2/report.md" || fail "the report does not say the tag is already merged: $(cat "$OUT2/report.md")"
 # --- apply-identity: new upstream code gets the fork's external names, provider keys stay
 IDREPO=$W/identity; mkdir -p "$IDREPO/packages/core/src"; git init -q "$IDREPO"
 printf 'const a = process.env.OPENCODE_NEW_FLAG\nconst k = process.env.OPENCODE_API_KEY\nconst d = ".opencode/agent"\nconst c = "opencode.json"\n' >"$IDREPO/packages/core/src/x.ts"
