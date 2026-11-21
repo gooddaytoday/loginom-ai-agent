@@ -1,154 +1,225 @@
 import { expect, test } from "bun:test"
+import { statSync } from "node:fs"
+import { cp, mkdtemp, rm } from "node:fs/promises"
+import { createRequire } from "node:module"
+import os from "node:os"
+import path from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Configuration } from "electron-builder"
-import { Product, productName, productSlug } from "@loginom-ai-agent/product"
-import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
-import release from "../product/loginom-release.json"
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
-import { pathToFileURL } from "node:url"
-import { bundledLanguages, lcid } from "app-builder-lib/out/util/langs"
+import { getConfig } from "./electron-builder.config"
+import { CLI_BINARIES, nodePtyPackage } from "./script/utils"
 
-test("installer verification messages cover every bundled NSIS language", async () => {
-  const include = (await Bun.file(join(import.meta.dir, "resources/uninstall-uri.nsh")).text()).replaceAll("\r\n", "\n")
-  for (const language of bundledLanguages) {
-    const id = lcid[language]
+// Use electron-builder's matcher so the tests also cover its glob and directory traversal semantics.
+const { FileMatcher } = createRequire(import.meta.resolve("electron-builder"))("app-builder-lib/out/fileMatcher")
+
+const channels = [
+  { channel: "dev", appId: "ai.opencode.desktop.dev", feed: "dev" },
+  { channel: "beta", appId: "ai.opencode.desktop.beta", feed: "beta" },
+  { channel: "prod", appId: "ai.opencode.desktop", feed: "latest" },
+] as const
+
+function load(channel: string, target?: string): Configuration {
+  const previous = process.env.OPENCODE_CHANNEL
+  const previousTarget = process.env.OPENCODE_TARGET
+  process.env.OPENCODE_CHANNEL = channel
+
+  if (target !== undefined) process.env.OPENCODE_TARGET = target
+  else delete process.env.OPENCODE_TARGET
+
+  try {
+    return getConfig()
+  } finally {
+    delete process.env.OPENCODE_CHANNEL
+    delete process.env.OPENCODE_TARGET
+
+    if (previous !== undefined) process.env.OPENCODE_CHANNEL = previous
+
+    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
+  }
+}
+
+function trimFilter(dir: string, config: Configuration) {
+  const patterns = Array.isArray(config.files) ? config.files.flatMap((value) => (value ? [String(value)] : [])) : []
+
+  return new FileMatcher(dir, "", (value: string) => value, [
+    "**/*",
+    ...patterns.filter((value) => value.startsWith("!")),
+  ]).createFilter()
+}
+
+test.each(channels)("channel identity for $channel", ({ channel, appId, feed }) => {
+  const config = load(channel)
+  expect(config.appId).toBe(appId)
+  // Every published channel updates from its own feed on the update service.
+  expect(config.publish).toEqual({
+    provider: "generic",
+    url: `https://opencode.ai/update/api/${feed}/desktop/opencode/`,
+    channel: "latest",
+  })
+  expect(config.extraMetadata?.desktopName).toBe(`${appId}.desktop`)
+  // The executable must never end in `.desktop`: libappimage resolves the
+  // AppImage's desktop entry by globbing `*.desktop`, and an ELF matching
+  // that glob breaks integration (anomalyco/opencode#51867).
+  expect(config.linux?.executableName).toBe(appId.replace(/\.desktop$/, ""))
+  expect(config.linux?.executableName).not.toMatch(/\.desktop$/)
+  // The installed `.desktop` filename still derives from `desktopName` so
+  // window association (StartupWMClass/desktop file basename) is unchanged.
+  expect(config.linux?.syncDesktopName).toBe(true)
+  expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(appId)
+
+  for (const fpm of [config.deb?.fpm, config.rpm?.fpm]) {
+    expect(fpm).toContainEqual(expect.stringContaining(`/usr/share/metainfo/${appId}.metainfo.xml`))
     expect(
-      include.includes(`!insertmacro VerifyResourcesEnglish ${id}\n`) ||
-        ["VerifyResourcesStatus", "VerifyResourcesError"].every((key) => include.includes(`LangString ${key} ${id} `)),
-    ).toBe(true)
+      fpm?.some((entry) => entry.endsWith("opencode-desktop.desktop=/usr/share/applications/opencode-desktop.desktop")),
+    ).toBe(channel === "prod")
+  }
+
+  // Shared Electron binaries must not ship /usr/lib/.build-id links that collide with other Electron RPMs.
+  // fpm rejects flags after the first src=dest mapping, so the flag must come first.
+  expect(config.rpm?.fpm?.[0]).toBe("--rpm-rpmbuild-define=_build_id_links none")
+  expect(config.deb?.fpm).not.toContain("--rpm-rpmbuild-define=_build_id_links none")
+})
+
+test("legacy Linux launcher stays hidden", async () => {
+  const desktop = await Bun.file(path.join(import.meta.dirname, "resources/linux/opencode-desktop.desktop")).text()
+  expect(desktop).toContain("Exec=/opt/OpenCode/ai.opencode %U")
+  expect(desktop).toContain("Icon=ai.opencode")
+  expect(desktop).toContain("StartupWMClass=ai.opencode.desktop")
+  expect(desktop).toContain("NoDisplay=true")
+})
+
+test.each(channels)("macOS bundle for $channel", ({ channel }) => {
+  const config = load(channel)
+  expect(config.mac?.icon).toBe(channel === "prod" ? "resources/icons/icon.icon" : "resources/icons/icon.icns")
+  expect(config.dmg?.icon).toBe(channel === "prod" ? "resources/icons/icon.icns" : undefined)
+  // The prod override must keep the rest of the shared macOS settings.
+  expect(config.mac?.target).toEqual(["dmg", "zip"])
+
+  for (const key of [
+    "NSMicrophoneUsageDescription",
+    "NSDocumentsFolderUsageDescription",
+    "NSDesktopFolderUsageDescription",
+    "NSDownloadsFolderUsageDescription",
+    "NSNetworkVolumesUsageDescription",
+    "NSRemovableVolumesUsageDescription",
+  ])
+    expect(config.mac?.extendInfo?.[key], key).toMatch(/\S/)
+})
+
+test("the production Icon Composer package references its bundled artwork", async () => {
+  const icon = await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/icon.json")).json()
+  expect(icon["supported-platforms"]).toEqual({ squares: ["macOS"] })
+  const image = icon.groups[0].layers[0]["image-name"]
+  expect(await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/Assets", image)).exists()).toBe(true)
+})
+
+test("shared packaging defaults", async () => {
+  const config = load("dev")
+  // Packaging runs in secretless build jobs; the release workflow signs and notarizes afterwards.
+  expect(config.mac?.sign).toBeUndefined()
+  expect(config.mac?.notarize).toBeUndefined()
+  expect(config.win?.signtoolOptions).toBeUndefined()
+  expect(config.dmg?.sign).not.toBe(true)
+  expect(config.mac?.extendInfo?.NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac).toBe(true)
+  const include = path.join(import.meta.dirname, "resources/windows/installer.nsh")
+  expect(config.nsis?.include).toBe(include)
+  expect(await Bun.file(include).exists()).toBe(true)
+  expect(config.files).toContain("!resources/opencode-cli*")
+  expect(config.extraResources).toEqual([
+    { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
+  ])
+})
+
+test("trims external dependencies without excluding runtime files", () => {
+  const fileStats = statSync(import.meta.filename)
+  const dirStats = statSync(import.meta.dirname)
+  const filter = trimFilter(import.meta.dirname, load("dev"))
+
+  for (const prefix of ["node_modules/", "node_modules/parent/node_modules/"]) {
+    const included = (file: string, stats = fileStats) => filter(path.join(import.meta.dirname, prefix, file), stats)
+
+    // One file for each excluded pattern, including each brace alternative.
+    for (const file of [
+      "@zip.js/zip.js/dist/zip.js",
+      ...["index.cjs", "index.min.js", "index-fflate.js", "deno.json", "eslint.config.mjs"].map(
+        (name) => `@zip.js/zip.js/${name}`,
+      ),
+      ...["d.ts", "d.cts", "d.mts", "d.ts.map", "d.cts.map", "d.mts.map", "js.map", "cjs.map", "mjs.map"].map(
+        (extension) => `unrelated/dist/index.${extension}`,
+      ),
+      "ajv/lib/core.ts",
+      "ajv-formats/src/formats.ts",
+      "js-yaml/dist/js-yaml.js",
+      "js-yaml/dist/js-yaml.min.js",
+      "js-yaml/dist/js-yaml.mjs.map",
+      "js-yaml/bin/js-yaml.js",
+    ]) {
+      expect(included(file)).toBe(false)
+    }
+
+    for (const file of [
+      "@zip.js/zip.js/index.js",
+      "@zip.js/zip.js/lib/z-worker-inline.js",
+      "electron-updater/out/main.js",
+      "electron-updater/out/MacUpdater.js",
+      "electron-updater/out/NsisUpdater.js",
+      "electron-updater/out/providers/GitHubProvider.js",
+      "builder-util-runtime/out/httpExecutor.js",
+      "ajv/dist/ajv.js",
+      "ajv/dist/refs/json-schema-draft-07.json",
+      "ajv-formats/dist/formats.js",
+      "js-yaml/index.js",
+      "js-yaml/dist/js-yaml.mjs",
+      "unrelated/dist/index.js",
+      "unrelated/dist/index.cjs",
+      "unrelated/dist/data.json",
+      "unrelated/src/index.ts",
+      ...["@zip.js/zip.js", "electron-updater", "builder-util-runtime", "ajv", "ajv-formats", "js-yaml"].flatMap(
+        (name) => [`${name}/package.json`, `${name}/LICENSE`],
+      ),
+    ]) {
+      expect(included(file)).toBe(true)
+    }
+
+    expect(included("@zip.js/zip.js/dist", dirStats)).toBe(false)
+    expect(included("@zip.js/zip.js/lib", dirStats)).toBe(true)
+  }
+
+  for (const item of CLI_BINARIES) {
+    const targetFilter = trimFilter(import.meta.dirname, load("prod", item.target))
+    const active = nodePtyPackage(item.target)
+
+    for (const candidate of CLI_BINARIES) {
+      const pkg = nodePtyPackage(candidate.target)
+      const included = targetFilter(path.join(import.meta.dirname, "node_modules", pkg, "lib/index.js"), fileStats)
+      expect(included).toBe(pkg === active)
+    }
   }
 })
 
-for (const channel of ["dev", "beta", "prod"] as const) {
-  test(`isolates the ${channel} package and cannot publish upstream`, async () => {
-    const previous = process.env.LOGINOM_AI_AGENT_CHANNEL
-    process.env.LOGINOM_AI_AGENT_CHANNEL = channel
-    const module = await import(`./electron-builder.config.ts?channel=${channel}`)
-    const config = module.default as Configuration
-    if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CHANNEL
-    else process.env.LOGINOM_AI_AGENT_CHANNEL = previous
-    expect(config.appId).toBe(Product.channels[channel])
-    expect(config.extraMetadata?.desktopName).toBe(`${Product.channels[channel]}.desktop`)
-    expect(config.linux?.syncDesktopName).toBe(true)
-    expect(config.linux?.executableName).toBe(productSlug(channel))
-    expect(config.deb?.packageName).toBe(productSlug(channel))
-    expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(Product.channels[channel])
-    expect(config.publish).toEqual({ provider: "generic", url: "https://updates.invalid/", channel: "latest" })
-    expect(config.protocols).toEqual({ name: Product.name, schemes: [Product.scheme] })
-    expect(JSON.stringify(config)).not.toContain("opencode")
-    expect(config.extraResources).not.toContainEqual(expect.objectContaining({ filter: ["opencode-cli*"] }))
-    expect(config.extraResources).toContainEqual({ from: "resources", to: ".", filter: ["updates-s3.json"] })
-    expect(config.linux?.target).toEqual(["AppImage", "deb"])
-    expect(config.linux?.icon).toBe("resources/icons/linux")
-    expect(config.win?.icon).toBe("resources/icons/icon.ico")
-    expect(config.mac?.icon).toBe("resources/icons/icon.icns")
-    expect(config.npmRebuild).toBe(false)
-    expect(config.win?.executableName).toBe(productSlug(channel))
-    expect(config.win?.requestedExecutionLevel).toBe("asInvoker")
-    expect(config.win?.target).toEqual([{ target: "nsis", arch: ["x64"] }])
-    expect(config.nsis).toEqual(
-      expect.objectContaining({
-        oneClick: true,
-        perMachine: false,
-        deleteAppDataOnUninstall: false,
-        shortcutName: productName(channel),
-      }),
-    )
-  })
-}
+test("the trimmed Zip.js package can still export compressed logs", async () => {
+  const config = load("dev")
+  const dir = await mkdtemp(path.join(os.tmpdir(), "opencode-zip-package-"))
+  const source = path.dirname(fileURLToPath(import.meta.resolve("@zip.js/zip.js/package.json")))
+  const filter = trimFilter(dir, config)
 
-test("macOS test packages use explicit ad-hoc arm64 signing without rewriting vendor resources", async () => {
-  const config = (await import("./electron-builder.config")).default
-  expect(config.mac?.minimumSystemVersion).toBe("14.0")
-  expect(config.mac?.identity).toBe("-")
-  expect(config.mac?.notarize).toBe(false)
-  expect(config.dmg?.sign).toBe(false)
-  expect(config.mac?.target).toEqual([
-    { target: "dmg", arch: ["arm64"] },
-    { target: "zip", arch: ["arm64"] },
-  ])
-  expect(config.mac?.signIgnore).toEqual([
-    "/Contents/Resources/loginom/bin/",
-    "/Contents/Resources/loginom/browsers/",
-    "/Contents/Resources/loginom/ripgrep/",
-  ])
-  expect(JSON.stringify(config.extraResources)).not.toContain("native/")
-})
-
-test.skipIf(process.platform !== "linux")(
-  "Linux afterPack restores the current pinned Chromium sandbox mode",
-  async () => {
-    const root = await mkdtemp(join(tmpdir(), "loginom-afterpack-"))
-    try {
-      const sandbox = join(
-        root,
-        `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
-      )
-      await mkdir(dirname(sandbox), { recursive: true })
-      await writeFile(sandbox, "fixture", { mode: 0o700 })
-      const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-      if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node executable")
-      // electron-builder executes this hook in Node. Bun 1.3.14's fs.chmod drops
-      // setuid bits, so running the hook in the Bun test process is not faithful.
-      const bundle = await Bun.build({
-        entrypoints: [join(import.meta.dir, "electron-builder.config.ts")],
-        target: "node",
-      })
-      if (!bundle.success) throw Error("Could not bundle packaging hook")
-      const module = join(root, "hook.mjs")
-      await writeFile(module, await bundle.outputs[0].text())
-      await promisify(execFile)(node, [
-        "--input-type=module",
-        "-e",
-        `import config from ${JSON.stringify(pathToFileURL(module).href)};
-       if (process.versions.node !== ${JSON.stringify(release.nodeVersion)}) throw Error('Unexpected Node version');
-       await config.afterPack({appOutDir:${JSON.stringify(root)},electronPlatformName:'linux'});`,
-      ])
-      expect((await stat(sandbox)).mode & 0o7777).toBe(0o4755)
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  },
-)
-
-test("packaging uses the explicitly supplied feed without uploading", () => {
-  const result = Bun.spawnSync(
-    [
-      process.execPath,
-      "--eval",
-      `
-    import config from './electron-builder.config.ts';
-    console.log(JSON.stringify(config.publish));
-  `,
-    ],
-    { cwd: import.meta.dir, env: { ...process.env, LOGINOM_AI_AGENT_UPDATE_FEED: "https://example.test/feed/" } },
-  )
-  expect(result.exitCode).toBe(0)
-  expect(JSON.parse(result.stdout.toString())).toEqual({
-    provider: "generic",
-    url: "https://example.test/feed/",
-    channel: "latest",
-  })
-})
-
-test("AppImage post-build hook emits an external blockmap without changing the binary", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-blockmap-"))
   try {
-    const file = join(root, "fixture.AppImage")
-    const bytes = Buffer.from("AppImage embedded blockmap fixture ".repeat(10000))
-    await writeFile(file, bytes)
-    const config = (await import("./electron-builder.config")).default
-    if (typeof config.afterAllArtifactBuild !== "function") throw Error("Missing artifact hook")
-    const artifacts = await config.afterAllArtifactBuild({ artifactPaths: [file, join(root, "fixture.deb")] } as never)
-    expect(artifacts).toEqual([`${file}.blockmap`])
-    expect(await Bun.file(file).bytes()).toEqual(bytes)
-    const { gunzipSync } = await import("node:zlib")
-    const map = JSON.parse(gunzipSync(await Bun.file(`${file}.blockmap`).bytes()).toString())
-    expect(map.version).toBe("2")
-    expect(map.files[0].sizes.reduce((sum: number, size: number) => sum + size, 0)).toBe(bytes.length)
+    await cp(source, dir, {
+      recursive: true,
+      filter: (file) =>
+        filter(path.join(dir, "node_modules/@zip.js/zip.js", path.relative(source, file)), statSync(file)),
+    })
+    const zip = await import(pathToFileURL(path.join(dir, "index.js")).href)
+    const writer = new zip.ZipWriter(new zip.BlobWriter("application/zip"))
+    await writer.add("desktop.log", new zip.BlobReader(new Blob(["diagnostic log\n".repeat(100)])))
+    const reader = new zip.ZipReader(new zip.BlobReader(await writer.close()))
+    const entries = await reader.getEntries()
+    expect(entries.map((entry: { filename: string }) => entry.filename)).toEqual(["desktop.log"])
+    expect(entries[0].compressionMethod).toBe(8)
+    expect(await entries[0].getData(new zip.TextWriter())).toBe("diagnostic log\n".repeat(100))
+    await reader.close()
+    await zip.terminateWorkers()
   } finally {
-    await rm(root, { recursive: true, force: true })
+    await rm(dir, { recursive: true, force: true })
   }
 })

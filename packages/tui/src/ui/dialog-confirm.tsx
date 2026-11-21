@@ -1,108 +1,62 @@
-import { TextAttributes } from "@opentui/core"
+import { Keymap } from "../context/keymap"
 import { useTheme } from "../context/theme"
-import { useDialog, type DialogContext } from "./dialog"
+import { useNewDesigns } from "../config"
+import { DialogButtons, DialogHeader, DialogLayout, useDialog } from "./dialog"
 import { createStore } from "solid-js/store"
-import { For } from "solid-js"
 import { Locale } from "../util/locale"
-import { useBindings } from "../keymap"
 
 export type DialogConfirmProps = {
   title: string
   message: string
   onConfirm?: () => void
   onCancel?: () => void
-  label?: string
+  label?: {
+    confirm?: string
+    cancel?: string
+  }
 }
 
-export type DialogConfirmResult = boolean | undefined
+const keys = ["cancel", "confirm"] as const
 
 export function DialogConfirm(props: DialogConfirmProps) {
   const dialog = useDialog()
-  const { theme } = useTheme()
+  const theme = useTheme().surface("dialog")
+  const newDesigns = useNewDesigns()
   const [store, setStore] = createStore({
     active: "confirm" as "confirm" | "cancel",
   })
 
-  useBindings(() => ({
-    bindings: [
-      {
-        key: "return",
-        desc: "Confirm dialog selection",
-        group: "Dialog",
-        cmd: () => {
-          if (store.active === "confirm") props.onConfirm?.()
-          if (store.active === "cancel") props.onCancel?.()
-          dialog.clear()
-        },
-      },
-      {
-        key: "left",
-        desc: "Previous dialog option",
-        group: "Dialog",
-        cmd: () => {
-          setStore("active", store.active === "confirm" ? "cancel" : "confirm")
-        },
-      },
-      {
-        key: "right",
-        desc: "Next dialog option",
-        group: "Dialog",
-        cmd: () => {
-          setStore("active", store.active === "confirm" ? "cancel" : "confirm")
-        },
-      },
+  const choose = (key: "confirm" | "cancel") => {
+    if (key === "confirm") props.onConfirm?.()
+    if (key === "cancel") props.onCancel?.()
+    dialog.clear()
+  }
+
+  const toggle = () => setStore("active", store.active === "confirm" ? "cancel" : "confirm")
+
+  Keymap.createLayer(() => ({
+    mode: "modal",
+    commands: [
+      { bind: "return", title: "Confirm dialog selection", group: "Dialog", run: () => choose(store.active) },
+      { bind: "left", title: "Previous dialog option", group: "Dialog", run: toggle },
+      { bind: "right", title: "Next dialog option", group: "Dialog", run: toggle },
+      { bind: "tab", title: "Next dialog option", group: "Dialog", run: toggle },
+      { bind: "shift+tab", title: "Previous dialog option", group: "Dialog", run: toggle },
+      ...(newDesigns() ? [{ bind: "escape", title: "Cancel", group: "Dialog", run: () => choose("cancel") }] : []),
     ],
   }))
   return (
-    <box paddingLeft={2} paddingRight={2} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text attributes={TextAttributes.BOLD} fg={theme.text}>
-          {props.title}
-        </text>
-        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
-          esc
-        </text>
-      </box>
-      <box paddingBottom={1}>
-        <text fg={theme.textMuted}>{props.message}</text>
-      </box>
-      <box flexDirection="row" justifyContent="flex-end" paddingBottom={1}>
-        <For each={["cancel", "confirm"] as const}>
-          {(key) => (
-            <box
-              paddingLeft={1}
-              paddingRight={1}
-              backgroundColor={key === store.active ? theme.primary : undefined}
-              onMouseUp={() => {
-                if (key === "confirm") props.onConfirm?.()
-                if (key === "cancel") props.onCancel?.()
-                dialog.clear()
-              }}
-            >
-              <text fg={key === store.active ? theme.selectedListItemText : theme.textMuted}>
-                {Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
-              </text>
-            </box>
-          )}
-        </For>
-      </box>
-    </box>
-  )
-}
-
-DialogConfirm.show = (dialog: DialogContext, title: string, message: string, label?: string) => {
-  return new Promise<DialogConfirmResult>((resolve) => {
-    dialog.replace(
-      () => (
-        <DialogConfirm
-          title={title}
-          message={message}
-          onConfirm={() => resolve(true)}
-          onCancel={() => resolve(false)}
-          label={label}
+    <DialogLayout
+      header={<DialogHeader title={props.title} />}
+      buttons={
+        <DialogButtons
+          buttons={keys.map((key) => ({ label: Locale.titlecase(props.label?.[key] ?? key), run: () => choose(key) }))}
+          active={keys.indexOf(store.active)}
+          onActive={(index) => setStore("active", keys[index]!)}
         />
-      ),
-      () => resolve(undefined),
-    )
-  })
+      }
+    >
+      <text fg={theme.text.muted}>{props.message}</text>
+    </DialogLayout>
+  )
 }

@@ -1,11 +1,14 @@
-import type { ElectronAPI } from "../preload/types"
+import type { ElectronNative } from "../preload/types"
 
 declare global {
+  interface ImportMetaEnv {
+    readonly OPENCODE_TEST_ONBOARDING: boolean
+  }
+
   interface Window {
-    api: ElectronAPI
-    __LOGINOM_AI_AGENT__?: {
+    electron: ElectronNative
+    __OPENCODE__?: {
       deepLinks?: string[]
-      coldDashboard?: string
     }
   }
 }

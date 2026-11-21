@@ -1,24 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/package",
-  "name": "@opencode-ai/script",
+  "name": "@opencode/script",
+  "type": "module",
   "license": "MIT",
   "scripts": {
-    "test": "bun test",
-    "typecheck": "tsgo --noEmit",
-    "typecheck:update-feed": "tsgo --noEmit -p tsconfig.update-feed.json"
+    "test": "bun test"
   },
   "dependencies": {
     "@zip.js/zip.js": "2.7.62",
-    "tar": "7.5.22",
-    "semver": "^7.6.3"
+    "semver": "^7.6.3",
+    "tar": "7.5.22"
   },
   "devDependencies": {
-    "@tsconfig/bun": "catalog:",
-    "@typescript/native-preview": "catalog:",
     "@types/bun": "catalog:",
     "@types/semver": "^7.5.8"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./highlights": "./src/highlights.ts",
+    "./pack": "./src/pack.ts"
   }
 }

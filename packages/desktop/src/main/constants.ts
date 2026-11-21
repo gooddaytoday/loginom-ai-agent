@@ -1,13 +1,26 @@
 import { app } from "electron"
 
-type Channel = "dev" | "beta" | "prod"
-const raw = import.meta.env.LOGINOM_AI_AGENT_CHANNEL
-export const CHANNEL: Channel = raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
+type Channel = "local" | "dev" | "beta" | "prod"
 
-export const BUILD_SOURCE = {
-  sourceSHA: import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA,
-  sourceDirty: import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY,
+const raw = import.meta.env.OPENCODE_CHANNEL
+
+export const CHANNEL: Channel = raw === "local" || raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
+
+export const VERSION = app.isPackaged ? app.getVersion() : (process.env.OPENCODE_VERSION ?? app.getVersion())
+
+const appNames: Record<string, string> = {
+  dev: "OpenCode Dev",
+  beta: "OpenCode Beta",
+  prod: "OpenCode",
 }
 
-// An administrator may supply a feed even when the build does not have one.
-export const UPDATER_ENABLED = app.isPackaged && CHANNEL !== "dev"
+const appIDs: Record<string, string> = {
+  dev: "ai.opencode.desktop.dev",
+  beta: "ai.opencode.desktop.beta",
+  prod: "ai.opencode.desktop",
+}
+
+// Local renderer/server mode keeps the dev application identity.
+export const APP_NAME = app.isPackaged ? appNames[CHANNEL] : "OpenCode Dev"
+
+export const APP_ID = app.isPackaged ? appIDs[CHANNEL] : "ai.opencode.desktop.dev"

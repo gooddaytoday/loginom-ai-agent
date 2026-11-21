@@ -1,27 +1,64 @@
 import path from "path"
+import { measureEditText, type WidthMethod } from "@opentui/core"
 import { onMount } from "solid-js"
 import { createStore, produce, unwrap } from "solid-js/store"
-import type { AgentPart, FilePart, TextPart } from "@opencode-ai/sdk/v2"
+import type { PromptInput } from "@opencode/schema"
+import type { Types } from "effect"
 import { createSimpleContext } from "../context/helper"
 import { useTuiPaths } from "../context/runtime"
 import { appendText, readText, writeText } from "../util/persistence"
 
-export type PromptInfo = {
-  input: string
+export type PastedText = {
+  text: string
+  source: {
+    start: number
+    end: number
+    text: string
+  }
+}
+
+// `path` is the local file a pasted attachment was read from. It stays in the TUI.
+export type PromptFile = Types.DeepMutable<PromptInput.FileAttachment> & { path?: string }
+
+export type PromptInfo = Types.DeepMutable<Pick<PromptInput.Prompt, "text" | "agents" | "skills">> & {
+  files?: PromptFile[]
+  pasted: PastedText[]
   mode?: "normal" | "shell"
-  parts: (
-    | Omit<FilePart, "id" | "messageID" | "sessionID">
-    | Omit<AgentPart, "id" | "messageID" | "sessionID">
-    | (Omit<TextPart, "id" | "messageID" | "sessionID"> & {
-        source?: {
-          text: {
-            start: number
-            end: number
-            value: string
-          }
-        }
-      })
-  )[]
+}
+
+export type PromptPartRef = {
+  type: "file" | "agent" | "skill" | "pasted"
+  index: number
+}
+
+export const emptyPrompt = (): PromptInfo => ({ text: "", files: [], agents: [], skills: [], pasted: [] })
+
+// Part ranges are textarea offsets, so shift by the measured offset rather than string length.
+export function appendPrompt(prompt: PromptInfo, following: PromptInfo, widthMethod: WidthMethod): PromptInfo {
+  const text = prompt.text ? `${prompt.text}\n\n` : ""
+  const offset = measureEditText(text, { widthMethod })
+  const shift = <T extends { start: number; end: number }>(range: T, by: number) => ({
+    ...range,
+    start: range.start + by,
+    end: range.end + by,
+  })
+  const mentions = <T extends { mention?: { start: number; end: number } }>(
+    items: T[] | undefined,
+    next: T[] | undefined,
+  ) => [
+    ...(items ?? []).map((item) => ({ ...item, mention: item.mention && shift(item.mention, 0) })),
+    ...(next ?? []).map((item) => ({ ...item, mention: item.mention && shift(item.mention, offset) })),
+  ]
+  return {
+    text: text + following.text,
+    files: mentions(prompt.files, following.files),
+    agents: mentions(prompt.agents, following.agents),
+    skills: mentions(prompt.skills, following.skills),
+    pasted: [
+      ...prompt.pasted.map((part) => ({ ...part, source: shift(part.source, 0) })),
+      ...following.pasted.map((part) => ({ ...part, source: shift(part.source, offset) })),
+    ],
+  }
 }
 
 export const MAX_HISTORY_ENTRIES = 50
@@ -32,7 +69,7 @@ export function parsePromptHistory(text: string) {
     .filter(Boolean)
     .map((line) => {
       try {
-        return JSON.parse(line) as PromptInfo
+        return parsePromptInfo(JSON.parse(line))
       } catch {
         return undefined
       }
@@ -46,7 +83,14 @@ export function isDuplicateEntry(previous: PromptInfo | undefined, next: PromptI
   return JSON.stringify(previous) === JSON.stringify(next)
 }
 
-export const { use: usePromptHistory, provider: PromptHistoryProvider } = createSimpleContext({
+export function parsePromptInfo(value: unknown): PromptInfo | undefined {
+  if (!value || typeof value !== "object") return
+  const input = value as Record<string, unknown>
+  if (typeof input.text !== "string" || !Array.isArray(input.pasted)) return
+  return input as PromptInfo
+}
+
+const { use: useHistoryEntries, provider: PromptHistoryProvider } = createSimpleContext({
   name: "PromptHistory",
   init: () => {
     const paths = useTuiPaths()
@@ -60,34 +104,15 @@ export const { use: usePromptHistory, provider: PromptHistoryProvider } = create
         writeText(historyPath, lines.map((line) => JSON.stringify(line)).join("\n") + "\n").catch(() => {})
     })
 
-    const [store, setStore] = createStore({
-      index: 0,
-      history: [] as PromptInfo[],
-    })
+    const [store, setStore] = createStore({ history: [] as PromptInfo[] })
 
     return {
-      move(direction: 1 | -1, input: string) {
-        if (!store.history.length) return undefined
-        const current = store.history.at(store.index)
-        if (!current) return undefined
-        if (current.input !== input && input.length) return
-        setStore(
-          produce((draft) => {
-            const next = store.index + direction
-            if (Math.abs(next) > store.history.length) return
-            if (next > 0) return
-            draft.index = next
-          }),
-        )
-        if (store.index === 0) return { input: "", parts: [] }
-        return store.history.at(store.index)
+      get entries() {
+        return store.history
       },
       append(item: PromptInfo) {
         const entry = structuredClone(unwrap(item))
-        if (isDuplicateEntry(store.history.at(-1), entry)) {
-          setStore("index", 0)
-          return
-        }
+        if (isDuplicateEntry(store.history.at(-1), entry)) return
         let trimmed = false
         setStore(
           produce((draft) => {
@@ -96,7 +121,6 @@ export const { use: usePromptHistory, provider: PromptHistoryProvider } = create
               draft.history = draft.history.slice(-MAX_HISTORY_ENTRIES)
               trimmed = true
             }
-            draft.index = 0
           }),
         )
 
@@ -109,3 +133,36 @@ export const { use: usePromptHistory, provider: PromptHistoryProvider } = create
     }
   },
 })
+
+export { PromptHistoryProvider }
+
+export function usePromptHistory(currentDraft = emptyPrompt) {
+  const history = useHistoryEntries()
+  let index = 0
+  let draft: PromptInfo | undefined
+  function reset() {
+    index = 0
+    draft = undefined
+  }
+  return {
+    move(direction: 1 | -1, input: string) {
+      const next = index + direction
+      if (next < -history.entries.length || next > 0) return
+      if (index < 0 && input && history.entries.at(index)?.text !== input) return
+      if (index === 0) draft = structuredClone({ ...currentDraft(), text: input })
+      index = next
+      if (next !== 0) {
+        const entry = history.entries.at(next)
+        return entry ? { ...emptyPrompt(), ...structuredClone(unwrap(entry)) } : undefined
+      }
+      const restored = draft
+      draft = undefined
+      return restored
+    },
+    reset,
+    append(item: PromptInfo) {
+      reset()
+      history.append(item)
+    },
+  }
+}

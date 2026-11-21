@@ -1,154 +1,277 @@
-import { execFile } from "node:child_process"
+import { copyFile, readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { promisify } from "node:util"
-import { linuxPermissions } from "./scripts/linux-permissions"
-import type { Configuration } from "electron-builder"
-import { Product, productChannel, productName, productSlug } from "@loginom-ai-agent/product"
-import release from "../product/loginom-release.json"
 
-const execFileAsync = promisify(execFile)
+import { Arch, type Configuration } from "electron-builder"
+import { NativeArch } from "../../script/native-arch"
+import { DESKTOP_NATIVE_ENGLISH } from "@opencode/app/i18n/desktop-native"
+import { CLI_BINARIES, getCurrentCli, nodePtyPackage } from "./script/utils"
+
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
-const rootDir = path.resolve(packageDir, "../..")
-const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 
-async function signWindows(configuration: { path: string }) {
-  if (process.platform !== "win32") return
-  if (process.env.GITHUB_ACTIONS !== "true") return
+// The Electron 42 packaging update briefly installed Linux launchers/icons under
+// "opencode-desktop". Keep that hidden desktop entry around so existing GNOME/KDE
+// pins still resolve after the canonical app id changes back to ai.opencode.desktop.
+const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 
-  await execFileAsync(
-    "pwsh",
-    ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.path],
-    { cwd: rootDir },
-  )
+const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
+
+// rpmbuild adds /usr/lib/.build-id links for every ELF file. The bundled Electron
+// binaries are byte-identical across apps on the same Electron version, so those
+// links collide with other Electron RPMs (Slack, Unity Hub, ...) and rpm/zypper
+// refuse to install or update. They only serve debuginfo lookup, so skip them.
+// fpm only accepts flags before the first src=dest mapping, so keep this first.
+const rpmNoBuildIdLinksFpm = "--rpm-rpmbuild-define=_build_id_links none"
+
+const metainfoFpm = (appId: string) =>
+  `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
+
+// Dev and beta package every commit, so they trade about 5% (deb) and 17% (rpm) larger files for xz -1, which
+// compresses the payload about 3x faster than the deb default (-3) and 5x faster than the rpm default (-9).
+const previewCompressionFpm = (target: "deb" | "rpm") => [`--${target}-compression-level`, "1"]
+
+function resolveChannel() {
+  const raw = process.env.OPENCODE_CHANNEL
+
+  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
+
+  if (raw === "latest") return "prod"
+
+  return "dev"
 }
 
-// FPM also creates desktop entries outside appOutDir; their modes must not inherit a private shell umask.
-if (process.platform === "linux") process.umask(0o022)
+const APP_IDS = {
+  dev: "ai.opencode.desktop.dev",
+  beta: "ai.opencode.desktop.beta",
+  prod: "ai.opencode.desktop",
+} as const
 
-// Ad-hoc test artifacts must never select a certificate from the local keychain.
-if (process.platform === "darwin") process.env.CSC_IDENTITY_AUTO_DISCOVERY = "false"
+// libappimage (used by AppImageLauncher) resolves the .desktop entry inside an
+// AppImage by globbing `*.desktop` at the squashfs root. If the main
+// executable itself ends in `.desktop` (prod appId `ai.opencode.desktop`), the
+// ELF binary matches the glob and is parsed as a desktop entry, so
+// integration fails with `Malformed desktop entry: Unexpected char '\x7f' at 0`
+// (0x7F is the first byte of the ELF magic).
+// https://github.com/anomalyco/opencode/issues/51867
+// Strip a trailing `.desktop` so the executable can never collide with the
+// desktop-entry glob. Beta/dev appIds end in `.beta`/`.dev` and are unaffected.
+function linuxExecutableName(appId: string): string {
+  return appId.replace(/\.desktop$/, "")
+}
 
-const channel = productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL)
-const appId = Product.channels[channel]
-const config: Configuration = {
-  appId,
-  // electron-builder uses productName for /opt, while desktop metadata keeps the display name.
-  productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
-  artifactName: Product.artifactName,
-  // A generic target writes metadata even with --publish never. The invalid
-  // placeholder only enables asset generation; Product keeps runtime updates off.
-  publish: {
-    provider: "generic",
-    url: process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || "https://updates.invalid/",
-    channel: "latest",
-  },
-  async afterAllArtifactBuild(result) {
-    const { buildBlockMap } = await import("app-builder-lib/out/targets/blockmap/blockmap")
-    const images = result.artifactPaths.filter((file) => file.endsWith(".AppImage"))
-    for (const file of images) await buildBlockMap(file, "gzip", `${file}.blockmap`)
-    return images.map((file) => `${file}.blockmap`)
-  },
-  // Native backend dependencies run in the bundled Node sidecar. Renderer/main
-  // dependencies use N-API or platform packages already selected by the lockfile.
-  npmRebuild: false,
-  async afterPack(context) {
-    if (context.electronPlatformName !== "linux") return
-    await linuxPermissions(context.appOutDir)
-    // Resource copying normalizes modes. Bun's fs.chmod clears setuid, so restore the bit with /bin/chmod
-    // before DEB ownership becomes root.
-    await execFileAsync("/bin/chmod", [
-      "4755",
-      path.join(
-        context.appOutDir,
-        `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
+const getBase = (appId: string): Configuration => {
+  const target = getCurrentCli()
+  const desktopName = `${appId}.desktop`
+
+  return {
+    artifactName: "opencode-desktop-${os}-${arch}.${ext}",
+    directories: {
+      output: "dist",
+      buildResources: "resources",
+    },
+    // Linux launchers are .desktop files, so this is the desktop file name,
+    // not just the app id. For prod, app id "ai.opencode.desktop" becomes
+    // "ai.opencode.desktop.desktop".
+    // https://developer.gnome.org/documentation/guidelines/maintainer/integrating.html
+    // https://www.electron.build/docs/linux/
+    // Release builds take their version from OPENCODE_VERSION instead of rewriting package.json.
+    extraMetadata: process.env.OPENCODE_VERSION
+      ? { desktopName, version: process.env.OPENCODE_VERSION }
+      : { desktopName },
+    files: [
+      "out/**/*",
+      "resources/**/*",
+      "!resources/opencode-cli*",
+      // Keep only the target platform's node-pty prebuild when cross-packaging with --cpu=*.
+      ...CLI_BINARIES.filter((item) => item.os !== target.os || item.cpu !== target.cpu).map(
+        (item) => `!**/node_modules/@lydell/node-pty-${item.os}-${item.cpu}{,/**/*}`,
       ),
-    ])
-  },
-  directories: { output: "dist", buildResources: "resources" },
-  extraMetadata: {
-    name: `${Product.namespace}/desktop`,
-    productName: productName(channel),
-    desktopName: `${appId}.desktop`,
-    ...(process.env.LOGINOM_AI_AGENT_VERSION ? { version: process.env.LOGINOM_AI_AGENT_VERSION } : {}),
-  },
-  files: ["out/**/*", "resources/icons/**/*"],
-  extraResources: [
-    { from: "resources/loginom", to: "loginom" },
-    { from: "resources/icons", to: "icons" },
-    { from: "resources", to: ".", filter: ["updates-s3.json"] },
-  ],
-  protocols: { name: Product.name, schemes: [Product.scheme] },
-  mac: {
-    category: "public.app-category.productivity",
-    icon: "resources/icons/icon.icns",
-    hardenedRuntime: true,
-    gatekeeperAssess: false,
-    entitlements: "resources/entitlements.plist",
-    entitlementsInherit: "resources/entitlements.plist",
-    minimumSystemVersion: "14.0",
-    identity: "-",
-    // Preserve upstream signatures and the staged resource-manifest hashes.
-    signIgnore: [
-      "/Contents/Resources/loginom/bin/",
-      "/Contents/Resources/loginom/browsers/",
-      "/Contents/Resources/loginom/ripgrep/",
+      // Log export imports Zip.js as ESM. Keep index.js and lib, including its inline worker.
+      "!**/node_modules/@zip.js/zip.js/dist{,/**/*}",
+      "!**/node_modules/@zip.js/zip.js/{index.cjs,index.min.js,index-fflate.js,deno.json,eslint.config.mjs}",
+      // Nothing executes type declarations or source maps, and every entry costs startup time: the
+      // main process parses the whole asar header before it runs any JavaScript.
+      "!**/node_modules/**/*.d.{ts,cts,mts}",
+      "!**/node_modules/**/*.d.{ts,cts,mts}.map",
+      "!**/node_modules/**/*.{js,cjs,mjs}.map",
+      // These packages execute compiled JavaScript, not their sources.
+      "!**/node_modules/ajv/lib{,/**/*}",
+      "!**/node_modules/ajv-formats/src{,/**/*}",
+      // Keep js-yaml's CommonJS sources and dist/js-yaml.mjs ESM entry, not browser bundles or its CLI.
+      "!**/node_modules/js-yaml/dist/{js-yaml.js,js-yaml.min.js,*.map}",
+      "!**/node_modules/js-yaml/bin{,/**/*}",
     ],
-    notarize: false,
-    target: [
-      { target: "dmg", arch: ["arm64"] },
-      { target: "zip", arch: ["arm64"] },
+    extraResources: [
+      {
+        from: "resources/",
+        to: "",
+        filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
+      },
     ],
-  },
-  dmg: { sign: false },
-  win: {
-    icon: "resources/icons/icon.ico",
-    executableName: productSlug(channel),
-    requestedExecutionLevel: "asInvoker",
-    signtoolOptions: { sign: signWindows },
-    target: [{ target: "nsis", arch: ["x64"] }],
-    verifyUpdateCodeSignature: true,
-  },
-  nsis: {
-    include: path.join(packageDir, "resources", "uninstall-uri.nsh"),
-    oneClick: true,
-    perMachine: false,
-    deleteAppDataOnUninstall: false,
-    installerIcon: "resources/icons/icon.ico",
-    installerHeaderIcon: "resources/icons/icon.ico",
-    shortcutName: productName(channel),
-  },
-  linux: {
-    syncDesktopName: true,
-    icon: "resources/icons/linux",
-    category: "Office",
-    executableName: productSlug(channel),
-    desktop: { entry: { Name: productName(channel), StartupWMClass: appId } },
-    target: ["AppImage", "deb"],
-  },
-  deb: {
-    // Electron and the bundled Chromium both link these libraries on all supported distributions.
-    depends: [
-      "libgtk-3-0",
-      "libnotify4",
-      "libnss3",
-      "libxss1",
-      "libxtst6",
-      "xdg-utils",
-      "libatspi2.0-0",
-      "libuuid1",
-      "libsecret-1-0",
-      "libgbm1",
-      // Ubuntu 24's unversioned libasound2 virtual package can select the incomplete OSS shim.
-      "libasound2t64 | libasound2 (>= 1.0.16)",
-      "ca-certificates",
-      "fonts-liberation",
-      "libcurl4 | libcurl4t64 | libcurl3-gnutls",
-      "libvulkan1",
-    ],
-    maintainer: "Loginom",
-    packageName: productSlug(channel),
-    fpm: [`${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`],
-  },
+    afterPack: async (context) => {
+      const arch = Arch[context.arch]
+
+      // The --arm64 flag picks Electron while OPENCODE_TARGET picks the CLI and node-pty, so they can disagree.
+      if (arch !== "x64" && arch !== "arm64") throw new Error(`Unsupported desktop architecture: ${arch}`)
+
+      if (arch !== target.cpu) throw new Error(`Packaging ${arch} Electron with the ${target.target} CLI`)
+      const resources = context.packager.getResourcesDir(context.appOutDir)
+      const cli = path.join(resources, context.electronPlatformName === "win32" ? "opencode-cli.exe" : "opencode-cli")
+
+      const file = await stat(cli)
+
+      if (!file.isFile() || file.size === 0) throw new Error(`Bundled CLI must be a non-empty file: ${cli}`)
+      await NativeArch.verify(cli, arch)
+      const version = path.join(path.dirname(cli), "opencode-cli.version")
+
+      if ((await stat(version)).size === 0) throw new Error(`Bundled CLI version must be a non-empty file: ${version}`)
+
+      // With an Icon Composer mac.icon, electron-builder bundles the ICNS that actool generates as the pre-macOS 26
+      // fallback. That one tops out at 256px and draws a light ring around the squircle, so ship ours instead.
+      if (context.electronPlatformName === "darwin")
+        await copyFile(path.join(packageDir, "resources/icons/icon.icns"), path.join(resources, "icon.icns"))
+
+      if (context.electronPlatformName !== "win32") return
+
+      const prebuilds = path.join(
+        resources,
+        "app.asar.unpacked/node_modules",
+        nodePtyPackage(target.target),
+        "prebuilds",
+        `${target.os}-${target.cpu}`,
+      )
+
+      const addon = path.join(prebuilds, "conpty.node")
+
+      if ((await stat(addon)).size === 0) throw new Error(`Bundled node-pty must be a non-empty file: ${addon}`)
+      const entries = await readdir(prebuilds, { recursive: true, withFileTypes: true })
+
+      await Promise.all(
+        entries
+          .filter((entry) => entry.isFile())
+          .map(async (entry) => {
+            const file = path.join(entry.parentPath, entry.name)
+
+            if (await NativeArch.isNative(file)) await NativeArch.verify(file, arch)
+          }),
+      )
+    },
+    mac: {
+      category: "public.app-category.developer-tools",
+      icon: `resources/icons/icon.icns`,
+      extendInfo: {
+        NSMicrophoneUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.microphoneUsage"],
+        // The CLI server and its terminals run as children of the app, so macOS asks for their access to
+        // these protected locations in the app's name. The prompt shows the description (#56479).
+        NSDocumentsFolderUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.documentsFolderUsage"],
+        NSDesktopFolderUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.desktopFolderUsage"],
+        NSDownloadsFolderUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.downloadsFolderUsage"],
+        NSNetworkVolumesUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.networkVolumesUsage"],
+        NSRemovableVolumesUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.removableVolumesUsage"],
+        NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
+      },
+      target: ["dmg", "zip"],
+    },
+    protocols: {
+      name: "OpenCode",
+      schemes: ["opencode"],
+    },
+    win: {
+      icon: `resources/icons/icon.ico`,
+      target: ["nsis"],
+      verifyUpdateCodeSignature: false,
+    },
+    nsis: {
+      include: path.join(packageDir, "resources", "windows", "installer.nsh"),
+      oneClick: true,
+      perMachine: false,
+      installerIcon: `resources/icons/icon.ico`,
+      installerHeaderIcon: `resources/icons/icon.ico`,
+    },
+    linux: {
+      icon: `resources/icons`,
+      category: "Development",
+      executableName: linuxExecutableName(appId),
+      // Derive the installed `.desktop` filename from `desktopName`
+      // (`ai.opencode.desktop.desktop` for prod) instead of `executableName`,
+      // so window association is unaffected by the executable rename above.
+      syncDesktopName: true,
+      desktop: {
+        entry: {
+          // Match the installed .desktop file and hicolor icon basename so
+          // Linux shells can associate the running Electron window with its launcher.
+          StartupWMClass: appId,
+        },
+      },
+      target: ["AppImage", "deb", "rpm"],
+    },
+  }
 }
-export default config
+
+export function getConfig() {
+  const channel = resolveChannel()
+  const appId = APP_IDS[channel]
+  const base = getBase(appId)
+
+  switch (channel) {
+    case "dev": {
+      return {
+        ...base,
+        appId,
+        productName: "OpenCode Dev",
+        publish: {
+          provider: "generic",
+          url: "https://opencode.ai/update/api/dev/desktop/opencode/",
+          channel: "latest",
+        },
+        deb: { fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        rpm: {
+          packageName: "opencode-dev",
+          fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
+        },
+      }
+    }
+
+    case "beta": {
+      return {
+        ...base,
+        appId,
+        productName: "OpenCode Beta",
+        protocols: { name: "OpenCode Beta", schemes: ["opencode"] },
+        publish: {
+          provider: "generic",
+          url: "https://opencode.ai/update/api/beta/desktop/opencode/",
+          channel: "latest",
+        },
+        deb: { fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        rpm: {
+          packageName: "opencode-beta",
+          fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
+        },
+      }
+    }
+
+    case "prod": {
+      return {
+        ...base,
+        appId,
+        productName: "OpenCode",
+        protocols: { name: "OpenCode", schemes: ["opencode"] },
+        // An Icon Composer package compiles to Assets.car, which macOS 26 and later draw the app icon from
+        // (Dock, Finder, system dialogs and the system icon styles). Older macOS keeps using the ICNS.
+        mac: { ...base.mac, icon: "resources/icons/icon.icon" },
+        // The DMG volume icon would otherwise use the same actool-generated ICNS.
+        dmg: { icon: "resources/icons/icon.icns" },
+        publish: {
+          provider: "generic",
+          url: "https://opencode.ai/update/api/latest/desktop/opencode/",
+          channel: "latest",
+        },
+        deb: { fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
+        rpm: { packageName: "opencode", fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId), legacyDesktopEntryFpm] },
+      }
+    }
+  }
+}
+
+export default getConfig()

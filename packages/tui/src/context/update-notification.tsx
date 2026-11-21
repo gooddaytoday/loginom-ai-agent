@@ -1,101 +1,158 @@
-import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { createSignal, onCleanup, onMount } from "solid-js"
 import { createSimpleContext } from "./helper"
-import { useKV } from "./kv"
-import { useExit } from "./exit"
-import { useDialog } from "../ui/dialog"
+import { useLog } from "./log"
+import { useStorage } from "./storage"
+import { useEvent } from "./event"
 import { errorMessage } from "../util/error"
+import { useExit } from "./exit"
+import { useEpilogue } from "./epilogue"
+import { useDialog } from "../ui/dialog"
 import { DialogUpdate } from "../component/dialog-update"
 
-export type UpdateTarget = { readonly type: "latest"; readonly version: string }
-
+type ClientNotice = { readonly type: "available" | "installed"; readonly version: string }
+type Notice = ClientNotice & ({ readonly source: "client" } | { readonly source: "server"; readonly remote: boolean })
 export type UpdateState =
-  | { readonly type: "installing"; readonly target: UpdateTarget }
-  | { readonly type: "installed"; readonly target: UpdateTarget }
-  | { readonly type: "failed"; readonly target: UpdateTarget; readonly message: string }
+  | ClientNotice
+  | { readonly type: "installing"; readonly version: string }
+  | { readonly type: "failed"; readonly message: string }
 
-export type UpdateNotice = { readonly type: "available"; readonly version: string }
-
-// Implemented by the CLI process so checks and installs run against this machine's installation.
 export type UpdateSource = {
-  readonly subscribe: (notify: (notice: UpdateNotice) => void) => () => void
-  readonly check: () => Promise<{ readonly current: string; readonly latest?: string }>
-  readonly apply: (target: UpdateTarget) => Promise<void>
-}
-
-// Skipping a version hides it until a newer one ships.
-export function visibleNotice(notice: UpdateNotice | undefined, hidden: { readonly skippedVersion?: string }) {
-  if (!notice) return undefined
-  if (hidden.skippedVersion && !isVersionGreater(notice.version, hidden.skippedVersion)) return undefined
-  return notice
+  readonly remote: boolean
+  readonly subscribe: (notify: (notice: ClientNotice) => void) => () => void
+  readonly check: (
+    signal: AbortSignal,
+    onInstall: (version: string) => void,
+  ) => Promise<ClientNotice | { readonly type: "unavailable"; readonly message: string } | undefined>
+  readonly apply: (version: string) => Promise<void>
 }
 
 export const { use: useUpdateNotification, provider: UpdateNotificationProvider } = createSimpleContext({
   name: "UpdateNotification",
   init: (props: { updater?: UpdateSource }) => {
-    const kv = useKV()
-    const dialog = useDialog()
+    const event = useEvent()
     const exit = useExit()
-    const [available, setAvailable] = createSignal<UpdateNotice>()
+    const epilogue = useEpilogue()
+    const dialog = useDialog()
+    const log = useLog({ component: "update-notification" })
     const [state, setState] = createSignal<UpdateState>()
+    const [notification, setNotification] = createSignal<Notice>()
+    const [notifications, markNotification] = useStorage().store<{ versions: string[] }>("update-notifications", {
+      initial: { versions: [] },
+    })
 
-    // Checks only announce a version. Installing always goes through /update.
-    onMount(() => {
+    const notify = (notice: Notice) => {
       if (!props.updater) return
-      onCleanup(props.updater.subscribe(setAvailable))
-    })
+      // Every way out of the TUI after a local install tells the user to start the new version.
+      if (notice.type === "installed" && !(notice.source === "server" && notice.remote))
+        epilogue.updatedVersion(notice.version)
+      if (
+        notifications.versions.includes(`${notice.source}:${notice.version}`) ||
+        (notice.source === "client" && notifications.versions.includes(notice.version))
+      )
+        return
+      setNotification((current) => {
+        if (notice.source === "server" && current?.source === "client") return current
+        return notice
+      })
+    }
 
-    const notification = createMemo(() => {
-      const current = state()
-      if (current?.type === "installed") return current
-      return visibleNotice(available(), { skippedVersion: kv.get("skipped_version") })
-    })
+    const dismiss = () => {
+      const current = notification()
+      if (!current) return
+      setNotification(undefined)
+      // Only interactions with the automatic notification update its history.
+      void markNotification((draft) => {
+        draft.versions = [...draft.versions, `${current.source}:${current.version}`].slice(-100)
+      }).catch((error) => log.error("failed to persist update notification", { error }))
+    }
 
-    const install = async (target: UpdateTarget) => {
+    const install = async () => {
       const updater = props.updater
-      if (!updater || state()?.type === "installing") return
-      setState({ type: "installing", target })
-      await updater.apply(target).then(
-        () => setState({ type: "installed", target }),
-        (error: unknown) => {
-          setState({ type: "failed", target, message: errorMessage(error) })
+      const current = state()
+      if (!updater || !current || current.type !== "available") return
+      setState({ type: "installing", version: current.version })
+      await updater.apply(current.version).then(
+        () => {
+          epilogue.updatedVersion(current.version)
+          setState({ type: "installed", version: current.version })
         },
+        (error) => setState({ type: "failed", message: errorMessage(error) }),
       )
     }
 
-    const open = () => {
+    const check = async (signal: AbortSignal) => {
       const updater = props.updater
-      if (!updater) return
+      if (!updater || state()?.type === "installing") return
+      const result = await updater
+        .check(signal, (version) => {
+          if (!signal.aborted) setState({ type: "installing", version })
+        })
+        .finally(() => {
+          if (state()?.type === "installing") setState(undefined)
+        })
+      if (signal.aborted) return
+      if (result?.type === "unavailable") return result.message
+      if (result?.type === "installed") epilogue.updatedVersion(result.version)
+      setState(result)
+    }
+
+    const restart = () => {
+      const current = state()
+      if (current?.type !== "installed") return
+      exit()
+    }
+
+    const open = (origin: "manual" | "notification") => {
+      if (!props.updater) return
+      const current = notification()
+      const known = current && (current.source === "client" || !current.remote) ? current : undefined
+      if (origin === "notification" && !known) return
+      const active = state()
+      // The notification can predate an installation through /update.
+      if (known && active?.type !== "installing" && !(active?.type === "installed" && active.version === known.version))
+        setState({ type: known.type, version: known.version })
+      const status = state()?.type
       dialog.replace(() => (
         <DialogUpdate
-          check={updater.check}
+          check={status === undefined || status === "failed" ? check : undefined}
           state={state}
+          skip={dismiss}
           install={install}
-          skip={(version) => kv.set("skipped_version", version)}
-          restart={() => exit()}
+          restart={restart}
         />
       ))
     }
 
+    onMount(() => {
+      if (!props.updater) return
+      onCleanup(props.updater.subscribe((notice) => notify({ ...notice, source: "client" })))
+    })
+
+    onCleanup(
+      event.on("installation.update-available", (event) =>
+        notify({
+          source: "server",
+          remote: props.updater?.remote ?? false,
+          type: "available",
+          version: event.data.version,
+        }),
+      ),
+    )
+    onCleanup(
+      event.on("installation.updated", (event) =>
+        notify({
+          source: "server",
+          remote: props.updater?.remote ?? false,
+          type: "installed",
+          version: event.data.version,
+        }),
+      ),
+    )
+
     return {
       notification,
+      dismiss,
       open: props.updater ? open : undefined,
     }
   },
 })
-
-export function isVersionGreater(left: string, right: string) {
-  const parse = (value: string) => {
-    const [core, prerelease] = value.replace(/^v/, "").split("-", 2)
-    return { core: core.split(".").map((part) => Number.parseInt(part, 10) || 0), prerelease }
-  }
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < Math.max(a.core.length, b.core.length); index++) {
-    const difference = (a.core[index] ?? 0) - (b.core[index] ?? 0)
-    if (difference) return difference > 0
-  }
-  if (a.prerelease === b.prerelease) return false
-  if (!a.prerelease) return true
-  if (!b.prerelease) return false
-  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true }) > 0
-}

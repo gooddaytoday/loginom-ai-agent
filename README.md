@@ -1,45 +1,114 @@
-# Loginom AI Agent
+<p align="center">
+  <a href="https://opencode.ai">
+    <picture>
+      <source srcset=".github/assets/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset=".github/assets/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
+      <img src=".github/assets/logo-ornate-light.svg" alt="OpenCode logo">
+    </picture>
+  </a>
+</p>
+<p align="center">The open source AI coding agent.</p>
+<p align="center">
+  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://www.npmjs.com/package/@opencode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@opencode/cli?style=flat-square" /></a>
+  <a href="https://github.com/anomalyco/opencode/actions/workflows/release.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/release.yml?style=flat-square&branch=dev" /></a>
+</p>
 
-Desktop-приложение для работы с Loginom с помощью AI. Клиент Loginom Dock встроен в приложение вместе с Node.js, Playwright и Chromium. Основано на OpenCode; сведения об исходном проекте и лицензиях сохранены в [архиве документации](docs/upstream/README.md).
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh.md">简体中文</a> |
+  <a href="README.zht.md">繁體中文</a> |
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.da.md">Dansk</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.bs.md">Bosanski</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.no.md">Norsk</a> |
+  <a href="README.br.md">Português (Brasil)</a> |
+  <a href="README.th.md">ไทย</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.uk.md">Українська</a> |
+  <a href="README.bn.md">বাংলা</a> |
+  <a href="README.gr.md">Ελληνικά</a> |
+  <a href="README.vi.md">Tiếng Việt</a>
+</p>
 
-## Linux
+[![OpenCode Terminal UI](services/site/public/v1/docs/assets/lander/screenshot.png)](https://opencode.ai)
 
-Поддерживаемая цель: Ubuntu 22.04+ и Debian 12+, x86_64. Основной установщик — DEB, дополнительный переносимый вариант — AppImage. Локальные кандидаты находятся в `packages/desktop/dist`; публикация и цифровая подпись не выполнялись.
+---
 
-```sh
-sudo apt install ./loginom-ai-agent-linux-amd64.deb
+### Installation
+
+```bash
+# YOLO
+curl -fsSL https://opencode.ai/v2/install | bash
+
+# Package managers
+npm i -g @opencode/cli@latest      # or bun/pnpm/yarn
+brew install anomalyco/tap/opencode-v2 # macOS and Linux (recommended, always up to date)
+brew install opencode              # macOS and Linux (official brew formula, updated less)
+sudo pacman -S opencode            # Arch Linux (Stable)
+paru -S opencode-beta              # Arch Linux (Latest from AUR)
+mise use -g opencode               # Any OS
+nix run github:anomalyco/opencode  # Nix
 ```
 
-После установки запустите **Loginom AI Agent**. Мастер первого запуска спрашивает ключ Loginom AI сервера, адрес Loginom, имя пользователя и пароль. Адрес по умолчанию — `https://app.loginom.ai`, пользователь — `user`, пароль пустой. Те же поля доступны в разделе **Loginom** настроек. Папка файлов определяется по имени пользователя: `/<пользователь>`.
+> [!TIP]
+> Remove versions older than 0.1.x before installing.
 
-Модель подключается отдельно через обычные настройки провайдеров приложения. Встроенный Dock не требует установки плагина, Node.js, Python или браузера на машине пользователя. В Linux секреты сохраняются в открытом виде с правами 0600 в приватном каталоге профиля.
+### Desktop App (BETA)
 
-## Узел Python и сервер Loginom
+OpenCode is also available as a desktop application. Download it from [opencode.ai/download](https://opencode.ai/download).
 
-Если администратор включил на сервере Loginom компонент Python, агент может создавать и выполнять узлы Python. Код выполняется на сервере Loginom. Перед выполнением агент проверяет текст кода, написанного моделью: разрешены вычислительные модули (pandas, numpy, стандартная библиотека), а чтение и запись файлов, сеть и запуск процессов запрещены.
+| Platform              | Download                           |
+| --------------------- | ---------------------------------- |
+| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
+| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
+| Windows               | `opencode-desktop-win-x64.exe`     |
+| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
 
-Эта проверка снижает риск, но не является песочницей: обход проверки остаётся возможным. Компонент Python доступен пользователям Loginom и без агента, поэтому агент не добавляет новых прав. Проверка защищает от другого: модель, сбитая данными или текстом, не должна выполнить вредный код от имени пользователя.
+```bash
+# macOS (Homebrew)
+brew install --cask opencode-desktop
+```
 
-Рекомендация администратору сервера Loginom: ограничьте среду выполнения Python правами операционной системы — отдельная учётная запись или контейнер без доступа к чувствительным файлам и с минимально необходимым сетевым доступом. Проверка кода агентом эти ограничения не заменяет.
+#### Installation Directory
 
-## Разработка и проверка
+The install script installs OpenCode to `$HOME/.opencode/bin`.
 
-- [Сборка, установка и тестирование Linux](docs/testing/loginom-ai-agent/linux.md).
-- [Текущий статус реализации и ограничения](docs/migration/linux-implementation-checkpoint.md).
-- [Тестирование Windows и macOS на отдельных машинах](docs/testing/loginom-ai-agent/README.md).
-- [Согласованный дизайн](docs/superpowers/specs/2026-09-16-loginom-ai-agent-desktop-design.md).
-- [Происхождение перенесённых исходников](docs/migration/source-map.json).
+### Agents
 
-Workspace-зависимости устанавливаются Bun 1.3.14. Тесты и `bun typecheck` запускаются из каталогов соответствующих пакетов, не из корня. Сборка закрепляет версии и хеши runtime; при первом запуске приложение ничего не устанавливает через npm.
+OpenCode includes two built-in agents you can switch between with the `Tab` key.
 
-Автообновление отключено до проверки собственного канала обновлений. Старые OpenCode wrapper/desktop и репозиторий Loginom Dock автоматически не удаляются. Клиентские интеграции Codex/Hermes сохранены в архиве переноса и не входят в активную разработку приложения.
+- **build** - Default, full-access agent for development work
+- **plan** - Read-only agent for analysis and code exploration
+  - Denies file edits by default
+  - Asks permission before running bash commands
+  - Ideal for exploring unfamiliar codebases or planning changes
 
-## Разработка обработчиков узлов
+Also included is a **general** subagent for complex searches and multistep tasks.
+This is used internally and can be invoked using `@general` in messages.
 
-[Единый комплект инструкций](docs/node-development/README.md): реестр готовности,
-оркестратор параллельной или последовательной очереди, обработка одного узла,
-создание подплана, приёмка standalone CLI и исторические доказательства.
+Learn more about [agents](https://opencode.ai/docs/agents).
 
-## Лицензии
+### Documentation
 
-Сохраняются [лицензия исходного проекта](LICENSE), лицензия перенесённого клиента Dock и уведомления сторонних компонентов. Соответствующие исходники и манифест хешей прилагаются к локальным установщикам. Архивные документы OpenCode описывают исходный проект и не являются инструкцией установки Loginom AI Agent.
+For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+
+### Contributing
+
+If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+
+### Building on OpenCode
+
+If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+
+---
+
+**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)

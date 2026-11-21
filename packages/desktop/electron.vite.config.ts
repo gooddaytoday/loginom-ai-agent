@@ -1,163 +1,134 @@
-import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
-import appPlugin from "@opencode-ai/app/vite"
-import * as fs from "node:fs/promises"
-import { execFileSync } from "node:child_process"
-import { createPublicKey } from "node:crypto"
+import type { Plugin } from "vite"
+import { pickerPlugin } from "./script/picker"
+import { nodePtyPackage } from "./script/utils"
 
-const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
+function resolveChannel() {
+  const raw = process.env.OPENCODE_CHANNEL
 
-// Fixture trust is a build input, never a runtime override. Release CI cannot opt in.
-const updateTestKey = (() => {
-  if (
-    process.env.LOGINOM_AI_AGENT_UPDATE_TEST_BUILD !== "1" ||
-    process.env.GITHUB_WORKFLOW === "release" ||
-    process.env.GITHUB_WORKFLOW_REF?.includes("/.github/workflows/release.yml@")
-  )
-    return null
-  const pem = process.env.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
-  if (!pem?.startsWith("-----BEGIN PUBLIC KEY-----") || createPublicKey(pem).asymmetricKeyType !== "ed25519")
-    throw Error("LOGINOM_UPDATE_TEST_PUBLIC_KEY_INVALID")
-  return pem
-})()
+  if (raw === "local" || raw === "dev" || raw === "beta" || raw === "prod") return raw
 
-// Capture provenance at build time, never from the user's working directory.
-const source = (() => {
-  try {
-    const git = (...args: string[]) =>
-      execFileSync("git", args, {
-        cwd: import.meta.dirname,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim()
-    // electron-vite creates this untracked ESM loader while evaluating us.
-    const dirty = git("status", "--porcelain", "--untracked-files=all")
-      .split("\n")
-      .some((line) => line && !/^\?\? "?(?:.*\/)?electron\.vite\.config\.\d+\.mjs"?$/.test(line))
-    return { sha: git("rev-parse", "HEAD"), dirty }
-  } catch {
-    return { sha: null, dirty: null }
-  }
-})()
+  if (raw === "latest") return "prod"
 
-const channel = (() => {
-  const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
-  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
-  if (process.env.LOGINOM_AI_AGENT_CHANNEL === "latest") return "prod"
   return "dev"
-})()
+}
 
-const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
+const appPlugin = (await import("@opencode/app/vite")).default
 
-const sentry =
-  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-    ? sentryVitePlugin({
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_PROJECT,
-        telemetry: false,
-        release: {
-          name: process.env.SENTRY_RELEASE ?? process.env.VITE_SENTRY_RELEASE,
-        },
-        sourcemaps: {
-          assets: "./out/renderer/**",
-          filesToDeleteAfterUpload: "./out/renderer/**/*.map",
-        },
-      })
-    : false
+// Every module the entry reaches through static imports lands in one chunk. Automatic splitting
+// otherwise fragments the initial graph into ~50 files shared with lazy routes, and each file costs
+// the renderer a main-thread request round trip through the main process before first paint.
+// Rolldown hands every chunk-name call a fresh context, so the graph is walked once per output.
+const initialGraph = new Set<string>()
 
-export default defineConfig({
-  main: {
-    define: {
-      LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: JSON.stringify(updateTestKey),
-      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: JSON.stringify(
-        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API?.trim() || null,
-      ),
-      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: JSON.stringify(
-        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD?.trim() || null,
-      ),
-      LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
-      "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
-      "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),
-      "import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY": JSON.stringify(source.dirty),
-      // Release builds bake browser recovery; packaged mode is still required at runtime.
-      "import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY": JSON.stringify(
-        process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
-      ),
-    },
-    build: {
-      rollupOptions: {
-        input: { index: "src/main/index.ts", sidecar: "src/main/sidecar.ts" },
-        // Keep this identical to electron-vite's Node 20.11+ shim. Its regex insertion can
-        // corrupt bundled TypeScript, while a Rollup banner places the shim safely.
-        output: {
-          banner: `
-// -- CommonJS Shims --
-import __cjs_mod__ from 'node:module';
-const __filename = import.meta.filename;
-const __dirname = import.meta.dirname;
-const require = __cjs_mod__.createRequire(import.meta.url);
-`,
-        },
-      },
-      externalizeDeps: {
-        include: [nodePtyPkg],
-        exclude: [
-          "@loginom-ai-agent/product",
-          "@opencode-ai/schema",
-          "@loginom-ai-agent/loginom-host",
-          "@loginom-ai-agent/dashboard",
-        ],
-      },
-    },
-    plugins: [
-      {
-        name: "loginom-ai-agent:node-pty-narrower",
-        enforce: "pre",
-        resolveId(s) {
-          if (s === "@lydell/node-pty") return nodePtyPkg
-        },
-      },
-      {
-        name: "loginom-ai-agent:virtual-server-module",
-        enforce: "pre",
-        resolveId(id) {
-          if (id === "virtual:loginom-ai-agent-server") return this.resolve(`${LOGINOM_AI_AGENT_SERVER_DIST}/node.js`)
-        },
-      },
-      {
-        name: "loginom-ai-agent:copy-server-assets",
-        async writeBundle() {
-          for (const l of await fs.readdir(LOGINOM_AI_AGENT_SERVER_DIST)) {
-            if (!l.endsWith(".wasm")) continue
-            await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(`${LOGINOM_AI_AGENT_SERVER_DIST}/${l}`))
-          }
-        },
-      },
-    ],
+const initialChunk: Plugin = {
+  name: "opencode-desktop:initial-chunk",
+  renderStart() {
+    const entries = [...this.getModuleIds()].filter((id) => this.getModuleInfo(id)?.isEntry)
+    initialGraph.clear()
+    entries.forEach((id) => initialGraph.add(id))
+
+    // A Set's iterator also visits members added while iterating, so this reaches every static import.
+    for (const id of initialGraph) this.getModuleInfo(id)?.importedIds.forEach((imported) => initialGraph.add(imported))
   },
-  preload: {
-    build: {
-      rollupOptions: {
-        input: { index: "src/preload/index.ts" },
-        output: {
-          format: "cjs",
-          entryFileNames: "[name].js",
+}
+
+export default defineConfig(({ command }) => {
+  const channel = resolveChannel()
+  const nodePtyPkg = nodePtyPackage()
+
+  return {
+    main: {
+      resolve: {
+        dedupe: ["effect"],
+      },
+      define: {
+        // Local renderer/server mode still uses the dev application identity and updater policy.
+        "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
+      },
+      build: {
+        minify: command === "build",
+        rolldownOptions: {
+          input: { index: "src/main/index.ts" },
+          output: {
+            format: "es",
+            // DesktopPaths resolves resources from the main output directory,
+            // including when the lazy desktop entry shares it with other chunks.
+            chunkFileNames: "[name]-[hash].js",
+          },
+        },
+        externalizeDeps: {
+          // Bundle the Effect family together.
+          exclude: ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"],
+          include: [nodePtyPkg],
+        },
+      },
+      plugins: [
+        {
+          name: "opencode:node-pty-narrower",
+          enforce: "pre",
+          resolveId(s) {
+            if (s === "@lydell/node-pty") return nodePtyPkg
+
+            return undefined
+          },
+        },
+        {
+          // Rolldown emits its own scoped createRequire runtime for CommonJS dependencies.
+          // electron-vite's post-bundle regex shim injects a top-level `const require` that collides
+          // with bundled ESM modules declaring their own `require` (such as @effect/platform-node).
+          name: "opencode:disable-esm-shim",
+          configResolved(config) {
+            const shim = config.plugins.find((plugin) => plugin.name === "vite:esm-shim")
+
+            if (shim) delete shim.renderChunk
+          },
+        },
+      ],
+    },
+    preload: {
+      build: {
+        minify: command === "build",
+        rolldownOptions: {
+          input: { index: "src/preload/index.ts" },
+          output: {
+            format: "cjs",
+            // The package is "type": "module". Under --no-sandbox Electron loads the preload
+            // through Node's module loader, which treats a .js file as ESM and fails on
+            // require("electron"). The sandboxed path ignores the extension.
+            entryFileNames: "[name].cjs",
+          },
         },
       },
     },
-  },
-  renderer: {
-    plugins: [appPlugin, sentry],
-    publicDir: "../../../app/public",
-    root: "src/renderer",
-    build: {
-      sourcemap: true,
-      rollupOptions: {
-        input: {
-          main: "src/renderer/index.html",
+    renderer: {
+      experimental: {
+        bundledDev: true,
+      },
+      define: {
+        "import.meta.env.OPENCODE_VERSION": JSON.stringify(process.env.OPENCODE_VERSION),
+        "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+        "import.meta.env.OPENCODE_TEST_ONBOARDING": JSON.stringify(
+          command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
+        ),
+      },
+      plugins: [pickerPlugin(), appPlugin, initialChunk],
+      publicDir: "../../../app/public",
+      root: "src/renderer",
+      build: {
+        minify: command === "build",
+        sourcemap: true,
+        rolldownOptions: {
+          input: {
+            main: "src/renderer/index.html",
+          },
+          output: {
+            codeSplitting: {
+              groups: [{ name: (id) => (initialGraph.has(id) ? "app" : null), priority: 10 }],
+            },
+          },
         },
       },
     },
-  },
+  }
 })

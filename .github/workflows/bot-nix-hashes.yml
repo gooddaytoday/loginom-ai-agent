@@ -4,9 +4,9 @@ name: bot-nix-hashes
 # - hash and compute run repository code (nix build) with a read-only token and no secrets. compute uploads only the
 #   new nix/hashes.json.
 # - publish holds the write token. It runs only .github/nix-hashes/ from this commit, treats the artifact as data,
-#   validates its exact shape and commits only that file to bot/v1-nix-hashes. It never runs repository code.
+#   validates its exact shape and commits only that file to bot/nix-hashes. It never runs repository code.
 # - check-bot-scope.yml, a required check, fails the bot's pull request unless it changes only a valid nix/hashes.json,
-#   so a tampered branch cannot auto-merge once v1 requires that check.
+#   so a tampered branch cannot auto-merge.
 # This file, check-bot-scope.yml and .github/nix-hashes/ are the security boundary.
 
 permissions:
@@ -15,12 +15,13 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches: [v1]
+    branches: [dev]
     # Mirrored in .github/nix-hashes/publish.sh.
     paths:
       - "bun.lock"
       - "package.json"
       - "packages/*/package.json"
+      - "services/*/package.json"
       - "flake.lock"
       - "nix/node_modules.nix"
       - "nix/scripts/**"
@@ -44,7 +45,7 @@ jobs:
           - system: aarch64-linux
             runner: blacksmith-4vcpu-ubuntu-2404-arm
           - system: aarch64-darwin
-            runner: macos-latest
+            runner: blacksmith-6vcpu-macos-latest
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -159,10 +160,10 @@ jobs:
   # Runs even when compute found no change, so an open bot pull request with stale hashes is closed, not merged.
   publish:
     needs: compute
-    if: github.repository == 'anomalyco/opencode' && github.ref == 'refs/heads/v1'
+    if: github.repository == 'anomalyco/opencode' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-24.04
     concurrency:
-      group: bot-nix-hashes-publish-v1
+      group: bot-nix-hashes-publish
       cancel-in-progress: false
     permissions:
       contents: write
@@ -180,10 +181,10 @@ jobs:
           persist-credentials: false
 
       # Holds the push credential; only nix/hashes.json is checked out and nothing in it runs.
-      - name: Check out v1
+      - name: Check out dev
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: v1
+          ref: dev
           path: repo
           sparse-checkout: /nix/hashes.json
           sparse-checkout-cone-mode: false

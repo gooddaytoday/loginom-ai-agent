@@ -1,19 +1,13 @@
 packages/core/migration/**/snapshot.json linguist-generated
 packages/core/src/database/migration.gen.ts linguist-generated
-packages/desktop/test/loginom/fixtures/standalone-cli/**/*.csv text eol=lf
-# Pinned action catalogs are verified byte-for-byte at runtime.
-packages/loginom-runtime/executor/catalog-releases/** -text
-# Offline Help has a committed manifest of exact page bytes.
-packages/product/help/** -text
-# These normalized build-input hashes are committed in loginom-release.json.
-packages/product/models.json text eol=lf
-packages/loginom-runtime/client/package-lock.json text eol=lf
-# Vendored notices and source companions have committed checksums too.
-packages/loginom-host/licenses/** -text
-# Static fixtures have committed manifest/provenance hashes and byte oracles.
-packages/loginom-host/test/fixtures/skills-cold/** -text
-packages/loginom-host/test/fixtures/package-docs/** -text
-packages/opencode/test/cli/package-docs-routing/fixtures/** -text
-evals/fixtures/** -text
-docs/node-development/**/fixtures/** -text
-docs/node-development/**/acceptance/**/data/** -text
+packages/core/src/models-dev/snapshot.txt linguist-generated
+packages/core/src/database/schema.gen.ts linguist-generated
+packages/desktop/src/main/storage/migration.gen.ts linguist-generated
+packages/protocol/openapi.json linguist-generated
+packages/client/src/promise/generated/** linguist-generated
+packages/client/src/effect/generated/** linguist-generated
+packages/client/src/effect/api/** linguist-generated
+packages/core/src/**/*.txt text eol=lf
+packages/httpapi-codegen/test/generated/*.ts text eol=lf
+# The site tests compare source text and humans.txt byte for byte, so Windows checkouts keep LF.
+services/site/** text=auto eol=lf

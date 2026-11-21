@@ -1,6 +1,10 @@
 name: "Setup Bun"
 description: "Setup Bun with caching and install dependencies"
 inputs:
+  bun-version:
+    description: "Bun version to install instead of the root packageManager version"
+    required: false
+    default: ""
   install-flags:
     description: "Additional flags to pass to 'bun install'"
     required: false
@@ -8,115 +12,67 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Native install scripts use the product's Node version before resource staging.
+    # node-gyp@latest (invoked via bunx for native install scripts) requires Node >=22;
+    # some runner images ship an older system Node on PATH
     - name: Setup Node
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
-        node-version-file: packages/loginom-runtime/client/.node-version
+        node-version: "24"
 
-    - name: Use installed Node headers for native dependencies
-      if: runner.os != 'Windows'
-      shell: bash
-      run: |
-        node <<'NODE'
-        const fs = require("node:fs")
-        const path = require("node:path")
-        const nodeDir = path.dirname(path.dirname(process.execPath))
-        if (!fs.existsSync(path.join(nodeDir, "include", "node", "node.h"))) {
-          throw new Error("Pinned Node distribution headers are missing")
-        }
-        fs.appendFileSync(process.env.GITHUB_ENV, `npm_package_config_node_gyp_nodedir=${nodeDir}\n`)
-        NODE
-
-    - name: Get Bun version and baseline download URL
+    - name: Get baseline download URL
       id: bun-url
       shell: bash
       run: |
-        V=$(node -p "require('./package.json').packageManager.split('@')[1]")
-        echo "version=$V" >> "$GITHUB_OUTPUT"
         if [ "$RUNNER_ARCH" = "X64" ]; then
+          V="${{ inputs.bun-version }}"
+          if [ -z "$V" ]; then V=$(node -p "require('./package.json').packageManager.split('@')[1]"); fi
+          TAG=$([ "$V" = "canary" ] && echo "canary" || echo "bun-v${V}")
           case "$RUNNER_OS" in
             macOS)   OS=darwin ;;
             Linux)   OS=linux ;;
             Windows) OS=windows ;;
           esac
-          echo "url=https://github.com/oven-sh/bun/releases/download/bun-v${V}/bun-${OS}-x64-baseline.zip" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/oven-sh/bun/releases/download/${TAG}/bun-${OS}-x64-baseline.zip" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Setup Bun
-      id: setup-bun
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
-        bun-version: ${{ !steps.bun-url.outputs.url && steps.bun-url.outputs.version || '' }}
+        bun-version: ${{ !steps.bun-url.outputs.url && inputs.bun-version || '' }}
+        bun-version-file: ${{ !steps.bun-url.outputs.url && !inputs.bun-version && 'package.json' || '' }}
         bun-download-url: ${{ steps.bun-url.outputs.url }}
 
     - name: Get cache directory
       id: cache
       shell: bash
-      run: echo "dir=$(bun pm cache)" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "dir=$(bun pm cache)" >> "$GITHUB_OUTPUT"
+        echo "version=$(bun --version)" >> "$GITHUB_OUTPUT"
 
+    # On Windows, extracting the cache archive takes longer than Bun downloading and
+    # extracting the same packages itself, so Windows installs skip the cache.
     - name: Restore Bun dependencies
       id: bun-cache
+      if: runner.os != 'Windows'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ steps.cache.outputs.dir }}
-        key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles('**/bun.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-version }}-
+        key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ steps.cache.outputs.version }}-${{ hashFiles('bun.lock', 'patches/**') }}
+        # Each dev merge changes beta's bun.lock. Beta falls back to the newest cache for the same Bun version
+        # (Bun's cache stores every package version separately) instead of installing everything from npm.
+        restore-keys: ${{ (github.ref_name == 'beta' && format('{0}-{1}-bun-{2}-', runner.os, runner.arch, steps.cache.outputs.version)) || '' }}
 
     - name: Install setuptools for distutils compatibility
       run: python3 -m pip install setuptools || pip install setuptools || true
       shell: bash
 
-    # Hoisted installs can enqueue the same cold patch for multiple lock entries.
-    # Materialize each repeated patched version once before installing the tree.
-    - name: Prepare repeated Windows patches in the Bun cache
-      if: runner.os == 'Windows'
-      shell: bash
-      run: |
-        node <<'NODE'
-        const fs = require('node:fs')
-        const path = require('node:path')
-        const { spawnSync } = require('node:child_process')
-        const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
-        const lock = fs.readFileSync('bun.lock', 'utf8')
-        const cache = spawnSync('bun', ['pm', 'cache'], { encoding: 'utf8' })
-        if (cache.error || cache.status !== 0) throw cache.error || new Error('Cannot resolve the Bun cache')
-        for (const [spec, patch] of Object.entries(manifest.patchedDependencies || {})) {
-          if (lock.split(`[${JSON.stringify(spec)},`).length <= 2) continue
-          const name = spec.slice(0, spec.lastIndexOf('@'))
-          const version = spec.slice(spec.lastIndexOf('@') + 1)
-          const directory = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'bun-patch-'))
-          try {
-            const scope = path.join(cache.stdout.trim(), path.dirname(name))
-            const before = fs.existsSync(scope) ? fs.readdirSync(scope).filter(entry =>
-              entry.startsWith(path.basename(spec) + '@') && entry.includes('_patch_hash=')) : []
-            console.log(`Preparing ${spec}; existing patched cache entries: ${JSON.stringify(before)}`)
-            fs.copyFileSync(patch, path.join(directory, 'package.patch'))
-            fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({
-              private: true,
-              dependencies: { [name]: version },
-              patchedDependencies: { [spec]: 'package.patch' },
-            }))
-            const result = spawnSync('bun', ['install', '--ignore-scripts', '--no-save', '--linker', 'hoisted'], {
-              cwd: directory,
-              env: { ...process.env, BUN_INSTALL_CACHE_DIR: cache.stdout.trim() },
-              stdio: 'inherit',
-            })
-            if (result.error || result.status !== 0) throw result.error || new Error(`Cannot prepare ${spec}`)
-          } finally {
-            fs.rmSync(directory, { recursive: true, force: true })
-          }
-        }
-        NODE
-
     - name: Install dependencies
-      run: bun install ${{ inputs.install-flags }}
+      run: bun install --frozen-lockfile ${{ inputs.install-flags }}
       shell: bash
 
     - name: Save Bun dependencies
-      if: steps.bun-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+      if: runner.os != 'Windows' && steps.bun-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ steps.cache.outputs.dir }}
-        key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles('**/bun.lock') }}
+        key: ${{ steps.bun-cache.outputs.cache-primary-key }}

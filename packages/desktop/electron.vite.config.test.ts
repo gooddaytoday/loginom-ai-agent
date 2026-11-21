@@ -1,156 +1,131 @@
 import { expect, test } from "bun:test"
-import { execFileSync } from "node:child_process"
-import { copyFile, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { generateKeyPairSync, sign } from "node:crypto"
 import { existsSync } from "node:fs"
+import path from "node:path"
+import { MainConfigFactory } from "electron-vite"
+import { build } from "vite"
+import createConfig from "./electron.vite.config"
+import pkg from "./package.json"
+import { CLI_BINARIES, nodePtyPackage } from "./script/utils"
 
-// build-windows.ps1 uses a hoisted install; Linux CI may use package-local links.
-const dependencies = existsSync(join(import.meta.dir, "node_modules/electron-vite"))
-  ? join(import.meta.dir, "node_modules")
-  : join(import.meta.dir, "../../node_modules")
-const linkType = process.platform === "win32" ? "junction" : "dir"
-
-test("only an explicitly built updater fixture trusts its baked key; runtime overrides cannot change release trust", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-update-trust-"))
-  const key = generateKeyPairSync("ed25519")
-  const pem = key.publicKey.export({ type: "spki", format: "pem" }).toString()
-  const raw = Buffer.from(
-    `version: 0.4.1\nminSupportedVersion: 0.4.0\nstagingPercentage: 100\npath: releases/0.4.1/loginom-ai-agent-win-x64.exe\nsha512: ${Buffer.alloc(64).toString("base64")}\nfiles:\n  - url: releases/0.4.1/loginom-ai-agent-win-x64.exe\n    sha512: ${Buffer.alloc(64).toString("base64")}\n`,
-  )
-  try {
-    await symlink(dependencies, join(root, "node_modules"), linkType)
-    for (const [requested, releaseName, releaseRef] of [
-      [false, false, false],
-      [true, false, false],
-      [true, true, false],
-      [true, false, true],
-      [true, true, true],
-    ]) {
-      const fixture = requested && !releaseName && !releaseRef
-      const config = Bun.spawnSync(
-        [
-          process.execPath,
-          "--eval",
-          `
-          import { loadConfigFromFile } from 'electron-vite';
-          const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, undefined, process.cwd(), 'silent');
-          console.log(JSON.stringify(loaded.config.main.define));
-        `,
-        ],
-        {
-          cwd: import.meta.dir,
-          env: {
-            ...process.env,
-            GITHUB_WORKFLOW: releaseName ? "release" : "Loginom Windows candidate",
-            GITHUB_WORKFLOW_REF: `owner/repo/.github/workflows/${releaseRef ? "release" : "loginom-windows"}.yml@refs/heads/test`,
-            LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: requested ? "1" : "0",
-            LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: pem,
-          },
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      )
-      if (config.exitCode) throw Error(config.stderr.toString())
-      const define = JSON.parse(config.stdout.toString()) as Record<string, string>
-      const module = join(root, `${fixture ? "fixture" : "release"}.mjs`)
-      // Keep compiler state independent of other Desktop tests and their module mocks.
-      const compiler = Bun.spawnSync(
-        [
-          process.execPath,
-          "--eval",
-          `
-          const built = await Bun.build({
-            entrypoints: [${JSON.stringify(join(import.meta.dir, "src/main/update-policy.ts"))}],
-            target: 'bun', format: 'esm', define: ${JSON.stringify(define)},
-            external: ['electron-updater', 'electron'],
-          });
-          if (!built.success) throw Error(built.logs.join('\\n'));
-          await Bun.write(${JSON.stringify(module)}, built.outputs[0]);
-        `,
-        ],
-        { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
-      )
-      if (compiler.exitCode) throw Error(compiler.stderr.toString())
-      const source = await readFile(module, "utf8")
-      const bytes = JSON.stringify(raw.toString("base64"))
-      const signature = JSON.stringify(sign(null, raw, key.privateKey).toString("base64"))
-      const probe = Bun.spawnSync(
-        [
-          process.execPath,
-          "--eval",
-          `
-          process.argv.push('--public-key', process.env.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY);
-          const { verifyUpdateManifest } = await import(${JSON.stringify(module)});
-          const raw = Buffer.from(${bytes}, 'base64');
-          const signature = ${signature};
-          const results = [raw, Buffer.concat([raw, Buffer.from('\\n')])].map(bytes => {
-            try { return verifyUpdateManifest(bytes, signature, 'https://updates.example.test/unstable/').version; }
-            catch (error) { return error.message; }
-          });
-          console.log(JSON.stringify(results));
-        `,
-        ],
-        {
-          env: {
-            ...process.env,
-            LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: "1",
-            LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: pem,
-          },
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      )
-      if (probe.exitCode) throw Error(probe.stderr.toString())
-      expect(JSON.parse(probe.stdout.toString())).toEqual([
-        fixture ? "0.4.1" : "LOGINOM_UPDATE_SIGNATURE_INVALID",
-        "LOGINOM_UPDATE_SIGNATURE_INVALID",
-      ])
-      expect(source.includes(pem.split("\n")[1])).toBe(fixture)
-      expect(define.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY ?? "null").toBe(JSON.stringify(fixture ? pem : null))
-    }
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
+const load = async (command: "build" | "serve") => ({
+  config: await createConfig({ command, mode: command === "build" ? "production" : "development" }),
 })
 
-test("bakes the source commit and ignores only the config loader's temporary file when measuring dirtiness", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-build-source-"))
-  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim()
+// Bundled into the main process, so the manifest must not also ship them as external packages.
+const bundled = ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"]
+
+test("minifies only builds, previews onboarding only in development, and ships sourcemaps and public assets", async () => {
+  const previous = process.env.OPENCODE_TEST_ONBOARDING
+  const previousTarget = process.env.OPENCODE_TARGET
+
   try {
-    await copyFile(join(import.meta.dir, "electron.vite.config.ts"), join(root, "electron.vite.config.ts"))
-    await symlink(dependencies, join(root, "node_modules"), linkType)
-    await writeFile(join(root, ".gitignore"), "node_modules\n")
-    await writeFile(join(root, "package.json"), '{"type":"module"}\n')
-    git("init", "-q")
-    git("add", ".")
-    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "fixture")
-    const load = () => {
-      const result = Bun.spawnSync(
-        [
-          process.execPath,
-          "--eval",
-          `
-        import { loadConfigFromFile } from 'electron-vite';
-        const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, undefined, process.cwd(), 'silent');
-        console.log(JSON.stringify(loaded.config.main.define));
-      `,
-        ],
-        { cwd: root, stdout: "pipe", stderr: "pipe" },
+    process.env.OPENCODE_TEST_ONBOARDING = "1"
+
+    for (const command of ["build", "serve"] as const) {
+      const result = await load(command)
+
+      for (const target of [result.config.main, result.config.preload, result.config.renderer])
+        expect(target?.build?.minify).toBe(command === "build")
+      expect(result.config.renderer?.define?.["import.meta.env.OPENCODE_TEST_ONBOARDING"]).toBe(
+        JSON.stringify(command === "serve"),
       )
-      if (result.exitCode) throw Error(result.stderr.toString())
-      return JSON.parse(result.stdout.toString())
     }
-    const clean = load()
-    expect(clean["import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA"]).toBe(JSON.stringify(git("rev-parse", "HEAD")))
-    expect(clean["import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY"]).toBe("false")
-    expect(clean["LOGINOM_AI_AGENT_UPDATE_FEED"]).toBe(
-      JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
+
+    delete process.env.OPENCODE_TEST_ONBOARDING
+    const serve = await load("serve")
+    expect(serve.config.renderer?.define?.["import.meta.env.OPENCODE_TEST_ONBOARDING"]).toBe("false")
+
+    for (const item of CLI_BINARIES) {
+      process.env.OPENCODE_TARGET = item.target
+      const main = (await load("build")).config.main
+      expect(main?.build?.externalizeDeps).toEqual({
+        exclude: bundled,
+        include: [nodePtyPackage(item.target)],
+      })
+    }
+  } finally {
+    delete process.env.OPENCODE_TEST_ONBOARDING
+    delete process.env.OPENCODE_TARGET
+
+    if (previous !== undefined) process.env.OPENCODE_TEST_ONBOARDING = previous
+
+    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
+  }
+
+  const renderer = (await load("build")).config.renderer
+  // Sentry uploads the renderer source maps, then deletes them.
+  expect(renderer?.build?.sourcemap).toBe(true)
+
+  // Vite resolves publicDir from the renderer root, not from the config file.
+  const root = renderer?.root ?? ""
+  const publicDir = renderer?.publicDir || ""
+  expect(existsSync(path.resolve(import.meta.dirname, root, publicDir, "oc-theme-preload.js"))).toBe(true)
+})
+
+test("bundles one Effect runtime and Drizzle while keeping native dependencies external", async () => {
+  for (const name of bundled) {
+    expect(Object.keys(pkg.dependencies)).not.toContain(name)
+    expect(Object.keys(pkg.optionalDependencies)).not.toContain(name)
+  }
+
+  expect(Object.keys(pkg.optionalDependencies).filter((name) => name.startsWith("@lydell/node-pty-"))).toEqual([
+    "@lydell/node-pty-darwin-arm64",
+    "@lydell/node-pty-darwin-x64",
+    "@lydell/node-pty-linux-arm64",
+    "@lydell/node-pty-linux-x64",
+    "@lydell/node-pty-win32-arm64",
+    "@lydell/node-pty-win32-x64",
+  ])
+
+  const previousTarget = process.env.OPENCODE_TARGET
+  // Build against the opposite architecture to prove cross-packaging resolves the target's native package, not the host's.
+  const crossTarget = process.arch === "arm64" ? "windows-x64" : "windows-arm64"
+  const crossNodePty = nodePtyPackage(crossTarget)
+
+  try {
+    process.env.OPENCODE_TARGET = crossTarget
+    const result = await load("build")
+
+    if (!result.config.main) throw new Error("Missing main-process build configuration")
+
+    const config = await new MainConfigFactory(
+      result.config.main,
+      { configFile: false, mode: "production" },
+      { root: import.meta.dirname },
+    ).build()
+
+    config.build = { ...config.build, minify: false, write: false }
+    config.logLevel = "silent"
+    const output = await build(config)
+
+    const chunks = (Array.isArray(output) ? output : [output]).flatMap((item) =>
+      "output" in item ? item.output.filter((entry) => entry.type === "chunk") : [],
     )
-    await writeFile(join(root, "uncommitted.ts"), "// real build input\n")
-    expect(load()["import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY"]).toBe("true")
+
+    expect(chunks.length).toBeGreaterThan(0)
+    // Resource resolution must not depend on which lazy entry owns DesktopPaths.
+    expect(chunks.every((chunk) => !chunk.fileName.includes("/"))).toBe(true)
+    const imports = chunks.flatMap((chunk) => [...chunk.imports, ...chunk.dynamicImports])
+    const modules = chunks.flatMap((chunk) => Object.keys(chunk.modules))
+
+    for (const name of bundled) {
+      expect(imports.filter((id) => id === name || id.startsWith(`${name}/`))).toEqual([])
+      expect(modules.some((id) => id.includes(`/node_modules/${name}/`))).toBe(true)
+    }
+
+    const effect = modules.filter((id) => id.includes("/node_modules/effect/"))
+    expect(new Set(effect.map((id) => id.split("/node_modules/effect/")[0])).size).toBe(1)
+    expect(new Set(effect).size).toBe(effect.length)
+    expect(imports).toContain("electron")
+    expect(imports).toContain("node:sqlite")
+    expect(chunks.some((chunk) => chunk.dynamicImports.includes("@zip.js/zip.js"))).toBe(true)
+    expect(imports).toContain(crossNodePty)
+    expect(imports).not.toContain(`@lydell/node-pty-${process.platform}-${process.arch}`)
+    expect(modules.some((id) => id.includes("/node_modules/msgpackr"))).toBe(false)
+    expect(chunks.some((chunk) => chunk.code.includes("msgpackr"))).toBe(false)
   } finally {
-    await rm(root, { recursive: true, force: true })
+    delete process.env.OPENCODE_TARGET
+
+    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
   }
-})
+}, 30_000)

@@ -1,7 +1,25 @@
 # Desktop package notes
 
-- Renderer process should only call `window.api` from `src/preload`.
-- Main process should register IPC handlers in `src/main/ipc.ts`.
+## Tests
+
+- Follow the Tests section of `packages/app/AGENTS.md`: every test protects a named contract with a credible regression, has one owner, and can fail.
+- Packaging, installer, IPC validation, credential, and SQLite migration and storage tests are contracts. Write them as tables: one table across channels, not one test per channel.
+- Never add test-only parameters or exports to production modules (`now`, `delay`, `budget`). Use `setSystemTime` from `bun:test`.
+- Test IPC through the raw message format the renderer sends, not through a mock client.
+- No source-grep or tombstone tests that assert a file, export or feature is gone.
+- Main-process code that belongs to a built-in GUI plugin is tested in `packages/gui-plugins`, not here.
+- `bun typecheck` does not cover test files. Run `bun test <file>` for every test file you touch.
+
+## Code
+
+- Follow Solid best practices, leave a comment when violating this: https://www.brenelz.com/posts/solid-js-best-practices/
+- Renderer code follows the Suspense rules in `packages/app/AGENTS.md`: never read a resource in render without the `state` guard. An unguarded read makes the UI flash on first load.
+- Fonts follow the Fonts section of `packages/app/AGENTS.md`: use the UI, code and terminal font roles from the design system. Never add font files, `@font-face` rules or literal font families here.
+- Loading indicators follow the Loading Indicators section of `packages/app/AGENTS.md`: the dot-matrix `Spinner` is only for AI activity; every other loading state uses `Loader`.
+- Lifecycles follow the State Machines section of `packages/app/AGENTS.md`, in main and renderer alike: one union, a pure `transition`, a driver at the edge, and consumers (quit handlers, menus, IPC, windows) that branch only on selectors. Precedents: `src/main/lifecycle/machine.ts`, `src/main/deep-links/machine.ts`.
+- Renderer process should only reach the main process through `window.electron` (exposed by `src/preload`) and the MessagePort RPC client in `src/renderer/api.ts`.
+- Main process should define IPC handlers in `src/main/ipc-handlers/*` and compose them in `src/main/ipc.ts`.
+- Avoid FS operations where possible. For any desktop persistence prefer sqlite in most cases, as performance and EPERM and many other things, especially on windows can be quite painful. Using anything other than sqlite should come with strong reasons.
 - NEVER hardcode user-visible English strings in production code. ALWAYS use an i18n key for native menus, picker titles, dialogs, buttons, accessible labels, and displayed errors.
 - When migrating existing copy to i18n, preserve the English text byte-for-byte unless the task explicitly requests a copy change.
 - NEVER change existing English text or English keys to facilitate translation. English is intentional, designer-written source copy; adapt locale-specific translations and i18n mechanics around it.
@@ -12,28 +30,3 @@
 - Translate whole native-menu and dialog phrases in context. Audit recurring concepts for consistency and review every exact-English value; retain it only when it is an intentional product/provider/tool name, URL, code token, keyboard legend, acronym, asset name, or established borrowing.
 - Record the corpora used and flag uncertain or regional terminology in review notes.
 - Also use the relevant language authority or official dictionary for the locale (for example RAE/Fundéu, FranceTerme, Duden, TDK, Kotus/Kielitoimiston sanakirja, Språkrådet/Bokmålsordboka, Rada Języka Polskiego/PWN, the Russian and Arabic language academies, the Ukrainian Orthography, Taiwan MOE dictionaries, or the Royal Society of Thailand). Treat the English dictionary as the semantic source of truth and preserve placeholders, code identifiers, product names, and keyboard labels.
-
-## Loginom packaging and operations
-
-- Identity/pins come from [product](../product/AGENTS.md); connection lifecycle has [its own instructions](src/main/loginom/AGENTS.md).
-- Native Linux builds set electron-builder's packaging `productName` to the channel slug because FPM uses it for `/opt`. `extraMetadata.productName` and `linux.desktop.entry.Name` retain the display name. `app.setName` also uses the full product name. Keep this separation when updating electron-builder.
-- Production DEB installs into `/opt/loginom-ai-agent`, exposes `/usr/bin/loginom-ai-agent`, and installs `com.loginom.aiagent.desktop`. Upgrades from 0.1.2 must remove the old `/opt/Loginom AI Agent` payload through dpkg while preserving user profiles/auth/history. Never clean profiles as part of a path migration.
-- Backend v1 is the released default. `LOGINOM_AI_AGENT_SIDECAR_V2=1` is experimental, not covered by Linux release acceptance.
-- Use pinned Bun/Node command-locally. Set `LOGINOM_AI_AGENT_CHANNEL=prod`, `LOGINOM_AI_AGENT_NODE_SOURCE` and `LOGINOM_AI_AGENT_BROWSER_SOURCE` before `bun run build`. Runtime resources are self-contained; Windows/macOS need native resource work before release.
-- Run `bun typecheck` and relevant package-local tests. For packaging: `bun test electron-builder.config.test.ts scripts/release/artifact.test.ts`. Build DEB/AppImage with `--publish never` into a version-specific dist directory, preserving previous candidates.
-- Commit all build inputs before creating `git archive` and `scripts/release/write-manifest.ts`. `verify-artifact.ts` validates hashes/resources, DEB install root and desktop launcher. Verify both artifacts, then installed dpkg status, symlink, desktop name/Exec and installed ASAR equality. Use [Linux commands](../../docs/testing/loginom-ai-agent/linux.md).
-- GUI acceptance uses an isolated `LOGINOM_AI_AGENT_TEST_ROOT` and `LOGINOM_AI_AGENT_TEST_ONBOARDING=1`; `test/loginom/gui-smoke.mjs` accepts `LOGINOM_AI_AGENT_TEST_EXECUTABLE`. Do not terminate the user's running app; after upgrading tell them to fully restart it.
-- Desktop logs are `<userData>/logs/<run>/`. electron-log rotates each file at 5 MB, and `logRetention` keeps that directory within 100 MB and 7 days. Crashpad minidumps stay outside that budget. The backend sidecar sets `LOGINOM_AI_AGENT_PRINT_LOGS=1` and `LOGINOM_AI_AGENT_DISABLE_LOG_FILE=1`, so Effect lines are appended to `server.log` instead of `loginom-ai-agent.log`. `logs/session` survives an unexpected exit; the next start records it in `crash.log` with any new `.dmp` paths. After `bun run build`, run `test/loginom/crash-logging.mjs` with the pinned Node.
-- System proxy v2 is detected after the single-instance lock and applied only through `createSidecarEnv`. Unparseable proxy URLs are not applied. Chromium resolution is capped at 3s; detection is capped at 35s on Windows (30s for cold Windows PowerShell startup), 10s elsewhere. If the sidecar exits before ready while proxy variables are set, restart it once without them and log `system proxy: fallback`. A proxy failure must not block the window: log `system proxy: <state>` and surface a toast. If the main fiber fails before any window exists, log it and `app.exit(1)`. Regression: `src/main/system-proxy.test.ts`, `test/loginom/system-proxy.mjs`, `test/loginom/sidecar-proxy-contract.mjs`, `test/loginom/startup-failure.mjs`, `test/loginom/no-proxy-contract.mjs`, and `test/loginom/environment-proxy.ts`. Never print proxy credentials.
-- Update [checkpoint](../../docs/migration/linux-implementation-checkpoint.md) with the new report. Container checks cover system libraries and bundled runtime, not physical GPU, portals or host AppArmor. Current packages are unsigned and the public update feed is disabled.
-- CI builds run through [release.yml](../../.github/workflows/release.yml) per the [CI runbook](../../docs/testing/loginom-ai-agent/ci-release.md). Commit root/Desktop versions before tagging (`script/set-version.ts`); never run `scripts/prepare.ts` in CI. All three native platform builds, static verification, shared tests and the Linux Docker matrix gate the draft pre-release. Linux/Windows remain unsigned; macOS own code is ad-hoc signed, not notarized. CI checks do not establish installed live acceptance for a new build. Publication requires explicit user authorization.
-
-- `scripts/bundle-loginom.ts` is the Desktop wrapper for the shared Host resource staging helper. Keep target/output explicit and preserve Desktop resource paths when adding CLI packaging.
-- `createSidecarEnv` supplies `LOGINOM_AI_AGENT_RESOURCES` from `loginomResources()` after shell/proxy environment merging; inherited values cannot replace the application's resource root. The backend discovers both verified bundled skills there, independently of the working directory and user skills. Fail closed on a damaged reserved skill; preserve ordinary user skills without allowing them to impersonate product names. See the [isolation journal](../../docs/testing/loginom-ai-agent/package-docs-implementation.md).
-- For persistent-profile upgrade/history acceptance, use a disposable normal HOME/XDG profile and the public backend APIs. `LOGINOM_AI_AGENT_TEST_ONBOARDING=1` uses an in-memory backend DB and cannot prove persistence across restarts or upgrades. Record the exact old/new payload hashes, close the owned app before replacement and verify profile bytes, history, native cleanup and the new installed resources afterward.
-
-- macOS dev candidates use `scripts/build-macos.ts --output <new directory> --version <version>` from a clean committed tree, Bun1.3.14 and pinned complete Node/Chromium inputs. It builds Desktop DMG/ZIP and CLI TAR.GZ from the same commit/version without editing package versions; do not use legacy `scripts/prepare.ts` for this workflow. macOS14 arm64 CI uses the same entry.
-- macOS own code is explicitly ad-hoc signed; preserve upstream Node/Chromium signatures and staged hashes. No certificate discovery, notarization, DMG signing or publication. Validate DMG readonly and ZIP extraction using the platform-aware release verifier. Artifact smoke is separate from installed GUI/Keychain/Loginom acceptance.
-- `before-quit` must prevent the initial exit until backend and Host cleanup finish. macOS closing the final window keeps the app alive; Cmd+Q runs awaited cleanup. System proxy detection must be cancelled on quit so a reader process does not outlive the app.
-
-- Установленный M4 проверяйте обычным Desktop/backend v1 в собственных HOME/XDG без `LOGINOM_AI_AGENT_TEST_ONBOARDING`: этот smoke-флаг использует БД в памяти и не доказывает сохранение истории после перезапуска. Private pre-chat open/builtin publication идут через Host; обычный dashboard model-turn не получает Loginom. Публикация всегда требует разового согласия без always и автоответа — [M4](../../docs/testing/loginom-ai-agent/dashboard-m4.md).

@@ -1,6 +1,9 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin"
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
-import desktopPlugin from "./vite"
+import desktopPlugin, { channel } from "./vite.js"
+import { icons } from "./vite.icons"
+import { serviceWorker } from "./vite.pwa"
 
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
@@ -20,16 +23,31 @@ const sentry =
     : false
 
 export default defineConfig({
-  // Git for Windows checks out repository symlinks as link-text files when
-  // Developer Mode is unavailable. Keep the renderer's public assets regular.
-  publicDir: "public-static",
-  plugins: [desktopPlugin, sentry] as any,
+  plugins: [
+    desktopPlugin,
+    icons(channel),
+    serviceWorker(fileURLToPath(new URL("./dist", import.meta.url))),
+    sentry,
+  ] as any,
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
     port: 3000,
   },
   build: {
+    ...(process.env.VITE_OPENCODE_TEST_FIXTURES === "1"
+      ? {
+          rolldownOptions: {
+            input: [
+              "index.html",
+              "e2e/utils/settings-wsl.html",
+              "e2e/utils/app-direction.html",
+              "e2e/utils/windows-menu.html",
+            ],
+          },
+        }
+      : {}),
+    assetsDir: "_assets",
     target: "esnext",
     sourcemap: true,
   },

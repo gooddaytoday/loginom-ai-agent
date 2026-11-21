@@ -1,13 +1,8 @@
 .DS_Store
 node_modules
 .worktrees
-.sst
 .env
 .env.local
-.env.*
-!.env.example
-!.env.*.example
-local.env
 .idea
 .vscode
 .codex
@@ -15,8 +10,10 @@ local.env
 playground
 tmp
 dist
+dist-node
 ts-dist
 .turbo
+.typecheck-profiles
 **/.serena
 .serena/
 **/.omo
@@ -24,18 +21,20 @@ ts-dist
 /result
 refs
 Session.vim
-/loginom-ai-agent.json
+/opencode.json
 a.out
 target
 .scripts
+.cache
 .direnv/
 
 # Local dev files
 opencode-dev
-UPCOMING_CHANGELOG.md
+RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
-/.local/project-memory/
-/packages/opencode/config.json
 /artifacts/
+
+# Legal drafts pending review are kept outside the repository; never copy them in.
+legal-drafts-private/
