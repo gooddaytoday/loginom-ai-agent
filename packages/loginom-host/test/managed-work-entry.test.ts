@@ -243,7 +243,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify(Reflect.get(error, "details")) : String(error)
+      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])

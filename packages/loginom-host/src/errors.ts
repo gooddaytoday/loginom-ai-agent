@@ -104,8 +104,9 @@ export function hostFailure(value: unknown) {
   const source = value && typeof value === "object" && "details" in value ? value.details : undefined
   const details: { reason: string; actual?: number; limit?: number; hint?: string } = { reason }
   if (error === "LOGINOM_FILE_TOO_LARGE") {
+    const fields: { actual?: unknown; limit?: unknown } = source && typeof source === "object" ? source : {}
     for (const key of ["actual", "limit"] as const) {
-      const number = source && typeof source === "object" ? Reflect.get(source, key) : undefined
+      const number = fields[key]
       if (typeof number === "number" && Number.isSafeInteger(number) && number >= 0) details[key] = number
     }
     details.hint = "Укажите путь; для больших файлов будет профиль и выборка. Сейчас выберите файл меньшего размера."
