@@ -140,7 +140,7 @@ pub(super) fn remove_stale_endpoint(
     canonical_directory: &Path,
     registration: Option<&Registration>,
 ) -> Result<()> {
-    // The abandoned daemon may have used a different OPENCODE_PTY_SOCKET_DIR, so
+    // The abandoned daemon may have used a different LOGINOM_AI_AGENT_PTY_SOCKET_DIR, so
     // prefer the socket it registered over this daemon's socket root.
     let socket = match registration {
         Some(registration) => registration.socket.clone(),
@@ -164,9 +164,10 @@ fn socket_path(directory: &Path) -> Result<PathBuf> {
 }
 
 // The default path stays short enough for sun_path; temp cleaners skip sockets.
+// Fork (CAT-13): the variable and the socket directory carry the product's name, not OpenCode's.
 fn socket_root() -> Result<PathBuf> {
     resolve_socket_root(
-        std::env::var_os("OPENCODE_PTY_SOCKET_DIR").map(PathBuf::from),
+        std::env::var_os("LOGINOM_AI_AGENT_PTY_SOCKET_DIR").map(PathBuf::from),
         nix::unistd::Uid::effective().as_raw(),
     )
 }
@@ -175,20 +176,20 @@ fn resolve_socket_root(directory: Option<PathBuf>, uid: u32) -> Result<PathBuf> 
     let base = match directory {
         None => PathBuf::from("/tmp"),
         Some(directory) if !directory.is_absolute() => {
-            bail!("OPENCODE_PTY_SOCKET_DIR must be an absolute path")
+            bail!("LOGINOM_AI_AGENT_PTY_SOCKET_DIR must be an absolute path")
         }
         Some(directory)
             if directory
                 .components()
                 .any(|part| part == Component::ParentDir) =>
         {
-            bail!("OPENCODE_PTY_SOCKET_DIR must not contain '..'")
+            bail!("LOGINOM_AI_AGENT_PTY_SOCKET_DIR must not contain '..'")
         }
         Some(directory) => directory,
     };
     // Sockets live in a dedicated child so the 0700 permission change never
     // applies to a caller-chosen directory.
-    Ok(base.join(format!("opencode-pty-{uid}")))
+    Ok(base.join(format!("loginom-ai-agent-pty-{uid}")))
 }
 
 fn socket_file(root: &Path, canonical_directory: &Path) -> PathBuf {
@@ -258,7 +259,7 @@ mod tests {
     fn socket_root_preserves_default_uid_directory() {
         assert_eq!(
             resolve_socket_root(None, 12345).unwrap(),
-            PathBuf::from("/tmp/opencode-pty-12345")
+            PathBuf::from("/tmp/loginom-ai-agent-pty-12345")
         );
     }
 
@@ -266,7 +267,7 @@ mod tests {
     fn socket_root_uses_dedicated_child_of_explicit_directory() {
         assert_eq!(
             resolve_socket_root(Some(PathBuf::from("/private/tmp/task-owned-pty")), 12345).unwrap(),
-            PathBuf::from("/private/tmp/task-owned-pty/opencode-pty-12345")
+            PathBuf::from("/private/tmp/task-owned-pty/loginom-ai-agent-pty-12345")
         );
     }
 
