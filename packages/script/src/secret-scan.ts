@@ -98,7 +98,7 @@ async function main() {
       config,
       ignore,
     )) {
-      const revision = mode === "staged" ? "" : finding.Commit
+      const revision = mode === "staged" ? "" : finding.Commit || undefined
       const upstreamFile =
         revision !== undefined &&
         upstream.some((files) => files.has(finding.File)) &&
