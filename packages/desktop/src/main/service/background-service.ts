@@ -10,6 +10,7 @@ import { cleanStages } from "./cli-stages"
 import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
+import { serviceFile } from "./service-identity"
 import { takeSidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
@@ -109,13 +110,14 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
 
   const file =
-    process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
+    serviceFile() ??
+    (process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
       ? path.join(
           process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
-          "opencode",
+          "loginom-ai-agent",
           "service-local.json",
         )
-      : undefined
+      : undefined)
 
   return { cli, client, file, isolated, version }
 })

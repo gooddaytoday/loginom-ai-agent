@@ -38,12 +38,25 @@ const decodeLegacy = Schema.decodeUnknownOption(
 )
 const decodeRegistration = Schema.decodeUnknownEffect(Schema.fromJsonString(Service.Info))
 
-export function filename(channel = OPENCODE_CHANNEL) {
+// Fork seam (CAT-13, U5): a launcher that names a service identity gets its own registration and config file,
+// `service-<identity>.json`, and states its port, so two products or profiles never adopt or block each other's
+// service. A port derived from the identity would fold into one 4096-port block on Windows (see defaultPort).
+export function identity(env: Record<string, string | undefined> = process.env) {
+  const name = env.LOGINOM_AI_AGENT_SERVICE_IDENTITY?.replace(/[^a-zA-Z0-9._-]/g, "-")
+  if (!name) return undefined
+  const port = Number(env.LOGINOM_AI_AGENT_SERVICE_PORT)
+  return { name, port: Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : undefined }
+}
+
+export function filename(channel = OPENCODE_CHANNEL, service = identity()) {
+  if (service) return `service-${service.name}.json`
   if (channel === "latest" || channel === "dev" || channel === "beta" || channel === "next") return "service.json"
   return `service-${channel.replace(/[^a-zA-Z0-9._-]/g, "-")}.json`
 }
 
-export function defaultPort(channel = OPENCODE_CHANNEL, platform = process.platform) {
+export function defaultPort(channel = OPENCODE_CHANNEL, platform = process.platform, service = identity()) {
+  // A stated port is used as given; the product states one below 0x8000, the same on every platform.
+  if (service?.port) return service.port
   const port = channelPort(channel)
   // Windows hands out 0xC000-0xFFFF for outgoing connections, Hyper-V and WinNAT reserve blocks of that range at boot,
   // and WSL mirrored networking reserves a 4096-port block that usually covers 44620-48715. A reserved port fails as in
@@ -59,8 +72,8 @@ function channelPort(channel: string) {
   return 10_000 + (Number.parseInt(Hash.fast(channel).slice(0, 8), 16) % 50_000)
 }
 
-export function legacyFilename(channel = OPENCODE_CHANNEL) {
-  if (channel === "latest" || channel === "local") return
+export function legacyFilename(channel = OPENCODE_CHANNEL, service = identity()) {
+  if (service || channel === "latest" || channel === "local") return
   return `service-${Hash.fast(channel)}.json`
 }
 
@@ -125,7 +138,10 @@ const paths = Effect.gen(function* () {
     legacyConfigFile: legacy ? path.join(global.config, legacy) : undefined,
     legacyRegistrationFiles: [
       ...(legacy ? [path.join(global.state, legacy)] : []),
-      ...(name !== "service.json" && OPENCODE_CHANNEL !== "local" ? [path.join(global.state, "service.json")] : []),
+      // Under an identity, `service.json` belongs to another product or profile.
+      ...(name !== "service.json" && OPENCODE_CHANNEL !== "local" && !identity()
+        ? [path.join(global.state, "service.json")]
+        : []),
     ],
     configFile: path.join(global.config, name),
   }
