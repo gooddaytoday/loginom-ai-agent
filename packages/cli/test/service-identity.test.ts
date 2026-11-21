@@ -73,12 +73,11 @@ test.each(["latest", "preview-a"])(
   },
 )
 
+// Each of the next two tests boots two real services from source, a cold CLI start each.
 test("two products with separate directories run their own services side by side", async () => {
   const roots = await Promise.all([desktop, profile].map((name) => fs.mkdtemp(path.join(os.tmpdir(), `${name}-`))))
-  const services = await Promise.all([
-    start(roots[0], desktop, await availablePort()),
-    start(roots[1], profile, await availablePort()),
-  ])
+  const ports = await availablePorts()
+  const services = [start(roots[0], desktop, ports[0]), start(roots[1], profile, ports[1])]
   try {
     const infos = await Promise.all(services.map((service) => waitForInfo(service.registration)))
     await expectOwnServices(services, infos)
@@ -94,14 +93,12 @@ test("two products with separate directories run their own services side by side
     await stop(services)
     await Promise.all(roots.map((root) => fs.rm(root, { recursive: true, force: true })))
   }
-}, 120_000)
+}, 60_000)
 
 test("two profiles that share directories run their own services side by side", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "loginom-service-identity-shared-"))
-  const services = await Promise.all([
-    start(root, desktop, await availablePort()),
-    start(root, profile, await availablePort()),
-  ])
+  const ports = await availablePorts()
+  const services = [start(root, desktop, ports[0]), start(root, profile, ports[1])]
   try {
     const infos = await Promise.all(services.map((service) => waitForInfo(service.registration)))
     await expectOwnServices(services, infos)
@@ -113,7 +110,7 @@ test("two profiles that share directories run their own services side by side", 
     await stop(services)
     await fs.rm(root, { recursive: true, force: true })
   }
-}, 120_000)
+}, 60_000)
 
 async function expectOwnServices(services: Awaited<ReturnType<typeof start>>[], infos: Info[]) {
   expect(infos.map((info) => new URL(info.url).port)).toEqual(services.map((service) => String(service.port)))
@@ -127,6 +124,7 @@ async function expectOwnServices(services: Awaited<ReturnType<typeof start>>[], 
     }).then((response) => response.json())
     expect(answer).toMatchObject({ pid: service.child.pid })
     // The service password sits in the service's config file and its registration; only the user may read either.
+    // Windows has no POSIX modes there: the profile directory's ACL applies.
     expect((await Bun.file(service.config).json()).password).toBe(info.password)
     if (process.platform !== "win32")
       for (const file of [service.config, service.registration]) expect(statSync(file).mode & 0o777).toBe(0o600)
@@ -228,7 +226,8 @@ function openCodeDirectories(root: string) {
 }
 
 async function waitForInfo(file: string) {
-  for (let attempt = 0; attempt < 1200; attempt++) {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
     const value = await Bun.file(file)
       .json()
       .catch(() => undefined)
@@ -238,10 +237,13 @@ async function waitForInfo(file: string) {
   throw new Error(`Timed out waiting for service registration ${file}`)
 }
 
-async function availablePort() {
-  const server = Bun.serve({ port: 0, fetch: () => new Response() })
-  const port = server.port
-  await server.stop(true)
-  if (port === undefined) throw new Error("Server did not bind a port")
-  return port
+// Both ports are held at once, so the second cannot be the first one just released.
+async function availablePorts() {
+  const servers = [0, 1].map(() => Bun.serve({ port: 0, fetch: () => new Response() }))
+  const ports = servers.map((server) => server.port)
+  await Promise.all(servers.map((server) => server.stop(true)))
+  return ports.map((port) => {
+    if (port === undefined) throw new Error("Server did not bind a port")
+    return port
+  })
 }

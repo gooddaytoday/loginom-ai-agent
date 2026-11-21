@@ -31,9 +31,11 @@ const product = {
 const roots: string[] = []
 const probes = {} as Record<"inherited" | "both", Awaited<ReturnType<typeof probe>>>
 
+// Two cold CLI starts and two bun processes, run together.
 beforeAll(async () => {
-  probes.inherited = await probe(inherited)
-  probes.both = await probe({ ...inherited, ...product })
+  const [first, second] = await Promise.all([probe(inherited), probe({ ...inherited, ...product })])
+  probes.inherited = first
+  probes.both = second
 }, 60_000)
 
 afterAll(async () => {
@@ -93,16 +95,18 @@ async function probe(env: Record<string, string>) {
     XDG_STATE_HOME: path.join(root, "state"),
     ...env,
   }
-  const paths = await run(["run", path.join(cli, "src/index.ts"), "debug", "paths"], isolated)
-  const password = await run(
-    [
-      "-e",
-      'import { Effect, Redacted } from "effect"; import { Env } from "./src/env"; ' +
-        "const value = await Effect.runPromise(Effect.gen(function* () { return yield* Env.password })); " +
-        "console.log(JSON.stringify(value === undefined ? null : Redacted.value(value)))",
-    ],
-    isolated,
-  )
+  const [paths, password] = await Promise.all([
+    run(["run", path.join(cli, "src/index.ts"), "debug", "paths"], isolated),
+    run(
+      [
+        "-e",
+        'import { Effect, Redacted } from "effect"; import { Env } from "./src/env"; ' +
+          "const value = await Effect.runPromise(Effect.gen(function* () { return yield* Env.password })); " +
+          "console.log(JSON.stringify(value === undefined ? null : Redacted.value(value)))",
+      ],
+      isolated,
+    ),
+  ])
   return {
     root,
     paths: Object.fromEntries(
