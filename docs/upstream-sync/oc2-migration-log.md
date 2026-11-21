@@ -383,3 +383,199 @@ B2.3b, B2.6a, B4), здесь не оценена: это не объём код
 - Метод, как и исследование, не считает не-код: подсказки `.txt`, иконки, `json`.
 - Хук `pre-commit` в новом рабочем дереве не срабатывает: `core.hooksPath` — `.husky/_`, а этот каталог создаёт
   `husky` при `bun install`. Перед коммитом журнала `bun run secrets staged` (Bun 1.4.4) запущен вручную.
+
+## B1.5 Bun 1.4.4, Effect 4.1, TS 6
+
+21.11.2026. Ветка `b15-toolchain` от `oc2-migration` (`2c3e19df86`), отдельное рабочее дерево. Решение В-84.
+Bun 1.4.4 — переносной (`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`),
+первым в `PATH` только для этих команд; глобальный Bun 1.4.3 не менялся. Node — 24.19.0 (`<node 24.19.0>`, как в
+B1.1). `bun install --frozen-lockfile` — код 0, 1600 пакетов; `.husky/_` появился, хук `pre-commit` срабатывал на
+каждом коммите.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `7819862a3b` `fix(loginom-host): use the Effect 4.1 schema names` | `session-v1.ts`, `cli-manifest.ts` | `clean` |
+| `e6ab45f02e` `fix(dashboard): decode JSON bodies with Effect 4.1 fromJsonString` | `dashboard/src/web/server.ts` | `clean` |
+| `9b47f3d861` `chore(loginom-host): check types with the v2.3.0 toolchain` | `package.json`, `tsconfig.json`, `bun.lock` | `clean` |
+| `0962f217a0` `fix(loginom-host): pass the v2.3.0 lint rules` | `errors.ts`, два теста | `clean` |
+| `5706f9d98a` `fix(loginom-runtime): pass the v2.3.0 lint rules` | 5 файлов `tools/loginom-acceptance`, `client/test/artifact-download.test.mjs` | `clean` |
+| `f8f306869a` `chore(lint): keep a frozen evidence snippet out of oxlint` | новый корневой `.eslintignore` | `clean` |
+
+Вне `loginom-host`, `loginom-runtime` и `dashboard` изменены только `.eslintignore` (новый), `bun.lock` и этот
+журнал. Пакеты upstream и `.oxlintrc.json` не менялись.
+
+### Версии
+
+- **Effect** — `effect: catalog:` (4.1.0) был уже с B1.2a. Поменялись имена API, по образцу кода v2.3.0:
+  `Schema.isStartsWith` → `Schema.isStartingWith`; `Schema.UnknownFromJsonString` →
+  `Schema.fromJsonString(Schema.Unknown)` (`loginom-host/src/cli-manifest.ts` ×2, `dashboard/src/web/server.ts` ×1).
+  Других вхождений старых имён в коде форка (`.ts`, `.mjs`, `.js`) нет.
+- **TypeScript**, `loginom-host`, как в `packages/schema` v2.3.0:
+  - devDependencies: `@typescript/native-preview` (пин форка `7.0.0-dev.20251207.1`) → `@typescript/native` и
+    `typescript` из catalog;
+  - скрипты: `typecheck` `tsgo --noEmit` → `bun check --no-script`; добавлен `typecheck:tsc` `tsc --noEmit`.
+  - В v2.3.0 `typescript` — это `@typescript/typescript6` 6.0.2 с командой `tsc6` (сам сообщает `Version 6.0.3`), а
+    `tsc` — из `@typescript/native` (`Version 7.1.0-beta`). `loginom-host` проверен всеми: `bun check`, `tsc`,
+    `tsc6` и прежним `tsgo` — 0 ошибок.
+  - `tsconfig.json` (база `@tsconfig/node22`) не менялся, кроме `exclude` (ниже).
+- **Bun** — `@types/bun: catalog:` (1.4.3) и override `bun-types` 1.4.4 уже как в v2.3.0. Сторонние материалы
+  `loginom-host/licenses/bun` ещё на 1.3.14 — это B1.6.
+- **`loginom-runtime`** — нечего поднимать: в `package.json` нет зависимостей и инструментов TS. Клиент живёт на своём
+  npm-lockfile и Node 24.19.0.
+- **catalog** не менялся. `@typescript/native-preview` в нём остаётся: им пользуются `product` и `dashboard`, их
+  инструменты не трогались.
+- **`bun.lock`** — `bun install` после правки манифеста: «no changes» в пакетах, в файле +2 −1, только блок
+  `packages/loginom-host`:
+
+```diff
+-        "@typescript/native-preview": "catalog:",
++        "@typescript/native": "catalog:",
++        "typescript": "catalog:",
+```
+
+  Разница с v2.3.0: `git diff --shortstat a6b15d33da HEAD -- bun.lock` — `95 insertions(+), 6 deletions(-)` (B1.2a
+  давала +94 −6). Сдвиг подъёма `@modelcontextprotocol/sdk` 1.32.2 → 1.29.0, `@hono/node-server`, `@xmldom/xmldom`,
+  `cookie` — из B1.2a. Потребители upstream сохраняют прежние версии вложенными записями, например
+  `@textjs/app/@modelcontextprotocol/sdk` 1.32.2.
+
+### Typecheck до и после
+
+«До» — `2c3e19df86`, «после» — `f8f306869a`. Команды запускались из каталога пакета.
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `loginom-host` | `tsgo --noEmit` (прежний скрипт) | 6: TS2307 ×2, TS2551 ×3, TS7006 ×1 | 0 |
+| `loginom-host` | `bun check --no-script` (новый `typecheck`) | 6, те же | 0, `No type errors in 170 files` |
+| `loginom-host` | `tsc6 --noEmit -p .` | 6, те же | 0 |
+| `loginom-host` | `tsc --noEmit` (новый `typecheck:tsc`) | — | 0 |
+| `dashboard` | `tsgo -p tsconfig.web.json` | 1: TS2551 | 0 (и `tsc6` — 0) |
+| `dashboard` | `tsgo -p tsconfig.shell.json` | 0 | 0 |
+
+### Lint
+
+`oxlint` до правок: 18 ошибок (510 предупреждений; предупреждения код не меняют). После: `Found 510 warnings and 0
+errors`.
+
+| Ошибки | Где | Решение |
+|---|---|---|
+| `no-restricted-globals` ×12 (`Reflect.ownKeys`) | `loginom-runtime/tools/loginom-acceptance`: `javascript-native-zero` 3, `javascript-calibration-wizard` 2, `javascript-native-details-discovery` 1, `javascript-native-input-binding` 2, `javascript-native-roundtrip-binding` 4 | Настоящая рефлексия: считаются собственные строковые и символьные ключи нативных объектов Loginom. Подавление с причиной одной строкой в начале каждого файла: `/* oxlint-disable no-restricted-globals -- Genuine reflection: … */`. Построчное подавление попало бы внутрь функций, которые уходят на страницу через `toString()`, и изменило бы их код. Строки этих файлов сдвинулись на одну; дизайн-документы JS-узла ссылаются на номера строк |
+| `no-restricted-globals` ×2 (`Reflect.get` в ловушке `Proxy`) | `loginom-runtime/client/test/artifact-download.test.mjs:99,167` | `target[key]`: это то же, что `Reflect.get(target, key)` без receiver |
+| `no-restricted-globals` ×1 | `loginom-host/src/errors.ts:108` | Типизированный доступ: `const fields: { actual?: unknown; limit?: unknown } = source && typeof source === "object" ? source : {}`. Результат `hostFailure` сверен с `HEAD` на шести входах, включая унаследованное свойство: совпадает |
+| `no-restricted-globals` ×1 | `loginom-host/test/managed-work-entry.test.ts:246` | `"details" in error ? error.details : undefined` |
+| `Identifier resources has already been declared` | `loginom-host/test/cli-install-native.mjs:48` | Первое объявление переименовано в `resourceManifest`. До правки скрипт не разбирался вовсе: `node --check` давал `SyntaxError: Identifier 'resources' has already been declared` |
+| `Expected , or } but found ]` | `services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v2/full-change.mjs` | Файл не правился: в нём действительно не хватает `}`, а его sha256 закреплён в `frozen-v2/manifest.json`. Новый корневой `.eslintignore` с одним этим путём и причиной. `oxlint` читает `.eslintignore` по умолчанию, `.oxlintrc.json` upstream не менялся |
+
+Остальные шаги `bun run lint` (`ast-grep`, `sdk-docs`, `check-greys`) проходили и до правок: код 0.
+
+### TS2307 в `loginom-host/script`
+
+Меньшее решение: в `loginom-host/tsconfig.json` добавлен `exclude` ровно двух файлов, а не каталога `script/`.
+Остальные скрипты по-прежнему проверяются. Их никто из проверяемых файлов не импортирует: тест
+`skills-acceptance.test.ts` запускает скрипт отдельным процессом.
+
+Вернуть в B4, когда будут перенесены файлы `packages/desktop`:
+- убрать `exclude` из `packages/loginom-host/tsconfig.json`;
+- `script/skills-acceptance.ts:11` → `../../desktop/scripts/release/manifest`. TS7006 в строке 106 должна уйти вместе с
+  этим импортом. От того же файла зависят 24 падения `test/skills-acceptance.test.ts`;
+- `script/system-proxy-smoke.ts:60` → `../../desktop/src/main/proxy-env`.
+
+### Тесты: база и итог
+
+Пары «файл + имя» сравнивались по JUnit (`bun test --reporter=junit`, `node --test --test-reporter=junit`). Формат —
+прошло / упало / пропущено.
+
+| Набор | B1.1, `a080f7725c`, Bun 1.4.3 | База, `2c3e19df86` | После, `f8f306869a` | Новые падения |
+|---|---|---|---|---|
+| `loginom-host`, `bun test` | 534 / 2 / 12 | 395 / 64 / 12 и 10 ошибок загрузки, 471 тест, 255 с | 500 / 38 / 12, 550 тестов, 275 с | 0 |
+| `loginom-runtime/client`, `node --test` | не гонялся | 9790 / 39 / 100, 9929 тестов, 454 с | 9790 / 39 / 100, 470 с | 0, набор упавших тот же |
+| `loginom-runtime/tools/loginom-acceptance` (покрывает 5 правленых файлов) | не гонялся | 18833 / 8 / 0, 208 с | 18833 / 8 / 0, 191 с | 0 |
+| `loginom-runtime/test` | не гонялся | 115 / 0 / 7, 7 с | 115 / 0 / 7, 7 с | 0 |
+
+`loginom-host`:
+- В базе 10 файлов не загрузились: `TypeError: Schema.isStartsWith is not a function`. После правки появились 89
+  тестов, 17 перестали падать, новых падений относительно базы нет.
+- `task-scope.ts` грузится: `test/task-scope.test.ts` — 18 / 0. Прямой вызов: `Info` принимает `msg_01`, отвергает
+  `ses_01`, `permits("package-docs", "loginom-automation")` — `false`, `MessageID.ascending()` начинается с `msg_`.
+- 550 тестов = 548 из B1.1 + 2 из `loginom.test.ts`, перенесённого в B1.2a. 38 падений против 2 в B1.1:
+  - 2 — базовые падения стенда из B1.1: `managed-work-entry` «Expected refusal» (случай `denied`, `chmod 0` под root) и
+    `cli-manifest` «archive verification preserves manifest modes under a private umask»;
+  - 24 — `skills-acceptance.test.ts`: `Cannot find module '../../desktop/scripts/release/manifest'`, B4;
+  - 9 — `skills-acceptance-turns.test.ts` (8) и `package-docs.test.ts` «native Calculator expressions…» (1): читают
+    `packages/opencode/test/cli/package-docs-routing/` (`cases.json`, `fixtures/edit-source.lgp`), B2;
+  - 3 — `bundled-ripgrep.test.ts`: сверяет текст `packages/core/src/ripgrep/binary.ts` и импортирует
+    `packages/core/src/effect/layer-node.ts`. В v2.3.0 формат первого другой, второго файла нет. Это не Effect и не
+    TS, в B1.5 не чинилось.
+
+`loginom-runtime`:
+- Команды как в CI форка, `--test-concurrency=3` вместо значения по умолчанию из-за соседнего агента. Браузер для
+  тестов (`LOGINOM_DOCK_TEST_BROWSER`) не задан, как в B1.1.
+- 39 падений клиента одинаковы до и после, причины не разбирались. 34 из них — в `*.integration.test.mjs`
+  (`loop-procedure` 12, `text-export-next` 11, `workspace-ui-export-combo` 6, `workspace-ui-export-owner-scan` 3,
+  `lgd-import` 1, `node-port-output-datetime` 1). Остальные 5: `bridge`, `imports-database-procedure`,
+  `log-regression-context`, `text-export-modes`, `variant-port-native`.
+- 8 падений `tools`: `fault-wrappers` 6, `javascript-cold-source` 1, `javascript-native-datetime` 1, тоже одинаковы.
+- Тесты `artifact-download.test.mjs` — 44 / 0 после правки.
+
+### Команды и вывод
+
+Из каталога пакета, Bun 1.4.4 первым в `PATH`:
+
+```sh
+cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> xvfb-run -a bun test --reporter=junit --reporter-outfile=<файл>
+#  500 pass / 12 skip / 38 fail / Ran 550 tests across 65 files. [274.00s]
+cd packages/loginom-host && bun run typecheck && bun run typecheck:tsc && ../../node_modules/.bin/tsc6 --noEmit -p .
+#  $ bun check --no-script / ✓ No type errors in 170 files / $ tsc --noEmit / код 0 у всех трёх
+cd packages/dashboard && bun typecheck   # код 0
+```
+
+`loginom-runtime`, Node 24.19.0 первым в `PATH`; клиенту перед этим нужен шаг `install` из `procedure.md`
+(`npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false` в `client`, `added 100 packages`):
+
+```sh
+cd packages/loginom-runtime/client && node --test --test-concurrency=3 test/*.test.mjs
+#  # tests 9929 / # pass 9790 / # fail 39 / # skipped 100
+cd packages/loginom-runtime && node --test --test-concurrency=3 tools/loginom-acceptance/*.test.mjs
+#  # tests 18841 / # pass 18833 / # fail 8
+cd packages/loginom-runtime && node --test --test-concurrency=3 test/*.test.mjs
+#  # tests 122 / # pass 115 / # fail 0 / # skipped 7
+```
+
+Полный `bun run check` из корня, один раз, на `f8f306869a`, чистое дерево: **код 0, 44 с** (`/usr/bin/time`: максимум
+памяти одного процесса — 704 МБ; свободно было около 9 ГБ):
+
+```text
+$ bun run lint && bun run typecheck
+Found 510 warnings and 0 errors.
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+$ bun turbo typecheck --concurrency=3
+@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 170 files [360.80ms]
+ Tasks:    38 successful, 38 total
+Cached:    0 cached, 38 total
+  Time:    30.734s
+```
+
+Хук `pre-push` целиком (`secrets push` и проверка версии Bun) не запускался: push не делался.
+
+### Где решал сам и что не проверено
+
+- **Инструменты TS** в `loginom-host` заменены на инструменты `packages/schema`, а не просто добавлен `typescript` к
+  `tsgo`. Так пакет форка проверяется тем же `bun check`, что и пакеты upstream. Меньший вариант — оставить `tsgo` и
+  пин `native-preview`. Он тоже даёт 0 ошибок, но тогда «TS 6» осталось бы только строкой в манифесте.
+- **`.eslintignore`** вместо строки в `ignorePatterns`: задание запрещает менять конфиг lint upstream. Это новый
+  корневой файл форка. При синхронизации его нужно учесть в `catalog.json` (B1.7).
+- **Подавление `Reflect`** в `tools` — одно на файл, а не на строку: так код, уходящий на страницу, не меняется.
+  Цена — правило выключено на весь файл.
+- **Не чинил, записываю**:
+  - `bundled-ripgrep.test.ts` (3 падения) завязан на внутренности `packages/core` v2.2.x;
+  - падения от отсутствующих файлов `packages/opencode` (B2) и `packages/desktop` (B4);
+  - материалы `licenses/bun` на 1.3.14 (B1.6);
+  - хэш `client/test/artifact-download.test.mjs` в `docs/migration/source-transforms.json` устарел ещё до B1.5:
+    файл на `2c3e19df86` даёт `27753281…`, записано `6417439d…`. Не пересчитывал.
+- В v2.3.0 есть `@opencode/schema/v1/session` с тем же `MessageID` (`isStartingWith("msg")`). `session-v1.ts` можно
+  было бы заменить импортом, но это пересмотр решения B1.2a. Оставлено как есть.
+- **Не проверено**:
+  - браузерные тесты клиента с закреплённым Chromium и `desktop/test/loginom` (B4);
+  - `turbo typecheck:tsc` по всему дереву (CI v2.3.0) — только `typecheck:tsc` в `loginom-host`;
+  - Windows и macOS.
