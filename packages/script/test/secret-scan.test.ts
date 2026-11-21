@@ -86,10 +86,74 @@ test("range and pre-push skip pinned upstream history and files identical to the
     invoke(root, ["push", "origin"], `refs/heads/fork ${fixture.merge} refs/heads/fork ${fixture.fork}\n`),
   ]) {
     expect(result.code).toBe(0)
-    expect(report(result.output).summary).toMatchObject({ status: "clean", commits: 1, upstream_findings: 1 })
+    expect(report(result.output).summary).toMatchObject({
+      status: "clean",
+      commits: 1,
+      upstream_commits: 3,
+      upstream_findings: 1,
+    })
     expect(result.output).not.toContain("upstream/")
     expect(result.output).not.toContain(upstreamKey)
   }
+})
+
+test("a key added to a pinned file and later restored to the pinned blob is reported where it was added", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `${fixture.upstream}\n`)
+  await Bun.write(join(root, "upstream", "client.txt"), `token=${upstreamKey}\nfork token=${upstreamKey}\n`)
+  git(root, "add", "upstream/client.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork key")
+  const added = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", fixture.upstream, "--", "upstream/client.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "restore pinned file")
+  const result = run(root, "range", fixture.merge, "HEAD")
+  expect(result.code).toBe(2)
+  expect(report(result.output).findings).toEqual([
+    { file: "upstream/client.txt", line: 2, rule: "github-pat", commit: added },
+  ])
+  expect(result.output).not.toContain(upstreamKey)
+})
+
+test("pinning a fork commit exempts its history, and the summary shows it", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, "config.txt"), `token=${upstreamKey}\n`)
+  git(root, "add", "config.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork key")
+  const pinned = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, ".gitleaks-upstream"), `${pinned}\n`)
+  const exempt = run(root, "range", base, pinned)
+  expect(exempt.code).toBe(0)
+  expect(report(exempt.output).summary).toMatchObject({ status: "clean", commits: 0, upstream_commits: 1 })
+  git(root, "add", ".gitleaks-upstream")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "pin fork commit")
+  const result = run(root, "range", base, "HEAD")
+  expect(result.code).toBe(0)
+  expect(report(result.output).summary).toMatchObject({ status: "clean", commits: 1, upstream_commits: 1 })
+})
+
+test("audit ignores the pin file and keeps upstream history", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `${fixture.upstream}\n`)
+  const result = run(root, "audit")
+  expect(result.code).toBe(2)
+  expect(
+    report(result.output)
+      .findings.filter((finding) => finding.commit)
+      .map((finding) => `${finding.file} ${finding.commit}`)
+      .sort(),
+  ).toEqual(
+    [
+      `upstream/client.txt ${fixture.merge}`,
+      `upstream/client.txt ${fixture.upstream}`,
+      `upstream/old.txt ${fixture.history}`,
+    ].sort(),
+  )
+  expect(report(result.output).summary).toMatchObject({ commits: 6 })
+  expect(report(result.output).summary).not.toHaveProperty("upstream_findings")
+  expect(result.output).not.toContain(upstreamKey)
 })
 
 test("a pinned upstream file changed by the fork is still reported", async () => {
@@ -147,7 +211,8 @@ test("staged scan skips only an indexed blob identical to the pinned commit at t
 })
 
 test("a pinned archive is skipped only at its pinned path", async () => {
-  for (const copy of [false, true]) {
+  // Fork copies sort before and after the pinned path, so neither the first nor the last occurrence may decide.
+  for (const copy of [undefined, "fork/package.lgp", "zfork/package.lgp"]) {
     const root = await repo()
     const start = git(root, "rev-parse", "HEAD")
     git(root, "checkout", "-qb", "upstream")
@@ -161,15 +226,15 @@ test("a pinned archive is skipped only at its pinned path", async () => {
     const fork = git(root, "rev-parse", "HEAD")
     git(root, "merge", "--no-ff", "--no-commit", "upstream")
     if (copy) {
-      await Bun.write(join(root, "fork", "package.lgp"), Bun.file(join(root, "package.lgp")))
-      git(root, "add", "fork/package.lgp")
+      await Bun.write(join(root, copy), Bun.file(join(root, "package.lgp")))
+      git(root, "add", copy)
     }
     git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "merge upstream tag")
     const merge = git(root, "rev-parse", "HEAD")
     const result = run(root, "range", fork, merge)
     expect(result.code).toBe(copy ? 2 : 0)
     expect(report(result.output).findings).toEqual(
-      copy ? [{ file: "fork/package.lgp!settings.xml", line: 1, rule: "github-pat", commit: merge }] : [],
+      copy ? [{ file: `${copy}!settings.xml`, line: 1, rule: "github-pat", commit: merge }] : [],
     )
     expect(report(result.output).summary).toMatchObject({ archives: 1, upstream_findings: copy ? 0 : 1 })
     expect(result.output).not.toContain(upstreamKey)
