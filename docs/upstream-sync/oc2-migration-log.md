@@ -19,10 +19,11 @@
 | `39a5ee597b` | Часть OpenCode заменена на v2.3.0; пакеты, `docs` и прочие файлы форка — как в `a080f7725c`; файлы форка внутри пакетов upstream и корневой `script/` удалены (вход ручного переноса) | код 0, `upstream_findings` 614, 26 с |
 | `beaf485e5d` | Схемы `loginom` и `v1/session` перенесены в `loginom-host`, зависимость — на `@opencode/schema` | код 0, `upstream_findings` 0 |
 | `69b456b79d` | Корневые `package.json`, `AGENTS.md`, `.gitignore`, `bun.lock` | код 0, `upstream_findings` 0 |
-| этот журнал | — | см. коммит журнала |
+| `bb8088bd83` | Этот журнал | код 0, `upstream_findings` 0 |
+| `chore(migration): carry the fork root scripts` | Корневой `script/` форка (18) и `packages/script/tsconfig.update-feed.json` возвращены как есть, журнал поправлен | код 0, `upstream_findings` 0 |
 
-`bun run secrets range a080f7725c HEAD` (до коммита журнала): код 0,
-`{"status":"clean","commits":14,"archives":0,"current_files":0,"skipped":[],"upstream_commits":0,"upstream_findings":614,"upstream_missing":0}`, 26 с.
+`bun run secrets range a080f7725c HEAD` после коммита со `script/`: код 0,
+`{"status":"clean","commits":16,"archives":0,"current_files":0,"skipped":[],"upstream_commits":0,"upstream_findings":614,"upstream_missing":0}`, 28 с.
 
 Первая попытка (ветка `b12-tree` от v2.3.0: `21e1119633` — защита от секретов, `20e222ad80` — журнал) остановилась:
 файлы форка становились новыми добавлениями, и прежний сканер давал 1324 находки в 402 файлах. Из них 149 — ключи,
@@ -49,10 +50,11 @@
 | `.agents`, `.claude/skills` (2 ссылки), `.cursor` | 5 + 2 + 3 |
 | Корневые файлы форка: `TODO-FIX.md`, `WINDOWS_IMPLEMENTATION_PLAN.md`, `eval_parallel_blockers.md`, `plan.md` | 4 |
 | `.github/workflows/{loginom-client-full,loginom-macos,loginom-windows,secrets,windows-native-check}.yml`, `.github/actions/setup-loginom-inputs` | 6 |
+| Корневой `script/`: `migration/` 12, `build-windows.ps1`, `test-windows-profile.ps1`, `release-notes.ts`, `set-version.ts`, `update-feed.ts` и тест; `packages/script/tsconfig.update-feed.json` (конфиг для `script/update-feed.ts`). Нужны workflow форка (`loginom-windows.yml`, `release.yml`, `windows-native-check.yml`) — B5 | 18 + 1 |
 | Защита от секретов: `.gitleaks.toml`, `.gitleaks-version`, `.gitleaks-upstream`, `.gitleaksignore`, `.husky/pre-commit`, `packages/script/src/{secret-scan,install-gitleaks}.ts` и три теста в `packages/script/test` — из базы `0907f48ba7` | 10 |
 
-«Как есть» проверено: `git diff --name-status 0907f48ba7 39a5ee597b -- <все перенесённые каталоги и файлы защиты>`
-даёт только 21 удаление `docs/upstream/README.*`. Остальное побайтно совпадает с базой.
+«Как есть» проверено: `git diff --name-status 0907f48ba7 HEAD -- <все перенесённые каталоги и файлы>` даёт только
+21 удаление `docs/upstream/README.*`. Остальное побайтно совпадает с базой.
 
 ### Опись: что не перенесено и почему
 
@@ -72,9 +74,7 @@
 | `packages/app` | 65 | `src` 17, `public`/`public-static` 39, `e2e`/`test-browser` 9 | C |
 | `packages/ui` | 18 | `src/assets` 13, `src/v2` 5 | C |
 | `packages/core` | 1 | `test/flag-identity.test.ts` | B1.3 |
-| `packages/script` | 1 из 6 | `tsconfig.update-feed.json` (для корневого `script/update-feed.ts`) | B5 |
 | `packages/schema` | 2 | `src/loginom.ts` и его тест — перенесены в `loginom-host`, см. ниже | — |
-| `script/` (корень) | 18 | `build-windows.ps1`, `test-windows-profile.ps1`, `migration/` 12, `release-notes.ts`, `set-version.ts`, `update-feed.ts` и тест | B5 |
 
 ### Схемы и область имён
 
@@ -149,7 +149,8 @@
 - Пакет для схем — `loginom-host`, единственный потребитель среди пакетов форка. `v1/session` — только `MessageID`,
   а не 676 строк.
 - `@typescript/native-preview` — одна строка в catalog, а не правка трёх манифестов форка.
-- Корневой `script/` не перенесён: в задании его нет, это каталог upstream.
+- Корневой `script/` сначала не перенёс: в списке задания его не было. При приёмке координатор указал, что это
+  файлы форка вне пакетов upstream. Они возвращены отдельным коммитом вместе с `packages/script/tsconfig.update-feed.json`.
 - Тесты сканера `install-gitleaks` и `secret-workflow` оставлены, как в базе, вместе с `secret-scan.test.ts`:
   относительно новой базы их удаление ослабило бы защиту. По той же причине в `pre-push` v2.3.0 добавлена строка
   `secrets push`.
