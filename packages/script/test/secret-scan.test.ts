@@ -41,6 +41,167 @@ function invoke(root: string, args: string[], input = "", env: Record<string, st
   return { code: result.exitCode, output: result.stdout.toString() + result.stderr.toString() }
 }
 
+function report(output: string) {
+  const lines = output
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+  return { findings: lines.filter((line) => line.rule), summary: lines.at(-1) }
+}
+
+const upstreamKey = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+
+// A fork commit merges an upstream tag whose history added and removed a key before the tag.
+async function upstreamMerge(root: string, resolve = async () => {}) {
+  const start = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-qb", "upstream")
+  await Bun.write(join(root, "upstream", "old.txt"), `token=${upstreamKey}\n`)
+  git(root, "add", "upstream/old.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "upstream history")
+  const history = git(root, "rev-parse", "HEAD")
+  // A separate commit keeps Git from pairing the next file with this one as a rename.
+  git(root, "rm", "-q", "upstream/old.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "upstream cleanup")
+  await Bun.write(join(root, "upstream", "client.txt"), `token=${upstreamKey}\n`)
+  git(root, "add", "upstream/client.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "upstream tag")
+  const upstream = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-qb", "fork", start)
+  await Bun.write(join(root, "fork.txt"), "fork change\n")
+  git(root, "add", "fork.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork")
+  const fork = git(root, "rev-parse", "HEAD")
+  git(root, "merge", "--no-ff", "--no-commit", "upstream")
+  await resolve()
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "merge upstream tag")
+  return { history, upstream, fork, merge: git(root, "rev-parse", "HEAD") }
+}
+
+test("range and pre-push skip pinned upstream history and files identical to the pinned commit", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root)
+  await Bun.write(join(root, ".gitleaks-upstream"), `# upstream v1.0.0\n${fixture.upstream}\n`)
+  for (const result of [
+    run(root, "range", fixture.fork, fixture.merge),
+    invoke(root, ["push", "origin"], `refs/heads/fork ${fixture.merge} refs/heads/fork ${fixture.fork}\n`),
+  ]) {
+    expect(result.code).toBe(0)
+    expect(report(result.output).summary).toMatchObject({ status: "clean", commits: 1, upstream_findings: 1 })
+    expect(result.output).not.toContain("upstream/")
+    expect(result.output).not.toContain(upstreamKey)
+  }
+})
+
+test("a pinned upstream file changed by the fork is still reported", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root, async () => {
+    await Bun.write(join(root, "upstream", "client.txt"), `token=${upstreamKey}\nfork edit\n`)
+    git(root, "add", "upstream/client.txt")
+  })
+  await Bun.write(join(root, ".gitleaks-upstream"), `${fixture.upstream}\n`)
+  const result = run(root, "range", fixture.fork, fixture.merge)
+  expect(result.code).toBe(2)
+  expect(report(result.output).findings).toEqual([
+    { file: "upstream/client.txt", line: 1, rule: "github-pat", commit: fixture.merge },
+  ])
+  expect(report(result.output).summary).toMatchObject({ commits: 1, upstream_findings: 0 })
+  expect(result.output).not.toContain(upstreamKey)
+})
+
+test("pinned upstream content at a new path is still reported", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root, async () => {
+    await Bun.write(join(root, "fork", "client.txt"), Bun.file(join(root, "upstream", "client.txt")))
+    git(root, "add", "fork/client.txt")
+  })
+  await Bun.write(join(root, ".gitleaks-upstream"), `${fixture.upstream}\n`)
+  const result = run(root, "range", fixture.fork, fixture.merge)
+  expect(result.code).toBe(2)
+  expect(report(result.output).findings).toEqual([
+    { file: "fork/client.txt", line: 1, rule: "github-pat", commit: fixture.merge },
+  ])
+  expect(report(result.output).summary).toMatchObject({ commits: 1, upstream_findings: 1 })
+  expect(result.output).not.toContain(upstreamKey)
+})
+
+test("staged scan skips only an indexed blob identical to the pinned commit at the same path", async () => {
+  const root = await repo()
+  const start = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-qb", "upstream")
+  await Bun.write(join(root, "upstream", "client.txt"), `token=${upstreamKey}\n`)
+  git(root, "add", "upstream/client.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "upstream tag")
+  await Bun.write(join(root, ".gitleaks-upstream"), `${git(root, "rev-parse", "HEAD")}\n`)
+  git(root, "checkout", "-q", "--detach", start)
+  git(root, "checkout", "upstream", "--", "upstream/client.txt")
+  const pinned = run(root, "staged")
+  expect(pinned.code).toBe(0)
+  expect(report(pinned.output).summary).toMatchObject({ status: "clean", upstream_findings: 1 })
+  await Bun.write(join(root, "upstream", "client.txt"), `token=${upstreamKey}\nfork edit\n`)
+  git(root, "add", "upstream/client.txt")
+  const changed = run(root, "staged")
+  expect(changed.code).toBe(2)
+  expect(report(changed.output).findings).toEqual([{ file: "upstream/client.txt", line: 1, rule: "github-pat" }])
+  expect(report(changed.output).summary).toMatchObject({ upstream_findings: 0 })
+  expect(changed.output).not.toContain(upstreamKey)
+})
+
+test("without a pin file upstream history and files are scanned as before", async () => {
+  const root = await repo()
+  const fixture = await upstreamMerge(root)
+  const result = run(root, "range", fixture.fork, fixture.merge)
+  expect(result.code).toBe(2)
+  expect(
+    report(result.output)
+      .findings.map((finding) => `${finding.file} ${finding.commit}`)
+      .sort(),
+  ).toEqual(
+    [
+      `upstream/client.txt ${fixture.merge}`,
+      `upstream/client.txt ${fixture.upstream}`,
+      `upstream/old.txt ${fixture.history}`,
+    ].sort(),
+  )
+  expect(report(result.output).summary).toMatchObject({ commits: 4 })
+  expect(report(result.output).summary).not.toHaveProperty("upstream_findings")
+})
+
+test.each(["tag", "abbreviated", "unknown"])("a %s pin blocks the scan", async (kind) => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, "notes.md"), "safe\n")
+  git(root, "add", "notes.md")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "safe")
+  git(root, "tag", "v1.0.0", base)
+  const pin = { tag: "v1.0.0", abbreviated: base.slice(0, 12), unknown: "1".repeat(40) }[kind]
+  await Bun.write(join(root, ".gitleaks-upstream"), `${pin}\n`)
+  const result = run(root, "range", base, "HEAD")
+  expect(result.code).toBe(1)
+  expect(result.output).toContain("incomplete")
+})
+
+test("a merge beyond Git's default rename limit completes the scan", async () => {
+  const root = await repo()
+  // Git 2.43 skips exhaustive rename detection above 1000 x 1000 unmatched files and warns.
+  const files = Array.from({ length: 1001 }, (_, index) => index)
+  await Promise.all(files.map((index) => Bun.write(join(root, "old", `a${index}.txt`), `old ${index}\n`)))
+  git(root, "add", "old")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "old files")
+  const start = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-qb", "upstream")
+  git(root, "rm", "-rq", "old")
+  await Promise.all(files.map((index) => Bun.write(join(root, "new", `b${index}.txt`), `new content ${index}\n`)))
+  git(root, "add", "new")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "replace files")
+  git(root, "checkout", "-qb", "fork", start)
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fork", "--allow-empty")
+  const fork = git(root, "rev-parse", "HEAD")
+  git(root, "-c", "core.hooksPath=/dev/null", "merge", "--no-ff", "-qm", "merge", "upstream")
+  const result = run(root, "range", fork, "HEAD")
+  expect(result.code).toBe(0)
+  expect(report(result.output).summary).toMatchObject({ status: "clean", commits: 2 })
+})
+
 test("staged scan blocks a secret without printing its value", async () => {
   const root = await repo()
   const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
