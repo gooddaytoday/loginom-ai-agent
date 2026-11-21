@@ -38,3 +38,12 @@ tsconfig.tsbuildinfo
 
 # Legal drafts pending review are kept outside the repository; never copy them in.
 legal-drafts-private/
+
+# Loginom AI Agent
+.env.*
+!.env.example
+!.env.*.example
+local.env
+/loginom-ai-agent.json
+/.local/project-memory/
+/packages/opencode/config.json

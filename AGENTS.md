@@ -220,3 +220,23 @@ const table = sqliteTable("session", {
 - Keep delivery vocabulary explicit. Prompts steer by default. At safe step boundaries, steered compaction takes priority up to the first steered move control; other steers retain enqueue order. At an idle boundary, steers take priority; otherwise exactly one queued item delivers before the runner reevaluates continuation. Inbox items may be cancelled or changed between queue and steer before delivery. Promoting new user input resets the selected agent's step allowance; a batch of steers resets it once.
 - One step is one logical LLM call; its durable record covers only the model-visible span. Do not write "provider turn", and do not use bare "turn" for a single call: "turn" is reserved for the future assistant-turn unit containing all steps from prompt promotion until the session would go idle.
 - Keep event replay ownership separate from clustered Session execution ownership.
+
+## Loginom AI Agent: module map and current state
+
+- In `loginom-cli`, implement the [standalone CLI design](docs/superpowers/specs/2026-09-17-loginom-cli-standalone-design.md), starting from `c37913ab5`. Desktop and CLI own independent backend v1 processes and profiles. The earlier shared-service CLI design is historical; do not introduce service discovery, client leases, or Desktop profile migration.
+- Standalone executable: `loginom-ai-agent-cli`; keep the GUI launcher `loginom-ai-agent`. Track implementation and checks in the design's progress section and [standalone runbook](docs/testing/loginom-ai-agent/standalone-cli.md).
+
+- [Product identity, release pins and bundled skills](packages/product/AGENTS.md)
+- [Desktop packaging, installation and acceptance](packages/desktop/AGENTS.md)
+- [Connection generations, credentials and recovery](packages/desktop/src/main/loginom/AGENTS.md)
+- [Runtime host and attachment admission](packages/loginom-host/AGENTS.md)
+- [Migrated Loginom client and browser runtime](packages/loginom-runtime/AGENTS.md)
+- [Application settings and onboarding](packages/app/AGENTS.md)
+- [Shared UI and new-chat branding](packages/ui/AGENTS.md)
+- [Model/backend integration](packages/opencode/AGENTS.md)
+- [CI: release builds and test workflows](docs/testing/loginom-ai-agent/ci-release.md)
+- [Git secret protection, commands and audit](docs/security/secret-protection.md)
+- [Eval harness for Loginom scenarios](evals/AGENTS.md)
+- [Node dashboards: Desktop/CLI draft from a one-use snapshot, then explicit publication](packages/dashboard/AGENTS.md). Dashboard — недоверенный код: модель пишет только в `<данные бэкенда>/dashboards/*/work/src/`, привязка хранится рядом в `control/`. Резолвер ограничивает сборку, loopback-сервер показывает черновик. Интеграция и публикация не меняют `.lgp`; текущий порядок — [runbook M4](docs/testing/loginom-ai-agent/dashboard-m4.md).
+
+Before resuming release work, read the [canonical Linux checkpoint](docs/migration/linux-implementation-checkpoint.md) and [platform runbooks](docs/testing/loginom-ai-agent/README.md). Reports distinguish tested installed artifacts from source-only checks. Keep durable decisions here or in the owning module; keep secrets and raw diagnostic logs out of git. Historical release reports retain the paths/version that were actually tested.

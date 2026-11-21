@@ -40,7 +40,8 @@
       "packages/*",
       "packages/plugins/*",
       "services/*",
-      "packages/data/*"
+      "packages/data/*",
+      "apps/loginom-site"
     ],
     "catalog": {
       "@effect/opentelemetry": "4.1.0",
@@ -90,6 +91,7 @@
       "semver": "7.7.4",
       "typescript": "npm:@typescript/typescript6@6.0.2",
       "@typescript/native": "npm:typescript@7.1.0-beta",
+      "@typescript/native-preview": "7.0.0-dev.20251207.1",
       "zod": "4.6.7",
       "remeda": "2.26.0",
       "shiki": "4.4.3",
