@@ -350,7 +350,12 @@ function manifest(path: Path.Path, netLogPath: string | undefined) {
 function serverLogRoots(path: Path.Path) {
   const xdgData = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
 
-  return [...new Set([path.join(xdgData, "opencode", "log"), path.join(app.getPath("userData"), "opencode", "log")])]
+  return [
+    ...new Set([
+      path.join(xdgData, "loginom-ai-agent", "log"),
+      path.join(app.getPath("userData"), "loginom-ai-agent", "log"),
+    ]),
+  ]
 }
 
 type Entry = { name: string; path: string; offset: number } | { name: string; data: Uint8Array }

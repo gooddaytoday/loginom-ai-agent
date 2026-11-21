@@ -69,7 +69,9 @@ test("fails without starting a server when none is registered", async () => {
 
   expect(result.stderr).toContain("No background server is running")
   expect(result.code).toBe(1)
-  expect(await Bun.file(path.join(root.path, "state", "opencode", ServiceConfig.filename())).exists()).toBe(false)
+  expect(await Bun.file(path.join(root.path, "state", "loginom-ai-agent", ServiceConfig.filename())).exists()).toBe(
+    false,
+  )
 })
 
 test("explains when the server predates heap dumps", async () => {
@@ -99,7 +101,7 @@ function fake(handle: (request: Request) => Response) {
 }
 
 async function register(root: string, url: string) {
-  const file = path.join(root, "state", "opencode", ServiceConfig.filename())
+  const file = path.join(root, "state", "loginom-ai-agent", ServiceConfig.filename())
   const info = { version: OPENCODE_VERSION, url, pid: process.pid, password: "secret" }
   await fs.mkdir(path.dirname(file), { recursive: true })
   await fs.writeFile(file, JSON.stringify(info))

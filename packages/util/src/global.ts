@@ -9,7 +9,9 @@ import { roots } from "#global-roots"
 import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
 
-const app = "opencode"
+// Fork (CAT-13): the product keeps data, config, state, logs and the service registration under its own name.
+// The client fallback and Desktop look for the registration under the same name.
+const app = "loginom-ai-agent"
 const { data, cache, config, state, tmp } = roots(app)
 
 const paths = {
