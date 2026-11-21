@@ -383,3 +383,268 @@ B2.3b, B2.6a, B4), здесь не оценена: это не объём код
 - Метод, как и исследование, не считает не-код: подсказки `.txt`, иконки, `json`.
 - Хук `pre-commit` в новом рабочем дереве не срабатывает: `core.hooksPath` — `.husky/_`, а этот каталог создаёт
   `husky` при `bun install`. Перед коммитом журнала `bun run secrets staged` (Bun 1.4.4) запущен вручную.
+
+## B1.3a Идентичность и U5
+
+21.11.2026. Ветка `b13a-identity` от `oc2-migration` (`2c3e19df86`). Rust `process-daemon` и системные каталоги
+OpenCode (`/etc/opencode`, `%ProgramData%\opencode`, MDM-plist) — B1.3b, здесь не трогались. Bun 1.4.4 переносной
+(`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`), первым в `PATH` только
+для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, 1600 пакетов, `.husky/_` появился, хук
+`pre-commit` срабатывал на каждом коммите.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `b319b3e695` | `apply-identity.py`: пакеты v2 в `SOURCES`, новый путь `flag-identity` в `EXCLUDED` | код 0, `clean` |
+| `66fae55ab3` | Каталог продукта `loginom-ai-agent` вместо `opencode`; тесты upstream с путями `opencode` | код 0, `clean` |
+| `7ba8671268` | Шов U5 в CLI и Desktop, тесты, запись каталога CAT-13 | код 0, `clean` |
+| `b86a3b1997` | `names.test.ts` на новых путях, `flag-identity.test.ts` возвращён в `cli` | код 0, `clean` |
+| `dfc697f765` | Правило о службе в `AGENTS.md` | код 0, `clean` |
+| этот журнал | | |
+
+### Правки файлов upstream
+
+Все — в новой записи каталога **CAT-13** «Product storage root and own background service (U5)». В `catalog.json` она
+стоит перед CAT-09 и CAT-12, иначе файлы забрали бы `packages/desktop/**` и `packages/**`. В `catalog.md` — раздел
+`## CAT-13` в формате остальных. `catalog-check.py` против `810c0eba1a` красный и до правки, каталог переводит B1.7;
+прогон против v2.3.0 — в разделе «Тесты».
+
+| Файл | Строк | Что |
+|---|---|---|
+| `util/src/global.ts` | +3 −1 | `const app = "loginom-ai-agent"`: данные, конфиг, состояние, кэш, журналы (`data/log`), `tmp` |
+| `client/src/service-probe.ts` | +1 −1 | `fallback()`: регистрация по умолчанию в `<state>/loginom-ai-agent/service.json` |
+| `desktop/src/main/native/logging.ts` | +6 −1 | Desktop собирает журналы службы из `loginom-ai-agent/log` |
+| `cli/src/services/service-config.ts` | +21 −5 | U5: `identity()`, параметр `service` у `filename`, `defaultPort`, `legacyFilename`; без переноса чужого `service.json` |
+| `desktop/src/main/service/sidecar-probe.ts` | +4 −1 | U5: зонд при старте ищет `serviceFile()` |
+| `desktop/src/main/service/background-service.ts` | +5 −3 | U5: `serviceFile()` раньше канала `local`; каталог `service-local.json` — `loginom-ai-agent` |
+
+Новый файл форка (в каталог не входит): `desktop/src/main/service/service-identity.ts`, 13 строк, `serviceFile()`.
+
+Шов U5 общего вида: запускающий задаёт `LOGINOM_AI_AGENT_SERVICE_IDENTITY` и `LOGINOM_AI_AGENT_SERVICE_PORT`.
+- Имя очищается как имя канала (`[^a-zA-Z0-9._-]` → `-`). Регистрация в `<state>/loginom-ai-agent/` и конфиг с паролем
+  в `<config>/loginom-ai-agent/` называются `service-<identity>.json`.
+- Порт берётся как задан, без свёртки win32 в блок `0x7000`: продукт выбирает порт ниже `0x8000`, тогда он одинаков на
+  Linux и Windows. `service set port` (поле `port` конфига) по-прежнему главнее. Без порта — порт канала upstream:
+  совпадение двух identity даёт явную ошибку «port … is already in use», а не подхват чужой службы.
+- Под identity служба не переносит в свой файл `service.json` и хешированные файлы канала. В spike этого не было видно:
+  из исходников канал `local`, а в нём перенос выключен. В установленной сборке (`latest`) `migrateRegistration`
+  скопировал бы чужой `service.json` той же версии в `service-<identity>.json` — подхват чужой службы.
+- Переключатель spike `LOGINOM_SPIKE_U5_DESKTOP` убран, имена `LOGINOM_SPIKE_*` не используются.
+
+Кто задаёт identity и порт в установленном Desktop и в профиле CLI — **не сделано**, это B4 (Desktop) и B2.7c (профили
+CLI). Сейчас шов включается только окружением запуска, как в spike. Desktop должен задать identity до
+`startSidecarProbe` (`desktop/src/main/index.ts`): зонд читает окружение при старте.
+
+### `apply-identity`
+
+`SOURCES`: добавлены `ai`, `client`, `util`, `plugin[^/]*` (`plugin`, `plugin-browser`, `plugins`), `gui-plugins`,
+`simulation`, `script`; убраны `opencode` и `enterprise` — в дереве v2.3.0 их нет. `theme` не добавлен: единственное
+совпадение — имя темы `opencode.json` в тесте, это бренд. В `EXCLUDED` путь `packages/core/test/flag-identity.test.ts`
+заменён на `packages/cli/test/flag-identity.test.ts`; `.github/archived/` в дереве нет, строка оставлена.
+
+`python3 -I scripts/upstream-sync/apply-identity.py --repo . --check`: до правки `would change: 298 files`, после —
+`335` (+37: `gui-plugins` 21, `client` 5, `simulation` 4, `plugin` 3, `script` 2, `util` 2; в `ai` только ключ
+провайдера).
+
+**Прогон скрипта по файлам: ни одного файла.** Каталоги данных скрипт не меняет вовсе — это константа `app`, правка
+вручную. Остальное он менял бы во всём файле сразу, а набор не замыкается ни по одному имени:
+- `util/src/global.ts`: `OPENCODE_CONFIG_DIR` читают ещё `cli/src/index.ts`, `cli/src/server-process.ts`,
+  `tui/src/mini/theme.ts`, а `core/script/test.ts` и тесты `cli`/`tui` его задают;
+- `cli/src/database-path.ts`: импорт `OPENCODE_CHANNEL` из `version.ts` — у него 27 упоминаний в `src`, у
+  `OPENCODE_VERSION` — 43;
+- `cli/src/server-process.ts`: `OPENCODE_PASSWORD` читает `cli/src/env.ts`, ставит `cli/src/services/standalone.ts`.
+  Переименование в одном файле оставило бы пароль в окружении инструментов;
+- `core/src/config/discovery.ts`: `opencode.json` и `.opencode` ищут ещё навыки, TUI и тесты `core`.
+
+Поэтому имена `OPENCODE_*`, файлы `opencode.db`, `opencode-<канал>.db`, `opencode.json(c)`, `.opencode`, `opencode.log` —
+в B1.4, массовым прогоном.
+
+### Тесты
+
+Новые:
+- `packages/cli/test/service-identity.test.ts`, 5 тестов: разбор identity и порта, одинаковый порт на `linux` и
+  `win32`; перенос чужих файлов под identity в каналах `latest` и `preview-a` (канал задаётся `bun --define`, как в
+  сборке; без identity тот же перенос идёт — тест не пустой); проверка S5 (ниже).
+- `packages/desktop/src/main/service/service-identity.test.ts`, 5 тестов: путь `serviceFile()` по окружению (в
+  отдельном процессе: тестовых параметров в модуле Desktop нет по `packages/desktop/AGENTS.md`); настоящий
+  `Service.discover` из `@opencode/client/service` с двумя поддельными службами той же версии — `service.json` чужой
+  службы подхватывается, если его назвать, а по `serviceFile()` — нет, пока нет своей регистрации; своя находится.
+- `packages/cli/test/flag-identity.test.ts`, 3 теста: CLI запускается сам (`debug paths`), с унаследованными
+  `OPENCODE_CONFIG_DIR`, `OPENCODE_DB`, `OPENCODE_DISABLE_CHANNEL_DB`, `OPENCODE_TEST_HOME`, `OPENCODE_PASSWORD`,
+  `OPENCODE_SERVER_PASSWORD`. Данные, кэш, состояние и журналы остаются в каталогах продукта — проходит. Два теста —
+  `test.failing` до B1.4: сейчас конфиг, домашний каталог, БД и пароль идут за `OPENCODE_*`, а `LOGINOM_AI_AGENT_*` не
+  читаются. Когда B1.4 переименует читателей, тесты станут красными и пометку надо снять. Не покрыты: `OPENCODE_CONFIG`,
+  `OPENCODE_CONFIG_CONTENT`, `OPENCODE_DISABLE_PROJECT_CONFIG` читаются только внутри `serve`. Из теста форка выпали
+  `OPENCODE_SERVER_USERNAME`, `OPENCODE_PURE`, `OPENCODE_PERMISSION`, `OPENCODE_TUI_CONFIG`: v2 их не читает.
+
+`names.test.ts`: область `@opencode/*`; пакет агента — `@opencode/cli` в `packages/cli`; в `SOURCES` проверки
+`OPENCODE_*` те же пакеты v2, `opencode` убран. Проверка `OPENCODE_*` помечена `test.failing` до B1.4: нарушений 387 до
+правки и 446 после расширения `SOURCES`. Остальные проверки — зелёные.
+
+Тесты upstream, где путь `opencode` записан литералом, переведены на `loginom-ai-agent`: `cli` — 7 файлов и
+`script/service-smoke.ts`, `core/test/preload.test.ts` и `core/script/test.ts`, `server/test/fetch.test.ts`,
+`util/test/global.test.ts`. В последнем добавлена проверка, что каталогов `opencode` нет.
+
+Полные наборы, `oc2-migration` (отдельное чистое дерево в scratchpad) → `b13a-identity`:
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 399 pass, 0 fail | 407 pass, 0 fail: +5 `service-identity`, +3 `flag-identity` |
+| `core` | `bun run script/test.ts` | 7115 pass, 3 fail | 7115 pass, 3 fail — те же: `ShellParse > extracts static directory targets…` и два теста `flock` на недоступный для записи корень (прогон под root) |
+| `desktop` | `bun test --timeout 30000` | 523 pass, 0 fail | 528 pass, 0 fail: +5 `service-identity` |
+| `server` | `bun test` | 127 pass, 0 fail | 127 pass, 0 fail |
+| `tui` | `bun test --timeout 30000` | 1672 pass, 1 fail | 1672 pass, 1 fail — то же: `the art stops every frame when hidden…` |
+| `util` | `bun test` | 145 pass, 0 fail | 145 pass, 0 fail |
+| `client` | `bun test` | 262 pass, 0 fail | 262 pass, 0 fail |
+| `product` | `bun test` | 50 pass, 11 fail | 53 pass, 8 fail: ушли 3 падения `names.test.ts`; 7 падений `repo-paths.test.ts` и 1 `automation-routing.test.ts` — как на `oc2-migration` |
+
+В падающем и до правки тесте `repo-paths` «catalog.json describes every file…» к 646 файлам без записи добавилось
+`entries without divergent files: CAT-13`: проверка идёт против `810c0eba1a`, где пакетов v2 нет. Против v2.3.0
+(`python3 -I scripts/upstream-sync/catalog-check.py --against a6b15d33da --summary`) у CAT-13 ровно 6 файлов, у CAT-12 —
+10 тестов upstream; пустыми остаются CAT-04…CAT-11 v1 — это перевод каталога, B1.7.
+
+Typecheck (`bun typecheck` из каталога пакета) до и после — 0 ошибок в `util`, `client`, `cli`, `core`, `product`,
+`desktop`, `server`. `bun typecheck` в `desktop` тесты не проверяет, поэтому новый тест запускался отдельно.
+
+Отдельные прогоны после коммитов:
+
+```text
+$ cd packages/cli && bun test test/service-identity.test.ts test/flag-identity.test.ts
+ 8 pass
+ 0 fail
+ 68 expect() calls
+Ran 8 tests across 2 files. [9.26s]
+$ cd packages/desktop && bun test src/main/service/service-identity.test.ts
+ 5 pass
+ 0 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [54.00ms]
+$ cd packages/product && bun test test/names.test.ts
+ 9 pass
+ 0 fail
+ 21 expect() calls
+Ran 9 tests across 1 file. [642.00ms]
+```
+
+### Проверка `s5`
+
+Перенесена в тест пакета: `packages/cli/test/service-identity.test.ts`. Службы — настоящие процессы
+`bun src/index.ts serve --service` из исходников, с изолированными `HOME`, `USERPROFILE`, `TMPDIR`, `XDG_*`, как в
+`env.ts`. Вместо пауз 6 и 12 с — опрос файла регистрации. Сценарии с identity `loginom-ai-agent-desktop` и
+`loginom-ai-agent-cli-work` и явными свободными портами:
+- два продукта в разных каталогах;
+- два профиля в общих каталогах.
+
+В обоих: обе службы живы, слушают свои порты, у регистраций разные `pid`, `/api/info` отвечает по своему паролю,
+`service.json` не появляется, в общих каталогах ровно два файла `service-<identity>.json`. Базовые строки spike (без
+U5) отдельно не повторялись. Подхват в общих каталогах без identity покрывает тест upstream «concurrent service
+processes elect one server».
+
+Две службы поднимаются за 2–3 с, весь файл — 7–9 с. Без шва регистрация называлась бы `service-local.json`, а
+`identity()` и тест переноса до правки падали (проверено: 0 pass, 3 fail).
+
+### Каталоги и пароль службы
+
+В тесте S5 рекурсивный обход изолированного корня не находит ни одного каталога `opencode` или `.opencode`. В `data`,
+`config`, `state`, `cache` и `tmp` есть `loginom-ai-agent`, журналы — `data/loginom-ai-agent/log`. Пароль лежит в
+конфиге службы и в регистрации. Тест проверяет, что он совпадает с паролем регистрации и что у обоих файлов права
+`0600` (на Windows права не проверяются).
+
+Ручной прогон CLI, корень — временный каталог в scratchpad:
+
+```text
+$ LOGINOM_AI_AGENT_SERVICE_IDENTITY=loginom-ai-agent-cli-work LOGINOM_AI_AGENT_SERVICE_PORT=24680 \
+  HOME=<root> TMPDIR=<root>/tmp XDG_{DATA,CONFIG,STATE,CACHE}_HOME=<root>/… bun run src/index.ts debug paths
+home       <root>
+data       <root>/data/loginom-ai-agent
+cache      <root>/cache/loginom-ai-agent
+config     <root>/config/loginom-ai-agent
+state      <root>/state/loginom-ai-agent
+tmp        <root>/tmp/loginom-ai-agent
+bin        <root>/cache/loginom-ai-agent/bin
+log        <root>/data/loginom-ai-agent/log
+repos      <root>/data/loginom-ai-agent/repos
+db         <root>/data/loginom-ai-agent/opencode-local.db
+$ … bun run src/index.ts service start
+http://127.0.0.1:24680
+$ find <root> -type d -name '*opencode*' | wc -l
+0
+$ ls <root>/{data,config,state,cache,tmp}
+data: loginom-ai-agent
+config: loginom-ai-agent
+state: loginom-ai-agent
+cache: bun loginom-ai-agent
+tmp: loginom-ai-agent
+$ ls -l <root>/config/loginom-ai-agent <root>/state/loginom-ai-agent
+-rw------- service-loginom-ai-agent-cli-work.json
+-rw------- service-loginom-ai-agent-cli-work.json
+$ cat <root>/state/loginom-ai-agent/service-loginom-ai-agent-cli-work.json   # пароль скрыт
+{"id": "3c400ed1-bd3c-487d-a0a9-61b97f7f8606", "version": "local", "url": "http://127.0.0.1:24680", "pid": 2311071, "password": "<redacted>"}
+$ … bun run src/index.ts service status
+http://127.0.0.1:24680
+$ … bun run src/index.ts service stop
+$ ls <root>/state/loginom-ai-agent
+(пусто)
+```
+
+То же `debug paths` на `oc2-migration`: `data <root>/data/opencode`, `config <root>/config/opencode`,
+`state <root>/state/opencode`, `db <root>/data/opencode/opencode-local.db`.
+
+### Правило в `AGENTS.md`
+
+Было: «Desktop and CLI own independent backend v1 processes and profiles. … do not introduce service discovery, client
+leases, or Desktop profile migration». Стало: профили раздельные; на OpenCode 2 у каждого продукта и профиля своя
+фоновая служба с U5 (В-79, CAT-13) — свой `service-<identity>.json` и явный порт, клиент находит только службу своей
+identity; служба останавливается вместе с приложением (В-87); не вводить службу, общую для Desktop и CLI, аренды
+клиентов и перенос профиля Desktop. Первое предложение (проект `standalone CLI`, `c37913ab5`) не менялось.
+
+### Заметки по Windows для B4.1
+
+- Bun на Windows берёт домашний каталог из `USERPROFILE`, `HOME` не учитывает (B0.2, проверено на стенде). Тесты и
+  обвязки задают оба.
+- Без `XDG_*` корни v2 строятся от домашнего каталога (`util/src/global-roots.ts`): после B1.3a данные —
+  `%USERPROFILE%\.local\share\loginom-ai-agent`, состояние и регистрация службы —
+  `%USERPROFILE%\.local\state\loginom-ai-agent\service-<identity>.json`, а не `%APPDATA%`. Профили CLI 0.4 лежат в
+  `%APPDATA%\com.loginom.aiagent\cli\profiles\…` (`product/src/cli-profile.ts`): перенос и выбор корня — B3 и B4.1.
+- Desktop на Windows всегда удаляет `XDG_STATE_HOME` (`desktop/src/main/lifecycle/environment.ts`,
+  `preferApplicationEnvironment`: оболочка входа на win32 не читается). Регистрация тогда в `%USERPROFILE%\.local\state\`.
+  `serviceFile()` Desktop и `Global` CLI считают путь одинаково (`XDG_STATE_HOME`, пустое — как отсутствующее, иначе
+  домашний каталог), если identity задана до запуска службы. По коду: зонд `startSidecarProbe` идёт раньше
+  `preferApplicationEnvironment`. Если окно запущено с `XDG_STATE_HOME`, зонд посмотрит в другой каталог и не найдёт
+  службу, тогда её найдёт `ensure`. Не проверялось.
+- Порт U5 задаётся явно и не сворачивается, номера для Desktop и профилей CLI выбирают B4 и B2.7c ниже `0x8000`.
+- `SIGTERM` на Windows жёсткий, файл регистрации остаётся (B0.2); служба поверх устаревшего файла поднимается.
+
+### Где решал сам
+
+- Identity и порт — две переменные окружения, их задаёт запускающий. Другие варианты: порт из конфига службы (некому
+  записать его в B1.3a) или хеш (не «явно»).
+- Каталог — литерал `loginom-ai-agent` в трёх файлах upstream, а не `productSlug(channel)`. `util`, `client` и
+  `desktop` не зависят от `@loginom-ai-agent/product`, а канала продукта (prod/beta/dev) в дереве v2 ещё нет. Разведение
+  хранилищ beta и dev по каналу (`packages/product/AGENTS.md`) — когда появится канал продукта (B4, B5).
+- `apply-identity` не прогонялся ни по одному файлу (выше почему). Охрана `OPENCODE_*` в `names.test.ts` и
+  `flag-identity.test.ts` сохранена как `test.failing`, а не сужением `SOURCES` или `ALLOWED`.
+- `flag-identity.test.ts` — в `packages/cli/test`: в v2 эти переменные читает процесс CLI.
+- Шов Desktop — в новом файле форка: его можно загрузить в тесте без `electron`, а правки upstream сводятся к вызовам.
+- В CAT-13 вошли и файлы каталога продукта: это одна правка идентичности. Тесты upstream в запись не внесены, их
+  относят CAT-09 и CAT-12.
+
+### Найдено, не чинил
+
+- `guarantees.md` (G2, «Как запускать»), `adr-0001-modular-integration.md` и раздел CAT-12 в `catalog.md` ссылаются на
+  `packages/core/test/flag-identity.test.ts`. Перевод этих документов — B1.7.
+- `repo-paths.test.ts`: 6 падений на `oc2-migration`, в том числе «the agent package keeps the upstream directory»
+  (`packages/opencode`) — B1.4, B1.7. `automation-routing.test.ts`: 1 падение там же.
+- `core/src/project.ts` и `core/src/git.ts`: кэш id проекта — файл `.git/opencode` в репозитории пользователя (B1.4).
+- `tui/src/theme/assets/opencode.json` — тема, на неё ссылаются по имени. Массовый `apply-identity` заменит ссылки на
+  `loginom-ai-agent.json`, а файл темы останется прежним — B1.4.
+- `desktop/perf/startup.bench.ts` ищет службу в `opencode/service*.json` — бенчмарк не правился.
+- В `XDG_CACHE_HOME` при запуске из исходников появляется `bun` — кэш самого Bun, не продукта.
+
+### Не проверено
+
+- Windows и macOS: всё запускалось на Linux. Права `0600` на Windows не имеют смысла (ACL профиля).
+- Собранный CLI: S5 и каталоги проверены из исходников (канал `local`); канал `latest` — только `bun --define` в
+  тесте переноса.
+- Вызовы в `sidecar-probe.ts` и `background-service.ts` под Electron: только typecheck. Окно Desktop с U5 — B4.
