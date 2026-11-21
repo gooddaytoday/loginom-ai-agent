@@ -35,12 +35,12 @@
 Из корня рабочего дерева, Bun 1.4.4 (`packageManager`) и Node 24.19.0 (`packages/product/loginom-release.json`):
 
 ```bash
-cd packages/loginom-runtime/client && npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false   # пакет acorn для product
+export LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0>                 # путь к bin/node, нужен loginom-host и dashboard
 cd packages/dashboard/template && "$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts
 cd packages/product && bun test                                  # repo-paths, names, identity, cli-profile, маршруты узлов
 cd packages/cli && bun test test/flag-identity.test.ts test/service-identity.test.ts
-cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> xvfb-run -a bun test
-cd packages/dashboard && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> bun run test
+cd packages/loginom-host && xvfb-run -a bun test
+cd packages/dashboard && bun run test
 scripts/upstream-sync/selftest.sh
 ```
 
@@ -48,8 +48,6 @@ scripts/upstream-sync/selftest.sh
 
 - `npm ci` шаблона `packages/dashboard/template` закреплённым Node — до тестов дашбордов. Без него на точке отсечения было 17 ложных падений (B1.1); на дереве v2 — 19 в `test:coverage:workers`, и скрипт `test` дальше не идёт (B1.7).
 - `LOGINOM_AI_AGENT_TEST_NODE` — путь к `bin/node` Node 24.19.0 для `loginom-host` и `dashboard`. Без неё `loginom-host` на дереве v2 даёт 205 падений вместо 38 (B1.5). В 0.4 то же требовалось набору пакета `opencode`: без неё 66 падений вместо 6 (B1.1); при переносе кода туда, где тесты запускают Node, переменную берут с собой.
-
-Ещё одна подготовка: тест маршрутов узлов в `product` загружает клиент `loginom-runtime`, а тот импортирует `acorn`. В 0.4 пакет лежал в корневом `node_modules`, на v2 Bun его туда не кладёт, и без `npm ci` клиента тест падает с `Cannot find package 'acorn'`. Шаг `install` процедуры ставит клиента тем же `npm ci`.
 
 `bun turbo test` переменную не передаёт: задачи `turbo.json` с `passThroughEnv` для пакетов форка на дереве v2 ещё нет (B5.1). Поэтому `loginom-host` и `dashboard` запускают из каталога пакета, как выше.
 
