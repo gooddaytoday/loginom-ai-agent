@@ -136,3 +136,11 @@
 - **Компоненты.** `packages/util/src/global.ts`, `packages/client/src/service-probe.ts`, `packages/cli/src/services/service-config.ts`, `packages/desktop/src/main/service/{sidecar-probe,background-service}.ts`, `packages/desktop/src/main/native/logging.ts`. Тесты upstream с путями `opencode` переведены на `loginom-ai-agent` (`cli`, `core`, `server`, `util`).
 - **Проверка при обновлении.** `packages/cli/test/service-identity.test.ts`: две службы с разными и с общими каталогами — свои файлы, порты и пароль с правами `0600`, чужие файлы под identity не переносятся. Ещё `packages/desktop/src/main/service/service-identity.test.ts`, `packages/util/test/global.test.ts`, `packages/cli/test/debug-paths.test.ts`, `packages/cli/test/flag-identity.test.ts`.
 - **Политика.** `merge`; строки шва U5 — `fork-owned`. Identity и порт в установленном Desktop и в профиле CLI задают B4 и B2.7c.
+
+## B1.6: генератор комплекта Bun
+
+Запись B1.6 (21.11.2026) к решению «подъём Bun upstream (LAB-306)» выше. Слова «штатного генератора комплекта нет»
+устарели: генератор — `packages/loginom-host/script/bun-notices.ts`, команды `generate <версия> <кэш> <новый каталог>`
+и `verify [<комплект>] [<входы companion>]`. Остальное в записи действует. После генерации нужны сборщики companion,
+независимая проверка `SHA256SUMS`, сборка CLI на целевом Bun, отказ на чужой ревизии и офлайн-проверка на трёх ОС.
+`incomplete` и `remaining` остаются. Файлы OpenCode не менялись, `catalog.json` тоже.
