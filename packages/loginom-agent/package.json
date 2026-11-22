@@ -10,9 +10,11 @@
   },
   "scripts": {
     "typecheck": "bun check --no-script",
-    "typecheck:tsc": "tsc --noEmit"
+    "typecheck:tsc": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
+    "@loginom-ai-agent/loginom-host": "workspace:*",
     "@opencode/plugin": "workspace:*"
   },
   "devDependencies": {

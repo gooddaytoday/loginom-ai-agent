@@ -7,5 +7,5 @@
     "noEmit": true,
     "noUncheckedIndexedAccess": false
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }
