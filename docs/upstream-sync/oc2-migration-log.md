@@ -2829,3 +2829,180 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Настоящий запуск в GitHub Actions: `setup-bun` с 1.4.4, раннер ubuntu-24.04, время тестов на его CPU, событие
   `pull_request_target`. Локально — только push новой ветки.
 - Как GitHub считает `paths` для первого push ветки переноса (`windows-native-check.yml`).
+
+## B2.1 Каркас плагина, U1, только встроенные плагины
+
+22.11.2026. Ветка `b21-plugin-scaffold` от `oc2-migration` (`56fe41abdb`), рабочее дерево `.claude/worktrees/b21`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`:
+1600 пакетов, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Основа —
+`origin/stage-b-checks`: `spike/oc2/plugin/loginom-product`, `spike/oc2/patches/u1-product-plugin.patch`,
+`spike/oc2/plugin/impostor`, `spike/oc2/harness/s8.ts`, отчёт spike (S8, «Правки в файлах OpenCode»).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `1c5a043fe6` `feat(core): register the loginom.product plugin as a guarded built-in (U1)` | пакет `packages/loginom-agent`, зависимость `core`, `bun.lock`, `core/src/plugin/{product,internal,supervisor}.ts`, тесты S8, `FORK_ONLY` в `product/test/names.test.ts`, CAT-07 и CAT-01 |
+| `4ffd31bbed` `feat(core): load only built-in server plugins in the product server` | запрет пакетов: `PluginProduct.Packages`, проверка в супервизоре, `ServerOptions.pluginPackages`, замена узла в `routes.ts`, `pluginPackages: false` в CLI; тесты `core` и `cli`; CAT-07 |
+| следующий | этот раздел |
+
+### Что сделано
+
+- **Пакет `packages/loginom-agent`** (`@loginom-ai-agent/loginom-agent`, private, рабочее пространство по маске
+  `packages/*`): `src/index.ts` — `Plugin.define({ id: "loginom.product", setup: () => {} })` на promise-API, как
+  прототип spike; хуков нет — шов их не требует, инструменты, допуск и аренда — B2.2…B2.5. `package.json` и
+  `tsconfig.json` — по образцу `plugin-browser` (встроенный плагин, который `core` импортирует так же), `typecheck` —
+  `bun check --no-script`. От `core` пакет не зависит. Имя `@loginom-ai-agent/agent` не взято: так в 0.4 назывался пакет
+  агента (`compat-compare.ts`). Новый пакет форка внесён в `FORK_ONLY` политики имён (`product/test/names.test.ts`), иначе
+  два теста `package names` красные.
+- **U1.** `core/src/plugin/product.ts` (файл форка): `plugins = [PluginPromise.fromPromise(LoginomAgent)]`, `ids`;
+  приведение `as unknown as InternalPlugin` из spike не понадобилось. `internal.ts`: плагины продукта последними в `post`,
+  их id в `guarded`. `supervisor.ts`: пакет с id из `guarded` — `failed: Plugin ID is reserved by a built-in plugin: <id>`.
+  Переключателей `LOGINOM_SPIKE_*` нет: плагин встроен всегда.
+- **Только встроенные плагины.** `PluginProduct.Packages` (`{ allowed }`, узел `PluginProduct.node`, по умолчанию
+  `true`). При `allowed = false` супервизор превращает каждую операцию `add` с пакетом (локальный путь из `plugins`,
+  каталог `plugins/` конфига, npm-имя) в запись `failed: Plugin packages are disabled: only built-in plugins load` ещё до
+  `modules.load`: модуль не импортируется, npm не вызывается. Операции над встроенными id (`-id`, `id`, `opencode.*`)
+  работают как прежде. Сервер: `ServerOptions.pluginPackages` и `PluginProduct.node.replace(PluginProduct.configured(...))`
+  в `routes.ts`. CLI передаёт `pluginPackages: false` при каждом запуске сервера (`serve`, `service`, stdio — один вызов
+  `start` в `server-process.ts`); переменной окружения и ключа конфига нет.
+
+### Правки файлов upstream
+
+| Файл | Строк | Запись |
+|---|---|---|
+| `packages/core/src/plugin/internal.ts` | +8 −1 | CAT-07 |
+| `packages/core/src/plugin/supervisor.ts` | +22 | CAT-07 |
+| `packages/server/src/options.ts` | +2 | CAT-07 |
+| `packages/server/src/routes.ts` | +2 | CAT-07 |
+| `packages/cli/src/server-process.ts` | +2 | CAT-07 (раньше файл был в CAT-12 по маске: имена `apply-identity`) |
+| `packages/core/package.json`, `bun.lock` | +1, +16 | CAT-01 |
+
+CAT-07 теперь запись с расхождениями: `pending: B2.1, B2.7a, B4.1` снят, B2.7a и B4.1 — в «Не перенесено из 0.4», как у
+CAT-09. Новые файлы форка: `packages/loginom-agent/**`, `core/src/plugin/product.ts`, `core/test/plugin/product.test.ts`,
+`cli/test/builtin-plugins.test.ts`.
+
+### Тесты
+
+`packages/core/test/plugin/product.test.ts` — настоящая загрузка Location с конфигом проекта
+`.loginom-ai-agent/loginom-ai-agent.json`, Npm-заглушка записывает вызовы:
+
+| Тест | Режим | Что проверяет |
+|---|---|---|
+| самозванец с `id: "loginom.product"` из конфига (S8) | пакеты разрешены (умолчание OpenCode) | встроенный `active` с `source: builtin`; пакет `failed: Plugin ID is reserved…`; маркер самозванца — только `imported`, `setup` не выполнялся |
+| `-loginom.product`, `-loginom.*`, `-*` (S8) | как в продукте | плагин продукта `active`; соседнее удаление `-opencode.config.agent` применилось (конфиг прочитан); последний активный плагин — `loginom.product` |
+| сторонний пакет из конфига | как в продукте | локальный и npm-пакет — `failed: Plugin packages are disabled…`; маркер пуст (модуль не импортирован); вызовов npm нет |
+| встроенные провайдеры | как в продукте | все id из `ProviderPlugins`, `opencode.models.dev`, `opencode.provider.dynamic` активны; отдельно названы `chatgpt`, `openai`, `github.copilot`, `opencode`, `claude-agent`, `ollama`, `lmstudio`, `vllm` |
+
+Самозванец S8 проверяется при разрешённых пакетах: при запрете пакет отклоняется раньше, и проверка зарезервированного id
+до него не доходит.
+
+`packages/cli/test/builtin-plugins.test.ts` — `bun src/index.ts serve --port 0` из исходников в изолированном доме
+(`isolatedEnv`), конфиг проекта с локальным пакетом (маркер), npm-именем `third-party-npm-plugin` и провайдером `stub`
+(`@opencode/ai/providers/openai-compatible`, `baseURL` — подставной сервер в тесте, без `apiKey`). Ждёт по `GET /api/plugin`,
+пока появится `loginom.product`, проверяет обе записи `failed`, отсутствие маркера, активные `loginom.product`,
+`opencode.provider.openai`, `opencode.models.dev`. Затем вход по ключу и запрос модели — ниже.
+
+### Мутации
+
+Финальный код, файл подменялся `perl` и возвращался из копии; `core` — `bun run script/test.ts test/plugin/product.test.ts`,
+`cli` — `bun test --timeout 60000 test/builtin-plugins.test.ts`:
+
+```text
+=== M0 none                                   core 6 pass 0 fail; cli 1 pass 0 fail
+=== M1 guarded without PluginProduct.ids      core 2 pass 4 fail: самозванец и три удаления
+=== M2 reserved-id check off                  core 5 pass 1 fail: самозванец
+=== M3 product first in post                  core 3 pass 3 fail: три удаления (порядок)
+=== M4 package gate off                       core 5 pass 1 fail: сторонний пакет; cli 0 pass 1 fail
+=== M5 CLI without pluginPackages: false      cli 0 pass 1 fail
+=== M6 test without key login                 cli 0 pass 1 fail: запросы к провайдеру без ключа
+```
+
+M1 повторяет базу S8 из spike: самозванец `active` с `source: local`, встроенный —
+`failed: Duplicate plugin ID: loginom.product`.
+
+### Вход по ключу (В-82)
+
+Через API: `POST /api/integration/stub/connect/key` с `{ key, location }` — тот же вызов, что делает
+`auth login <id> --method key`. Сама команда CLI ключ спрашивает только в интерактивном терминале
+(`form.ts`, `secret`: `API key input requires an interactive terminal`), флага для ключа нет, поэтому вход — через API.
+Ключ у сконфигурированного провайдера — метод `key` из `ConfigProviderPlugin`. Затем `POST /api/session`,
+`POST /api/session/:id/prompt` и `POST /api/experimental/session/:id/wait`; подставной провайдер записывает заголовок
+`authorization` каждого запроса `/chat/completions`: запросы есть, у всех `Bearer <ключ>`. Без входа (M6) запросы идут без
+ключа, тест красный. Всё это — при запрете пакетов, то есть в конфигурации продукта.
+
+Вход по подписке ChatGPT (`opencode.provider.chatgpt`, OAuth) не проверялся: аккаунта нет. Плагин загружается
+(тест провайдеров выше), сам вход — не проверен.
+
+### Приёмка
+
+| Пакет | Команда | База (B1, журнал) | После `4ffd31bbed` |
+|---|---|---|---|
+| `core` | `bun run script/test.ts` | 7119 pass, 354 skip, 3 fail | 7125 pass (+6 новых), 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (прогон под root) |
+| `cli` | `bun test --timeout 60000` | 407 pass, 9 skip, 0 fail | 408 pass (+1 новый), 9 skip, 0 fail |
+| `server` | `bun test` | 127 pass, 1 skip, 0 fail | 127 pass, 1 skip, 0 fail |
+| `sdk` | `bun run test` | 40 / 0 | 40 / 0 |
+| `product` | `bun test` | 58 pass, 3 fail (`repo-paths`, В-95) | 58 pass, 3 fail — те же |
+
+`core` на состоянии первого коммита (до запрета): 7123 pass, 354 skip, 3 fail — те же три. Typecheck (`bun run typecheck`):
+`core` 1986 файлов, `server` 1573, `cli` 2142, `sdk` 1577, `loginom-agent` 173 — без ошибок.
+
+Числа `server` и `sdk` в таблице — после переименования поля в `pluginPackages` (первое имя `plugins: { packages }`
+столкнулось с полем `plugins` в `sdk/src/internal/host.ts`, `CreateOptions extends Omit<ServerOptions, …>`: typecheck
+`sdk` дал TS2430).
+
+```text
+$ python3 scripts/upstream-sync/catalog-check.py
+against a6b15d33daf6: 429 divergent upstream files       # код 0; CAT-07: 5, CAT-01: 7, CAT-12: 187
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files
+$ bun install --frozen-lockfile
+Checked 1686 installs across 2060 packages (no changes)
+$ bun run check                                          # код 0, 42 с, 39 задач без кэша turbo
+Found 517 warnings and 0 errors.                          # как в B1.8; у новых файлов oxlint — 0 предупреждений
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 173 files
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Запрет — опцией сервера, а не безусловно в `core`.** Задание требует и запрета в загрузчике, и «`core` без новых
+  падений». Пробный безусловный запрет в `supervisor.ts` дал 10 новых падений в `core` (`supervisor-reload.test.ts` — 8,
+  `session-activation.test.ts` — 2) и 3 в `server` (`artifact.test.ts`, `worktree.test.ts` — 2): тесты upstream
+  загружают локальные пакеты. Сравнил два пути. Запрет по умолчанию с разрешением в тестах трогал бы ещё 4 файла тестов
+  upstream и требовал бы того же поля опций: `server/test/fixture/server.ts` запускает `ServerProcess.start` без
+  замен. Выбран меньший: библиотека по умолчанию ведёт себя как OpenCode, а сервер продукта всегда передаёт
+  `pluginPackages: false`. Переменной окружения и ключа конфига нет: правка значения — правка кода CLI. Путь запуска
+  сервера продукта один — `server-process.ts`; его охраняет `cli/test/builtin-plugins.test.ts` (M5). Пакеты по-прежнему
+  загружает встраивание через `@opencode/sdk` и тесты `core`, но это не продукт.
+- **Проверка зарезервированного id оставлена**, хотя при запрете пакетов продукт до неё не доходит. Задание и план
+  называют её частью U1, и она держит S8, если запрет когда-нибудь ослабят. Тест — при разрешённых пакетах.
+- **Отклонённый пакет — `failed` с текстом.** В схеме `@opencode/schema/plugin` есть только `active` и `failed`. Свой
+  статус «отклонён» — правка публичной схемы и `bun run generate`.
+- **Удаления встроенных плагинов из конфига не запрещены.** `-opencode.provider.dynamic` и другие `-opencode.*` действуют
+  как в OpenCode: В-80 говорит о загрузке сторонних плагинов. Защищены только `guarded`: id upstream и `loginom.product`.
+- **Плагины `SdkPlugins` и `InstancePlugins` (`source: sdk`) не трогал.** Их регистрирует только встраивающий код, в
+  сервере продукта их нет. Такой плагин с id `loginom.product` встал бы в `pre` раньше встроенного — как и для id
+  upstream из `guarded`.
+- **Скелет на promise-API** (`setup`), как прототип: B2.2…B2.5 переносят его код. Регистрация — через
+  `PluginPromise.fromPromise`.
+- **Ключ узла** — `@opencode/PluginProduct/Packages`: политика имён (`names.test.ts`) требует `@opencode/` для ключей
+  сервисов Effect.
+
+### Найдено, не чинил
+
+- Отклонённый npm-пакет остаётся целью проверки обновлений (`PluginUpdate.check`, у записи `source.type: "package"`).
+  `Npm.check` отвечает `Package is not installed` до сети, но в журнал на каждую активацию пишется
+  `failed to check plugin update`. Сетевых обращений нет — по коду `util/src/npm.ts`, перехватом трафика не проверял.
+- `cli/src/server-process.ts` не отформатирован prettier ещё на базе: строки, удлинённые `apply-identity`. Мои строки
+  формат не меняют.
+- B1.7 предлагал проверить в B2.1 исправления 0.4 в `provider/transform.ts`, кодах OAuth и WebSocket через прокси.
+  В задание B2.1 это не вошло, записано в CAT-07 как не проверенное.
+
+### Не проверено
+
+- Вход по подписке ChatGPT (нет аккаунта); вход OAuth и устройства у других провайдеров.
+- Windows и macOS; установленная сборка CLI (`build.ts`) — только запуск из исходников.
+- Клиентские плагины TUI (TUI грузит их сам из своего конфига) и GUI-плагины Desktop. При запрете сервер не отдаёт
+  GUI-бандл пакета из конфига, потому что пакет не загружается. Сам Desktop не запускал.
