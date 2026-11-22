@@ -1,3 +1,5 @@
+import path from "node:path"
+
 export function parseCliVersion(output: string) {
   const marker = output.lastIndexOf(" v")
   const version = marker === -1 ? output : output.slice(marker + 2)
@@ -32,6 +34,17 @@ export function shouldRetryEnsure(version: string | undefined, message: string) 
 
 export function stageName(version: string, arch = process.arch) {
   return `${version}-${arch}`.replace(/[^a-zA-Z0-9._-]/g, "-")
+}
+
+// Fork (catalog CAT-13): stages live in a directory 0.4 never had. 0.4 shares userData with the standalone CLI,
+// whose profile is `<userData>/cli/profiles/default` (product cli-profile.ts).
+export function stageDirectory(userData: string, version: string) {
+  return path.join(userData, "cli-stages", stageName(version))
+}
+
+// Desktop builds for x64 and arm64 only, and Windows ARM64 runs both installers from one userData.
+export function isStageName(name: string) {
+  return /^[a-zA-Z0-9._-]+-(x64|arm64)$/.test(name)
 }
 
 export function keptStages(bundledVersion: string, runningVersion?: string, arch = process.arch) {
