@@ -69,10 +69,11 @@ export default Plugin.define({
     // Host lease (B2.3, G3): one Host run per session execution, as 0.4 `turnLifecycle.acquireRun` held one per run. It
     // is taken when the execution starts, or by the first tool that needs it if that comes first, and released when the
     // execution succeeds, fails or is interrupted; a steer prompt joins the running execution and its lease. A plugin
-    // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`.
+    // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`. A failed record write
+    // only loses that lease: the event loop below must keep running to release the others.
     const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
     const hold = (sessionID: string) => {
-      const current = leases.get(sessionID) ?? ServiceHost.acquire(sessionID)
+      const current = leases.get(sessionID) ?? ServiceHost.acquire(sessionID).catch(() => undefined)
       leases.set(sessionID, current)
       return current
     }
@@ -80,7 +81,7 @@ export default Plugin.define({
       const current = leases.get(sessionID)
       leases.delete(sessionID)
       const lease = await current
-      if (lease) await ServiceHost.release(lease)
+      if (lease) await ServiceHost.release(lease).catch(() => undefined)
     }
     const stop = new AbortController()
     void (async () => {
