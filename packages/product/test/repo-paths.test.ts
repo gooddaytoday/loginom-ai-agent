@@ -46,21 +46,29 @@ const tooling = checked.filter((path) => TOOLING.test(path) && !path.includes("/
 
 describe("workspace packages", () => {
   test("the agent package keeps the upstream directory", () => {
-    expect(workspaces.get("opencode")).toBe("packages/opencode")
+    expect(workspaces.get("@opencode/cli")).toBe("packages/cli")
     expect(existsSync(join(root, "packages/agent/package.json"))).toBe(false)
   })
 
   test("turbo task keys name existing workspace packages", () => {
-    const tasks = Object.keys(JSON.parse(read("turbo.json")).tasks)
+    // turbo.json carries comments since OpenCode 2.
+    const tasks = Object.keys((Bun.JSONC.parse(read("turbo.json")) as { tasks: Record<string, unknown> }).tasks)
     const dangling = tasks.filter((key) => key.includes("#") && !workspaces.has(key.split("#")[0]!))
     expect(dangling).toEqual([])
   })
 
   test("--filter arguments in CI and scripts name existing workspace packages", () => {
+    // Scripts with a --filter option of their own; the usage line is not a turbo filter.
+    const NOT_FILTERS = new Set(["packages/codemode/script/bench.ts: --filter name]"])
     const dangling: string[] = []
     for (const path of checked.filter((item) => /^(\.github\/|script\/|scripts\/|nix\/|packages\/[^/]+\/scripts?\/)/.test(item))) {
       for (const match of read(path).matchAll(/--filter[ =]+['"]?([^\s'"`)]+)/g)) {
-        const name = match[1]!.replace(/^!/, "")
+        if (NOT_FILTERS.has(`${path}: --filter ${match[1]}`)) continue
+        // turbo graph selectors: `pkg...`, `pkg^...` (dependencies), `...pkg`, `...^pkg` (dependents).
+        const name = match[1]!
+          .replace(/^!/, "")
+          .replace(/^\.\.\.\^?/, "")
+          .replace(/\^?\.\.\.$/, "")
         if (name.includes("${") || name.includes("*") || name.startsWith("$")) continue
         // git clone and fetch take object filters (blob:none, tree:0); they are not workspace names.
         if (/^(blob|tree|object|sparse|combine):/.test(name)) continue
@@ -118,9 +126,13 @@ describe("path literals in build and CI code", () => {
   const siblingNames = new Set([...workspaces.values()].map((dir) => dir.split("/").at(-1)!).concat("agent"))
   // Strings that look like packages/<name> but are not repository paths (upstream changelog categories, fixtures).
   // electron.vite.config.ts: publicDir is relative to the renderer root (src/renderer), not to the config file.
+  // Stale paths in OpenCode 2.3.0's own files: the patch script builds an OpenCode 1 checkout, release.ts excludes a
+  // directory that no longer exists from a git pathspec.
   const NOT_PATHS = new Set([
     "script/raw-changelog.ts: packages/extensions",
     "packages/desktop/electron.vite.config.ts: ../../../app",
+    "patches/install-korean-ime-fix.sh: packages/opencode",
+    "script/release.ts: packages/console",
   ])
   const fixture = (path: string) => /(^|\/)(fixtures?|__snapshots__)\//.test(path)
 
