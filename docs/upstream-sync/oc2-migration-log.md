@@ -5569,3 +5569,291 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   `sdk` не запускались.
 - Установленная сборка: что сборщик CLI забирает `file-xlsx.ts` по динамическому импорту вместе с `htmlparser2` и
   `@zip.js/zip.js`, не проверял.
+
+## B2.5c package-docs
+
+22.11.2026. Ветка `b25c-package-docs` от `oc2-migration` (`523fba3a37`: B2.1, B2.2, B2.4, B2.5a, B2.5b1, B2.5b2,
+B3.1…B3.3), рабочее дерево `.claude/worktrees/b25c`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и
+`git commit`. `bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите.
+Основа — 0.4 `a080f7725c`: `packages/opencode/src/tool/package-docs.ts` (205 строк), тест
+`test/tool/package-docs.test.ts` (1076 строк), регистрация в `src/product/tool-contributor.ts` (`definitions`) и политика
+`src/product/tool-policy.ts`; spike `origin/stage-b-checks` (`spike/oc2/plugin/loginom-ui-demo/index.ts`,
+`spike/oc2/plugin/loginom-product/index.ts`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `4d9203a9ae` `feat(loginom-agent): package_docs_run in the product plugin (B2.5c)` | `packages/loginom-agent/src/package-docs.ts` (новый), регистрация в `src/index.ts`; тест `packages/server/test/loginom-package-docs.test.ts` (новый файл форка); в `packages/server/test/loginom-access.test.ts` набор инструментов `package-docs` дополнен `package_docs_run` |
+| `76c3fabc8c` `test(core): count the product plugin's package_docs_run among location tools` | тест upstream `packages/core/test/location-layer.test.ts` +2: имя в двух ожидаемых списках (файл уже в CAT-07) |
+| `878e01558b` `test(loginom-host): read the Calculator fixture from loginom-host, not the 0.4 opencode package` | `packages/loginom-host/test/fixtures/package-docs/edit-source.lgp` (копия из 0.4), строка в `README.md` фикстур, путь в `test/package-docs.test.ts` |
+| следующий | этот раздел, строка G1 и «Как запускать» в `guarantees.md`, CAT-05 в `catalog.md` |
+
+### Правки файлов upstream
+
+Код — без правок upstream. Один тест upstream: `packages/core/test/location-layer.test.ts` (+2) — плагин продукта встроен
+в каждую location (U1), и `package_docs_run` входит в полный набор инструментов теста «isolates provider state by
+location», как файловые инструменты B2.5a и B2.5b1. Файл уже в CAT-07. В CAT-05 (`pending` — B2.3, B2.5, B2.6, B2.9 без
+изменений: остаётся B2.5d) дописано, что сделано. `catalog.json` не менялся.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 437 divergent upstream files       # код 0; как на базе
+  CAT-05: 0 (pending: B2.3, B2.5, B2.6, B2.9)
+  CAT-07: 6
+```
+
+### Что это в 0.4
+
+`package_docs_run` — один инструмент у модели: `extract` (структура `.lgp` в `structure.json`), `skeleton` (черновик
+`report.md` и текст `narrative-prompts.md` для модели), `emit` (отчёт PDF, DOCX или MD рядом с сессией под свободным
+именем `<имя>.lgp_report[-N].<формат>`). Работа — внешний генератор `skills/package-docs/scripts/package-docs.mjs` под
+встроенным Node из ресурсов (`LOGINOM_AI_AGENT_RESOURCES`): навык сверен с манифестом (`verifyBundledSkills`), Node — по
+SHA-256 манифеста и только внутри ресурсов, окружение — только `LANG`, предел 60 с, вывод до 64 КиБ. Путь к `.lgp`
+проходит `authorizeLoginomFile` (B2.5a), запись в `.work/package-docs/<имя>-<хеш>/` и итоговый файл спрашивают `edit`,
+публикация сначала спрашивает `read` черновика. `toolContributor.definitions` добавлял инструмент только профилю
+`package-docs`, `toolPolicy` его пропускал только там. Host и браузер не нужны.
+
+### Что поменялось против 0.4 и почему
+
+Имя, описание, схема входа (`Parameters` — тот же `Schema.Union` Effect), порядок проверок, запрашиваемые права, тексты
+ошибок, аргументы и окружение исполнителя и результат — как в 0.4 (описание, `Parameters` и все строки
+`PACKAGE_DOCS_*` сверены скриптом с файлом 0.4: совпадают). Код переведён с Effect-сервисов пакета `opencode` на
+async/await и API плагина, как в B2.5a.
+
+- **Регистрация.** `packageDocs(files, directory, resources)` в `src/package-docs.ts` строит `Info` плагина
+  (`codemode: false`) на экземпляре `localFiles` из B2.5a; `src/index.ts` добавляет его в том же `ctx.tool.transform`,
+  что и файловые инструменты. `directory` — `ctx.location.directory` (0.4: каталог сессии), `resources` —
+  `LOGINOM_AI_AGENT_RESOURCES`, прочитанный при `setup` один раз для каталога навыков и инструмента (0.4:
+  `RuntimeFlags.loginomResources`, тот же ключ окружения). Инструмент зарегистрирован всегда, видит и вызывает его
+  только сессия с допуском `package-docs` (шлюз B2.2).
+- **Контекст вызова.** `ctx.abort` → `call.signal`; `authorizeLoginomFile(lgp, ctx)` → `files.authorize(lgp, call)`
+  (B2.5a; отказ права там же переводится в `LOGINOM_FILE_ACCESS_DENIED`); `sessions.get(...).directory` →
+  `realpath(location.directory)`; `ctx.ask` → `files.ask` (`permission.assert` с `source` вызова), без обёртки, как в
+  0.4: запрет правилом — `Tool.Error` с `Permission.BlockedError`, отказ без отзыва — сам `Permission.DeclinedError`.
+  `title` у результата v2 нет — убран; `metadata: { truncated: false }` — как в 0.4.
+- **Ошибки.** `Effect.die(Error(…))` → `throw Error(…)` с текстом 0.4; среда v2 переводит брошенное в `Tool.Error` с тем
+  же текстом.
+- **Имена ресурсов прав.** 0.4 — относительно `worktree`; здесь — относительно каталога Location, как у `write` и
+  `edit` v2 (`FileAccess.resolve`), иначе правила `edit` из конфига v2 к инструменту не применялись бы. Все пути
+  инструмента лежат внутри этого каталога. `save` — те же `<work>/*` и итоговый файл.
+- **Исполнитель.** `AppProcess` 0.4 жил в `@opencode-ai/core/process`; на v2 тот же модуль — `@opencode/util/process`
+  (зависимость `loginom-agent` уже есть). Слой `LayerNode.compile(AppProcess.node)` собирается один раз на модуль, вызов —
+  `Effect.runPromise` с теми же параметрами 0.4: `signal`, `timeout: "60 seconds"`, `maxOutputBytes`, `maxErrorBytes`,
+  `extendEnv: false`. Тексты ошибок остановки и предела те же (`…: The operation was aborted.`, `…: Timed out`).
+- **Проверка навыка.** `verifyBundledSkills` грузится динамическим импортом внутри проверки исполнителя: модулю нужен
+  `yaml` из npm-дерева клиента `loginom-runtime` (B2.4), статический импорт ломал бы загрузку `core`, `server`, `cli` без
+  `npm ci`. Сбой самой проверки — `PACKAGE_DOCS_RESOURCES_INVALID`, как в 0.4; сбой импорта (нет `yaml`) — ошибка
+  импорта как есть.
+- **Разбор вывода.** 0.4: `Schema.UnknownFromJsonString`, затем `Schema.Record(String, String)`; в Effect 4.1 — один
+  `Schema.fromJsonString(Schema.Record(...))`. Любой сбой — `PACKAGE_DOCS_OUTPUT_INVALID`, как в 0.4.
+- **Профиль допуска** — `package-docs`, как в 0.4. `access.ts` не менялся: `package_docs_run` уже был в наборе
+  `package-docs` и в `profileTools` (недоступен `default` и `loginom-automation`) с B2.2.
+
+Схема входа у модели. v2 сам переводит `Schema.Union` в JSON Schema; модель получает верхний `anyOf` из трёх объектов,
+как в 0.4. Отличия — общий перевод v2, не код инструмента: у объектов `additionalProperties: false`, необязательный
+`format` — `anyOf` с `{ type: "null" }`; у 0.4 (`ToolJsonSchema.fromSchema`; модуль 0.4 запущен на этой схеме под Effect 4.1) —
+`$schema`, без `additionalProperties`, `format` — простой `enum`. Тест шлюза закрепляет схему v2 целиком.
+
+### Предел 50 КиБ
+
+Результат — `truncated: false`, как в 0.4: среда v2 его не урезает (контрактный тест B2.5b1). Самый большой результат —
+`skeleton`: пути и `narrativeInstructions` (файл навыка, 8303 байта); замер скриптом при обычных путях — 8616 байт, одна строка JSON;
+тест проверяет `truncated: false` и размер меньше 16 КиБ. `extract` и `emit` — только пути.
+
+Новых экспериментальных хуков задача не использует: инструмент — `tool.transform` и `permission.assert`; хуки шлюза
+проверены контрактными тестами B2.2, `permission.evaluate` — B2.5a, предел результата — B2.5b1. Нового контрактного
+теста нет.
+
+### Тесты
+
+`packages/server/test/loginom-package-docs.test.ts` — настоящий сервер (`createEmbeddedRoutes`), модель — `TestLLM` по
+сценарию из текста сообщения, как в B2.5a. Комплект ресурсов строится в `beforeAll`, как в 0.4: навыки продукта, генератор
+`build-package-docs.ts` из `loginom-host`, Node из `LOGINOM_AI_AGENT_TEST_NODE`, манифест `resourceInventory`. Плагин
+стенда (`SdkPlugins`, promise-API) строит `packageDocs` на своём `localFiles` и вызывает его с синтетическим вызовом, как
+0.4 вызывал инструмент с тестовым `Tool.Context`. Правила сессии, вложения (настоящий промпт с `files`), ответы на вопросы
+(`permission.reply`), форк, сжатие и откат истории — настоящие. `prepare` 0.4 → сессия с правилами случая (по умолчанию
+своих правил нет, действуют правила агента) и, если нужно, промпт с вложением. Запросы прав 0.4 (`ctx.ask`) записывает
+хук стенда `permission.evaluate`; проверки «только запрет» (B2.5a) он пропускает. Запрос, отклонённый правилом, до хуков
+не доходит (`Permission.assert`), поэтому «запросов нет» в случаях запрета значит «не было вопроса». Глобальные каталоги —
+вне каталога Location: несколько случаев сверяют его содержимое целиком. В 0.4 часть случаев шла в git-репозитории
+(`{ git: true }`), здесь каталог Location без git, поэтому в списках нет `.git`. Тип отказа: 0.4
+`PermissionV1.DeniedError` → `Tool.Error` с `Permission.BlockedError` в `.error`, `RejectedError` →
+`Permission.DeclinedError`.
+
+Случаи 0.4 (41 с учётом циклов):
+
+| Случай 0.4 | На v2 |
+|---|---|
+| `extracts an original user attachment with bundled Node and requests only session writes` | проходит; ресурсы `edit` — `.work/package-docs/…` |
+| `a query / fragment / other-file attachment must request fresh read permission…` | проходят: вопрос `read`, отказ — `DeclinedError`, `.work` нет |
+| `a message-reverted attachment…` | проходит в виде «откат подготовлен и применён» (`revert.stage` + `revert.commit`): v2 не запускает шаг, пока откат только подготовлен, — следующий промпт или сжатие применяют его первым. Только подготовленный откат вложение не отзывает (первый прогон, «Найдено») |
+| `a reverted attachment…` (откат части сообщения) | не перенесён: v2 откатывает сообщения целиком, отката части нет |
+| `a replayed attachment…` (вложение в сообщении-повторе `compaction_replay_of` невидимого исходного) | не перенесён: в v2 нет повтора сообщения при сжатии и такой метки |
+| `a compaction replay preserves the visible original attachment's read authorization` | `a compaction preserves…` — проходит: после `Session.compact` сообщение с вложением остаётся в `session.context` (проверено пробой: `user`, `assistant`, `idle`, `compaction`, `idle`), вопроса `read` нет |
+| `forked original attachments keep read authorization in the new session` | проходит; правила форка — «всё разрешено», как в 0.4 |
+| `an OS read refusal names the file without suggesting an attachment` | пропущен под root с комментарием, как в B2.5a: `chmod 0` не мешает root читать |
+| `local path filesystem errors include their reason and path without an attachment hint` | проходит |
+| `configured file deny beats an attachment and an earlier always approval` | проходит: ответ «всегда» на вопрос `read` в другой сессии сохраняется для проекта, запрет правилом сессии всё равно побеждает; `{ permissionDenied: true }` — в `metadata` ошибки (0.4: `ctx.metadata`) |
+| `an original attachment does not override the user's explicit read deny`; `plan cannot create…`; `a model-supplied path must pass external_directory…`; `a range reference does not authorize the whole package`; `canonicalizing an attachment does not bypass a deny…`; `an original attachment preserves an explicit external_directory deny` | проходят (`plan` — агент `plan` v2, у него `edit * deny`) |
+| `a tampered skill bundle is rejected before Node can launch it` | проходит |
+| `edit denies use the same project-relative paths as ordinary write tools` | переписан: `…same Location-relative paths…`. Правило `edit .work/* deny` останавливает и инструмент, и настоящий `write` v2 через модель (`Permission denied: edit`). Различие «каталог сессии против `worktree`» 0.4 в v2 исчезло: оба инструмента считают путь от каталога Location |
+| `creates a session skeleton…`; `a deny on the skeleton…`; `repeating the skeleton…`; `publishes a completed PDF…`; `chooses the next free name…`; `an explicit deny on the final filename…`; `emit preserves an explicit read deny…`; `unfilled placeholders fail explicitly…` | проходят; в случае скелета добавлены `metadata { truncated: false }` и размер результата меньше 16 КиБ |
+| `a filename occupied during approval is rejected without moving the authorized output` | проходит: файл занимает хук стенда на вопросе `edit` (0.4 — обёртка `ctx.ask`) |
+| `attachments from another session in the model context do not authorize a path` | `attachments from another session do not authorize a path` — проходит. В 0.4 чужие сообщения подавались в `ctx.messages`; плагин v2 читает историю вызывающей сессии сам, поэтому вложение просто лежит в другой сессии |
+| `a missing generated bundle…`; `a zero exit with malformed executor output…`; `a successful executor cannot substitute a path…`; `an executor cannot claim completion…`; `a Node hash mismatch…`; `even the correctly hashed pinned Node cannot be a symlink…`; `a request cancelled before execution…` | проходят |
+| `abort terminates the running Node executor…`; `timeout terminates…` | проходят; второй честно ждёт 60 с предела 0.4 (60,5 с), таймаут теста 70 с, как в 0.4 |
+| `the executor receives fixed argv, the session cwd and a minimal environment` | проходит: окружение `["LANG"]`, `cwd` — каталог Location, Node — из ресурсов |
+| `rejected package access remains typed and tells CLI users to attach it with --file` | переписан под v2, как в B2.5a: подсказку `--file` и `LOGINOM_FILE_ACCESS_DENIED` даёт отказ с отзывом (`Tool.Error` с `Permission.CorrectedError`); отказ без отзыва — сам `Permission.DeclinedError`, по нему v2 останавливает шаг |
+
+Новые случаи:
+
+| Тест | Что проверяет |
+|---|---|
+| `a reported path other than the selected one fails even when the selected file exists` | исполнитель создал нужный файл, но сообщил другой путь — `PACKAGE_DOCS_OUTPUT_INVALID`. В случае 0.4 `…substitute a path…` нужного файла тоже нет, и его ловит проверка файла, а не пути (мутация M7 ниже) |
+| `the product's package_docs_run is offered and called only with the package-docs grant (G1 gate)` | настоящий инструмент плагина продукта через модель: без допуска и с `loginom-automation` — нет в запросе, вызов — `LOGINOM_SCOPE_DENIED: tool package_docs_run`, до инструмента не дошёл; с `package-docs` — набор инструментов в запросе ровно `edit, glob, grep, package_docs_run, question, read, skill, todowrite, write` (набор 0.4 для профиля без `apply_patch` и локальной справки Loginom, которых в этом запросе нет), описание 0.4 и схема входа v2 целиком; вызов дошёл до инструмента (`LOGINOM_FILE_NOT_FOUND` для `missing.lgp`), вопросов нет, в каталоге Location ничего не записано |
+
+Итого в файле 41 тест: 40 pass, 1 skip (под root). Полный файл — около 80 с, из них 60 с — случай предела.
+
+`packages/server/test/loginom-access.test.ts`: в случае `package-docs` теста источников допуска разрешённый набор
+дополнен `package_docs_run` — без этого тест красный, инструмент теперь есть в каждом запросе профиля.
+
+`packages/loginom-host/test/package-docs.test.ts`: случай `native Calculator expressions retain their name, data type and
+exact formula` читал `edit-source.lgp` из `packages/opencode/test/cli/package-docs-routing/fixtures/` — каталога пакета
+`opencode` 0.4, которого на дереве v2 нет (B1.2a, B1.5). Фикстура скопирована без изменений из `a080f7725c` в
+`packages/loginom-host/test/fixtures/package-docs/` (9873 байта, SHA-256 `4313b47f…e7bf` совпал с
+`edit-source.provenance.json` того же коммита), путь в тесте — `join(fixtures, "edit-source.lgp")`. Сам корпус
+маршрутизации (`cases.json`, `read-control.txt`, README, provenance) не переносил: см. «Где решал сам».
+
+### Мутации
+
+На рабочем дереве до коммита `4d9203a9ae` (тот же код без нового случая пути и без переносов строк prettier): мутация вносилась `perl` в файл дерева, запускался
+`bun test test/loginom-package-docs.test.ts -t '^(?!.*timeout terminates)'` из `packages/server` (без 60-секундного
+случая), файл возвращался из копии; после последней — `git status` без изменений кода (скрипт и вывод — во временном
+каталоге).
+
+```text
+=== M0  none                                  38 pass, 1 skip, 0 fail
+=== M1  tool not registered (index.ts)        37/1: G1 gate
+=== M2  permits always true (access.ts)       37/1: G1 gate
+=== M3  no authorize (realpath of the path)   24/14: query, fragment, other-file, message-reverted, local path errors,
+                                              configured deny…always, read deny, external_directory (model path),
+                                              range reference, canonicalizing, external_directory with attachment,
+                                              another session, rejected…--file, G1 gate
+=== M4  no edit ask                           27/11: extracts…, compaction, fork, plan, Location-relative, skeleton,
+                                              deny on skeleton, PDF, next free name, deny on final filename, occupied
+=== M5  no read ask on emit                   36/2: publishes a completed PDF…, emit preserves an explicit read deny
+=== M6  Node hash check off                   37/1: a Node hash mismatch…
+=== M7  reported path check off               38/0 — не поймана
+=== M8  no own abort check                    38/0 — не поймана
+=== M9  acknowledged file check off           37/1: an executor cannot claim completion…
+=== M10 metadata without truncated            37/1: creates a session skeleton…
+=== M11 executor without call.signal          37/1: abort terminates…
+=== M12 extendEnv: true                       37/1: the executor receives fixed argv…
+=== M13 skill verification swallowed          36/2: a tampered skill bundle…, a missing generated bundle…
+```
+
+После нового случая `a reported path other than the selected one…`: M0 — 39/0 (плюс skip), M7 — 38/1 (этот случай).
+M8 не ловится поведением, как и в 0.4: `files.authorize` первым делом сам вызывает `call.signal.throwIfAborted()` (0.4 —
+`ctx.abort.throwIfAborted()` в `authorizeLoginomFile`), и остановленный вызов не доходит ни до вопросов, ни до файлов.
+Собственная проверка инструмента — повтор 0.4, оставлен.
+
+### Приёмка
+
+Полные прогоны по одному пакету, `bun test` из каталога пакета, junit на каждый пакет; падения сравнивались по именам. До
+прогонов — `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` Node 24.19.0; `LOGINOM_AI_AGENT_TEST_NODE` —
+этот Node; `loginom-host` — под `xvfb-run -a`; `core` — `bun run script/test.ts`. Итог — дерево с кодом `878e01558b`
+(prettier менял только переносы строк в двух новых файлах, пока шёл прогон `server`). База `loginom-host` — то же дерево, где
+`test/package-docs.test.ts` временно возвращён к `523fba3a37` (пакет `loginom-host` больше ничем не изменён); база
+остальных — числа задания и раздела B2.5b2 (`523fba3a37`).
+
+| Пакет | База `523fba3a37` | Итог |
+|---|---|---|
+| `loginom-agent` | 50 pass, 0 fail | 50 pass, 0 fail (новых тестов в пакете нет) |
+| `server` | 187 pass, 2 skip, 0 fail | 227 pass (+40), 3 skip (+1: отказ ОС под root), 0 fail — 41 тест нового файла |
+| `loginom-host` | 506 pass, 12 skip, 38 fail | 507 pass, 12 skip, 37 fail; ушло ровно `package-docs.test.ts` «native Calculator expressions…», остальные 37 — те же по именам (`skills-acceptance` 24, `skills-acceptance-turns` 8, `bundled-ripgrep` 3, `cli-manifest` и `managed-work-entry` под root) |
+| `core` | 7125 pass, 354 skip, 3 fail (B2.5b2) | 7125 pass, 354 skip, 3 fail — те же: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) |
+
+`core/test/location-layer.test.ts` и `core/test/plugin/product.test.ts` отдельно: 29 pass, 2 skip, 0 fail. Без
+`node_modules` клиента `loginom-runtime` (свежее дерево до `npm ci`): `core/test/plugin/product.test.ts` — 6 pass, 0 fail;
+`loginom-agent` — 50 pass, 0 fail.
+
+Инструмент пишет только в каталог Location (`.work/package-docs`, отчёт); у стенда это временный каталог теста, а вызов
+инструмента продукта в тесте шлюза падает до записи. После прогонов `/root/.local/share/loginom-ai-agent-dev/file-profiles`
+не существует.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py
+against a6b15d33daf6: 437 divergent upstream files       # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                    # код 0
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 210 files                            # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 1,609 files across 2 projects        # tsc -b — код 0
+$ cd packages/core && bun run typecheck
+✓ No type errors in 2,001 files across 2 projects
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                          # код 0
+Found 517 warnings and 0 errors.                          # как в B2.5b2; у новых и изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 210 files
+ Tasks:    39 successful, 39 total                        # 31 из кэша turbo
+```
+
+### Где решал сам
+
+- **Инструмент регистрируется всегда, без условия Host.** В 0.4 `definitions` добавлял его только профилю
+  `package-docs`; здесь видимость и вызов решает шлюз B2.2 по той же политике (`permits`), как для инструментов B2.5a и
+  B2.5b1. Host и браузер инструменту не нужны, шва аренды нет.
+- **Схема входа — `Schema.Union` 0.4, а не JSON Schema.** v2 принимает схему Effect и сам проверяет вход, как 0.4.
+  Модель получает перевод v2 (раздел «Что поменялось»); точная копия JSON 0.4 потребовала бы своей JSON Schema и разбора
+  входа в инструменте — это уже переписывание. Тест шлюза закрепляет то, что модель получает на самом деле.
+- **`AppProcess` из `@opencode/util`, а не свой запуск `child_process`.** Тот же модуль, что в 0.4: предел, остановка,
+  усечение вывода и завершение процесса не переписывались. Слой собирается при загрузке модуля; `Effect.runPromise` идёт на
+  настоящих часах, как и требуется для предела 60 с.
+- **Случай предела 60 с оставлен как в 0.4.** Навык `unit-tests` советует не ждать производственные константы, а делать
+  их опцией. Это правка кода инструмента сверх API v2; меньший вариант — оставить случай 0.4 (+60 с к пакету `server`).
+  Если владелец решит иначе — предел станет параметром `packageDocs` со значением 0.4 по умолчанию.
+- **Каталог ресурсов читается один раз при `setup`.** Та же переменная, что у каталога навыков B2.4; в 0.4
+  `RuntimeFlags` тоже читал её при старте. Кто передаёт её службе v2 — B4 и B2.7a.
+- **Тест — новый файл в `packages/server`, свой стенд.** Случаям нужны правила, история, форк, сжатие и откат сессии, то
+  есть ядро; пакет плагина от `core` не зависит. Стенд B2.5a в `loginom-local-file.test.ts` не расширял: файлу пакета
+  нужны `npm ci` клиента и `LOGINOM_AI_AGENT_TEST_NODE`, а B2.5a держал свой файл без них; в 0.4 тесты тоже были
+  отдельными файлами. Повтор кода стенда (около 150 строк) — цена этого.
+- **Падение `loginom-host` закрыто переносом одной фикстуры.** Задание связывает его с B2. Случаю нужны только байты
+  `edit-source.lgp`; корпус маршрутизации (`cases.json` и остальное) читают `skills-acceptance-turns.test.ts` (8 падений),
+  `script/skills-acceptance.ts` и его README — это приёмка выбора навыков, не инструмент. Где корпусу жить на v2, решает
+  тот, кто переносит `skills-acceptance`; если он перенесёт корпус целиком, копию в фикстурах `package-docs` можно
+  заменить ссылкой на корпус.
+- **Подсказка `--file` при простом отказе не перенесена**, как и в B2.5a: v2 останавливает шаг только на самом
+  `DeclinedError`. Подсказка приходит с отказом с отзывом.
+
+### Найдено, не чинил
+
+- Подготовленный, но не применённый откат истории (`revert.stage`) вложение не отзывает: первый прогон случая
+  `message-reverted` без `revert.commit` — вопроса `read` нет, вызов прошёл по вложению (подтверждает находку B2.5a,
+  сделанную по коду). Достичь этого моделью нельзя: пока откат подготовлен, v2 шаг не запускает (`wake` пропускается,
+  промпт и сжатие сначала применяют откат), инструмент вызывает только шаг. Прямой вызов `Session.resume` при
+  подготовленном откате не проверял.
+- После `Session.compact` на короткой истории сообщение с вложением остаётся в `session.context`, и вложение по-прежнему
+  разрешает файл без вопроса. Предупреждение B2.5a («после сжатия файл снова требует вопроса») верно не всегда; на длинной
+  истории не проверял.
+- Модель видит `format` как `anyOf` с `null` (перевод `Schema.optional` в v2). Принимает ли проверка входа v2 `null` для
+  такого поля (`Schema.optional` его не принимает), не проверял; модель 0.4 такого варианта не видела.
+- `oc2-migration` за время задачи ушла вперёд (`dd98f25e8a`, B4.1 дописал свой раздел журнала): при слиянии разделы
+  журнала столкнутся в конце файла.
+
+### Не проверено
+
+- Настоящая модель и настоящий навык `package-docs` в разговоре: модель — `TestLLM`, успешные вызовы — на экземпляре
+  стенда с тем же кодом `packageDocs`; инструмент продукта через модель — только отказы шлюза и ошибка до записи (у
+  сервера в тесте нет `LOGINOM_AI_AGENT_RESOURCES`).
+- Установленная сборка: что служба v2 получает `LOGINOM_AI_AGENT_RESOURCES` и что в ресурсах есть собранный
+  `package-docs.mjs` и `bin/node` (B4, B2.7a); динамический импорт проверки навыка в бандле CLI.
+- Windows и macOS (`node.exe`, пути, остановка процесса), Desktop; `cli`, `sdk`, `product` не запускались.
+- Отказ ОС на чтение (`chmod 0`) — под root пропущен.
+- Принимается ли схема с верхним `anyOf` провайдерами, требующими `type: "object"` на верхнем уровне (OpenAI): в 0.4
+  модель получала тот же верхний `anyOf`; преобразования схемы провайдером в v2 не смотрел.
