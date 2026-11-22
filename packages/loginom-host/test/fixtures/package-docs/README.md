@@ -34,6 +34,11 @@ decode page text through ToUnicode and compare runs, not compressed PDF bytes.
 The regression reads actual PDF pages and requires the short statistics list to
 stay with its heading. This is a pagination fixture, not a new Python oracle.
 
+`edit-source.lgp` is the confirmed local edit source of the 0.4 routing corpus,
+copied unchanged from `a080f7725c:packages/opencode/test/cli/package-docs-routing/fixtures/edit-source.lgp`
+(9873 bytes, SHA-256 4313b47f09cc875993e8acc42ef2d35baec7d7dc61589af817d413b37261e7bf; provenance in
+`edit-source.provenance.json` there). The Calculator expression case reads it.
+
 `heading-chain-pagination.report.md` retains the synthetic nested-package
 narrative from CLI669 `docs-attached-pdf`, attempt 3 (2026-10-08,
 OpenAI gpt-6.1-sol/medium). The module heading was orphaned on page 1 while
