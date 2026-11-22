@@ -2283,3 +2283,259 @@ Cached:    0 cached, 38 total
 - ACP в настоящем клиенте и экран обновления CLI глазами: только тесты (у экрана обновления теста нет).
 - `install` — только путь `--binary` на Linux; загрузка по сети и Windows (`opencode.exe`) не проверялись.
 - Windows и macOS: всё на Linux. BRAND-01 в собранном CLI — не проверялся: остаются B2.7a, B2.7d и задачи TUI.
+
+## B1.4 группа B: ручные правки бренда в TUI, ядре и `process-daemon`
+
+22.11.2026. Ветка `b14-brand-b` от `oc2-migration` (`53ec8ddff3`), рабочее дерево `.claude/worktrees/b14-brand-b`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; для Rust — toolchain 1.90.0
+(`/root/.cargo/bin`) и Zig 0.16.0 из scratchpad (B1.3b), только для `cargo`. `bun install --frozen-lockfile`: код 0,
+1600 пакетов, `.husky/_` появился, хук `pre-commit` срабатывал на каждом коммите. Задачи из таблицы B1.4a: Р-4, Р-5,
+Р-7, Р-8 (а и б), Р-13…Р-18. Параллельно группа A (раздел выше) делала Р-1…Р-3, Р-12, Р-19…Р-26; её ветка влита в
+`oc2-migration` (`6fab89624c`) и слита в эту ветку перед журналом.
+
+### Коммиты
+
+Каждая задача — отдельный коммит, не больше пяти файлов. Описание задач в `catalog.md` (кроме CAT-01 и Р-14) — общим
+коммитом после слияния с группой A: с тестами многие задачи уже занимали пять файлов, а конфликт в каталоге так
+решался один раз. `bun run secrets staged` перед каждым коммитом — `clean`.
+
+| Задача | Коммит | Файлы |
+|---|---|---|
+| зависимость | `c1fc2378e5` `chore(tui): depend on the product package for the product name and wordmark` | `tui/package.json`, `bun.lock` (одна строка), `catalog.md` (CAT-01) |
+| Р-13 | `abf6c3f6be` `fix(identity): name the log and channel database files after the product` | `util/src/observability/logging.ts`, `cli/src/database-path.ts`, `cli/script/service-smoke.ts`, `core/test/logging.test.ts`, `cli/test/flag-identity.test.ts` |
+| Р-15 | `87f35b756d` `fix(identity): name the telemetry client and service after the product` | `util/src/observability.ts`, `util/src/observability/otlp.ts`, `core/test/effect/observability.test.ts` |
+| Р-18 | `0f691f99b1` `docs(core): point the built-in skill texts at the product's directories` | `core/src/plugin/skill/{opencode,report}.md`, `core/src/plugin/command/initialize.txt` |
+| Р-14 | `895411348f` `docs(upstream-sync): keep the .git/opencode project id cache that 0.4 wrote` | `catalog.md` (CAT-12) |
+| Р-4 | `18571e4520` `fix(tui): show the product name in the terminal title, notifications and exit hint` | `app.tsx`, `attention.ts`, `mini/runtime.lifecycle.ts`, `mini/footer.prompt.tsx`, `test/app-lifecycle.test.tsx` |
+| Р-5 (1/2) | `5b7d05ed17` `fix(tui): name the product in the update dialog and the highlights setting` | `component/dialog-update.tsx`, `config/index.tsx`, `test/component/dialog-update.test.tsx` |
+| Р-5 (2/2) | `f41e47210c` `fix(tui): name the product on the crash screen and in error messages` | `component/{error-component,terminal-pane}.tsx`, `util/error-details.ts`, `test/util/error-details.test.ts` |
+| Р-7 | `f6f67c73f6` `feat(tui): show the product wordmark on the home screen and in the session epilogue` | `logo.ts`, `component/logo.tsx`, `routes/home.tsx`, `util/presentation.ts`, `test/util/presentation.test.ts` |
+| Р-8а | `d3650d1ef6` `feat(tui): rename the default theme to loginom-ai-agent as in 0.4` | `theme/index.ts`, `context/theme.tsx`, `mini/theme.ts`, `test/theme.test.ts`, `test/cli/tui/theme-mode.test.tsx` |
+| Р-8б | `f0755ba813` `fix(tui): default the theme setting to loginom-ai-agent and use the id in theme tests` | `component/dialog-config.tsx`, `test/mini/theme.test.ts`, `test/ui/pane-resize-handle.test.tsx` |
+| Р-16 (1/2) | `7102c257f0` `fix(process-daemon): name the package and the executable after the product` | `Cargo.toml`, `Cargo.lock`, `tests/{ownership,playground,rows}.rs` |
+| Р-16 (2/2) | `c70916674e` `fix(process-daemon): name the Windows pipes after the product` | `src/daemon/windows.rs`, `src/transport/windows.rs`, `src/service/pipe/windows.rs`, `tests/windows-daemon.rs`, `.github/workflows/check-process-daemon.yml` |
+| Р-17 | `6e6cc78425` `fix(identity): cache and look up the embedded pty executable under the product name` | `core/src/persistent-pty/{binary.bun,binary.node,daemon}.ts`, `cli/src/node/target.ts` |
+| — | `6245c0ff89` `chore: merge oc2-migration with the B1.4 brand group A into b14-brand-b` | конфликт `catalog.md` (CAT-01, CAT-12) |
+| каталог | `d643224fdd` `docs(upstream-sync): describe the TUI, core and process-daemon brand edits in the catalog` | `catalog.md` (CAT-02, CAT-11, CAT-12, CAT-13) |
+| Р-15 (тест) | `e6ffe4cb21` `test(util): expect the product service name in the exported OTLP trace` | `util/test/observability-otlp.test.ts` |
+| Р-5 (тест) | `1043165956` `test(tui): expect the product name in the MCP error investigation draft` | `tui/test/cli/tui/dialog-mcp.test.tsx` |
+| — | следующий | этот журнал; в `catalog.md` — ссылка на этот раздел |
+
+Р-5, Р-8 и Р-16 разделены: со строками и тестами выходило 6–9 файлов. Р-8 поделён так, чтобы каждый коммит был
+зелёным: в первом — читатели id и два теста, которые падают без них; во втором — значение по умолчанию в диалоге
+настроек и тесты, которые проходят и со старым id (у темы есть запасной вариант). Два последних коммита с тестами
+появились после полного прогона «после»: эти проверки старых строк лежали вне файлов задач, фокусные прогоны их не
+брали (`util/test/observability-otlp.test.ts` ждал `service.name` = `opencode`, `dialog-mcp.test.tsx` — текст
+расследования). До этих коммитов `util` и `tui` давали по одному новому падению.
+
+### Что сделано
+
+- **Р-4.** `Product.name` в заголовке терминала (главная, сессия, плагин; TUI и Mini), вместо префикса `OC |`, в
+  заголовке уведомлений по умолчанию, в подсказке `/exit` Mini («close Loginom AI Agent») и в пункте палитры
+  «Update Loginom AI Agent». `util/tool-display.ts` не менялся: «Web Search via OpenCode» — имя услуги провайдера
+  `opencode`, а не продукта (как Р-6).
+- **Р-5.** Диалог обновления (заголовок, тексты установки, «… is already up to date»), описание настройки
+  `highlights`, экран сбоя («Loginom AI Agent crashed», версия), ошибка устаревшего сервера терминала, текст
+  расследования ошибки для модели.
+- **Р-7.** Как в 0.4 (`a080f7725c:packages/tui/src/logo.ts`): логотип — `Product.wordmark` «Loginom AI» одной строкой,
+  «AI» акцентом `#C79292`, на главной, в статистике и в эпилоге сессии. В v2 у логотипа есть узкие варианты (вторая
+  половина логотипа или знак `go` при ширине меньше 44 и 22); со словом-знаком шириной 10 колонок они давали бы «AI»
+  или знак OpenCode — убраны, остался порог по высоте. Уведомление об обновлении на главной было шириной логотипа и
+  переносилось бы в три строки (проверено рендером, ниже) — `minWidth` вместо `width`.
+- **Р-8.** В 0.4 тему переименовали (`a080f7725c`, `theme/assets/loginom-ai-agent.json`, id `loginom-ai-agent`) —
+  поэтому переименована и здесь: id темы по умолчанию `loginom-ai-agent` во всех читателях (`theme/index.ts`,
+  `context/theme.tsx`, `mini/theme.ts`) и в значении по умолчанию настроек. Файлы `assets/opencode.json` и
+  `assets/v2/opencode.json` не переименованы (ниже).
+- **Р-13.** Журнал `<log>/loginom-ai-agent.log` (установленные каналы) и `loginom-ai-agent-<канал>.log` (запуск из
+  исходников, `Product.slug`), БД локальных каналов `loginom-ai-agent-<канал>.db`. `service-smoke.ts` ищет журнал
+  собранной службы под новым именем. Замыкание по `packages/`: других чтений `opencode*.log` и `opencode-*.db` нет,
+  кроме `core/src/database/v1-migration.bun.ts` (`opencode-next.db` — источник переноса данных v1, не файл продукта).
+- **Р-15.** Имя клиента по умолчанию и `serviceName` OTLP — `Product.slug`. CLI передаёт клиента сам
+  (`LOGINOM_AI_AGENT_CLIENT` или артефакт сборки). Ключи атрибутов `opencode.client` и `opencode.run` не менялись:
+  задача про имя клиента и службы, а ключи читают коллекторы. **Включена ли телеметрия:** экспорт OTLP есть только
+  при заданном `OTEL_EXPORTER_OTLP_ENDPOINT` (`util/src/observability.ts`, `cli/src/index.ts`); без него — только
+  локальный файл журнала. Значение по умолчанию не трогалось (этап F).
+- **Р-14.** Не переименован, записано в CAT-12. В v2 `.git/opencode` только читается как прежний id (`previous`) —
+  писателя нет (`grep` по `packages/*/src`). Файл писали OpenCode 1 и продукт 0.4
+  (`a080f7725c:packages/core/src/project.ts`, чтение и запись под тем же именем). Переименование сделало бы чтение
+  мёртвым и отняло бы прежний id у репозиториев 0.4. `.opencode-probe` (аргумент `git ls-files`, файла нет),
+  `opencode.gitconfig`, `index.opencode-*`, `opencode-pack.lock` (служебные файлы хранилища снимков) и
+  `.opencode-version` (кэш навыков в каталоге продукта) — внутренние имена, не менялись.
+- **Р-16.** Пакет и исполняемый файл `loginom-ai-agent-pty`; библиотека — прежнее `opencode_pty` (`[lib]` в
+  `Cargo.toml`), иначе пришлось бы править `src/main.rs` и девять файлов `tests/`. `Cargo.lock`: тот же состав, пакет
+  переехал по алфавиту (проверено сравнением отсортированных строк). Именованные каналы Windows — служебный
+  `\\.\pipe\loginom-ai-agent-pty-<instance>`, проверка префикса в транспорте и закрытый канал вывода процесса.
+  `check-process-daemon.yml`: шаг проверки исполняемого файла Windows ищет новый пакет и `.exe`. Сообщения и справка
+  бинарника (`opencode-pty …`, в том числе вывод `--version`) не менялись — задача про имена.
+- **Р-17.** Как решено: кэш встроенного бинарника — `<bin>/loginom-ai-agent-pty/<версия>-<хеш>/loginom-ai-agent-pty`,
+  запасное имя для поиска в `PATH` — `loginom-ai-agent-pty` (`binary.bun.ts`, `binary.node.ts`, `daemon.ts`), ключ
+  ресурса сборки Node — `loginom-ai-agent-pty/loginom-ai-agent-pty(.exe)` (`cli/src/node/target.ts`). Бинарник из npm
+  `@opencode/pty` копируется под этим именем: сборка Bun встраивает его файлом, `install()` пишет под новым именем;
+  сборка Node кладёт его под новым ключом. Имя файла внутри пакета npm (`cli/script/opencode-pty.ts`) и
+  `OPENCODE_PTY_SOCKET_DIR` не менялись; TS эту переменную не задаёт.
+- **Р-18.** Пути `~/.config/loginom-ai-agent/…`, `$XDG_CONFIG_HOME/loginom-ai-agent/cli.json`,
+  `~/.local/share/loginom-ai-agent/log/loginom-ai-agent.log` (имя журнала — из Р-13), «Loginom AI Agent config» в
+  навыке `report` и в `/init`, «future Loginom AI Agent sessions» в `/init`.
+
+### Где решал сам
+
+- **Зависимость `@loginom-ai-agent/product` — только у `tui`**, как в 0.4 (`a080f7725c:packages/tui/package.json`).
+  В TUI имя продукта — в 12 местах и слово-знак. В `core` (три строки `loginom-ai-agent-pty`) и `cli` (имя БД рядом с
+  литералом `loginom-ai-agent.db` от `apply-identity`, ключ ресурса) — литералы: как `core/src/config/discovery.ts`
+  (B1.3b) и как группа A в `cli`; `cli/package.json` и замок не трогались, чтобы не конфликтовать с группой A.
+- **Id темы — литерал `loginom-ai-agent`, а не `Product.slug`.** Это имя темы в конфигах пользователей, как в 0.4; оно
+  не должно меняться вместе с идентичностью.
+- **Файлы тем не переименованы.** `assets/v2/opencode.json` — тема upstream; правило B1.4a тоже не трогает пути
+  `assets/`. В 0.4 файл переименовал скрипт вместе с id. `assets/opencode.json` (v1) в v2 не поставляется: его
+  импортируют только тесты `tui` и `packages/theme`. Временная тема эксперимента `opencode2` не менялась.
+- **`OC |` → `Product.name |`.** Короткого имени продукта в `Product` нет; придумывать его не стал. Заголовок вкладки
+  длиннее, обрезка заголовка сессии (40 символов) прежняя.
+- **Адрес отчёта о сбое не менялся** (`github.com/anomalyco/opencode/issues/new`, параметр `opencode-version`, текст
+  тела «The OpenCode TUI crashed…»): в 0.4 так же. Видимые строки экрана сбоя — продукта.
+- **Р-14 и внутренние файлы `git.ts` — оставлены**, выше. Задание противоречило фактам: меньший вариант.
+- **`[lib] name = "opencode_pty"`** — меньше правок, чем переименование библиотеки в 10 файлах.
+- **Р-16: `release-process-daemon.yml` и `packages/process-daemon/npm/` не правились.** Они публикуют `@opencode/pty` в
+  npm и после переименования crate не сработают (`select(.name == "opencode-pty")`, `target/…/opencode-pty`). Продукт
+  их не запускает и пакет upstream не публикует; судьба — B5.1, где собирается свой бинарник для Windows.
+  `check-process-daemon.yml` поправлен: он запускается на PR с `packages/process-daemon/**`.
+- **Отступ над словом-знаком на главной (`height={3}`) не менялся**, хотя 0.4 его уменьшал: блок центрирован, без
+  глаз менять не стал.
+
+### Тесты
+
+До — `oc2-migration` (`53ec8ddff3`) в отдельном чистом дереве в scratchpad. После — ветка после слияния с группой A
+(`d643224fdd`), тот же набор команд. Сравнивались числа и имена упавших тестов (строки `(fail)`).
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `util` | `bun test` | 146 pass, 0 fail | 146 pass, 0 fail (`1043165956`; на `d643224fdd` — 145 / 1, `observability-otlp`, исправлено `e6ffe4cb21`) |
+| `product` | `bun test` | 56 pass, 5 fail (`repo-paths`) | 58 pass, 3 fail — то же, что у группы A после Р-1 (B5.1, B2.7a); моих правок в `product` нет |
+| `theme` | `bun test` | 2 / 0 | 2 / 0 |
+| `cli` | `bun test --timeout 60000` | 407 pass, 9 skip, 0 fail | 407 pass, 9 skip, 0 fail |
+| `tui` | `bun test --timeout 30000` | 1672 pass, 2 skip, 1 fail | 1672 pass, 2 skip, 1 fail (`1043165956`) — то же `the art stops every frame when hidden…`; на `d643224fdd` было ещё `dialog-mcp` (исправлено `1043165956`) |
+| `server` | `bun test` | 127 pass, 1 skip, 0 fail | 127 pass, 1 skip, 0 fail |
+| `core` | `bun run script/test.ts` | 7118 pass, 354 skip, 3 fail | 7119 pass (+1 новый тест телеметрии), 354 skip, 3 fail — те же: `ShellParse > extracts static directory targets…` и два `flock` (прогон под root) |
+| `process-daemon` | `cargo test --locked` | 147 passed, 0 failed, 1 ignored | 147 passed, 0 failed, 1 ignored (тесты Windows на Linux пустые) |
+
+Пакеты, которые зависят от `core`, `util` или `tui`, но не менялись, — один прогон на коде `1043165956` (после него — только документы), без своей базы
+(числа совпадают с таблицей B1.4a): `gui-plugins` 1129 / 0, `plugin` 37 / 0, `simulation` 48 / 0, `sdk` 40 / 0, `ui`
+(`bun test src`) 620 / 0, `session-ui` (`bun test src`) 599 / 0, `app` (`bun run test`) 2715 + 360 / 0.
+
+Новые проверки и их красный прогон на старом коде (файл подменялся из `HEAD` на время прогона и возвращался):
+
+```text
+$ cd packages/cli && bun test test/flag-identity.test.ts      # database-path.ts до Р-13
++   "db": "/tmp/loginom-flag-identity-…/data/loginom-ai-agent-dev/opencode-local.db",
+ 2 pass
+ 1 fail
+$ cd packages/core && bun test test/effect/observability.test.ts   # otlp.ts до Р-15
+- Expected  - 2
++ Received  + 6
+ 6 pass
+ 1 fail
+```
+
+После правок: `flag-identity` 3 pass, `observability` 7 pass, `logging` 2 pass, `error-details` (+2 ожидания),
+`presentation` (строка слова-знака в эпилоге), `theme`/`theme-mode` (id `loginom-ai-agent`) — зелёные.
+
+Рендер уведомления об обновлении под словом-знаком (временный тест в `packages/tui/test`, после прогона удалён;
+`Logo` и `FadeInText` настоящие):
+
+```text
+--- width 80, logo 10, width={logoWidth}       --- то же, minWidth={logoWidth}
+            Loginom AI                                     Loginom AI
+            /update to                              /update to install v2.3.1
+            install
+            v2.3.1
+```
+
+Установка встроенного бинарника (`install()` из `binary.bun.ts`; временный скрипт подменял `pty-binding.ts`
+настоящим бинарником npm, как плагин `cli/script/build.ts`):
+
+```text
+source: opencode-pty
+resolved: loginom-ai-agent-pty/probe-bc9cb0fa0ebb4e56/loginom-ai-agent-pty
+version: opencode-pty 0.5.2 (protocol 8)
+daemon alive after 4s: true                          # daemon --name probe --runtime-dir <tmp> из этой копии
+runtime: [ "probe", "probe/service.json", "probe/service.lock" ]
+```
+
+`process-daemon` после Р-16 (1/2):
+
+```text
+$ cargo build --locked                                          # код 0
+$ cargo fmt --check                                             # код 0 (после Р-16 (2/2) — тоже, после cargo fmt)
+$ cargo clippy --locked --all-targets --all-features -- -D warnings   # код 0
+$ target/debug/loginom-ai-agent-pty --version
+opencode-pty 0.5.2 (protocol 8)
+```
+
+`cargo check --target x86_64-pc-windows-msvc` на Linux не собирается: `build.rs` собирает Ghostty для Windows через
+Zig и падает (`build.rs:150`); для `x86_64-pc-windows-gnu` Ghostty не поддерживается (`build.rs:117`). Правки `*.rs`
+под `cfg(windows)` проверены только разбором `rustfmt`. Для этой попытки `rustup` поставил в `~/.rustup` цели
+`x86_64-pc-windows-gnu` и `x86_64-pc-windows-msvc`; в репозиторий ничего не попало. Полный поиск старых имён по
+`packages/process-daemon` (без `*.md`): `opencode-pty` осталось в сообщениях, именах потоков и временных каталогах
+тестов, в `npm/` и `script/npm-packages.mjs` (публикация `@opencode/pty`); `tests/ghostty-effects/Cargo.toml` (Miri)
+на пакет по имени не ссылается.
+
+Замыкание вне изменённых пакетов (`.github`, `script`, `scripts`, `evals`, `nix`, остальные `packages/*`, без
+`services/` и `*.md`): `git grep -E "opencode\.log|opencode-[a-z${][^ \"']*\.(db|log)|opencode-pty|\"OC \| |Updating
+OpenCode|OpenCode crashed|close OpenCode"` и поиск id темы — читателей нет. Остались `release-process-daemon.yml`
+(выше), моки e2e `app` и тест `gui-plugins/src/terminal/model.test.ts` со значением `service: "opencode-pty"` — это
+поле ошибки API сервера (`server/src/handlers/persistent-pty.ts`), не имя файла; не менялось.
+
+Typecheck (`bun typecheck` в каталоге пакета) после правок: `tui` (1910 файлов), `core` (1982), `cli` (2140), `util`
+(72) — 0 ошибок. `prettier --check` на изменённых строках — чисто; `app.tsx`, `theme/index.ts`, `mini/theme.ts`,
+`test/app-lifecycle.test.tsx`, `test/theme.test.ts`, `test/mini/theme.test.ts` не отформатированы и в v2.3.0 —
+форматировались только мои строки.
+
+### Итоговая проверка
+
+На `1043165956` (после него — только этот журнал и ссылка на раздел в `catalog.md`), из корня дерева; `git log
+HEAD..oc2-migration` пуст:
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                   # код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 420 divergent upstream files      # код 0; у группы A было 382
+  CAT-01: 6 (+1 tui/package.json)   CAT-02: 54 (+1 check-process-daemon.yml)   CAT-03: 26   CAT-09: 22   CAT-10: 75
+  CAT-11: 39 (+21 файл tui)   CAT-12: 188 (+15: util, core, cli, process-daemon)   CAT-13: 10   CAT-04…CAT-08: 0 (pending)
+$ cd packages/product && bun test test/names.test.ts          # 9 pass, 0 fail
+$ cd packages/cli && bun test test/flag-identity.test.ts      # 3 pass, 0 fail
+$ bun run secrets range oc2-migration HEAD
+{"status":"clean","commits":18,"archives":0, …}
+$ bun run check                                         # код 0, 42 с
+Found 517 warnings and 0 errors.
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    38 successful, 38 total
+Cached:    0 cached, 38 total
+```
+
+### Найдено, не чинил
+
+- `tui/src/context/program-status.ts`: `APP = "opencode"` — имя приложения в отчётах о состоянии терминалу; задачи в
+  таблице нет.
+- `app.tsx`, «Open docs» открывает `https://opencode.ai/docs`; в `Product` есть `documentation`. Канал upstream — к
+  B2.7d или CAT-04.
+- Экран сбоя ведёт отчёт на трекер upstream и просит «help us fix this» (выше).
+- `tui/src/mini/splash.ts` (знак `go` и «Continue opencode mini -s …»), `util/presentation.ts` («Run opencode …»,
+  «opencode -s …») — команда, B2.7a; знак `go` общий с предложением Go (Р-6).
+- `process-daemon`: сообщения и справка бинарника `opencode-pty …` (`client.rs`, `daemon*.rs`), имена потоков,
+  `README.md` (имя бинарника, пути по умолчанию до B1.3b — отметила и группа A), `AGENTS.md`, `SPEC.md`, `PLAN.md`,
+  `description` в `Cargo.toml` («for OpenCode»).
+- Навык `opencode` целиком про OpenCode (ссылки на `opencode.ai/docs`, команды `opencode …`); поставлять ли его —
+  B2.4 (CAT-06).
+- Комментарии «opencode process» в `util/src/observability/logging.ts` остались.
+- `server/src/handlers/persistent-pty.ts`: поле ошибки `service: "opencode-pty"` в API (его ждут тесты `gui-plugins` и
+  моки e2e `app`) — значение протокола, не имя файла.
+
+### Не проверено
+
+- Windows и macOS: всё на Linux. Каналы Windows и `check-process-daemon.yml` не запускались; `cargo check` под Windows
+  на Linux не собирается (выше).
+- TUI глазами в терминале: только тесты и рендер в тестовом рендерере. Отступ главной со словом-знаком не смотрел.
+- Собранный CLI: сборка `bun run script/build.ts --single --skip-install --skip-web-ui` прошла (15 с), но терминал в
+  собранной службе не создавался; путь `install()` и запуск `daemon` из копии проверены скриптом из исходников.
+  Сборка Node (SEA) не собиралась.
+- Экспорт OTLP в настоящий коллектор не проверялся.
