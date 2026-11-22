@@ -41,6 +41,7 @@ export type Summary = {
 export type Result =
   | { readonly status: "migrated" | "already-migrated"; readonly summary: Summary }
   | { readonly status: "missing" }
+  | { readonly status: "current" }
 
 export class MigrateError extends Error {}
 
@@ -51,6 +52,10 @@ export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Se
     if (typeof Bun === "undefined") return yield* Effect.fail(new MigrateError("migrate runs only in the Bun build"))
     // Imported here, not statically: the Node build of the CLI bundles this module too.
     const sqlite = yield* Effect.promise(() => import("bun:sqlite"))
+    if (input.target === ":memory:")
+      return yield* Effect.fail(
+        new MigrateError("the database is in memory (LOGINOM_AI_AGENT_DB); nothing to migrate into"),
+      )
     const source = path.resolve(input.source)
     const target = path.resolve(input.target)
     const backup = path.resolve(input.backup)
@@ -58,6 +63,8 @@ export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Se
       ? yield* readOnly(sqlite.Database, target, (db) => ({ next: isNext(db), done: marker(db, source) }))
       : undefined
     if (existing?.done) return { status: "already-migrated" as const, summary: existing.done }
+    // A profile that never had 0.4 data, once the server has created its database there.
+    if (source === target && existing?.next) return { status: "current" as const }
     if (!existsSync(source)) {
       if (source === target && existsSync(backup))
         return yield* Effect.fail(
@@ -79,7 +86,7 @@ export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Se
     )
     if (fresh) {
       if (inPlace) moveDatabase(source, backup)
-      renameSync(destination, target)
+      moveDatabase(destination, target)
     }
     return { status: "migrated" as const, summary }
   }).pipe(Effect.catchCause(failWith("migrate failed")))

@@ -65,7 +65,7 @@ describe("LegacyMigrate", () => {
     const exit = await migrate({ source, target: source, backup })
 
     expect(failure(exit)).toBe("the migration succeeded")
-    if (Exit.isFailure(exit) || exit.value.status === "missing") return
+    if (Exit.isFailure(exit) || !("summary" in exit.value)) return
     expect(exit.value.status).toBe("migrated")
     expect(exit.value.summary).toMatchObject({
       rows: { sessions: 3, messages: 9, parts: 25 },
@@ -125,16 +125,33 @@ describe("LegacyMigrate", () => {
     const same = await migrate({ source: copy, target, backup })
     const other = await migrate({ source: older, target, backup })
 
-    expect(Exit.isSuccess(same) && same.value.status !== "missing" && same.value.summary).toMatchObject({
+    expect(Exit.isSuccess(same) && "summary" in same.value && same.value.summary).toMatchObject({
       migrated: { sessions: 0, messages: 0 },
       present: 3,
     })
-    expect(Exit.isSuccess(other) && other.value.status !== "missing" && other.value.summary).toMatchObject({
+    expect(Exit.isSuccess(other) && "summary" in other.value && other.value.summary).toMatchObject({
       migrated: { sessions: 3 },
       present: 0,
     })
     expect(rows(target, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 6 }])
     expect(expectPartsMigrated(older, target)).toBe(25)
+  })
+
+  test("an OpenCode 2 database at its own path has nothing to migrate", async () => {
+    // A profile without 0.4 data: once the server has created the database, later runs must still succeed.
+    await using dir = await tmpdir("loginom-migrate-")
+    const legacy = path.join(dir.path, "legacy.db")
+    const target = path.join(dir.path, "loginom-ai-agent.db")
+    const backup = path.join(dir.path, "loginom-ai-agent.v1-backup.db")
+    await restoreLegacy("0.4", legacy)
+    expect(failure(await migrate({ source: legacy, target, backup }))).toBe("the migration succeeded")
+    const current = await hash(target)
+
+    const exit = await migrate({ source: target, target, backup })
+
+    expect(Exit.isSuccess(exit) && exit.value.status).toBe("current")
+    expect(await hash(target)).toBe(current)
+    expect(existsSync(backup)).toBe(false)
   })
 
   test("a damaged profile stops the migration and changes nothing", async () => {

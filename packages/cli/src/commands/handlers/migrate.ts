@@ -28,28 +28,30 @@ export default Runtime.handler(
       const lines =
         result.status === "missing"
           ? [`No 0.3.9 or 0.4 database at ${path.resolve(source)}; nothing to migrate.`]
-          : [
-              result.status === "migrated"
-                ? `Migrated ${result.summary.source} to ${result.summary.target}.`
-                : `Already migrated ${result.summary.source} to ${result.summary.target}; nothing changed.`,
-              `  Source: ${result.summary.rows.sessions} sessions, ${result.summary.rows.messages} messages, ${result.summary.rows.parts} parts` +
-                (result.summary.schema ? ` (schema ${result.summary.schema})` : ""),
-              `  Written: ${result.summary.migrated.sessions} sessions, ${result.summary.migrated.messages} messages` +
-                (result.summary.present ? `; ${result.summary.present} sessions were already present` : ""),
-              ...(result.summary.backup ? [`  Original kept as ${result.summary.backup}`] : []),
-              ...(result.summary.warnings.length
-                ? [
-                    `  Skipped ${result.summary.warnings.length} rows that OpenCode 2 cannot read:`,
-                    ...result.summary.warnings.map(
-                      (warning) =>
-                        `    ${warning.reason}: session ${warning.sessionID}` +
-                        (warning.messageID ? `, message ${warning.messageID}` : "") +
-                        (warning.partID ? `, part ${warning.partID}` : "") +
-                        (warning.observedType ? ` (${warning.observedType})` : ""),
-                    ),
-                  ]
-                : []),
-            ]
+          : result.status === "current"
+            ? [`${path.resolve(source)} is already an OpenCode 2 database; nothing to migrate.`]
+            : [
+                result.status === "migrated"
+                  ? `Migrated ${result.summary.source} to ${result.summary.target}.`
+                  : `Already migrated ${result.summary.source} to ${result.summary.target}; nothing changed.`,
+                `  Source: ${result.summary.rows.sessions} sessions, ${result.summary.rows.messages} messages, ${result.summary.rows.parts} parts` +
+                  (result.summary.schema ? ` (schema ${result.summary.schema})` : ""),
+                `  Written: ${result.summary.migrated.sessions} sessions, ${result.summary.migrated.messages} messages` +
+                  (result.summary.present ? `; ${result.summary.present} sessions were already present` : ""),
+                ...(result.summary.backup ? [`  Original kept as ${result.summary.backup}`] : []),
+                ...(result.summary.warnings.length
+                  ? [
+                      `  Skipped ${result.summary.warnings.length} rows that OpenCode 2 cannot read:`,
+                      ...result.summary.warnings.map(
+                        (warning) =>
+                          `    ${warning.reason}: session ${warning.sessionID}` +
+                          (warning.messageID ? `, message ${warning.messageID}` : "") +
+                          (warning.partID ? `, part ${warning.partID}` : "") +
+                          (warning.observedType ? ` (${warning.observedType})` : ""),
+                      ),
+                    ]
+                  : []),
+              ]
       process.stdout.write(
         [
           ...lines,
