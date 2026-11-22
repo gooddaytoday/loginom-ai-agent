@@ -4471,3 +4471,265 @@ Found 517 warnings and 0 errors.                                    # как н�
   B3.1 уже сливает сессии.
 - Сборка Node: предохранитель и `migrate` там не работают (B3.1b); перенос ключей под Node не запускался.
 - Установленная сборка: проверен запуск из исходников, канал dev.
+
+## B2.5a loginom-local-file
+
+22.11.2026. Ветка `b25a-local-file` от `oc2-migration` (`7791ebdad6`: B2.1, B2.2, B2.4, B3.1…B3.1c), рабочее дерево
+`.claude/worktrees/b25a`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на
+каждом коммите. Основа — 0.4 `a080f7725c`: `packages/opencode/src/tool/loginom-local-file.ts` (291 строка), тест
+`test/tool/loginom-local-file.test.ts` (473 строки), инструмент `loginom_file_admit` в
+`src/product/tool-contributor.ts`, `src/util/file-snapshot.ts`, `exactFileDigest` из
+`src/tool/loginom-file-profile-core.ts`; spike `origin/stage-b-checks` (`spike/oc2/plugin/loginom-ui-demo/index.ts`,
+`spike/oc2/plugin/loginom-product/index.ts`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `4698e1e9ce` `feat(loginom-agent): local file admission and loginom_file_admit (B2.5a)` | `packages/loginom-agent/src/{local-file,file-snapshot,file-profile-core}.ts`, регистрация в `src/index.ts`, зависимости `@opencode/schema`, `@opencode/util`, `effect`, `bun.lock` +3; `packages/server/test/loginom-local-file.test.ts` |
+| `e8a0445591` `test(core): count the product plugin's loginom_file_admit among location tools` | тест upstream `packages/core/test/location-layer.test.ts` +2, путь в CAT-07 (`catalog.json`) |
+| `0d10d160b9` `docs(upstream-sync): record B2.5a loginom-local-file` | этот раздел (первая версия), CAT-05 и CAT-07 в `catalog.md`, строка G1 и «Как запускать» в `guarantees.md` |
+| `258ced929c` `test(server): permission replies and stopped calls in local file admission` | ответ на запрос права (отказ с отзывом и без) и остановка вызова |
+| следующий | уточнения этого раздела |
+
+### Правки файлов upstream
+
+Код — без правок upstream. Один тест upstream: `packages/core/test/location-layer.test.ts` (+2). Тест «isolates provider
+state by location» сверяет полный набор инструментов location со списком; плагин продукта встроен в каждую location
+(U1), и `loginom_file_admit` в наборе есть — в прогоне `core` это было единственное новое падение. Имя добавлено в оба
+ожидаемых списка с комментарием. Запись — CAT-07 (шов U1): у CAT-05 есть `pending`, а `catalog-check.py` не принимает
+`pending` у записи с расходящимися файлами; раньше файл попадал в CAT-12 по маске (имена `apply-identity`).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 437 divergent upstream files       # код 0; как на базе
+  CAT-05: 0 (pending: B2.3, B2.5, B2.6, B2.9)
+  CAT-07: 6                                               # было 5
+  CAT-12: 186                                             # было 187
+```
+
+### Что это в 0.4
+
+`loginom-local-file.ts` в 0.4 — не инструмент, а модуль: `authorizeLoginomFile` (можно ли читать файл),
+`admitLoginomLocalFile` и `admitLoginomFileReference` (передать файл в Host байтами до 16 МиБ или ссылкой на оригинал),
+`snapshotLoginomFile`, `localFilePermissionFailure`. Инструмент у модели один — `loginom_file_admit`; его собирал
+`toolContributor` на каждом ходе, только при профиле `loginom-automation`, полученной аренде Host и каталоге Host с
+`dock_action_describe`. Остальные потребители модуля — `loginom_file_*` (B2.5b), `package-docs` (B2.5c) и
+`local_package_path` у `loginom_dock_prepare` (B2.5d); им модуль отдаёт те же функции.
+
+### Что поменялось против 0.4 и почему
+
+Порядок проверок и тексты ошибок — как в 0.4. Код переведён с Effect и сервисов пакета `opencode` на async/await и API
+плагина: плагин продукта — на promise-API (B2.1), от `core` не зависит.
+
+- **Регистрация.** `localFiles(ctx, profiles)` в `src/index.ts` создаёт функции модуля для экземпляра плагина,
+  `admitTool(lease)` — инструмент `loginom_file_admit` (`ctx.tool.transform`, `codemode: false`). Имя, описание и схема
+  входа — из 0.4. Инструмент зарегистрирован всегда; видит и вызывает его только сессия с допуском `loginom-automation`
+  (шлюз B2.2). Аренды Host до B2.3 нет: `admitTool` получает функцию `lease(sessionID)`, в продукте она пока возвращает
+  `undefined`, и вызов отвечает `LOGINOM_HOST_NOT_READY` раньше вопросов и чтения файла. Условие 0.4 «Host и
+  `dock_action_describe` в каталоге» — B2.3 и B2.5d.
+- **Контекст вызова.** `Tool.Context` 0.4 → `ToolContext` плагина: `ctx.callID` → `id`, `ctx.abort` → `signal`,
+  `ctx.metadata({ permissionDenied })` → `metadata` у `Tool.Error`. Каталог сессии → `location.directory`, `worktree` →
+  `location.project.directory`, `FSUtil` → `node:fs/promises`. `plugin.trigger("tool.execute.before/after")` и
+  `completeToolCall` не нужны: хуки и запись результата делает среда v2. У результата v2 нет `title` — убран.
+- **Права.** `ctx.ask` → `permission.assert` с `source` вызова. Проверку «только запрет, без вопроса» (`checkDeny`) API
+  плагина не даёт: `assert` спрашивает. Сделано без правок upstream: `assert` с одноразовым токеном экземпляра в
+  `metadata`, а собственный хук модуля `permission.evaluate` превращает для такого запроса `ask` в `allow`. Запрет из
+  правил агента и сессии `Permission.assert` решает до хуков — это закреплено контрактным тестом. Имена ресурсов —
+  как у файловых инструментов v2 (`FileAccess.resolve`): внутри Location или проекта — относительный путь от каталога
+  Location, снаружи — абсолютный; в 0.4 — относительный от `worktree`, правила `read` v2 его бы не узнали.
+  `external_directory` — `<каталог>/*`, как в 0.4.
+- **Ошибки.** Классы 0.4 `LocalFileDenied/Rejected/Corrected` (наследники ошибок `PermissionV1`) → `Tool.Error` с текстом
+  0.4 и исходной ошибкой в `.error`. Отказ без отзыва (`Permission.DeclinedError`) пробрасывается как есть: v2
+  останавливает шаг, только если инструмент бросил именно его, как 0.4 останавливал цикл на `RejectedError`. Поэтому
+  подсказка 0.4 «Для CLI передайте файл через --file…» при таком отказе модели не доходит.
+- **История.** 0.4 читал все сообщения (`sessions.messages`) и отрезал их по `revert` (`TaskScope.visible`). У плагина
+  есть только `session.context` — сообщения от последнего сжатия истории. Квитанция выборки — JSON в текстовом
+  содержимом завершённого вызова `loginom_file_sample` (в 0.4 — `state.output`); это контракт для B2.5b. Вложение —
+  `files[]` сообщения пользователя с `source: { type: "uri", uri: "file:…" }` без `?` и `#`, чей `realpath` совпал
+  (ветка 0.4 без квитанции). Поля для квитанции вложения (0.4: `source.text.value`) в v2 нет — привязка вложения к
+  квитанции (`verifyAttachmentReceipt`) не перенесена, это B2.5d (`attachmentResolver`).
+- **Зависимости модуля.** `fileSnapshot` перенесён без изменений (`src/file-snapshot.ts`); из
+  `loginom-file-profile-core.ts` — только `exactFileDigest` с `loadProfile` (`src/file-profile-core.ts`), остальное —
+  B2.5b. Корень `file-profiles` (в 0.4 `Global.Path.data`) передаёт `src/index.ts`: тесты дают временный каталог и не
+  пишут в каталог данных машины. Новые зависимости `loginom-agent`: `@opencode/schema` (`Tool.Error`),
+  `@opencode/util` (`Global`, `FSUtil.contains`), `effect` (разбор квитанции `Schema.decodeUnknownOption`, как в 0.4).
+- **Профиль допуска** — `loginom-automation`, как в 0.4 (`toolContributor` добавлял инструмент только этому профилю).
+  `access.ts` не менялся: `loginom_file_admit` — не локальная справка, значит только `loginom-automation`; строка уже есть
+  в таблице `access.test.ts` (`mutating`).
+
+### Тесты
+
+`packages/server/test/loginom-local-file.test.ts` — настоящий сервер (`createEmbeddedRoutes`), модель — `TestLLM` по
+сценарию из текста сообщения. Плагин стенда (`SdkPlugins`, promise-API) создаёт свой `localFiles` и вызывает его с
+синтетическим вызовом инструмента, как 0.4 вызывал модуль с тестовым `Tool.Context`; правила и история сессии —
+настоящие. Вместо заглушки `ask` из 0.4 сессия разрешает всё (как тестовая сессия 0.4), а хук стенда
+`permission.evaluate` записывает каждый запрос права и может в этот момент действовать (подмена ссылки). Квитанцию
+выборки пишет тест (файл в `file-profiles/<сессия>` и его SHA-256) и отдаёт заглушке `loginom_file_sample`, вызванной
+под допуском мастера (RPC `loginom.runner.start`): `profileFile` и `sampleFile` — B2.5b.
+
+Случаи 0.4 (на точке отсечения под root: 24 pass, 1 fail — «reports denied», B1.1):
+
+| Случай 0.4 | На v2 |
+|---|---|
+| `public local admission selects the byte/reference boundary at 16777216` и `…16777217` | проходят |
+| `private reference admission authorizes before reserving…` | проходит |
+| `denied local paths never obtain a private reference reservation` | проходит |
+| `snapshots the authorized realpath when a symlink changes during a permission request` | проходит; подмена — в хуке стенда на запросе `read`, запросов ровно `["read"]` |
+| `oversize registration errors include the typed cause, exact limit and next step` | проходит |
+| `local file registration reports missing/directory without reading or admitting bytes` | проходят |
+| `local file registration reports denied without reading or admitting bytes` | пропущен под root с комментарием: `chmod 0` не мешает root читать; на точке отсечения этот случай под root падал |
+| `configured deny is reported before an OS-inaccessible requested path is resolved` | проходит: `Tool.Error` с `Permission.BlockedError` в `.error` (0.4 — `PermissionV1.DeniedError`), `metadata` `{ permissionDenied: true }`, запросов нет |
+| `attachment receipt authorization: stable` | `attachment authorization: stable` — проходит без квитанции: вложенный файл разрешён без вопроса. Повторная проверка квитанции после изменения файла (`verifyAttachment` → `LOGINOM_FILE_CHANGED`) не перенесена — B2.5d |
+| `attachment receipt authorization: changed` | не перенесён: без квитанции изменение вложенного файла не обнаружить — B2.5d |
+| `attachment receipt authorization: deleted`, `deny` | `attachment authorization: deleted`, `deny` — проходят |
+| `sample authorization: own, other-session, parent, unissued, traversal, symlink, directory-symlink, changed, malformed, deny` | проходят |
+| `sample authorization: case` | как в 0.4: только Windows, на Linux тест сразу завершается |
+
+Новые случаи:
+
+| Тест | Что проверяет |
+|---|---|
+| `attachment authorization: other` | вложение разрешает только свой файл: другой файл спрашивает `read` |
+| `attachment authorization: env` | сессия без своих правил, вложен `settings.env` (агент `build` спрашивает `read *.env`): проверка «только запрет» ничего не спрашивает |
+| `loginom_file_admit asks for itself, then admits…` | `admitTool` с подставной арендой: запросы `loginom_file_admit`, затем `read`; ответ `{ source_path, artifact }`, `metadata` `{ generation, truncated: false }`, приём `["local-file", messageID, id]`; без аренды — `LOGINOM_HOST_NOT_READY` без запросов; правило `loginom_file_admit deny` — `LOGINOM_FILE_ACCESS_DENIED` с путём, приёма нет |
+| `the product's loginom_file_admit is hidden and rejected without the loginom-automation grant (G1 gate)` | настоящий инструмент плагина продукта: без допуска и с `package-docs` — нет в запросе к модели, вызов — `LOGINOM_SCOPE_DENIED`, до инструмента не дошёл; с `loginom-automation` — в запросе с описанием и схемой 0.4, вызов дошёл до инструмента (`LOGINOM_HOST_NOT_READY`) |
+| `permission.evaluate contract` | порядок, на котором стоит проверка «только запрет»: хук с `allow` отвечает на `ask` без вопроса (ничего не ждёт ответа), запрет правилом сессии хук не перебивает (`BlockedError`) |
+| `a rejection with feedback fails with the file and the next step; a plain rejection stays the decline…` (`258ced929c`) | настоящий вопрос (`read` файла `*.env` в сессии без своих правил), ответ через `permission.reply`: отказ с отзывом — `Tool.Error` с `Permission.CorrectedError`, текстом 0.4 (код, отзыв, путь, подсказка про `--file`) и `metadata` `{ permissionDenied: true }`; отказ без отзыва — сам `Permission.DeclinedError`, по нему v2 останавливает шаг |
+| `a stopped call admits nothing…` (`258ced929c`) | остановленный сигнал: `authorize` сразу бросает, запросов нет; остановка во время вопроса `read` — `LOGINOM_UPLOAD_CANCELLED` до резерва; остановка во время резерва Host — `LOGINOM_UPLOAD_CANCELLED` и `discardReference` резерва |
+
+Итого в файле 31 тест: 30 pass, 1 skip (под root). Устойчивость на `258ced929c`:
+`bun test --rerun-each 5 test/loginom-local-file.test.ts` — 150 pass, 5 skip, 0 fail за 27,7 с.
+
+### Мутации
+
+На `4698e1e9ce`: мутация вносилась `perl` в копию файла дерева, запускался `bun test --timeout 30000
+test/loginom-local-file.test.ts` из `packages/server`, файл возвращался `git checkout`; после последней — `git status`
+без изменений кода (скрипт и вывод — во временном каталоге).
+
+```text
+=== M0 none                              28 pass 1 skip 0 fail
+=== M1 deny pre-check off (checkDeny)    24/4: denied local paths…, configured deny…, attachment: deny, sample: deny
+=== M2 any attachment authorizes         27/1: attachment: other
+=== M3 sample receipt path not checked   27/1: sample: unissued
+=== M4 sample digest not checked         27/1: sample: changed
+=== M5 ".." check off                    27/1: sample: traversal
+=== M6 rules-only hook off               27/1: attachment: env (вопрос без ответа, таймаут 30 с)
+=== M7 permissionFailure untouched       27/1: loginom_file_admit asks for itself…
+=== M8 no Host check                     26/2: loginom_file_admit asks for itself…, G1 gate
+=== M9 tool not registered (index.ts)    27/1: G1 gate
+=== M10 permits always true (access.ts)  27/1: G1 gate
+```
+
+На `258ced929c` (два новых теста, 30 pass в M0):
+
+```text
+=== M7 permissionFailure untouched       28/2: loginom_file_admit asks for itself…, a rejection with feedback…
+=== M11 no abort check before reserving  29/1: a stopped call admits nothing…
+=== M12 no discard after reserving       29/1: a stopped call admits nothing…
+=== M13 no throwIfAborted                29/1: a stopped call admits nothing…
+```
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, `bun test` из каталога пакета, junit на каждый пакет; падения сравнивались по
+именам. База — отдельное дерево на `7791ebdad6` во временном каталоге, итог — это дерево на `4698e1e9ce`, `core` —
+повторно на `e8a0445591`. В обоих деревьях до прогонов — `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` Node 24.19.0; `LOGINOM_AI_AGENT_TEST_NODE` — этот Node; `loginom-host` — под
+`xvfb-run -a`; `cli` — `--timeout 60000`, `core` — `bun run script/test.ts`.
+
+| Пакет | База `7791ebdad6` | Итог |
+|---|---|---|
+| `loginom-agent` | 11 pass, 0 fail | 11 pass, 0 fail (новых тестов в пакете нет) |
+| `server` | 144 pass, 1 skip, 0 fail | на `4698e1e9ce`: 172 pass (+28 новых), 2 skip (+1: «reports denied» под root), 0 fail; `loginom-access.test.ts` 9/0, как на базе. На `258ced929c`: 174 pass, 2 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 / 0 (B2.4) | 40 / 0 на `258ced929c` |
+| `cli` | 414 pass, 9 skip, 0 fail | 414 pass, 9 skip, 0 fail |
+| `core` | 7125 pass, 354 skip, 3 fail | на `4698e1e9ce`: 7124 pass, 4 fail — новое `LocationServiceMap > isolates provider state by location` (см. «Правки файлов upstream»); на `e8a0445591`: 7125 pass, 354 skip, 3 fail — те же, что на базе: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) |
+| `loginom-host` | 506 pass, 12 skip, 38 fail | 506 pass, 12 skip, 38 fail — список падений совпал по именам |
+| `product` | 58 pass, 3 fail (`repo-paths`, В-95) | 58 pass, 3 fail — те же |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py
+against a6b15d33daf6: 437 divergent upstream files       # код 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 198 files                            # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 1,596 files across 2 projects        # tsc -b — код 0
+$ cd packages/core && bun run typecheck
+✓ No type errors in 1,997 files across 2 projects
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                          # код 0, на e8a0445591 с этим разделом
+Found 517 warnings and 0 errors.                          # как в B2.4; у новых и изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 198 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+Повтор `bun run check` на `258ced929c` с этим разделом: код 0, `Found 517 warnings and 0 errors`, 39/39 задач (36 из
+кэша turbo).
+
+Без `node_modules` клиента `loginom-runtime` (свежее дерево, до `npm ci`): `core/test/plugin/product.test.ts` — 6 pass,
+0 fail; `server/test/loginom-local-file.test.ts` — зелёный.
+
+### Где решал сам
+
+- **Инструмент регистрируется всегда, Host — шов `lease`.** Задание: инструмент плагина за шлюзом B2.2, без аренды
+  Host (B2.3). Вызывать `LoginomHost.acquire` в самом инструменте нельзя: приём файла привязан к прогону аренды, а
+  `admitLoginomLocalFile` кэширует ссылки по объекту Host. Меньший вариант — функция `lease(sessionID)`, которую
+  заполнит B2.3, и отказ `LOGINOM_HOST_NOT_READY` без неё. Скрывать инструмент без аренды (как 0.4 без Host) не стал:
+  сейчас аренды нет никогда, и шлюз нечем было бы проверить; видимость по аренде и каталогу — B2.3 и B2.5d.
+- **«Только запрет» — хуком `permission.evaluate`, без правки upstream.** Другие варианты: новый метод
+  `assertNotDenied` в API плагина (правка `plugin` и `core/src/plugin/host.ts`, общий контракт) или своё сравнение правил
+  агента и сессии (повтор `Wildcard` ядра, мимо запретов из хуков других плагинов). Токен — свой у каждого экземпляра
+  `localFiles`, ключ в `metadata` чужой запрос подделать не может: `permission.assert` вызывают только встроенные
+  плагины и инструменты. Хук только меняет `ask` на `allow`; запрет правилом или хуком другого плагина остаётся
+  запретом.
+- **Ресурсы прав — как у `FileAccess` v2**, а не относительные от `worktree`, как в 0.4: иначе правила `read` из конфига
+  v2 (`locked/*`, абсолютные пути вне проекта) к этому инструменту не применялись бы. `save` у `external_directory` —
+  `<каталог>/*`, как в 0.4 (у `FileAccess` — корень проекта).
+- **Нет ленивого импорта модуля.** В 0.4 `toolContributor` импортировал модуль лениво. Здесь хук `permission.evaluate`
+  нужен при `setup`, а модуль тянет только встроенные модули Node и `loginom-host` (`file-reference.mjs` клиента —
+  тоже только `node:*`). Проверено: без `node_modules` клиента `loginom-runtime` (их в свежем дереве нет)
+  `core/test/plugin/product.test.ts` — 6 pass, 0 fail; `loginom-local-file.test.ts` — зелёный.
+- **Тесты — в `packages/server`, свой стенд.** Случаям нужны настоящие правила и история сессии, то есть ядро; пакет
+  плагина от `core` не зависит. Файл B2.2 `loginom-access.test.ts` не трогал: модулю нужен свой плагин стенда (вызов
+  `localFiles` с контекстом плагина), а допуск для заглушки `loginom_file_sample` даёт RPC мастера — без каталога
+  навыков и `npm ci` клиента.
+- **Квитанция выборки в тесте пишется руками**, а не `sampleFile` 0.4: модуль профилей — B2.5b. Формат — тот, что читает
+  модуль (`{ path, manifest: { sha256 } }`). B2.5b, перенося `sampleFile` и настоящий `loginom_file_sample`, заменит
+  этим заготовку и заглушку (продукт последним в `post` перекроет заглушку стенда с тем же именем).
+- **`file-snapshot.test.ts` 0.4 не перенесён**: задание называет только тест `loginom-local-file`. `fileSnapshot`
+  проверяется через случаи предела, отсутствующего файла и каталога; «файл изменился во время чтения» — нет. Второй
+  тест того файла под root падает (`chmod 0`), как на точке отсечения.
+
+### Найдено, не чинил
+
+- Агент `build` в v2.3.0 разрешает всё (`* * allow`), кроме чтения файлов окружения (`*.env`, `*.env.*`) — в том числе
+  `read` и `external_directory` вне проекта. Значит, `loginom_file_admit` с правилами по умолчанию читает любой такой
+  файл без вопроса, как и `read` v2. Разрешения продукта («Читать файлы проекта») — B2.6.
+- Контракт квитанции для B2.5b: среда v2 урезает результат инструмента до 2000 строк или 50 КиБ (`ToolOutput.truncate`
+  в `session/runner/step.ts`) до записи `state.content`. Квитанция `loginom_file_sample` должна в это укладываться
+  целиком, иначе её JSON не разберётся и файл выборки будет спрашивать `read`; либо B2.5b кладёт квитанцию в `metadata`
+  результата (её среда не урезает), и чтение в `local-file.ts` меняется вместе с ним.
+- После сжатия истории файл, разрешённый по выборке или вложению до сжатия, снова требует вопроса: `session.context`
+  отдаёт сообщения от последнего сжатия. Ошибка в безопасную сторону.
+- По коду, не прогоном: форк сессии копирует сообщения родителя, и вложение родителя в форке разрешает файл без вопроса.
+  Выборка родителя — нет: её каталог `file-profiles/<сессия>` у форка другой.
+- По коду, не прогоном: подготовленный, но не применённый `revert` из `session.context` не вычитается (0.4 отрезал
+  историю по `revert`).
+- При отказе без отзыва v2 останавливает шаг, и подсказку 0.4 модель не видит. Что агент делает после отказа — B2.6b.
+- Хук agent-kit один раз сработал на упоминание имени файла окружения в тексте команды с `cat` (дописывание черновика
+  этого раздела heredoc-ом): ложное срабатывание, файлов с секретами не читал. Текст дописан через Edit, хук не обходил.
+
+### Не проверено
+
+- Настоящий Host и аренда (B2.3), настоящий `loginom_file_sample` и профили (B2.5b), вложения с квитанцией (B2.5d).
+- Путь ссылки (больше 16 МиБ) через сам инструмент — только через функции модуля (`admit`, `admitReference`).
+- Windows и macOS: случаи `case` и `directory-symlink` с junction; установленная сборка, Desktop; настоящая модель.
+- Тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), кроме `bun run check`. Поиск по тестам всех
+  пакетов (списки инструментов вида `"webfetch",`) нашёл только тесты `core` (прошли целиком) и списки разрешений для
+  интерфейса в `tui/test/util/permission.test.ts` и `session-ui` — реестр инструментов они не перечисляют.
