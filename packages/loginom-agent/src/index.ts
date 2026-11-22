@@ -8,6 +8,7 @@ import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { fileTools } from "./file-profile"
 import { localFiles } from "./local-file"
+import { packageDocs } from "./package-docs"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -46,7 +47,8 @@ export default Plugin.define({
     const profile = (sessionID: string): Profile => granted.get(sessionID) ?? "default"
 
     // Skill sources (G6): the bundled catalog owns the product's skill IDs and names, so only it grants access.
-    const catalog = await bundled(process.env.LOGINOM_AI_AGENT_RESOURCES)
+    const resources = process.env.LOGINOM_AI_AGENT_RESOURCES
+    const catalog = await bundled(resources)
     await ctx.skill.transform((editor) => apply(editor, catalog, hub))
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
@@ -64,12 +66,13 @@ export default Plugin.define({
 
     // Local data files for Loginom (B2.5a). The Host lease is stage B2.3: until then `loginom_file_admit` answers
     // LOGINOM_HOST_NOT_READY. The file profile tools (B2.5b1) need no Host. Like every `loginom_*` tool, they need the
-    // `loginom-automation` grant.
+    // `loginom-automation` grant. `package_docs_run` (B2.5c) needs neither Host nor browser, only the `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
     await ctx.tool.transform((editor) => {
       editor.add(files.admitTool(() => undefined))
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
+      editor.add(packageDocs(files, ctx.location.directory, resources))
     })
 
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.

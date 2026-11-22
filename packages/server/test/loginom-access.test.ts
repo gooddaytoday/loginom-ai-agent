@@ -382,7 +382,18 @@ describe("loginom.product access and tool gate (G1)", () => {
         for (const request of docsRequests)
           expect(
             names(request).every((name) =>
-              ["read", "glob", "grep", "edit", "write", "patch", "todowrite", "question", "skill"].includes(name),
+              [
+                "read",
+                "glob",
+                "grep",
+                "edit",
+                "write",
+                "patch",
+                "todowrite",
+                "question",
+                "skill",
+                "package_docs_run",
+              ].includes(name),
             ),
           ).toBe(true)
         expect(JSON.stringify(docsRequests[1]?.messages)).toContain(denied)
