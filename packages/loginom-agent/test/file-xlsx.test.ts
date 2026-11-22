@@ -1,5 +1,6 @@
 // XLSX profiles of the file tools (B2.5b2), ported from 0.4
-// `a080f7725c:packages/opencode/test/tool/loginom-file-xlsx.test.ts` unchanged except three relative paths.
+// `a080f7725c:packages/opencode/test/tool/loginom-file-xlsx.test.ts` unchanged except three relative paths. The last
+// two tests are new: they cover two guards that the 0.4 cases leave to other limits.
 import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile, appendFile, readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -430,3 +431,27 @@ test("C1 bounds: profile 64/65 fields and 1000/1001 header rows without relaxing
     },
   )
 })
+
+// New: a sample before the exact scan refuses a workbook whose shared strings exceed the quick budget.
+test("a sample before the exact scan refuses an incomplete shared string index", async () => {
+  const sst = Array.from(
+    { length: 75000 },
+    (_, i) => `<si><t>${i}-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</t></si>`,
+  ).join("")
+  await fixture(
+    header + '<row r="2"><c r="A2" t="s"><v>75000</v></c>' + num("B", 2, "1.25") + "</row>",
+    async (path, dir) => {
+      const p = await profile(path, dir)
+      await expect(sampleFile(p.profile_id, dir)).rejects.toThrow("shared string index incomplete")
+    },
+    { sst },
+  )
+}, 30000)
+
+// New: a worksheet member over 8 MiB with a compression ratio over 200 is refused before it is inflated, even when its
+// XML is well-formed.
+test("a highly compressed worksheet over 8 MiB is refused as ZIP expansion", async () => {
+  await fixture(header + "<b/>".repeat(2.5 * 1048576), async (path, dir) => {
+    await expect(profileFile(path, dir)).rejects.toThrow("LOGINOM_FILE_XLSX_LIMIT: ZIP expansion")
+  })
+}, 30000)
