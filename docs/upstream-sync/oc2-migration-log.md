@@ -4750,7 +4750,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 | `d4ecbf1d41` `feat(loginom-agent): file profile tools loginom_file_profile, _scan and _sample (B2.5b1)` | `packages/loginom-agent/src/{file-profile,file-xlsx}.ts` (новые), полное ядро в `src/file-profile-core.ts`, регистрация в `src/index.ts`, тест `test/file-profile-core.test.ts`; `packages/server/test/loginom-local-file.test.ts` (случаи `sample authorization` без заглушки, новый `describe`) |
 | `56cc5852ec` `test(core): count the product plugin's file profile tools among location tools` | тест upstream `packages/core/test/location-layer.test.ts` +8 −2: три имени в двух списках, комментарий строки B2.5a |
 | `babe56fd3a` `test(server): a symlink redirected during the read question fails the file profile` | случай подмены ссылки во время вопроса `read` (без него мутацию проверки `authorized_path` ничего не ловило) |
-| следующий | этот раздел, CAT-05 в `catalog.md`, строка G1 и «Как запускать» в `guarantees.md` |
+| `53f176b028` `docs(upstream-sync): record B2.5b1 loginom-file-profile` | этот раздел (первая версия), CAT-05 в `catalog.md`, строка G1 и «Как запускать» в `guarantees.md` |
+| `100ca29417` `test(server): a tool result with truncated set reaches the session history whole` | контрактный тест предела результата (раздел «Квитанция выборки и предел 50 КиБ») |
+| следующий | уточнения этого раздела |
 
 ### Правки файлов upstream
 
@@ -4814,7 +4816,11 @@ state by location» сверяет полный набор инструмент�
 
 Предупреждение B2.5a верно только для результатов без поля `truncated`. `ToolOutput.truncate`
 (`core/src/tool-output.ts`) возвращает результат без изменений, если `metadata.truncated !== undefined`; все три
-инструмента профиля и `loginom_file_admit` возвращают `truncated: false`, как в 0.4, и среда их не урезает. Размеры:
+инструмента профиля и `loginom_file_admit` возвращают `truncated: false`, как в 0.4, и среда их не урезает. Это закреплено контрактным тестом `tool result size contract (B2.5b1)` в
+`loginom-local-file.test.ts`: инструмент-проба стенда возвращает одну строку в 60 КиБ; с `truncated: false` она лежит
+в истории сессии (`session.context`) целиком, без поля — урезана с пометкой `full output saved to`. Мутация upstream —
+убрать в `tool-output.ts` строку `if (result.metadata?.truncated !== undefined) return result` — краснит тест (0/1).
+Размеры:
 
 - страница профиля CSV — не больше 7900 байт JSON (`reply` в ядре переносит колонки на следующую страницу; случай 0.4
   «wide profile paginates under 8 KiB» проходит);
@@ -4856,10 +4862,14 @@ OLE-сигнатурой получает `LOGINOM_FILE_XLSX_UNSUPPORTED`, а н
 
 Входы теста шлюза падают внутри инструмента до записи профиля: инструменты продукта держат профили в
 `Global.Path.data`, то есть в каталоге данных машины (в тестах `server` — `/root/.local/share/loginom-ai-agent-dev`).
-Поэтому тесты по-прежнему не пишут в каталог данных машины.
+Поэтому тесты по-прежнему не пишут в каталог данных машины: после всех прогонов
+`/root/.local/share/loginom-ai-agent-dev/file-profiles` не существует.
 
-Итого: `loginom-agent` — 30 тестов (было 11), `loginom-local-file.test.ts` — 39 (было 31): 38 pass, 1 skip (под root,
-как в B2.5a). Устойчивость на `babe56fd3a`:
+Контрактный тест предела результата — отдельный `describe` в том же файле; инструмент-проба `probe_output` стенда
+(`codemode: false`) виден всем сессиям стенда.
+
+Итого: `loginom-agent` — 30 тестов (было 11), `loginom-local-file.test.ts` — 40 (было 31): 39 pass, 1 skip (под root,
+как в B2.5a). Устойчивость на `babe56fd3a` (до контрактного теста):
 `bun test --rerun-each 5 test/loginom-local-file.test.ts` — 190 pass, 5 skip, 0 fail за 32,2 с.
 
 ### Мутации
@@ -4893,7 +4903,8 @@ M5 снимает обе проверки `authorized_path` в `profileFile`: п
   без Host и `dock_action_describe` — это условие видимости, оно уходит в B2.3 и B2.5d вместе с `loginom_file_admit`.
 - **Заглушка `file-xlsx.ts`, а не отказ внутри ядра.** Отказ в четырёх точках ветвления ядра тоже работает, но тогда
   ядро расходится с 0.4, и B2.5b2 пришлось бы возвращать эти места. С заглушкой ядро — файл 0.4, а B2.5b2 меняет один
-  файл. Отказ — существующий код 0.4 `LOGINOM_FILE_XLSX_UNSUPPORTED`.
+  файл. Отказ — существующий код 0.4 `LOGINOM_FILE_XLSX_UNSUPPORTED`. Для B2.5b2: вместе с `file-xlsx.ts` заменить
+  ZIP-половину нового теста `a workbook is refused before the XLSX module is ported` (OLE-половина остаётся).
 - **`authorized.sourcePath` в `profileFile`** — единственное место, где поведение отличается от 0.4 не только формой
   API (см. «Путь к файлу»). Ядро не тронуто.
 - **Квитанция в истории — импорт сессии, а не настоящий `loginom_file_sample` продукта.** Корень профилей продукта —
@@ -4937,13 +4948,14 @@ Node; `loginom-host` — под `xvfb-run -a`; `core` — `bun run script/test.t
 | Пакет | База `5de70181ba` | Итог `babe56fd3a` |
 |---|---|---|
 | `loginom-agent` | 11 pass, 0 fail | 30 pass (+19 новых), 0 fail |
-| `server` | 177 pass, 2 skip, 0 fail | 185 pass (+8 новых), 2 skip, 0 fail |
+| `server` | 177 pass, 2 skip, 0 fail | 185 pass (+8 новых), 2 skip, 0 fail; на `100ca29417` — 186 pass (+9), 2 skip, 0 fail |
 | `loginom-host` | 506 pass, 12 skip, 38 fail | 506 pass, 12 skip, 38 fail — список падений совпал по именам |
+| `product` | 58 pass, 3 fail (`repo-paths`, В-95; B2.5a) | на `100ca29417`: 58 pass, 3 fail — те же |
 | `core` | 7125 pass, 354 skip, 3 fail — `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) | 7124 pass, 354 skip, 4 fail — те же три и `FileWatch > publishes filesystem.changed on the watch's location` (см. ниже) |
 
 База `core` — отдельное временное дерево на `5de70181ba` в каталоге временных файлов. Четвёртое падение `core` —
 `test/filesystem/file-watch.test.ts`: ожидалось событие `change`, пришло `unlink` (гонка `fs.rm` и первого события
-наблюдателя). Тест не загружает плагины и `loginom-agent`. Повторы этого файла: итог — 1 падение на 400 прогонов
+наблюдателя). Тест не загружает плагины и `loginom-agent`. Итог: падение в полном прогоне и ещё 1 на 400 повторов этого файла
 (`--rerun-each 10`: 79/1, затем дважды `--rerun-each 20`: 160/0), база — 0 на 480 (трижды `--rerun-each 20`: 160/0).
 Считаю его нестабильным тестом upstream, не связанным с этой задачей.
 
@@ -4952,19 +4964,19 @@ $ python3 -I scripts/upstream-sync/catalog-check.py
 against a6b15d33daf6: 437 divergent upstream files       # код 0; CAT-05: 0 (pending: B2.3, B2.5, B2.6, B2.9), CAT-07: 6
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                    # код 0
-$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc   # на 100ca29417
 ✓ No type errors in 202 files                            # tsc --noEmit — код 0
-$ cd packages/server && bun run typecheck && bun run typecheck:tsc
+$ cd packages/server && bun run typecheck && bun run typecheck:tsc         # на 100ca29417
 ✓ No type errors in 1,604 files across 2 projects        # tsc -b — код 0
 $ cd packages/core && bun run typecheck
 ✓ No type errors in 2,000 files across 2 projects
 $ bun install --frozen-lockfile
 Checked 1687 installs across 2060 packages (no changes)
-$ bun run check                                          # код 0, рабочее дерево на babe56fd3a с этим разделом
+$ bun run check                                          # код 0: на babe56fd3a с этим разделом и повтор на 100ca29417
 Found 517 warnings and 0 errors.                          # как в B2.5a; у новых и изменённых файлов предупреждений oxlint нет
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 @loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 202 files
- Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+ Tasks:    39 successful, 39 total                        # 32 и 36 из кэша turbo
 ```
 
 Без `node_modules` клиента `loginom-runtime` (каталог временно убран): `core/test/plugin/product.test.ts` — 6 pass,
@@ -4977,4 +4989,5 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   на экземпляре стенда с тем же кодом `fileTools`; продукт через модель — только отказы шлюза и ошибки до записи.
 - Настоящий Host и аренда (B2.3), каталог Dock и вложения (B2.5d), настоящая модель.
 - Windows и macOS (ссылки, регистр путей), установленная сборка, Desktop.
-- Тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), кроме `bun run check`.
+- `cli` и `sdk` не запускались (B2.5a их гонял); тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), —
+  только `bun run check`.
