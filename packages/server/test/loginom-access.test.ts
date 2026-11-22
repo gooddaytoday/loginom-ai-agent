@@ -221,6 +221,11 @@ describe("loginom.product access and tool gate (G1)", () => {
         expect(system(first)).not.toContain("loginom_probe")
         expect(JSON.stringify(second.messages)).toContain(denied)
         expect(test.ran(direct)).toBe(0)
+        // A side question (`session.generate`, `/btw`) offers the session's tools too; the same filter applies.
+        yield* test.sessions.generate({ sessionID: direct, prompt: "summary" })
+        const asked = yield* test.requests(direct)
+        expect(asked).toHaveLength(3)
+        expect(names(asked[2])).not.toContain(probe)
 
         const codemode = yield* test.create("codemode")
         yield* test.prompt(
