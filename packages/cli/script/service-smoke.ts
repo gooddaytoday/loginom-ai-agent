@@ -93,7 +93,7 @@ try {
   await Promise.all(processes.map((process) => process.exited))
   if (failure)
     errors.push(
-      Array.fromAsync(product("log/opencode.log").scan(path.join(root, "data")))
+      Array.fromAsync(product("log/loginom-ai-agent.log").scan(path.join(root, "data")))
         .then(([log]) => fs.readFile(path.join(root, "data", log ?? ""), "utf8"))
         .catch(() => ""),
     )

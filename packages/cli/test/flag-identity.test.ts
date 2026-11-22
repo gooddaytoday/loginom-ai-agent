@@ -57,10 +57,10 @@ describe("inherited OpenCode environment", () => {
 
   test("moves no location or credential", () => {
     const { root, paths, password } = probes.inherited
-    expect({ home: paths.home, config: paths.config, db: path.dirname(paths.db), password }).toEqual({
+    expect({ home: paths.home, config: paths.config, db: paths.db, password }).toEqual({
       home: root,
       config: path.join(root, "config", "loginom-ai-agent-dev"),
-      db: path.join(root, "data", "loginom-ai-agent-dev"),
+      db: path.join(root, "data", "loginom-ai-agent-dev", "loginom-ai-agent-local.db"),
       password: null,
     })
   })
