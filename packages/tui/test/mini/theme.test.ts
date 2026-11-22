@@ -152,10 +152,10 @@ test.each(["light", "dark"] as const)("preserves %s monochrome terminal defaults
 
 test.each(["light", "dark"] as const)("uses shared %s defaults and named built-in themes", async (mode) => {
   const colors = terminalColors({}, mode)
-  for (const name of [undefined, "opencode", "tokyonight"] as const) {
+  for (const name of [undefined, "loginom-ai-agent", "tokyonight"] as const) {
     const theme = await resolveRunTheme(renderer({ colors }), { name, mode })
     const expected = resolveThemeDocument(
-      name === undefined || name === "opencode" ? getOpenCodeTheme() : parseTheme(DEFAULT_THEMES[name]),
+      name === undefined || name === "loginom-ai-agent" ? getOpenCodeTheme() : parseTheme(DEFAULT_THEMES[name]),
       mode,
     )
     try {
@@ -330,7 +330,7 @@ test.each(["light", "dark"] as const)("handles unavailable palettes in %s mode",
     expect(fallback).toBe(mode === "light" ? RUN_THEME_FALLBACK_LIGHT : RUN_THEME_FALLBACK)
     expectFooter(fallback, expected)
   }
-  const theme = await resolveRunTheme(renderer({ fail: true }), { name: "opencode", mode })
+  const theme = await resolveRunTheme(renderer({ fail: true }), { name: "loginom-ai-agent", mode })
   try {
     expectFooter(theme, expected)
   } finally {
@@ -368,7 +368,7 @@ test.each(["light", "dark"] as const)("follows physical %s mode over opposite co
   }
 })
 
-test.each(["system", "opencode"])(
+test.each(["system", "loginom-ai-agent"])(
   "prefers a new renderer mode over cached %s colors after failed probes",
   async (name) => {
     const colors = terminalColors()
@@ -414,7 +414,7 @@ test("retains a usable system palette after background-only and empty probes", a
   }
 })
 
-test.each(["system", "opencode"])(
+test.each(["system", "loginom-ai-agent"])(
   "retains and refreshes the %s scrollback palette across probe failures",
   async (name) => {
     const input = { fail: false, colors: terminalColors() }
