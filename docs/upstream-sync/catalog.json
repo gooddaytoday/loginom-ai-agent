@@ -22,7 +22,15 @@
     },
     { "id": "CAT-04", "title": "Upstream endpoints: updates, installer, sharing", "paths": [], "pending": "B2.7d, B4.1" },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.3, B2.5, B2.6, B2.9" },
-    { "id": "CAT-06", "title": "Skills and commands", "paths": [], "pending": "B2.4" },
+    {
+      "id": "CAT-06",
+      "title": "Skills and commands",
+      "paths": [
+        "packages/core/src/session/skill.ts", "packages/protocol/src/groups/session.ts", "packages/server/src/handlers/session.ts",
+        "packages/client/src/promise/generated/client.ts", "packages/client/src/promise/generated/types.ts",
+        "packages/core/test/session-skill.test.ts", "packages/core/test/session-owned.test.ts"
+      ]
+    },
     {
       "id": "CAT-07",
       "title": "Providers, plugins, proxy",

@@ -11,6 +11,7 @@ import { Config } from "@opencode/core/config"
 import { Image } from "@opencode/core/image"
 import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
+import { Permission } from "@opencode/core/permission"
 import type { LocationServices } from "@opencode/core/location-services"
 import { Project } from "@opencode/core/project"
 import { Plugin } from "@opencode/core/plugin"
@@ -77,6 +78,7 @@ const locations = makeGlobalNode({
             ),
           ),
           Layer.mock(Plugin.Service, { awaitActivation: Effect.void }),
+          Layer.mock(Permission.Service, { assertNotDenied: () => Effect.void }),
         ) as unknown as Layer.Layer<LocationServices, FileSystem.DirectoryNotFoundError>,
       { idleTimeToLive: Duration.infinity },
     ),

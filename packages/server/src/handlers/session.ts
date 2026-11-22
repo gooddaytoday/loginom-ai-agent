@@ -19,6 +19,7 @@ import {
   FormAlreadySettledError,
   FormInvalidAnswerError,
   FormNotFoundError,
+  ForbiddenError,
   InvalidRequestError,
   InvalidCursorError,
   MessageNotFoundError,
@@ -372,6 +373,9 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               Effect.catchTag("Session.NotFoundError", missingSession),
               Effect.catchTag("Session.SkillNotFoundError", (error) =>
                 Effect.fail(new SkillNotFoundError({ skill: error.skill, message: `Skill not found: ${error.skill}` })),
+              ),
+              Effect.catchTag("Permission.BlockedError", (error) =>
+                Effect.fail(new ForbiddenError({ message: error.message })),
               ),
               locationErrors,
             )
