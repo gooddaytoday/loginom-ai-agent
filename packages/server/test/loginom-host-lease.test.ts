@@ -61,12 +61,22 @@ beforeAll(async () => {
 }, 60_000)
 afterAll(() => fs.rm(fixture.directory, { recursive: true, force: true }))
 
-// Sessions whose execution holds a Host lease now.
+// Sessions whose execution holds a Host lease now. A record released between listing and reading is gone.
 const leased = (data: string) =>
   Effect.promise(async () => {
     const directory = path.join(data, "loginom", "leases")
     const names = (await fs.readdir(directory).catch(() => [])).filter((name) => name.endsWith(".json"))
-    return Promise.all(names.map(async (name) => (await Bun.file(path.join(directory, name)).json()).session as string))
+    const sessions = await Promise.all(
+      names.map((name) =>
+        Bun.file(path.join(directory, name))
+          .json()
+          .then(
+            (record: { session: string }) => [record.session],
+            () => [],
+          ),
+      ),
+    )
+    return sessions.flat()
   })
 
 // `sent`, when given, collects what the plugin sends the Host: the same Node host, launched by the test.
