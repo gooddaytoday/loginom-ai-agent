@@ -110,6 +110,19 @@ const boot = Effect.gen(function* () {
             asked.push({ sessionID: event.sessionID, action: event.action })
             await hooks.ask?.(event.action)
           })
+          // Probe of the result size contract below: one line over 50 KiB, with or without `truncated` set.
+          await ctx.tool.transform((editor) =>
+            editor.add({
+              name: "probe_output",
+              description: "Probe output",
+              input: { type: "object", properties: { truncated: { type: "boolean" } } },
+              options: { codemode: false },
+              execute: async (input) => ({
+                content: "x".repeat(60 * 1024),
+                ...((input as { truncated?: boolean }).truncated ? { metadata: { truncated: false } } : {}),
+              }),
+            }),
+          )
           ready.resolve({ plugin: ctx, files: await localFiles(ctx, profiles) })
         },
       }),
@@ -1007,6 +1020,43 @@ describe("loginom file profile tools (B2.5b1)", () => {
         expect(test.asked(plain)).toEqual([])
         expect(test.asked(docs)).toEqual([])
         expect(test.asked(granted)).toEqual(["loginom_file_profile"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+// A sample's result is its receipt, read back from the session's history (`local-file.ts`). The file tools set
+// `truncated`, as in 0.4, and rest on OpenCode leaving such a result whole.
+describe("tool result size contract (B2.5b1)", () => {
+  it.live(
+    "a result with `truncated` set reaches the history whole; without it OpenCode cuts it at 50 KiB",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const sessionID = yield* test.create()
+        yield* test.prompt(
+          sessionID,
+          script({ tool: "probe_output", input: { truncated: true } }, { tool: "probe_output", input: {} }, { text: "end" }),
+        )
+        const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID }))
+        const results = history.flatMap((message) =>
+          message.type !== "assistant"
+            ? []
+            : message.content.flatMap((part) =>
+                part.type === "tool" && part.name === "probe_output" && part.state.status === "completed"
+                  ? [part.state]
+                  : [],
+              ),
+        )
+        const texts = results.map((state) =>
+          state.content.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n"),
+        )
+        expect(texts).toHaveLength(2)
+        expect(texts[0]).toBe("x".repeat(60 * 1024))
+        expect(results[0].metadata).toEqual({ truncated: false })
+        expect(Buffer.byteLength(texts[1])).toBeLessThan(60 * 1024)
+        expect(texts[1]).toContain("full output saved to")
+        expect(results[1].metadata).toMatchObject({ truncated: true })
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
