@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = { port: Port; close(): Promise<void> }
@@ -23,6 +24,9 @@ type Started = {
 }
 
 const state: { current?: Started } = {}
+const decodeRecord = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
+)
 
 /**
  * Starts the process's Host in `<data>/loginom`, the Loginom directory of the server's profile: connection, recovery
@@ -30,26 +34,26 @@ const state: { current?: Started } = {}
  * without disposing its plugins (B0.4, Windows `service stop`) still has their records. They are removed and returned;
  * the Host itself drops that process's uncertain journal entries when it opens them, without replaying anything (G4).
  * The Node host comes from `resources` and starts in the background, so the server does not wait for its handshake.
- * `connect` replaces it in tests.
+ * `connect` replaces it in tests. A file system failure here only leaves the server without leases, never stops it.
  */
 export async function start(input: { data: string; resources?: string; connect?: () => Promise<Connection> }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
   await state.current?.closing
   const root = join(input.data, "loginom")
   const directory = join(root, "leases")
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  // This process has leased nothing yet, so every record here belongs to an earlier one.
+  await mkdir(directory, { recursive: true, mode: 0o700 }).catch(() => undefined)
+  // This process has leased nothing yet. A record of a process that is still alive stays: one data directory normally
+  // has one server (U5), but a parallel `serve` or a service contender that loses the port also starts here. Anything
+  // else, including a record cut short by a kill, belongs to a stopped process.
   const recovered = await Promise.all(
-    (await readdir(directory))
+    (await readdir(directory).catch(() => []))
       .filter((name) => name.endsWith(".json") || name.endsWith(".tmp"))
       .map(async (name) => {
         const file = join(directory, name)
-        const session = await readFile(file, "utf8").then(
-          (text) => (JSON.parse(text) as { session?: unknown }).session,
-          () => undefined,
-        )
-        await rm(file, { force: true })
-        return typeof session === "string" ? [session] : []
+        const record = Option.getOrUndefined(decodeRecord(await readFile(file, "utf8").catch(() => "")))
+        if (record && record.pid !== process.pid && alive(record.pid)) return []
+        await rm(file, { force: true }).catch(() => undefined)
+        return record ? [record.session] : []
       }),
   ).then((sessions) => sessions.flat())
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
@@ -103,6 +107,16 @@ export async function release(lease: Lease) {
   current?.held.delete(lease)
   await lease.release()
   if (file) await rm(file, { force: true })
+}
+
+function alive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    // EPERM: the process exists but belongs to someone else.
+    return (error as { code?: string }).code === "EPERM"
+  }
 }
 
 // The bundled Node and the Host entry that `build-cli.ts` stages into the resources (`host/node-host.mjs`).

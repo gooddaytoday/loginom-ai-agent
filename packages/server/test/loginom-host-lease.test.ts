@@ -435,6 +435,16 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
         expect(yield* leased(data)).toEqual(["ses_killed"])
         // Its Node host stops by itself once its owner is gone (`node-entry.ts`, IPC disconnect).
         if (host !== undefined) yield* until(() => Effect.succeed(alive(host) ? undefined : true))
+        // A kill can also cut a record short; and a record of a process that still lives (a parallel server on the same
+        // profile) is not stale.
+        const leases = path.join(data, "loginom", "leases")
+        yield* Effect.promise(() =>
+          Promise.all([
+            fs.writeFile(path.join(leases, "cut.json.tmp"), ""),
+            fs.writeFile(path.join(leases, "cut.json"), "{"),
+            fs.writeFile(path.join(leases, "live.json"), JSON.stringify({ session: "ses_live", pid: process.ppid })),
+          ]),
+        )
 
         // The next server: the server process starts the Host first, with no Location and no plugin yet.
         const started = yield* Effect.acquireRelease(
@@ -442,15 +452,15 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
           () => Effect.promise(() => ServiceHost.close()),
         )
         expect(started.recovered).toEqual(["ses_killed"])
-        expect(yield* leased(data)).toEqual([])
+        expect((yield* Effect.promise(() => fs.readdir(leases))).sort()).toEqual(["live.json"])
         // Recovered: the session leases the new Host again, and its journal holds nothing to replay.
         const lease = yield* Effect.promise(() => ServiceHost.acquire("ses_killed"))
         expect(lease?.generation).toBe(0)
-        expect(yield* leased(data)).toEqual(["ses_killed"])
+        expect((yield* leased(data)).sort()).toEqual(["ses_killed", "ses_live"])
         const journal = yield* Effect.promise(() => fs.readdir(path.join(data, "loginom", "recovery")))
         expect(journal.filter((name) => name.endsWith(".json"))).toEqual([])
         if (lease) yield* Effect.promise(() => ServiceHost.release(lease))
-        expect(yield* leased(data)).toEqual([])
+        expect(yield* leased(data)).toEqual(["ses_live"])
       }),
     timeout,
   )

@@ -20,7 +20,8 @@ test("serve recovers the Loginom Host leases of a killed server before it listen
   // `<data>/loginom/leases` of the dev channel, as `isolatedEnv` places the data directory.
   const leases = path.join(root, "data", "loginom-ai-agent-dev", "loginom", "leases")
   await fs.mkdir(leases, { recursive: true })
-  await fs.writeFile(path.join(leases, "killed.json"), JSON.stringify({ session: "ses_killed", pid: 1 }))
+  // No process has this PID on Linux (`pid_max` is far below it) or Windows (PIDs are multiples of 4).
+  await fs.writeFile(path.join(leases, "killed.json"), JSON.stringify({ session: "ses_killed", pid: 2 ** 31 - 1 }))
   const child = Bun.spawn([process.execPath, path.join(cli, "src/index.ts"), "serve", "--port", "0"], {
     cwd: cli,
     env: isolatedEnv(root, { LOGINOM_AI_AGENT_PASSWORD: "loginom-host-test", LOGINOM_AI_AGENT_RESOURCES: undefined }),
