@@ -95,17 +95,17 @@ stdenv.mkDerivation (finalAttrs: {
 
     cd packages/desktop
 
-    export OPENCODE_CLI_DIST="$TMPDIR/desktop-cli"
+    export LOGINOM_AI_AGENT_CLI_DIST="$TMPDIR/desktop-cli"
     cli_package=$(bun -e 'import { getCurrentCli } from "./script/utils.ts"; console.log(getCurrentCli().package.replace("@opencode/", ""))')
     # copyBuiltCliToResources joins this dist with the npm package name getCurrentCli()
     # reports, not the Nix build's name. It reads only .version from the manifest and
     # writes it as opencode-cli.version beside the binary.
-    mkdir -p "$OPENCODE_CLI_DIST/$cli_package/bin"
-    cp ${lib.getExe opencode} "$OPENCODE_CLI_DIST/$cli_package/bin/opencode"
-    # OPENCODE_VERSION is what the bundled CLI prints for --version, so the manifest
+    mkdir -p "$LOGINOM_AI_AGENT_CLI_DIST/$cli_package/bin"
+    cp ${lib.getExe opencode} "$LOGINOM_AI_AGENT_CLI_DIST/$cli_package/bin/opencode"
+    # LOGINOM_AI_AGENT_VERSION is what the bundled CLI prints for --version, so the manifest
     # and the executable cannot drift.
-    bun -e 'await Bun.write(process.argv[1], JSON.stringify({ version: process.env.OPENCODE_VERSION }) + "\n")' \
-      "$OPENCODE_CLI_DIST/$cli_package/package.json"
+    bun -e 'await Bun.write(process.argv[1], JSON.stringify({ version: process.env.LOGINOM_AI_AGENT_VERSION }) + "\n")' \
+      "$LOGINOM_AI_AGENT_CLI_DIST/$cli_package/package.json"
 
     bun run build
     npx electron-builder --dir \

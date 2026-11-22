@@ -21,7 +21,7 @@
 - When a user asks for a TUI story, add a fixture-driven story under `packages/tui/src/feature-plugins/system/storybook` and register it in `index.tsx`.
 - Render the real production component rather than a visual copy. Keep submissions and other side effects local to the story so it is safe to explore repeatedly.
 - Expose the meaningful state dimensions through story keybindings and list them in `StoryFooter`; include a reset command when combinations can leave the fixture in a confusing state.
-- Run a specific story with `OPENCODE_STORY=<story-id> bun run dev:live` from the development worktree, and exercise narrow and wide terminal sizes when layout is relevant.
+- Run a specific story with `LOGINOM_AI_AGENT_STORY=<story-id> bun run dev:live` from the development worktree, and exercise narrow and wide terminal sizes when layout is relevant.
 
 ## TUI Theme Tokens
 
@@ -182,8 +182,8 @@ const table = sqliteTable("session", {
 
 - When you open a PR, decide whether the change needs a flag: new user-visible behavior, risky core changes, and anything not ready to release get one; fixes, refactors, docs and tests do not.
 - Gate risky behavior, or behavior that lands over several PRs, with a key and a description in `packages/schema/src/config/flag.ts`, and read it with `Flag.enabled("<key>")` from `@opencode/core/flag`.
-- Flags are on in local and dev builds and off in releases; `experimental.<key>` in config and `OPENCODE_FLAGS="key,-other"` override that.
-- Say in the PR body which flag guards the change. To try every flag at once, use `OPENCODE_FLAGS=all` or `experimental.all_flags: true`; a `-<key>` opt-out or `experimental.<key>: false` still wins, and neither `all` nor `all_flags` is a flag key.
+- Flags are on in local and dev builds and off in releases; `experimental.<key>` in config and `LOGINOM_AI_AGENT_FLAGS="key,-other"` override that.
+- Say in the PR body which flag guards the change. To try every flag at once, use `LOGINOM_AI_AGENT_FLAGS=all` or `experimental.all_flags: true`; a `-<key>` opt-out or `experimental.<key>: false` still wins, and neither `all` nor `all_flags` is a flag key.
 - Ship a feature by deleting its flag and the checks that read it.
 
 ## Testing

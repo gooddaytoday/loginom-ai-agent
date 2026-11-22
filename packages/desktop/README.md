@@ -21,11 +21,11 @@ bun run build && bun run pack
 
 Both read the same environment as every other release package:
 
-| Variable           | Meaning                                                                                                         |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `OPENCODE_CHANNEL` | `dev` (default), `beta`, or `latest`/`prod`. Picks the app identity, icons and bundled CLI.                     |
-| `OPENCODE_VERSION` | Version stamped into the app and its packages.                                                                  |
-| `OPENCODE_TARGET`  | `darwin-arm64`, `darwin-x64`, `windows-arm64`, `windows-x64`, `linux-x64`, `linux-arm64`. Defaults to the host. |
+| Variable                   | Meaning                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `LOGINOM_AI_AGENT_CHANNEL` | `dev` (default), `beta`, or `latest`/`prod`. Picks the app identity, icons and bundled CLI.                     |
+| `LOGINOM_AI_AGENT_VERSION` | Version stamped into the app and its packages.                                                                  |
+| `LOGINOM_AI_AGENT_TARGET`  | `darwin-arm64`, `darwin-x64`, `windows-arm64`, `windows-x64`, `linux-x64`, `linux-arm64`. Defaults to the host. |
 
 The CLI is placed outside `app.asar` in the application's resources directory, and packaging fails if it is missing.
 `bun run build` uses `packages/cli/dist` when that holds the target's CLI. Otherwise `dev` (and `local`, unset or unrecognized)
@@ -45,7 +45,7 @@ from `dev`. Install it from `https://opencode.ai/update/api/beta/desktop/opencod
 
 `perf/startup.bench.ts` times a launch with [strobe](https://github.com/anomalyco/strobe), from process spawn to what a
 person waits for, in pairs of launches of two builds with an interval per case. Every launch runs in a private home
-(its own `%APPDATA%`, XDG folders, database, config and service registration, the developer's `OPENCODE_*`, `OTEL_*`
+(its own `%APPDATA%`, XDG folders, database, config and service registration, the developer's `LOGINOM_AI_AGENT_*`, `OTEL_*`
 and `SENTRY_*` environment removed), so it never touches the developer's app, profile or live service.
 
 | Case                            | Launch                                                                              | Ends on      |
@@ -57,7 +57,7 @@ and `SENTRY_*` environment removed), so it never touches the developer's app, pr
 | dev start to Home               | `bun dev:desktop` with Vite's caches and `out` deleted.                             | Home         |
 
 ```bash
-# A returning user's launches of two packaged builds (pack each with OPENCODE_CHANNEL=beta or prod), or two installed
+# A returning user's launches of two packaged builds (pack each with LOGINOM_AI_AGENT_CHANNEL=beta or prod), or two installed
 # channels.
 strobe bench perf/startup.bench.ts --target desktop --base exe:<old>/OpenCode.exe --head exe:<new>/OpenCode.exe
 strobe bench perf/startup.bench.ts --target desktop --base app:opencode --head app:opencode-beta

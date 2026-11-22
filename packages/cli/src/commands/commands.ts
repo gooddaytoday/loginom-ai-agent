@@ -47,12 +47,12 @@ const PermissionParams = {
 }
 
 const Root = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_AI_AGENT_CLI_NAME : "opencode", {
-  description: "OpenCode command line interface",
+  description: "Loginom AI Agent command line interface",
   params: {
     ...ServerParams,
     ...PermissionParams,
     directory: Argument.String("directory").pipe(
-      Argument.withDescription("Directory to start OpenCode in"),
+      Argument.withDescription("Directory to start Loginom AI Agent in"),
       Argument.optional,
     ),
     continue: Flag.Boolean("continue").pipe(
@@ -69,7 +69,7 @@ const Root = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_A
   },
   commands: [
     Spec.make("upgrade", {
-      description: "Upgrade OpenCode to the latest or a specific version",
+      description: "Upgrade Loginom AI Agent to the latest or a specific version",
       aliases: ["update"],
       params: {
         target: Argument.String("target").pipe(
@@ -84,7 +84,7 @@ const Root = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_A
       },
     }),
     Spec.make("uninstall", {
-      description: "Uninstall OpenCode, keeping session data, configuration, and state",
+      description: "Uninstall Loginom AI Agent, keeping session data, configuration, and state",
       params: {
         dryRun: Flag.Boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),
@@ -398,7 +398,7 @@ const Root = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_A
       },
     }),
     Spec.make("run", {
-      description: "Run OpenCode with a message",
+      description: "Run Loginom AI Agent with a message",
       globalFlags: ServerFlags,
       params: {
         message: Argument.String("message").pipe(

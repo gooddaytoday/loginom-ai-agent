@@ -9,15 +9,15 @@
       "paths": [
         ".github/**", ".husky/**", "script/**", "nix/**", "patches/**", "turbo.json", ".gitignore", ".gitleaksignore",
         ".gitattributes", ".dockerignore", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
-        "packages/cli/bin/**"
+        "packages/cli/bin/**", "strobe.json"
       ]
     },
     {
       "id": "CAT-03",
       "title": "Brand: documentation, icons, repository dotdirs",
       "paths": [
-        "packages/desktop/icons/**", "packages/desktop/resources/**", "packages/app/public/**", ".loginom-ai-agent/**", ".opencode/**",
-        "specs/**", "sdks/**", "*.md", "packages/*/*.md", "packages/*/README*"
+        "packages/desktop/icons/**", "packages/desktop/resources/**", "packages/app/public/**", "docs/upstream/**", ".loginom-ai-agent/**",
+        ".opencode/**", "specs/**", "sdks/**", "*.md", "packages/*/*.md", "packages/*/README*"
       ]
     },
     { "id": "CAT-04", "title": "Upstream endpoints: updates, installer, sharing", "paths": [], "pending": "B2.7d, B4.1" },

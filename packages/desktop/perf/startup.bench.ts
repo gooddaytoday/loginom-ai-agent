@@ -62,15 +62,15 @@ export default bench({
     install: app("opencode", { gpuCache: "cold" }),
     // A contributor's `bun dev:desktop` in each variant's checkout, isolated under the launch's home.
     dev: command("bun dev:desktop", {
-      unset: ["OPENCODE_*", "OTEL_*", "SENTRY_*"],
+      unset: ["LOGINOM_AI_AGENT_*", "OTEL_*", "SENTRY_*"],
       env: {
-        OPENCODE_CONFIG_DIR: "{home}/config",
-        OPENCODE_DB: "{home}/data/opencode.db",
-        OPENCODE_TEST_HOME: "{home}/home",
-        OPENCODE_TEST_ONBOARDING: "0",
-        OPENCODE_DESKTOP_TEST_ROOT: "{home}",
-        OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT: "0",
-        OPENCODE_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: "1",
+        LOGINOM_AI_AGENT_CONFIG_DIR: "{home}/config",
+        LOGINOM_AI_AGENT_DB: "{home}/data/loginom-ai-agent.db",
+        LOGINOM_AI_AGENT_TEST_HOME: "{home}/home",
+        LOGINOM_AI_AGENT_TEST_ONBOARDING: "0",
+        LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT: "{home}",
+        LOGINOM_AI_AGENT_DESKTOP_REMOTE_DEBUGGING_PORT: "0",
+        LOGINOM_AI_AGENT_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: "1",
         // The test root moves XDG_CACHE_HOME, which would make every start transpile the source CLI
         // from scratch; a contributor's dev start reuses Bun's own cache.
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH ?? bunTranspilerCache(),
@@ -128,7 +128,7 @@ export default bench({
           for (const dir of ["data", "config", "cache", "state", "desktop", "session", "home"])
             mkdirSync(join(root, dir), { recursive: true })
           writeFileSync(
-            join(root, "desktop", "opencode.settings"),
+            join(root, "desktop", "loginom-ai-agent.settings"),
             JSON.stringify({ firstLaunchOnboardingComplete: true }),
           )
           writeFileSync(join(root, "desktop", "opencode.global.dat"), JSON.stringify({ language: '{"locale":"en"}' }))
@@ -158,7 +158,7 @@ function skipOnboarding(ctx: LaunchContext<unknown>) {
       ? "ai.opencode.desktop.dev"
       : "ai.opencode.desktop"
 
-  const file = join(ctx.home!, "AppData", "Roaming", id, "opencode.settings")
+  const file = join(ctx.home!, "AppData", "Roaming", id, "loginom-ai-agent.settings")
   const settings = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {}
 
   if (settings.firstLaunchOnboardingComplete) return

@@ -2119,3 +2119,167 @@ $ cd packages/cli && bun test --timeout 60000 test/service-identity.test.ts test
 - `python3 -I scripts/upstream-sync/catalog-check.py --summary` — код 0: на `5ab3dbae96` 344 расходящихся файла,
   CAT-01 — 3; на ветке 346, CAT-01 — 5 (`util/package.json`, `desktop/package.json`). Остальные записи — те же.
 - `bun run check` из корня на `32c61f7f49` — код 0: `Found 517 warnings and 0 errors`, `Tasks: 38 successful, 38 total`.
+
+## B1.4 Ручные правки бренда: `product`, CLI, корень, документы
+
+22.11.2026. Ветка `b14-brand-a` от `oc2-migration` (`53ec8ddff3`), рабочее дерево `.claude/worktrees/b14-brand-a`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`. `bun install
+--frozen-lockfile`: код 0, 1600 пакетов, `.husky/_` появился, хук `pre-commit` срабатывал на каждом коммите. Задачи из
+таблицы B1.4a: Р-1, Р-2, Р-3, Р-12, Р-19, Р-20, Р-21, Р-22…Р-26. Параллельно другой агент делает Р-4, Р-5, Р-7, Р-8,
+Р-13…Р-18. Р-6 и Р-10 ждут решения владельца, Р-9 и Р-11 — B4; их здесь нет.
+
+### Коммиты
+
+Каждая задача — отдельный коммит, не больше пяти файлов; `catalog.json` и `catalog.md` считаются, журнал — отдельный
+коммит. `bun run secrets staged` перед каждым коммитом — `clean`.
+
+| Задача | Коммит | Файлы |
+|---|---|---|
+| Р-1 | `b130ac1847` `test(product): read the OpenCode 2 layout in the repository path guard` | `repo-paths.test.ts`, `guarantees.md` |
+| Р-2 (1/2) | `ec9e192ff3` `fix(cli): name the product in command descriptions, upgrade and uninstall` | `commands.ts`, `upgrade.ts`, `uninstall.ts`, `test/mini.test.ts` |
+| Р-2 (2/2) | `9bb553d436` `fix(cli): name the product in the update and remote pairing messages` | `default.ts`, `pair.ts`, `test/pair-remote-consent.test.ts`, `catalog.md` (CAT-12) |
+| Р-3 (1/2) | `31423f23b8` `fix(cli): name the product in ACP login label and error messages` | `acp/{service,error,translate}.ts`, `test/acp/{session,error}.test.ts` |
+| Р-3 (2/2) | `90784ff78b` `fix(cli): name the product on the update preflight screen` | `update-preflight.tsx`, `catalog.md` (CAT-12) |
+| Р-19 | `69e8901a27` `fix(install): install into the product directory ~/.loginom-ai-agent/bin` | `install`, `catalog.md` (CAT-02) |
+| Р-12 (1/2) | `60f317717a` `chore(identity): give the Desktop startup benchmark profiles the product names` | `strobe.json`, `desktop/perf/startup.bench.ts`, `catalog.json` (`strobe.json` в CAT-02), `catalog.md` (CAT-02, CAT-09) |
+| Р-20 | `345277933f` `docs: name the product variables the code reads in AGENTS.md and package READMEs` | `AGENTS.md`, `desktop/README.md`, `process-daemon/README.md`, `catalog.md` (CAT-03) |
+| Р-21 | `9cb363516b` `docs: point the root README and the app perf guide at the product names` | `README.md`, `app/perf/README.md`, `catalog.md` (CAT-03, CAT-10) |
+| Р-22 | `778e563f42` `docs: move the translated upstream READMEs to docs/upstream (1/5)` | 3 переноса, `catalog.json` (`docs/upstream/**` в CAT-03), `catalog.md` |
+| Р-23 | `f96894e078` `… (2/5)` | 5 переносов |
+| Р-24 | `9937983264` `… (3/5)` | 5 переносов |
+| Р-25 | `83d661fa12` `… (4/5)` | 5 переносов |
+| Р-26 | `55a1b30938` `… (5/5)` | 3 переноса, `README.md` (переключатель языков), `catalog.md` |
+| Р-12 (2/2) | `f240b721a0` `chore(identity): give the root dev:live scripts and the nix builds the product names` | `package.json`, `nix/opencode.nix`, `nix/desktop.nix`, `catalog.md` (CAT-01, CAT-02) |
+| — | следующий | этот журнал; в `catalog.md` (CAT-03) — что видимого `OpenCode` осталось в CLI |
+
+Р-2, Р-3 и Р-12 разделены на два коммита: с тестами, которые проверяют строки, и с записью каталога выходило 7–8
+файлов. Порядок коммитов не совпадает с номерами: Р-12 (1/2) раньше Р-20, потому что README Desktop описывает очистку
+окружения в замере; Р-12 (2/2) — последним, пока шёл полный прогон тестов `cli` в том же дереве.
+
+### Что сделано
+
+- **Р-1.** `repo-paths.test.ts`: пакет агента — `@opencode/cli` в `packages/cli`; `turbo.json` читается
+  `Bun.JSONC.parse`; у `--filter` снимаются селекторы графа turbo (`pkg^...`, `...pkg`); строка справки `[--filter
+  name]` в `codemode/script/bench.ts` — исключение `NOT_FILTERS`; устаревшие пути в файлах самого v2.3.0
+  (`patches/install-korean-ime-fix.sh` → `packages/opencode`, `script/release.ts` → `packages/console`) — в `NOT_PATHS`.
+  Остались три падения: `--filter` в `loginom-macos.yml` и `secrets.yml`, фильтры путей и пути `packages/opencode` в
+  workflows Windows — B5.1; `evals`, `loginom-host/script/{build-cli,skills-acceptance}.ts`,
+  `node-acceptance` — B2.7a. В `guarantees.md` число падений — 3.
+- **Р-2, Р-3.** `OpenCode` → `Loginom AI Agent` в описаниях команд, `upgrade`, `uninstall`, сбое службы при
+  обновлении, согласии `pair --remote`, подписи входа ACP («Loginom AI Agent Login»), ошибках ACP «… server is
+  unavailable» и «… prompt failed», на экране обновления. Тесты `mini`, `pair-remote-consent`, `acp/{session,error}`
+  поправлены вместе со строками.
+- **Р-12.** Правила `apply-identity` по явному пути на `package.json`, `nix/opencode.nix`, `nix/desktop.nix`,
+  `strobe.json`, `desktop/perf/startup.bench.ts` и руками маска `unset` `OPENCODE_*` → `LOGINOM_AI_AGENT_*` в двух
+  профилях замера. Каждое новое имя проверено по читателю: `LOGINOM_AI_AGENT_TUI_CHANNEL` (`cli/…/default.ts`),
+  `_PASSWORD` (`cli/src/env.ts`), `_DISABLE_MODELS_FETCH` (`cli/src/server-process.ts`), `_VERSION` и `_CHANNEL`
+  (сборка CLI), `_DB`, `_CONFIG_DIR`, `_TEST_HOME`, `_TEST_ONBOARDING`, `_DESKTOP_*` (код Desktop, `cli`, `util`),
+  `loginom-ai-agent.settings` (`desktop/src/main/storage/keys.ts`). `_CLI_DIST` задаёт и читает сам `desktop.nix`.
+- **Р-19.** `INSTALL_DIR=$HOME/.loginom-ai-agent/bin`, одна строка.
+- **Р-20, Р-21.** `AGENTS.md`: `LOGINOM_AI_AGENT_STORY`, `LOGINOM_AI_AGENT_FLAGS`. `desktop/README.md`: переменные
+  сборки и очистка окружения замера. `process-daemon/README.md`: `LOGINOM_AI_AGENT_PTY_SOCKET_DIR` (её читает
+  `src/daemon/unix.rs` после B1.3b). `README.md`: каталог установки. `app/perf/README.md`: `LOGINOM_AI_AGENT_CHANNEL`.
+- **Р-22…Р-26.** 21 переведённый README (`README.<язык>.md`; 22-й корневой — английский `README.md`, он остаётся и
+  входит в Р-21) перенесён `git mv` без правок в `docs/upstream/`, как в 0.4. Там уже лежит английский
+  `docs/upstream/README.md` форка (README v1 upstream), и его ссылки на переводы снова ведут к файлам. Переключатель
+  языков корневого `README.md` ведёт в `docs/upstream/` (последний коммит серии). Маска `docs/upstream/**` в CAT-03
+  возвращена: `catalog-check.py` классифицирует перенос по новому пути.
+
+### Где решал сам
+
+- **Литерал `Loginom AI Agent` в `cli`, а не `Product.name`.** `cli` не зависит от `@loginom-ai-agent/product`.
+  Зависимость — это `cli/package.json` и `bun.lock` (CAT-01), сверх пяти файлов и с конфликтом замка у параллельного
+  агента. В 0.4 те же строки CLI тоже были литералами (`a080f7725c:packages/opencode/src/cli/cmd/uninstall.ts`).
+- **ACP: только подписи и сообщения.** В 0.4 ACP не переименовывали вовсе (`a080f7725c:packages/opencode/src/acp/service.ts`),
+  но таблица Р-3 называет ACP явно. Изменены подпись входа и две ошибки. Не менялись идентификаторы протокола
+  `opencode-login` и `opencode/retry`, поле `agentInfo.name` (в ACP оно для программного использования) и строки с
+  командой `opencode` («Login with opencode», «Run `opencode auth login`») — имя команды, B2.7a. **Спорное:** клиент
+  ACP без `title` может показать `agentInfo.name` как имя агента; тогда это задача B2.7a вместе с командой.
+- **Р-12 — только имена, у которых читатель уже переименован.** Таблица B1.4a называла и `opencode service` в
+  `dev:live`; по заданию имя команды — B2.7a, оставлено. Пути установленного Desktop (`ai.opencode.desktop`,
+  `OpenCode.exe`), каталоги данных и регистрации службы `opencode`, кэш обновлятора, протокол `opencode` в профилях
+  замера — B4 и Р-10.
+- **Р-20, Р-21 — без лишних правок.** `.opencode/skills` в `AGENTS.md` и `.opencode/plugins/` в
+  `packages/plugins/README.md` — настоящие каталоги дерева v2 (B1.4a: продукт их больше не находит, так и задумано).
+  `OPENCODE_PERF_SESSION` читает сам `app/perf/tabs.bench.ts`, скрипт его не берёт. `VITE_OPENCODE_*` и
+  `OPENCODE_ZIG_CPU` скрипт оставляет намеренно. Без правок: `packages/app/README.md`, `packages/app/AGENTS.md` (там
+  команда `opencode dev web` — B2.7a — и адрес upstream), `packages/plugins/README.md`, `packages/sdk/README.md`
+  (`this.opencode` — имя переменной в примере кода).
+- **Переводы README перенесены как есть.** Внутренние ссылки переводов на ресурсы от корня (`.github/assets/…`,
+  `services/site/…`, `./CONTRIBUTING.md`) из `docs/upstream/` не открываются — так же было в 0.4. Между Р-22 и Р-26
+  переключатель корневого `README.md` вёл к уже перенесённым файлам по старым путям: правка `README.md` в каждом коммите
+  вывела бы серию за пять файлов.
+- **Правка `AGENTS.md`** — только имена переменных по задаче Р-20; правила для агентов не менялись.
+
+### Тесты
+
+До — `oc2-migration` (`53ec8ddff3`), в этом же дереве до первой правки (Desktop — с двумя файлами базы на месте своих,
+тесты их не берут). После — на коммитах ниже.
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `product` | `bun test` | 56 pass, 5 fail (`repo-paths`) | 58 pass, 3 fail (`b130ac1847` и `f240b721a0`, списки внутри трёх падений те же — 3, 5 и 10 строк): остались B5.1 и B2.7a |
+| `cli` | `bun test --timeout 60000` | 407 pass, 9 skip, 0 fail | 407 pass, 9 skip, 0 fail (`90784ff78b`, после всех правок `cli`) |
+| `desktop` | `bun test --timeout 30000` | 529 pass, 4 skip, 0 fail | 529 pass, 4 skip, 0 fail (`f240b721a0`) |
+
+```text
+$ cd packages/product && bun test test/names.test.ts          # 9 pass, 0 fail
+$ cd packages/cli && bun test test/flag-identity.test.ts      # 3 pass, 0 fail
+$ cd packages/product && bun typecheck                        # tsgo --noEmit, код 0
+$ cd packages/cli && bun typecheck                            # ✓ No type errors in 2,140 files across 2 projects
+$ cd packages/desktop && bun typecheck                        # ✓ No type errors in 3,503 files across 2 projects (perf входит)
+```
+
+Первый `bun typecheck` в `product` после Р-1: `test/repo-paths.test.ts(55,31): error TS2571: Object is of type
+'unknown'` — `Bun.JSONC.parse` возвращает `unknown`; добавлено приведение к `{ tasks: Record<string, unknown> }`.
+
+`install` во временном домашнем каталоге (`env -i HOME=<tmp> SHELL=/bin/bash bash ./install --binary <поддельный
+бинарник>`, `.bashrc` создан заранее): код 0, бинарник в `<tmp>/.loginom-ai-agent/bin/opencode` и `opencode2`,
+каталога `<tmp>/.opencode` нет, в `.bashrc` — `# opencode` и `export PATH=<tmp>/.loginom-ai-agent/bin:$PATH` (пару
+ищет `uninstall.ts`).
+
+### Итоговая проверка
+
+На `f240b721a0` (после него — только этот журнал), из корня дерева:
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                   # код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 382 divergent upstream files      # код 0; было 346
+  CAT-01: 5   CAT-02: 53 (+4: install, strobe.json, nix ×2)   CAT-03: 26 (+24: 21 перенос, README.md, 2 README пакетов)
+  CAT-09: 22 (+1: perf/startup.bench.ts)   CAT-10: 75 (+1: app/perf/README.md)   CAT-11: 18   CAT-12: 173 (+6: файлы cli)
+  CAT-13: 10   CAT-04…CAT-08: 0 (pending)
+$ bun run secrets range oc2-migration HEAD
+{"status":"clean","commits":15,"archives":0, …}
+$ bun run check                                         # код 0, 47 с
+Found 517 warnings and 0 errors.
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    38 successful, 38 total
+Cached:    0 cached, 38 total
+```
+
+### Найдено, не чинил
+
+- `process-daemon/README.md` называет пути по умолчанию до B1.3b: `${XDG_STATE_HOME:-~/.local/state}/opencode/pty`,
+  `/tmp/opencode-pty-<uid>/`, дочерний каталог `opencode-pty-<uid>`; исходник после B1.3b — `loginom-ai-agent`. Имя
+  бинарника `opencode-pty` в том же README — Р-16.
+- Видимый `OpenCode` вне моих задач: скрипт `install` («OpenCode Installer», «OpenCode includes free models», логотип,
+  `opencode.ai/docs`), `cli/script/postinstall.mjs` (две ошибки установки пакета npm), `cli/script/build.ts`
+  (заглушка Scalar/Swagger), `cli/src/services/updater.ts` (около 20 строк, B2.7d), комментарий в `uninstall.ts:73`.
+  Задач на них в таблице B1.4a нет; для BRAND-01 их нужно распределить (предложение: B2.7a и B2.7d).
+- Форматирование upstream после `apply-identity`: `prettier --check` красный на `cli/src/commands/handlers/default.ts`
+  (длинный импорт `LOGINOM_AI_AGENT_*`) и на таблице корневого `README.md` (так в v2.3.0). Мои строки форматированы.
+- Повторный поиск старых строк Р-2 и Р-3 по `packages`, `evals`, `scripts`, `script` (`*.ts`, `*.tsx`, `*.js`, `*.mjs`,
+  `*.json`, `*.snap`): вхождений в тестах вне `packages/cli/test` нет. Остаток `OpenCode` в `packages/cli/src` вне
+  `updater.ts` — `agentInfo.name` и комментарий `uninstall.ts:73`.
+- **Конфликты при слиянии с веткой Р-4…Р-18:** `catalog.md` — строки CAT-12 «Назначение» и «Не перенесено» (обе ветки
+  правят одну строку), возможно CAT-03 и CAT-11; хвост этого журнала (оба раздела дописаны в конец).
+
+### Не проверено
+
+- Сборки `nix`: `nix` на машине нет. Замер `strobe` (`strobe.json`, `startup.bench.ts`) не запускался: нужен strobe и
+  установленный Desktop.
+- ACP в настоящем клиенте и экран обновления CLI глазами: только тесты (у экрана обновления теста нет).
+- `install` — только путь `--binary` на Linux; загрузка по сети и Windows (`opencode.exe`) не проверялись.
+- Windows и macOS: всё на Linux. BRAND-01 в собранном CLI — не проверялся: остаются B2.7a, B2.7d и задачи TUI.
