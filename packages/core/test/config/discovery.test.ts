@@ -137,7 +137,7 @@ describe("ConfigDiscovery.discover", () => {
 
           const sources = yield* discoverWith(root, project, project, (base) => ({
             readDirectory: (target, options) =>
-              target === project ? Effect.succeed([".OPENCODE"]) : base.readDirectory(target, options),
+              target === project ? Effect.succeed([".LOGINOM-AI-AGENT"]) : base.readDirectory(target, options),
           }))
           expect(sources.project).toContainEqual({
             path: AbsolutePath.make(path.join(project, ".loginom-ai-agent")),
