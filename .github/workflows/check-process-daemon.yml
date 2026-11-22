@@ -198,8 +198,8 @@ jobs:
         run: |
           $metadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $version = ($metadata.packages | Where-Object name -eq 'opencode-pty').version
-          $binary = Join-Path $metadata.target_directory "$env:CARGO_BUILD_TARGET/debug/opencode-pty.exe"
+          $version = ($metadata.packages | Where-Object name -eq 'loginom-ai-agent-pty').version
+          $binary = Join-Path $metadata.target_directory "$env:CARGO_BUILD_TARGET/debug/loginom-ai-agent-pty.exe"
           $output = & $binary --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Output $output

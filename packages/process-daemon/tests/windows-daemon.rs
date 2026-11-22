@@ -178,7 +178,7 @@ impl Drop for Daemon {
 }
 
 fn spawn(directory: &Path) -> Child {
-    Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .args(["daemon", "--name"])
         .arg(directory.file_name().unwrap())
         .arg("--runtime-dir")
@@ -200,7 +200,7 @@ fn registration(child: &mut Child, directory: &Path) -> Registration {
             assert_eq!(
                 registration.socket,
                 PathBuf::from(format!(
-                    r"\\.\pipe\opencode-pty-{}",
+                    r"\\.\pipe\loginom-ai-agent-pty-{}",
                     registration.instance_id
                 ))
             );

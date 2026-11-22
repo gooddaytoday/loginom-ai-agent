@@ -612,10 +612,13 @@ struct OutputPipe {
 
 fn output_pipe() -> Result<OutputPipe> {
     let security = PrivateSecurity::new()?;
-    let name: Vec<u16> = format!(r"\\.\pipe\opencode-pty-{:032x}", rand::random::<u128>())
-        .encode_utf16()
-        .chain([0])
-        .collect();
+    let name: Vec<u16> = format!(
+        r"\\.\pipe\loginom-ai-agent-pty-{:032x}",
+        rand::random::<u128>()
+    )
+    .encode_utf16()
+    .chain([0])
+    .collect();
     // SAFETY: the name is NUL-terminated and the descriptor and attributes
     // outlive the call. One private, inbound, byte-mode instance with a 64 KiB
     // in-buffer, so the child can write ahead while the reader is busy.

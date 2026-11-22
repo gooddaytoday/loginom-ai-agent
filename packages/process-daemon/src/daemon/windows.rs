@@ -107,7 +107,7 @@ impl Runtime {
 
         let instance_id = format!("{:032x}", rand::random::<u128>());
         let registration = Registration {
-            socket: PathBuf::from(format!(r"\\.\pipe\opencode-pty-{instance_id}")),
+            socket: PathBuf::from(format!(r"\\.\pipe\loginom-ai-agent-pty-{instance_id}")),
             instance_id,
             pid: std::process::id(),
             protocol: PROTOCOL_VERSION,
@@ -354,7 +354,7 @@ mod tests {
             instance_id: "first".into(),
             pid: 1,
             protocol: PROTOCOL_VERSION,
-            socket: PathBuf::from(r"\\.\pipe\opencode-pty-first"),
+            socket: PathBuf::from(r"\\.\pipe\loginom-ai-agent-pty-first"),
             token: "secret".into(),
             features: features(),
         };
