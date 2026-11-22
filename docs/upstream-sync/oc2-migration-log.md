@@ -6423,7 +6423,9 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
 | `91d6df0908` `feat(loginom-agent): one browser recovery reminder per attempt (B2.3, G4)` | `packages/loginom-agent/src/browser-recovery.ts` (новый), хук `experimental.idle` в `src/index.ts`; тест `packages/loginom-agent/test/browser-recovery.test.ts`, контрактный тест хука в `loginom-host-lease.test.ts` |
 | `51fa4ce078` `fix(loginom-agent): keep releasing Host leases when one lease record fails` | отказ записи аренды теряет только эту аренду, цикл событий продолжает освобождать остальные |
 | `85de14c97d` `test(server): read Host lease records that may be released meanwhile` | хелпер записей в тесте (раздел «Мутации») |
-| следующий | этот раздел, строки G3 и G4 и «Как запускать» в `guarantees.md`, CAT-01, CAT-05, CAT-07 в `catalog.md`, `pending` CAT-05 в `catalog.json` |
+| `76de4f0584` `docs(upstream-sync): record B2.3 Host lease and recovery` | этот раздел (первая версия), `guarantees.md`, `catalog.md`, `catalog.json` |
+| `7666e33d93` `fix(loginom-agent): recover lease records a kill cut short, keep a live process's` | поиск зависших: запись разбирается `Schema`, оборванная или испорченная — удаляется, запись живого процесса остаётся, сбой файловой системы не останавливает сервер; случаи в тесте kill -9 и `cli` |
+| следующий | уточнения этого раздела и строки G3 |
 
 ### Где живёт Host и как получает подключение
 
@@ -6459,11 +6461,14 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
   `rename`, `0600`), после `release` — удаляется; при отказе Host — тоже. Процесс, убитый в любой момент после записи,
   оставляет запись.
 - **Поиск зависших — в `start`, до любой location** и до `SessionRestart.resumeSuspendedSessions` (он возобновляет
-  прерванные исполнения при старте сервера, `server/src/process.ts`). Этот процесс ещё ничего не арендовал, поэтому каждая
-  запись в каталоге — от прежнего процесса: она удаляется, сессия возвращается в `recovered`, сервер пишет предупреждение.
-  Восстановление — то, что делает Host: новый Node host открывает журнал прошлого процесса в мягком режиме и удаляет его
-  записи без повтора (G4, `recovery-store.ts`), следующая аренда той же сессии проходит. Пульса и TTL, как в spike, нет:
-  один сервер на каталог данных обеспечивает регистрация U5, два процесса на одном профиле CLI — защёлка `.writer` B2.7c.
+  прерванные исполнения при старте сервера, `server/src/process.ts`). Этот процесс ещё ничего не арендовал, поэтому
+  запись чужого процесса, которого уже нет, — зависшая: она удаляется, сессия возвращается в `recovered`, сервер пишет
+  предупреждение. Запись, оборванная убийством (пустой `.tmp`, неполный JSON), тоже удаляется, без сессии; сбой файловой
+  системы оставляет сервер без аренд, но не останавливает его. Запись процесса, который ещё жив (`process.kill(pid, 0)`),
+  остаётся: обычно на каталог данных один сервер (U5), но запуск Host стоит до привязки порта и выполняется во всех режимах,
+  поэтому параллельный `serve` на том же профиле или служба, проигравшая порт, тоже сюда доходят. Пульса и TTL, как в spike,
+  нет. Восстановление — то, что делает Host: новый Node host открывает журнал прошлого процесса в мягком режиме и удаляет
+  его записи без повтора (G4, `recovery-store.ts`), следующая аренда той же сессии проходит.
 - **Windows.** `service stop` не выполняет `dispose` (B0.4); здесь запись аренды остаётся и находится при следующем старте
   — тест «kill -9» ниже. Мягкая остановка — B2.3b.
 - **Инструменты B2.5.** `loginom_file_admit` получает аренду исполнения (`admitTool` ждёт обещание) и отвечает
@@ -6501,7 +6506,7 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
 | S2 dispose | закрытие плагинов location (`Plugin.Service.close`) во время инструмента освобождает аренду: инструмент ещё ждёт, событий окончания нет |
 | `loginom_file_admit` | с допуском `loginom-automation` (RPC мастера) и разрешениями вызов доходит до Host через аренду: в ответе модели `LOGINOM_SCOPE_DENIED` от Host, нет `LOGINOM_HOST_NOT_READY` и отказа шлюза |
 | G4 (контракт `experimental.idle`) | попытка `start` → конец хода → ровно одно напоминание в третьем запросе к модели, инструмент Loginom в нём ещё предложен (допуск жив), исполнение одно (`started`, `succeeded`); второе окончание — запрос `call` `dock_browser_recovery` `{action: "stop", operation_id: "op-1"}` к Host (порт записывается обёрткой вокруг того же Node host) |
-| S2 kill -9 | процесс-владелец (`fixture/loginom-host-owner.ts`) запускает Host из ресурсов, арендует, убит `SIGKILL`: запись осталась; его Node host завершился сам (Linux, `/proc`); `ServiceHost.start` в процессе теста без единой location вернул `recovered: ["ses_killed"]`, записей нет, новая аренда той же сессии прошла, журнал восстановления пуст |
+| S2 kill -9 | процесс-владелец (`fixture/loginom-host-owner.ts`) запускает Host из ресурсов, арендует, убит `SIGKILL`: запись осталась; его Node host завершился сам (Linux, `/proc`); рядом — пустой `.tmp`, неполный `.json` и запись живого процесса (`process.ppid`); `ServiceHost.start` в процессе теста без единой location вернул `recovered: ["ses_killed"]`, осталась только запись живого процесса, новая аренда той же сессии прошла, журнал восстановления пуст |
 
 `packages/cli/test/loginom-host.test.ts` — настоящий `serve --port 0` (`isolatedEnv`, без ресурсов): запись аренды убитого
 сервера в `<data>/loginom/leases` удалена к моменту, когда сервер слушает порт.
@@ -6512,7 +6517,8 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
 ### Мутации
 
 Скрипт меняет одну строку, гоняет тест и возвращает файл (`<scratchpad>/b23-mut/run.sh`); итог — на `85de14c97d`, кроме
-мутаций `cli` и `browser-recovery.test.ts` (на `91d6df0908` и `f83a7cb738`, эти файлы с тех пор не менялись).
+мутаций `cli` и `browser-recovery.test.ts` (на `f83a7cb738` и `91d6df0908`) и двух последних (на `7666e33d93`; там же
+мутация «поиск выключен» повторена — **6/1**).
 `loginom-host-lease.test.ts` без мутаций — 7/0, три прогона подряд.
 
 | Мутация | Тест | Итог |
@@ -6529,6 +6535,8 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
 | нет остановки при втором окончании | то же | → **6/1** (G4: запроса `stop` нет) |
 | напоминание не засчитывается (`reminded: true` не ставится) | `browser-recovery.test.ts` | 3/0 → **2/1** |
 | запуск Host в `server-process.ts` заменён на `Promise.resolve({ recovered: [] })` | `cli/test/loginom-host.test.ts` | 1/0 → **0/1** |
+| разбор записи через `JSON.parse` без защиты (как в первой версии) | `loginom-host-lease.test.ts` на `7666e33d93` | 7/0 → **6/1** (kill -9: `start` отклонён на пустом `.tmp`, `JSON Parse error`) |
+| запись живого процесса не пропускается | то же | → **6/1** (kill -9: `ses_live` в `recovered`) |
 
 Первая версия хелпера записей в тесте читала файл после `readdir` без допуска на исчезновение: под мутацией
 `lease.release()` она давала лишние падения (`ENOENT` на записи, удалённой между листингом и чтением); `85de14c97d`
@@ -6536,10 +6544,11 @@ Desktop 0.4 (`desktop/src/main/loginom/desktop-service.ts`, `index.ts:220-237`, 
 
 ### Приёмка
 
-Наборы пакетов — на `91d6df0908` (код B2.3 целиком), база — `374ff612cc` в отдельном дереве, тот же стенд, `npm ci`
+Наборы пакетов — на `91d6df0908` (код B2.3 до двух поправок), база — `374ff612cc` в отдельном дереве, тот же стенд, `npm ci`
 клиента в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан. После них — два узких коммита (`51fa4ce078`: отказ записи
 аренды не останавливает цикл событий; `85de14c97d`: хелпер теста); на них повторены `loginom-agent`, тесты `loginom-*`
-сервера, `core` и мутации.
+сервера, `core` и мутации. На `7666e33d93` (поиск зависших) повторены `loginom-host-lease.test.ts` — 7/0 и
+`cli/test/loginom-host.test.ts` — 1/0, typecheck `loginom-agent`, `server`, `cli` — без ошибок.
 
 ```text
 $ cd packages/loginom-agent && bun test                     # база 50 pass, 0 fail
@@ -6583,7 +6592,7 @@ against a6b15d33daf6: 438 divergent upstream files       # код 0; было 43
   CAT-07: 6                                               # server-process.ts уже был в CAT-07
 $ python3 -I scripts/upstream-sync/apply-identity.py --check
 would change: 0 files                                     # код 0
-$ bun run check                                           # на 85de14c97d с правками документов
+$ bun run check                                           # на 85de14c97d с правками документов; повтор на 7666e33d93 — то же
 Found 517 warnings and 0 errors.
  Tasks:    39 successful, 39 total                        # код 0
 ```
@@ -6604,7 +6613,10 @@ Found 517 warnings and 0 errors.
 - **Подсказки модели 0.4 (`system()`: «Loginom tools are currently unavailable (acquire: …)» и «Loginom is available
   through…») — B2.5d,** вместе с каталогом: сейчас предлагать модели инструменты Loginom нечем.
 - **Сессия дашборда без аренды (0.4)** — B2.9.
-- **Запись аренды без пульса и TTL** — см. «Аренда».
+- **Запись аренды без пульса и TTL, с проверкой живого PID** — см. «Аренда». PID может достаться другому процессу; тогда
+  зависшая запись лишь дождётся его выхода.
+- **Сбой `start` не останавливает сервер:** без Host продукт работает, инструменты Loginom отвечают
+  `LOGINOM_HOST_NOT_READY`.
 - **`start` до прослушивания порта, но без ожидания handshake:** handshake Host — до 180 с, Desktop ждёт регистрацию 120 с.
 - **Правка `server-process.ts` — в CAT-07** (файл уже там, плагины), `catalog.json` — только `pending` CAT-05 без B2.3.
 - **Мост порта Host воркера TUI 0.4 (`cli/tui/loginom-bridge.ts`, CAT-11 называл B2.3) не нужен:** Host в службе, TUI
@@ -6631,6 +6643,12 @@ Found 517 warnings and 0 errors.
 - Windows и macOS: тесты — только Linux. Что Node host завершается после `service stop` на Windows (обрыв IPC) — по коду.
 - Настоящий Loginom, браузер и упакованные ресурсы: `host/node-host.mjs` в ресурсах Desktop v2 и CLI v2 ещё не
   раскладывается (B4.8a, B2.7a).
-- Время закрытия Host при остановке службы и перекрытие: если старый Node host после `kill -9` ещё закрывает Chromium,
-  новый сервер запустит второй на том же корне — не обрабатывается.
+- Два Node host на одном корне: если старый после `kill -9` ещё закрывает Chromium, или рядом работает второй сервер того
+  же профиля (параллельный `serve`, служба, проигравшая порт), новый сервер запустит свой Node host на том же
+  `<data>/loginom` — общий журнал, подключение и ссылки на файлы. Записи аренд живого процесса защищены, остальное — нет;
+  один Host на профиль — вместе с защёлкой `.writer` B2.7c. Время закрытия Host при остановке службы не мерилось.
+- Сбой запуска Node host молчит: сервер не пишет причину, Host просто нет. Сейчас ни одна сборка v2 не кладёт
+  `host/node-host.mjs` в ресурсы, так что в собранном продукте Host пока всегда отсутствует.
+- Напоминание G4 читает `session.context` — сообщения от последнего сжатия; 0.4 читал всю историю. Сжатие посреди попытки
+  может потерять её `start` или напоминание.
 - Напоминание G4 с настоящими инструментами браузера — после B2.5d.
