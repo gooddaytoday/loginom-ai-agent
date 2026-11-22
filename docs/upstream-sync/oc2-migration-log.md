@@ -3604,8 +3604,9 @@ $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
 
 ## B3.1b Предохранитель службы
 
-22.11.2026. Ветка `b31b-guard` от `oc2-migration` (`05957cf699`, влит B3.1), рабочее дерево `.claude/worktrees/b31`,
-переключено на новую ветку. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+22.11.2026. Ветка `b31b-guard` от `oc2-migration` (`05957cf699`, влит B3.1). Перед приёмкой — rebase на `dd724e0905`
+(влит B2.2; конфликт — только конец журнала, оба раздела сохранены). Рабочее дерево `.claude/worktrees/b31`, переключено
+на новую ветку. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
 
 Зачем: в сборке канала база 0.4 и база v2 — один файл (раздел B3.1). Если `serve` откроет непереносённую базу 0.4
 раньше `migrate`, миграции схемы v2 удалят таблицы сессий и ответят `completed` (S4). После этого `migrate` скажет
@@ -3615,8 +3616,10 @@ $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
 
 | Коммит | Файлы | `bun run secrets staged` |
 |---|---|---|
-| `e9bb640cb4` `feat(cli): migrate a 0.3.9 or 0.4 database before the server opens it` | `cli/src/server-process.ts` (+3), `server/src/legacy-migrate.ts` (`guard`, `backupPath`), `cli/src/commands/handlers/migrate.ts` (имя копии из `backupPath`), `cli/test/legacy-guard.test.ts` (новый) | `clean` |
-| следующий | этот раздел, `catalog.md` (CAT-12) | |
+| `83d8b1e510` `feat(cli): migrate a 0.3.9 or 0.4 database before the server opens it` | `cli/src/server-process.ts` (+3), `server/src/legacy-migrate.ts` (`guard`, `backupPath`), `cli/src/commands/handlers/migrate.ts` (имя копии из `backupPath`), `cli/test/legacy-guard.test.ts` (новый) | `clean` |
+| `626aa90b89` `docs(migration): record the B3.1b server guard and the non-git session finding` | этот раздел, `catalog.md` (CAT-12), поправка в B3.1 | `clean` |
+| `bbb5348aae` `fix(server): run one migration of a database at a time` | `server/src/legacy-migrate.ts` (`Flock`), тест одновременного переноса | `clean` |
+| следующий | этот раздел: гонка двух стартов, итоговые числа | |
 
 ### Где проверка и что делает
 
@@ -3656,6 +3659,28 @@ port until stopped`. Эти тесты кладут каталог на мест
 нечитаемый файл — не база 0.4, его судьба — как в upstream. После правки эти три теста и новые проходят вместе
 (13 / 0).
 
+### Два одновременных старта
+
+`guard` стоит до `start`, то есть до занятия порта, а конкурирующие запуски службы до сих пор разводил порт:
+`service-lifecycle.test.ts` считает второй запуск при медленном первом штатным. Перенос замедляет первый старт. Прогон
+скриптом из scratchpad: 10 раундов, в каждом два `serve --port 0` одновременно на одном корне с фикстурой 0.4. Итог
+каждого раунда — чем кончился каждый процесс, хеш копии, число сессий в итоговой базе.
+
+До блокировки (первый коммит до rebase, `e9bb640cb4`; после rebase — `83d8b1e510`):
+
+- раунды 1, 7, 8, 9 — оба процесса упали (`cannot read …` / `cannot write ….migrating`), база 0.4 на месте, копии нет;
+- раунды 3, 6 — один слушает, 3 сессии, копия равна оригиналу;
+- раунды 2, 4, 5, 10 — один слушает на базе **без сессий**, копия равна оригиналу. Второй процесс удалил временный файл
+  первого (`removeDatabase` перед копированием), и новая база встала на место недостроенной. История осталась только в
+  копии, а следующий `migrate` ответил бы `current`.
+
+Исправление `bbb5348aae`: `run` берёт `Flock.acquire(<цель>, { dir: <каталог цели> })` до первого чтения состояния и
+держит его до конца замены файлов. Это та же блокировка через каталог с heartbeat и порогом устаревания 60 с, что у конфига CLI
+(`cli/src/config/config.ts`). Второй процесс ждёт, затем видит базу v2 с меткой (`already-migrated`), и служба стартует
+на ней. После исправления все 10 раундов: оба процесса слушают, 3 сессии, копия равна оригиналу. В двух раундах рядом
+с копией остались пустые `-wal`/`-shm`. Их создало чтение признака во втором процессе: оно открыло исходный файл на
+чтение, а первый процесс тем временем унёс файл вместе с ними в копию. На хеш копии это не влияет.
+
 **Автоперенос, а не отказ.** Перенос внутри службы оказался не больше отказа. Общий код уже был в `server`,
 импорт тот же, что у `migrate`, слои не переставлялись. `guard` вызывается до сборки слоёв сервера, на `Global` процесса
 `serve`. Отказ «сначала `migrate`» был бы той же проверкой без переноса.
@@ -3668,6 +3693,11 @@ port until stopped`. Эти тесты кладут каталог на мест
 1. 0.4: служба отдаёт 3 сессии, хеш `loginom-ai-agent.v1-backup.db` равен оригиналу. Второй запуск на уже перенесённой
    базе (v2): снова 3 сессии, копия та же.
 2. 0.3.9: 3 сессии, копия равна оригиналу.
+`server/test/legacy-migrate.test.ts`, новый тест: два `run` одновременно на одном файле. Один — `migrated`, другой —
+`already-migrated`; копия равна оригиналу; 3 сессии.
+
+`cli/test/legacy-guard.test.ts`:
+
 3. Перенос не удался (в базе 0.4 сессия `zzz`, её v2 не принимает): сервер не начал слушать, в stderr
    `could not be migrated, so the server does not start: cannot copy session zzz`, код 1. Хеш оригинала тот же, других
    файлов `*.db*` нет.
@@ -3675,7 +3705,7 @@ port until stopped`. Эти тесты кладут каталог на мест
 Без перехвата эта база открылась бы штатным путём v2 и потеряла бы сессии, как в S4. Поэтому тест 3 проверяет и отказ,
 и сохранность.
 
-Мутации (`server-process.ts` подменялся на время прогона и возвращался):
+Мутации на итоговом коде (файл подменялся на время прогона и возвращался):
 
 ```text
 # проверка выключена: вызов guard закомментирован
@@ -3686,21 +3716,34 @@ Received length: 0
 Expected length: 3
 Received length: 0
 (fail) serve on a 0.3.9/0.4 database > migrates a 0.3.9 profile first
-Received: "http://127.0.0.1:32861"
+Received: "http://127.0.0.1:42953"
 (fail) serve on a 0.3.9/0.4 database > does not start when the migration fails and leaves the original alone
  0 pass
  3 fail
 
 # ошибка переноса подавлена: guard(...).pipe(Effect.ignore)
-Received: "http://127.0.0.1:42431"
+Received: "http://127.0.0.1:40015"
 (fail) serve on a 0.3.9/0.4 database > does not start when the migration fails and leaves the original alone
  2 pass
  1 fail
+
+# server/src/legacy-migrate.ts: блокировка убрана
+$ cd packages/server && bun test test/legacy-migrate.test.ts -t "two migrations"
+  [
+-   "already-migrated",
+-   "migrated",
++   "Error: cannot read /tmp/loginom-migrate-kVYOsl/loginom-ai-agent.db.migrating: unable to open database file",
++ "Error: cannot write /tmp/loginom-migrate-kVYOsl/loginom-ai-agent.db.migrating: Failed query: insert into "kv" …"
+  ]
+(fail) LegacyMigrate > two migrations of one database at once run one after the other
 ```
+
+С `--rerun-each 5` без блокировки тест упал 4 раза из 5.
 
 ### Ручные проверки
 
-Собранный CLI `latest` (`opencode v2.3.0-b31b`, `script/build.ts --single --skip-install --skip-web-ui`). Профиль
+Собранный CLI `latest` (`opencode v2.3.0-b31b`, `script/build.ts --single --skip-install --skip-web-ui`; сборка с
+`e9bb640cb4`, до блокировки и rebase). Профиль
 0.4 лежит в каталоге prod `<root>/data/loginom-ai-agent/loginom-ai-agent.db`, то есть по пути новой базы. Запуск
 `opencode session list --format json` из каталога сессий фикстуры, `env -i`, `HOME` и `XDG_*` указывают в корень,
 `LOGINOM_AI_AGENT_SERVICE_IDENTITY` и `_PORT` (U5) — свои. CLI сам поднял фоновую службу `serve --service`, как это
@@ -3713,7 +3756,7 @@ Received: "http://127.0.0.1:42431"
 
 `session list` при этом вернул `[]` — это не потеря, а находка ниже.
 
-Сборка Node (`script/build-node.ts --single --bundle-only --skip-install`): код 0, то же предупреждение о
+Сборка Node (`script/build-node.ts --single --bundle-only --skip-install`, тоже с `e9bb640cb4`): код 0, то же предупреждение о
 `transformSession`, что в B3.1. `serve --port 0` под Node 24.19.0 на пустом профиле стартует
 (`server listening on http://127.0.0.1:…`), проверка пропущена.
 
@@ -3728,22 +3771,28 @@ Received: "http://127.0.0.1:42431"
 - все три сессии по-прежнему `project_id = global`;
 - `session list` (сессии текущего проекта) — `[]`.
 
-`GET /api/session` из тестов отдаёт все сессии, поэтому тесты B3.1 и B3.1b это не ловят. Сессии из git-репозиториев
-не затронуты: 0.4 уже хранил их под ID проекта git. Исправление — шаг `resolveDirectory` из `V1Migration.run` (проект
+`GET /api/session` из тестов отдаёт все сессии, поэтому тесты B3.1 и B3.1b это не ловят. С предохранителем
+перенос стал автоматическим, а базы, перенесённые до исправления, сами не поправятся: метка уже стоит. Исправление — шаг `resolveDirectory` из `V1Migration.run` (проект
 каталога через `Project.Service`, слой `Project.node` с `Bus`, `Database`, `FSUtil`, `Git`, `AppProcess`) в
 `legacy-migrate.ts`. Это за пределами B3.1b, не делал; предложение — отдельная задача до B3.3.
 
 ### Приёмка
 
-База — `05957cf699`: `cli` 411 / 9 / 0, `server` 133 / 1 / 0, `catalog-check` 430 файлов (итог B3.1 в его разделе).
-Итог — `e9bb640cb4`, после него — только этот раздел и `catalog.md`. Сравнивались числа и имена упавших тестов.
+База — `dd724e0905` (`oc2-migration` после B2.2), прогон в отдельном чистом дереве в scratchpad. Итог — `bbb5348aae`,
+после него — только этот раздел. Команды одни и те же; сравнивались числа и имена упавших тестов.
 
 | Пакет | Команда | База | Итог |
 |---|---|---|---|
 | `cli` | `bun test --timeout 60000` | 411 pass, 9 skip, 0 fail | 414 pass (+3 `legacy-guard`), 9 skip, 0 fail |
-| `server` | `bun test` | 133 pass, 1 skip, 0 fail | 133 pass, 1 skip, 0 fail |
+| `server` | `bun test` | 140 pass, 1 skip, 0 fail | 141 pass (+1 одновременный перенос), 1 skip, 0 fail |
 
-`core` и остальные пакеты не менялись.
+`core` и остальные пакеты не менялись. До rebase на базе `05957cf699` (`cli` 411, `server` 133) было: `cli` 414 / 9 /
+0, `server` 134 / 1 / 0. Устойчивость: `--rerun-each 10` — `cli/test/legacy-guard.test.ts` 30 pass / 0 fail;
+`--rerun-each 5` — `server/test/legacy-migrate.test.ts` 35 pass / 0 fail.
+
+Первый прогон `cli` после rebase дал 13 падений `Cannot find package '@loginom-ai-agent/loginom-host'`: B2.2 добавил
+`loginom-agent` эту зависимость, а `bun install` после rebase не запускался. После `bun install --frozen-lockfile`
+прогон чистый (таблица выше).
 
 ```text
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
@@ -3751,9 +3800,9 @@ against a6b15d33daf6: 430 divergent upstream files                  # как н�
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                               # код 0
 $ bun install --frozen-lockfile                                     # код 0
-$ cd packages/cli && bun typecheck; cd ../server && bun typecheck   # код 0 у обоих
+$ cd packages/cli && bun run typecheck:tsc; cd ../server && bun run typecheck:tsc   # код 0 у обоих
 $ bun run check                                                     # код 0
-Found 517 warnings and 0 errors.                                    # как на базе; в изменённых файлах предупреждений нет
+Found 517 warnings and 0 errors.                                    # на базе столько же; в изменённых файлах предупреждений нет
  Tasks:    39 successful, 39 total
 ```
 
@@ -3767,6 +3816,10 @@ Found 517 warnings and 0 errors.                                    # как н�
   «перенос уже был» нет, поэтому база 0.4, подложенная на место позже, тоже поймается.
 - **Сборка Node пропускает проверку.** Под Node `#v1-migration` — пустой модуль, а `bun:sqlite` нет. Отказ стартовать
   остановил бы и все базы v2. Продукт поставляет сборку Bun (B1.6); дыра S4 в сборке Node остаётся, она записана.
+- **Файл, который проверка не смогла прочитать как базу, проходит к серверу, как раньше.** Его судьба — как в upstream:
+  `Database.layer` падает после регистрации службы. Останавливает старт только неудавшийся перенос узнанной базы 0.4.
+- **Блокировка — в `run`, а не только в `guard`.** Так с запуском службы сериализуется и команда `migrate`.
+  Блокировка — каталог `<хеш>.lock` рядом с базой, только на время переноса.
 - **Прерванная замена файлов не останавливает службу.** Если базы по пути нет, а копия `.v1-backup.db` есть (сбой
   между двумя переименованиями `migrate`), `guard` файла не видит, и служба создаёт пустую базу. `migrate` в этом
   случае отказывает и просит вернуть копию, служба — нет: копия может остаться и после того, как пользователь сам удалил
@@ -3776,7 +3829,8 @@ Found 517 warnings and 0 errors.                                    # как н�
 
 - Windows и macOS; живые профили — B3.3.
 - Время старта службы на большом профиле: перенос идёт до прослушивания порта. Desktop ждёт регистрацию 120 с — B4.
-- Два одновременных переноса одной базы (служба и автономный сервер, служба и `migrate`). Временный файл общий, а
-  перенос не закрыт `Flock`: второй может удалить временный файл первого. Что тогда получится, не проверялось.
+- Видны ли после переноса сессии 0.4 из git-репозиториев в списке сессий каталога. Фикстуры содержат только проект
+  `global`, а v2 берёт ID проекта git сначала из remote и лишь потом из прежнего (`gitDiscover`).
+- Одновременный перенос службы и команды `migrate` — тот же `Flock`, но отдельно не гонялся. Гонялись два `serve`.
 - Сборка Node: проверка пропускается, дыра S4 остаётся.
 - Desktop: служба поднималась из CLI (`session list`), а не из окна приложения — B4.
