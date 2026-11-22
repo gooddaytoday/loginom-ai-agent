@@ -9,7 +9,7 @@
       "paths": [
         ".github/**", ".husky/**", "script/**", "nix/**", "patches/**", "turbo.json", ".gitignore", ".gitleaksignore",
         ".gitattributes", ".dockerignore", "install", "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
-        "packages/cli/bin/**"
+        "packages/cli/bin/**", "strobe.json"
       ]
     },
     {
