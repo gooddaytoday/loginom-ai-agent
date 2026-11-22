@@ -47,6 +47,35 @@ export class MigrateError extends Error {}
 
 const SIDECARS = ["-wal", "-shm"]
 
+/** Where the original goes when the new database takes its path. */
+export function backupPath(source: string) {
+  return path.join(path.dirname(source), `${path.basename(source, ".db")}.v1-backup.db`)
+}
+
+/**
+ * Runs before the server opens its database: a 0.3.9/0.4 database at that path is migrated first, because the v2
+ * schema migrations would drop its sessions and report success (spike S4), and a failed migration stops the start.
+ * Anything else passes through to the server as before: a v2 or missing database, a file that does not read as a
+ * database at all, the in-memory one, and the Node build, which cannot read the legacy file.
+ */
+export function guard(file: string) {
+  if (file === ":memory:" || typeof Bun === "undefined" || !existsSync(file)) return Effect.void
+  return Effect.gen(function* () {
+    const sqlite = yield* Effect.promise(() => import("bun:sqlite"))
+    if (!(yield* readOnly(sqlite.Database, file, isLegacy).pipe(Effect.orElseSucceed(() => false)))) return
+    const result = yield* run({ source: file, target: file, backup: backupPath(file) })
+    if (result.status === "migrated")
+      yield* Effect.logWarning("migrated a Loginom AI Agent 0.3.9/0.4 database before opening it", result.summary)
+  }).pipe(
+    Effect.mapError(
+      (error) =>
+        new MigrateError(
+          `The Loginom AI Agent 0.3.9/0.4 database ${file} could not be migrated, so the server does not start: ${error.message}`,
+        ),
+    ),
+  )
+}
+
 export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Service> {
   return Effect.gen(function* () {
     if (typeof Bun === "undefined") return yield* Effect.fail(new MigrateError("migrate runs only in the Bun build"))
@@ -337,6 +366,16 @@ function marker(db: SQLiteDatabase, source: string) {
   if (!isNext(db)) return undefined
   const row = db.query<{ value: string }, [string]>("SELECT value FROM kv WHERE key = ?").get(markerKey(source))
   return row ? (JSON.parse(row.value) as Summary) : undefined
+}
+
+function isLegacy(db: SQLiteDatabase) {
+  const tables = new Set(
+    db
+      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((table) => table.name),
+  )
+  return !tables.has("session_v2") && ["project", "session", "message", "part"].every((table) => tables.has(table))
 }
 
 function isNext(db: SQLiteDatabase) {

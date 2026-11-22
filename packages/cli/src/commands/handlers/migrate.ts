@@ -23,7 +23,7 @@ export default Runtime.handler(
       const result = yield* LegacyMigrate.run({
         source,
         target: databasePath(global.data),
-        backup: path.join(path.dirname(source), `${path.basename(source, ".db")}.v1-backup.db`),
+        backup: LegacyMigrate.backupPath(source),
       })
       const lines =
         result.status === "missing"

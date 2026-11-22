@@ -81,6 +81,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Keep a package-manager or curl install replaceable while the service runs; Desktop updates its own copy.
       if (options.mode === "service" && process.platform === "win32" && RetainedImage.installed(global.home))
         yield* RetainedImage.retain(global.cache, "service")
+      // Loginom AI Agent (B3.1b): a 0.3.9/0.4 database at this path is migrated before v2 opens it, or the start fails.
+      const { LegacyMigrate } = yield* Effect.promise(() => import("@opencode/server/legacy-migrate"))
+      yield* LegacyMigrate.guard(databasePath(global.data))
       const { start } = yield* Effect.promise(() => import("@opencode/server/process"))
       const environmentPassword = yield* Env.password
       // Keep the lease credential out of the environment inherited by tools.
