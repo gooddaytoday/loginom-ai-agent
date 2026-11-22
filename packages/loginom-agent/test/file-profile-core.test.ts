@@ -260,14 +260,11 @@ test("private scan receipt requires exact current source identity", async () => 
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
-// New: the XLSX module is ported separately (B2.5b2). Until then a ZIP workbook is refused like a legacy OLE one, and
-// neither is profiled as text.
-test("a workbook is refused before the XLSX module is ported", async () => {
-  for (const magic of [
-    [0x50, 0x4b, 0x03, 0x04],
-    [0xd0, 0xcf, 0x11, 0xe0],
-  ])
-    await fixture(Buffer.concat([Buffer.from(magic), Buffer.from("region;amount\nNorth;25\n")]), async (path, dir) => {
-      await expect(profileFile(path, dir)).rejects.toThrow("LOGINOM_FILE_XLSX_UNSUPPORTED")
-    })
+// New: a legacy OLE workbook is refused, not profiled as text. A ZIP workbook goes to the XLSX module
+// (`file-xlsx.test.ts`).
+test("a legacy OLE workbook is refused", async () => {
+  const bytes = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0]), Buffer.from("region;amount\nNorth;25\n")])
+  await fixture(bytes, async (path, dir) => {
+    await expect(profileFile(path, dir)).rejects.toThrow("LOGINOM_FILE_XLSX_UNSUPPORTED")
+  })
 })

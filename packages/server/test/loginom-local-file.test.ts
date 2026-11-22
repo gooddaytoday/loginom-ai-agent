@@ -871,6 +871,64 @@ describe("loginom file profile tools (B2.5b1)", () => {
     timeout,
   )
 
+  it.live(
+    "an XLSX workbook goes through the same tools, and its sample's result admits the XLSX sample (B2.5b2)",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        // 16 columns, one header row and two records; 0.4's C1 case for native Excel import.
+        yield* Effect.promise(() =>
+          fs.copyFile(
+            new URL(
+              "../../../docs/node-development/nodes/imports-excel/acceptance/capabilities/fixtures/wide16.xlsx",
+              import.meta.url,
+            ),
+            test.dir + "/wide16.xlsx",
+          ),
+        )
+        const ctx = yield* test.call()
+        const tool = tools(test.files, test.profiles)
+        const profile = yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: "wide16.xlsx" }, ctx))
+        const profiled = content(profile)
+        expect(profiled).toMatchObject({ format: "xlsx", columns_total: 16, settings_complete: true })
+        expect(profile.metadata).toEqual({ truncated: false })
+        const scan = content(
+          yield* Effect.promise(() => tool.loginom_file_scan.execute({ profile_id: profiled.profile_id }, ctx)),
+        )
+        expect(scan).toMatchObject({ profile_id: profiled.profile_id, status: "exact", records: 2 })
+        const result = yield* Effect.promise(() =>
+          tool.loginom_file_sample.execute({ profile_id: profiled.profile_id }, ctx),
+        )
+        const sample = content(result)
+        expect(sample.path.endsWith(".xlsx")).toBe(true)
+        expect(path.dirname(sample.path)).toBe(path.join(test.profiles, ctx.sessionID))
+        expect(sample).toMatchObject({ offset_count: 2, manifest: { format: "xlsx", records: 2 } })
+        expect(sample.manifest.offsets).toBeUndefined()
+        expect(sample.manifest.sha256).toBe(
+          createHash("sha256")
+            .update(yield* Effect.promise(() => fs.readFile(sample.path)))
+            .digest("hex"),
+        )
+        expect(test.asked(ctx.sessionID)).toEqual([
+          "loginom_file_profile",
+          "read",
+          "loginom_file_scan",
+          "read",
+          "loginom_file_sample",
+          "read",
+        ])
+        expect(result.metadata).toEqual({ truncated: false })
+        expect(Buffer.byteLength(String(profile.content))).toBeLessThan(8 * 1024)
+        expect(Buffer.byteLength(String(result.content))).toBeLessThan(8 * 1024)
+
+        yield* test.sessions.remove(ctx.sessionID)
+        yield* test.sampled(ctx.sessionID, String(result.content))
+        expect((yield* Effect.promise(() => test.files.authorize(sample.path, ctx))).canonicalPath).toBe(sample.path)
+        expect(test.asked(ctx.sessionID).slice(6)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   for (const change of ["disappears", "changes", "is replaced", "symlink is redirected"] as const) {
     const code = change === "disappears" ? "LOGINOM_FILE_NOT_FOUND" : "LOGINOM_FILE_CHANGED"
     it.live(
