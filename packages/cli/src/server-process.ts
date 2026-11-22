@@ -88,7 +88,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // process left before any Location activates or a suspended session resumes.
       const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
       const host = yield* Effect.acquireRelease(
-        Effect.promise(() => ServiceHost.start({ data: global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES })),
+        Effect.promise(() =>
+          ServiceHost.start({ data: global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
+        ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
       )
       if (host.recovered.length)
