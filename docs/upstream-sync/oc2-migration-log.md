@@ -6400,3 +6400,224 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Отказ ОС на чтение (`chmod 0`) — под root пропущен.
 - Принимается ли схема с верхним `anyOf` провайдерами, требующими `type: "object"` на верхнем уровне (OpenAI): в 0.4
   модель получала тот же верхний `anyOf`; преобразования схемы провайдером в v2 не смотрел.
+
+## B4.2 appId и userData
+
+22.11.2026. Ветка `b42-desktop-userdata` от `oc2-migration` (`374ff612cc`), рабочее дерево `.claude/worktrees/b42`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0,
+1600 пакетов, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/loginom-agent`
+и `packages/loginom-host` (B2.3) не трогал. Упакованная сборка не собиралась и не запускалась, окно Desktop тоже: после
+правки запуск из исходников берёт настоящий userData dev `<appData>/com.loginom.aiagent.dev`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `926085e14c` `fix(desktop): stage the bundled CLI outside the CLI 0.4 profile` | ступени в `<userData>/cli-stages/`, `cleanStages` удаляет только каталоги вида ступени; тесты в `service/cli-stages.test.ts` |
+| `75ae5bf54f` `feat(desktop): product app id, name and userData by channel, as in 0.4` | `constants.ts` берёт имя и id у нового файла форка `src/main/app-identity.ts`; тест `app-identity.test.ts` (новый) |
+| следующий | этот раздел; CAT-09, CAT-13 и список новых файлов в `catalog.md` |
+
+Порядок коммитов нарочно такой: ни на одном коммите ветки нет `appId` продукта без защиты профиля.
+
+### Что это в 0.4
+
+- **Имя, id, userData.** 0.4: `index.ts:151-181`: `appId = app.isPackaged ? Product.channels[CHANNEL] : Product.channels.dev`,
+  `app.setName(productName(app.isPackaged ? CHANNEL : "dev"))`, `app.setAppUserModelId(appId)`, userData —
+  `<appData>/<appId>` (кроме тестового корня онбординга). Каналов три: `prod`, `beta`, `dev`.
+- **Профиль автономного CLI 0.4** — `<appData>/<Product.channels[канал]>/cli/profiles/default` (`product/src/cli-profile.ts`),
+  то есть внутри userData Desktop 0.4 того же канала: подключение Loginom с паролем, база, конфиг.
+- **Копии CLI в 0.4.** Экспериментальный backend v2 (`LOGINOM_AI_AGENT_SIDECAR_V2=1`) копировал CLI в `<userData>/cli/<версия>/`
+  без суффикса архитектуры и без очистки (0.4: `background-cli.ts:66`). Остальное в userData 0.4: `loginom/`, `logs/`,
+  `Crashpad/`, `drafts.sqlite`, `*.dat`, каталог состояния backend (`XDG_STATE_HOME` = userData, 0.4: `server.ts:60`) и
+  каталоги Chromium. Каталога `cli-stages` в 0.4 нет: `git grep -l cli-stages a080f7725c` — пусто.
+
+### Что поменялось против v2.3.0 и почему
+
+**Имя, id и userData — как в 0.4.** `constants.ts` вместо таблиц `OpenCode*` / `ai.opencode.desktop*` вызывает
+`appIdentity({ packaged: app.isPackaged, channel: CHANNEL })` из нового файла форка `src/main/app-identity.ts`:
+`productChannel` (prod, beta; остальное — dev), `Product.channels`, `productName`; запуск из исходников — dev, как в 0.4.
+Канал `local` сборка main и так сворачивает в `dev` (`electron.vite.config.ts:47`), `productChannel` делает то же.
+`lifecycle/configure.ts` не менялся: `app.setName(APP_NAME)`, `app.setAppUserModelId(APP_ID)`, userData `<appData>/<APP_ID>`.
+
+| Сборка | Имя (`app.setName`) | id (`setAppUserModelId`, каталог userData) | userData: Windows / macOS / Linux |
+|---|---|---|---|
+| prod | `Loginom AI Agent` | `com.loginom.aiagent` | `%APPDATA%\com.loginom.aiagent` / `~/Library/Application Support/com.loginom.aiagent` / `${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent` |
+| beta | `Loginom AI Agent Beta` | `com.loginom.aiagent.beta` | то же с `.beta` |
+| dev, `local`, запуск из исходников | `Loginom AI Agent Dev` | `com.loginom.aiagent.dev` | то же с `.dev` |
+
+Совпадение userData и имени с 0.4 нужно B4.13: ключ `safeStorage` на Windows лежит в `<userData>/Local State`, на macOS —
+в Keychain под именем приложения (B4.1, по документации Electron; здесь не проверялось).
+
+**Ступени копии CLI — вне профиля.** Две независимые защиты, у каждой свой тест:
+
+- **Каталог, которого в 0.4 нет.** `stageDirectory(userData, version)` в `service/cli-version.ts` рядом со `stageName` —
+  `<userData>/cli-stages/<версия>-<арх>`; `service/desktop-cli.ts` (`installCli`) берёт каталог у неё вместо
+  `<userData>/cli/<ступень>`. `cleanStages` чистит родителя текущей ступени, то есть `cli-stages/`, и до `cli/profiles/`
+  не доходит.
+- **Удаляются только каталоги вида ступени.** `isStageName` рядом со `stageName`: `^[a-zA-Z0-9._-]+-(x64|arm64)$` — всё, что
+  выдаёт `stageName` (после замены символов), с архитектурами, под которые собирается Desktop (`electron-builder.config.ts:115`,
+  «Unsupported desktop architecture»). Обе архитектуры, а не только `process.arch`: на Windows ARM64 установщики x64 и
+  arm64 делят userData. `cleanStages` пропускает всё остальное: `profiles`, чужие каталоги, ступени без архитектуры.
+
+В таблице теста upstream `service/cli-stages.test.ts` имена ступеней получили суффикс `-x64`, как у настоящих ступеней
+(без него проверка вида ступени их не трогает); случаи и ожидания те же.
+
+### Правки файлов upstream
+
+| Файл | +/− | Что |
+|---|---|---|
+| `packages/desktop/src/main/constants.ts` | +5 −14 | имя и id из `appIdentity` вместо литералов OpenCode |
+| `packages/desktop/src/main/service/cli-version.ts` | +13 | `stageDirectory`, `isStageName` (новые для каталога, теперь расходится с v2.3.0) |
+| `packages/desktop/src/main/service/cli-stages.ts` | +3 −1 | пропуск каталогов не вида ступени (новый для каталога) |
+| `packages/desktop/src/main/service/desktop-cli.ts` | +2 −3 | каталог ступени из `stageDirectory` |
+| `packages/desktop/src/main/service/cli-stages.test.ts` | +80 −5 | суффикс архитектуры в таблице upstream; блок форка (новый для каталога) |
+
+Новые файлы форка: `packages/desktop/src/main/app-identity.ts` (11 строк), `app-identity.test.ts` (25). Все пять файлов
+upstream попадают в CAT-09 по маске `packages/desktop/**`: у CAT-13 явный список путей, и этих файлов в нём нет.
+`catalog.json` не менялся. В `catalog.md`: CAT-09 — назначение, «почему не вынесено», проверка, политика (`fork-owned` для
+имени и id в `constants.ts`, каталога ступеней и отбора в `cleanStages`), «не перенесено»; CAT-13 — одно предложение со
+ссылкой на CAT-09; в шапке — новый файл Desktop `app-identity.ts`.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 440 divergent upstream files      # база 437: +cli-version.ts, +cli-stages.ts, +cli-stages.test.ts
+  CAT-13: 10
+  CAT-09: 25                                              # база 22
+```
+
+### Тесты
+
+- `service/cli-stages.test.ts`, блок форка «staged CLIs beside the CLI 0.4 profile»:
+  - «cleanStages removes old stages and leaves the profile and any other directory» — раскладка пробы B4.1: в очищаемом
+    каталоге `profiles/default/{loginom/connection/connection.json,data/loginom-ai-agent.db}`, чужой каталог `notes` и
+    ступени `2.2.0-x64`, `2.3.0-arm64`, `2.3.0-x64`; текущая — `2.3.0-x64`. Остаются `2.3.0-x64`, `notes`, `profiles`,
+    `connection.json` не изменён. Это случай «ступени остались бы в `<userData>/cli`».
+  - «stages live outside the directory of the CLI 0.4 profile» — во временном userData профиль 0.4 в `cli/profiles/default`,
+    старые ступени `stageDirectory` для `2.2.0`, `2.1.0-beta.1`, `local`, `0.0.0-dev+build/7` и текущая `2.3.0`: ступень
+    не внутри `<userData>/cli`, в `cli-stages/` осталась только текущая, в `cli/` — только `profiles`, `connection.json`
+    цел. Заодно проверяет, что `isStageName` узнаёт имена `stageName` с пререлизом, `local` и заменёнными символами.
+- `app-identity.test.ts` — одна таблица: packaged prod, beta, dev, packaged `local`, запуск из исходников. Имя и id —
+  литералы 0.4; профиль CLI 0.4 канала (`cliProfile`, Linux, `home=/home/u`) лежит в `/home/u/.config/<id>/cli/profiles/default`,
+  то есть внутри userData `<appData>/<id>`.
+
+```text
+$ cd packages/desktop && bun test src/main/service/cli-stages.test.ts src/main/app-identity.test.ts
+ 11 pass
+ 0 fail
+Ran 11 tests across 2 files. [383.00ms]
+```
+
+### Мутации
+
+Каждая — правка `sed` в рабочем дереве на `75ae5bf54f`, прогон, возврат (`git checkout` или копия); после — `git status` чистый по коду.
+
+```text
+=== M1: cleanStages без защиты: if (keep.has(entry)) return
+error: expect(received).toEqual(expected)
+@@ -2,4 +2,2 @@
+    "2.3.0-x64",
+-   "notes",
+-   "profiles",
+  ]
+(fail) staged CLIs beside the CLI 0.4 profile > cleanStages removes old stages and leaves the profile and any other directory
+ 5 pass
+ 1 fail
+=== M2: stageDirectory снова в <userData>/cli ("cli-stages" → "cli")
+Expected: true
+Received: false
+(fail) staged CLIs beside the CLI 0.4 profile > stages live outside the directory of the CLI 0.4 profile
+ 5 pass
+ 1 fail
+=== M1+M2 вместе (как v2.3.0)
+(fail) … cleanStages removes old stages and leaves the profile and any other directory
+(fail) … stages live outside the directory of the CLI 0.4 profile
+ 4 pass
+ 2 fail
+=== M3: appIdentity возвращает OpenCode / ai.opencode.desktop*
+ 0 pass
+ 5 fail
+=== M4: запуск из исходников берёт канал сборки (без packaged ? … : "dev")
+(fail) appIdentity > packaged false, channel prod keeps the 0.4 identity com.loginom.aiagent.dev
+ 4 pass
+ 1 fail
+```
+
+### Приёмка
+
+`packages/desktop`, `LOGINOM_AI_AGENT_TEST_NODE` — переносной Node 24.19.0:
+
+```text
+# база 374ff612cc
+$ bun typecheck
+✓ No type errors in 3,503 files across 2 projects [3.74s]
+$ bun test --timeout 30000
+ 529 pass
+ 4 skip
+ 0 fail
+Ran 533 tests across 68 files. [7.44s]
+# итог 75ae5bf54f
+$ bun typecheck
+✓ No type errors in 3,504 files across 2 projects [3.57s]
+$ bun test --timeout 30000
+ 536 pass                                                 # +7: 2 в cli-stages.test.ts, 5 в app-identity.test.ts
+ 4 skip
+ 0 fail
+Ran 540 tests across 69 files. [5.82s]
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py                  # код 0
+against a6b15d33daf6: 440 divergent upstream files
+$ python3 -I scripts/upstream-sync/apply-identity.py --check          # код 0
+would change: 0 files
+$ bun run check                                                       # код 0, на 75ae5bf54f
+Found 515 warnings and 0 errors.                          # у новых и изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`product` (`bun test`, пакет не менялся) — 58 pass, 3 fail: те же три `repo-paths.test.ts` (В-95), на базе так же.
+
+### Где решал сам
+
+- **`cli-stages.test.ts` не новый.** Задание называет его новым, а файл есть в v2.3.0. Меньший вариант — дописать в него
+  блок форка, а не заводить второй файл тех же тестов.
+- **Две защиты, а не одна.** Так в задании и разведке. Любая из них одна спасает профиль, поэтому мутация «без защиты»
+  разделена: M1 снимает проверку вида ступени — красный тест пробы B4.1; M2 возвращает каталог — красный тест раскладки.
+- **Вид ступени — по имени, а не по содержимому.** Задание называет ступень `<версия>-<арх>`; проверка стоит рядом со
+  `stageName`, тест раскладки гоняет её через `stageName`. Цена — правка данных таблицы upstream (суффикс архитектуры) и
+  то, что каталоги без суффикса больше не чистятся: в `cli-stages/` их быть не может. Копии экспериментального backend
+  v2 0.4 в `<userData>/cli/<версия>/` остаются на диске — они не данные, и удалять что-то в `cli/` эта задача не должна.
+- **Имя каталога `cli-stages`.** Нет в userData 0.4 (выше), в `cli/` не вложен, поэтому не пересекается и с профилями
+  CLI v2, если B2.7c оставит их в `<appData>/com.loginom.aiagent/cli/profiles/`.
+- **Новый файл `app-identity.ts`.** `constants.ts` читает `app.isPackaged` при загрузке, и `bun test` его не импортирует
+  без подмены Electron. Чистая функция рядом — как `service-identity.ts` и `diagnostics/options.ts`; её вызывает
+  производственный код, тестовых параметров нет (по той же причине у `stageDirectory` нет параметра архитектуры).
+- **Каталог.** Файлы ступеней тематически ближе к CAT-13 («свой каталог продукта»), но по правилам каталога они попадают
+  в CAT-09 (маска), и переносить их в явный список CAT-13 — лишняя правка `catalog.json`. Описаны в CAT-09, в CAT-13 —
+  ссылка.
+- **`guarantees.md` не менял.** Новые тесты защищают профиль CLI (близко к G2), но таблица гарантий — общий контракт;
+  добавить строку — решение владельца.
+
+### Найдено, не чинил
+
+Литералы id и имени OpenCode, которые теперь расходятся с `APP_ID` во время работы (задачи B4.3, B4.5a):
+
+- `electron-builder.config.ts:43-47` `APP_IDS` и с ним NSIS `${APP_ID}` (`resources/windows/installer.nsh`: каталог установки
+  `<…>\Programs\<appId>`, `SetLnkAUMI` закреплённого ярлыка). До B4.5a у упакованной сборки AUMID ярлыка и окна разные.
+- `perf/startup.bench.ts:154-160` ищет `loginom-ai-agent.settings` в `AppData/Roaming/ai.opencode.desktop*` — замер не
+  найдёт настройки продукта.
+- `script/dev-electron.ts:31-34`: пакет разработки macOS — `OpenCode Dev`, `ai.opencode.desktop.dev`; Dock и, возможно,
+  имя записи Keychain у запуска из исходников на macOS не совпадут с `app.setName`.
+- `script/copy-metainfo.ts:7-9` — id и имя в metainfo Linux; комментарий `storage/store.ts:25` называет
+  `%APPDATA%\ai.opencode.desktop.dev`.
+
+### Не проверено
+
+- Упакованная сборка и настоящий userData: не собиралась и не запускалась (задание). Пути `app.getPath("appData")` по
+  платформам взяты из документации Electron и модели `cliProfile`, Electron их здесь не считал.
+- `constants.ts` тестами не покрыт (импорт Electron при загрузке) — только typecheck и `bun run check`; соответствие
+  каналов проверяет `app-identity.test.ts`.
+- Чтение записей `safeStorage` 0.4 при тех же userData и имени (B4.14a); Windows и macOS; общий userData x64 и arm64 на
+  Windows ARM64 — только по именам ступеней в юнит-тесте.
