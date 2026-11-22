@@ -29,7 +29,7 @@ impl Daemon {
             rand::random::<u128>()
         ));
         let directory = root.join("test");
-        let mut child = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
             .args(["daemon", "--name", "test", "--runtime-dir"])
             .arg(&root)
             .stdin(Stdio::null())

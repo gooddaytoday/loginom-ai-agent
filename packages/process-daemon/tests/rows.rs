@@ -86,7 +86,7 @@ fn daemon_client_read_rows_roundtrip() {
     let root =
         std::env::temp_dir().join(format!("opencode-pty-rows-{:032x}", rand::random::<u128>()));
     let runtime = root.join("rows");
-    let mut daemon = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let mut daemon = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .args(["daemon", "--name", "rows", "--runtime-dir"])
         .arg(&root)
         .stdin(Stdio::null())

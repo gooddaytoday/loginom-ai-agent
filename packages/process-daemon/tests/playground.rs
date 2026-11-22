@@ -70,7 +70,7 @@ fn read_created_terminal(child: &mut std::process::Child) -> String {
 fn playground_proves_authoritative_query_response() {
     let root = runtime_root("query");
     let runtime = root.join("play");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .arg("play")
         .args(target(&root))
         .stdin(Stdio::piped())
@@ -100,7 +100,7 @@ fn playground_proves_authoritative_query_response() {
 fn playground_exit_stops_all_terminals_and_observers_do_not_start_daemons() {
     let root = runtime_root("ownership");
     let runtime = root.join("play");
-    let mut owner = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let mut owner = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .arg("play")
         .args(target(&root))
         .stdin(Stdio::piped())
@@ -126,7 +126,7 @@ fn playground_exit_stops_all_terminals_and_observers_do_not_start_daemons() {
         })
         .collect::<Vec<_>>();
 
-    let second = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let second = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .arg("play")
         .args(target(&root))
         .stdin(Stdio::null())
@@ -141,7 +141,7 @@ fn playground_exit_stops_all_terminals_and_observers_do_not_start_daemons() {
     );
     for command in ["list", "status"] {
         assert!(
-            Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+            Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
                 .arg(command)
                 .args(target(&root))
                 .output()
@@ -163,7 +163,7 @@ fn playground_exit_stops_all_terminals_and_observers_do_not_start_daemons() {
     }
     for args in [&["list"][..], &["status"], &["watch", "1"]] {
         assert!(
-            !Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+            !Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
                 .args(args)
                 .args(target(&root))
                 .output()
@@ -181,7 +181,7 @@ fn playground_exit_stops_all_terminals_and_observers_do_not_start_daemons() {
 fn observer_stream_replays_and_follows_until_exit() {
     let root = runtime_root("stream");
     let runtime = root.join("play");
-    let mut owner = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let mut owner = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .arg("play")
         .args(target(&root))
         .stdin(Stdio::piped())
@@ -196,7 +196,7 @@ fn observer_stream_replays_and_follows_until_exit() {
         .unwrap();
     let terminal_id = created_terminal_id(read_created_terminal(&mut owner).as_bytes());
 
-    let watched = Command::new(env!("CARGO_BIN_EXE_opencode-pty"))
+    let watched = Command::new(env!("CARGO_BIN_EXE_loginom-ai-agent-pty"))
         .args(["watch", &terminal_id])
         .args(target(&root))
         .stdout(Stdio::piped())
