@@ -3365,3 +3365,238 @@ Found 517 warnings and 0 errors.                                    # в нов�
 - Большие профили: время, память, размер журнала одной транзакции.
 - Вложения 0.4 больше 10 МБ (часть `file` с `source` квитанции хоста): примет ли их `SessionV1.FilePart` v2.
 - Запуск при работающей службе. Команда этого не проверяет; порядок «до старта службы» обеспечит B4.
+
+## B2.2 Допуск и шлюз инструментов
+
+22.11.2026. Ветка `b22-access-gate` от `oc2-migration` (`93b90a5daa`, в ней B2.1), рабочее дерево `.claude/worktrees/b22`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`:
+1600 пакетов, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Основа —
+spike `origin/stage-b-checks` (отчёт: S1, S7, B0.3/S11; прототип `spike/oc2/plugin/loginom-product/index.ts`) и 0.4
+`a080f7725c` (`packages/opencode/src/product/{tool-policy,tool-contributor,turn-lifecycle}.ts`,
+`session/task-scope.ts` и их тесты). Решения: 11 с В-36 и В-41, В-69 (запрет администратора — B2.6c, здесь не задет).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `8574c217a1` `feat(loginom-agent): Loginom access grants and the tool gate (G1)` | `packages/loginom-agent/src/{access,index}.ts`, `test/access.test.ts`, зависимость от `loginom-host`, скрипт `test`, `bun.lock`; `packages/server/test/loginom-access.test.ts` |
+| `7695706bfb` `test(server): the Loginom gate also filters session.generate requests` | проверка `session.generate` в тесте S1 |
+| `182503a34a` `docs(upstream-sync): record B2.2 access grants and the tool gate (G1)` | этот раздел (первая версия), строка G1 в `guarantees.md`, CAT-05 |
+| `30d8a5528e` `fix(loginom-agent): leave tools registered outside CodeMode untouched; test the compaction filter` | `codemode: false` ставится только тем, у кого его нет; проверка сжатия истории в тесте S1 |
+| следующий | уточнения этого раздела и `guarantees.md` |
+
+### Что сделано
+
+- **Политика** — `packages/loginom-agent/src/access.ts`, одна функция `permits(profile, tool)` для обоих хуков шлюза
+  (в 0.4 было два метода, `permits` и `permitsLoginom`; при двух методах мутация «`permits` всегда `true`» не
+  задела бы инструменты Loginom). Профили задачи: `default`, `package-docs`, `loginom-automation` (дашборд — B2.9).
+  - `package-docs`: только `read`, `glob`, `grep`, `edit`, `write`, `patch`, `todowrite`, `question`, `skill`,
+    `package_docs_run` и локальная справка Loginom (`loginom_{find,search,read,grep,glob,list,tree,dock_diagnostics}`);
+    CodeMode `execute`, `shell`, `subagent`, сайты — нет.
+  - `loginom_*`, кроме локальной справки, — только `loginom-automation`; `package_docs_run` — только `package-docs`;
+    `subagent` в `loginom-automation` запрещён (в 0.4 — `task`).
+  - Переходы — `next(current, requested)` через `HostTaskScope.permits` из `loginom-host`: `package-docs` не
+    расширяется до `loginom-automation`, обратное разрешено, как в 0.4.
+- **Шлюз** — `packages/loginom-agent/src/index.ts`, хуки плагина `loginom.product` (последний в `post`, U1):
+  - `context`, `compaction`, `generate` — удаляют из `event.tools` всё, что профилю задачи не разрешено (на
+    `compaction` и `generate` модель тоже видит инструменты сессии; так же сделано у `patch` upstream);
+  - `execute.before` — отклоняет вызов с текстом `LOGINOM_SCOPE_DENIED: tool <имя> is not available in this task`;
+    срабатывает и на вложенный вызов из CodeMode, и на вызов, оставшийся в шаге после отзыва допуска;
+  - `tool.transform` — инструментам, которым нужен допуск (`!permits("default", id)`) и которые зарегистрированы без
+    `codemode: false`, ставит `codemode: false`. Уже правильные не трогает: `editor.update` Promise-API перекрывает
+    исполнитель инструмента обёрткой (`executePromiseTool(promiseExecutor(…))`, `plugin/src/promise/adapter.ts`), и у
+    настоящих инструментов B2.5 поменялась бы отмена (контекст читает `signal`, `cancel` пропадает) — до `30d8a5528e`
+    так и было.
+    Без этого их видно в каталоге CodeMode в инструкциях без допуска (находка S1). Инструменты Loginom переносит B2.5;
+    правило действует на любой инструмент с таким именем, кто бы его ни зарегистрировал.
+- **Допуск** — память экземпляра плагина, ключ — точный ID сессии (не родитель и не `affinity`). Живёт одну задачу,
+  как в 0.4: от промпта или загрузки навыка, которые его выдали, до следующего принятого промпта сессии.
+  - Мастер: RPC `loginom.runner.start {sessionID, profile, text}` (имя из spike S7). Обработчик кладёт одноразовый
+    токен в `metadata` промпта, хук `prompt` узнаёт по нему промпт мастера, выдаёт профиль и удаляет ключ из метаданных.
+    Подделать токен клиент не может, другой промпт его не получает. Интерфейс мастера — этап C.
+  - Команда пользователя: навык продукта (`loginom-automation`, `package-docs`), приложенный к промпту
+    (`prompt.skills`). По коду так передают выбранный пользователем навык TUI (автодополнение `@навык` и окно навыков:
+    `tui/src/component/prompt/{autocomplete.tsx,index.tsx}`) и приложение (`skills` в `app/src/composer/submit.ts`).
+    Навыков-команд в v2 нет (`core/src/command.ts`), API `experimental.session.skill` (`Session.skill`) приложение, TUI,
+    CLI и Desktop не вызывают; через него допуск не выдаётся. Расписание и `subagent` шлют только текст.
+  - Сам агент в обычном разговоре (решение 11): `execute.after` инструмента `skill` со статусом `completed` и ID навыка
+    продукта. Вопроса пользователю нет, как в 0.4; инструменты появляются со следующего шага.
+  - Hub: навык Hub с именем `loginom-automation` имеет свой ID (`hub.…`) и допуска не даёт — ни приложенный, ни
+    загруженный агентом. Что ID навыков продукта бывают только у встроенного каталога, держит B2.4 (G6).
+- **Не наследуют:** подсессия и форк — другая сессия; хук `session.fork` удаляет допуск для нового ID (по построению
+  его там нет: хук закрепляет правило, если хранилище когда-нибудь станет выводиться из истории). Пробуждение по
+  расписанию — новый промпт (`admitWake`, доставка `steer`), то есть новая задача, даже если выполнение с допуском ещё
+  идёт. `session.permissions` клиента шлюз не читает.
+
+### Правки файлов upstream
+
+Нет. Новые файлы форка: `packages/loginom-agent/src/access.ts`, `packages/loginom-agent/test/access.test.ts`,
+`packages/server/test/loginom-access.test.ts`; изменены файлы форка `packages/loginom-agent/{package.json,tsconfig.json,src/index.ts}`.
+`bun.lock` +1 строка (зависимость `loginom-agent` от `loginom-host`, запись CAT-01). В каталоге у CAT-05 снят `pending`
+B2.2 (остались B2.3, B2.5, B2.6, B2.9), в `catalog.md` записано, где теперь шлюз. `catalog-check.py` — 429 расходящихся
+файлов upstream, как после B2.1.
+
+### Тесты
+
+`packages/loginom-agent/test/access.test.ts` (6 тестов) — таблица политики по образцу 0.4 `tool-policy.test.ts` с именами
+v2 и переходы допуска.
+
+`packages/server/test/loginom-access.test.ts` (7 тестов) — настоящий сервер (`createEmbeddedRoutes`, канал `dev`, где
+расписания включены по умолчанию), планировщик запущен, как в `process.ts`, модель — `TestLLM` по сценарию из текста
+сообщения: один шаг сценария на вызов модели. Плагин стенда (`SdkPlugins`) регистрирует заглушки инструментов Loginom
+`loginom_probe` (`codemode: false`, как будут у B2.5) и `loginom_probe_codemode` (CodeMode по умолчанию), инструмент
+`hold`, навыки продукта (как у B2.4) и навык Hub `hub.loginom-automation`.
+
+| Тест | Что проверяет |
+|---|---|
+| S1 без допуска | прямой вызов: инструмента нет в запросе к модели, вызов отклонён, не выполнен; в каталоге CodeMode в инструкциях его нет; CodeMode `execute` → `tools.loginom_probe_codemode()` не выполнен; правила сессии `* * allow` и `* * allow` + `execute deny` (инструменты CodeMode становятся прямыми) — ни в запросе, ни при вызове (правила ставятся через `Session.setPermissions`, тот же сервис, что за `PATCH /api/session/:id`); запросы `session.generate` (`/btw`) и ручного сжатия истории тоже без инструмента |
+| источники допуска | мастер (RPC `loginom.runner.start`): инструмент в запросе, выполнен; следующий промпт — уже без допуска; команда пользователя (`prompt.skills`) — выполнен; агент грузит `loginom-automation` — инструмент появляется со следующего шага, выполнен; навык Hub приложен или загружен — не выполнен; `package-docs`: в запросах только инструменты профиля, `shell` отклонён, загрузка `loginom-automation` профиль не расширяет |
+| S1 подсессия и форк | сессия с `loginom-automation` не видит и не вызывает `subagent`; ребёнок, созданный до допуска родителя, после допуска родителя вызывает инструмент — отклонено; форк сессии с допуском, разбуженный синтетическим сообщением (без промпта), — отклонено; то же синтетическое сообщение в исходной сессии допуск не снимает — выполнен |
+| S1 расписание | пробуждение после выполнения с допуском — отклонено; пробуждение во время выполнения с допуском (инструмент `hold` держит шаг, пробуждение принято, затем доставлено на границе шага того же выполнения — последний шаг исходного сценария так и не наступил) — отклонено |
+| промпт посреди шага | шаг начат с допуском (инструмент в запросе), вызов модели задержан; принят новый промпт; вызов отклонён `execute.before` — это единственный слой, который тут работает |
+| контракт: `context`, `execute.before` | плагин-проба без политики продукта: удаление ключа из `event.tools` убирает инструмент из запроса, его прямой вызов — `Tool is not available for this request`; брошенная в `execute.before` ошибка отклоняет вложенный вызов из CodeMode, соседний разрешённый вложенный вызов выполняется |
+| контракт: `prompt`, `fork`, `skill` | `prompt` видит промпт клиента с `skills` и пробуждение по расписанию с `metadata.schedule`, синтетическое сообщение — нет; `fork` получает ID новой сессии; `execute.after` инструмента `skill` — вход `{ id }` и `completed` |
+
+Устойчивость: `bun test --rerun-each 10 test/loginom-access.test.ts` — на `8574c217a1` 70 pass / 0 fail за 56,9 с, на
+`7695706bfb` — 62,8 с, на `30d8a5528e` — 59,6 с, везде 70 / 0. Длительности по `--reporter=junit`: 0,27–2,4 с, дольше всех тест расписания
+(две реальные секундные задержки планировщика). Таймаут теста — 30 с с комментарием: пакет `server` по умолчанию даёт 5 с.
+
+### Мутации
+
+Скрипт в дереве `30d8a5528e` (числа те же, что на `7695706bfb`, плюс M7): мутация вносится `perl`/`sed`, оба набора запускаются
+(`cd packages/loginom-agent && bun test`, `cd packages/server && bun test test/loginom-access.test.ts`), файл
+возвращается из копии; после последней мутации `git status` пакета чистый.
+
+```text
+=== M0 none                                 access 6 pass 0 fail; loginom-access 7 pass 0 fail
+=== M1 permits always true                  access 2/4 (политика); loginom-access 2/5: S1 без допуска, источники допуска,
+                                            подсессия и форк, расписание, промпт посреди шага (зелёные — два контракта)
+=== M2 execute.before gate off              access 6/0; loginom-access 3/4: S1 без допуска, источники допуска,
+                                            подсессия и форк, промпт посреди шага
+=== M3 CodeMode not forced off              loginom-access 6/1: S1 без допуска (инструмент в каталоге CodeMode)
+=== M4 a new prompt keeps the grant         loginom-access 4/3: источники допуска, расписание, промпт посреди шага
+=== M5 package-docs widens to automation    access 5/1 (переходы); loginom-access 6/1: источники допуска (package-docs)
+=== M6 generate hook off                    loginom-access 6/1: S1 без допуска (запрос session.generate)
+=== M7 compaction hook off                  loginom-access 6/1: S1 без допуска (запрос сжатия истории)
+```
+
+M1 — мутация из приёмки B2.2 («`permits` всегда `true`»). При M2 там, где инструмент скрыт `context`, вызов
+останавливает ядро (`Tool is not available for this request`), а тесты ждут текста продукта `LOGINOM_SCOPE_DENIED`;
+выполниться инструмент может только в тесте «промпт посреди шага» (по коду, счётчик вызовов при M2 не печатал).
+Хук `fork` без мутации: по построению он ничего не меняет.
+
+### Приёмка
+
+Полные прогоны — на `8574c217a1` одной цепочкой, по одному пакету. Дальше `7695706bfb` и `30d8a5528e` меняют тест
+`server` и фильтр преобразования инструментов (сужение: только инструменты с допуском без `codemode: false`; в тестах
+`core`, `cli`, `sdk` таких имён нет); на `30d8a5528e` повторены `server` целиком — 134 pass, 1 skip, 0 fail —
+и `loginom-agent` — 6 / 0. `loginom-host` — после
+`npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` Node 24.19.0, с `LOGINOM_AI_AGENT_TEST_NODE`, под
+`xvfb-run -a`.
+
+| Пакет | Команда | База | `8574c217a1` |
+|---|---|---|---|
+| `loginom-agent` | `bun test` | тестов не было | 6 pass, 0 fail |
+| `server` | `bun test` | 127 pass, 1 skip, 0 fail (B2.1) | 134 pass (+7 новых), 1 skip, 0 fail |
+| `core` | `bun run script/test.ts` | 7125 pass, 354 skip, 3 fail | 7125 pass, 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) |
+| `cli` | `bun test --timeout 60000` | 408 pass, 9 skip, 0 fail | 408 pass, 9 skip, 0 fail |
+| `sdk` | `bun run test` | 40 / 0 | 40 / 0 |
+| `product` | `bun test` | 58 pass, 3 fail (`repo-paths`, В-95) | 58 pass, 3 fail — те же |
+| `loginom-host` | `xvfb-run -a bun test` | 504 pass, 13 skip, 38 fail | 505 pass, 12 skip, 38 fail |
+
+`loginom-host`: те же 38 падений по группам базы (`skills-acceptance` 24, фикстуры пакета `opencode` 0.4 — 9,
+`bundled-ripgrep` 3, `umask` и `managed-work-entry` под root). На один пропуск меньше и на один успех больше, чем в
+базе: пакет B2.2 не трогал (`git diff 93b90a5daa HEAD -- packages/loginom-host` пуст) и от `loginom-agent` он не
+зависит; пропуски там зависят от окружения (`skipIf` по переменным `LOGINOM_*` и наличию архивов), какой тест
+разошёлся — не выяснял.
+
+```text
+$ python3 scripts/upstream-sync/catalog-check.py
+against a6b15d33daf6: 429 divergent upstream files       # код 0; CAT-05: 0 (pending: B2.3, B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                          # код 0
+Found 517 warnings and 0 errors.                          # как в B2.1; у новых файлов oxlint — 0 предупреждений
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 177 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo; повтор `bun turbo typecheck --force`: 39/39, 0 из кэша
+$ cd packages/loginom-agent && bun run typecheck:tsc      # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
+```
+
+`bun run check` повторён на `64fe2e93a7` (код как в `30d8a5528e`): код 0, `Found 517 warnings and 0 errors`, 39/39 задач;
+у новых файлов предупреждений oxlint нет.
+
+### Где решал сам
+
+- **Допуск живёт до следующего промпта, а не до конца выполнения (как в spike).** Пробуждение по расписанию приходит
+  промптом с доставкой `steer` и, если выполнение с допуском ещё идёт, попадает в него на границе шага: допуск,
+  привязанный к выполнению, перешёл бы к пробуждению (spike проверял только пробуждение после конца выполнения).
+  Отзыв по событию `session.execution.*` к тому же асинхронный и может догнать свежий допуск следующей задачи.
+  Отзыв в хуке `prompt` синхронный и совпадает с 0.4: новая задача — новое сообщение пользователя. Синтетические
+  сообщения (уведомления о фоновой работе, напоминания) хук `prompt` не вызывают и задачу не меняют — проверено тестом.
+- **Отзыв — в момент приёма промпта, а не доставки.** Промпт с доставкой `queue` снимает допуск текущей задачи
+  сразу, а не когда сессия дойдёт до простоя; запрос мастера или команда, поставленные в очередь, выдают допуск тоже
+  сразу. Ошибка в безопасную сторону; точный вариант требует выводить задачу из истории в `context` и ломается на
+  сжатии истории — не стал.
+- **Имена инструментов.** Задание: «`write` и `patch` → `edit`». В v2.3.0 `write` и `patch` — по-прежнему имена
+  инструментов (`core/src/tool/plugin/{write,patch}.ts`), `edit` у них только действие разрешения; ключи `event.tools`
+  и `event.tool` — имена инструментов. Поэтому в списках `edit`, `write`, `patch`; переименования 0.4 → v2:
+  `apply_patch` → `patch`, `bash` → `shell`, `task` → `subagent` (как `RENAMED_TOOLS` в `core/src/database/v1-migration.bun.ts`).
+  Набор в настоящем запросе (модель не GPT, поэтому `patch` убран плагином `patch` upstream): без допуска —
+  `edit, glob, grep, hold, question, read, shell, skill, subagent, todowrite, webfetch, websearch, write, execute`;
+  `loginom-automation` — те же без `subagent`, плюс оба `loginom_probe*`; `package-docs` — `edit, glob, grep, question,
+  read, skill, todowrite, write`.
+- **Команда пользователя — навык в `prompt.skills`**, а не своя команда плагина (`ctx.command.transform`) и не
+  `Session.skill`. Так v2 передаёт выбор навыка пользователем, и хук `prompt` видит его до приёма. Активация через API
+  `Session.skill` допуска не даёт.
+- **RPC мастера `loginom.runner.start`** — новый контракт для этапа C (окно мастера) и B4; имя и форма из spike S7,
+  вход проверяет JSON Schema хоста RPC. До первой работы в location RPC ещё не зарегистрирован (`rpc.unavailable`,
+  S7) — клиент ждёт сам, как велит `AGENTS.md` («Plugin Loading»).
+- **`codemode: false` навязывает плагин**, а не ждёт его от B2.5: преобразование инструментов продукта идёт последним.
+  Следствие: инструмент с допуском в CodeMode не попадает вовсе, вложенный путь для него закрыт до `execute.before`.
+  `execute.before` остаётся для вызовов шага, начатого до отзыва допуска, и для запретов профиля.
+- **Самодопуск в подсессии и при пробуждении по расписанию не запрещён**, как в 0.4: подсессия может загрузить навык
+  продукта сама. Расширения нет: сессия с допуском `loginom-automation` или `package-docs` подсессий не запускает,
+  ребёнок обычной сессии получает то же, что получил бы родитель.
+- **Проверку `origin` из 0.4 не переносил.** В v2 один реестр по действующему имени, грузятся только встроенные
+  плагины (B2.1), имена инструментов MCP всегда с пространством имён (`<сервер>_<инструмент>`).
+- **Тесты — в `packages/server`, не в `core` и не в `cli`.** `createEmbeddedRoutes` даёт сервер целиком (RPC, HTTP,
+  расписания, форк) без своей сборки слоёв; в `cli` пакеты-плагины запрещены, и там работает B3.1. Контрактные тесты
+  хуков — тем же стендом с плагином-пробой, отдельным `describe`.
+- **Привязка к задаче Host** (0.4: `loginom.scope("bind"|"request"|"apply")` в `turnLifecycle`) и подсказка модели в
+  системном промпте («сначала активируй `loginom-automation`») не перенесены: обе зависят от аренды Host и каталога —
+  B2.3 и B2.5d.
+
+### Найдено, не чинил
+
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
+- До B2.4 навык из `.agents`, `.claude` или проекта с ID `loginom-automation` даст допуск: ID навыков продукта держит
+  только B2.4 (G6).
+- Сервер MCP с именем `loginom` даст инструменты `loginom_*`: шлюз считает их инструментами Loginom (видны только
+  с допуском), а `loginom_find` и другие имена локальной справки — видны всем, если B2.5 не зарегистрировал свой
+  инструмент с тем же именем. В 0.4 это различал `origin`.
+- Перезапуск службы или перезагрузка плагинов сбрасывает все допуски (память экземпляра): агент или мастер выдают
+  заново. Восстановленное после сбоя выполнение идёт без допуска.
+- Хук `fork` по построению ничего не меняет; мутация «без хука» ничего не краснит.
+- Каталог CodeMode в инструкциях строится из набора инструментов по правилам сессии, а не из хука `context`
+  (`core/src/session/context.ts`): для `package-docs` `execute` скрыт, но каталог из инструкций не убирается. В тесте
+  имён инструментов CodeMode (`schedule_create`, `session_rename`) в системной части запроса `package-docs` не нашлось;
+  отдельно не разбирал.
+
+### Не проверено
+
+- Окно мастера и разговор в окне приложения (этап C), Desktop, Windows и macOS, установленная сборка — только сервер
+  из исходников в тестах.
+- Настоящая модель: модель — `TestLLM` по сценарию; что агент сам загружает навык продукта, когда нужен Loginom, —
+  дело текста навыка (B2.4) и подсказки (B2.3, B2.5d).
+- Настоящие инструменты Loginom и Host — заглушки (B2.5); инструменты MCP и выполняемые провайдером не проверялись.
+- Тесты других пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), не запускались.
+- Правила сессии через HTTP `PATCH /api/session/:id` не отправлялись — только через сервис.
+- База приёмки — `93b90a5daa`. `oc2-migration` с тех пор ушла вперёд (B3.1, `05957cf699`, тот же журнал): при слиянии
+  разделы журнала столкнутся.

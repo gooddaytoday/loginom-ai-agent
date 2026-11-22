@@ -500,6 +500,7 @@
       "name": "@loginom-ai-agent/loginom-agent",
       "version": "0.1.0",
       "dependencies": {
+        "@loginom-ai-agent/loginom-host": "workspace:*",
         "@opencode/plugin": "workspace:*",
       },
       "devDependencies": {
