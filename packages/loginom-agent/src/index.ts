@@ -6,6 +6,7 @@ import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { BrowserRecovery } from "./browser-recovery"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -94,6 +95,7 @@ export default Plugin.define({
         else await drop(event.data.sessionID)
       }
     })().catch(() => undefined)
+
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
     // process has not seen a prompt for (resumed after a restart) uses its latest user message.
     const tasks = new Map<string, string>()
@@ -101,6 +103,34 @@ export default Plugin.define({
       tasks.get(sessionID) ??
       (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
       ""
+
+    // Browser recovery (G4), 0.4 `turnLifecycle.endTurn`: when the session would go idle while an attempt still holds the
+    // Loginom page, one reminder per attempt keeps the same execution working. A synthetic message is not a prompt, so the
+    // task and its grant stay. The second end stops the attempt instead of repeating the instruction.
+    await ctx.session.hook("experimental.idle", async (event) => {
+      const recovery = BrowserRecovery.active(await ctx.session.context({ sessionID: event.sessionID }))
+      if (!recovery) return
+      if (!recovery.reminded) {
+        await ctx.session.synthetic({
+          sessionID: event.sessionID,
+          text: BrowserRecovery.reminder(recovery.operationID),
+          metadata: { browser_recovery_reminder: recovery.attempt },
+        })
+        return
+      }
+      const lease = await leases.get(event.sessionID)
+      await lease
+        ?.call(
+          "dock_browser_recovery",
+          {
+            action: "stop",
+            operation_id: recovery.operationID,
+            reason: "The agent ended its turn again without finishing browser recovery.",
+          },
+          await task(event.sessionID),
+        )
+        .catch(() => undefined)
+    })
 
     // Local data files for Loginom (B2.5a). `loginom_file_admit` takes the execution's Host lease and answers
     // LOGINOM_HOST_NOT_READY only without one. The file profile tools (B2.5b1) need no Host. Like every `loginom_*` tool,

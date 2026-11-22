@@ -22,7 +22,9 @@ import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
+import { BrowserRecovery } from "../../loginom-agent/src/browser-recovery"
 import { ServiceHost } from "../../loginom-agent/src/host"
+import { launchNodeHost } from "../../loginom-host/src/node-client"
 import { createEmbeddedRoutes } from "../src/routes"
 
 // Host lease of the built-in product plugin `loginom.product` (guarantee G3, stage B2.3), the cases of spike S2 on a real
@@ -64,161 +66,197 @@ const leased = (data: string) =>
   Effect.promise(async () => {
     const directory = path.join(data, "loginom", "leases")
     const names = (await fs.readdir(directory).catch(() => [])).filter((name) => name.endsWith(".json"))
-    return Promise.all(
-      names.map(async (name) => (await Bun.file(path.join(directory, name)).json()).session as string),
-    )
+    return Promise.all(names.map(async (name) => (await Bun.file(path.join(directory, name)).json()).session as string))
   })
 
-const boot = Effect.gen(function* () {
-  const dir = (yield* tmpdirScoped("loginom-host-lease-")).path
-  const data = path.join(dir, "data")
-  // As the server process: the Host starts before the routes and closes after them.
-  yield* Effect.acquireRelease(
-    Effect.promise(() => ServiceHost.start({ data, resources: fixture.resources })),
-    () => Effect.promise(() => ServiceHost.close()),
-  )
-  const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
-  const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
-  // A `fail` step waits for the test before the provider rejects the request.
-  const gate = yield* Queue.unbounded<void>()
-  yield* llm.serve((request) => respond(request, gate))
-  const model = SessionRunnerModel.resolved(
-    LanguageModel.make({ id: "loginom-lease-model", provider: "test", route: OpenAIChat.route }),
-    {
-      capabilities: { tools: true, input: ["text"], output: ["text"] },
-      cost: [],
-      limit: { context: 200_000, output: 8_192 },
-    },
-  )
-  const global = path.join(dir, "global")
-  const context = yield* Layer.build(
-    createEmbeddedRoutes(
+// `sent`, when given, collects what the plugin sends the Host: the same Node host, launched by the test.
+const boot = (sent?: unknown[]) =>
+  Effect.gen(function* () {
+    const dir = (yield* tmpdirScoped("loginom-host-lease-")).path
+    const data = path.join(dir, "data")
+    const connect = async () => {
+      const host = await launchNodeHost({
+        node: path.join(fixture.resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        entry: path.join(fixture.resources, "host", "node-host.mjs"),
+        root: path.join(data, "loginom"),
+        resources: fixture.resources,
+        headless: true,
+      })
+      const port = {
+        ...host.port,
+        postMessage: (value: unknown) => {
+          sent?.push(value)
+          host.port.postMessage(value)
+        },
+      }
+      return { port, close: host.close }
+    }
+    // As the server process: the Host starts before the routes and closes after them.
+    yield* Effect.acquireRelease(
+      Effect.promise(() => ServiceHost.start({ data, resources: fixture.resources, connect: sent && connect })),
+      () => Effect.promise(() => ServiceHost.close()),
+    )
+    const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
+    const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
+    // A `fail` step waits for the test before the provider rejects the request.
+    const gate = yield* Queue.unbounded<void>()
+    yield* llm.serve((request) => respond(request, gate))
+    const model = SessionRunnerModel.resolved(
+      LanguageModel.make({ id: "loginom-lease-model", provider: "test", route: OpenAIChat.route }),
       {
-        app: { channel: "dev", version: "test" },
-        database: { path: ":memory:" },
-        config: { project: false, claude: false },
-        models: { fetch: false, snapshot: false },
-        fs: { filewatcher: false, fff: false },
+        capabilities: { tools: true, input: ["text"], output: ["text"] },
+        cost: [],
+        limit: { context: 200_000, output: 8_192 },
       },
-      [
-        Global.node.replace(
-          Global.layerWith({
-            home: path.join(dir, "home"),
-            config: path.join(global, "config"),
-            data: path.join(global, "data"),
-            cache: path.join(global, "cache"),
-            state: path.join(global, "state"),
-            tmp: path.join(global, "tmp"),
-            bin: path.join(global, "bin"),
-            log: path.join(global, "log"),
-            repos: path.join(global, "repos"),
-          }),
-        ),
-        llmClient.replace(Layer.succeed(LLMClient.Service, llm)),
-        SessionRunnerModel.node.replace(
-          Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
-        ),
-      ],
-    ).pipe(Layer.provide(HttpServer.layerServices)),
-  )
-  // `hold` waits until the test releases it; `executions` lists each session's execution events in order.
-  const held = yield* Queue.unbounded<void>()
-  const holding: string[] = []
-  const executions: string[] = []
-  yield* Context.get(context, SdkPlugins.Service).register(
-    define({
-      id: "test.loginom-host-lease",
-      effect: Effect.fnUntraced(function* (ctx) {
-        yield* ctx.tool.transform((editor) => {
-          editor.add({
-            name: "hold",
-            description: "Wait until the test releases the call",
-            input: Schema.Struct({}),
-            output: Schema.String,
-            options: { codemode: false },
-            execute: (_input, call) =>
-              Effect.sync(() => holding.push(call.sessionID)).pipe(
-                Effect.andThen(Queue.take(held)),
-                Effect.as({ output: "released", content: "released" }),
-              ),
+    )
+    const global = path.join(dir, "global")
+    const context = yield* Layer.build(
+      createEmbeddedRoutes(
+        {
+          app: { channel: "dev", version: "test" },
+          database: { path: ":memory:" },
+          config: { project: false, claude: false },
+          models: { fetch: false, snapshot: false },
+          fs: { filewatcher: false, fff: false },
+        },
+        [
+          Global.node.replace(
+            Global.layerWith({
+              home: path.join(dir, "home"),
+              config: path.join(global, "config"),
+              data: path.join(global, "data"),
+              cache: path.join(global, "cache"),
+              state: path.join(global, "state"),
+              tmp: path.join(global, "tmp"),
+              bin: path.join(global, "bin"),
+              log: path.join(global, "log"),
+              repos: path.join(global, "repos"),
+            }),
+          ),
+          llmClient.replace(Layer.succeed(LLMClient.Service, llm)),
+          SessionRunnerModel.node.replace(
+            Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
+          ),
+        ],
+      ).pipe(Layer.provide(HttpServer.layerServices)),
+    )
+    // `hold` waits until the test releases it; `executions` lists each session's execution events in order.
+    const held = yield* Queue.unbounded<void>()
+    const holding: string[] = []
+    const executions: string[] = []
+    yield* Context.get(context, SdkPlugins.Service).register(
+      define({
+        id: "test.loginom-host-lease",
+        effect: Effect.fnUntraced(function* (ctx) {
+          yield* ctx.tool.transform((editor) => {
+            editor.add({
+              name: "hold",
+              description: "Wait until the test releases the call",
+              input: Schema.Struct({}),
+              output: Schema.String,
+              options: { codemode: false },
+              execute: (_input, call) =>
+                Effect.sync(() => holding.push(call.sessionID)).pipe(
+                  Effect.andThen(Queue.take(held)),
+                  Effect.as({ output: "released", content: "released" }),
+                ),
+            })
+            // Stand-in for the Dock tool of B2.5d: `start` holds the page (phase `browser`), as the runtime reports it.
+            editor.add({
+              name: "loginom_dock_browser_recovery",
+              description: "Stand-in browser recovery",
+              input: Schema.Struct({ action: Schema.String, operation_id: Schema.String }),
+              output: Schema.String,
+              options: { codemode: false },
+              execute: (input) =>
+                Effect.succeed(
+                  JSON.stringify({
+                    phase: input.action === "start" ? "browser" : "dock",
+                    operation_id: input.operation_id,
+                  }),
+                ).pipe(Effect.map((text) => ({ output: text, content: text }))),
+            })
           })
-        })
-        yield* ctx.event
-          .subscribe({
-            types: [
-              "session.execution.started",
-              "session.execution.succeeded",
-              "session.execution.failed",
-              "session.execution.interrupted",
-            ],
-          })
-          .pipe(
-            Stream.runForEach((event) => Effect.sync(() => executions.push(`${event.data.sessionID} ${event.type}`))),
-            Effect.forkScoped,
-          )
+          yield* ctx.event
+            .subscribe({
+              types: [
+                "session.execution.started",
+                "session.execution.succeeded",
+                "session.execution.failed",
+                "session.execution.interrupted",
+              ],
+            })
+            .pipe(
+              Stream.runForEach((event) => Effect.sync(() => executions.push(`${event.data.sessionID} ${event.type}`))),
+              Effect.forkScoped,
+            )
+        }),
       }),
-    }),
-  )
-  const sessions = Context.get(context, Session.Service)
-  const handler = Context.get(context, HttpRouter.HttpRouter)
-    .asHttpEffect()
-    .pipe(HttpEffect.toWebHandlerWith(context))
-  const create = (title: string) =>
-    sessions
-      .create({ title, agent: Agent.ID.make("build"), model: model.ref, location })
-      .pipe(Effect.map((session) => session.id))
-  // The prompt runs in the background; join it to wait for the session to go idle.
-  const prompt = (sessionID: Session.ID, text: string) =>
-    sessions
-      .prompt({ sessionID, text })
-      .pipe(Effect.andThen(sessions.wait(sessionID)), Effect.forkChild({ startImmediately: true }))
-  // The wizard's RPC grants `loginom-automation` to one prompt (B2.2). It needs the Location's plugins loaded.
-  const wizard = (sessionID: Session.ID, text: string) =>
-    until(() =>
-      Effect.promise(() =>
-        handler(
-          new Request(`http://opencode.local/api/rpc/loginom.runner/start?location[directory]=${encodeURIComponent(dir)}`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ input: { sessionID, profile: "loginom-automation", text } }),
-          }),
-        ),
-      ).pipe(Effect.map((response) => (response.status === 200 ? true : undefined))),
-    ).pipe(Effect.andThen(sessions.wait(sessionID)))
-  const ended = (sessionID: Session.ID) =>
-    executions.filter((entry) => entry.startsWith(`${sessionID} `) && !entry.endsWith(".started")).map(type)
-  // Closes every plugin of the Location, as unloading it does.
-  const unload = Effect.gen(function* () {
-    const plugins = yield* Plugin.Service
-    yield* plugins.close(Exit.void)
-  }).pipe(Effect.provide(Context.get(context, LocationServiceMap.Service).get(location)))
-  const requests = (sessionID: Session.ID) =>
-    llm
-      .requests()
-      .pipe(Effect.map((all) => all.filter((request) => request.headers?.["x-opencode-session-id"] === sessionID)))
-  return {
-    dir,
-    data,
-    sessions,
-    create,
-    prompt,
-    wizard,
-    ended,
-    unload,
-    requests,
-    holding,
-    release: Queue.offer(held, undefined),
-    open: Queue.offer(gate, undefined),
-    leased: leased(data),
-  }
-})
+    )
+    const sessions = Context.get(context, Session.Service)
+    const handler = Context.get(context, HttpRouter.HttpRouter)
+      .asHttpEffect()
+      .pipe(HttpEffect.toWebHandlerWith(context))
+    const create = (title: string) =>
+      sessions
+        .create({ title, agent: Agent.ID.make("build"), model: model.ref, location })
+        .pipe(Effect.map((session) => session.id))
+    // The prompt runs in the background; join it to wait for the session to go idle.
+    const prompt = (sessionID: Session.ID, text: string) =>
+      sessions
+        .prompt({ sessionID, text })
+        .pipe(Effect.andThen(sessions.wait(sessionID)), Effect.forkChild({ startImmediately: true }))
+    // The wizard's RPC grants `loginom-automation` to one prompt (B2.2). It needs the Location's plugins loaded.
+    const wizard = (sessionID: Session.ID, text: string) =>
+      until(() =>
+        Effect.promise(() =>
+          handler(
+            new Request(
+              `http://opencode.local/api/rpc/loginom.runner/start?location[directory]=${encodeURIComponent(dir)}`,
+              {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ input: { sessionID, profile: "loginom-automation", text } }),
+              },
+            ),
+          ),
+        ).pipe(Effect.map((response) => (response.status === 200 ? true : undefined))),
+      ).pipe(Effect.andThen(sessions.wait(sessionID)))
+    const history = (sessionID: Session.ID) => executions.filter((entry) => entry.startsWith(`${sessionID} `)).map(type)
+    const ended = (sessionID: Session.ID) => history(sessionID).filter((event) => event !== "started")
+    // Closes every plugin of the Location, as unloading it does.
+    const unload = Effect.gen(function* () {
+      const plugins = yield* Plugin.Service
+      yield* plugins.close(Exit.void)
+    }).pipe(Effect.provide(Context.get(context, LocationServiceMap.Service).get(location)))
+    const requests = (sessionID: Session.ID) =>
+      llm
+        .requests()
+        .pipe(Effect.map((all) => all.filter((request) => request.headers?.["x-opencode-session-id"] === sessionID)))
+    return {
+      dir,
+      data,
+      sessions,
+      create,
+      prompt,
+      wizard,
+      history,
+      ended,
+      unload,
+      requests,
+      holding,
+      release: Queue.offer(held, undefined),
+      open: Queue.offer(gate, undefined),
+      leased: leased(data),
+    }
+  })
 
 describe("loginom.product Host lease (G3, spike S2)", () => {
   it.live(
     "S2 success: an execution holds one Host lease until it succeeds, and the session's next execution leases again",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot
+        const test = yield* boot()
         const id = yield* test.create("success")
         const first = yield* test.prompt(id, script({ tool: "hold" }, { text: "end" }))
         yield* until(() => Effect.succeed(test.holding.length === 1 || undefined))
@@ -242,7 +280,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     "S2 provider error: the lease taken for the execution is released when it fails",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot
+        const test = yield* boot()
         const id = yield* test.create("provider error")
         const run = yield* test.prompt(id, script({ fail: true }))
         yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 1 || undefined)))
@@ -259,7 +297,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     "S2 interruption during the model's answer and during a tool releases the lease",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot
+        const test = yield* boot()
         const model = yield* test.create("interrupted model")
         const answering = yield* test.prompt(model, script({ hang: true }))
         yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 1 || undefined)))
@@ -284,7 +322,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     "S2 dispose: a plugin that unloads mid-execution releases the lease it holds",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot
+        const test = yield* boot()
         const id = yield* test.create("dispose")
         const run = yield* test.prompt(id, script({ tool: "hold" }, { text: "end" }))
         yield* until(() => Effect.succeed(test.holding.length === 1 || undefined))
@@ -303,7 +341,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     "loginom_file_admit reaches the Host through the execution's lease instead of answering LOGINOM_HOST_NOT_READY",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot
+        const test = yield* boot()
         yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "input.csv"), "amount\n10\n"))
         const id = yield* test.create("admit")
         yield* test.sessions.setPermissions({
@@ -322,13 +360,59 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
   )
 
   it.live(
+    "G4: one reminder per browser recovery attempt continues the same execution with its grant; the second end stops it",
+    () =>
+      Effect.gen(function* () {
+        const sent: unknown[] = []
+        const test = yield* boot(sent)
+        const id = yield* test.create("browser recovery")
+        yield* test.wizard(
+          id,
+          script(
+            { tool: "loginom_dock_browser_recovery", input: { action: "start", operation_id: "op-1" } },
+            { text: "end" },
+            { text: "end again" },
+          ),
+        )
+        const requests = yield* test.requests(id)
+        const reminder = BrowserRecovery.reminder("op-1")
+        // The hook (`experimental.idle`) ran before the session went idle; its synthetic message continued the same
+        // execution, and the task kept its grant: the Loginom tool is still offered after the reminder.
+        expect(requests).toHaveLength(3)
+        expect(JSON.stringify(requests[1].messages)).not.toContain(reminder)
+        expect(JSON.stringify(requests[2].messages).split(reminder)).toHaveLength(2)
+        expect(requests[2].tools.map((tool) => tool.name)).toContain("loginom_dock_browser_recovery")
+        expect(test.history(id)).toEqual(["started", "succeeded"])
+        // The second end of turn asked the Host to stop the attempt.
+        const stop = sent.find(
+          (message) =>
+            typeof message === "object" &&
+            message !== null &&
+            "method" in message &&
+            message.method === "call" &&
+            JSON.stringify(message).includes("dock_browser_recovery"),
+        )
+        expect(stop).toMatchObject({
+          input: { name: "dock_browser_recovery", args: { action: "stop", operation_id: "op-1" } },
+        })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "S2 kill -9: the next server finds the killed server's lease at start, before any Location, and recovers it",
     () =>
       Effect.gen(function* () {
         const dir = (yield* tmpdirScoped("loginom-host-killed-")).path
         const data = path.join(dir, "data")
         const owner = Bun.spawn(
-          [process.execPath, path.join(import.meta.dir, "fixture/loginom-host-owner.ts"), data, fixture.resources, "ses_killed"],
+          [
+            process.execPath,
+            path.join(import.meta.dir, "fixture/loginom-host-owner.ts"),
+            data,
+            fixture.resources,
+            "ses_killed",
+          ],
           { stdout: "pipe", stderr: "pipe" },
         )
         const report = yield* Effect.promise(() => firstLine(owner.stdout))
@@ -375,7 +459,9 @@ function respond(request: LLMRequest, gate: Queue.Queue<void>) {
   if ("fail" in step)
     return Stream.fromEffect(Queue.take(gate)).pipe(
       Stream.flatMap(() =>
-        TestLLM.failAfter(new AIError({ reason: new InvalidRequestError({ message: "provider rejected the request" }) })),
+        TestLLM.failAfter(
+          new AIError({ reason: new InvalidRequestError({ message: "provider rejected the request" }) }),
+        ),
       ),
     )
   return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, step.input ?? {})
