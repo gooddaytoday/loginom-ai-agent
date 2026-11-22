@@ -7,7 +7,7 @@ export const available = true
 
 export async function resolveBinary(bin: string) {
   if (process.env.LOGINOM_AI_AGENT_PTY_BIN) return process.env.LOGINOM_AI_AGENT_PTY_BIN
-  if (!asset) return "opencode-pty"
+  if (!asset) return "loginom-ai-agent-pty"
   if (typeof asset === "string") return asset
   return install(bin, asset)
 }
@@ -16,17 +16,20 @@ async function install(
   bin: string,
   input: { readonly path: string; readonly version: string; readonly sha256: string },
 ) {
-  const root = path.join(bin, "opencode-pty")
+  const root = path.join(bin, "loginom-ai-agent-pty")
   await privateDirectory(root)
   const directory = path.join(root, `${input.version}-${input.sha256.slice(0, 16)}`)
   await privateDirectory(directory)
   // Windows only launches executables with their extension.
-  const destination = path.join(directory, process.platform === "win32" ? "opencode-pty.exe" : "opencode-pty")
+  const destination = path.join(
+    directory,
+    process.platform === "win32" ? "loginom-ai-agent-pty.exe" : "loginom-ai-agent-pty",
+  )
   if (await validateIfPresent(destination, input.sha256)) return destination
 
   const bytes = new Uint8Array(await Bun.file(input.path).arrayBuffer())
   if (sha256(bytes) !== input.sha256) throw new Error("Embedded opencode-pty checksum mismatch")
-  const temporary = path.join(directory, `opencode-pty.${process.pid}.${crypto.randomUUID()}.tmp`)
+  const temporary = path.join(directory, `loginom-ai-agent-pty.${process.pid}.${crypto.randomUUID()}.tmp`)
   try {
     const file = await open(temporary, "wx", 0o700)
     try {
