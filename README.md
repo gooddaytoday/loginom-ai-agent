@@ -80,7 +80,7 @@ brew install --cask opencode-desktop
 
 #### Installation Directory
 
-The install script installs OpenCode to `$HOME/.opencode/bin`.
+The install script installs OpenCode to `$HOME/.loginom-ai-agent/bin`.
 
 ### Agents
 

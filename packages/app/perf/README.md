@@ -177,7 +177,7 @@ strobe bench packages/app/perf/timeline.bench.ts --filter "scroll*" --bisect <go
   (otherwise an older channel downloads the next release mid-run and looks like it idles at 10% CPU), the user's
   service registration as guarded state (strobe stops if it changes), and the `opencode://` key, which strobe saves
   and restores around each launch. The Dev channel has no profile on purpose. A source build is packed with
-  `OPENCODE_CHANNEL=beta` or `prod` and passed as `exe:<path>`.
+  `LOGINOM_AI_AGENT_CHANNEL=beta` or `prod` and passed as `exe:<path>`.
 
 ## Not benchmarks
 
