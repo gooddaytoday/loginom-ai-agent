@@ -1,3 +1,4 @@
+import { Product } from "@loginom-ai-agent/product"
 import { Effect, Layer, Scope } from "effect"
 import { OtlpLogger } from "effect/observability"
 import { runID } from "./shared.js"
@@ -42,13 +43,13 @@ function resourceAttributes() {
   }
 }
 
-export function resource(app: App = { client: "opencode", version: "unknown", channel: "local" }): {
+export function resource(app: App = { client: Product.slug, version: "unknown", channel: "local" }): {
   serviceName: string
   serviceVersion: string
   attributes: Record<string, string>
 } {
   return {
-    serviceName: "opencode",
+    serviceName: Product.slug,
     serviceVersion: app.version,
     attributes: {
       ...resourceAttributes(),

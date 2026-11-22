@@ -1,6 +1,7 @@
 export * as Observability from "./observability.js"
 
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
+import { Product } from "@loginom-ai-agent/product"
 import { LayerNode } from "./effect/layer-node.js"
 import { Effect, Layer, Logger, References, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
@@ -24,7 +25,7 @@ export function layer(
   },
 ) {
   const app = {
-    client: options.client ?? "opencode",
+    client: options.client ?? Product.slug,
     version: options.version ?? "unknown",
     channel: options.channel ?? "local",
   }

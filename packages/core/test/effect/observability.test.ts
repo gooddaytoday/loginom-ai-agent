@@ -34,6 +34,13 @@ describe("resource", () => {
     expect(resource().attributes["opencode.client"]).toBeDefined()
   })
 
+  test("names the client and the service after the product", () => {
+    expect(resource()).toMatchObject({
+      serviceName: "loginom-ai-agent",
+      attributes: { "opencode.client": "loginom-ai-agent" },
+    })
+  })
+
   test("keeps built-in attributes when env values conflict", () => {
     process.env.OTEL_RESOURCE_ATTRIBUTES =
       "opencode.client=web,service.instance.id=override,service.namespace=anomalyco"
