@@ -1448,3 +1448,341 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
 - Сборка CLI до конца и офлайн-проверка Desktop+CLI.
 - `verify` не считает записи `rust-src` (`.tar.xz`) ни на одной ОС: их считает генератор, `verify` проверяет размер и sha256.
 - Rebuild/relink и юридический аудит. `status: incomplete` и `remaining` сохранены.
+
+## B1.4a Бренд: механический прогон `apply-identity`
+
+22.11.2026. Ветка `b14a-identity-script` от `oc2-migration` (`4b65c9ba94`), отдельное рабочее дерево. Bun 1.4.4
+переносной (`<project-root>/.claude/worktrees/b0-journal/spike/oc2/.run/cache/bun-1.4.4/bun-linux-x64`) и Node 24.19.0 —
+первыми в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, 1600 пакетов,
+`.husky/_` появился, хук `pre-commit` срабатывал на каждом коммите. Базовые прогоны тестов — в отдельном чистом дереве
+`oc2-migration` в scratchpad. Ручные правки бренда — отдельные задачи по таблице в конце раздела. `services/` не
+трогались.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `4d79e5942f` `fix(upstream-sync): keep apply-identity from breaking code on the OpenCode 2 tree` | `apply-identity.py`, `test_tools.py` | `clean` |
+| `af97f62a44` `chore(security): ignore reviewed fixture paths in lines apply-identity renames` | `.gitleaksignore`, +8 отпечатков | `clean` |
+| `abe1f24221` `chore(identity): apply product names to the OpenCode 2 tree with apply-identity` | 330 файлов, только вывод скрипта | `clean` (с отпечатками) |
+| `fd0526066c` `test(identity): drop test.failing from the OPENCODE_* guards …` | `names.test.ts`, `flag-identity.test.ts` | `clean` |
+| `67ed7b618f` `docs(upstream-sync): describe the apply-identity run in the catalog and the procedure` | `catalog.json`, `catalog.md`, `procedure.md`, `guarantees.md`, `adr-0001-modular-integration.md` | `clean` |
+| `27da0b969a` `docs(upstream-sync): keep per-entry file counts out of the catalog` | `catalog.md`: числа файлов по записям — в этот журнал | `clean` |
+| `eb1ab715e6` `test(core): spell the cased config directory fixture with the product name` | `core/test/config/discovery.test.ts`, `catalog.md` (CAT-12) | `clean` |
+| `af918a7717` `fix(upstream-sync): rename .opencode in regular expressions and templates too` | `apply-identity.py`, `test_tools.py` | `clean` |
+| `656428d33a` `chore(identity): rerun apply-identity after the regular expression rule` | 2 файла, только вывод скрипта | `clean` |
+| `8f8a4984b5` `docs(gui-plugins): keep the README source block in step with the renamed settings file` | `gui-plugins/README.md` (тем же скриптом по явному пути), `catalog.md` (CAT-03), `procedure.md` | `clean` |
+| следующий | этот журнал | |
+
+### Прогон
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo .          # скрипт после правки
+changed: 330 files
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check  # повторный прогон
+would change: 0 files                                                 # код 0
+$ git diff --shortstat af97f62a44 abe1f24221
+ 330 files changed, 1174 insertions(+), 1174 deletions(-)
+$ git show --shortstat 656428d33a      # повторный прогон после правки правила (ниже)
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+```
+
+На `oc2-migration` скрипт до правки менял 337 файлов, после — 330: минус 8 файлов, где вся правка была порчей, минус 2
+исключённых файла, плюс 3 файла, которые он теперь покрывает. Замены по пакетам и правилам (счёт правилами самого скрипта по тексту до прогона):
+
+| Пакет | Файлов | `OPENCODE_*` | `.opencode` | `opencode.json` | `opencode.db` | `opencode.settings` | `opencode.updater` | Всего |
+|---|---|---|---|---|---|---|---|---|
+| `cli` | 54 | 284 | 11 | 11 | 5 | 6 | 0 | 317 |
+| `core` | 73 | 99 | 65 | 127 | 4 | 0 | 0 | 295 |
+| `app` | 72 | 131 | 6 | 139 | 0 | 0 | 0 | 276 |
+| `desktop` | 32 | 81 | 5 | 1 | 0 | 21 | 4 | 112 |
+| `.github` | 22 | 81 | 0 | 0 | 0 | 0 | 0 | 81 |
+| `gui-plugins` | 21 | 45 | 15 | 3 | 0 | 1 | 2 | 66 |
+| `tui` | 18 | 32 | 7 | 1 | 0 | 5 | 0 | 45 |
+| `server` | 11 | 4 | 0 | 19 | 6 | 0 | 0 | 29 |
+| `script` (пакет) | 2 | 12 | 0 | 0 | 0 | 0 | 0 | 12 |
+| `script/` (корень) | 4 | 9 | 1 | 0 | 0 | 0 | 0 | 10 |
+| `schema` | 5 | 4 | 1 | 3 | 0 | 0 | 0 | 8 |
+| `client` | 5 | 6 | 0 | 1 | 0 | 0 | 0 | 7 |
+| `plugin` | 3 | 0 | 0 | 4 | 0 | 2 | 1 | 7 |
+| `simulation` | 4 | 5 | 0 | 0 | 0 | 0 | 0 | 5 |
+| `util` | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| `ui` | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 3 |
+| всего | 330 | 800 | 111 | 309 | 15 | 35 | 7 | 1277 |
+
+109 разных имён `OPENCODE_*`; чаще всего `OPENCODE_VERSION` (137), `OPENCODE_WORKTREE_BASE` и `_PATH` (по 66),
+`OPENCODE_CHANNEL` (51), `OPENCODE_CONFIG_DIR` (26). `package.json` пакетов скрипт не изменил (CAT-01 — те же 3 файла).
+
+**`util/src/global.ts` (для B1.4c).** Скрипт меняет две строки, каталог `app` не трогает:
+`process.env.OPENCODE_TEST_HOME` → `LOGINOM_AI_AGENT_TEST_HOME` (стр. 19) и `OPENCODE_CONFIG_DIR` →
+`LOGINOM_AI_AGENT_CONFIG_DIR` (стр. 81).
+
+### Что пришлось поправить в скрипте
+
+Первый прогон (337 файлов) просмотрен по правилам и по контексту каждого совпадения. Порча:
+
+| Что | Где | Правка правила |
+|---|---|---|
+| `.opencode` как свойство: `registered()?.opencode`, `...opencode }`, `allThemes().opencode` — синтаксическая ошибка или другой смысл | `tui/test/keymap.test.tsx`, `core/test/voice.test.ts`, `tui/test/theme.test.ts` | перед `.opencode` не может стоять `\w $ . ? ! ) ]` |
+| экранированный хост upstream `console\.opencode\.ai` в регулярном выражении | `core/src/console-access.ts` | обратная косая после `.opencode` — только не перед `.`; путь Windows `\\.opencode\\bin` меняется по-прежнему |
+| URL upstream `https://formulae.brew.sh/api/formula/opencode.json` | `cli/src/services/updater.ts` и его тест | имена файлов внутри `http(s)://…` не меняются |
+| файл темы `theme/assets/opencode.json`, `assets/v2/opencode.json`: импорт несуществующего файла | `tui/src/theme/index.ts`, три теста `tui`, комментарий; `packages/theme/test` импортирует старый путь | путь с сегментом `assets/` не меняется |
+| имя сразу после `\n` не ловил `\b`: кадр регистрации SSH начинался с `LOGINOM_AI_AGENT_SSH_REGISTRATION_BEGIN`, а печать конца и разбор ждали `OPENCODE_SSH_REGISTRATION_END` | `gui-plugins/src/ssh/bootstrap.ts` (стр. 15, 49), `bootstrap.test.ts`, `command.test.ts` | имя начинается и после `\n`, `\r`, `\t` |
+| `[\\/]\.opencode[\\/]` в регулярном выражении и `` `${path.sep}.opencode${path.sep}` `` не менялись (правило останавливалось на `[` и `$`): корень конфига проекта искался по старому каталогу (тест `gui-plugins` упал), отрицательная проверка путей наблюдателя в тесте `core` стала пустой. Найдено полным прогоном тестов | `gui-plugins/src/details/config-file.ts`, `core/test/config/config.test.ts` | после `.opencode` допустимы `[` и `$`; коммиты `af918a7717`, `656428d33a` |
+| `OPENCODE_ZIG_CPU` и `OPENCODE_REAL_ZIG` переименованы в workflows, а читает их только `process-daemon` (`build.rs`, `script/release-bin/zig` — скрипт их не обрабатывает): сборка молча теряла бы baseline CPU | `.github/workflows/release-process-daemon.yml` | имена в списке `UNPROCESSED_READERS`, как ключи провайдеров |
+
+Покрытие и исключения:
+- `SOURCES`: `packages/*/*.config.test.ts` и `packages/*/vite.js`. Конфиги Desktop читают `LOGINOM_AI_AGENT_CHANNEL`,
+  `_TARGET`, `_TEST_ONBOARDING`, а их тесты (`electron-builder.config.test.ts`, `electron.vite.config.test.ts`) задавали
+  старые имена; `app/vite.js` читал `OPENCODE_CHANNEL`, который больше никто не задаёт. `vite.icons.ts` не добавлен: его
+  заполнители `OPENCODE_FAVICON` парные с `index.html`, а `.html` скрипт не берёт.
+- `EXCLUDED`: `tui/test/cli/tui/inline-tool-wrap-snapshot.test.tsx` — образец вывода `grep` с `OPENCODE_DB`;
+  переименование удлиняет строку, и снимок `.snap` с переносами падает (2 теста). `core/drizzle.config.ts` — путь к БД
+  разработчика upstream в его домашнем каталоге: изменённая строка стала бы для сканера секретов строкой форка.
+- Первая версия защиты путей `assets/` (`[\w./-]*\bassets/…`) давала квадратичный перебор на длинных словах: `--check`
+  не завершился за 2 минуты. Окончательное правило `\bassets/[\w./-]*` — 8 с на всё дерево.
+
+Тесты — класс `ApplyIdentityRules` в `test_tools.py`, 7 тестов, каждый случай взят из файла, где он произошёл. На
+скрипте до правки — `FAILED (failures=6)`, седьмой (регулярные выражения) на `4d79e5942f` — `FAILED (failures=1)`;
+после — `OK`. Полные наборы — в «Итоговой проверке» ниже.
+
+### Замыкание имён
+
+Для каждого имени, которое переименовал прогон, искал старое написание в остальных файлах (кроме `services/` и
+`docs/`). Оставшиеся пары:
+
+| Где старое имя | Имена | Решение |
+|---|---|---|
+| `process-daemon/build.rs`, `script/release-bin/zig` | `OPENCODE_ZIG_CPU`, `OPENCODE_REAL_ZIG` | не переименовываются с обеих сторон (`UNPROCESSED_READERS`) |
+| `desktop/*.config.test.ts`, `app/vite.js` | `OPENCODE_CHANNEL`, `_TARGET`, `_TEST_ONBOARDING` | покрыты `SOURCES` |
+| `tui/test/…/inline-tool-wrap-snapshot.test.tsx` и `.snap` | `OPENCODE_DB`, `OPENCODE_DEV` (текст образца) | `EXCLUDED` |
+| `app/index.html` и `app/vite.icons.ts` | `OPENCODE_FAVICON`, `OPENCODE_APPLE_TOUCH_ICON` | пара целиком вне прогона, согласована |
+| корневой `package.json` (`dev:live`, `dev:vite:live`) | `OPENCODE_TUI_CHANNEL`, `OPENCODE_PASSWORD` | ручная задача Р-12 |
+| `nix/opencode.nix`, `nix/desktop.nix` | `OPENCODE_VERSION`, `_CHANNEL`, `_CLI_NAME`, `_DISABLE_MODELS_FETCH` | ручная задача Р-12 |
+| `strobe.json`, `desktop/perf/startup.bench.ts` | `OPENCODE_DB`, `OPENCODE_CONFIG_DIR`, `OPENCODE_TEST_HOME` и др. | ручная задача Р-12 |
+| `cli/test/flag-identity.test.ts` | унаследованные `OPENCODE_*` | так задумано (`EXCLUDED`) |
+
+Не пары: `turbo.json` (`OPENCODE_DISABLE_SHARE` никто не читает), `app/perf/tabs.bench.ts` (`OPENCODE_PERF_SESSION`
+задаёт и читает сам), тестовые `OPENCODE_PTY_*` в `process-daemon/tests`, `sdks/vscode` (`OPENCODE_CALLER` в v2 не
+читается), `patches/install-korean-ime-fix.sh`.
+
+### Сканер секретов
+
+Изменённые строки больше не совпадают с файлом закреплённого v2.3.0, поэтому сканер (В-93) их проверяет. Первый
+`bun run secrets staged` на прогоне дал 8 находок в 7 строках, например
+`{"file":"packages/app/e2e/regression/settings.spec.ts","line":31,"rule":"personal-home-path"}`, статус `findings`.
+
+Все восемь — искусственные домашние каталоги тестов upstream (пользователи `test`, `kit`, `me`, `new`) в строках, где
+скрипт поменял имя файла конфига или установки. Разобраны построчно и записаны в `.gitleaksignore` отпечатками без
+коммита (`файл:правило:строка`) с причиной; такой отпечаток действует и в `staged`, и в `range`. Девятая находка —
+настоящий путь разработчика upstream в `core/drizzle.config.ts`: такие данные исключать нельзя, файл исключён из
+скрипта (выше). После этого `staged` на каждом коммите ветки — `clean`;
+`bun run secrets range oc2-migration HEAD` после коммита прогона — `{"status":"clean","commits":3, …}`.
+
+Отпечатки привязаны к номерам строк: если upstream изменит эти файлы, сканер найдёт строки снова, и разбор повторяется.
+
+### Каталог
+
+- `catalog.json`: у CAT-09, CAT-10, CAT-11 снято `pending`. Прогон дал расхождения в `desktop`, `app`, `ui` и `tui`, а
+  запись с `pending` и расхождениями `catalog-check.py` отклоняет; B1.7 предписывает для этого случая снять `pending` и
+  описать правку. Маски не менялись.
+- `catalog.md`: в разделах CAT-09…CAT-12 — «Назначение» с правками `apply-identity` (без чисел файлов: документ их не хранит), политика
+  `merge` + `apply-identity.py`; прежний текст `pending` перенесён в «Не перенесено из 0.4» с задачей (B4, этап C,
+  B2.3, B2.5d). CAT-02 — правки скрипта, оставленные имена `process-daemon`, блок отпечатков `.gitleaksignore`,
+  устаревшие `OPENCODE_*` в `nix`, корневом `package.json` и `strobe.json`. CAT-03 — правки скрипта лежат в записях
+  пакетов, видимый бренд и README — ручные задачи. CAT-13 — имена конфига `loginom-ai-agent.json(c)` и
+  `.loginom-ai-agent` в `discovery.ts` (закрыта строка «имя файла в системном каталоге — B1.4»), переименования в пяти
+  файлах записи, каталоги по каналу — B1.4c. Шапка «Имена» и правило «Для всех записей» — без «до B1.4».
+- Распределение 330 файлов прогона по записям: CAT-02 — 46, CAT-09 — 21, CAT-10 — 74, CAT-11 — 18, CAT-12 — 166,
+  CAT-13 — 5. Ещё `packages/gui-plugins/README.md` — CAT-03 (блок кода, который сверяет `sdk-docs`).
+- Документы процедуры, где «до B1.4» стало неправдой: `procedure.md` (правило 3 шага 2: что команда оставляет, находки
+  сканера), `guarantees.md` (G2 и строки охранных тестов), `adr-0001-modular-integration.md` (решение 2).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary     # код 0
+against a6b15d33daf6: 344 divergent upstream files
+  CAT-01: 3
+  CAT-02: 49
+  CAT-03: 2
+  CAT-04: 0 (pending: B2.7d, B4.1)
+  CAT-05: 0 (pending: B2.2, B2.3, B2.5, B2.6, B2.9)
+  CAT-06: 0 (pending: B2.4)
+  CAT-07: 0 (pending: B2.1, B2.7a, B4.1)
+  CAT-08: 0 (pending: B2.7, B2.8, B3.2)
+  CAT-13: 10
+  CAT-09: 21
+  CAT-10: 74
+  CAT-11: 18
+  CAT-12: 167
+```
+
+До правки каталога, на коммите прогона: `PROBLEM: pending entries with divergent files (describe the change, drop
+pending): CAT-09, CAT-10, CAT-11`, код 1.
+
+### Ручные правки по задачам
+
+Не больше пяти файлов на задачу. «Откуда» — где пункт найден. Видимые строки — решение по каждой строке (CAT-03);
+имена услуг upstream («OpenCode Console», «OpenCode Zen», «OpenCode Go») — не бренд продукта, их судьба — решение
+владельца, не переименование.
+
+| Задача | Пакет | Файлы | Что менять | Откуда |
+|---|---|---|---|---|
+| Р-1 | `product` | `test/repo-paths.test.ts` | три падения B1.4: пакет агента — `@opencode/cli` в `packages/cli`, а не `packages/opencode`; `turbo.json` v2 — JSONC, читать без `JSON.parse`; синтаксис `--filter …^...` и ложное `--filter name]` в `codemode/script/bench.ts`; исключения для устаревших путей в файлах самого v2.3.0 (`patches/install-korean-ime-fix.sh`, `script/release.ts`). Падения B5.1 и B2.7a не входят | B1.7 |
+| Р-2 | `cli` | `src/commands/commands.ts`, `src/commands/handlers/{default,uninstall,upgrade,pair}.ts` | `OpenCode` в описаниях команд и сообщениях → `Loginom AI Agent` (`Product.name`) | grep строк |
+| Р-3 | `cli` | `src/acp/{error,service,translate}.ts`, `src/services/update-preflight.tsx` | `OpenCode` в сообщениях ACP (метод входа «OpenCode Login») и экране обновления | grep строк |
+| Р-4 | `tui` | `src/app.tsx`, `src/attention.ts`, `src/mini/runtime.lifecycle.ts`, `src/mini/footer.prompt.tsx`, `src/util/tool-display.ts` | заголовок терминала, уведомления, подсказки | grep строк |
+| Р-5 | `tui` | `src/component/{dialog-update,terminal-pane,error-component}.tsx`, `src/config/index.tsx`, `src/util/error-details.ts` | диалог обновления (0.4: «имя продукта в пункте и диалоге обновления»), ошибки | CAT-11, grep |
+| Р-6 | `tui` | `src/mini/footer.permission.tsx`, `src/routes/session/permission.tsx`, `src/feature-plugins/sidebar/footer.tsx`, `src/component/{usage,dialog-go-upsell}.tsx` | «Tell OpenCode…», бесплатные модели, OpenCode Console и Go: переименовать или скрыть — решение владельца | grep строк |
+| Р-7 | `tui` | `src/logo.ts`, `src/component/logo.tsx`, `src/routes/home.tsx`, `src/feature-plugins/home/footer.tsx` | слово-знак и главная страница — `Product.wordmark` «Loginom AI» | CAT-11 (0.4) |
+| Р-8a, Р-8b | `tui`, `theme` | а: `src/theme/assets/opencode.json`, `src/theme/assets/v2/opencode.json`, `src/theme/index.ts` (и комментарий в `error-component.tsx` из Р-5); б: `test/theme.test.ts`, `test/cli/tui/theme-mode.test.tsx`, `test/theme/v2/v1-migrate.test.ts`, `packages/theme/test/theme.test.ts` | тема по умолчанию `opencode`: оставить имя темы upstream или переименовать — решение; скрипт её больше не трогает | B1.3a, прогон |
+| Р-9 | `desktop` (B4) | `src/main/constants.ts`, `src/main/windows/{early,appearance}.ts`, `src/renderer/index.html`, `src/renderer/migration-status.tsx` | `APP_NAME` по каналам, заголовки окон | grep строк |
+| Р-10 | `desktop` (B4) | `electron-builder.config.ts`, `src/main/lifecycle/{environment,deep-link,index}.ts`, `src/main/lifecycle/deep-link.test.ts` | схема `opencode` → `Product.scheme` (`loginom-ai-agent`): `schemes`, `setAsDefaultProtocolClient`, разбор `opencode://`; вход OpenCode Console через `opencode://console/authorized` — решение | B0.4 |
+| Р-11 | `desktop` (B4) | `package.json`, `script/pack.ts`, `resources/windows/installer.nsh` | кэш обновлятора `%LOCALAPPDATA%\@opencodedesktop-updater` (из имени пакета в `updaterCacheDirName`); `customUnInstall` удаляет ключ протокола и копию установщика | B0.4 |
+| Р-12 | корень | `package.json` (`dev:live`, `dev:vite:live`), `nix/opencode.nix`, `nix/desktop.nix`, `strobe.json`, `packages/desktop/perf/startup.bench.ts` | старые `OPENCODE_*` и `opencode service` в инструментах разработчика | замыкание имён |
+| Р-13 | `cli`, `util`, `core` | `cli/src/database-path.ts`, `util/src/observability/logging.ts`, `core/test/logging.test.ts`, `core/test/effect/observability.test.ts`, `cli/script/service-smoke.ts` | файлы БД `opencode-<канал>.db` и журнала `opencode.log`, `opencode-<канал>.log` (правило `opencode.db` их не ловит) | B1.7, прогон |
+| Р-14 | `core` | `src/project.ts`, `src/git.ts`, `test/project.test.ts`, `test/git.test.ts` | кэш id проекта `.git/opencode` в репозитории пользователя | B1.3a |
+| Р-15 | `util` | `src/observability.ts`, `src/observability/otlp.ts`, `core/test/effect/observability.test.ts` | имя клиента и службы телеметрии `opencode` — решение | grep |
+| Р-16 | `process-daemon` | `Cargo.toml`, `Cargo.lock`, `src/daemon/windows.rs`, `src/transport/windows.rs` | имя crate и бинарника `opencode-pty`, канал Windows `\\.\pipe\opencode-pty-<instance>`. Ждёт ответа владельца B1.3b: собирать ли свой бинарник | B1.3b |
+| Р-17 | `core`, `cli` | `core/src/persistent-pty/{binary.bun,binary.node}.ts`, `cli/src/node/target.ts`, `cli/script/{opencode-pty,node-assets}.ts` | поиск бинарника и каталог `<bin>/opencode-pty/`; вместе с Р-16 | B1.3b |
+| Р-18 | `core` | `src/plugin/skill/opencode.md`, `src/plugin/skill/report.md`, `src/plugin/command/initialize.txt` | тексты встроенных навыков: пути `~/.config/opencode`, `~/.local/share/opencode/log/opencode.log`, «OpenCode config» | прогон |
+| Р-19 | корень | `install` | `INSTALL_DIR=$HOME/.opencode/bin` → `.loginom-ai-agent/bin` (решение владельца, CAT-02); имя бинарника — B2.7a | CAT-02 |
+| Р-20 | документы | `AGENTS.md`, `packages/{desktop,process-daemon,app}/README.md`, `packages/app/AGENTS.md` | `OPENCODE_STORY`, `OPENCODE_FLAGS`, `OPENCODE_CHANNEL`, `OPENCODE_PTY_SOCKET_DIR`, `.opencode/skills` | CAT-03 |
+| Р-21 | документы | `README.md`, `packages/app/perf/README.md`, `packages/plugins/README.md`, `packages/sdk/README.md` | то же | CAT-03 |
+| Р-22…Р-26 | документы | 22 корневых `README.*.md`, по 4–5 на задачу | переведённые README (CAT-03); или решение их не поставлять | CAT-03 |
+
+Итого 27 задач: `product` 1, `cli` 2, `tui` 6, `desktop` 3 (все в B4), `core`/`util`/`process-daemon` 6, корень 2,
+документы 7. Ждут решения владельца: Р-6, Р-8, Р-10 (вход Console), Р-15, Р-16 и Р-17, Р-22…Р-26.
+
+Не задачи B1.4, для справки: имя команды `opencode` в сообщениях (39 строк в 19 файлах `cli`, `tui`, `gui-plugins`: «run `opencode pair`», «opencode upgrade», «`opencode mcp add`») — вместе с именем бинарника, B2.7a; без этого BRAND-01 для CLI не закрыть. Имя бинарника CLI `opencode` в путях установки (`cli/src/services/updater.ts` `curlPath`,
+`desktop/src/main/service/desktop-cli.ts`, `desktop/script/utils.ts`, удалённый путь SSH в `gui-plugins/src/ssh`) —
+B2.7a; строки и адреса обновлятора CLI (`opencode.ai/update`, `formulae.brew.sh`) — B2.7d (CAT-04); `appId`
+`ai.opencode.desktop` и onboarding по каталогу `opencode` в userData — B4.1; хранилища по каналу — B1.4c; каталог
+`.opencode/` самого репозитория (навыки для разработки) продукт больше не находит — так и должно быть.
+
+### Тесты
+
+Полные наборы, `oc2-migration` (отдельное чистое дерево) → ветка. Сравнивались число прошедших и упавших и имена
+упавших тестов (`bun test` печатает их строками `(fail)`). Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE` задан.
+
+| Пакет | Команда | `oc2-migration` | B1.4a |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 407 pass, 0 fail | 407 pass, 0 fail |
+| `core` | `bun run script/test.ts` | 7118 pass, 3 fail | 7118 pass, 3 fail — те же: `ShellParse > extracts static directory targets…` и два `flock` (прогон под root) |
+| `server` | `bun test` | 127 / 0 | 127 / 0 |
+| `client` | `bun test` | 262 / 0 | 262 / 0 |
+| `util` | `bun test` | 145 / 0 | 145 / 0 |
+| `desktop` | `bun test --timeout 30000` | 528 / 0 | 528 / 0 |
+| `tui` | `bun test --timeout 30000` | 1672 / 1 | 1672 / 1 — то же `the art stops every frame when hidden…` |
+| `app` | `bun run test` (unit и browser) | 3075 / 0 | 3075 / 0 |
+| `ui` | `bun test src` | 620 / 0 | 620 / 0 |
+| `gui-plugins` | `bun test` | 1129 / 0 | 1129 / 0 |
+| `schema` | `bun test` | 92 / 0 | 92 / 0 |
+| `plugin` | `bun test` | 37 / 0 | 37 / 0 |
+| `simulation` | `bun test --timeout 30000` | 48 / 0 | 48 / 0 |
+| `script` | `bun test` | 59 / 12 | 59 / 12 — те же 12 тестов архивов сканера секретов |
+| `product` | `bun test` | 56 / 5 | 56 / 5 — те же 5 в `repo-paths.test.ts` (B1.4: Р-1; B5.1, B2.7a) |
+
+Первый полный прогон ветки дал два новых падения, оба — последствия переименования:
+- `core`: `ConfigDiscovery.discover > probes candidates when readDirectory reports a differently cased entry` —
+  фикстура `.OPENCODE` в другом регистре, кандидат теперь `.loginom-ai-agent`. Исправлено руками (`eb1ab715e6`).
+- `gui-plugins`: `setup sessions run in the global configuration's directory…` — регулярное выражение с `.opencode`
+  в `config-file.ts` скрипт не менял. Исправлено правилом (`af918a7717`, `656428d33a`).
+
+Полные наборы ветки — на `67ed7b618f`. Потом менялись только `core` (тест `discovery`, `config.test.ts`), `gui-plugins`
+(`config-file.ts`) и документы; `core` и `gui-plugins` прогнаны ещё раз на `656428d33a`: 7118 / 3 (те же три) и 1129 / 0.
+
+Охранные тесты отдельно, после снятия `test.failing`:
+
+```text
+$ cd packages/product && bun test test/names.test.ts
+ 9 pass
+ 0 fail
+$ cd packages/cli && bun test test/flag-identity.test.ts
+ 3 pass
+ 0 fail
+```
+
+Typecheck (`bun typecheck` в каталоге пакета) после прогона — 0 ошибок в `cli`, `core`, `server`, `client`, `util`,
+`desktop`, `tui`, `app`, `ui`, `gui-plugins`, `schema`, `plugin`, `simulation`, `product`. Сгенерированный клиент и
+OpenAPI не изменились: `bun run check:generated` в `packages/client` и `packages/protocol` — код 0, `git status` чистый
+(прогон менял описания в `schema/src/config`).
+
+### Итоговая проверка
+
+На `8f8a4984b5` (после него — только этот журнал), Bun 1.4.4 и Node 24.19.0 первыми в `PATH`, из корня дерева:
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                   # код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 344 divergent upstream files      # код 0, состав — в разделе «Каталог»
+$ bun run secrets range oc2-migration HEAD
+{"status":"clean","commits":10,"archives":0, …}
+$ bun run check                                         # код 0, 50 с
+Found 522 warnings and 0 errors.
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    38 successful, 38 total
+Cached:    0 cached, 38 total
+$ TMPDIR=<scratchpad> scripts/upstream-sync/selftest.sh  # на 656428d33a: после него менялись только README и документы
+SELFTEST PASS                                           # код 0, 1 мин 56 с
+```
+
+Внутри `selftest.sh`: `test_tools.py` (70 тестов, в том числе 7 `ApplyIdentityRules`), `test_acceptance.py`,
+`test_stand.sh`, док-тест `procedure.md` (`RESULT: ACCEPTED`) и случай уже слитого тега.
+
+Первый `bun run check` (на `656428d33a`) был красным: `sdk-docs` — `packages/gui-plugins/README.md:541 the code block
+differs from packages/gui-plugins/src/pairing/main.ts at its line 24`. README повторяет исходник, а скрипт README не
+берёт. Исправлено тем же скриптом по явному пути (`8f8a4984b5`); других документов с блоками `<!-- source: … -->`,
+которые меняет скрипт, нет.
+
+### Где решал сам
+
+- **Снят `pending` у CAT-09, CAT-10, CAT-11**, хотя задание называло записи CAT-03, CAT-12, CAT-13. Иначе
+  `catalog-check.py` красный: прогон дал расхождения в масках этих записей. Меньший вариант без нового правила — снять
+  `pending` и описать правку, как предписал B1.7. Перечислять 113 файлов явными путями в CAT-03 перед ними — длиннее и
+  прячет от записей пакетов будущие правки в тех же файлах. Задачи 0.4 сохранены в «Не перенесено». **Спорное.**
+- **Восемь отпечатков в `.gitleaksignore`** для искусственных путей тестов upstream. Правило документа о сканере
+  («специальные исключения — для конкретного искусственного значения, места и с объяснением») это допускает; решение
+  В-94 было про сторонние исходники, здесь — код upstream, который форк изменил. Отпечатки без коммита, чтобы
+  действовали и в `staged`, и в `range`; цена — такой отпечаток пропустит любое новое совпадение того же правила в той
+  же строке файла, а не только разобранное значение. Настоящий путь разработчика upstream не исключал: файл не трогает
+  скрипт. **Спорное**, для владельца.
+- **Порчу исправлял правилами скрипта**, не результатом: прогон — один коммит, который воспроизводится командой и
+  проходит `--check` с кодом 0.
+- **`.github/` переименован вместе с остальным**, как было в `SOURCES` 0.4: workflows upstream задают переменные для
+  скриптов выпуска, которые тоже переименованы. Секреты и `vars` GitHub прогон не тронул (в именах их нет).
+- **Имена переменных `process-daemon` — список в скрипте**, а не исключение файлов workflows: так остальные имена в тех
+  же workflows переименовываются.
+- **Тема `opencode` не переименована.** Это файл и имя темы upstream, а не конфиг. Переименовать ли — Р-8.
+- **`opencode-<канал>.db` и `opencode-<канал>.log` — ручная задача Р-13**, а не правило скрипта: имя собирается
+  шаблоном (`` `opencode-${…}.db` ``), общего правила без ложных срабатываний не нашёл.
+- **Снимок TUI — исключение файла теста**, а не обновление `.snap`: так файл остаётся равным upstream.
+- **`.OPENCODE` в `core/test/config/discovery.test.ts` — правка руками** (`.LOGINOM-AI-AGENT`), не правило: это
+  единственное написание в другом регистре, а правило с сохранением регистра сложнее самой правки. Записано в CAT-12.
+- **Корневые `package.json`, `nix/`, `strobe.json` в `SOURCES` не добавлены**: это инструменты разработчика upstream,
+  которые ищут установленный `opencode`; их правка — Р-12.
+
+### Найдено, не чинил
+
+- `names.test.ts` проверяет `OPENCODE_*` только в `src`, `script`, `scripts` пакетов из своего списка, без `tui`,
+  `ui`, тестов и `.github`: его зелёный результат не говорит о 32 именах, переименованных в `tui`. Их покрывают тесты
+  `tui` и `apply-identity --check`.
+- `packages/core/src/plugin/skill/opencode.md` после прогона называет конфиг `~/.config/opencode/loginom-ai-agent.json(c)`:
+  каталог в тексте прежний (Р-18).
+- `core/src/tool/plugin/shell.ts` ставит дочерним оболочкам `OPENCODE=1` (без `_`, правило его не берёт): метка «запущено
+  из агента» для скриптов пользователя; переименовать ли — решение, добавить к Р-13 или Р-15.
+- `VITE_OPENCODE_CHANNEL` в `desktop/electron.vite.config.ts` правило не берёт (`_` перед `OPENCODE`): имя внутреннее,
+  обе стороны в одном файле, не трогал.
+- Строки `gui-plugins/src/updater/web-driver.ts` (`loginom-ai-agent.updater.reset`, имя `BroadcastChannel`) переименованы
+  правилом `opencode.updater`: имя внутреннее и одно, поведение не меняется.
+
+### Не проверено
+
+- Windows и macOS: всё на Linux. Пути Windows в правиле `.opencode` проверены только тестом скрипта.
+- Workflows и скрипты выпуска upstream в `.github/release/` не запускались: переименование согласовано по чтениям, не
+  прогоном. Сборка CLI и Desktop не собиралась; «в собранном CLI нет имён OpenCode» (BRAND-01) — не проверялось, это
+  приёмка B1.4 целиком (ручные задачи и B2.7a).
+- e2e `app` (Playwright, `packages/app/e2e`) не запускались: в них 4 файла прогона; `bun test` пакета `app` их не берёт.
+- `process-daemon` (`cargo test`) не запускался: скрипт его не меняет.
+- Пароль и каталоги при унаследованных `OPENCODE_*` проверены тестом `flag-identity` из исходников (канал `local`), не
+  в установленной сборке.
