@@ -140,6 +140,8 @@ async function cliServiceFile(root: string, channel: string | undefined, env: Re
     cli,
     {
       ...process.env,
+      // The isolated XDG_CACHE_HOME would hold Bun's transpiler cache; share the CLI tests' cache instead.
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(os.tmpdir(), "opencode-test-transpiler-cache"),
       HOME: root,
       USERPROFILE: root,
       TMPDIR: path.join(root, "tmp"),
