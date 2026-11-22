@@ -3023,3 +3023,345 @@ $ bun run secrets range 56fe41abdb HEAD                  # на 19dcfa34c1
 - Windows и macOS; установленная сборка CLI (`build.ts`) — только запуск из исходников.
 - Клиентские плагины TUI (TUI грузит их сам из своего конфига) и GUI-плагины Desktop. При запрете сервер не отдаёт
   GUI-бандл пакета из конфига, потому что пакет не загружается. Сам Desktop не запускал.
+
+## B3.1 Команда migrate
+
+22.11.2026. Ветка `b31-migrate` от `oc2-migration` (`56fe41abdb`), перед приёмкой перенесена rebase на `93b90a5daa`
+(влит B2.1; конфликт — только строка CAT-01 в `catalog.md`, взята версия B2.1 и дописана своя). Рабочее дерево
+`.claude/worktrees/b31`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: 1600 пакетов,
+`.husky/_` появился, хук `pre-commit` срабатывал на каждом коммите. `packages/loginom-agent` и `core/src/plugin` (B2.1)
+не трогал.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `99d0a8355e` `feat(cli): migrate 0.3.9 and 0.4 profiles into the OpenCode 2 database` | `server/src/legacy-migrate.ts` (новый), `cli/src/commands/handlers/migrate.ts` (новый), `cli/src/commands/commands.ts`, `cli/src/index.ts`, `server/package.json`, `bun.lock` (одна строка) | `clean` |
+| `cfc31009f5` `test: cover migrate with profiles written by the 0.3.9 and 0.4 CLI` | фикстуры и генератор `server/test/fixture/legacy/`, `server/test/legacy-migrate.test.ts`, `cli/test/migrate.test.ts` | `clean` |
+| `e9b344d826` `fix(cli): let migrate pass over a profile that is already on OpenCode 2` | `legacy-migrate.ts`, обработчик, тест | `clean` |
+| следующий | этот раздел, `catalog.md` (CAT-01, CAT-12) | |
+
+### Где лежали базы 0.3.9 и 0.4
+
+Одинаково на `v0.3.9` и `a080f7725c`:
+
+- Desktop и бэкенд v1: `core/src/global.ts` — каталог `productSlug(productChannel(LOGINOM_AI_AGENT_CHANNEL ?? "prod"))`
+  в `$XDG_DATA_HOME` (`xdg-basedir`, на всех ОС `~/.local/share`); `core/src/database/database.ts` — файл
+  `join(Global.Path.data, Product.database)`, то есть `loginom-ai-agent.db`. Desktop задавал бэкенду только
+  `LOGINOM_AI_AGENT_CHANNEL` (`desktop/src/main/server.ts`), `XDG_DATA_HOME` и `LOGINOM_AI_AGENT_DB` — только в тестовом
+  профиле (`desktop/src/main/index.ts`).
+- Каналы 0.4: `prod` → `loginom-ai-agent`, `beta` → `loginom-ai-agent-beta`, остальное → `loginom-ai-agent-dev`
+  (`product/src/index.ts`). На v2 после B1.4c — те же каталоги по тому же правилу, сборка `latest` — prod.
+- Отдельный профиль автономного CLI 0.4: `<config>/com.loginom.aiagent[.beta|.dev]/cli/profiles/default/data/loginom-ai-agent.db`
+  (`product/src/cli-profile.ts`, `opencode/src/cli/profile.ts`). Сам `migrate` его не ищет, см. «Где решал сам».
+- Схема обеих версий одна: 38 записей в таблице `migration`, последняя `20260622202450_simplify_session_input`. Это и
+  ломает штатный путь v2 (S4).
+
+Итог: в сборке канала X база 0.4 канала X и новая база v2 — **один и тот же файл**
+(`$XDG_DATA_HOME/loginom-ai-agent[-beta|-dev]/loginom-ai-agent.db`). Запуск из исходников (канал `local`) пишет рядом
+`loginom-ai-agent-local.db`, совпадения нет.
+
+### Команда
+
+`opencode migrate [database]` (имя бинарника — B2.7a). Подкоманда верхнего уровня рядом с `upgrade` и `uninstall` —
+тоже локальная обслуживающая команда. Флагов `--standalone`/`--server` у неё нет: службу она не запускает и к ней не
+обращается. Без аргумента источник — `<data>/loginom-ai-agent.db` своего канала, цель — `databasePath(global.data)`,
+та же функция, по которой открывает базу служба.
+
+Порядок (`server/src/legacy-migrate.ts`):
+
+1. Если в цели есть метка этого источника (`kv`, ключ `loginom.migrate:<путь источника>`), команда пишет
+   `Already migrated …; nothing changed.` и выходит с кодом 0. Цель при этом открывается только на чтение.
+2. Источник совпадает с целью, и это уже база v2 без метки — `… is already an OpenCode 2 database; nothing to
+   migrate.`, код 0. Так выглядит профиль без данных 0.4 после первого старта службы: без этого правила каждый
+   следующий запуск падал бы (нашёл ревью до приёмки, коммит `e9b344d826`).
+3. Источника нет — `No 0.3.9 or 0.4 database at …; nothing to migrate.`, код 0. Исключение — источник совпадает с
+   целью, а резервная копия уже есть (прерванная замена файлов). Тогда это ошибка с подсказкой вернуть копию.
+4. Источник открывается через `bun:sqlite` с `readonly: true` и в `Database.layer` не попадает. Пустые `-wal`/`-shm`,
+   которые создаёт такое открытие, удаляются при закрытии; чужие не трогаются. Проверки: нет `session_v2`, есть
+   `project`, `session`, `message`, `part`.
+5. Новая база собирается рядом, в `<цель>.migrating`, через `Database.layer`: те же миграции, что при первом старте
+   службы. Всё пишется в одной транзакции:
+   - проекты и проект `global`;
+   - по каждой сессии строка `session_v2` (`permission` — NULL);
+   - `V1Migration.transformSession`, затем `session_message`, итоги сессии и `event_sequence`;
+   - метка — в той же транзакции.
+
+   Это копия цикла `V1Migration.run` без `resolveDirectory`.
+6. После закрытия базы число сессий, сообщений и метка пересчитываются на закрытом файле. Расхождение — ошибка.
+7. Если источник и цель — один файл, источник вместе с `-wal`/`-shm` переименовывается в
+   `loginom-ai-agent.v1-backup.db`. Затем `<цель>.migrating` (тоже вместе с `-wal`/`-shm`, если они пережили закрытие)
+   становится целью. При разных файлах оригинал остаётся на
+   месте.
+8. Любая ошибка: в stderr `migrate failed: <что и где>`, код 1. Временный файл удаляется, оригинал не меняется.
+   База в памяти (`LOGINOM_AI_AGENT_DB=:memory:`) — отказ.
+
+Если цель уже есть и это база v2, а источник — другой файл (явный аргумент), сессии добавляются в неё на месте одной
+транзакцией. Сессии с уже существующим ID пропускаются, их число выводится в отчёте. Если цель есть, но это не база v2,
+команда отказывает.
+
+Отчёт: число сессий, сообщений и частей источника, его схема, сколько записано, где резервная копия, пропущенные строки
+(предупреждения `transformSession`: `invalid-message`, `invalid-part`, `orphan-part`), пользовательские плагины. Плагины
+берутся из списков `plugin` в `config.json`, `loginom-ai-agent.json` и `loginom-ai-agent.jsonc` глобального каталога
+конфига и из файлов `plugin(s)/*.{ts,js}` рядом с ними (`a080f7725c:packages/opencode/src/config/config.ts`,
+`config/plugin.ts`). Конфиг только читается; конфиги проектов не просматриваются.
+
+Только Bun: под Node `#v1-migration` указывает на пустой модуль. `bun:sqlite` импортируется динамически внутри `run`.
+Сборка Node (`script/build-node.ts --single --bundle-only --skip-install`) — код 0. Она печатает одно предупреждение:
+`"transformSession" is not exported by "../core/src/database/v1-migration.noop.ts"`. Собранный под Node CLI отвечает
+`migrate failed: migrate runs only in the Bun build`, код 1.
+
+### Фикстуры
+
+`server/test/fixture/legacy/generate.ts` запускает CLI самого релиза из исходников, как `s4.ts`. Отличие от S4: модель
+отвечает из того же процесса, поэтому CLI запускается асинхронно — `spawnSync` блокирует ответы модели.
+
+- **0.4.x** — `git worktree add --detach <scratchpad>/v04 a080f7725c`.
+- **0.3.9** — то же для тега `v0.3.9`. CLI 0.3.9 запустился, остановок не было.
+
+Обе сборки — `bun install --frozen-lockfile` и `npm ci --ignore-scripts --omit=dev …` в `loginom-runtime/client` (без него
+`Cannot find package 'yaml'`, то же, что в B1.1). Запуск — Bun 1.4.3, как в B1.1. Модель — сценарная
+OpenAI-совместимая заглушка. Профиль — по фиксированному нейтральному пути `/tmp/loginom-fixture` (канал `prod`).
+
+В каждом профиле три сессии, 9 сообщений и 25 частей:
+
+1. Два хода текстом: `run`, затем `run --continue`.
+2. `run --file notes.txt` с вызовом инструмента `read`: часть `file` с адресом `file://` и синтетический текст с
+   содержимым файла.
+3. `serve` и `run --attach … --file notes.txt`: вложение адресом `data:`, как его шлёт клиент, подключённый к бэкенду.
+
+Хранятся как SQL-дамп (`0.4.sql`, `0.3.9.sql`, по 70 КБ), а не `.db`. Сканер секретов (`gitleaks git --staged`) и ревью
+так видят каждую строку, а двоичный `.db` сканер не читает. Тесты восстанавливают дамп через `bun:sqlite` и включают
+WAL, как в настоящих профилях. Проверка дампа: восстановленная база совпала с исходной — схема `sqlite_master` и строки
+всех 20 таблиц (сравнение через Python `sqlite3`). Первый дамп 0.4 сканер отклонил: `generic-api-key` сработал на
+случайный ID события `evt_…Key…`. После перегенерации — `clean`. В дампах нет `/root`, `/home` и имён пользователей
+(`strings | grep`); пути — только `/tmp/loginom-fixture/project`.
+
+### Тесты
+
+`server/test/legacy-migrate.test.ts` (в процессе, 0,7 с):
+
+1. 0.4, источник = цель:
+   - статус `migrated`, источник `3 / 9 / 25`, предупреждений нет;
+   - хеш резервной копии равен хешу оригинала, в каталоге только два файла;
+   - ID сессий совпадают;
+   - ID строк `user` и `assistant` в `session_message` совпадают с ID сообщений v1;
+   - содержимое каждой части есть в перенесённой сессии: текст, в том числе синтетический, `callID` и имя инструмента,
+     данные вложения `data:`;
+   - для вложения `file://` есть пометка `[Attachment unavailable after migration: notes.txt (text/plain)]`. Так
+     upstream переносит недоступный файл: адрес `file://` в v2 не переносится, текст файла остаётся в синтетическом
+     сообщении.
+   - Повторный запуск — `already-migrated`, хеши цели и копии не изменились.
+2. 0.3.9 в отдельную цель: оригинал не изменён (хеш), рядом нет `-wal`/`-shm`, части на месте.
+3. Второй профиль в существующую базу v2 (явный источник). Копия того же профиля 0.4 по другому пути: 0 записано,
+   3 уже есть. Профиль 0.3.9: 3 сессии добавлены, всего 6, части на месте.
+4. База v2 по пути самой цели, без метки: статус `current`, файл не изменён, копии нет.
+5. Испорченный профиль (файл обрезан наполовину):
+   `cannot read <источник>: database disk image is malformed`; хеш тот же, других файлов нет.
+6. Сессия, которую v2 не принимает (ID `zzz` без префикса `ses`, идёт после трёх хороших):
+   `cannot copy session zzz`. Цели и временного файла нет, хеш источника тот же — откат всей транзакции.
+
+`cli/test/migrate.test.ts` (три запуска собранного из исходников CLI, 2,5 с). `LOGINOM_AI_AGENT_DISABLE_CHANNEL_DB=1`
+даёт имя релизной базы, то есть совпадение файлов:
+
+1. Код 0, `Migrated …`, `Written: 3 sessions`, `Original kept as …v1-backup.db`, хеш копии равен оригиналу.
+   Названы все три плагина: `opencode-wakatime` и `@acme/loginom-extra` из `loginom-ai-agent.jsonc`, `local-tool.ts` из
+   `plugins/`.
+2. Повтор: код 0, `Already migrated`, хеши всех файлов `*.db*` каталога те же.
+3. Ошибка: код 1, в stderr `migrate failed: cannot read … database disk image is malformed`, в stdout нет `Migrated`,
+   файл тот же.
+
+Мутации на итоговом коде (`e9b344d826`; файл подменялся на время прогона и возвращался):
+
+```text
+# cli/src/commands/handlers/migrate.ts: убрана строка `process.exitCode = 1` (ошибка проглатывается)
+$ cd packages/cli && bun test --timeout 30000 test/migrate.test.ts
+error: expect(received).toBe(expected)
+Expected: 1
+Received: 0
+(fail) migrate > an error stops the command with a non-zero code and no success report
+ 2 pass
+ 1 fail
+
+# server/src/legacy-migrate.ts: ошибка сессии подавлена — `Effect.catchCause(() => Effect.succeed(undefined))`
+$ cd packages/server && bun test test/legacy-migrate.test.ts
+Expected to contain: "cannot copy session zzz"
+Received: "Error: /tmp/loginom-migrate-sKh1Ye/loginom-ai-agent-local.db.migrating holds 3 of 4 sessions and 12 of 12 messages after the copy"
+(fail) LegacyMigrate > a session that cannot be copied rolls the whole migration back
+ 5 pass
+ 1 fail
+
+# то же и без сверки числа сессий на закрытом файле
+Expected to contain: "cannot copy session zzz"
+Received: "the migration succeeded"
+(fail) LegacyMigrate > a session that cannot be copied rolls the whole migration back
+ 5 pass
+ 1 fail
+```
+
+Вторая мутация показывает второй рубеж: подавленную ошибку ловит пересчёт на закрытом файле, и команда всё равно не
+сообщает успех.
+
+### Ручные проверки
+
+Сборки трёх каналов, сборка Node и `serve` собранного `latest` шли на первом коммите до rebase (`44c6800bc8`, после
+rebase — `99d0a8355e`), до правки `e9b344d826` и до
+rebase на B2.1. После них менялись: правило «уже база v2», перенос `-wal` вместе с готовой копией, отказ для
+`:memory:` и загрузка серверных плагинов (B2.1). На итоговом дереве (`e9b344d826` после rebase) из исходников повторены:
+перенос 0.4 при совпадении файлов, `serve` на результате, профиль без 0.4, отказ для `:memory:`:
+
+```text
+Migrated <root>/data/loginom-ai-agent-dev/loginom-ai-agent.db to <root>/data/loginom-ai-agent-dev/loginom-ai-agent.db.
+  Written: 3 sessions, 12 messages
+exit 0
+migration {"status":"completed"}
+sessions ["ses_dfc1cc978ffeMiptdveabobUqg Fixture title","ses_dfc1cd836ffeH719EHffD9cPhW Fixture title","ses_dfc1cebaeffeJboO7nU7RBSAUo Fixture title"]
+$ LOGINOM_AI_AGENT_DB=:memory: … migrate
+migrate failed: the database is in memory (LOGINOM_AI_AGENT_DB); nothing to migrate into
+exit 1
+```
+
+Ниже — прогоны на `44c6800bc8`.
+
+Собранный CLI трёх каналов. Сборка: `LOGINOM_AI_AGENT_CHANNEL=<канал> bun run script/build.ts --single --skip-install
+--skip-web-ui --outdir=<scratchpad>`, для `latest` ещё `LOGINOM_AI_AGENT_VERSION=2.3.0-b31`. В одном корне лежат три
+профиля 0.4/0.3.9 — по одному в каталоге каждого канала. Каждый бинарник запускался два раза, `env -i`, `HOME` и
+`XDG_*` указывали в корень:
+
+```text
+до:
+47056ec1…  data/loginom-ai-agent-beta/loginom-ai-agent.db        (0.3.9)
+c36e2481…  data/loginom-ai-agent-dev/loginom-ai-agent.db         (0.4)
+c36e2481…  data/loginom-ai-agent/loginom-ai-agent.db             (0.4)
+== latest (opencode v2.3.0-b31)
+Migrated <root>/data/loginom-ai-agent/loginom-ai-agent.db to <root>/data/loginom-ai-agent/loginom-ai-agent.db.
+  Source: 3 sessions, 9 messages, 25 parts (schema 20260622202450_simplify_session_input)
+  Written: 3 sessions, 12 messages
+  Original kept as <root>/data/loginom-ai-agent/loginom-ai-agent.v1-backup.db
+exit 0
+Already migrated <root>/data/loginom-ai-agent/loginom-ai-agent.db to <root>/data/loginom-ai-agent/loginom-ai-agent.db; nothing changed.
+exit 0
+== beta (opencode v0.0.0-beta-202611221547)    — то же для data/loginom-ai-agent-beta, exit 0, повтор exit 0
+== dev (opencode v0.0.0-dev-202611221547)      — то же для data/loginom-ai-agent-dev, exit 0, повтор exit 0
+после:
+a808400e…  data/loginom-ai-agent-beta/loginom-ai-agent.db
+47056ec1…  data/loginom-ai-agent-beta/loginom-ai-agent.v1-backup.db
+532ac445…  data/loginom-ai-agent-dev/loginom-ai-agent.db
+c36e2481…  data/loginom-ai-agent-dev/loginom-ai-agent.v1-backup.db
+08dd899c…  data/loginom-ai-agent/loginom-ai-agent.db
+c36e2481…  data/loginom-ai-agent/loginom-ai-agent.v1-backup.db
+```
+
+Каждый канал перенёс только свою базу. Копии совпали с оригиналами по хешу. Файлов `-wal`/`-shm` не осталось.
+
+Служба v2 видит перенесённое (противоположность S4). `opencode serve` собранного `latest` на этом корне,
+`GET /api/experimental/migration/v1`, `GET /api/session`, `GET /api/session/<id>/message`:
+
+```text
+migration {"status":"completed"}
+sessions ["ses_dfc1cc978ffeMiptdveabobUqg Fixture title","ses_dfc1cd836ffeH719EHffD9cPhW Fixture title","ses_dfc1cebaeffeJboO7nU7RBSAUo Fixture title"]
+ses_dfc1cc978ffeMiptdveabobUqg ["assistant","synthetic","user"]
+ses_dfc1cd836ffeH719EHffD9cPhW ["system","assistant","assistant","synthetic","user"]
+ses_dfc1cebaeffeJboO7nU7RBSAUo ["assistant","user","assistant","user"]
+```
+
+Профиль без данных 0.4 (из исходников, `LOGINOM_AI_AGENT_DISABLE_CHANNEL_DB=1`, пустой корень): `migrate`, затем
+короткий `serve`, который создаёт базу, затем снова `migrate`:
+
+```text
+No 0.3.9 or 0.4 database at <root>/data/loginom-ai-agent-dev/loginom-ai-agent.db; nothing to migrate.
+exit 0
+migration {"status":"completed"}
+sessions []
+<root>/data/loginom-ai-agent-dev/loginom-ai-agent.db is already an OpenCode 2 database; nothing to migrate.
+exit 0
+```
+
+То же из исходников на 0.3.9 при совпадении файлов (`LOGINOM_AI_AGENT_DISABLE_CHANNEL_DB=1`) и на 0.4 без совпадения
+(`loginom-ai-agent-local.db`). Девять сообщений v1 стали двенадцатью: по одной синтетической строке на каждое вложение
+и системная пометка о смене аргументов `read` (`legacyToolNotice` upstream).
+
+### Приёмка
+
+База — `93b90a5daa` (числа B2.1 в его разделе). Итог — `e9b344d826` (после него — только этот раздел и
+`catalog.md`). Те же команды; сравнивались числа и имена упавших тестов.
+
+| Пакет | Команда | База | Итог |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 408 pass, 9 skip, 0 fail | 411 pass (+3 `migrate`), 9 skip, 0 fail |
+| `server` | `bun test` | 127 pass, 1 skip, 0 fail | 133 pass (+6 `legacy-migrate`), 1 skip, 0 fail |
+| `core` | `bun run script/test.ts` | 7125 pass, 354 skip, 3 fail | 7125 pass, 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (прогон под root); `core` не менялся |
+
+До rebase на базе `56fe41abdb` (`cli` 407 / 9 / 0, `core` 7119 / 354 / 3) получилось: `cli` 410 / 9 / 0, `server`
+131 / 1 / 0 — тогда было 4 теста `legacy-migrate` — и `core` 7119 / 354 / 3 с теми же тремя падениями. `server` на
+`56fe41abdb` в чистом дереве — 127 / 1 / 0.
+
+Устойчивость на итоговом дереве: `--rerun-each 10` — `server/test/legacy-migrate.test.ts` 60 pass / 0 fail,
+`cli/test/migrate.test.ts` 30 pass / 0 fail. `product` (`names.test.ts` сканирует весь репозиторий): 58 pass, 3 fail —
+те же три `repo-paths`, что у базы (В-95).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 430 divergent upstream files                  # на 93b90a5daa — 429; CAT-01: 7 → 8
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                                     # код 0
+Checked 1686 installs across 2060 packages (no changes)
+$ cd packages/server && bun typecheck && bun run typecheck:tsc      # код 0 у обеих
+$ cd packages/cli && bun typecheck && bun run typecheck:tsc         # код 0 у обеих
+$ bun run check                                                     # код 0, 21 с
+Found 517 warnings and 0 errors.                                    # в новых файлах предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Место кода.** Тест границ CLI (`cli/test/import-boundaries.test.ts`) запрещает CLI импортировать `@opencode/core`.
+  Поэтому перенос — новый файл форка в `server` (`legacy-migrate.ts`), как запуск службы (`@opencode/server/process`).
+  Обработчик CLI импортирует его динамически. Для `eq`/`sql` в `server/package.json` добавлен `drizzle-orm`
+  (`catalog:`, та же версия, что у `core`): в `bun.lock` одна строка, разрешённые версии те же. Другой путь — писать
+  через голый `bun:sqlite` без drizzle — разошёлся бы с кодом `V1Migration.run`, который копируется.
+- **Каталог.** `commands.ts` и `index.ts` уже расходились с v2.3.0 (`apply-identity`) и стоят под CAT-12 по маске
+  `packages/**`, `server/package.json` — под CAT-01. Новой записи нет, в `catalog.md` дописаны CAT-01 и CAT-12.
+  CAT-08 (`pending`, в том числе B3.2) не трогал: запись с `pending` и с файлами `catalog-check.py` отклоняет. Число
+  расходящихся файлов — 429 → 430 (`server/package.json`; на `93b90a5daa`).
+- **Явный аргумент `database` вместо поиска профиля CLI 0.4.** Где будет профиль CLI на v2, решит B2.7c. По умолчанию
+  переносится база Desktop/бэкенда своего канала. Базу CLI 0.4 можно передать путём, тогда она добавляется в базу
+  канала v2 на месте.
+- **Пропущенные строки не роняют команду.** `transformSession` не бросает исключений, а возвращает предупреждения о
+  строках, которые v2 не читает; upstream их только пишет в журнал. Здесь они перечисляются в отчёте построчно, код 0.
+  Расхождение счётчиков на закрытом файле и любая ошибка чтения или записи — код 1. Если владелец решит, что пропуск
+  строки — тоже ошибка, это одна проверка в обработчике.
+- **«Уже база v2» по пути цели — код 0.** Правило не отличает чистый профиль от базы 0.4, на которой служба v2 уже
+  стартовала раньше `migrate`: её таблицы v1 удалены миграцией v2, история потеряна, как в S4. Команда ответит
+  `nothing to migrate` и в этом случае. Запуск `migrate` до первого старта службы целиком на B4.
+- **Без `resolveDirectory`.** Сессии из каталогов без git остаются в проекте `global`, как в v1. v2 переносит их в
+  проект каталога, когда тот разрешается (`Worktree.Event.Resolved` в `core/src/session/projector.ts`). Так результат не
+  зависит от того, есть ли каталог на диске в момент переноса. Вживую перенос в проект каталога не проверялся.
+- **Одна транзакция на весь профиль, временный файл и замена в конце.** Сбой не оставляет базы, которую служба
+  приняла бы за готовую. Цена — память и время на больших профилях, см. «Не проверено».
+- **Имя копии** — `loginom-ai-agent.v1-backup.db`: формат бэкенда v1, общий для 0.3.9 и 0.4. Если копия уже есть,
+  команда отказывает и не перезаписывает её.
+- **Фикстуры — SQL-текст**, а не `.db` (выше).
+- **Не переносится, как и в `V1Migration.run` upstream:** `todo`, `permission`, `session_share`, `workspace`,
+  `project_directory`, `event`, учётные записи. Учётные данные — B3.2. Побочный эффект: `Database.layer` новой базы
+  выполняет миграцию `20260805200742_import_legacy_credentials`, то есть читает `<data>/auth.json` канала — так же, как
+  первый старт службы. Её проверку на пути S4 план отдал B3.2.
+
+### Найдено, не чинил
+
+- В 0.4 и 0.3.9 `run --format json` сохраняет текст запроса в кавычках (`"\"First session…\""`) — видно в фикстурах.
+  На перенос не влияет.
+- Предупреждение сборки Node о `transformSession` (выше). Чтобы его не было, нужно экспортировать функцию из
+  `v1-migration.noop.ts` — это правка upstream ради предупреждения. Не делал.
+
+### Не проверено
+
+- Windows и macOS: переименование файлов при открытых дескрипторах, пути `%USERPROFILE%\.local\share`. Живые профили —
+  B3.3.
+- База 0.4 с непустым `-wal` (незавершённая контрольная точка). Фикстуры сохранены с контрольной точкой; код переносит
+  `-wal`/`-shm` вместе с копией, но тестом это не покрыто.
+- Большие профили: время, память, размер журнала одной транзакции.
+- Вложения 0.4 больше 10 МБ (часть `file` с `source` квитанции хоста): примет ли их `SessionV1.FilePart` v2.
+- Запуск при работающей службе. Команда этого не проверяет; порядок «до старта службы» обеспечит B4.
