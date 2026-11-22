@@ -34,16 +34,18 @@ describe("debug paths command", () => {
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
       expect(paths).toMatchObject({
         home: os.homedir(),
-        data: path.join(root, "data", "loginom-ai-agent"),
-        config: path.join(root, "config", "loginom-ai-agent"),
-        cache: path.join(root, "cache", "loginom-ai-agent"),
-        state: path.join(root, "state", "loginom-ai-agent"),
-        bin: path.join(root, "cache", "loginom-ai-agent", "bin"),
-        log: path.join(root, "data", "loginom-ai-agent", "log"),
-        repos: path.join(root, "data", "loginom-ai-agent", "repos"),
+        data: path.join(root, "data", "loginom-ai-agent-dev"),
+        config: path.join(root, "config", "loginom-ai-agent-dev"),
+        cache: path.join(root, "cache", "loginom-ai-agent-dev"),
+        state: path.join(root, "state", "loginom-ai-agent-dev"),
+        bin: path.join(root, "cache", "loginom-ai-agent-dev", "bin"),
+        log: path.join(root, "data", "loginom-ai-agent-dev", "log"),
+        repos: path.join(root, "data", "loginom-ai-agent-dev", "repos"),
       })
       expect(paths.tmp).toBeTruthy()
-      expect(await Bun.file(path.join(root, "state", "loginom-ai-agent", "service-local.json")).exists()).toBe(false)
+      expect(await Bun.file(path.join(root, "state", "loginom-ai-agent-dev", "service-local.json")).exists()).toBe(
+        false,
+      )
     } finally {
       await fs.rm(root, { recursive: true, force: true })
     }

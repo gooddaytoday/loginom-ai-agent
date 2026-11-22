@@ -31,6 +31,7 @@
     "@brendonovich/vite-plugin-opencode": "0.1.3",
     "@effect/platform-node": "catalog:",
     "@hona/strobe": "catalog:",
+    "@loginom-ai-agent/product": "workspace:*",
     "@lydell/node-pty": "catalog:",
     "@opencode/app": "workspace:*",
     "@opencode/gui-plugins": "workspace:*",

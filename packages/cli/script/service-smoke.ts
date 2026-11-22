@@ -92,7 +92,11 @@ try {
   processes.forEach((process) => process.kill())
   await Promise.all(processes.map((process) => process.exited))
   if (failure)
-    errors.push(fs.readFile(path.join(root, "data", "loginom-ai-agent", "log", "opencode.log"), "utf8").catch(() => ""))
+    errors.push(
+      Array.fromAsync(product("log/opencode.log").scan(path.join(root, "data")))
+        .then(([log]) => fs.readFile(path.join(root, "data", log ?? ""), "utf8"))
+        .catch(() => ""),
+    )
 }
 
 const output = await Promise.all(errors)
@@ -114,16 +118,18 @@ function spawnService() {
 }
 
 async function waitForRegistration() {
-  const directory = path.join(root, "state", "loginom-ai-agent")
+  const directory = path.join(root, "state")
   for (let attempt = 0; attempt < 400; attempt++) {
-    const files = await fs.readdir(directory).catch(() => [])
-    const file = files.find(
-      (file) => file === "service.json" || (file.startsWith("service-") && file.endsWith(".json")),
-    )
+    const [file] = await Array.fromAsync(product("service{,-*}.json").scan(directory)).catch(() => [])
     if (file) return path.join(directory, file)
     await Bun.sleep(25)
   }
   throw new Error("Compiled service did not publish registration")
+}
+
+// The product channel the binary was built for names its directories: `loginom-ai-agent`, `-beta` or `-dev`.
+function product(file: string) {
+  return new Bun.Glob(`loginom-ai-agent*/${file}`)
 }
 
 // Reads the web UI from the binary's embedded archive: the shell, and the entry script it names.

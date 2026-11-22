@@ -46,12 +46,12 @@ describe("inherited OpenCode environment", () => {
   test("leaves data, cache, state and logs in the product's directories", () => {
     const { root, paths } = probes.inherited
     expect(paths).toMatchObject({
-      data: path.join(root, "data", "loginom-ai-agent"),
-      cache: path.join(root, "cache", "loginom-ai-agent"),
-      state: path.join(root, "state", "loginom-ai-agent"),
-      bin: path.join(root, "cache", "loginom-ai-agent", "bin"),
-      log: path.join(root, "data", "loginom-ai-agent", "log"),
-      repos: path.join(root, "data", "loginom-ai-agent", "repos"),
+      data: path.join(root, "data", "loginom-ai-agent-dev"),
+      cache: path.join(root, "cache", "loginom-ai-agent-dev"),
+      state: path.join(root, "state", "loginom-ai-agent-dev"),
+      bin: path.join(root, "cache", "loginom-ai-agent-dev", "bin"),
+      log: path.join(root, "data", "loginom-ai-agent-dev", "log"),
+      repos: path.join(root, "data", "loginom-ai-agent-dev", "repos"),
     })
   })
 
@@ -61,8 +61,8 @@ describe("inherited OpenCode environment", () => {
     const { root, paths, password } = probes.inherited
     expect({ home: paths.home, config: paths.config, db: path.dirname(paths.db), password }).toEqual({
       home: root,
-      config: path.join(root, "config", "loginom-ai-agent"),
-      db: path.join(root, "data", "loginom-ai-agent"),
+      config: path.join(root, "config", "loginom-ai-agent-dev"),
+      db: path.join(root, "data", "loginom-ai-agent-dev"),
       password: null,
     })
   })

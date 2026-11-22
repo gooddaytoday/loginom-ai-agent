@@ -20,6 +20,7 @@ import {
 import { homedir } from "node:os"
 import { VERSION } from "../constants"
 import { marks } from "../lifecycle/marks"
+import { directory } from "../service/service-identity"
 import {
   EXPORT_ARCHIVE_TIMEOUT_MS,
   initialLoggingState,
@@ -350,12 +351,7 @@ function manifest(path: Path.Path, netLogPath: string | undefined) {
 function serverLogRoots(path: Path.Path) {
   const xdgData = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
 
-  return [
-    ...new Set([
-      path.join(xdgData, "loginom-ai-agent", "log"),
-      path.join(app.getPath("userData"), "loginom-ai-agent", "log"),
-    ]),
-  ]
+  return [...new Set([path.join(xdgData, directory, "log"), path.join(app.getPath("userData"), directory, "log")])]
 }
 
 type Entry = { name: string; path: string; offset: number } | { name: string; data: Uint8Array }

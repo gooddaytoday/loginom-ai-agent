@@ -6,12 +6,18 @@ import { Context, Effect, Layer } from "effect"
 // The variants resolve through the `workerd` bundle condition, like the
 // native-module stubs, so no runtime sniffing happens here.
 import { roots } from "#global-roots"
+import { productChannel, productSlug } from "@loginom-ai-agent/product"
 import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
 
-// Fork (CAT-13): the product keeps data, config, state, logs and the service registration under its own name.
-// The client fallback and Desktop look for the registration under the same name.
-const app = "loginom-ai-agent"
+// The CLI build replaces this with its release channel; running from source leaves it undefined.
+declare const OPENCODE_CHANNEL: string
+
+// Fork (CAT-13): the product keeps data, config, state, logs and the service registration under its own name, one
+// directory per product channel (`productSlug`): the stable build (`latest`) is prod, beta is beta, any other build
+// and a source run are dev. Desktop looks for the registration in the directory of its own channel.
+const build = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : undefined
+const app = productSlug(productChannel(build === "latest" ? "prod" : build))
 const { data, cache, config, state, tmp } = roots(app)
 
 const paths = {

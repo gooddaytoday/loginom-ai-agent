@@ -47,8 +47,10 @@ test.each(["latest", "preview-a"])(
   "an identity on channel %s never takes over another service's files",
   async (channel) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "loginom-service-identity-migration-"))
-    const state = path.join(root, "state", "loginom-ai-agent")
-    const config = path.join(root, "config", "loginom-ai-agent")
+    // The stable build is the prod channel; a preview build is dev.
+    const directory = channel === "latest" ? "loginom-ai-agent" : "loginom-ai-agent-dev"
+    const state = path.join(root, "state", directory)
+    const config = path.join(root, "config", directory)
     const hashed = ServiceConfig.legacyFilename(channel, undefined)
     const other = { id: "other", version: "local", url: "http://127.0.0.1:1", pid: 1, password: "other" }
     try {
@@ -82,12 +84,12 @@ test("two products with separate directories run their own services side by side
     const infos = await Promise.all(services.map((service) => waitForInfo(service.registration)))
     await expectOwnServices(services, infos)
     for (const root of roots) {
-      expect(await fs.readdir(path.join(root, "state", "loginom-ai-agent"))).not.toContain("service.json")
+      expect(await fs.readdir(path.join(root, "state", "loginom-ai-agent-dev"))).not.toContain("service.json")
       // Data, config, logs, state, cache and tmp all live in the product's directories, none in OpenCode's.
       expect(openCodeDirectories(root)).toEqual([])
       for (const base of ["data", "config", "state", "cache", "tmp"])
-        expect(await fs.readdir(path.join(root, base))).toContain("loginom-ai-agent")
-      expect(statSync(path.join(root, "data", "loginom-ai-agent", "log")).isDirectory()).toBe(true)
+        expect(await fs.readdir(path.join(root, base))).toContain("loginom-ai-agent-dev")
+      expect(statSync(path.join(root, "data", "loginom-ai-agent-dev", "log")).isDirectory()).toBe(true)
     }
   } finally {
     await stop(services)
@@ -102,7 +104,7 @@ test("two profiles that share directories run their own services side by side", 
   try {
     const infos = await Promise.all(services.map((service) => waitForInfo(service.registration)))
     await expectOwnServices(services, infos)
-    const files = await fs.readdir(path.join(root, "state", "loginom-ai-agent"))
+    const files = await fs.readdir(path.join(root, "state", "loginom-ai-agent-dev"))
     expect(files.filter((name) => name.endsWith(".json")).toSorted()).toEqual(
       [`service-${desktop}.json`, `service-${profile}.json`].toSorted(),
     )
@@ -158,8 +160,8 @@ function start(root: string, identity: string, port: number) {
   return {
     child,
     port,
-    registration: path.join(root, "state", "loginom-ai-agent", `service-${identity}.json`),
-    config: path.join(root, "config", "loginom-ai-agent", `service-${identity}.json`),
+    registration: path.join(root, "state", "loginom-ai-agent-dev", `service-${identity}.json`),
+    config: path.join(root, "config", "loginom-ai-agent-dev", `service-${identity}.json`),
   }
 }
 

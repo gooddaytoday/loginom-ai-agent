@@ -27,7 +27,7 @@ describe("global", () => {
     })
 
     expect(result.exitCode, result.stderr.toString()).toBe(0)
-    directories.forEach((directory) => expect(fs.existsSync(path.join(directory, "loginom-ai-agent"))).toBe(false))
+    directories.forEach((directory) => expect(fs.existsSync(path.join(directory, "loginom-ai-agent-dev"))).toBe(false))
     fs.rmSync(root, { recursive: true, force: true })
   })
 
@@ -83,15 +83,15 @@ describe("global", () => {
     expect(result.exitCode, result.stderr.toString()).toBe(0)
     // The layer canonicalizes through the native realpath, which on Windows also expands 8.3 short
     // names such as RUNNER~1 that the JavaScript realpathSync leaves in place.
-    expect(result.stdout.toString()).toBe(fs.realpathSync.native(path.join(directories[4], "loginom-ai-agent")))
+    expect(result.stdout.toString()).toBe(fs.realpathSync.native(path.join(directories[4], "loginom-ai-agent-dev")))
     const created = [
-      path.join(directories[0], "loginom-ai-agent"),
-      path.join(directories[1], "loginom-ai-agent", "bin"),
-      path.join(directories[2], "loginom-ai-agent"),
-      path.join(directories[3], "loginom-ai-agent"),
-      path.join(directories[0], "loginom-ai-agent", "log"),
-      path.join(directories[0], "loginom-ai-agent", "repos"),
-      path.join(directories[4], "loginom-ai-agent"),
+      path.join(directories[0], "loginom-ai-agent-dev"),
+      path.join(directories[1], "loginom-ai-agent-dev", "bin"),
+      path.join(directories[2], "loginom-ai-agent-dev"),
+      path.join(directories[3], "loginom-ai-agent-dev"),
+      path.join(directories[0], "loginom-ai-agent-dev", "log"),
+      path.join(directories[0], "loginom-ai-agent-dev", "repos"),
+      path.join(directories[4], "loginom-ai-agent-dev"),
     ]
     created.forEach((directory) => expect(fs.statSync(directory).isDirectory()).toBe(true))
     // Product storage never lands in an OpenCode directory.
