@@ -4991,3 +4991,427 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Windows и macOS (ссылки, регистр путей), установленная сборка, Desktop.
 - `cli` и `sdk` не запускались (B2.5a их гонял); тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), —
   только `bun run check`.
+
+## B3.3 Живые профили
+
+22.11.2026. Ветка `b33-live-profiles` от `oc2-migration` (`3e00f7f94c`: влиты B3.1, B3.1b, B3.1c и B3.2), рабочее дерево
+`.claude/worktrees/b33`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`;
+`bun install --frozen-lockfile` — код 0, `.husky/_` появился. Код продукта не менялся: задача — проверка, коммиты —
+обвязка и этот раздел. `packages/loginom-agent` (B2.5a) не трогал.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `be902d0dcc` `test(migration): drive live 0.3.9 and 0.4 profiles from installed Desktop builds into OpenCode 2` | `scripts/live-profiles/live.mjs`, `windows.ps1`, `wipe.ps1`, `cli.cmd`, `stand.sh` (новые) | `clean` |
+| следующий | этот раздел | |
+
+### Чем сделаны профили
+
+Профили писали **установленные сборки релизов**, а не исходники:
+
+| Релиз | Из чего собран | Linux | Windows |
+|---|---|---|---|
+| 0.4.0 | `a63462dde1` `chore(release): v0.4.0`: `a080f7725c` и ещё 5 коммитов выпуска (сравнение на GitHub: ahead 5, behind 0); релиз пока черновик | `loginom-ai-agent-linux-x86_64.AppImage`, SHA-256 `b9b2f3f0…6bf5` | `loginom-ai-agent-win-x64.exe` (NSIS), `f75e780f…be4b` |
+| 0.3.9 | тег `v0.3.9` = `2910b8782c` | AppImage, `d7e64fa0…8179` | NSIS, `d26120da…142d` |
+
+Хеши совпали с `SHA256SUMS.txt` своих релизов; `release-manifest.json` — `source.commit` как в таблице, `dirty: false`.
+
+- **Linux.** AppImage скачан `gh release download` и распакован `--appimage-extract` в каталог `labsync`.
+- **Windows.** Установщики уже лежали в `C:\lab` (чужая работа). Они скопированы без изменений в `C:\lab\b33\dist`, хеши
+  сверены. Установка — под временной учётной записью, `/S /currentuser /D=C:\lab\b33\u\apps\<релиз>`.
+
+Профиль пишет **бэкенд самого Desktop**. Обвязка запускает установленное приложение с `--remote-debugging-port` и через
+DevTools берёт у окна `window.api.awaitInitialization()` — адрес и пароль его бэкенда. Пароль остаётся в памяти. Дальше
+она вызывает API бэкенда так, как это делают настройки и чат Desktop:
+
+- `PUT /auth/b33stub` с выдуманным ключом;
+- `PATCH /global/config` с провайдером, как диалог «Свой сервер»: `@ai-sdk/openai-compatible`, `baseURL` подставной
+  модели; затем `model`;
+- сессии в каталоге `~/Проекты B33/Анализ продаж` (кириллица и пробелы на обеих ОС):
+  1. два хода текстом;
+  2. вызов инструмента `read` файла `заметки к отчёту.txt`;
+  3. вложение `data:` этого файла, как его шлёт окно;
+- на Linux ещё сессия в git-репозитории `~/Проекты B33/repo`. На стенде git нет, там этой сессии нет;
+- свой навык `b33-sales-summary` — файл `<конфиг>/loginom-ai-agent/skills/b33-sales-summary/SKILL.md`. 0.4 и 0.3.9
+  отдают его в `GET /skill`;
+- подключение Loginom — через `window.api.loginom.check` и `save` окна, см. «Подключение Loginom»;
+- окно закрывается через `window.close()`, как кнопкой (B0.4). Приложение выходит с кодом 0, бэкенд больше не отвечает.
+
+Модель — подставная OpenAI-совместимая, в процессе обвязки. Ответы задаёт сценарий в тексте запроса, как в фикстурах
+B3.1. Заголовок `Authorization` каждого вызова она хранит в памяти; обвязка сравнивает его с ключом и печатает только
+`true` или `false`.
+
+**Новая сборка** — CLI продукта v2 из `3e00f7f94c`, канал `latest`: `opencode v2.3.0-b33` (имя бинарника — B2.7a).
+
+```text
+$ cd packages/loginom-runtime/client && npm ci --ignore-scripts --omit=dev   # без него: Could not resolve: "yaml"
+$ cd packages/cli && LOGINOM_AI_AGENT_CHANNEL=latest LOGINOM_AI_AGENT_VERSION=2.3.0-b33 \
+    bun run script/build.ts --single --skip-install --skip-web-ui --outdir=<scratchpad>/linux      # 15 с, код 0
+44a3b660…bebf5  opencode       linux-x64, 233 498 800 байт
+$ LOGINOM_AI_AGENT_TARGET=windows-x64-baseline LOGINOM_AI_AGENT_CHANNEL=latest LOGINOM_AI_AGENT_VERSION=2.3.0-b33 \
+    bun run script/build.ts --skip-web-ui --outdir=<scratchpad>/windows                             # 36 с, код 0
+71ad5526…df72  opencode.exe   windows-x64-baseline, 240 351 744 байт
+```
+
+- `baseline` — у процессора стенда нет AVX2 (B0.2).
+- Кросс-сборке нужны нативные пакеты Windows, поэтому без `--skip-install`. Её `bun install --os=* --cpu=* --libc=*`
+  положил пакеты всех платформ всего рабочего пространства, свободное место упало с 14 до 6,1 ГБ. B0.4 видел то же:
+  11 ГБ `node_modules`. `bun.lock` и манифесты не изменились, `git status` чистый.
+- Место вернул. Из кэша Bun удалены 570 записей, добавленных этой установкой, — все пакеты чужих платформ.
+  `node_modules` дерева пересобраны `bun install --frozen-lockfile`; снова 14 ГБ.
+- На стенд бинарник ушёл архивом `tar.xz` (73 МБ, `scp` за 76 с). Хеш на стенде тот же, `opencode.exe --version` —
+  `opencode v2.3.0-b33`.
+
+### Пользователи
+
+**Linux** — `labsync`: uid 1000, группы — только `labsync`, `sudo -l -U labsync` — «not allowed to run sudo».
+Системных пользователей не создавал.
+
+- Запуск: `runuser -u labsync -- env -i HOME=/tmp/b33-lab/home-<релиз> PATH=/usr/bin:/bin LANG=C.UTF-8 …`.
+- На каждый профиль свой домашний каталог во временной папке. `XDG_*` и переопределений базы нет; окружение одно у
+  старой и новой версии. Настоящий домашний каталог `labsync` не тронут (снимок ниже).
+- Electron из распакованного AppImage — с `--no-sandbox` и `xvfb-run`, как в B0.4. Распакованный `chrome-sandbox`
+  принадлежит `labsync`, setuid root у него быть не может; без флага запуск не пробовал.
+
+**Windows.** Обычной учётной записи на стенде не было (`user` — администратор), поэтому создана временная локальная
+`Проверка Б33`. Кириллица и пробел в имени дают их и в пути профиля — каталоге с этим именем в `C:\Users`. Ниже он
+записан как `%USERPROFILE%`: сканер секретов не пропускает в git домашние пути с именем пользователя.
+
+- Группы — только «Пользователи».
+- В сессии уровень целостности Medium (`S-1-16-8192`), `S-1-5-32-544` нет, привилегий `SeDebug`, `SeBackup`,
+  `SeTakeOwnership` нет.
+- DPAPI в сессии работает: `ProtectedData.Protect` вернул 230 байт.
+
+**Как входили на Windows.**
+
+- **Планировщик с сохранённым паролем — не вышло.** Задача не запустилась, `LastTaskResult` 267011 («ещё не
+  выполнялась»). В журнале безопасности 4625: тип входа 4, `0xC000015B` — «не предоставлен запрошенный тип входа».
+  Права «Вход в качестве пакетного задания» у группы «Пользователи» нет (`SeBatchLogonRight =
+  *S-1-5-32-544,*S-1-5-32-551,*S-1-5-32-559`), и планировщик его сам не выдал. Политику не менял: строка та же до и после.
+- **Вход по ключу отпал.** У новой учётной записи до первого входа нет профиля и `authorized_keys`. Кроме того, при
+  входе по ключу (S4U) DPAPI, которым Desktop шифрует подключение, по известному поведению Windows недоступен. Это не
+  проверялось.
+- **Итог — SSH по паролю.** Пароль случайный, создан на стенде и лежит в `C:\lab\b33\secret` с доступом только для
+  администраторов и SYSTEM. На Linux — в файле `0600` в scratchpad; подаётся через `SSH_ASKPASS` (`stand.sh user`).
+  BatchMode для этого входа выключен, иначе пароль не подать. Администраторский алиас `winstand` — как раньше: ключ и
+  BatchMode. Первый вход создал профиль.
+
+### Сценарий и обвязка
+
+`scripts/live-profiles/live.mjs` — одна для обеих ОС. Она запускается на Node из установленного Desktop
+(`resources/loginom/bin/node[.exe]`, v24.19.0).
+
+1. `old --app <Desktop> --label <релиз> --state <каталог>` — профиль, как выше. После выхода всех процессов приложения
+   обвязка делает нетронутую копию каталогов данных и конфига (`pristine`) и снимок трёх мест профиля:
+   - данные бэкенда `~/.local/share/loginom-ai-agent`;
+   - конфиг `~/.config/loginom-ai-agent`;
+   - userData Desktop: `~/.config/com.loginom.aiagent` или `%APPDATA%\com.loginom.aiagent`.
+
+   Снимок — размер и SHA-256 каждого файла. Обвязка ищет `loginom-ai-agent*.db` по всему домашнему каталогу и
+   останавливается, если базы нет там, где её ищет v2.
+2. `v2 --bin <opencode> --path serve|migrate` — сначала возвращает профиль из `pristine`, затем:
+   - `serve`: `opencode serve --port 0` (предохранитель B3.1b) с проверками API и остановкой, второй `serve`, `migrate`;
+   - `migrate`: `opencode migrate`, ещё раз `migrate`, затем те же два `serve` и `migrate`.
+
+   Проверки на каждом `serve` (пароль `LOGINOM_AI_AGENT_PASSWORD` — случайный на запуск):
+   - `GET /api/session` — все сессии старого профиля;
+   - `GET /api/session/<id>/message` — ID каждого сообщения v1, а в сообщениях — каждый текст, `callID` и имя
+     инструмента, данные вложения `data:`;
+   - `GET /api/location` и `GET /api/session?project=` — сессии каталога лежат в проекте этого каталога (B3.1c);
+   - `GET /api/skill` — свой навык из каталога конфига. Опрос до 30 с: навыки грузятся вместе с плагинами;
+   - `GET /api/config` — провайдер;
+   - только на первом `serve` — новая сессия и запрос к модели без ввода ключа. Модель должна получить ключ старого
+     профиля.
+
+   Снимок трёх мест — после каждого шага. «Ничего не меняет» — про файлы базы: в каталоге данных ещё и журнал CLI
+   `log/loginom-ai-agent.log`, в него дописывает каждый запуск.
+
+### Профили
+
+| | Linux 0.4.0 | Linux 0.3.9 | Windows 0.4.0 | Windows 0.3.9 |
+|---|---|---|---|---|
+| Сессии / сообщения / части (счёт по копии базы) | 4 / 11 / 26 | 4 / 11 / 26 | 3 / 9 / 22 | 3 / 9 / 22 |
+| Схема | 38 миграций, последняя `20260622202450_simplify_session_input` | то же | то же | то же |
+| Строки `credential` | 0 | 0 | 0 | 0 |
+| Где база | `.local/share/loginom-ai-agent/loginom-ai-agent.db` | то же | `.local\share\loginom-ai-agent\loginom-ai-agent.db` | то же |
+| Вызовы модели | 10 | 10 | 8 | 8 |
+| Свой навык в `GET /skill` 0.4/0.3.9 | есть | есть | есть, `%USERPROFILE%\.config\…\SKILL.md` | есть |
+| Хранилище подключения | `connection.json`, `generations/1.json`, `v040-migration.json` | `connection.json`, `generations/1.json` | `connection.json`, `generations/1.json`, `v040-migration.json`; `secrets: {encrypted}` | `pending.json`, `secrets: {encrypted}` |
+| Закрытие окна | код 0, 0,3 с | код 0, 0,9 с | код 0, 0,6 с | код 0, 0,8 с |
+
+Других баз `loginom-ai-agent*.db` в домашних каталогах нет. Ключ лежал в `auth.json` рядом с базой (79 байт).
+Конфиг — `loginom-ai-agent.jsonc` в каталоге конфига; 0.3.9 положила туда ещё `.gitignore`.
+
+Сессии Windows 0.4.0: `ses_dfb45bc3cffeIxWktWyBKbDZGX`, `ses_dfb45bcf5ffeYqAH7aHbx0bH3d`, `ses_dfb45c5d5ffevU3PmFvGvSJsii`.
+Сессии Linux 0.4.0: `ses_dfb3ce1daffenl2DNnW6SgQCwQ`, `ses_dfb3ce263ffea1iNWv6BTZy8Ve`, `ses_dfb3ce899ffeTnaU7WNT6mnn94`
+(каталог `Анализ продаж`, проект `global`) и `ses_dfb3ce13cffe2IivjOl7y9V5Tk` (`repo`, проект `8445f58e…`).
+
+### Перенос: результат
+
+Все восемь прогонов (две ОС × два релиза × два пути) дали одно и то же:
+
+| Проверка | Linux 0.4.0 | Linux 0.3.9 | Windows 0.4.0 | Windows 0.3.9 |
+|---|---|---|---|---|
+| Сессии старого профиля в `GET /api/session` | 4/4 | 4/4 | 3/3 | 3/3 |
+| Сообщения v1 по ID | 2/2, 3/3, 4/4, 2/2 | то же | 2/2, 3/3, 4/4 | то же |
+| Пропавшие тексты, `callID`, инструменты, вложения | 0 | 0 | 0 | 0 |
+| Сессии каталога в своём проекте | `Анализ продаж` 3/3, `repo` 1/1 | то же | 3/3 | 3/3 |
+| Свой навык в `GET /api/skill`, путь — каталог конфига | да | да | да | да |
+| Провайдер в `GET /api/config` | да | да | да | да |
+| Запрос к модели без ввода ключа: ключ старого профиля | да, 2 вызова | да | да | да |
+| Резервная копия = исходная база (SHA-256) | `fd0c34e1…` | `edc3534b…` | `55c6533e…` | `df4a38f7…` |
+| Вторая копия, `.migrating`, блокировка | нет | нет | нет | нет |
+| Конфиг и навык, `auth.json`, userData Desktop с подключением — побайтно | те же | те же | те же | те же |
+| Первый `serve` готов (с переносом), мс | 380 | 361 | 488 | 1271 |
+
+В v2 сообщений больше, чем в v1: 13 вместо 11 на Linux и 11 вместо 9 на Windows. Добавились синтетическая строка
+вложения и системная пометка о смене аргументов `read` (`legacyToolNotice`), как в B3.1.
+
+Путь `serve`, Windows 0.4.0, журнал службы (путь профиля — `%USERPROFILE%`):
+
+```text
+timestamp=2026-11-22T19:30:00.340Z level=WARN run=a9992897 message="migrated a Loginom AI Agent 0.3.9/0.4 database before opening it" source="%USERPROFILE%\\.local\\share\\loginom-ai-agent\\loginom-ai-agent.db" target="%USERPROFILE%\\.local\\share\\loginom-ai-agent\\loginom-ai-agent.db" backup="%USERPROFILE%\\.local\\share\\loginom-ai-agent\\loginom-ai-agent.v1-backup.db" schema=20260622202450_simplify_session_input rows.sessions=3 rows.messages=9 rows.parts=22 migrated.sessions=3 migrated.messages=11 present=0 warnings=[] credentials="[\"b33stub\"]" role=server
+```
+
+Путь `migrate`, Windows 0.4.0 (путь профиля — `%USERPROFILE%`):
+
+```text
+> opencode.exe migrate
+Migrated %USERPROFILE%\.local\share\loginom-ai-agent\loginom-ai-agent.db to %USERPROFILE%\.local\share\loginom-ai-agent\loginom-ai-agent.db.
+  Source: 3 sessions, 9 messages, 22 parts (schema 20260622202450_simplify_session_input)
+  Written: 3 sessions, 11 messages
+  Provider credentials: b33stub
+  Original kept as %USERPROFILE%\.local\share\loginom-ai-agent\loginom-ai-agent.v1-backup.db
+code 0
+> opencode.exe migrate
+Already migrated %USERPROFILE%\.local\share\loginom-ai-agent\loginom-ai-agent.db to %USERPROFILE%\.local\share\loginom-ai-agent\loginom-ai-agent.db; nothing changed.
+  (те же четыре строки)
+code 0
+```
+
+На Linux вывод тот же с путями `/tmp/b33-lab/home-<релиз>/.local/share/loginom-ai-agent/…` и числами `4 / 11 / 26`,
+`Written: 4 sessions, 13 messages`.
+
+### Повтор
+
+- **`migrate` после `migrate`** — `Already migrated …; nothing changed.`, код 0. Файлы базы побайтно те же на обеих ОС.
+- **`serve` после переноса** — предохранитель базу v2 пропускает. В журнале службы нет второй строки `migrated …`.
+  Резервная копия та же (SHA-256), второй копии нет. Список сессий — тот же, что после первого `serve`: старые сессии и
+  одна новая из проверки ключа. Сообщения старых сессий те же. Сама база v2 при старте службы меняется (B3.1b).
+- **`migrate` после двух `serve`** — `Already migrated`, код 0. `.db` и `-wal` те же.
+  - Linux: служба по SIGTERM закрывает базу сама, `-wal` и `-shm` не остаётся.
+  - Windows: `kill` — это `TerminateProcess` (B0.2), служба выходит без контрольной точки. Остаются `-wal` (13 МБ) и
+    `-shm`. `migrate` читает базу, и SQLite перестраивает индекс WAL — меняется только `-shm`, во всех четырёх прогонах
+    (ниже — Windows 0.3.9, путь `serve`):
+
+    ```text
+    afterServeAgain -> afterMigrateAfter: loginom-ai-agent.db-shm 32768 a7e949c09472666a -> 32768 9e6ef5091f7b8651
+    ```
+
+    Данные (`.db`, `-wal`) не меняются. Первые два прогона Windows (0.3.9) обвязка сравнивала вместе с `-shm` и
+    показала `false`; после разбора `-shm` вынесен в отдельное поле `walIndexChanged`.
+
+### Подключение Loginom
+
+**Desktop 0.4 и 0.3.9 сохраняют подключение без стенда Loginom.** Обвязка вызвала из окна
+`window.api.loginom.check({url: "http://127.0.0.1:9/", username: "b33", password: <выдуманный>})`.
+
+- Хост вернул проверку с `browser: {state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE"}`.
+- `save` с её `validationId` записал хранилище, ответ — `state: "starting"`.
+- Через интерфейс окна это не проверялось: вызов шёл по IPC, как его делает окно.
+
+Что получилось:
+
+- Linux: открытая запись `connection.json` и `generations/1.json`. У 0.4 рядом маркер `v040-migration.json`.
+- Windows: `secrets: {encrypted}` — `safeStorage`, то есть DPAPI этой учётной записи.
+  - 0.4.0 — `connection.json`, `generations/1.json`, маркер.
+  - 0.3.9 — только `pending.json`: отложенная смена. Окно закрылось раньше, чем 0.3.9 её применила.
+
+v2 эти хранилища не читает: Desktop v2 — B4. Проверено, что весь каталог userData с подключением после обоих путей
+побайтно тот же.
+
+**CLI 0.4 без стенда Loginom.**
+
+- **Windows: умеет.** Под той же учётной записью `install.cmd` из архива CLI 0.4.0 (`cli-0.4.0.zip`, SHA-256
+  `6c8c44bc…9808` — как в `SHA256SUMS.txt`) поставил CLI в `%LOCALAPPDATA%\Programs\loginom-ai-agent-cli` без прав
+  администратора. Затем запрос подключения с недоступным адресом и выдуманным паролем:
+
+  ```text
+  > echo {"url":"http://127.0.0.1:9/","username":"b33","password":"<выдуманный>"}| loginom-ai-agent-cli loginom setup --stdin-json --format json
+  {"revision":1,"generation":1,"setupRequired":true,"url":"http://127.0.0.1:9/","username":"b33","folder":"/b33","hasPassword":true,"state":"starting","browser":{"state":"failed","failure":"LOGINOM_LOGIN_UNAVAILABLE"}}
+  setup exit 0
+  > loginom-ai-agent-cli loginom status --format json
+  {"revision":1,"generation":1,"url":"http://127.0.0.1:9/","username":"b33","folder":"/b33","hasPassword":true,"state":"configured","browser":{"state":"unknown"}}
+  ```
+
+  Хранилище — `%APPDATA%\com.loginom.aiagent\cli\profiles\default\loginom\connection\`: `connection.json`,
+  `generations/1.json`, `v040-migration.json`, `secrets: {format: "loginom-cli-secrets-v1", protection: "dpapi"}`.
+  Профиль CLI лежит внутри userData Desktop. Поэтому после него ещё раз прогнан путь `serve` Windows 0.4.0, и весь
+  каталог userData — с хранилищами Desktop и CLI — остался побайтно тем же. Остальные проверки этого прогона — как в
+  таблице. CLI удалён `uninstall.cmd`: `{"uninstalled":true,"profilesPreserved":true}`.
+- **Linux: не установить без sudo.** `install.sh` делает `chrome-sandbox` root:root 4755 через sudo (`INSTALL.md`), а
+  у `labsync` sudo нет. Распакованный, но не установленный CLI на `loginom setup --stdin-json` отвечает
+  `{"ok":false,"code":"LOGINOM_BUNDLE_INCOMPLETE"}`, код 1.
+
+### Стенд Windows: до и после
+
+Снимок `windows.ps1 -Task snapshot` — только чтение. «До» снят перед созданием учётной записи, «после» — после уборки.
+В «до» уже был `C:\lab\b33`: в нём лежал файл замера скорости отправки, 4 МБ, удалён до работы. Скорость отправки по
+SSH — 340–950 КБ/с, а не 30–90 КБ/с, как в B0.4.
+
+| Что | До (21:36) | После (23:00) |
+|---|---|---|
+| Локальные пользователи | 5 | 5, те же |
+| «Администраторы» / «Пользователи» | 2 / 2 | те же |
+| Профили (`Win32_UserProfile`), каталоги `C:\Users` | 4 / 6 | те же |
+| `SeBatchLogonRight`, `SeInteractiveLogonRight`, `SeNetworkLogonRight` | 3 строки | те же |
+| Задачи планировщика / службы | 246 / 270 | те же; папки задач `\b33` нет |
+| Правила брандмауэра | 469 | 469, ни одного с `opencode`, `loginom`, `node`, `b33` |
+| HKLM Uninstall / `Run` | 20 / 2 | те же |
+| Слушающие порты | 24 | те же адреса и порты |
+| `C:\lab` | 33 записи, с `b33` | 32 — без `b33`; чужие не тронуты |
+| Процессы из `C:\lab\b33` | — | нет |
+| Свободно на C: | 45,3 ГБ | 45,4 ГБ |
+
+Уборка по шагам:
+
+1. Под учётной записью — `uninstall.cmd` CLI (`{"uninstalled":true,"profilesPreserved":true}`) и деинсталлятор
+   Desktop 0.4.0 `/S /currentuser`: код 0, папки установки нет, записей в HKCU Uninstall не осталось. 0.3.9 удалена
+   своим деинсталлятором раньше, перед установкой 0.4.0.
+2. `windows.ps1 -Task account-delete` с первого раза не прошёл: `Remove-CimInstance` — `0x80070020`, профиль занят.
+   - Процессов учётной записи не было, а куст `HKU\S-1-5-21-…-1002` оставался загруженным.
+   - Журнал User Profile Service: одно событие 5 «загружен» в 21:54 (первый вход по SSH) и ни одной выгрузки.
+     Вывод: Win32-OpenSSH при каждом входе по паролю загружает профиль и не выгружает его. Это вывод по журналу и по
+     числу выгрузок ниже, в коде OpenSSH не проверялся.
+   - `reg unload` — «Отказано в доступе». `handle64` (Sysinternals) не нашёл держателей.
+   - Помогло: один `LoadUserProfile` с токеном этой учётной записи, затем `UnloadUserProfile` по дубликатам
+     описателя, пока служба не выгрузила куст. Понадобилось 28 выгрузок, примерно по числу входов по SSH.
+   - После этого `account-delete`: профиль удалён, учётная запись удалена, папки профиля в `C:\Users` и ключа
+     `ProfileList` нет, файл пароля удалён.
+
+   Шаг выгрузки теперь входит в `account-delete` (функция `Release-Profile`).
+3. Папка задач `\b33`, пустая, осталась от попытки с планировщиком — удалена.
+4. Ключ `HKCU\Software\Sysinternals\Handle` (принятие лицензии `handle64` в профиле `user`, записан в 22:55) и
+   пустой родитель удалены. `handle64.exe` лежал в `C:\lab\b33\tools`.
+5. `windows.ps1 -Task clean`: процессов из `C:\lab\b33` нет, папка удалена.
+6. Временные файлы снимка в `%TEMP%` администратора удалены.
+7. Только чтением: в `C:\ProgramData`, `%PUBLIC%`, `C:\Windows\Temp` записей новее 21:36 нет. Хеш имён правил
+   брандмауэра той же формулой, что в снимке «до», — `366A47E7FDC068BA`, как до. `C:\ProgramData\Loginom AI Agent`
+   создан 16.11, не этой работой.
+
+**Что осталось — системные следы.**
+
+- Prefetch: `OPENCODE.EXE`, `LOGINOM-AI-AGENT.EXE` ×14, `LOGINOM-AI-AGENT-CLI.EXE`, `NODE.EXE` ×4, `CHROME.EXE` ×18,
+  `DESKTOP-0.3.9.EXE`, `DESKTOP-0.4.0.EXE`, `UNINSTALL LOGINOM-AI-AGENT.EXE` ×2, `UN_A.EXE`, `HANDLE64.EXE`, `TAR.EXE`.
+  Их ведёт Windows, часть может быть от соседней работы с 0.4.0 под `user`. Не удалял, как в B0.2 и B0.4.
+- Журналы событий: 4625 от попытки с планировщиком, события входа и User Profile Service.
+
+### Linux: до и после
+
+- `/tmp/b33-lab` (распакованные AppImage и CLI, домашние каталоги профилей, отчёты обвязки, 4,7 ГБ) удалён.
+- Каталог `xvfb-run` от первого, упавшего прогона удалён.
+- В `/tmp` от `labsync` за время работы остались `org.chromium.Chromium.scoped_dir.*` (10:55), три
+  `.bun-1000-*.so`/`.node` (11:00 — нативные библиотеки, которые распаковал собранный `opencode`) и два `pulse-*`
+  (11:02, 11:37). Удалены. Процессов `labsync` от работы нет; в `/dev/shm` пусто. Чужое — `Xvfb :102` и сессия
+  `systemd --user` с 28.10 — не трогал.
+- Новых `/tmp/loginom-cli-*` нет: список до и после одинаков.
+- Настоящий домашний каталог `labsync`: 958 397 записей, хеш списка «путь, размер, mtime» до и после один — `69ac6467…`.
+- Свободно на `/` — 16 ГБ; в начале работы было 17 ГБ, рядом работают другие агенты. Свои сборки и скачанное удалены.
+
+### Проверки дерева
+
+```text
+$ bun run check                                                     # код 0, 12 с
+Found 517 warnings and 0 errors.                                    # как на базе (B3.2)
+ Tasks:    39 successful, 39 total                                  # Cached: 39 — пакеты не менялись
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 437 divergent upstream files                  # коммиты B3.3 файлов upstream не трогают
+$ oxlint scripts/live-profiles/live.mjs; prettier --check …         # 0 warnings, 0 errors; форматирование — prettier
+```
+
+### Приёмка
+
+| Пункт плана | Итог |
+|---|---|
+| Сессии на месте на обеих ОС | да: все сессии, сообщения v1 по ID, тексты, вызов инструмента и вложение, сессии каталога в своём проекте; 0.3.9 и 0.4.0, Linux и Windows, оба пути |
+| Учётные данные на месте | да: ключ из `auth.json` в базе v2 (`Provider credentials: b33stub`), модель получила его без ввода ключа |
+| Подключения на месте | хранилища Desktop (Linux — открытое, Windows — DPAPI) и CLI (Windows, DPAPI) после переноса побайтно те же. Читает их только Desktop v2 и профиль CLI — B4 и B2.7c |
+| Свои навыки | на месте: v2 отдаёт навык из каталога конфига 0.4 |
+| Повтор ничего не меняет | `migrate` — побайтно; `serve` — без второго переноса, копия та же, сессии те же; на Windows меняется только индекс WAL (`-shm`) |
+| Резервная копия на месте | `loginom-ai-agent.v1-backup.db` равна исходной базе по SHA-256 во всех восьми прогонах |
+| Обычный пользователь на обеих ОС | Linux — `labsync`; Windows — временная стандартная учётная запись, Medium |
+| Стенд убран, учётная запись удалена | да, снимки до и после выше |
+
+### Где решал сам
+
+- **Профиль Desktop, а не профиль автономного CLI.** Предохранитель и `migrate` без аргумента видят только базу
+  канала (B3.1), туда пишет Desktop. Профиль автономного CLI 0.4 (`com.loginom.aiagent/cli/profiles/default`) ждёт
+  B2.7c, его базу `migrate` берёт явным аргументом. Отдельно его не создавал.
+- **Данные через API бэкенда Desktop, а не щелчками в окне.** Профиль пишет тот же бэкенд и тем же API, что окно. Путь
+  через интерфейс (кнопки, мастер первого запуска) не проверялся.
+- **Подключение — через IPC окна с недоступным адресом.** Без стенда Loginom иначе записать хранилище нельзя, а формат
+  записи (на Windows — шифрованной) так получается настоящим.
+- **Одна учётная запись Windows на оба релиза.** Между релизами `wipe.ps1` удалял `.local`, `.config`, `.cache`,
+  `Проекты B33` и `%APPDATA%\com.loginom.aiagent`. Потом удалялась 0.3.9 (её деинсталлятором) и ставилась 0.4.0.
+- **Установка 0.4.0 на Windows.** Установщик в конце запускает `loginom-ai-agent.exe --verify-resources` и ждёт его
+  (`uninstall-uri.nsh`, `customInstall`). Проверка шла дольше трёх минут; я принял её за запуск приложения и остановил
+  процесс. Установка дописалась: запись «Loginom AI Agent 0.4.0» в HKCU Uninstall есть.
+  - Целостность проверил отдельно: `loginom-ai-agent.exe --verify-resources` — код 0 за 86 с.
+  - Что успела записать остановленная проверка (`%APPDATA%\com.loginom.aiagent`), удалено до создания профиля.
+- **Два прогона `old` на Windows.**
+  - 0.3.9: первая попытка проверки подключения не уложилась в 90 с обвязки (окно закрылось, `LOGINOM_HOST_CLOSED`).
+  - 0.4.0: первая проверка сразу вернула `LOGINOM_CONNECTION_CHECK_FAILED`. По `startup-phases.jsonl` хост в это время
+    ещё проверял свои файлы (`resources.verify`).
+
+  Профиль удалялся и создавался заново, с ожиданием до 10 минут и повтором проверки. В итоговых прогонах проверка
+  прошла с первой попытки.
+- **Обвязка менялась по ходу работы.** Исправлено: сценарий модели склеивался с текстом вложения; пагинация
+  передавала `order` вместе с `cursor`; навык читался без ожидания; журнал CLI и `-shm` попадали в сравнение;
+  добавлен повтор проверки подключения. Профиль после каждого падения удалялся и создавался заново; перенос всегда
+  начинается с `pristine`. Какой версией что прогнано:
+  - Linux, оба релиза — итоговой (`be902d0dcc`), полный проход заново. Числа выше — из него. Ранние проходы дали то же.
+  - Windows 0.4.0 — той же логикой, до форматирования prettier.
+  - Windows 0.3.9 — до повтора проверки и до `walIndexChanged`; разбор `-shm` — в «Повторе».
+  - `git show be902d0dcc:scripts/live-profiles/live.mjs | sha256sum` — `6ece3135…`, тот же файл, что в итоговом
+    проходе Linux.
+  - Не исполнялось в том виде, как в коммите:
+    - `Release-Profile` в `account-delete` — только разбор синтаксиса на стенде (`Parser.ParseFile`, 0 ошибок).
+      Работал тот же код отдельным скриптом.
+    - `stand.sh user` — работала его предшественница в scratchpad с теми же параметрами `ssh`.
+    - `account-create`, `dist` и снимок «до» — ранние скрипты с теми же командами. Поэтому брандмауэр в «до» записан
+      числом и хешем имён, а в «после» — списком.
+- **«Из одной нетронутой копии» — только данные и конфиг.** `pristine` возвращает `~/.local/share/loginom-ai-agent` и
+  `~/.config/loginom-ai-agent`. Каталоги состояния и кэша v2 переходили из пути `serve` в путь `migrate`, так что
+  `migrate` ни разу не шёл по профилю совсем без следов v2.
+
+### Найдено, не чинил
+
+- **Манифест Windows 0.4.0 неточен.** В `windows-release-manifest.json` указано `paths.data:
+  "%APPDATA%/com.loginom.aiagent"`. Живой профиль показывает: база и `auth.json` бэкенда лежат в
+  `%USERPROFILE%\.local\share\loginom-ai-agent`, как в коде (`xdg-basedir`, B3.1), а в `%APPDATA%` — только userData и
+  каталог состояния. v2 ищет базу там же, где она есть, поэтому перенос сработал. Неточен только манифест.
+- **На Windows служба v2 после `kill` оставляет `-wal` 13 МБ без контрольной точки.** Это B0.2: мягкой остановки на
+  Windows нет. Данные целы, следующий запуск читает WAL.
+- **CLI 0.4 на Linux без sudo не встаёт.** `install.sh` делает `chrome-sandbox` root:root 4755 через sudo
+  (`INSTALL.md`). Без установки распакованный CLI отвечает `{"ok":false,"code":"LOGINOM_BUNDLE_INCOMPLETE"}` на
+  `loginom setup`. Это поведение 0.4, не v2.
+- **0.3.9 на Windows** пишет в журнал `background dependency install failed … 404 Not Found` для каталога конфига. На
+  перенос не влияет.
+
+### Не проверено
+
+- **Desktop v2 — B4.**
+  - Читает ли он хранилище подключения из userData 0.4: на Linux открытые записи, на Windows — `safeStorage`/DPAPI.
+  - Запускает ли он службу так же, через предохранитель.
+  - Список сессий в окне.
+
+  Здесь службу запускал CLI (`serve`).
+- **Профиль автономного CLI 0.4 — B2.7c**: его база, конфиг, навыки и подключение. `migrate <база>` по базе живого
+  профиля CLI возможен уже сейчас (B3.1), но не запускался: в профиле CLI на стенде было только подключение, сессий не
+  было.
+- **Подключение Loginom на живом стенде Loginom:** вход и работа после переноса.
+- macOS.
+- Сессии git-репозитория на Windows: на стенде нет git.
+- Большие профили, вложения больше 10 МБ, база 0.4 с непустым `-wal`.
+- Сборка Node.
