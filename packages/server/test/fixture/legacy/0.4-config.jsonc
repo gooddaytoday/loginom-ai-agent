@@ -1,0 +1,20 @@
+{
+  "$schema": "urn:loginom-ai-agent:config",
+  "disabled_providers": [],
+  "provider": {
+    "stub": {
+      "name": "Stub provider",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:4010/v1"
+      },
+      "models": {
+        "stub-model": {
+          "name": "Stub model"
+        }
+      }
+    }
+  },
+  "shell": "/bin/bash",
+  "model": "stub/stub-model"
+}
