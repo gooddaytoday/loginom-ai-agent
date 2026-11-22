@@ -16,6 +16,7 @@ import {
   type CliRenderer,
   type ScrollbackWriter,
 } from "@opentui/core"
+import { Product } from "@loginom-ai-agent/product"
 import { isFallbackTitle } from "@opencode/util/session-title-fallback"
 import { setTerminalTitle } from "../util/renderer"
 import { monoSnapshot } from "./mono"
@@ -177,8 +178,8 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
   if (mono) renderer.on(CliRenderEvents.EXTERNAL_OUTPUT, monoSnapshot)
   const setTitle = (title?: string) => {
     if (input.host.platform !== "linux") return
-    if (!title || isFallbackTitle(title)) return setTerminalTitle(renderer, "OpenCode")
-    setTerminalTitle(renderer, `OC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
+    if (!title || isFallbackTitle(title)) return setTerminalTitle(renderer, Product.name)
+    setTerminalTitle(renderer, `${Product.name} | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
   }
   setTitle(input.sessionTitle)
   const theme = await resolveRunTheme(renderer, tuiConfig.theme, mono)

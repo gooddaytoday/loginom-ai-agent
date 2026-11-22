@@ -5,6 +5,7 @@ import "./component/spinner-renderable"
 import { Effect, Latch } from "effect"
 import { Service, type Endpoint } from "@opencode/client/effect/service"
 import { OpenCode, type SessionInfo } from "@opencode/client"
+import { Product } from "@loginom-ai-agent/product"
 import { Global } from "@opencode/util/global"
 import { noTimeoutFetch } from "@opencode/util/no-timeout-fetch"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
@@ -640,23 +641,23 @@ function App() {
     if (!terminalTitleEnabled()) return
 
     if (route.data.type === "home") {
-      setTerminalTitle(renderer, "OpenCode")
+      setTerminalTitle(renderer, Product.name)
       return
     }
 
     if (route.data.type === "session") {
       const title = session?.title
       if (!title || isFallbackTitle(title)) {
-        setTerminalTitle(renderer, "OpenCode")
+        setTerminalTitle(renderer, Product.name)
         return
       }
 
-      setTerminalTitle(renderer, `OC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
+      setTerminalTitle(renderer, `${Product.name} | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
       return
     }
 
     if (route.data.type === "plugin") {
-      setTerminalTitle(renderer, `OC | ${route.data.name}`)
+      setTerminalTitle(renderer, `${Product.name} | ${route.data.name}`)
     }
   })
 
@@ -1063,7 +1064,7 @@ function App() {
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenCode",
+              title: `Update ${Product.name}`,
               slash: { name: "update" },
               run: () => updater.open?.("manual"),
               category: "System",

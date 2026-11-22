@@ -7,6 +7,7 @@ import type {
   AttentionWhen,
   AttentionSoundName,
 } from "@opencode/plugin/tui/context"
+import { Product } from "@loginom-ai-agent/product"
 import { Config } from "./config"
 import { Schema } from "effect"
 import stripAnsi from "strip-ansi"
@@ -32,7 +33,7 @@ type AttentionHost = Attention & {
   dispose(): void
 }
 
-const DEFAULT_TITLE = "OpenCode"
+const DEFAULT_TITLE = Product.name
 const TITLE_LIMIT = 80
 const MESSAGE_LIMIT = 240
 const BUILTIN_SOUNDS: Record<AttentionSoundName, string> = {
