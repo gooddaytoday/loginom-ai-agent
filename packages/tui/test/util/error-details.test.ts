@@ -15,6 +15,8 @@ test("copy and investigation include the plugin context and matching log referen
   expect(result.prompt).toContain("Find the server log entry matching reference err_a1b2c3d4")
   expect(result.prompt).toContain("If the server logs are not accessible")
   expect(result.prompt).toContain("Do not expose credentials.")
+  expect(result.prompt).toContain("Investigate why this Loginom AI Agent component failed")
+  expect(result.prompt).not.toContain("OpenCode")
 })
 
 test("errors without a reference still have useful copy and investigation text", () => {
