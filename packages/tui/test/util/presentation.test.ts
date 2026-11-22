@@ -12,17 +12,19 @@ test("prints nothing without a session or update", () => {
 
 test("formats session continuation summary", () => {
   expect(rows(epilogue({ session: { title: "A session", sessionID: "ses_123" } }))).toEqual([
+    "  Loginom AI",
     "  Session   A session",
     "  Continue  opencode -s ses_123",
   ])
 })
 
 test("tells the user to start OpenCode again after an update", () => {
-  expect(rows(epilogue({ updatedVersion: "2.0.0" }))).toEqual(["  Run opencode to use 2.0.0"])
+  expect(rows(epilogue({ updatedVersion: "2.0.0" }))).toEqual(["  Loginom AI", "  Run opencode to use 2.0.0"])
 })
 
 test("keeps the session continuation after an update", () => {
   expect(rows(epilogue({ session: { title: "A session", sessionID: "ses_123" }, updatedVersion: "2.0.0" }))).toEqual([
+    "  Loginom AI",
     "  Run opencode to use 2.0.0",
     "  Session   A session",
     "  Continue  opencode -s ses_123",

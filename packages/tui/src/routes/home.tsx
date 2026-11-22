@@ -143,7 +143,7 @@ function UpdateNotification(props: { width: number }) {
               flexShrink={0}
               flexDirection="row"
               justifyContent="center"
-              width={props.width}
+              minWidth={props.width}
               maxWidth="100%"
               gap={1}
               backgroundColor={hovered() ? theme.background.action.primary.hovered : undefined}

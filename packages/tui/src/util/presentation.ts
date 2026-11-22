@@ -1,4 +1,4 @@
-import { logo } from "../logo"
+import { logo, wordmarkAccentAnsi } from "../logo"
 
 const reset = "\x1b[0m"
 const bold = "\x1b[1m"
@@ -18,7 +18,7 @@ function wordmark(pad = "") {
 
   return logo.left.map((line, index) => {
     const left = draw(line, dim, "\x1b[38;5;235m", "\x1b[48;5;235m")
-    const right = draw(logo.right[index] ?? "", reset, "\x1b[38;5;238m", "\x1b[48;5;238m")
+    const right = draw(logo.right[index] ?? "", wordmarkAccentAnsi, "\x1b[38;5;238m", "\x1b[48;5;238m")
     return `${pad}${left} ${right}`
   })
 }
