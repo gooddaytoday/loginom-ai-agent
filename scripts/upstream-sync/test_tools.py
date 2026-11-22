@@ -181,6 +181,13 @@ class ApplyIdentityRules(unittest.TestCase):
         self.assertEqual(self.ai.transform('path.join(dir, ".opencode") + " ~/.opencode/bin" + "C:\\\\me\\\\.opencode\\\\bin"'),
                          'path.join(dir, ".loginom-ai-agent") + " ~/.loginom-ai-agent/bin" + "C:\\\\me\\\\.loginom-ai-agent\\\\bin"')
 
+    def test_a_directory_in_a_regular_expression_or_a_template_is_renamed(self):
+        # gui-plugins/src/details/config-file.ts tests the project root, core/test/config/config.test.ts the watcher paths.
+        self.assertEqual(self.ai.transform(r"!/[\\/]\.opencode[\\/]?$/.test(root.path)"), r"!/[\\/]\.loginom-ai-agent[\\/]?$/.test(root.path)")
+        self.assertEqual(self.ai.transform("path.includes(`${path.sep}.opencode${path.sep}`)"),
+                         "path.includes(`${path.sep}.loginom-ai-agent${path.sep}`)")
+        self.assertKept("Provider.ID.opencode, x.opencode[0]")
+
     def test_an_escaped_upstream_host_keeps_its_name(self):
         self.assertKept(r"server.replace(/^https:\/\/console\.opencode\.ai(?=\/|$)/, defaultServer)")   # core/src/console-access.ts
 

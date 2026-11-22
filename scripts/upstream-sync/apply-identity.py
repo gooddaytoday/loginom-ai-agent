@@ -33,8 +33,9 @@ PROVIDER_KEYS = ("OPENCODE_API_KEY", "OPENCODE_GO_API_KEY")
 UNPROCESSED_READERS = ("OPENCODE_ZIG_CPU", "OPENCODE_REAL_ZIG")
 # A name also starts right after an escape such as `\n` in a string or a regular expression.
 VARIABLE = re.compile(r"(?:\b|(?<=\\[nrt]))OPENCODE_[A-Z0-9_]+")
-# `.opencode` as a path segment, not a property (`?.opencode`, `...opencode`) or an escaped host (`console\.opencode\.ai`).
-PATH_NAME = re.compile(r"(?<![\w$.?!)\]])\.opencode(?=[/\s\"'`)]|\\(?!\.)|$)|opencode\.(json|db|settings|updater)")
+# `.opencode` as a path segment, also in a regular expression (`[\\/]\.opencode[\\/]`) or a template (`.opencode${sep}`), not a
+# property (`?.opencode`, `...opencode`) or an escaped host (`console\.opencode\.ai`).
+PATH_NAME = re.compile(r"(?<![\w$.?!)\]])\.opencode(?=[/\s\"'`)\[$]|\\(?!\.)|$)|opencode\.(json|db|settings|updater)")
 # Upstream URLs (`formulae.brew.sh/api/formula/opencode.json`) and theme files (`theme/assets/opencode.json`) keep their names.
 UNTOUCHED = re.compile(r"https?://[^\s\"'`<>]+|\bassets/[\w./-]*")
 # Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose; the TUI
