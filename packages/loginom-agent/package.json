@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@loginom-ai-agent/loginom-host": "workspace:*",
+    "@loginom-ai-agent/product": "workspace:*",
     "@opencode/plugin": "workspace:*"
   },
   "devDependencies": {

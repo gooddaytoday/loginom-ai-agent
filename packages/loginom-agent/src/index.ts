@@ -1,9 +1,10 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
-// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host lease, skill sources and Loginom tools arrive
-// in stage B2.3…B2.5.
+// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host lease and Loginom tools arrive in stage B2.3
+// and B2.5.
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
 const runner = {
@@ -39,6 +40,10 @@ export default Plugin.define({
     const granted = new Map<string, Grant>()
     const pending = new Map<string, { sessionID: string; profile: Grant }>()
     const profile = (sessionID: string): Profile => granted.get(sessionID) ?? "default"
+
+    // Skill sources (G6): the bundled catalog owns the product's skill IDs and names, so only it grants access.
+    const catalog = await bundled(process.env.LOGINOM_AI_AGENT_RESOURCES)
+    await ctx.skill.transform((editor) => apply(editor, catalog, hub))
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
     // Only tools registered without `codemode: false` are touched: a Promise-API update re-wraps the tool's executor.
