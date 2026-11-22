@@ -1801,7 +1801,9 @@ differs from packages/gui-plugins/src/pairing/main.ts at its line 24`. README п
 
 22.11.2026. Ветка `b14c-channels` от `oc2-migration` (`4b65c9ba94`), рабочее дерево `.claude/worktrees/b14c`. Bun 1.4.4
 переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, `.husky/_`
-появился, хук `pre-commit` срабатывал на каждом коммите. `apply-identity` не запускался (его гоняет B1.4a).
+появился, хук `pre-commit` срабатывал на каждом коммите. `apply-identity` до переноса не запускался (его гоняет B1.4a).
+Раздел написан до B1.4a и называет константу канала `OPENCODE_CHANNEL`. После переноса на `5ab3dbae96` она называется
+`LOGINOM_AI_AGENT_CHANNEL`, см. «Перенос» в конце раздела.
 
 ### Коммиты
 
@@ -1809,7 +1811,11 @@ differs from packages/gui-plugins/src/pairing/main.ts at its line 24`. README п
 |---|---|---|
 | `fb6a8e7401` `feat: keep prod, beta and dev storage in separate directories` | `util`, Desktop, манифесты, `bun.lock`, тесты | `clean` |
 | `66823bfb50` `docs(migration): record B1.4c channel storage and its checks` | `catalog.md` (CAT-01, CAT-13), этот раздел | `clean` |
-| следующие | кэш транспилятора в тесте Desktop; уточнения раздела после ревью | |
+| `8ecb1fc4d5` `test(desktop): share the transpiler cache in the channel pairs test` | кэш транспилятора в тесте Desktop | `clean` |
+| `53dc6c3dfa` `docs(migration): note the B1.4a merge risk and the 0.4 CLI channel source` | уточнения раздела после ревью | `clean` |
+| `4a804816f1` `chore: merge oc2-migration with the B1.4a identity run into b14c-channels` | перенос на `5ab3dbae96`, разрешение конфликтов | `clean` |
+| `32c61f7f49` `chore(identity): apply product names to the B1.4c channel code` | вывод `apply-identity`, 7 файлов | `clean` |
+| следующий | журнал переноса | |
 
 ### Способ и почему
 
@@ -1984,8 +1990,9 @@ opencode v0.0.0-beta-202611221116
   запуска из исходников он разойдётся с `Global`. Вызовов на дереве нет, только тест `product`; связку дашбордов делает
   B2.9.
 - `names.test.ts`, проверка `OPENCODE_*` (`test.failing` до B1.4): совпадений на 12 больше — `OPENCODE_CHANNEL` в
-  `util/src/global.ts`, `service-identity.ts` и тесте Desktop, `OPENCODE_DESKTOP_SERVER_CHANNEL` переехал.
-- **Риск при слиянии с B1.4a (`b14a-identity-script`), текстового конфликта не будет.** `wants()` в
+  `util/src/global.ts`, `service-identity.ts` и тесте Desktop, `OPENCODE_DESKTOP_SERVER_CHANNEL` переехал. После
+  переноса на B1.4a — ноль (ниже).
+- **Риск при слиянии с B1.4a (`b14a-identity-script`), текстового конфликта не будет. Снят переносом (ниже).** `wants()` в
   `apply-identity.py` покрывает и ключи define (`cli/script/build.ts`, `cli/vite.node.config.ts`,
   `desktop/electron.vite.config.ts` — маски `script/` и `packages/*/*.config.ts`), и мои чтения (`util/src`,
   `desktop/src`, тесты). Проверено копией регулярки `SOURCES`, скрипт не запускался. Но на ветке B1.4a чтений
@@ -2000,6 +2007,115 @@ opencode v0.0.0-beta-202611221116
 - Окно Desktop под Electron и собранный Desktop: свёртку `latest` → prod и `local` → dev в `electron.vite.config.ts`
   тест через окружение не доказывает, она проверена только чтением кода. Пары окна и CLI проверены подстановкой
   константы окну через `import.meta.env` в Bun.
-- Собранный CLI — только `beta`. `latest` и `dev` — через `bun --define` в тестах. `service-smoke.ts` до конца не
-  прошёл: веб-интерфейс не собирался.
+- Собранный CLI: до переноса — только `beta`, после — `latest`, `beta` и `dev` (ниже), все без веб-интерфейса.
+  `service-smoke.ts` до конца не прошёл: веб-интерфейс не собирался.
 - Две службы разных каналов одновременно не запускались (порт — выше).
+
+### Перенос на `oc2-migration` после B1.4a (`5ab3dbae96`)
+
+B1.4c принят по проверке, но в `oc2-migration` уже влит B1.4a (прогон `apply-identity`). По команде координатора
+`oc2-migration` влит в `b14c-channels` слиянием (`4a804816f1`, родители `53dc6c3dfa` и `5ab3dbae96`), без rebase.
+
+Конфликты и как разрешены:
+
+| Файл | Разрешение |
+|---|---|
+| `desktop/src/main/service/background-service.ts` | сторона B1.4c: `const file = serviceFile()`; ветка `service-local.json` B1.4a (с `LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL`) живёт в `service-identity.ts` |
+| `core/script/test.ts`, `cli/test/service.test.ts`, `cli/test/debug-heap-dump.test.ts` | сторона B1.4c (каталог `loginom-ai-agent-dev`), имена переменных — следующим прогоном `apply-identity` |
+| `docs/upstream-sync/catalog.md`, CAT-13 | текст B1.4c, в него перенесены правки B1.4a: имена `loginom-ai-agent.json(c)` и `.loginom-ai-agent`, переименованные чтения пяти файлов записи, `OPENCODE_ZIG_CPU` и `OPENCODE_REAL_ZIG`; константа канала названа по-новому |
+| этот журнал | раздел B1.4a целиком из `5ab3dbae96`, затем раздел B1.4c целиком |
+
+Остальные файлы слились сами, в том числе `util/src/global.ts` (B1.4a переименовал там `…_TEST_HOME` и `…_CONFIG_DIR`).
+После слияния ключи define уже были `LOGINOM_AI_AGENT_CHANNEL`, а чтения B1.4c — `OPENCODE_CHANNEL`. Это и есть риск,
+названный выше.
+
+`apply-identity` по всему дереву после разрешения (`32c61f7f49`):
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo .
+changed: 7 files
+packages/cli/test/debug-heap-dump.test.ts
+packages/cli/test/service.test.ts
+packages/core/script/test.ts
+packages/desktop/src/main/service/service-identity.test.ts
+packages/desktop/src/main/service/service-identity.ts
+packages/util/src/global.ts
+packages/util/test/product-channel.test.ts
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files
+```
+
+Первый `--check` во время слияния назвал 13 файлов, часть по три раза: `git ls-files` перечисляет неразрешённый путь
+по стадиям. Прогон шёл после `git add` разрешённых файлов. Prettier переложил таблицу каналов в тесте Desktop
+(строки стали длиннее 120), один комментарий в `product-channel.test.ts` перенесён руками.
+
+Ключ define и чтения совпадают:
+
+| Где | Имя |
+|---|---|
+| `cli/script/build.ts` (define), `cli/vite.node.config.ts` (define и `process.env`) | `LOGINOM_AI_AGENT_CHANNEL` |
+| `packages/script/src/index.ts` (канал сборки из окружения) | `LOGINOM_AI_AGENT_CHANNEL` |
+| `cli/src/version.ts`, `util/src/global.ts` (чтение константы) | `LOGINOM_AI_AGENT_CHANNEL` |
+| `desktop/electron.vite.config.ts` (`import.meta.env.…` для main), `desktop/src/main/env.d.ts` | `LOGINOM_AI_AGENT_CHANNEL` |
+| `desktop/src/main/service/service-identity.ts` (чтение) | `import.meta.env.LOGINOM_AI_AGENT_CHANNEL` |
+| `desktop/script/dev.ts` (задаёт), `service-identity.ts` (читает) | `LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL` |
+
+Собранный CLI, три канала (`LOGINOM_AI_AGENT_CHANNEL=<канал> bun run script/build.ts --single --skip-install
+--skip-web-ui`, для `latest` ещё `LOGINOM_AI_AGENT_VERSION=2.3.0-b14c`; 15–16 с каждая), `debug paths` в пустом корне
+(`env -i`, `HOME` и `XDG_*` — в корень):
+
+```text
+== latest (opencode v2.3.0-b14c)
+data       <root>/data/loginom-ai-agent
+config     <root>/config/loginom-ai-agent
+state      <root>/state/loginom-ai-agent
+cache      <root>/cache/loginom-ai-agent
+tmp        <root>/tmp/loginom-ai-agent
+log        <root>/data/loginom-ai-agent/log
+db         <root>/data/loginom-ai-agent/loginom-ai-agent.db
+== beta (opencode v0.0.0-beta-202611221134)
+data       <root>/data/loginom-ai-agent-beta
+config     <root>/config/loginom-ai-agent-beta
+state      <root>/state/loginom-ai-agent-beta
+cache      <root>/cache/loginom-ai-agent-beta
+tmp        <root>/tmp/loginom-ai-agent-beta
+log        <root>/data/loginom-ai-agent-beta/log
+db         <root>/data/loginom-ai-agent-beta/loginom-ai-agent.db
+== dev (opencode v0.0.0-dev-202611221134)
+data       <root>/data/loginom-ai-agent-dev
+config     <root>/config/loginom-ai-agent-dev
+state      <root>/state/loginom-ai-agent-dev
+cache      <root>/cache/loginom-ai-agent-dev
+tmp        <root>/tmp/loginom-ai-agent-dev
+log        <root>/data/loginom-ai-agent-dev/log
+db         <root>/data/loginom-ai-agent-dev/loginom-ai-agent.db
+```
+
+Тесты после переноса, отдельно:
+
+```text
+$ cd packages/util && bun test test/product-channel.test.ts test/global.test.ts      # 4 pass, 0 fail
+$ cd packages/desktop && bun test src/main/service/service-identity.test.ts          # 6 pass, 0 fail
+$ cd packages/product && bun test test/names.test.ts                                 # 9 pass, 0 fail
+$ cd packages/cli && bun test --timeout 60000 test/service-identity.test.ts test/flag-identity.test.ts   # 8 pass, 0 fail
+```
+
+`names.test.ts` и `flag-identity.test.ts` после B1.4a идут без `test.failing`: проверка `OPENCODE_*` по исходникам
+зелёная и с кодом B1.4c.
+
+Полные наборы, `5ab3dbae96` (отдельное чистое дерево в scratchpad) → `b14c-channels` (`32c61f7f49`), по очереди, те же
+команды, что выше:
+
+| Пакет | До | После |
+|---|---|---|
+| `util` | 145 pass, 0 fail | 146 pass, 0 fail: +1 `product-channel` |
+| `client` | 262 pass, 0 fail | то же |
+| `desktop` | 528 pass, 4 skip, 0 fail | 529 pass, 4 skip, 0 fail: +1 пары каналов |
+| `server` | 127 pass, 1 skip, 0 fail | то же |
+| `cli` | 407 pass, 9 skip, 0 fail | то же |
+| `core` | 7118 pass, 354 skip, 3 fail | то же, те же три падения (`ShellParse`, два `flock` под root) |
+| `product` | 56 pass, 5 fail | то же, те же пять `repo-paths` |
+
+- `python3 -I scripts/upstream-sync/catalog-check.py --summary` — код 0: на `5ab3dbae96` 344 расходящихся файла,
+  CAT-01 — 3; на ветке 346, CAT-01 — 5 (`util/package.json`, `desktop/package.json`). Остальные записи — те же.
+- `bun run check` из корня на `32c61f7f49` — код 0: `Found 517 warnings and 0 errors`, `Tasks: 38 successful, 38 total`.
