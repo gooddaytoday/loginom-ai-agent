@@ -2645,3 +2645,187 @@ Cached:    36 cached, 38 total
 ### Не проверено
 
 - TUI в настоящем терминале и живой бесплатный лимит OpenCode Zen: только тестовый рендерер.
+
+## B1.8 Проверка секретов в CI
+
+22.11.2026. Ветка `b18-secrets-ci` от `oc2-migration` (`b1b45848e6`), рабочее дерево `.claude/worktrees/b18`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: 1600 пакетов,
+`.husky/_` есть, хук `pre-commit` срабатывал на каждом коммите. Код сканера (`secret-scan.ts`) и его тесты не менялись.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `35799e6bd3` `fix(ci): run the secret scan workflow on the OpenCode 2 tree` | `secrets.yml`, `packages/script/package.json`, `bun.lock` (одна строка) | `clean` |
+| `af21ac5ded` `fix(ci): give the secret scanner tests a 30 s per-test limit` | `secrets.yml` | `clean` |
+| следующий | этот раздел, `catalog.md` (CAT-01) | |
+
+### Что изменено
+
+`secrets.yml`, четыре правки (пять строк с комментарием):
+
+- `bun-version: "1.4.4"`, как `packageManager`. Action `oven-sh/setup-bun` закреплён тем же SHA `0c5077e5…` (v2.2.0).
+  Файл релиза `bun-v1.4.4/bun-linux-x64.zip` на GitHub есть (HTTP 200); как именно action его скачивает — не проверял.
+- `--filter @opencode/script`. Со старым именем `bun install` в чистом дереве даёт код 0, ничего не ставит и пишет
+  только `warn: No workspace packages matched the filter "@opencode-ai/script"` — сбой всплыл бы в тестах.
+- `bun typecheck` → `bun check --no-script`. В `packages/script/package.json` v2.3.0 есть только `test`: `bun typecheck`
+  отвечает `Script not found "typecheck"`, код 1.
+- `bun test` → `bun test --timeout 30000` (отдельный коммит, сверх списка задания; ниже).
+
+Проверка типов: из двух вариантов задания выбран прямой вызов `bun check --no-script` — той же команды, что в скриптах
+`typecheck` соседних пакетов v2.3.0 (`plugin`, `schema`, `util`, `protocol` и другие). Скрипт `typecheck` в
+`package.json` — это правка файла OpenCode, и пакет попал бы в `bun turbo typecheck`, то есть в состав `bun run check` и
+хука `pre-push`: это общий контракт. Прямой вызов — одна строка в файле форка (в v2.3.0 `secrets.yml` нет).
+
+Расхождение с заданием: одного варианта не хватило. После установки с `--filter @opencode/script` в чистом дереве
+`bun check --no-script` дал 5 ошибок: `tsconfig.json(3,14): TS6053 File '@tsconfig/bun/tsconfig.json' not found` и
+четыре в `bun-types` (`TextEncoderEncodeIntoResult`, `ConnectionOptions`, `KeyObject`, `TLSSocket`) — следствие: без
+базового конфига нет `skipLibCheck`. `tsconfig.json` пакета наследует `@tsconfig/bun`, но в v2.3.0 пакет его не
+объявляет и берёт из корневых `devDependencies`, а фильтр их не ставит. На точке отсечения (`a080f7725c`) он был в
+`devDependencies` пакета. Выбрано меньшее: та же строка `"@tsconfig/bun": "catalog:"`, что у 20 соседних пакетов v2
+(`ai`, `cli`, `client`, `core`, `plugin`, `schema`, `util` и другие). `bun install` дописал одну строку в раздел
+рабочего пространства `bun.lock`, разрешённые версии не менялись. Другой путь без правки файла OpenCode — добавить корень
+в фильтр — ставит все корневые зависимости и рабочие пространства, то есть не «Install scanner tooling only». Запись —
+CAT-01 в `catalog.md`; `catalog-check.py` — 420 расходящихся файлов, как до задачи: манифест и lock-файл уже расходились.
+
+Предел теста: в чистом дереве `a pinned archive is skipped only at its pinned path` (`secret-scan.test.ts`, тест правки
+сканера B1.2s) упал по пределу 5 с по умолчанию: `this test timed out after 5000ms`. Он трижды запускает сканер с
+настоящим gitleaks. Три одиночных прогона без моих фоновых прогонов (load average 1,4 на 6 ядрах): 4,83 / 4,93 / 5,05 с; рядом
+`a merge beyond Git's default rename limit…` — 4,3 с и `exceptions are exact…` — 3,7 с. Запаса нет, первый push ветки
+переноса мог дать красный статус. В workflow — `--timeout 30000`, как в ручных прогонах пакета от 12 ноября: тесты и
+сканер не менялись, ни одна проверка не ослаблена, общий предел задаёт `timeout-minutes: 15`. Если владелец решит иначе,
+коммит `af21ac5ded` выбрасывается целиком, а предел ставится в самом тесте в рамках B1.2s.
+
+Что сохранено из `secret-protection.md`: checkout `pull_request.base.sha || github.sha`, `fetch-depth: 0`,
+`persist-credentials: false`; fetch head PR из публичного origin без credentials; `pull_request_target` только для
+`loginom`, `pull_request` нет; `--frozen-lockfile --ignore-scripts`; сканер вызывается `bun --no-install`, без скриптов
+пакетов; `permissions: contents: read`. Шаг «Scan only incoming commits» не менялся.
+
+Правка действует только для push. PR в `loginom` проверяется событием `pull_request_target`: GitHub берёт workflow и
+checkout из базовой ветки `loginom`. PR переноса проверит прежний workflow (Bun 1.3.14, `@opencode-ai/script`,
+`bun typecheck`) на дереве `loginom`, где он согласован с деревом (`origin/loginom`: `packageManager` `bun@1.3.14`,
+пакет `@opencode-ai/script` со скриптом `typecheck: tsgo --noEmit`); новый workflow начнёт действовать для PR только после
+слияния переноса в `loginom`. Для PR переноса нужно, чтобы в `loginom` раньше попали правка сканера B1.2s,
+`.gitleaks-upstream` и записи `.gitleaksignore` (итог B1).
+
+### Локальный прогон шагов
+
+Чистое дерево — `git worktree add --detach <scratchpad>/b18-clean`, на `af21ac5ded` после `git clean -xfd`, без
+`node_modules`. Шаги `run:` берутся из YAML скриптом из scratchpad (`b18-run-steps.ts`, в репозиторий не входит) и
+исполняются как у раннера: `bash --noprofile --norc -eo pipefail`, `env` шага, `working-directory`, `GITHUB_ENV` и
+`GITHUB_PATH` между шагами, `RUNNER_TEMP`, пустой `HOME` (свежий кэш Bun; gitleaks ставится туда, а не в общий
+`~/.local/bin`), `PATH` без `~/.local/bin`. Событие — push новой ветки: `EVENT=push`, `BEFORE` — 40 нулей,
+`HEAD=af21ac5ded`. Действия `checkout` и `setup-bun` заменены чистым деревом и Bun 1.4.4 в `PATH`; шаг fetch PR
+пропущен (только `pull_request_target`). `origin/loginom` = `ae89c43b57`, совпал с `git ls-remote origin
+refs/heads/loginom`; база диапазона — `git merge-base origin/loginom HEAD` = `dd2f949d11`.
+
+`zip` на этой машине нет (на образе GitHub ubuntu-24.04 он есть). Первый прогон, ещё на `35799e6bd3`: 12 тестов
+`secret-scan.test.ts` упали с `Executable not found in $PATH: "zip"`. Для следующих прогонов `zip` 3.0-13ubuntu0.2 взят
+`apt-get download` и распакован `dpkg-deb -x` в scratchpad, без установки в систему; SHA256 пакета совпал с индексом
+apt. Второй прогон (с `zip`, без `--timeout`): 70 pass, 1 fail — предел 5 с, выше.
+
+Итоговый прогон на `af21ac5ded`, код 0, 2 мин 19 с:
+
+```text
+## skip (action): actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+## skip (PR only): Fetch PR objects without checking out untrusted code
+## skip (action): oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+## run: Install scanner tooling only
+$ export TMPDIR="$RUNNER_TEMP"; echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+$ bun install --frozen-lockfile --ignore-scripts --filter @opencode/script
+bun install v1.4.4 (38afee6c8)
+warn: patches/…  no longer applies (…is no longer installed)      # сокращено: 4 строки, пакетов нет в фильтре
++ @tsconfig/bun@1.0.9
++ @types/bun@1.4.3
++ semver@7.8.5
+14 packages installed [272.00ms]
+$ bun run secrets:install
+$ bun packages/script/src/install-gitleaks.ts
+Gitleaks 8.30.1 installed with verified checksum. Add <scratchpad>/b18-ci/home/.local/bin to PATH.
+$ echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+## exit 0, 1.1 s: Install scanner tooling only
+## run: Verify scanner behavior
+$ cd packages/script && bun test --timeout 30000                  # вывод тестов сокращён
+ 71 pass
+ 0 fail
+ 259 expect() calls
+Ran 71 tests across 5 files. [85.33s]
+$ bun check --no-script
+✓ No type errors in 10 files [62.72ms]
+## exit 0, 85.4 s: Verify scanner behavior
+## run: Scan only incoming commits
+$ EVENT=push BEFORE=0000000000000000000000000000000000000000 BASE= HEAD=af21ac5ded…  <run шага из YAML>
+# ветка BEFORE=0…0: base=$(git merge-base origin/loginom "$HEAD") = dd2f949d11
+$ bun --no-install packages/script/src/secret-scan.ts range "$base" "$HEAD"
+{"status":"clean","commits":2583,"archives":46,"current_files":0,"skipped":[],"upstream_commits":6784,"upstream_findings":606,"upstream_missing":0,"elapsed_ms":51434}
+## exit 0, 52.1 s: Scan only incoming commits
+```
+
+Диапазон первого push ветки переноса (от `dd2f949d11`: 2583 коммита форка и 6784 коммита истории OpenCode, снятые
+закреплением) чист и занимает 52 с при `timeout-minutes: 15`. На `35799e6bd3` тот же шаг: `clean`, 2582 коммита, 55 с.
+
+Проверка типов не холостая: временный файл `src/b18-negative.ts` с `const broken: number = "text"` в чистом дереве —
+`TS2322`, код 1; файл удалён.
+
+Разбор YAML: `python3` (`yaml.safe_load`) и `Bun.YAML.parse` — код 0, шесть шагов, `with: {bun-version: "1.4.4"}`;
+`secret-workflow.test.ts` читает тот же файл через `Bun.YAML` и исполняет шаг сканирования — 71 pass выше.
+`actionlint` на машине нет (`command -v actionlint` пусто), не ставил.
+
+### Какие workflow стартуют при push в обычную ветку
+
+GitHub берёт workflow для push из отправленного коммита, то есть из дерева v2. Только список, чинить — B5.1.
+
+| Workflow | Push-триггер | Push ветки переноса |
+|---|---|---|
+| `secrets.yml` | `branches: ["**"]`, `tags: ["**"]` | стартует всегда; локально зелёный (выше) |
+| `windows-native-check.yml` | `branches: ["**"]` и `paths`: `packages/loginom-host/**`, `packages/desktop/src/main/apps{,.test}.ts`, `packages/opencode/…`, `script/test-windows-profile.ps1`, сам файл | стартует, если push меняет эти пути: ветка переноса меняет `packages/loginom-host/**` (115 файлов от `dd2f949d11`). По коду скорее красный: Bun `1.3.14` при `packageManager` 1.4.4; `packages/desktop/src/main/apps.test.ts` в дереве v2 нет, а шаг его запускает; путей `packages/opencode/…` нет |
+| `loginom-macos.yml` | `branches: [macos-build, loginom]` и `paths` | нет |
+| `loginom-windows.yml` | push нет (PR по путям, ручной запуск) | нет |
+| `loginom-client-full.yml` | push нет (PR по путям, ручной запуск) | нет |
+| `release.yml` (v2.3.0 с правками форка) | `branches: [beta]`; ещё `schedule` и ручной запуск | нет |
+
+Workflow v2.3.0 в дереве реагируют на push только в `dev`, `beta`, `production` или теги `process-daemon-v*`
+(`bot-nix-hashes`, `check`, `check-nix`, `check-process-daemon`, `check-test`, `deploy*`, `release-process-daemon`) — на
+обычной ветке не стартуют. Как GitHub применяет `paths` к первому push ветки с тысячами изменённых файлов, локально не
+проверить: для `windows-native-check.yml` считать, что стартует.
+
+К сведению B5.1, не push:
+
+- `schedule` работает только из ветки по умолчанию (`loginom`): расписания `release.yml` (каждые 6 ч), `nightly-beta.yml`
+  и `triage-*` начнут срабатывать после слияния переноса в `loginom`. У `release.yml` и `nightly-beta.yml` первое
+  задание с `if: github.repository == 'anomalyco/opencode'` и в форке пропускается; у `triage-*` такого условия нет.
+- PR из ветки переноса в `loginom`: событие `pull_request` берёт workflow из PR — стартуют `check-test.yml` и
+  `check-bot-scope.yml` на любой PR, по путям `check-docs`, `check-process-daemon`, `loginom-client-full`,
+  `loginom-macos`, `loginom-windows`, `release-process-daemon`. `pull_request_target` (`secrets`, `triage-*`) — из
+  `loginom`. Списки составлены по `on:`; условия `if:` заданий, кроме `github.repository` выше, не разбирал.
+
+### Итоговая проверка
+
+На `af21ac5ded` (после него — только этот раздел и строка CAT-01 в `catalog.md`), из корня дерева:
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 420 divergent upstream files      # код 0; CAT-01: 6, как до задачи
+$ bun install --frozen-lockfile                         # код 0, проверка CAT-01
+Checked 1684 installs across 2059 packages (no changes)
+$ cd packages/script && bun check --no-script
+✓ No type errors in 10 files                            # код 0
+$ bun run check                                         # код 0, 17 с; 37 из 38 задач из кэша turbo
+Found 517 warnings and 0 errors.
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    38 successful, 38 total
+```
+
+### Найдено, не чинил
+
+- Тесты сканера B1.2s с настоящим gitleaks идут 3,7–5,1 с при пределе 5 с по умолчанию (выше); локальные прогоны пакета
+  без `--timeout` нестабильны.
+- `windows-native-check.yml` на Bun 1.3.14 и вызывает `bun typecheck`; `loginom-windows.yml` тоже вызывает
+  `bun typecheck` — B5.1.
+- Установка с фильтром печатает 4 предупреждения `patches/… no longer applies` — пакетов нет в фильтре, код 0.
+
+### Не проверено
+
+- Настоящий запуск в GitHub Actions: `setup-bun` с 1.4.4, раннер ubuntu-24.04, время тестов на его CPU, событие
+  `pull_request_target`. Локально — только push новой ветки.
+- Как GitHub считает `paths` для первого push ветки переноса (`windows-native-check.yml`).
