@@ -860,6 +860,10 @@ B4); не вводить службу, общую для Desktop и CLI, аре�
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - `guarantees.md` (G2, «Как запускать»), `adr-0001-modular-integration.md` и раздел CAT-12 в `catalog.md` ссылаются на
   `packages/core/test/flag-identity.test.ts`. Перевод этих документов — B1.7.
 - `repo-paths.test.ts`: 7 падений на `oc2-migration`, в том числе «the agent package keeps the upstream directory»
@@ -1135,6 +1139,10 @@ $ cd packages/product && bun test                                  # без clie
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - `conflict-classes.py`: правила классов — пути 0.4; на v2 почти любой конфликт попадёт в `unclassified` (код 4, в
   `prepare` не роняет). Дополнить после первой настоящей синхронизации.
 - `compat-snapshot.ts` на дереве v2 работает (38 имён `LOGINOM_AI_AGENT_*`, 26 workflow), но `agentDir` падает на
@@ -1276,6 +1284,10 @@ CAT-13: 6 → 10, CAT-12: 10 → 11. До правки `catalog.json` прове
 - Название CAT-13 в `catalog.json` не менял, раздел дополнен.
 
 ### Найдено, не чинил
+
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
 
 - **Продукт пока запускает бинарник `opencode-pty` из npm `@opencode/pty@0.5.2`**, а не из `packages/process-daemon`:
   `core/src/persistent-pty/pty-binding.ts` (`binaryPath`), сборка CLI — `cli/script/opencode-pty.ts`, свой бинарник
@@ -1437,6 +1449,10 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
   `LOGINOM_BUN_NOTICE_REVISION_MISMATCH`.
 
 ### Найдено, не чинил
+
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
 
 - `windows-native-check.yml` и `secrets.yml` закреплены на Bun 1.3.14. `check-test.yml` берёт версию из
   `package.json`.
@@ -1774,6 +1790,10 @@ differs from packages/gui-plugins/src/pairing/main.ts at its line 24`. README п
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - `names.test.ts` проверяет `OPENCODE_*` только в `src`, `script`, `scripts` пакетов из своего списка, без `tui`,
   `ui`, тестов и `.github`: его зелёный результат не говорит о 32 именах, переименованных в `tui`. Их покрывают тесты
   `tui` и `apply-identity --check`.
@@ -1980,6 +2000,10 @@ opencode v0.0.0-beta-202611221116
 - `service-smoke.ts` ищет каталог по маске, а не знает канал бинарника: канал задаёт CI.
 
 ### Найдено, не чинил
+
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
 
 - **Порт.** Без identity службы всех каналов слушают порт канала upstream `0xc0de` (`ServiceConfig.defaultPort`).
   Службы prod и beta одновременно: вторая не стартует («port … is already in use»). Чужую при этом не подхватывает.
@@ -2261,6 +2285,10 @@ Cached:    0 cached, 38 total
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - `process-daemon/README.md` называет пути по умолчанию до B1.3b: `${XDG_STATE_HOME:-~/.local/state}/opencode/pty`,
   `/tmp/opencode-pty-<uid>/`, дочерний каталог `opencode-pty-<uid>`; исходник после B1.3b — `loginom-ai-agent`. Имя
   бинарника `opencode-pty` в том же README — Р-16.
@@ -2514,6 +2542,10 @@ Cached:    0 cached, 38 total
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - `tui/src/context/program-status.ts`: `APP = "opencode"` — имя приложения в отчётах о состоянии терминалу; задачи в
   таблице нет.
 - `app.tsx`, «Open docs» открывает `https://opencode.ai/docs`; в `Product` есть `documentation`. Канал upstream — к
@@ -2607,6 +2639,10 @@ Expected to not contain: "Free limit reached"
   models…»?
 
 ### Найдено, не чинил
+
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
 
 - То же предложение Go при бесплатном лимите есть в веб-приложении: `app/src/session/usage-exceeded-dialogs.tsx`,
   `app/src/providers/connect/usage-exceeded.tsx` и `go-upsell-hero*`, строки `ui/src/i18n/en.ts`
@@ -2818,6 +2854,10 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - Тесты сканера B1.2s с настоящим gitleaks идут 3,7–5,1 с при пределе 5 с по умолчанию (выше); локальные прогоны пакета
   без `--timeout` нестабильны.
 - `windows-native-check.yml` на Bun 1.3.14 и вызывает `bun typecheck`; `loginom-windows.yml` тоже вызывает
@@ -3008,6 +3048,10 @@ $ bun run secrets range 56fe41abdb HEAD                  # на 19dcfa34c1
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - Отклонённый npm-пакет остаётся целью проверки обновлений (`PluginUpdate.check`, у записи `source.type: "package"`).
   `Npm.check` отвечает `Package is not installed` до сети, но в журнал на каждую активацию пишется
   `failed to check plugin update`. Что сети нет — только для этой фоновой проверки и только по коду `util/src/npm.ts`,
@@ -3039,7 +3083,9 @@ spike `origin/stage-b-checks` (отчёт: S1, S7, B0.3/S11; прототип `s
 |---|---|
 | `8574c217a1` `feat(loginom-agent): Loginom access grants and the tool gate (G1)` | `packages/loginom-agent/src/{access,index}.ts`, `test/access.test.ts`, зависимость от `loginom-host`, скрипт `test`, `bun.lock`; `packages/server/test/loginom-access.test.ts` |
 | `7695706bfb` `test(server): the Loginom gate also filters session.generate requests` | проверка `session.generate` в тесте S1 |
-| следующий | этот раздел, строка G1 в `guarantees.md`, CAT-05 |
+| `182503a34a` `docs(upstream-sync): record B2.2 access grants and the tool gate (G1)` | этот раздел (первая версия), строка G1 в `guarantees.md`, CAT-05 |
+| `30d8a5528e` `fix(loginom-agent): leave tools registered outside CodeMode untouched; test the compaction filter` | `codemode: false` ставится только тем, у кого его нет; проверка сжатия истории в тесте S1 |
+| следующий | уточнения этого раздела и `guarantees.md` |
 
 ### Что сделано
 
@@ -3058,7 +3104,11 @@ spike `origin/stage-b-checks` (отчёт: S1, S7, B0.3/S11; прототип `s
     `compaction` и `generate` модель тоже видит инструменты сессии; так же сделано у `patch` upstream);
   - `execute.before` — отклоняет вызов с текстом `LOGINOM_SCOPE_DENIED: tool <имя> is not available in this task`;
     срабатывает и на вложенный вызов из CodeMode, и на вызов, оставшийся в шаге после отзыва допуска;
-  - `tool.transform` — инструментам, которым нужен допуск (`!permits("default", id)`), ставит `codemode: false`.
+  - `tool.transform` — инструментам, которым нужен допуск (`!permits("default", id)`) и которые зарегистрированы без
+    `codemode: false`, ставит `codemode: false`. Уже правильные не трогает: `editor.update` Promise-API перекрывает
+    исполнитель инструмента обёрткой (`executePromiseTool(promiseExecutor(…))`, `plugin/src/promise/adapter.ts`), и у
+    настоящих инструментов B2.5 поменялась бы отмена (контекст читает `signal`, `cancel` пропадает) — до `30d8a5528e`
+    так и было.
     Без этого их видно в каталоге CodeMode в инструкциях без допуска (находка S1). Инструменты Loginom переносит B2.5;
     правило действует на любой инструмент с таким именем, кто бы его ни зарегистрировал.
 - **Допуск** — память экземпляра плагина, ключ — точный ID сессии (не родитель и не `affinity`). Живёт одну задачу,
@@ -3067,8 +3117,10 @@ spike `origin/stage-b-checks` (отчёт: S1, S7, B0.3/S11; прототип `s
     токен в `metadata` промпта, хук `prompt` узнаёт по нему промпт мастера, выдаёт профиль и удаляет ключ из метаданных.
     Подделать токен клиент не может, другой промпт его не получает. Интерфейс мастера — этап C.
   - Команда пользователя: навык продукта (`loginom-automation`, `package-docs`), приложенный к промпту
-    (`prompt.skills`). Так приложение и TUI v2 передают навык, выбранный пользователем (`/навык`, `@навык`);
-    расписание и `subagent` шлют только текст.
+    (`prompt.skills`). По коду так передают выбранный пользователем навык TUI (автодополнение `@навык` и окно навыков:
+    `tui/src/component/prompt/{autocomplete.tsx,index.tsx}`) и приложение (`skills` в `app/src/composer/submit.ts`).
+    Навыков-команд в v2 нет (`core/src/command.ts`), API `experimental.session.skill` (`Session.skill`) приложение, TUI,
+    CLI и Desktop не вызывают; через него допуск не выдаётся. Расписание и `subagent` шлют только текст.
   - Сам агент в обычном разговоре (решение 11): `execute.after` инструмента `skill` со статусом `completed` и ID навыка
     продукта. Вопроса пользователю нет, как в 0.4; инструменты появляются со следующего шага.
   - Hub: навык Hub с именем `loginom-automation` имеет свой ID (`hub.…`) и допуска не даёт — ни приложенный, ни
@@ -3099,7 +3151,7 @@ v2 и переходы допуска.
 
 | Тест | Что проверяет |
 |---|---|
-| S1 без допуска | прямой вызов: инструмента нет в запросе к модели, вызов отклонён, не выполнен; в каталоге CodeMode в инструкциях его нет; CodeMode `execute` → `tools.loginom_probe_codemode()` не выполнен; правила сессии от клиента `* * allow` и `* * allow` + `execute deny` (инструменты CodeMode становятся прямыми) — ни в запросе, ни при вызове; запрос `session.generate` (`/btw`) тоже без инструмента |
+| S1 без допуска | прямой вызов: инструмента нет в запросе к модели, вызов отклонён, не выполнен; в каталоге CodeMode в инструкциях его нет; CodeMode `execute` → `tools.loginom_probe_codemode()` не выполнен; правила сессии `* * allow` и `* * allow` + `execute deny` (инструменты CodeMode становятся прямыми) — ни в запросе, ни при вызове (правила ставятся через `Session.setPermissions`, тот же сервис, что за `PATCH /api/session/:id`); запросы `session.generate` (`/btw`) и ручного сжатия истории тоже без инструмента |
 | источники допуска | мастер (RPC `loginom.runner.start`): инструмент в запросе, выполнен; следующий промпт — уже без допуска; команда пользователя (`prompt.skills`) — выполнен; агент грузит `loginom-automation` — инструмент появляется со следующего шага, выполнен; навык Hub приложен или загружен — не выполнен; `package-docs`: в запросах только инструменты профиля, `shell` отклонён, загрузка `loginom-automation` профиль не расширяет |
 | S1 подсессия и форк | сессия с `loginom-automation` не видит и не вызывает `subagent`; ребёнок, созданный до допуска родителя, после допуска родителя вызывает инструмент — отклонено; форк сессии с допуском, разбуженный синтетическим сообщением (без промпта), — отклонено; то же синтетическое сообщение в исходной сессии допуск не снимает — выполнен |
 | S1 расписание | пробуждение после выполнения с допуском — отклонено; пробуждение во время выполнения с допуском (инструмент `hold` держит шаг, пробуждение принято, затем доставлено на границе шага того же выполнения — последний шаг исходного сценария так и не наступил) — отклонено |
@@ -3108,12 +3160,12 @@ v2 и переходы допуска.
 | контракт: `prompt`, `fork`, `skill` | `prompt` видит промпт клиента с `skills` и пробуждение по расписанию с `metadata.schedule`, синтетическое сообщение — нет; `fork` получает ID новой сессии; `execute.after` инструмента `skill` — вход `{ id }` и `completed` |
 
 Устойчивость: `bun test --rerun-each 10 test/loginom-access.test.ts` — на `8574c217a1` 70 pass / 0 fail за 56,9 с, на
-`7695706bfb` 70 pass / 0 fail за 62,8 с. Длительности по `--reporter=junit`: 0,27–2,4 с, дольше всех тест расписания
+`7695706bfb` — 62,8 с, на `30d8a5528e` — 59,6 с, везде 70 / 0. Длительности по `--reporter=junit`: 0,27–2,4 с, дольше всех тест расписания
 (две реальные секундные задержки планировщика). Таймаут теста — 30 с с комментарием: пакет `server` по умолчанию даёт 5 с.
 
 ### Мутации
 
-Скрипт в копии дерева `7695706bfb`: мутация вносится `perl`/`sed`, оба набора запускаются
+Скрипт в дереве `30d8a5528e` (числа те же, что на `7695706bfb`, плюс M7): мутация вносится `perl`/`sed`, оба набора запускаются
 (`cd packages/loginom-agent && bun test`, `cd packages/server && bun test test/loginom-access.test.ts`), файл
 возвращается из копии; после последней мутации `git status` пакета чистый.
 
@@ -3127,6 +3179,7 @@ v2 и переходы допуска.
 === M4 a new prompt keeps the grant         loginom-access 4/3: источники допуска, расписание, промпт посреди шага
 === M5 package-docs widens to automation    access 5/1 (переходы); loginom-access 6/1: источники допуска (package-docs)
 === M6 generate hook off                    loginom-access 6/1: S1 без допуска (запрос session.generate)
+=== M7 compaction hook off                  loginom-access 6/1: S1 без допуска (запрос сжатия истории)
 ```
 
 M1 — мутация из приёмки B2.2 («`permits` всегда `true`»). При M2 там, где инструмент скрыт `context`, вызов
@@ -3136,8 +3189,10 @@ M1 — мутация из приёмки B2.2 («`permits` всегда `true`�
 
 ### Приёмка
 
-Полные прогоны — на `8574c217a1` одной цепочкой, по одному пакету (`8574c217a1` → `7695706bfb` меняет только тест
-`server`; `server/test/loginom-access.test.ts` на `7695706bfb` — выше, 7/0). `loginom-host` — после
+Полные прогоны — на `8574c217a1` одной цепочкой, по одному пакету. Дальше `7695706bfb` и `30d8a5528e` меняют тест
+`server` и фильтр преобразования инструментов (сужение: только инструменты с допуском без `codemode: false`; в тестах
+`core`, `cli`, `sdk` таких имён нет); на `30d8a5528e` повторены `server` целиком — 134 pass, 1 skip, 0 fail —
+и `loginom-agent` — 6 / 0. `loginom-host` — после
 `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` Node 24.19.0, с `LOGINOM_AI_AGENT_TEST_NODE`, под
 `xvfb-run -a`.
 
@@ -3216,6 +3271,10 @@ $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
 
 ### Найдено, не чинил
 
+- Хук `prompt` выдаёт допуск до приёма промпта. Если промпт затем не принят (например, до B2.4 навыка
+  `loginom-automation` в каталоге нет и подготовка падает с `SkillNotFoundError`), допуск остаётся до следующего
+  промпта. Вызвать это может только клиент.
+
 - До B2.4 навык из `.agents`, `.claude` или проекта с ID `loginom-automation` даст допуск: ID навыков продукта держит
   только B2.4 (G6).
 - Сервер MCP с именем `loginom` даст инструменты `loginom_*`: шлюз считает их инструментами Loginom (видны только
@@ -3235,5 +3294,8 @@ $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
   из исходников в тестах.
 - Настоящая модель: модель — `TestLLM` по сценарию; что агент сам загружает навык продукта, когда нужен Loginom, —
   дело текста навыка (B2.4) и подсказки (B2.3, B2.5d).
-- Настоящие инструменты Loginom и Host — заглушки (B2.5); фильтр в хуке `compaction` тестом не покрыт (сжатие истории не
-  вызывалось); инструменты MCP и выполняемые провайдером не проверялись.
+- Настоящие инструменты Loginom и Host — заглушки (B2.5); инструменты MCP и выполняемые провайдером не проверялись.
+- Тесты других пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), не запускались.
+- Правила сессии через HTTP `PATCH /api/session/:id` не отправлялись — только через сервис.
+- База приёмки — `93b90a5daa`. `oc2-migration` с тех пор ушла вперёд (B3.1, `05957cf699`, тот же журнал): при слиянии
+  разделы журнала столкнутся.
