@@ -3228,6 +3228,9 @@ $ cd packages/loginom-agent && bun run typecheck:tsc      # tsc --noEmit — к�
 $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
 ```
 
+`bun run check` повторён на `64fe2e93a7` (код как в `30d8a5528e`): код 0, `Found 517 warnings and 0 errors`, 39/39 задач;
+у новых файлов предупреждений oxlint нет.
+
 ### Где решал сам
 
 - **Допуск живёт до следующего промпта, а не до конца выполнения (как в spike).** Пробуждение по расписанию приходит
