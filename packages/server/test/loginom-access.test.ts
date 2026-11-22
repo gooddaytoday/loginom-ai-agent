@@ -19,16 +19,18 @@ import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
-import { tempGlobalLayer } from "../../core/test/fixture/global"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
+import { pluginsLoaded } from "./fixture/routes"
 
 // Loginom access grants and the tool gate of the built-in product plugin `loginom.product` (guarantee G1, stage B2.2),
 // on a real server with a scripted model. The spike S1 paths: a direct call, a call from CodeMode `execute`, a subsession,
 // a scheduled wake and the granted control. Loginom tools arrive in B2.5, so a harness plugin registers stand-ins with
-// the same names and rules, plus the bundled product skills (B2.4) and a Hub skill. A user message carries its script
-// as `SCRIPT<json>SCRIPT`: one entry per step (model call).
+// the same names and rules, plus a Hub skill. The bundled product skills come from a verified resource catalog, as in an
+// installation (B2.4); its verifier needs `npm ci` in `packages/loginom-runtime/client`. A user message carries its
+// script as `SCRIPT<json>SCRIPT`: one entry per step (model call).
 
 // A `gated` tool call streams only after the test opens the gate; its step keeps the tools it was offered.
 type Step = { tool: string; input?: unknown; gated?: boolean } | { text: string }
@@ -38,13 +40,62 @@ const probe = "loginom_probe"
 // real one-second wake: about 1–2 s each locally, too close to the server package's 5 s default on a loaded runner.
 const timeout = 30_000
 const denied = "LOGINOM_SCOPE_DENIED"
+const bundled = ["loginom-automation", "package-docs", "loginom-dashboard"]
 
 type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 
-const boot = (extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void) =>
+// The bundled catalog under `LOGINOM_AI_AGENT_RESOURCES`: verified, damaged after its manifest was written, or not set.
+type Catalog = "verified" | "damaged" | "missing"
+// `sources` turns on OpenCode's project and `.claude` skill roots. `files`, relative to the project directory, are
+// written before the server starts; the profile lives under `global/config` there and the home directory under `home`.
+type Options = { catalog?: Catalog; sources?: boolean; files?: Record<string, string> }
+
+const boot = (
+  extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
+  options: Options = {},
+) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-access-")).path
     const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
+    const resources = path.join(dir, "resources")
+    const global = path.join(dir, "global")
+    yield* Effect.promise(async () => {
+      const files = {
+        ...Object.fromEntries(
+          bundled.map((name) => [
+            `resources/skills/${name}/SKILL.md`,
+            `---\nname: ${name}\ndescription: Bundled ${name}.\n---\n\nBUNDLED ${name}\n`,
+          ]),
+        ),
+        // The Hub stand-in the harness plugin registers below.
+        "hub/loginom-automation/SKILL.md": "---\nname: Loginom automation from Hub\ndescription: Hub\n---\n\nHub\n",
+        ...options.files,
+      }
+      for (const [file, text] of Object.entries(files)) {
+        await fs.mkdir(path.dirname(path.join(dir, file)), { recursive: true })
+        await fs.writeFile(path.join(dir, file), text)
+      }
+      await Bun.write(
+        path.join(resources, "resource-manifest.json"),
+        JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
+      )
+      if (options.catalog === "damaged")
+        await fs.appendFile(path.join(resources, "skills/loginom-automation/SKILL.md"), "\nTAMPERED\n")
+    })
+    // The product plugin reads the catalog root when the Location activates, as the service does in an installation.
+    yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        const previous = process.env.LOGINOM_AI_AGENT_RESOURCES
+        if (options.catalog === "missing") delete process.env.LOGINOM_AI_AGENT_RESOURCES
+        else process.env.LOGINOM_AI_AGENT_RESOURCES = resources
+        return previous
+      }),
+      (previous) =>
+        Effect.sync(() => {
+          if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_RESOURCES
+          else process.env.LOGINOM_AI_AGENT_RESOURCES = previous
+        }),
+    )
     const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
     // Text answers the scripted model gave, as `<session> <text>`.
     const answered: string[] = []
@@ -64,30 +115,31 @@ const boot = (extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Sc
           // Schedules are on by default in the dev channel.
           app: { channel: "dev", version: "test" },
           database: { path: ":memory:" },
-          config: { project: false, claude: false },
+          config: options.sources ? {} : { project: false, claude: false },
           models: { fetch: false, snapshot: false },
           fs: { filewatcher: false, fff: false },
         },
         [
-          Global.node.replace(tempGlobalLayer),
+          // Home and profile live in the test directory, so the machine's own `~/.agents` and `~/.claude` stay out.
+          Global.node.replace(
+            Global.layerWith({
+              home: path.join(dir, "home"),
+              config: path.join(global, "config"),
+              data: path.join(global, "data"),
+              cache: path.join(global, "cache"),
+              state: path.join(global, "state"),
+              tmp: path.join(global, "tmp"),
+              bin: path.join(global, "bin"),
+              log: path.join(global, "log"),
+              repos: path.join(global, "repos"),
+            }),
+          ),
           llmClient.replace(Layer.succeed(LLMClient.Service, llm)),
           SessionRunnerModel.node.replace(
             Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
           ),
         ],
       ).pipe(Layer.provide(HttpServer.layerServices)),
-    )
-    const skills = path.join(dir, ".skills")
-    yield* Effect.promise(() =>
-      Promise.all(
-        ["loginom-automation", "package-docs", "hub-loginom-automation"].map(async (name) => {
-          await fs.mkdir(path.join(skills, name), { recursive: true })
-          await fs.writeFile(
-            path.join(skills, name, "SKILL.md"),
-            `---\nname: ${name}\ndescription: ${name}\n---\n${name}\n`,
-          )
-        }),
-      ),
     )
     const calls: string[] = []
     const prompts: { sessionID: string; skills: string[]; metadata?: Record<string, unknown> }[] = []
@@ -120,22 +172,17 @@ const boot = (extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Sc
               execute: () => Deferred.await(held).pipe(Effect.as({ output: "released", content: "released" })),
             })
           })
-          // The bundled product skills of B2.4 and a Hub skill that reuses a product name under its own ID.
+          // A Hub skill under its own ID; a product name itself belongs to the bundled catalog (G6).
           yield* ctx.skill.transform((editor) => {
-            for (const [id, name, folder] of [
-              ["loginom-automation", "loginom-automation", "loginom-automation"],
-              ["package-docs", "package-docs", "package-docs"],
-              ["hub.loginom-automation", "loginom-automation", "hub-loginom-automation"],
-            ])
-              editor.add(
-                Skill.Info.make({
-                  id: Skill.ID.make(id),
-                  name: Skill.Name.make(name),
-                  description: name,
-                  path: AbsolutePath.make(path.join(skills, folder, "SKILL.md")),
-                  content: name,
-                }),
-              )
+            editor.add(
+              Skill.Info.make({
+                id: Skill.ID.make("hub.loginom-automation"),
+                name: Skill.Name.make("Loginom automation from Hub"),
+                description: "Loginom automation from Hub",
+                path: AbsolutePath.make(path.join(dir, "hub/loginom-automation/SKILL.md")),
+                content: "Hub",
+              }),
+            )
           })
           // Runs before the product's hook, so it sees each admitted prompt as the client sent it.
           yield* ctx.session.hook("prompt", (event) =>
@@ -202,7 +249,17 @@ const boot = (extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Sc
         .requests()
         .pipe(Effect.map((all) => all.filter((request) => header(request) === sessionID && request.tools.length > 0)))
     const ran = (sessionID: Session.ID) => calls.filter((call) => call.startsWith(`${sessionID} `)).length
-    return { sessions, create, prompt, wizard, post, requests, ran, answered, prompts, held, gate }
+    // The skill catalog over HTTP, once the Location's plugins have loaded (the server does not wait for them).
+    const skills = pluginsLoaded(context, dir).pipe(
+      Effect.andThen(
+        Effect.promise(() =>
+          handler(new Request(`http://opencode.local/api/skill?location[directory]=${encodeURIComponent(dir)}`)),
+        ),
+      ),
+      Effect.flatMap((response) => Effect.promise(() => response.json())),
+      Effect.map((body) => Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Skill.Info) }))(body).data),
+    )
+    return { sessions, create, prompt, wizard, post, skills, requests, ran, answered, prompts, held, gate, resources }
   })
 
 describe("loginom.product access and tool gate (G1)", () => {
@@ -300,7 +357,7 @@ describe("loginom.product access and tool gate (G1)", () => {
         expect(names(after)).toContain(probe)
         expect(test.ran(agent)).toBe(1)
 
-        // A Hub skill with the product name grants nothing, attached by the user or loaded by the agent.
+        // A Hub skill grants nothing, attached by the user or loaded by the agent.
         const hub = yield* test.create("hub")
         yield* test.prompt(hub, script({ tool: probe }, { text: "end" }), ["hub.loginom-automation"])
         yield* test.prompt(
@@ -457,6 +514,128 @@ describe("loginom.product access and tool gate (G1)", () => {
         yield* test.sessions.wait(session)
         expect(test.ran(session)).toBe(0)
         expect(JSON.stringify((yield* test.requests(session))[1]?.messages)).toContain(denied)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+// Skill sources of `loginom.product` (guarantee G6, stage B2.4) and seam U3, the spike S3 cases. As in 0.4, every
+// OpenCode source keeps its ordinary skills; a product ID or name comes only from the bundled catalog. Each root holds an
+// impostor of every product name (and the obsolete `package_docs`), a lookalike that only takes the name, and one
+// ordinary skill.
+const roots = {
+  "home/.agents/skills": "home-agents",
+  "home/.claude/skills": "home-claude",
+  ".agents/skills": "project-agents",
+  ".claude/skills": "project-claude",
+  // The project config directory, named after the product in the fork.
+  ".loginom-ai-agent/skills": "project-config",
+  // The user's own skills in the profile.
+  "global/config/skills": "profile",
+  // `skills[]` of the project config.
+  configured: "configured",
+}
+const impostors = [...bundled, "package_docs"]
+const skillFile = (name: string, text: string) => `---\nname: ${name}\ndescription: ${text}\n---\n\n${text}\n`
+const sources = Object.fromEntries([
+  ...Object.entries(roots).flatMap(([root, tag]) => [
+    ...impostors.map((name) => [`${root}/${name}/SKILL.md`, skillFile(name, `IMPOSTOR ${tag}`)]),
+    [`${root}/${tag}-lookalike/SKILL.md`, skillFile("loginom-automation", `IMPOSTOR ${tag}`)],
+    [`${root}/${tag}-skill/SKILL.md`, skillFile(`${tag}-skill`, `Ordinary ${tag}`)],
+  ]),
+  ["loginom-ai-agent.json", JSON.stringify({ skills: ["configured"] })],
+])
+const product = (skill: Skill.Info) => impostors.includes(skill.id) || impostors.includes(skill.name)
+
+describe("loginom.product skill sources (G6) and direct skill activation (U3)", () => {
+  it.live(
+    "S3: only the bundled catalog supplies product skills, in the list, the system prompt and the grant; ordinary skills stay",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot(undefined, { sources: true, files: sources })
+        const listed = yield* test.skills
+        expect(listed.filter(product).map((skill) => [skill.id, skill.name, skill.path])).toEqual(
+          expect.arrayContaining(
+            bundled.map((name) => [name, name, path.join(test.resources, "skills", name, "SKILL.md")]),
+          ),
+        )
+        expect(listed.filter(product)).toHaveLength(bundled.length)
+        expect(JSON.stringify(listed)).not.toContain("IMPOSTOR")
+        expect(listed.map((skill) => skill.id).filter((id) => id.endsWith("-skill"))).toEqual(
+          expect.arrayContaining(Object.values(roots).map((tag) => `${tag}-skill`)),
+        )
+
+        // The model sees the same catalog, and the agent's load of the bundled skill grants access (decision 11).
+        const session = yield* test.create("sources")
+        yield* test.prompt(
+          session,
+          script({ tool: "skill", input: { id: "loginom-automation" } }, { tool: probe }, { text: "end" }),
+        )
+        const [first, second] = yield* test.requests(session)
+        for (const id of [...bundled, ...Object.values(roots).map((tag) => `${tag}-skill`)])
+          expect(system(first)).toContain(`<id>${id}</id>`)
+        expect(system(first)).not.toContain("IMPOSTOR")
+        expect(JSON.stringify(second.messages)).toContain("BUNDLED loginom-automation")
+        expect(JSON.stringify(second.messages)).not.toContain("IMPOSTOR")
+        expect(names(second)).toContain(probe)
+        expect(test.ran(session)).toBe(1)
+
+        // U3: while the grant holds, a direct activation through the API obeys the session's `skill` rules. A denied
+        // skill is 403, a skill the product dropped is 404, an allowed ordinary skill still activates (В-41).
+        yield* test.sessions.setPermissions({
+          sessionID: session,
+          permissions: [{ action: "skill", resource: "home-agents-skill", effect: "deny" }],
+        })
+        const activate = (id: string) =>
+          test
+            .post(`/api/experimental/session/${session}/skill`, { id, resume: false })
+            .pipe(
+              Effect.flatMap((response) =>
+                Effect.promise(() => response.text()).pipe(Effect.map((body) => ({ status: response.status, body }))),
+              ),
+            )
+        const forbidden = yield* activate("home-agents-skill")
+        expect(forbidden.status).toBe(403)
+        expect(JSON.parse(forbidden.body)).toMatchObject({ _tag: "ForbiddenError" })
+        for (const id of ["package_docs", "home-agents-lookalike"]) {
+          const missing = yield* activate(id)
+          expect(missing.status).toBe(404)
+          expect(JSON.parse(missing.body)).toMatchObject({ _tag: "SkillNotFoundError", skill: id })
+        }
+        expect((yield* activate("project-agents-skill")).status).toBe(204)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "an impostor loginom-automation grants nothing when the bundled catalog is damaged or missing",
+    () =>
+      Effect.gen(function* () {
+        for (const catalog of ["damaged", "missing"] as const) {
+          const test = yield* boot(undefined, { catalog, sources: true, files: sources })
+          const listed = yield* test.skills
+          expect(listed.filter(product)).toEqual([])
+          expect(listed.map((skill) => skill.id)).toContain(Skill.ID.make("home-agents-skill"))
+          // The agent cannot load it, the user cannot attach it, and the API cannot activate it.
+          const agent = yield* test.create("agent")
+          yield* test.prompt(
+            agent,
+            script({ tool: "skill", input: { id: "loginom-automation" } }, { tool: probe }, { text: "end" }),
+          )
+          const [, second] = yield* test.requests(agent)
+          expect(names(second)).not.toContain(probe)
+          expect(JSON.stringify(second.messages)).not.toContain("IMPOSTOR")
+          expect(test.ran(agent)).toBe(0)
+          expect(
+            yield* test
+              .prompt(agent, script({ tool: probe }, { text: "end" }), ["loginom-automation"])
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "Session.SkillNotFoundError" })
+          expect(
+            (yield* test.post(`/api/experimental/session/${agent}/skill`, { id: "loginom-automation", resume: false }))
+              .status,
+          ).toBe(404)
+        }
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

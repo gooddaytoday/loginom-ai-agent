@@ -20,6 +20,7 @@ import {
   FormAlreadySettledError,
   FormInvalidAnswerError,
   FormNotFoundError,
+  ForbiddenError,
   InvalidCursorError,
   InvalidRequestError,
   MessageNotFoundError,
@@ -388,7 +389,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           resume: Schema.Boolean.pipe(Schema.optional),
         }),
         success: HttpApiSchema.NoContent,
-        error: [SessionNotFoundError, SkillNotFoundError],
+        error: [SessionNotFoundError, SkillNotFoundError, ForbiddenError],
       })
         .middleware(sessionLocationMiddleware)
         .annotateMerge(

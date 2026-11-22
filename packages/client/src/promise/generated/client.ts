@@ -1103,7 +1103,7 @@ export function make(options: ClientOptions) {
               path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/skill`,
               body: { id: input["id"], resume: input["resume"] },
               successStatus: 204,
-              declaredStatuses: [400, 401, 404],
+              declaredStatuses: [400, 401, 403, 404],
               empty: true,
             },
             requestOptions,

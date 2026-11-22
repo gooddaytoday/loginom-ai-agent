@@ -2,7 +2,8 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
-import { verifyBundledSkills } from "../src/bundled-skills"
+import { productSkills, verifyBundledSkills } from "../src/bundled-skills"
+import { reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 async function fixture(files: Record<string, string>) {
@@ -127,4 +128,22 @@ test("a skill revision is unaffected by changes in a different skill or manifest
   expect(after.find((skill) => skill.name === "package-docs")?.digest).not.toBe(
     before.find((skill) => skill.name === "package-docs")?.digest,
   )
+})
+
+test("product skills carry their description and body, and come only from a complete verified catalog", async () => {
+  const files = Object.fromEntries(
+    reservedSkillNames.map((name) => [
+      `${name}/SKILL.md`,
+      `---\nname: ${name}\ndescription: >-\n  Folded\n  ${name}.\n---\n\n# ${name}\n`,
+    ]),
+  )
+  await using resource = await fixture(files)
+  const skills = await productSkills(resource.root)
+  expect(skills.map((skill) => [skill.name, skill.description, skill.content, skill.location]).toSorted()).toEqual(
+    reservedSkillNames
+      .map((name) => [name, `Folded ${name}.`, `\n# ${name}\n`, join(resource.root, "skills", name, "SKILL.md")])
+      .toSorted(),
+  )
+  await using partial = await fixture({ "package-docs/SKILL.md": files["package-docs/SKILL.md"] })
+  await expect(productSkills(partial.root)).rejects.toThrow("LOGINOM_PRODUCT_SKILLS_INCOMPLETE")
 })
