@@ -18,7 +18,9 @@ export const Parameters = Schema.Union([
   Schema.Struct({
     operation: Schema.Literal("emit"),
     lgp: Schema.String,
-    format: Schema.optional(Schema.Literals(["pdf", "docx", "md"])),
+    // 0.4 had `Schema.optional`. OpenCode 2 offers such a key to the model as nullable, yet its input check refuses
+    // `null`; `optionalKey`, as OpenCode's own tools use, shows the model 0.4's plain enum.
+    format: Schema.optionalKey(Schema.Literals(["pdf", "docx", "md"])),
   }),
 ])
 

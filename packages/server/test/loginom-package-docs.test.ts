@@ -364,17 +364,33 @@ describe("package_docs_run (B2.5c)", () => {
     timeout,
   )
 
+  // 0.4 replayed the compacted prompt with its attachment, which kept authorizing the file. OpenCode 2 keeps the recent
+  // tail beside the summary as text only (`metadata.keepID`), so after a completed compaction the session's context
+  // starts at the summary and the attachment no longer authorizes: the call asks again. Restoring 0.4 is B2.5d
+  // (attachments through the `compaction` hook).
   it.live(
-    "a compaction preserves the visible original attachment's read authorization",
+    "after a completed compaction the attachment must request fresh read permission (0.4 kept it through a replay)",
     () =>
       Effect.gen(function* () {
         const test = yield* boot
-        const ctx = yield* test.prepare({ attachment: pathToFileURL(fixture).href })
+        const ctx = yield* test.prepare({
+          attachment: pathToFileURL(fixture).href,
+          permissions: [
+            { action: "external_directory", resource: "*", effect: "allow" },
+            { action: "read", resource: "*", effect: "ask" },
+            { action: "edit", resource: "*", effect: "allow" },
+          ],
+        })
         yield* test.sessions.compact({ sessionID: ctx.sessionID })
         yield* test.sessions.wait(ctx.sessionID)
-        const output = yield* test.execute({ operation: "extract", lgp: fixture }, ctx)
-        expect(yield* exists(output.structure)).toBe(true)
-        expect(actions(test.asked(ctx.sessionID))).toEqual(["edit"])
+        const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
+        expect(history[0]).toMatchObject({ type: "compaction", status: "completed" })
+        expect(history.some((item) => item.type === "user")).toBe(false)
+        const fiber = yield* test.run({ operation: "extract", lgp: fixture }, ctx).pipe(Effect.forkScoped)
+        const request = yield* test.reply(ctx.sessionID, "reject")
+        expect(request.action).toBe("read")
+        expect(yield* Fiber.join(fiber)).toBeInstanceOf(Permission.DeclinedError)
+        expect(yield* exists(path.join(test.dir, ".work"))).toBe(false)
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -1108,8 +1124,8 @@ describe("package_docs_run (B2.5c)", () => {
           "todowrite",
           "write",
         ])
-        // 0.4's input schema as OpenCode 2 converts it: the same three variants, with `additionalProperties: false` and
-        // the optional `format` as nullable instead of 0.4's `$schema` and plain enum (journal, B2.5c).
+        // 0.4's input schema as OpenCode 2 converts it: the same three variants and plain `format` enum, with
+        // `additionalProperties: false` and without 0.4's `$schema` (journal, B2.5c).
         const variant = (operation: string, format?: object) => ({
           type: "object",
           properties: { operation: { type: "string", enum: [operation] }, lgp: { type: "string" }, ...format },
@@ -1124,9 +1140,7 @@ describe("package_docs_run (B2.5c)", () => {
             anyOf: [
               variant("extract"),
               variant("skeleton"),
-              variant("emit", {
-                format: { anyOf: [{ type: "string", enum: ["pdf", "docx", "md"] }, { type: "null" }] },
-              }),
+              variant("emit", { format: { type: "string", enum: ["pdf", "docx", "md"] } }),
             ],
           },
         })
@@ -1140,6 +1154,9 @@ describe("package_docs_run (B2.5c)", () => {
 })
 
 function respond(request: LLMRequest) {
+  // A compaction completes only with a summary in its template.
+  if (request.messages.some((message) => text(message).includes("You MUST summarize the conversation above")))
+    return TestLLM.text("## Objective\n- Document the attached package.", "text_summary")
   // Titles and other tool-less requests get plain text.
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))
   if (user < 0 || request.tools.length === 0) return TestLLM.text("ok", "text_ok")
