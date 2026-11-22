@@ -137,6 +137,27 @@ describe("LegacyMigrate", () => {
     expect(expectPartsMigrated(older, target)).toBe(25)
   })
 
+  test("two migrations of one database at once run one after the other", async () => {
+    // Two server starts, or a start and `migrate`, can reach the same 0.4 database together.
+    await using dir = await tmpdir("loginom-migrate-")
+    const source = path.join(dir.path, "loginom-ai-agent.db")
+    const backup = path.join(dir.path, "loginom-ai-agent.v1-backup.db")
+    await restoreLegacy("0.4", source)
+    const original = await hash(source)
+
+    const exits = await Promise.all([
+      migrate({ source, target: source, backup }),
+      migrate({ source, target: source, backup }),
+    ])
+
+    expect(exits.map((exit) => (Exit.isSuccess(exit) ? exit.value.status : failure(exit))).sort()).toEqual([
+      "already-migrated",
+      "migrated",
+    ])
+    expect(await hash(backup)).toBe(original)
+    expect(rows(source, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 3 }])
+  })
+
   test("an OpenCode 2 database at its own path has nothing to migrate", async () => {
     // A profile without 0.4 data: once the server has created the database, later runs must still succeed.
     await using dir = await tmpdir("loginom-migrate-")

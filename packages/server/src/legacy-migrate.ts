@@ -18,6 +18,7 @@ import { SessionMessage } from "@opencode/core/session/message"
 import { SessionSchema } from "@opencode/core/session/schema"
 import { SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { ProjectID } from "@opencode/schema/project-id"
+import { Flock } from "@opencode/util/flock"
 import type { Global } from "@opencode/util/global"
 
 export type Input = {
@@ -88,6 +89,15 @@ export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Se
     const source = path.resolve(input.source)
     const target = path.resolve(input.target)
     const backup = path.resolve(input.backup)
+    // One migration of a database at a time: two server starts, or a start and `migrate`, otherwise share the
+    // temporary file and the second start may open a half-built database. The state is read again under the lock.
+    yield* Effect.acquireRelease(
+      Effect.tryPromise({
+        try: (signal) => Flock.acquire(target, { dir: path.dirname(target), signal }),
+        catch: (error) => describe(`cannot lock ${target}`, error),
+      }),
+      (lease) => Effect.promise(() => lease.release()),
+    )
     const existing = existsSync(target)
       ? yield* readOnly(sqlite.Database, target, (db) => ({ next: isNext(db), done: marker(db, source) }))
       : undefined
@@ -118,7 +128,7 @@ export function run(input: Input): Effect.Effect<Result, MigrateError, Global.Se
       moveDatabase(destination, target)
     }
     return { status: "migrated" as const, summary }
-  }).pipe(Effect.catchCause(failWith("migrate failed")))
+  }).pipe(Effect.scoped, Effect.catchCause(failWith("migrate failed")))
 }
 
 function copy(
