@@ -11,12 +11,12 @@ import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
 
 // The CLI build replaces this with its release channel; running from source leaves it undefined.
-declare const OPENCODE_CHANNEL: string
+declare const LOGINOM_AI_AGENT_CHANNEL: string
 
 // Fork (CAT-13): the product keeps data, config, state, logs and the service registration under its own name, one
 // directory per product channel (`productSlug`): the stable build (`latest`) is prod, beta is beta, any other build
 // and a source run are dev. Desktop looks for the registration in the directory of its own channel.
-const build = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : undefined
+const build = typeof LOGINOM_AI_AGENT_CHANNEL === "string" ? LOGINOM_AI_AGENT_CHANNEL : undefined
 const app = productSlug(productChannel(build === "latest" ? "prod" : build))
 const { data, cache, config, state, tmp } = roots(app)
 

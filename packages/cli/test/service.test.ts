@@ -759,7 +759,7 @@ test("a failed service stays registered and owns the selected port until stopped
   await fs.mkdir(database)
   await fs.mkdir(path.join(root, "config", "loginom-ai-agent-dev"), { recursive: true })
   await fs.writeFile(path.join(root, "config", "loginom-ai-agent-dev", "service-local.json"), JSON.stringify({ port }))
-  const env = { ...serviceEnv(root), OPENCODE_DB: database }
+  const env = { ...serviceEnv(root), LOGINOM_AI_AGENT_DB: database }
   const command = [process.execPath, path.join(import.meta.dir, "../src/index.ts"), "serve", "--service"]
   const registration = path.join(root, "state", "loginom-ai-agent-dev", "service-local.json")
   const owner = Bun.spawn(command, { env, stderr: "pipe", stdout: "ignore" })

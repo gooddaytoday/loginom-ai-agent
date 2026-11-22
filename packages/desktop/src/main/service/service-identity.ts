@@ -7,7 +7,7 @@ import { productChannel, productSlug } from "@loginom-ai-agent/product"
 // in packages/util). The build sets the channel to prod, beta or dev, as for the CLI it bundles (`latest` is prod).
 // Desktop always names the file: the client's default `service.json` knows no channel, and under an identity the
 // default file belongs to another product or profile running the same version.
-export const directory = productSlug(productChannel(import.meta.env.OPENCODE_CHANNEL))
+export const directory = productSlug(productChannel(import.meta.env.LOGINOM_AI_AGENT_CHANNEL))
 
 // Read at call time: the isolated development server moves XDG_STATE_HOME before it asks.
 export function serviceFile() {
@@ -22,7 +22,7 @@ function filename() {
   if (identity) return `service-${identity}.json`
 
   // The development server runs the CLI from source, whose channel is local.
-  if (process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") return "service-local.json"
+  if (process.env.LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL === "local") return "service-local.json"
 
   return "service.json"
 }

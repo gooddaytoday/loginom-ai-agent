@@ -45,16 +45,28 @@ describe("service-identity", () => {
     const identity = { LOGINOM_AI_AGENT_SERVICE_IDENTITY: "loginom-ai-agent-desktop" }
 
     const channels = [
-      { desktop: { OPENCODE_CHANNEL: "prod" }, cli: "latest", file: path.join("loginom-ai-agent", "service.json") },
-      { desktop: { OPENCODE_CHANNEL: "beta" }, cli: "beta", file: path.join("loginom-ai-agent-beta", "service.json") },
-      { desktop: { OPENCODE_CHANNEL: "dev" }, cli: "dev", file: path.join("loginom-ai-agent-dev", "service.json") },
       {
-        desktop: { OPENCODE_CHANNEL: "dev", OPENCODE_DESKTOP_SERVER_CHANNEL: "local" },
+        desktop: { LOGINOM_AI_AGENT_CHANNEL: "prod" },
+        cli: "latest",
+        file: path.join("loginom-ai-agent", "service.json"),
+      },
+      {
+        desktop: { LOGINOM_AI_AGENT_CHANNEL: "beta" },
+        cli: "beta",
+        file: path.join("loginom-ai-agent-beta", "service.json"),
+      },
+      {
+        desktop: { LOGINOM_AI_AGENT_CHANNEL: "dev" },
+        cli: "dev",
+        file: path.join("loginom-ai-agent-dev", "service.json"),
+      },
+      {
+        desktop: { LOGINOM_AI_AGENT_CHANNEL: "dev", LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL: "local" },
         cli: undefined,
         file: path.join("loginom-ai-agent-dev", "service-local.json"),
       },
       {
-        desktop: { OPENCODE_CHANNEL: "prod", ...identity },
+        desktop: { LOGINOM_AI_AGENT_CHANNEL: "prod", ...identity },
         cli: "latest",
         env: identity,
         file: path.join("loginom-ai-agent", "service-loginom-ai-agent-desktop.json"),
@@ -132,7 +144,7 @@ async function cliServiceFile(root: string, channel: string | undefined, env: Re
   return output(
     [
       process.execPath,
-      ...(channel === undefined ? [] : ["--define", `OPENCODE_CHANNEL=${JSON.stringify(channel)}`]),
+      ...(channel === undefined ? [] : ["--define", `LOGINOM_AI_AGENT_CHANNEL=${JSON.stringify(channel)}`]),
       "-e",
       script,
       path.join(cli, "src/index.ts"),
@@ -150,7 +162,7 @@ async function cliServiceFile(root: string, channel: string | undefined, env: Re
       XDG_CONFIG_HOME: path.join(root, "config"),
       XDG_DATA_HOME: path.join(root, "data"),
       XDG_STATE_HOME: path.join(root, "state"),
-      OPENCODE_CONFIG_DIR: undefined,
+      LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
       LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
       LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
       ...env,

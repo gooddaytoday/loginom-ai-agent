@@ -4,9 +4,9 @@ import os from "os"
 import path from "path"
 
 // Contract (catalog CAT-13, packages/product/AGENTS.md): prod, beta and dev keep their data, config, state, cache, logs
-// and tmp apart. The CLI build bakes its release channel into OPENCODE_CHANNEL; the stable build (`latest`) is prod and
-// keeps the unsuffixed directory, every other build and a run from source is dev. Each row is a fresh process, as each
-// build is.
+// and tmp apart. The CLI build bakes its release channel into LOGINOM_AI_AGENT_CHANNEL; the stable build (`latest`) is
+// prod and keeps the unsuffixed directory, every other build and a run from source is dev. Each row is a fresh process,
+// as each build is.
 const channels = [
   { build: "latest", directory: "loginom-ai-agent" },
   { build: "prod", directory: "loginom-ai-agent" },
@@ -44,7 +44,7 @@ async function paths(root: string, build: string | undefined) {
   const child = Bun.spawn(
     [
       process.execPath,
-      ...(build === undefined ? [] : ["--define", `OPENCODE_CHANNEL=${JSON.stringify(build)}`]),
+      ...(build === undefined ? [] : ["--define", `LOGINOM_AI_AGENT_CHANNEL=${JSON.stringify(build)}`]),
       "-e",
       `const { Global } = await import("./src/global.ts")
        const { data, cache, config, state, log, tmp } = Global.Path
