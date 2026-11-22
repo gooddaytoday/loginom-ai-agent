@@ -3339,7 +3339,8 @@ Found 517 warnings and 0 errors.                                    # в нов�
 - **Без `resolveDirectory`.** Сессии из каталогов без git остаются в проекте `global`, как в v1. v2 переносит их в
   проект каталога, когда тот разрешается (`Worktree.Event.Resolved` в `core/src/session/projector.ts`). Так результат не
   зависит от того, есть ли каталог на диске в момент переноса. Вживую перенос в проект каталога не проверялся.
-  **Поправка B3.1b:** для каталогов без git это неверно, см. «Находка» в разделе B3.1b.
+  **Поправка B3.1b:** для каталогов без git это неверно, см. «Находка» в разделе B3.1b. Исправлено в B3.1c: проект
+  каталога ищется при переносе, как в `V1Migration.run`.
 - **Одна транзакция на весь профиль, временный файл и замена в конце.** Сбой не оставляет базы, которую служба
   приняла бы за готовую. Цена — память и время на больших профилях, см. «Не проверено».
 - **Имя копии** — `loginom-ai-agent.v1-backup.db`: формат бэкенда v1, общий для 0.3.9 и 0.4. Если копия уже есть,
@@ -3834,3 +3835,145 @@ Found 517 warnings and 0 errors.                                    # на ба�
 - Одновременный перенос службы и команды `migrate` — тот же `Flock`, но отдельно не гонялся. Гонялись два `serve`.
 - Сборка Node: проверка пропускается, дыра S4 остаётся.
 - Desktop: служба поднималась из CLI (`session list`), а не из окна приложения — B4.
+
+## B3.1c Проекты перенесённых сессий
+
+22.11.2026. Ветка `b31c-projects` от `oc2-migration` (`b060e252ff`, влит B3.1b), рабочее дерево `.claude/worktrees/b31`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0.
+Все коммиты — с хуком `pre-commit`.
+
+Задача — находка B3.1b. После переноса сессии 0.4 из каталогов без git оставались в проекте `global` и не попадали в
+список сессий своего каталога.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `57eb3bab54` `fix(server): give migrated sessions of a directory without git its own project` | `server/src/legacy-migrate.ts`, фикстуры и генератор, `restore.ts`, тесты `server` и `cli` | `clean` |
+| следующий | этот раздел, поправка в B3.1, строка CAT-12 в `catalog.md` | |
+
+### Как v2 показывает сессии каталога
+
+- `session list` (`cli/src/commands/handlers/session/list.ts`): `location.get` для текущего каталога, затем
+  `session.list({ project: location.project.id, parentID: null })`. Это сессии проекта, в который разрешается каталог.
+- `core/src/project.ts`, `resolve`, — как определяется проект:
+  - git: ID из remote, иначе из `.git/opencode` (прежний), иначе корневой коммит;
+  - без VCS: свой проект `Hash.fast("directory:" + каталог)` с `worktree` = каталог.
+
+  У каталога без git свой проект, а не `global`.
+- Сессии `global` переходят в проект каталога (`Worktree.Event.Resolved`) только у проектов с VCS:
+  `if (!project.vcs) return project` в `persist`.
+- В 0.4 (бэкенд v1) сессии каталога без git лежат в `global`. Сессии git-репозитория лежат под корневым коммитом,
+  и 0.4 пишет его же в `.git/opencode`: в фикстурах это `4bc6698a…` в обоих местах. v2 получает тот же ID.
+
+Итог: новая сессия v2 в каталоге без git попадает в проект каталога, а перенесённая оставалась в `global`. В
+git-репозитории без remote ID совпадает и без правки.
+
+### Что сделано
+
+`server/src/legacy-migrate.ts`, перед транзакцией записи. Кандидаты — сессии проекта `global` или неизвестного проекта,
+без рабочего пространства, с абсолютным каталогом; условия те же, что у `V1Migration.run`. Для каждого такого каталога
+один раз вызывается `Project.Service.resolve(<realpath>, { persist: false })`, как в `resolveDirectory` upstream:
+
+- функция скопирована, потому что она не экспортируется;
+- поиск идёт в отдельном файбере с пределом 5 с;
+- после первого тайм-аута остальные каталоги остаются в `global`;
+- любой сбой тоже оставляет сессию в `global`.
+
+В транзакции сначала пишется строка `project` (`id`, `worktree` = канонический каталог, `vcs`) через `onConflictDoNothing`,
+затем у сессии ставятся `project_id` и `path` найденного владельца.
+
+Слои: база цели (`Database.layer`), `Project.node` и `FSUtil.node` собираются через `AppNodeBuilder.build`, `Global` —
+от вызывающего, как в `core/test/v1-migration.test.ts`. Правка в общем `run`, поэтому её получают и `migrate`, и
+предохранитель службы. Каталога нет на диске в момент переноса — сессия остаётся в `global`, как в upstream.
+
+**Уже перенесённые базы не чинятся.** Код B3.1 и B3.1b не выпускался: `oc2-migration` не опубликован, сборок нет.
+Пользовательской базы с меткой переноса и сессиями в `global` не существует. Базу разработки можно перенести заново:
+вернуть копию на место (`loginom-ai-agent.v1-backup.db` → `loginom-ai-agent.db`) и запустить `migrate` или службу.
+Проверке при старте пришлось бы писать в рабочую базу при каждом запуске до появления отметки, и ей нужны свои
+тесты. Для нуля пользователей это не дёшево.
+
+### Фикстуры
+
+Перегенерированы тем же `generate.ts` (CLI 0.4 `a080f7725c` и 0.3.9 `v0.3.9`, Bun 1.4.3). В каждом профиле четыре
+сессии, 11 сообщений и 29 частей:
+
+- три прежние в `project` (каталог без git, проект `global`);
+- новая — в `repo`: git-репозиторий, проект `4bc6698a4d40d826198eb842ddb917e74942b1e4`.
+
+Корневой коммит `repo` делает `legacyDirectories` в `restore.ts`: фиксированные имя, почта, даты и сообщение, пустое
+дерево. Поэтому у коммита один и тот же хеш везде — в генераторе и в тестах, проверено во временном каталоге.
+`restoreLegacy(version, file, root)` переносит записанный корень `/tmp/loginom-fixture` в каталог теста (`directory`
+сессий, `worktree` проектов), чтобы параллельные прогоны не делили каталоги. Сканер секретов — `clean`, в дампах нет
+`/root`, `/home` и имён пользователей.
+
+### Тесты
+
+- `server/test/legacy-migrate.test.ts`, новый тест. Сессии `project` после переноса — в своём проекте, не `global`;
+  у проекта `worktree` = каталог, `vcs` = NULL. Сессия `repo` — в проекте, который ей дал 0.4.
+- `cli/test/legacy-guard.test.ts`, новый `test.each` для 0.4 и 0.3.9: `serve` на базе 0.4/0.3.9, затем для `project` и
+  `repo` — как `session list`:
+  - `GET /api/location` даёт проект каталога;
+  - `POST /api/session` создаёт новую сессию в этом каталоге;
+  - `GET /api/session?project=<проект>` возвращает ровно перенесённые сессии этого каталога и новую — 4 и 2.
+- В прежних тестах числа поменялись под новые фикстуры: 3 → 4 сессии, 9 → 11 сообщений, 25 → 29 частей.
+
+Мутация «без правки» (владелец не ставится, у сессии остаётся `projectID`):
+
+```text
+$ cd packages/server && bun test test/legacy-migrate.test.ts
+-     "project_id": "own",
++     "project_id": "global",
+-     "worktree": "/tmp/loginom-migrate-2Ve4EV/project",
++     "worktree": "/",
+(fail) LegacyMigrate > gives the sessions of a directory without git that directory's project, as OpenCode 2 does
+ 7 pass
+ 1 fail
+$ cd packages/cli && bun test --timeout 30000 test/legacy-guard.test.ts
+(fail) serve on a 0.3.9/0.4 database > lists 0.4 sessions in the session list of their own directory, next to a new session made there
+(fail) serve on a 0.3.9/0.4 database > lists 0.3.9 sessions in the session list of their own directory, next to a new session made there
+ 3 pass
+ 2 fail
+```
+
+### Приёмка
+
+База — `b060e252ff`: `cli` 414 / 9 / 0, `server` 141 / 1 / 0 (итог B3.1b; после него только документы). Итог — `57eb3bab54`,
+после него — только этот раздел, поправка в B3.1 и строка CAT-12.
+
+| Пакет | Команда | База | Итог |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 414 pass, 9 skip, 0 fail | 416 pass (+2 видимость в каталоге, 0.4 и 0.3.9), 9 skip, 0 fail |
+| `server` | `bun test` | 141 pass, 1 skip, 0 fail | 142 pass (+1 проект каталога), 1 skip, 0 fail |
+
+`core` и остальные пакеты не менялись. Устойчивость: `--rerun-each 5` — `server/test/legacy-migrate.test.ts` 40 pass /
+0 fail, `cli/test/legacy-guard.test.ts` вместе с `migrate.test.ts` 40 pass / 0 fail.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 430 divergent upstream files                  # как на базе: правки только в файлах форка
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                                     # код 0
+$ cd packages/server && bun run typecheck:tsc; cd ../cli && bun run typecheck:tsc   # код 0 у обоих
+$ bun run check                                                     # код 0
+Found 517 warnings and 0 errors.                                    # как на базе; в изменённых файлах предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Копия `resolveDirectory`, а не экспорт из upstream.** Экспорт — правка `core/src/database/v1-migration.bun.ts`
+  ради форка. Копия короткая; при обновлении сверяется с upstream по записи CAT-12.
+- **Пути фикстур переносятся в каталог теста.** Иначе тесты `cli` и `server` делили бы `/tmp/loginom-fixture`, а CI
+  гоняет их параллельно.
+- **Видимость git-сессии проверена без remote.** Если у репозитория есть remote, v2 возьмёт ID из него, а не из
+  корневого коммита 0.4. Тогда сессии перенесёт штатный `Worktree.Event.Resolved` (прежний ID из `.git/opencode`);
+  тестом это не покрыто.
+
+### Не проверено
+
+- Git-репозиторий с remote, Mercurial, пути Windows (`FSUtil.windowsPath`).
+- Каталог без git, которого не было на диске в момент переноса и который появился позже. Сессии остаются в `global`:
+  у проекта без VCS нет события, которое бы их забрало, как и у upstream после `V1Migration.run`.
+- Список сессий в окне Desktop: проверены запросы API, как их делает `session list`.
