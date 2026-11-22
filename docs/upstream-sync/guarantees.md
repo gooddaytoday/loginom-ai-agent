@@ -44,7 +44,9 @@ cd packages/dashboard && bun run test
 scripts/upstream-sync/selftest.sh
 ```
 
-Два шага, без которых прогон врёт (B1.1, B1.5):
+Три шага, без которых прогон врёт (B1.1, B1.5, checkpoint B1):
+
+- `npm ci` клиента `packages/loginom-runtime/client` закреплённым Node — до тестов `loginom-host`. У клиента свой npm-lockfile, `bun install` его не ставит. Без него на дереве v2 у `loginom-host` 16 ошибок загрузки (`Cannot find package 'yaml'`) и 52 падения из 379 тестов вместо 38 из 555.
 
 - `npm ci` шаблона `packages/dashboard/template` закреплённым Node — до тестов дашбордов. Без него на точке отсечения было 17 ложных падений (B1.1); на дереве v2 — 19 в `test:coverage:workers`, и скрипт `test` дальше не идёт (B1.7).
 - `LOGINOM_AI_AGENT_TEST_NODE` — путь к `bin/node` Node 24.19.0 для `loginom-host` и `dashboard`. Без неё `loginom-host` на дереве v2 даёт 205 падений вместо 38 (B1.5). В 0.4 то же требовалось набору пакета `opencode`: без неё 66 падений вместо 6 (B1.1); при переносе кода туда, где тесты запускают Node, переменную берут с собой.
