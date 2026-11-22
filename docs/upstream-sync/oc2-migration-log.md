@@ -1448,3 +1448,200 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
 - Сборка CLI до конца и офлайн-проверка Desktop+CLI.
 - `verify` не считает записи `rust-src` (`.tar.xz`) ни на одной ОС: их считает генератор, `verify` проверяет размер и sha256.
 - Rebuild/relink и юридический аудит. `status: incomplete` и `remaining` сохранены.
+
+## B1.4c Хранилища каналов prod, beta и dev
+
+22.11.2026. Ветка `b14c-channels` от `oc2-migration` (`4b65c9ba94`), рабочее дерево `.claude/worktrees/b14c`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`. `bun install --frozen-lockfile`: код 0, `.husky/_`
+появился, хук `pre-commit` срабатывал на каждом коммите. `apply-identity` не запускался (его гоняет B1.4a).
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `fb6a8e7401` `feat: keep prod, beta and dev storage in separate directories` | `util`, Desktop, манифесты, `bun.lock`, тесты | `clean` |
+| следующий `docs` | `catalog.md` (CAT-01, CAT-13), этот раздел | |
+
+### Способ и почему
+
+**Канал — существующая константа сборки `OPENCODE_CHANNEL`, правило — `productChannel` и `productSlug` из
+`@loginom-ai-agent/product` (новая зависимость `util`).**
+
+- Сборка CLI уже подставляет `OPENCODE_CHANNEL` во весь бандл (`cli/script/build.ts`, `vite.node.config.ts`); по ней
+  upstream уже выбирает имя БД и файл регистрации (`cli/src/version.ts`). `util/src/global.ts` читает ту же константу
+  тем же способом, что `version.ts` (`typeof … === "string"`). Нового ключа define и нового механизма нет; массовое
+  переименование `OPENCODE_*` (B1.4a) переименует define и чтение вместе.
+- Переменная окружения не годится. `Global` считает пути при импорте модуля, раньше любого кода CLI. Окружение
+  наследуют дочерние процессы: CLI из терминала Desktop взял бы канал Desktop. Пользователь мог бы перевести prod на
+  данные dev. Так было в 0.4 (`a080f7725c:packages/core/src/global.ts`, `LOGINOM_AI_AGENT_CHANNEL ?? "prod"`, задавал
+  Desktop). Но CLI 0.4 брал канал из константы сборки (`standalone.ts`, `InstallationChannel`, `local` → dev).
+- Зависимость `util → product` вместо литерала правила: правило каталога одно, в `product`. `product` своих
+  зависимостей не имеет, цикла нет. `bun run build` и `bun run typecheck:dist` в `packages/util` — код 0, TS6059 нет.
+  Desktop тоже берёт правило из `product` (`devDependencies`, пакет попадает в бандл main, как остальные workspace-пакеты).
+- Сведение канала сборки к каналу продукта: `latest` → `prod` в `util/src/global.ts`, дальше `productChannel` без
+  изменений: `prod`, `beta` — как есть, остальное — `dev`. Контракт `productChannel` не менялся. Desktop сворачивает
+  `latest` в `prod` и `local` в `dev` сам (`electron.vite.config.ts`), поэтому читает свою константу
+  `import.meta.env.OPENCODE_CHANNEL` прямо.
+- Запуск из исходников и любая сборка, кроме `latest`/`prod`/`beta`, — канал dev (`productChannel(undefined)`). Это
+  следствие правила продукта и совпадает с 0.4: CLI 0.4 сводил `local` к dev, Desktop разработки — тоже. Иначе окно
+  разработки (канал dev) разошлось бы со службой из исходников.
+
+| Сборка CLI (`OPENCODE_CHANNEL`) | Канал продукта | Каталог |
+|---|---|---|
+| `latest`, `prod` | prod | `loginom-ai-agent` |
+| `beta` | beta | `loginom-ai-agent-beta` |
+| `dev`, `next`, имя ветки, `local`, без константы (исходники) | dev | `loginom-ai-agent-dev` |
+
+### Правки файлов upstream
+
+| Файл | Строк против v2.3.0 (было после B1.3a) | Что |
+|---|---|---|
+| `util/src/global.ts` | +9 −1 (+3 −1) | константа сборки → `productSlug(productChannel(…))`; данные, конфиг, состояние, кэш, журналы, `tmp` |
+| `util/package.json` | +1 | `@loginom-ai-agent/product` в `dependencies` (CAT-01) |
+| `desktop/package.json` | +1 | `@loginom-ai-agent/product` в `devDependencies` (CAT-01) |
+| `bun.lock` | +2 | две строки зависимостей (CAT-01) |
+| `desktop/src/main/service/background-service.ts` | +2 −9 (+5 −3) | `const file = serviceFile()` вместо ветки `service-local.json`; лишний `Path.Path` убран |
+| `desktop/src/main/native/logging.ts` | +2 −1 (+6 −1) | журналы службы — из каталога канала |
+| `cli/script/service-smoke.ts` (CAT-02) | +12 −6 против `4b65c9ba94` | каталог собранного бинарника — по маске `loginom-ai-agent*`: канал задаёт сборка |
+
+Файл форка `desktop/src/main/service/service-identity.ts`: `directory` — каталог канала сборки Desktop;
+`serviceFile()` возвращает файл всегда: `service-<identity>.json`, `service-local.json` сервера разработки или
+`service.json`. Без identity (так будет до B4) окно раньше доходило до `fallback()` клиента, а клиент канала не знает:
+окно beta или dev ждало бы регистрацию в каталоге prod и через 120 с показало бы ошибку запуска сервера.
+`sidecar-probe.ts` не менялся — он уже передаёт `serviceFile()`.
+
+Тесты upstream с литералом `loginom-ai-agent` (B1.3a) запускают CLI из исходников и теперь ждут
+`loginom-ai-agent-dev`: `cli` — 8 файлов, `core/test/preload.test.ts` и пара к нему `core/script/test.ts`
+(`OPENCODE_CONFIG_DIR`), `server/test/fetch.test.ts`, `util/test/global.test.ts`. Три строки `cli` prettier перенёс.
+
+### Что от канала не зависит
+
+- **Системный каталог конфига и MDM** (`core/src/config/discovery.ts`) не менялись. В 0.4 они от канала не зависели
+  (`a080f7725c:packages/opencode/src/config/managed.ts`: `/etc/loginom-ai-agent`, `com.loginom.aiagent.managed`).
+  Меньший вариант — оставить: одна политика администратора действует на prod, beta и dev.
+- **`process-daemon`** не менялся. Продукт запускает его с `--runtime-dir <Global.state>/pty`
+  (`core/src/persistent-pty/index.ts`) — каталог канала приходит оттуда. Литерал в Rust — значение по умолчанию для
+  запуска без `--runtime-dir`. Имя сокета — хеш каталога, поэтому сокеты каналов не совпадают.
+- **`client/src/service-probe.ts` `fallback()`** не менялся: `service.json` каталога prod. Продукт его больше не
+  вызывает: CLI всегда передаёт `ServiceConfig.options().file`, Desktop — `serviceFile()`. Клиент — общий пакет без
+  канала. Зависимость `client → product` не добавлялась: по правилу `AGENTS.md` клиент зависит от Schema и Protocol.
+
+### Тесты
+
+Новые и изменённые тесты форка:
+- `packages/util/test/product-channel.test.ts` (новый): одна таблица, каждая строка — свой процесс
+  `bun --define OPENCODE_CHANNEL=…`. Сборки `latest`, `prod`, `beta`, `dev`, `next`, имя ветки и без константы. Данные,
+  кэш, конфиг, состояние, журналы и `tmp` лежат в своём каталоге, всего каталогов три, у prod суффикса нет.
+- `packages/desktop/src/main/service/service-identity.test.ts`: таблица пар «окно Desktop ↔ собранный с ним CLI»: prod ↔
+  `latest`, beta ↔ beta, dev ↔ dev, сервер разработки (dev + `OPENCODE_DESKTOP_SERVER_CHANNEL=local`) ↔ CLI из
+  исходников, prod ↔ `latest` под identity. `serviceFile()` окна равен файлу настоящего `ServiceConfig.options()` CLI в
+  общем корне, и путь — ожидаемый. Ожидания четырёх строк `serviceFile()` и проверки чужого `service.json` — в каталоге
+  dev: в тесте константы сборки нет.
+- `packages/cli/test/service-identity.test.ts` (B1.3a): каталог перенесённых файлов зависит от канала: `latest` — prod,
+  `preview-a` — dev. Службы из исходников — в `loginom-ai-agent-dev`.
+
+Мутации, каждая откатывалась:
+- `const app = "loginom-ai-agent"` в `util/src/global.ts` — падают `product-channel` и пары Desktop;
+- без `latest` → `prod` — падает `product-channel`;
+- литерал каталога в `service-identity.ts` — падают все шесть тестов Desktop;
+- без ветки `service-local.json` — падают пары Desktop.
+
+Полные наборы пакетов: `oc2-migration` (`4b65c9ba94`, отдельное чистое дерево в scratchpad) → `b14c-channels`
+(`fb6a8e7401`). Наборы шли по очереди, Bun 1.4.4, `LOGINOM_AI_AGENT_TEST_NODE` задан:
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `util` | `bun test` | 145 pass, 0 fail | 146 pass, 0 fail: +1 `product-channel` |
+| `client` | `bun test --timeout 5000` | 262 pass, 0 fail | 262 pass, 0 fail |
+| `desktop` | `bun test --timeout 30000` | 528 pass, 4 skip, 0 fail | 529 pass, 4 skip, 0 fail: +1 пары каналов |
+| `server` | `bun test` | 127 pass, 1 skip, 0 fail | то же |
+| `cli` | `bun test --timeout 30000` | 407 pass, 9 skip, 0 fail | то же |
+| `core` | `bun run script/test.ts` | 7118 pass, 354 skip, 3 fail | то же; падения те же: `ShellParse > extracts static directory targets…`, `util.effect-flock > fails on unwritable lock roots`, `util.flock > fails clearly on unwritable lock roots` (прогон под root) |
+| `product` | `bun test` | 56 pass, 5 fail | то же; те же пять `repo-paths` (B1.4, B5.1, B2.7a) |
+
+Тронутые файлы отдельно:
+
+```text
+$ cd packages/util && bun test test/product-channel.test.ts test/global.test.ts
+ 4 pass
+ 0 fail
+Ran 4 tests across 2 files. [946.00ms]
+$ cd packages/desktop && bun test src/main/service/service-identity.test.ts
+ 6 pass
+ 0 fail
+Ran 6 tests across 1 file. [1319.00ms]
+$ cd packages/cli && bun test --timeout 60000 test/service-identity.test.ts test/flag-identity.test.ts test/debug-paths.test.ts
+ 10 pass
+ 0 fail
+Ran 10 tests across 3 files. [11.20s]
+```
+
+Собранный CLI: доходит ли define до `util` в бандле. Сборка `beta` без веб-интерфейса, корень — временный каталог:
+
+```text
+$ cd packages/cli && OPENCODE_CHANNEL=beta bun run script/build.ts --single --skip-install --skip-web-ui --outdir=<tmp>/cli-beta
+building cli-linux-x64                                  # код 0
+$ env -i PATH=… HOME=<root> XDG_{DATA,CONFIG,STATE,CACHE}_HOME=<root>/… TMPDIR=<root>/tmp <tmp>/cli-beta/cli-linux-x64/bin/opencode debug paths
+data       <root>/data/loginom-ai-agent-beta
+cache      <root>/cache/loginom-ai-agent-beta
+config     <root>/config/loginom-ai-agent-beta
+state      <root>/state/loginom-ai-agent-beta
+tmp        <root>/tmp/loginom-ai-agent-beta
+log        <root>/data/loginom-ai-agent-beta/log
+db         <root>/data/loginom-ai-agent-beta/opencode.db
+$ … opencode --version
+opencode v0.0.0-beta-202611221116
+```
+
+`script/service-smoke.ts` на этом бинарнике (скопирован в `packages/cli/dist` и затем удалён). Регистрация нашлась в
+`state/loginom-ai-agent-beta`, прошли ожидание готовности, сокет MCP и обе проверки аутентификации по токену. Дальше
+падение `Compiled service did not serve the web UI` — веб-интерфейс в сборку не входил (`--skip-web-ui`). Журнал
+службы в выводе ошибки есть: маска нашла `data/loginom-ai-agent-beta/log/opencode.log`.
+
+### Проверки
+
+- `bun typecheck` в `util`, `desktop`, `cli` — 0 ошибок; в `util` ещё `bun run typecheck:tsc`, `bun run build` и
+  `bun run typecheck:dist` — код 0 (зависимость от `product` не ломает сборку `dist`).
+- `bun install --frozen-lockfile` после правки манифестов — `no changes`.
+- `python3 -I scripts/upstream-sync/catalog-check.py --summary` — код 0: 30 → 32 расходящихся файла, CAT-01 3 → 5
+  (`util/package.json`, `desktop/package.json`), CAT-13 — 10, CAT-12 — 11, без изменений.
+- `bun run check` из корня на `fb6a8e7401` — код 0: `oxlint` `Found 517 warnings and 0 errors`,
+  `Tasks: 38 successful, 38 total`, `Cached: 0 cached`. Предупреждения в изменённых файлах — только
+  `anti-slop(require-readable-spacing)` и `no-unknown-returns` в тесте Desktop (у теста B1.3a их было больше);
+  `service-identity.ts` — без предупреждений.
+- prettier по всем изменённым `.ts` — чисто.
+
+### Где решал сам
+
+- Канал — константа сборки, правило — из `product` через зависимость `util` (выше). Desktop тоже зависит от `product`.
+- `latest` → `prod` сводится в `util/src/global.ts`, а не в `productChannel`: контракт `product` без изменений.
+- Запуск из исходников — канал dev. Тесты upstream из исходников ждут `loginom-ai-agent-dev`.
+- Системный каталог, MDM, `process-daemon` и `fallback()` клиента от канала не зависят (выше). **Спорное:** одна политика
+  администратора на три канала. План B1.3b называл MDM для beta и dev задачей B1.4; сделано меньшее, как в 0.4.
+- `serviceFile()` Desktop теперь возвращает файл всегда, а не только под identity. Ветка `service-local.json` переехала
+  туда же из `background-service.ts`; пустой `XDG_STATE_HOME` там теперь, как у CLI, значит «не задан».
+- `service-smoke.ts` ищет каталог по маске, а не знает канал бинарника: канал задаёт CI.
+
+### Найдено, не чинил
+
+- **Порт.** Без identity службы всех каналов слушают порт канала upstream `0xc0de` (`ServiceConfig.defaultPort`).
+  Службы prod и beta одновременно: вторая не стартует («port … is already in use»). Чужую при этом не подхватывает.
+  Identity и явный порт задают B4 и B2.7c.
+- CLI, собранный с `OPENCODE_CHANNEL=prod`, пишет `service-prod.json`: upstream `ServiceConfig.filename` знает `latest`,
+  а не `prod`. Окно prod ищет `service.json`, в паре с CLI `latest`, как в `release.yml`. Сборку CLI с `prod` выбирает B5.
+- `product/src/dashboard-root.ts` берёт корень данных из `LOGINOM_AI_AGENT_CHANNEL ?? "prod"`: для beta и dev и для
+  запуска из исходников он разойдётся с `Global`. Вызовов на дереве нет, только тест `product`; связку дашбордов делает
+  B2.9.
+- `names.test.ts`, проверка `OPENCODE_*` (`test.failing` до B1.4): совпадений на 12 больше — `OPENCODE_CHANNEL` в
+  `util/src/global.ts`, `service-identity.ts` и тесте Desktop, `OPENCODE_DESKTOP_SERVER_CHANNEL` переехал. B1.4a
+  переименует их вместе с define в `cli/script/build.ts`, `vite.node.config.ts` и `electron.vite.config.ts`.
+
+### Не проверено
+
+- Windows и macOS: всё на Linux.
+- Окно Desktop под Electron и собранный Desktop: свёртку `latest` → prod и `local` → dev в `electron.vite.config.ts`
+  тест через окружение не доказывает, она проверена только чтением кода. Пары окна и CLI проверены подстановкой
+  константы окну через `import.meta.env` в Bun.
+- Собранный CLI — только `beta`. `latest` и `dev` — через `bun --define` в тестах. `service-smoke.ts` до конца не
+  прошёл: веб-интерфейс не собирался.
+- Две службы разных каналов одновременно не запускались (порт — выше).
