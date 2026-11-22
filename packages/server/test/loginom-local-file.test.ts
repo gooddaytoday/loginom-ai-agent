@@ -637,6 +637,103 @@ describe("loginom local file admission (B2.5a)", () => {
   )
 
   it.live(
+    "a rejection with feedback fails with the file and the next step; a plain rejection stays the decline that ends the step",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        // The build agent asks before reading `*.env`; without session rules the read waits for the user.
+        const file = test.dir + "/secret.env"
+        yield* Effect.promise(() => fs.writeFile(file, "TOKEN=x\n"))
+        const answer = (message?: string) =>
+          Effect.gen(function* () {
+            const ctx = yield* test.call(yield* test.create([]))
+            const pending = test.files.authorize(file, ctx).then(
+              () => undefined,
+              (error: unknown) => error,
+            )
+            const request = yield* until(() =>
+              Effect.promise(() => test.plugin.permission.list({ sessionID: ctx.sessionID })).pipe(
+                Effect.map((requests) => requests[0]),
+              ),
+            )
+            expect(request.action).toBe("read")
+            yield* Effect.promise(() =>
+              test.plugin.permission.reply({
+                sessionID: ctx.sessionID,
+                requestID: request.id,
+                decision: "reject",
+                message,
+              }),
+            )
+            return yield* Effect.promise(() => pending)
+          })
+        const corrected = yield* answer("use the attached copy")
+        expect(corrected).toBeInstanceOf(Tool.Error)
+        expect((corrected as Tool.Error).error).toBeInstanceOf(Permission.CorrectedError)
+        expect(message(corrected)).toContain("LOGINOM_FILE_ACCESS_DENIED")
+        expect(message(corrected)).toContain("use the attached copy")
+        expect(message(corrected)).toContain(file)
+        expect(message(corrected)).toContain("через --file")
+        expect((corrected as Tool.Error).metadata).toEqual({ permissionDenied: true })
+        expect(yield* answer()).toBeInstanceOf(Permission.DeclinedError)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a stopped call admits nothing: before authorization, before reserving and after reserving a reference",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const source = test.dir + "/large.csv"
+        yield* truncate(source, limit + 1)
+        const stopped = new AbortController()
+        stopped.abort()
+        const idle = yield* test.call()
+        const before = yield* rejected(() => test.files.authorize(source, { ...idle, signal: stopped.signal }))
+        expect(before).toBeInstanceOf(DOMException)
+        expect(test.asked(idle.sessionID)).toEqual([])
+
+        // A stop while the user answers the read request: authorization completes, nothing is reserved.
+        const asking = new AbortController()
+        const reserving = new AbortController()
+        const reserved: string[] = []
+        const discarded: string[] = []
+        const host = {
+          reserveReference: async () => {
+            reserved.push("reserve")
+            reserving.abort()
+            return { grant: "grant" } as never
+          },
+          discardReference: async (grant: string) => {
+            discarded.push(grant)
+          },
+          admitReference: async () => {
+            throw Error("Must not admit a stopped call")
+          },
+        }
+        test.hooks.ask = async () => asking.abort()
+        const early = yield* test.call()
+        const first = yield* rejected(() =>
+          test.files.admitReference(source, { ...early, signal: asking.signal }, host, "msg_original"),
+        )
+        expect(message(first)).toContain("LOGINOM_UPLOAD_CANCELLED")
+        expect(reserved).toEqual([])
+
+        // A stop while the Host reserves: the grant is discarded.
+        test.hooks.ask = undefined
+        const late = yield* test.call()
+        const second = yield* rejected(() =>
+          test.files.admitReference(source, { ...late, signal: reserving.signal }, host, "msg_original"),
+        )
+        expect(message(second)).toContain("LOGINOM_UPLOAD_CANCELLED")
+        expect(reserved).toEqual(["reserve"])
+        expect(discarded).toEqual(["grant"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "the product's loginom_file_admit is hidden and rejected without the loginom-automation grant (G1 gate)",
     () =>
       Effect.gen(function* () {
