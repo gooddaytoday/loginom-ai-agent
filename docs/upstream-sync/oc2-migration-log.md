@@ -2844,7 +2844,9 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 |---|---|
 | `1c5a043fe6` `feat(core): register the loginom.product plugin as a guarded built-in (U1)` | пакет `packages/loginom-agent`, зависимость `core`, `bun.lock`, `core/src/plugin/{product,internal,supervisor}.ts`, тесты S8, `FORK_ONLY` в `product/test/names.test.ts`, CAT-07 и CAT-01 |
 | `4ffd31bbed` `feat(core): load only built-in server plugins in the product server` | запрет пакетов: `PluginProduct.Packages`, проверка в супервизоре, `ServerOptions.pluginPackages`, замена узла в `routes.ts`, `pluginPackages: false` в CLI; тесты `core` и `cli`; CAT-07 |
-| следующий | этот раздел |
+| `a8101b8738` `docs(upstream-sync): record B2.1 plugin scaffold, U1 and built-in-only plugins` | этот раздел (первая версия) |
+| `19dcfa34c1` `test(core): reject a plugin-directory package in the product server` | файл в каталоге `plugins/` конфига в тесте запрета; проверка маркера самозванца — «есть `imported`, нет `setup`» |
+| следующий | уточнения этого раздела и CAT-07 |
 
 ### Что сделано
 
@@ -2889,9 +2891,9 @@ CAT-09. Новые файлы форка: `packages/loginom-agent/**`, `core/src
 
 | Тест | Режим | Что проверяет |
 |---|---|---|
-| самозванец с `id: "loginom.product"` из конфига (S8) | пакеты разрешены (умолчание OpenCode) | встроенный `active` с `source: builtin`; пакет `failed: Plugin ID is reserved…`; маркер самозванца — только `imported`, `setup` не выполнялся |
+| самозванец с `id: "loginom.product"` из конфига (S8) | пакеты разрешены (умолчание OpenCode) | встроенный `active` с `source: builtin`; пакет `failed: Plugin ID is reserved…`; в маркере самозванца есть `imported`, нет `setup` |
 | `-loginom.product`, `-loginom.*`, `-*` (S8) | как в продукте | плагин продукта `active`; соседнее удаление `-opencode.config.agent` применилось (конфиг прочитан); последний активный плагин — `loginom.product` |
-| сторонний пакет из конфига | как в продукте | локальный и npm-пакет — `failed: Plugin packages are disabled…`; маркер пуст (модуль не импортирован); вызовов npm нет |
+| сторонний пакет из конфига и из каталога плагинов | как в продукте | файл `.loginom-ai-agent/plugins/discovered.ts` (клонированный проект, конфиг не правится), локальный пакет из `plugins` и npm-имя — `failed: Plugin packages are disabled…`; маркер пуст (модули не импортированы); вызовов npm нет |
 | встроенные провайдеры | как в продукте | все id из `ProviderPlugins`, `opencode.models.dev`, `opencode.provider.dynamic` активны; отдельно названы `chatgpt`, `openai`, `github.copilot`, `opencode`, `claude-agent`, `ollama`, `lmstudio`, `vllm` |
 
 Самозванец S8 проверяется при разрешённых пакетах: при запрете пакет отклоняется раньше, и проверка зарезервированного id
@@ -2905,7 +2907,7 @@ CAT-09. Новые файлы форка: `packages/loginom-agent/**`, `core/src
 
 ### Мутации
 
-Финальный код, файл подменялся `perl` и возвращался из копии; `core` — `bun run script/test.ts test/plugin/product.test.ts`,
+Код `4ffd31bbed`, файл подменялся `perl` и возвращался из копии; `core` — `bun run script/test.ts test/plugin/product.test.ts`,
 `cli` — `bun test --timeout 60000 test/builtin-plugins.test.ts`:
 
 ```text
@@ -2917,6 +2919,10 @@ CAT-09. Новые файлы форка: `packages/loginom-agent/**`, `core/src
 === M5 CLI without pluginPackages: false      cli 0 pass 1 fail
 === M6 test without key login                 cli 0 pass 1 fail: запросы к провайдеру без ключа
 ```
+
+После `19dcfa34c1` тест запрета проверяет и каталог `plugins/`; M4 его по-прежнему краснит (без проверки файл
+импортируется). Устойчивость: `--rerun-each 10` — `core/test/plugin/product.test.ts` 60 pass / 0 fail,
+`cli/test/builtin-plugins.test.ts` 10 pass / 0 fail.
 
 M1 повторяет базу S8 из spike: самозванец `active` с `source: local`, встроенный —
 `failed: Duplicate plugin ID: loginom.product`.
@@ -2936,7 +2942,9 @@ M1 повторяет базу S8 из spike: самозванец `active` с `
 
 ### Приёмка
 
-| Пакет | Команда | База (B1, журнал) | После `4ffd31bbed` |
+Полные прогоны — на `19dcfa34c1` (код окончательный; после него только документы), одной цепочкой, по одному пакету:
+
+| Пакет | Команда | База (B1, журнал) | `19dcfa34c1` |
 |---|---|---|---|
 | `core` | `bun run script/test.ts` | 7119 pass, 354 skip, 3 fail | 7125 pass (+6 новых), 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (прогон под root) |
 | `cli` | `bun test --timeout 60000` | 407 pass, 9 skip, 0 fail | 408 pass (+1 новый), 9 skip, 0 fail |
@@ -2944,12 +2952,16 @@ M1 повторяет базу S8 из spike: самозванец `active` с `
 | `sdk` | `bun run test` | 40 / 0 | 40 / 0 |
 | `product` | `bun test` | 58 pass, 3 fail (`repo-paths`, В-95) | 58 pass, 3 fail — те же |
 
-`core` на состоянии первого коммита (до запрета): 7123 pass, 354 skip, 3 fail — те же три. Typecheck (`bun run typecheck`):
-`core` 1986 файлов, `server` 1573, `cli` 2142, `sdk` 1577, `loginom-agent` 173 — без ошибок.
+Промежуточные прогоны: `core` на первом коммите (до запрета) — 7123 pass, 354 skip, 3 fail. Все пять пакетов на рабочем
+дереве перед вторым коммитом (до смены ключа узла на `@opencode/` и до теста каталога `plugins/`) дали те же числа,
+кроме `product`: 55 pass, 6 fail. Три новых падения `package names` имели две причины: новый пакет вне `FORK_ONLY` и
+ключ `@loginom-ai-agent/…`. `FORK_ONLY` исправлен в первом коммите (amend до публикации), ключ — во втором.
 
-Числа `server` и `sdk` в таблице — после переименования поля в `pluginPackages` (первое имя `plugins: { packages }`
-столкнулось с полем `plugins` в `sdk/src/internal/host.ts`, `CreateOptions extends Omit<ServerOptions, …>`: typecheck
-`sdk` дал TS2430).
+Первое имя поля, `plugins: { packages }`, совпало с полем `plugins` в `sdk/src/internal/host.ts`
+(`CreateOptions extends Omit<ServerOptions, …>`), и typecheck `sdk` дал TS2430. Поле переименовано в `pluginPackages`.
+
+Typecheck на `19dcfa34c1`: `bun run typecheck` — `core` 1986 файлов, `server` 1573, `cli` 2142, `sdk` 1577,
+`loginom-agent` 173, без ошибок. `bun run typecheck:tsc` (`tsc`): `core`, `server`, `cli`, `loginom-agent` — код 0.
 
 ```text
 $ python3 scripts/upstream-sync/catalog-check.py
@@ -2963,7 +2975,11 @@ Found 517 warnings and 0 errors.                          # как в B1.8; у �
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 @loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 173 files
  Tasks:    39 successful, 39 total
+$ bun run secrets range 56fe41abdb HEAD                  # на 19dcfa34c1
+{"status":"clean","commits":4,…}
 ```
+
+`bun run check` запускался на `4ffd31bbed`; в `19dcfa34c1` изменился только тест, его typecheck и `tsc` выше.
 
 ### Где решал сам
 
@@ -2994,7 +3010,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Отклонённый npm-пакет остаётся целью проверки обновлений (`PluginUpdate.check`, у записи `source.type: "package"`).
   `Npm.check` отвечает `Package is not installed` до сети, но в журнал на каждую активацию пишется
-  `failed to check plugin update`. Сетевых обращений нет — по коду `util/src/npm.ts`, перехватом трафика не проверял.
+  `failed to check plugin update`. Что сети нет — только для этой фоновой проверки и только по коду `util/src/npm.ts`,
+  перехватом трафика не проверял. Что делает ручной `POST /api/plugin/update` для отклонённой цели — не смотрел.
 - `cli/src/server-process.ts` не отформатирован prettier ещё на базе: строки, удлинённые `apply-identity`. Мои строки
   формат не меняют.
 - B1.7 предлагал проверить в B2.1 исправления 0.4 в `provider/transform.ts`, кодах OAuth и WebSocket через прокси.
