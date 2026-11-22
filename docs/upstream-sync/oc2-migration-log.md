@@ -1562,6 +1562,15 @@ $ git show --shortstat 656428d33a      # повторный прогон пос�
 | `strobe.json`, `desktop/perf/startup.bench.ts` | `OPENCODE_DB`, `OPENCODE_CONFIG_DIR`, `OPENCODE_TEST_HOME` и др. | ручная задача Р-12 |
 | `cli/test/flag-identity.test.ts` | унаследованные `OPENCODE_*` | так задумано (`EXCLUDED`) |
 
+Остаточный просмотр на `99b6395761`, по файлам, которые берёт скрипт, без усечения: каждое `.opencode` после
+допустимого символа и каждое `OPENCODE_` без границы слова, кроме URL, путей `assets/` и списка оставленных имён.
+`.opencode` осталось в 8 местах: класс CSS `.opencode-pierre-file-tree`, служебные файлы `.opencode-probe`
+(`core/src/git.ts`) и `.opencode-version` (`core/src/skill/discovery.ts`, пишет и читает сам) — бренд, к Р-14;
+фикстура `.opencode-test-missing`; id пакета winget upstream `anomaly\.opencode_` и хост `console\.opencode\.ai` —
+так и надо; конец фразы в комментарии `formatter.test.ts`. `OPENCODE_` без границы — только `VITE_OPENCODE_*`
+(43 места: переменные сборки веб-приложения, задаёт и читает покрытый код) — не трогались. Правило менять не
+пришлось.
+
 Не пары: `turbo.json` (`OPENCODE_DISABLE_SHARE` никто не читает), `app/perf/tabs.bench.ts` (`OPENCODE_PERF_SESSION`
 задаёт и читает сам), тестовые `OPENCODE_PTY_*` в `process-daemon/tests`, `sdks/vscode` (`OPENCODE_CALLER` в v2 не
 читается), `patches/install-korean-ime-fix.sh`.
@@ -1746,7 +1755,8 @@ differs from packages/gui-plugins/src/pairing/main.ts at its line 24`. README п
   В-94 было про сторонние исходники, здесь — код upstream, который форк изменил. Отпечатки без коммита, чтобы
   действовали и в `staged`, и в `range`; цена — такой отпечаток пропустит любое новое совпадение того же правила в той
   же строке файла, а не только разобранное значение. Настоящий путь разработчика upstream не исключал: файл не трогает
-  скрипт. **Спорное**, для владельца.
+  скрипт. **Нужно решение владельца до публикации:** PR-проверка берёт исключения из базовой ветки, поэтому блок
+  должен попасть в `loginom` раньше PR переноса, как закрепление В-93; у исключений B1.6 было решение В-94, у этих нет.
 - **Порчу исправлял правилами скрипта**, не результатом: прогон — один коммит, который воспроизводится командой и
   проходит `--check` с кодом 0.
 - **`.github/` переименован вместе с остальным**, как было в `SOURCES` 0.4: workflows upstream задают переменные для
