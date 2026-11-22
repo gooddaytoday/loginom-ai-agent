@@ -97,6 +97,15 @@ const Root = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_A
         ),
       },
     }),
+    Spec.make("migrate", {
+      description: "Move sessions of a Loginom AI Agent 0.3.9 or 0.4 profile into this version",
+      params: {
+        source: Argument.String("database").pipe(
+          Argument.withDescription("0.3.9 or 0.4 database to read (default: this channel's database)"),
+          Argument.optional,
+        ),
+      },
+    }),
     Spec.make("acp", {
       description: "Start an Agent Client Protocol server",
       params: {
