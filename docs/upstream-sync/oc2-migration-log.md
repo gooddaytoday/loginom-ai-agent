@@ -5588,7 +5588,9 @@ B3.1…B3.3), рабочее дерево `.claude/worktrees/b25c`. Bun 1.4.4 п
 | `4d9203a9ae` `feat(loginom-agent): package_docs_run in the product plugin (B2.5c)` | `packages/loginom-agent/src/package-docs.ts` (новый), регистрация в `src/index.ts`; тест `packages/server/test/loginom-package-docs.test.ts` (новый файл форка); в `packages/server/test/loginom-access.test.ts` набор инструментов `package-docs` дополнен `package_docs_run` |
 | `76c3fabc8c` `test(core): count the product plugin's package_docs_run among location tools` | тест upstream `packages/core/test/location-layer.test.ts` +2: имя в двух ожидаемых списках (файл уже в CAT-07) |
 | `878e01558b` `test(loginom-host): read the Calculator fixture from loginom-host, not the 0.4 opencode package` | `packages/loginom-host/test/fixtures/package-docs/edit-source.lgp` (копия из 0.4), строка в `README.md` фикстур, путь в `test/package-docs.test.ts` |
-| следующий | этот раздел, строка G1 и «Как запускать» в `guarantees.md`, CAT-05 в `catalog.md` |
+| `51be975bf0` `docs(upstream-sync): record B2.5c package-docs` | этот раздел (первая версия), строка G1 и «Как запускать» в `guarantees.md`, CAT-05 в `catalog.md` |
+| `2d7643c609` `fix(loginom-agent): offer package_docs_run's format as 0.4 did; test a completed compaction` | `format` — `Schema.optionalKey`; случай сжатия со сжатием, которое действительно завершилось (раздел «Тесты») |
+| следующий | уточнения этого раздела и строки G1 |
 
 ### Правки файлов upstream
 
@@ -5617,9 +5619,9 @@ SHA-256 манифеста и только внутри ресурсов, окр
 
 ### Что поменялось против 0.4 и почему
 
-Имя, описание, схема входа (`Parameters` — тот же `Schema.Union` Effect), порядок проверок, запрашиваемые права, тексты
-ошибок, аргументы и окружение исполнителя и результат — как в 0.4 (описание, `Parameters` и все строки
-`PACKAGE_DOCS_*` сверены скриптом с файлом 0.4: совпадают). Код переведён с Effect-сервисов пакета `opencode` на
+Имя, описание, схема входа (`Parameters` — тот же `Schema.Union` Effect, кроме `format`, см. ниже), порядок проверок,
+запрашиваемые права, тексты ошибок, аргументы и окружение исполнителя и результат — как в 0.4 (описание, `Parameters` до
+правки `format` и все строки `PACKAGE_DOCS_*` сверены скриптом с файлом 0.4: совпадали). Код переведён с Effect-сервисов пакета `opencode` на
 async/await и API плагина, как в B2.5a.
 
 - **Регистрация.** `packageDocs(files, directory, resources)` в `src/package-docs.ts` строит `Info` плагина
@@ -5652,9 +5654,13 @@ async/await и API плагина, как в B2.5a.
   `package-docs` и в `profileTools` (недоступен `default` и `loginom-automation`) с B2.2.
 
 Схема входа у модели. v2 сам переводит `Schema.Union` в JSON Schema; модель получает верхний `anyOf` из трёх объектов,
-как в 0.4. Отличия — общий перевод v2, не код инструмента: у объектов `additionalProperties: false`, необязательный
-`format` — `anyOf` с `{ type: "null" }`; у 0.4 (`ToolJsonSchema.fromSchema`; модуль 0.4 запущен на этой схеме под Effect 4.1) —
-`$schema`, без `additionalProperties`, `format` — простой `enum`. Тест шлюза закрепляет схему v2 целиком.
+как в 0.4. В первой версии (`4d9203a9ae`) `format` был `Schema.optional`, как в 0.4: v2 показывал его модели как `anyOf`
+с `{ type: "null" }`, а проверка входа v2 `null` отвергала — через модель `format: null` вернулся
+`Invalid arguments for tool "package_docs_run": format: Expected "pdf" | "docx" | "md" | undefined`. В `2d7643c609`
+`format` — `Schema.optionalKey`, как необязательные поля у инструментов upstream (`grep`, `image-generate`): модель видит
+простой `enum`, как в 0.4, разбор JSON-входа тот же (поле можно опустить, `null` по-прежнему отвергается, как и в 0.4).
+Оставшиеся отличия от 0.4 — общий перевод v2: у объектов `additionalProperties: false`, нет `$schema` (схема 0.4 —
+`ToolJsonSchema.fromSchema`, модуль 0.4 запущен на этой схеме под Effect 4.1). Тест шлюза закрепляет схему целиком.
 
 ### Предел 50 КиБ
 
@@ -5691,7 +5697,7 @@ async/await и API плагина, как в B2.5a.
 | `a message-reverted attachment…` | проходит в виде «откат подготовлен и применён» (`revert.stage` + `revert.commit`): v2 не запускает шаг, пока откат только подготовлен, — следующий промпт или сжатие применяют его первым. Только подготовленный откат вложение не отзывает (первый прогон, «Найдено») |
 | `a reverted attachment…` (откат части сообщения) | не перенесён: v2 откатывает сообщения целиком, отката части нет |
 | `a replayed attachment…` (вложение в сообщении-повторе `compaction_replay_of` невидимого исходного) | не перенесён: в v2 нет повтора сообщения при сжатии и такой метки |
-| `a compaction replay preserves the visible original attachment's read authorization` | `a compaction preserves…` — проходит: после `Session.compact` сообщение с вложением остаётся в `session.context` (проверено пробой: `user`, `assistant`, `idle`, `compaction`, `idle`), вопроса `read` нет |
+| `a compaction replay preserves the visible original attachment's read authorization` | не проходит на v2, записан тестом обратного поведения `after a completed compaction the attachment must request fresh read permission (0.4 kept it through a replay)`. В 0.4 сжатие повторяло промпт с вложением. v2 держит свежий хвост рядом со сводкой только текстом (`metadata.keepID`, `SessionRecentText`), `session.context` начинается со сводки, сообщения с `files` в нём нет — вызов снова спрашивает `read`. Ошибка в безопасную сторону; вернуть поведение 0.4 — B2.5d (вложения через хук `compaction`). В первой версии случай проходил ложно: сценарная модель отвечала на запрос сводки без шаблона, сжатие кончалось `failed` («Compaction summary did not match the required template»), и вложение оставалось в контексте; теперь модель отвечает по шаблону, тест проверяет `completed` и отсутствие сообщений пользователя |
 | `forked original attachments keep read authorization in the new session` | проходит; правила форка — «всё разрешено», как в 0.4 |
 | `an OS read refusal names the file without suggesting an attachment` | пропущен под root с комментарием, как в B2.5a: `chmod 0` не мешает root читать |
 | `local path filesystem errors include their reason and path without an attachment hint` | проходит |
@@ -5703,7 +5709,7 @@ async/await и API плагина, как в B2.5a.
 | `a filename occupied during approval is rejected without moving the authorized output` | проходит: файл занимает хук стенда на вопросе `edit` (0.4 — обёртка `ctx.ask`) |
 | `attachments from another session in the model context do not authorize a path` | `attachments from another session do not authorize a path` — проходит. В 0.4 чужие сообщения подавались в `ctx.messages`; плагин v2 читает историю вызывающей сессии сам, поэтому вложение просто лежит в другой сессии |
 | `a missing generated bundle…`; `a zero exit with malformed executor output…`; `a successful executor cannot substitute a path…`; `an executor cannot claim completion…`; `a Node hash mismatch…`; `even the correctly hashed pinned Node cannot be a symlink…`; `a request cancelled before execution…` | проходят |
-| `abort terminates the running Node executor…`; `timeout terminates…` | проходят; второй честно ждёт 60 с предела 0.4 (60,5 с), таймаут теста 70 с, как в 0.4 |
+| `abort terminates the running Node executor…`; `timeout terminates…` | проходят; второй ждёт настоящие 60 с предела 0.4 (60,5 с), таймаут теста 70 с, как в 0.4 |
 | `the executor receives fixed argv, the session cwd and a minimal environment` | проходит: окружение `["LANG"]`, `cwd` — каталог Location, Node — из ресурсов |
 | `rejected package access remains typed and tells CLI users to attach it with --file` | переписан под v2, как в B2.5a: подсказку `--file` и `LOGINOM_FILE_ACCESS_DENIED` даёт отказ с отзывом (`Tool.Error` с `Permission.CorrectedError`); отказ без отзыва — сам `Permission.DeclinedError`, по нему v2 останавливает шаг |
 
@@ -5714,7 +5720,8 @@ async/await и API плагина, как в B2.5a.
 | `a reported path other than the selected one fails even when the selected file exists` | исполнитель создал нужный файл, но сообщил другой путь — `PACKAGE_DOCS_OUTPUT_INVALID`. В случае 0.4 `…substitute a path…` нужного файла тоже нет, и его ловит проверка файла, а не пути (мутация M7 ниже) |
 | `the product's package_docs_run is offered and called only with the package-docs grant (G1 gate)` | настоящий инструмент плагина продукта через модель: без допуска и с `loginom-automation` — нет в запросе, вызов — `LOGINOM_SCOPE_DENIED: tool package_docs_run`, до инструмента не дошёл; с `package-docs` — набор инструментов в запросе ровно `edit, glob, grep, package_docs_run, question, read, skill, todowrite, write` (набор 0.4 для профиля без `apply_patch` и локальной справки Loginom, которых в этом запросе нет), описание 0.4 и схема входа v2 целиком; вызов дошёл до инструмента (`LOGINOM_FILE_NOT_FOUND` для `missing.lgp`), вопросов нет, в каталоге Location ничего не записано |
 
-Итого в файле 41 тест: 40 pass, 1 skip (под root). Полный файл — около 80 с, из них 60 с — случай предела.
+Итого в файле 41 тест: 40 pass, 1 skip (под root); из случаев 0.4 перенесено 38 (из них 4 переписаны под v2), 3 не
+перенесены (`reverted`, `replayed`, сжатие с повтором — последнее заменено тестом поведения v2). Полный файл — около 80 с, из них 60 с — случай предела.
 
 `packages/server/test/loginom-access.test.ts`: в случае `package-docs` теста источников допуска разрешённый набор
 дополнен `package_docs_run` — без этого тест красный, инструмент теперь есть в каждом запросе профиля.
@@ -5728,36 +5735,40 @@ exact formula` читал `edit-source.lgp` из `packages/opencode/test/cli/pac
 
 ### Мутации
 
-На рабочем дереве до коммита `4d9203a9ae` (тот же код без нового случая пути и без переносов строк prettier): мутация вносилась `perl` в файл дерева, запускался
-`bun test test/loginom-package-docs.test.ts -t '^(?!.*timeout terminates)'` из `packages/server` (без 60-секундного
-случая), файл возвращался из копии; после последней — `git status` без изменений кода (скрипт и вывод — во временном
-каталоге).
+На `2d7643c609`: мутация вносилась `perl` в файл дерева, запускался
+`bun test test/loginom-package-docs.test.ts -t '^(?!.*timeout terminates)'` из `packages/server` (40 тестов, без
+60-секундного случая), файл возвращался из копии; после последней — `git status` без изменений кода (скрипт и вывод — во
+временном каталоге).
 
 ```text
-=== M0  none                                  38 pass, 1 skip, 0 fail
-=== M1  tool not registered (index.ts)        37/1: G1 gate
-=== M2  permits always true (access.ts)       37/1: G1 gate
-=== M3  no authorize (realpath of the path)   24/14: query, fragment, other-file, message-reverted, local path errors,
-                                              configured deny…always, read deny, external_directory (model path),
-                                              range reference, canonicalizing, external_directory with attachment,
-                                              another session, rejected…--file, G1 gate
-=== M4  no edit ask                           27/11: extracts…, compaction, fork, plan, Location-relative, skeleton,
-                                              deny on skeleton, PDF, next free name, deny on final filename, occupied
-=== M5  no read ask on emit                   36/2: publishes a completed PDF…, emit preserves an explicit read deny
-=== M6  Node hash check off                   37/1: a Node hash mismatch…
-=== M7  reported path check off               38/0 — не поймана
-=== M8  no own abort check                    38/0 — не поймана
-=== M9  acknowledged file check off           37/1: an executor cannot claim completion…
-=== M10 metadata without truncated            37/1: creates a session skeleton…
-=== M11 executor without call.signal          37/1: abort terminates…
-=== M12 extendEnv: true                       37/1: the executor receives fixed argv…
-=== M13 skill verification swallowed          36/2: a tampered skill bundle…, a missing generated bundle…
+=== M0  none                                  39 pass, 1 skip, 0 fail
+=== M1  tool not registered (index.ts)        38/1: G1 gate
+=== M2  permits always true (access.ts)       38/1: G1 gate
+=== M3  no authorize (realpath of the path)   24/15: query, fragment, other-file, message-reverted, completed
+                                              compaction, local path errors, configured deny…always, read deny,
+                                              external_directory (model path), range reference, canonicalizing,
+                                              external_directory with attachment, another session, rejected…--file,
+                                              G1 gate
+=== M4  no edit ask                           29/10: extracts…, fork, plan, Location-relative, skeleton, deny on
+                                              skeleton, PDF, next free name, deny on final filename, occupied
+=== M5  no read ask on emit                   37/2: publishes a completed PDF…, emit preserves an explicit read deny
+=== M6  Node hash check off                   38/1: a Node hash mismatch…
+=== M7  reported path check off               38/1: a reported path other than the selected one…
+=== M8  no own abort check                    39/0 — не поймана
+=== M9  acknowledged file check off           38/1: an executor cannot claim completion…
+=== M10 metadata without truncated            38/1: creates a session skeleton…
+=== M11 executor without call.signal          38/1: abort terminates…
+=== M12 extendEnv: true                       38/1: the executor receives fixed argv…
+=== M13 skill verification swallowed          37/2: a tampered skill bundle…, a missing generated bundle…
 ```
 
-После нового случая `a reported path other than the selected one…`: M0 — 39/0 (плюс skip), M7 — 38/1 (этот случай).
-M8 не ловится поведением, как и в 0.4: `files.authorize` первым делом сам вызывает `call.signal.throwIfAborted()` (0.4 —
-`ctx.abort.throwIfAborted()` в `authorizeLoginomFile`), и остановленный вызов не доходит ни до вопросов, ни до файлов.
-Собственная проверка инструмента — повтор 0.4, оставлен.
+M7 до нового случая (первая версия, до `4d9203a9ae`) не ловилась: в случае 0.4 `…substitute a path…` нужного файла тоже
+нет, и вызов останавливает проверка файла. M8 не ловится поведением, как и в 0.4: `files.authorize` первым делом сам
+вызывает `call.signal.throwIfAborted()` (0.4 — `ctx.abort.throwIfAborted()` в `authorizeLoginomFile`), и остановленный
+вызов не доходит ни до вопросов, ни до файлов. Собственная проверка инструмента — повтор 0.4, оставлен.
+
+Устойчивость на `2d7643c609`: `bun test --rerun-each 5 test/loginom-package-docs.test.ts -t '^(?!.*timeout terminates)'`
+— 195 pass, 5 skip, 0 fail за 77,4 с.
 
 ### Приёмка
 
@@ -5774,6 +5785,11 @@ M8 не ловится поведением, как и в 0.4: `files.authorize`
 | `server` | 187 pass, 2 skip, 0 fail | 227 pass (+40), 3 skip (+1: отказ ОС под root), 0 fail — 41 тест нового файла |
 | `loginom-host` | 506 pass, 12 skip, 38 fail | 507 pass, 12 skip, 37 fail; ушло ровно `package-docs.test.ts` «native Calculator expressions…», остальные 37 — те же по именам (`skills-acceptance` 24, `skills-acceptance-turns` 8, `bundled-ripgrep` 3, `cli-manifest` и `managed-work-entry` под root) |
 | `core` | 7125 pass, 354 skip, 3 fail (B2.5b2) | 7125 pass, 354 skip, 3 fail — те же: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) |
+
+После `2d7643c609` (схема `format`, случай сжатия) повторены `server/test/loginom-package-docs.test.ts` вместе с
+`loginom-access.test.ts` — 49 pass, 1 skip, 0 fail за 84,6 с (41 и 9 тестов); остальные пакеты эта правка не задевает.
+`product` (`bun test`) — 58 pass, 3 fail: те же три `repo-paths.test.ts` (В-95); новые строки с путём
+`packages/opencode/…` в README фикстур и заголовке теста эти проверки не задевают (они смотрят код сборки и CI).
 
 `core/test/location-layer.test.ts` и `core/test/plugin/product.test.ts` отдельно: 29 pass, 2 skip, 0 fail. Без
 `node_modules` клиента `loginom-runtime` (свежее дерево до `npm ci`): `core/test/plugin/product.test.ts` — 6 pass, 0 fail;
@@ -5803,6 +5819,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total                        # 31 из кэша turbo
 ```
 
+`bun run check` повторён на `2d7643c609`: код 0, `Found 517 warnings and 0 errors`, 39/39 задач (32 из кэша turbo);
+`bun run secrets range 523fba3a37 HEAD` — `clean`.
+
 ### Где решал сам
 
 - **Инструмент регистрируется всегда, без условия Host.** В 0.4 `definitions` добавлял его только профилю
@@ -5828,6 +5847,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   `script/skills-acceptance.ts` и его README — это приёмка выбора навыков, не инструмент. Где корпусу жить на v2, решает
   тот, кто переносит `skills-acceptance`; если он перенесёт корпус целиком, копию в фикстурах `package-docs` можно
   заменить ссылкой на корпус.
+- **`format` — `Schema.optionalKey` вместо `Schema.optional` 0.4.** Единственная правка схемы 0.4: без неё модель видит
+  поле, допускающее `null`, которое проверка входа v2 отвергает (раздел «Что поменялось»). Это расхождение создаёт перевод
+  v2, а не логика инструмента; для JSON-входа обе формы разбираются одинаково.
 - **Подсказка `--file` при простом отказе не перенесена**, как и в B2.5a: v2 останавливает шаг только на самом
   `DeclinedError`. Подсказка приходит с отказом с отзывом.
 
@@ -5838,11 +5860,13 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   сделанную по коду). Достичь этого моделью нельзя: пока откат подготовлен, v2 шаг не запускает (`wake` пропускается,
   промпт и сжатие сначала применяют откат), инструмент вызывает только шаг. Прямой вызов `Session.resume` при
   подготовленном откате не проверял.
-- После `Session.compact` на короткой истории сообщение с вложением остаётся в `session.context`, и вложение по-прежнему
-  разрешает файл без вопроса. Предупреждение B2.5a («после сжатия файл снова требует вопроса») верно не всегда; на длинной
-  истории не проверял.
-- Модель видит `format` как `anyOf` с `null` (перевод `Schema.optional` в v2). Принимает ли проверка входа v2 `null` для
-  такого поля (`Schema.optional` его не принимает), не проверял; модель 0.4 такого варианта не видела.
+- Предупреждение B2.5a подтверждено прогоном: после завершённого сжатия вложение, приложенное до него, файл не разрешает,
+  вызов снова спрашивает `read` (случай сжатия выше). То же для выборки, по коду: квитанция `loginom_file_sample` до сжатия
+  тоже уходит из `session.context`.
+- Общее для всех инструментов на схемах Effect: v2 показывает модели поле `Schema.optional` как допускающее `null`, а
+  проверка входа `null` отвергает (здесь исправлено через `optionalKey`; у инструментов B2.5a–b схемы — JSON, их это не
+  касается). Плагин `opencode.tool.input.repair` обещает убирать `null` у необязательных полей, но на верхнем `anyOf` этого
+  инструмента не убрал.
 - `oc2-migration` за время задачи ушла вперёд (`dd98f25e8a`, B4.1 дописал свой раздел журнала): при слиянии разделы
   журнала столкнутся в конце файла.
 
@@ -5853,7 +5877,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   сервера в тесте нет `LOGINOM_AI_AGENT_RESOURCES`).
 - Установленная сборка: что служба v2 получает `LOGINOM_AI_AGENT_RESOURCES` и что в ресурсах есть собранный
   `package-docs.mjs` и `bin/node` (B4, B2.7a); динамический импорт проверки навыка в бандле CLI.
-- Windows и macOS (`node.exe`, пути, остановка процесса), Desktop; `cli`, `sdk`, `product` не запускались.
+- Windows и macOS (`node.exe`, пути, остановка процесса), Desktop; `cli` и `sdk` не запускались.
 - Отказ ОС на чтение (`chmod 0`) — под root пропущен.
 - Принимается ли схема с верхним `anyOf` провайдерами, требующими `type: "object"` на верхнем уровне (OpenAI): в 0.4
   модель получала тот же верхний `anyOf`; преобразования схемы провайдером в v2 не смотрел.
