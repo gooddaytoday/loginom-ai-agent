@@ -9,7 +9,7 @@ import { trackedSnapshot } from "./tracked"
 const root = resolve(import.meta.dir, "../../..")
 const { paths: tracked, read } = trackedSnapshot(root)
 
-const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals", "dashboard"]
+const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals", "dashboard", "loginom-agent"]
 
 const NAME_CHAR = "[A-Za-z0-9._~-]"
 const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`

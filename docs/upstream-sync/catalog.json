@@ -23,7 +23,11 @@
     { "id": "CAT-04", "title": "Upstream endpoints: updates, installer, sharing", "paths": [], "pending": "B2.7d, B4.1" },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.2, B2.3, B2.5, B2.6, B2.9" },
     { "id": "CAT-06", "title": "Skills and commands", "paths": [], "pending": "B2.4" },
-    { "id": "CAT-07", "title": "Providers, plugins, proxy", "paths": [], "pending": "B2.1, B2.7a, B4.1" },
+    {
+      "id": "CAT-07",
+      "title": "Providers, plugins, proxy",
+      "paths": ["packages/core/src/plugin/internal.ts", "packages/core/src/plugin/supervisor.ts"]
+    },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7, B2.8, B3.2" },
     {
       "id": "CAT-13",

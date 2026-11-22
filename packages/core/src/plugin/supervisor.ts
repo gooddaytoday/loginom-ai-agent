@@ -84,6 +84,16 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
       enabled.add(retained.id)
       continue
     }
+    // A package must not take a guarded built-in's ID: duplicate resolution keeps the first in boot order,
+    // so the package would silently replace the built-in.
+    if (PluginInternal.guarded.has(plugin.id)) {
+      failures.set(operation.target, {
+        source: PluginModule.source(operation.target),
+        state: { status: "failed", error: `Plugin ID is reserved by a built-in plugin: ${plugin.id}` },
+        features: { server: true },
+      })
+      continue
+    }
     failures.delete(operation.target)
     const previous = packages.get(operation.target)
     if (previous) enabled.delete(previous.id)

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig.json",
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src"]
+}

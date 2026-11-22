@@ -223,6 +223,7 @@
         "@effect/sql-sqlite-node": "catalog:",
         "@ff-labs/fff-bun": "0.10.5",
         "@ff-labs/fff-node": "0.10.5",
+        "@loginom-ai-agent/loginom-agent": "workspace:*",
         "@lydell/node-pty": "catalog:",
         "@modelcontextprotocol/client": "2.4.0",
         "@modelcontextprotocol/core": "2.4.0",
@@ -493,6 +494,19 @@
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",
         "@typescript/native": "catalog:",
+      },
+    },
+    "packages/loginom-agent": {
+      "name": "@loginom-ai-agent/loginom-agent",
+      "version": "0.1.0",
+      "dependencies": {
+        "@opencode/plugin": "workspace:*",
+      },
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+        "@typescript/native": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/loginom-host": {
@@ -1733,6 +1747,8 @@
     "@kobalte/utils": ["@kobalte/utils@0.9.2", "", { "dependencies": { "@solid-primitives/event-listener": "^2.2.14", "@solid-primitives/keyed": "^1.2.0", "@solid-primitives/map": "^0.4.7", "@solid-primitives/media": "^2.2.4", "@solid-primitives/props": "^3.1.8", "@solid-primitives/refs": "^1.0.5", "@solid-primitives/utils": "^6.2.1" }, "peerDependencies": { "solid-js": "^1.8.8" } }, "sha512-jRVXr+zsVHxzDXRoh+CDeXzvCsFJ6uiHhqqNQ26Cw9ZsZ3D6nqPUBt1gGVtj2ZPmRL3a9Uk1v8D1aJ8/I12Dow=="],
 
     "@loginom-ai-agent/dashboard": ["@loginom-ai-agent/dashboard@workspace:packages/dashboard"],
+
+    "@loginom-ai-agent/loginom-agent": ["@loginom-ai-agent/loginom-agent@workspace:packages/loginom-agent"],
 
     "@loginom-ai-agent/loginom-host": ["@loginom-ai-agent/loginom-host@workspace:packages/loginom-host"],
 
