@@ -39,8 +39,8 @@ For questions about the terminal interface, command-line invocation, `run`,
 that section.
 
 CLI and TUI preferences are separate from OpenCode's server and project
-configuration. They live in the global `~/.config/opencode/cli.json`, or
-`$XDG_CONFIG_HOME/opencode/cli.json` when `XDG_CONFIG_HOME` is set. There is no
+configuration. They live in the global `~/.config/loginom-ai-agent/cli.json`, or
+`$XDG_CONFIG_HOME/loginom-ai-agent/cli.json` when `XDG_CONFIG_HOME` is set. There is no
 project-local CLI configuration. Set `LOGINOM_AI_AGENT_CLI_CONFIG_CONTENT` to merge
 inline JSON over the global settings. Most preferences can also be changed from
 the TUI by pressing `Ctrl+P` and selecting **Open settings**.
@@ -77,7 +77,7 @@ autocomplete:
 }
 ```
 
-Global configuration lives at `~/.config/opencode/loginom-ai-agent.json(c)` and applies
+Global configuration lives at `~/.config/loginom-ai-agent/loginom-ai-agent.json(c)` and applies
 to every project for that user. Project configuration can live in any directory
 as `loginom-ai-agent.json(c)` or `.loginom-ai-agent/loginom-ai-agent.json(c)`, including nested packages
 in a monorepo.
@@ -257,7 +257,7 @@ problem belongs to the client, the shared server, or one project.
   `opencode api get /api/info`.
 - Compare with `opencode --standalone`, which runs the TUI with a private
   server, to isolate shared-service issues.
-- Inspect `~/.local/share/opencode/log/opencode.log`. Filter `role=cli` for
+- Inspect `~/.local/share/loginom-ai-agent/log/loginom-ai-agent.log`. Filter `role=cli` for
   client startup and `role=server` for sessions, providers, plugins,
   permissions, and tools.
 - Run one reproduction with `LOGINOM_AI_AGENT_LOG_LEVEL=DEBUG` when normal logs are not

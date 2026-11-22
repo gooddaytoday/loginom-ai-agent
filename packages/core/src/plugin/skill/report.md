@@ -34,9 +34,9 @@ Collect these values when possible:
   Windows when relevant.
 - Install/channel context: include whether this appears to be local, dev, beta,
   or release if the version output or environment reveals it.
-- Active plugins: inspect opencode config for configured plugins when possible.
+- Active plugins: inspect Loginom AI Agent config for configured plugins when possible.
   Check likely config locations such as `loginom-ai-agent.json`, `loginom-ai-agent.jsonc`,
-  `.loginom-ai-agent/loginom-ai-agent.json`, and `~/.config/opencode/loginom-ai-agent.json`. Record
+  `.loginom-ai-agent/loginom-ai-agent.json`, and `~/.config/loginom-ai-agent/loginom-ai-agent.json`. Record
   configured plugin entries, local plugin files under `.loginom-ai-agent/plugin/` or
   `.loginom-ai-agent/plugins/`, and note if plugin status could not be determined.
 
