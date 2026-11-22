@@ -6638,9 +6638,11 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 1600 пакетов, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. `packages/loginom-agent`
 и `packages/loginom-host/src` (B2.3) не трогал.
 
-**Итог одной строкой: файл перенесён, typecheck его проверяет, но 24 падения `skills-acceptance` не ушли.** У них была
-вторая причина — корпус маршрутизации пакета `opencode` 0.4. Теперь тесты падают на нём. Счёт `loginom-host` до и после —
-507 / 12 / 37 с теми же именами. Критерий приёмки «24 уходят» не выполнен (ниже «Тесты» и «Где решал сам»).
+**Итог: манифест и корпус маршрутизации перенесены, падения `skills-acceptance*` ушли.** `loginom-host`: база 507 / 12 / 37,
+итог 539 / 12 / 5 — остались пять базовых падений. У 24 падений `skills-acceptance` было две причины, а не одна:
+манифест Desktop и корпус маршрутизации пакета `opencode` 0.4. Первая версия раздела (`7ef86332a7`) перенесла только
+манифест. По решению координатора корпус перенесён в той же ветке в `packages/loginom-host/test/fixtures/package-docs-routing/`;
+вместе с ним ушли и 8 падений `skills-acceptance-turns`.
 
 ### Коммиты
 
@@ -6648,7 +6650,9 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 |---|---|
 | `ddbf4d8b66` `feat(desktop): carry the 0.4 release manifest for loginom-host` | `packages/desktop/scripts/release/manifest.ts` из `a080f7725c` без изменений; `@loginom-ai-agent/loginom-host` в `devDependencies` Desktop, `bun.lock` +1 |
 | `7387ed17b5` `chore(loginom-host): type-check skills-acceptance again` | `loginom-host/tsconfig.json`: из `exclude` убран `script/skills-acceptance.ts` |
-| следующий | этот раздел; CAT-01 и список новых файлов в `catalog.md` |
+| `7ef86332a7` `docs(upstream-sync): record B4.8b release manifest` | первая версия раздела; CAT-01 и список новых файлов в `catalog.md` |
+| `d5cd2b2acd` `test(loginom-host): carry the 0.4 skills routing corpus` | корпус из 0.4 и `sales.csv` в `test/fixtures/package-docs-routing/`; пути в `cases.json`, скрипте, README скрипта и `skills-acceptance-turns.test.ts` |
+| следующий | этот раздел, переписан под корпус |
 
 ### Что перенесено
 
@@ -6676,6 +6680,7 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
     файл, `src` Desktop его не импортирует (`git grep loginom-host packages/desktop/src packages/desktop/electron*.ts` —
     пусто). Обе правки попадают в CAT-01 по маскам `**/package.json` и `bun.lock`. `catalog.json` не менялся, в
     `catalog.md` дописано предложение в CAT-01 и новый файл в шапке.
+- **Корпус маршрутизации** — ниже, «Корпус».
 - **Не переносил:** `write-manifest.ts`, `verify-artifact.ts`, тесты `artifact` и `notes` — B5.2; `verify-macos.ts` —
   этап G (B4.1, «Передано другим задачам»).
 - **`loginom-host/tsconfig.json`.** В `exclude` остался только `script/system-proxy-smoke.ts`. Его импорт
@@ -6698,6 +6703,41 @@ $ ../../node_modules/.bin/tsc6 --noEmit -p .   # код 0
 `const probe: number = "not a number"`. Результат `bun check --no-script` — `Found 1 error in 1 file, checked 174 files`.
 Файл возвращён из копии, `git status` чистый. TS7006 в строке 106 (B1.5) ушла вместе с импортом.
 
+### Корпус
+
+Решение координатора: корпус — в `packages/loginom-host/test/fixtures/package-docs-routing/`, рядом с
+`fixtures/package-docs/` из B2.5c; содержимое как в 0.4, меняются только пути. CSV из тестовых фикстур Desktop 0.4 — туда же;
+тесты Desktop 0.4 не переносятся.
+
+| Файл в `test/fixtures/package-docs-routing/` | Откуда (`a080f7725c`) | Отличие от 0.4 |
+|---|---|---|
+| `README.md` | `packages/opencode/test/cli/package-docs-routing/README.md` | строка 63: личный домашний каталог → `/home/<user>/` |
+| `cases.json` | то же, `cases.json` | три пути в `fixtures`: `edit_lgp`, `csv`, `text` |
+| `fixtures/edit-source.lgp` | то же, `fixtures/` | нет |
+| `fixtures/edit-source.provenance.json` | то же, `fixtures/` | строки 64–65 (`evidence_root`, `staged_eval_input`): домашний каталог → `/home/<user>/` |
+| `fixtures/read-control.txt` | то же, `fixtures/` | нет |
+| `fixtures/sales.csv` | `packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv` | нет |
+
+Файлы клались `git show a080f7725c:<путь>`, до правок id блобов всех шести (`git ls-files -s`) совпали с `git ls-tree
+a080f7725c`. `fixtures.lgp` (`packages/loginom-host/test/fixtures/package-docs/nested.lgp`) уже на месте и не менялся.
+`fixtures.png` — см. «Где решал сам».
+
+Пути вне корпуса: `script/skills-acceptance.ts:59` и строка 4 `script/skills-acceptance/README.md`. В
+`test/skills-acceptance-turns.test.ts` семь URL: шесть `cases.json` и один `edit-source.provenance.json`,
+`../../opencode/test/cli/package-docs-routing/` → `./fixtures/package-docs-routing/`. Пути `fixtures` тест разрешает от
+корня репозитория, как и скрипт. В `test/skills-acceptance.test.ts` путей корпуса нет: он запускает скрипт. README
+корпуса ссылается на фикстуры относительно себя, эти ссылки не менялись.
+
+**Сканер секретов.** `bun run secrets staged` на шести файлах как в 0.4 — код 2, `status: findings`: `personal-home-path`
+×3 (README:63, provenance:64, :65). Это настоящий домашний каталог разработчика 0.4. По
+`docs/security/secret-protection.md` личные данные исключать нельзя, разрешена заглушка `<user>`. Имя заменено на
+`<user>`, JSON разбирается; после этого `staged` — `clean`, хук `pre-commit` — `clean`, а по всей ветке:
+
+```text
+$ bun run secrets range 82f7d909ec HEAD
+{"status":"clean","commits":4,"archives":1,"current_files":0,"skipped":[],"upstream_commits":0,"upstream_findings":0,"upstream_missing":0,…}
+```
+
 ### Тесты
 
 `loginom-host`, `LOGINOM_AI_AGENT_TEST_NODE` — переносной Node 24.19.0, перед этим `npm ci` клиента `loginom-runtime`
@@ -6705,45 +6745,35 @@ $ ../../node_modules/.bin/tsc6 --noEmit -p .   # код 0
 
 ```text
 $ cd packages/loginom-host && xvfb-run -a bun test --reporter=junit --reporter-outfile=<файл>
-# база 82f7d909ec:  507 pass / 12 skip / 37 fail / Ran 556 tests across 66 files. [275.98s]
-# после:            507 pass / 12 skip / 37 fail / Ran 556 tests across 66 files. [275.73s]
-```
-
-Набор упавших до и после один и тот же (`diff` списков пуст), новых падений нет. Сменилась причина у 24:
-
-| Файл | Падений | Причина в базе | Причина после |
-|---|---|---|---|
-| `skills-acceptance.test.ts` | 24 | `Cannot find module '../../desktop/scripts/release/manifest'` | `ENOENT … open 'packages/opencode/test/cli/package-docs-routing/cases.json'` |
-| `skills-acceptance-turns.test.ts` | 8 | `ENOENT … package-docs-routing/cases.json` | то же |
-| `bundled-ripgrep.test.ts` | 3 | `Cannot find module 'packages/core/src/effect/layer-node.ts'` ×2, сверка текста `binary.ts` ×1 (B1.5) | то же |
-| `cli-manifest.test.ts` | 1 | «archive verification preserves manifest modes under a private umask», базовое падение стенда | то же |
-| `managed-work-entry.test.ts` | 1 | «actual managed entry reads live bridge work and dispatching over private IPC» — `Expected refusal` под root, базовое падение стенда | то же |
-
-`script/skills-acceptance.ts:59` читает корпус `packages/opencode/test/cli/package-docs-routing/cases.json`. Пакета
-`opencode` на дереве v2 нет. Тест 8 падений `skills-acceptance-turns` читает тот же корпус и от манифеста не зависит
-(`grep desktop` по тесту — пусто), поэтому в эту задачу не входит.
-
-**Пробы с корпусом 0.4** (не коммитились). Каталог `packages/opencode/test/cli/package-docs-routing/` клался во временную
-копию из `a080f7725c`, после прогона удалялся (`rm -r packages/opencode`, `git status` без него):
-
-```text
-# только cases.json:
-$ xvfb-run -a bun test test/skills-acceptance.test.ts
+# база 82f7d909ec:        507 pass / 12 skip / 37 fail / Ran 556 tests across 66 files. [275.98s]
+# манифест, 7387ed17b5:   507 pass / 12 skip / 37 fail / Ran 556 tests across 66 files. [275.73s]
+# корпус, d5cd2b2acd:     539 pass / 12 skip /  5 fail / Ran 556 tests across 66 files. [274.43s]
+$ xvfb-run -a bun test test/skills-acceptance.test.ts          # d5cd2b2acd
  25 pass
  0 fail
-# весь каталог (README, cases.json, fixtures/{edit-source.lgp,edit-source.provenance.json,read-control.txt}):
-$ xvfb-run -a bun test test/skills-acceptance.test.ts test/skills-acceptance-turns.test.ts
-(fail) both adapters stage the selected external package and preserve the old default bytes
- 34 pass
- 1 fail
-#  ENOENT … lstat '…/packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv'
+$ bun test test/skills-acceptance-turns.test.ts                  # d5cd2b2acd, все 10 по именам — pass
+ 10 pass
+ 0 fail
 ```
 
-Значит, перенесённый манифест — всё, что нужно 24 тестам со стороны Desktop. Остаток — корпус. Поле `fixtures` в
-`cases.json` ссылается на пути 0.4: `packages/opencode/test/cli/package-docs-routing/fixtures/{edit-source.lgp,read-control.txt}`,
-`packages/opencode/test/tool/fixtures/large-image.png`, `packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv`.
-Из них в дереве v2 есть только `packages/loginom-host/test/fixtures/package-docs/{nested.lgp,edit-source.lgp}`
-(`git ls-files`).
+Новых падений против базы нет (`comm -13` списков пуст). По причинам:
+
+| Файл | Падений: база → манифест → корпус | Причина |
+|---|---|---|
+| `skills-acceptance.test.ts` | 24 → 24 → 0 | база: `Cannot find module '../../desktop/scripts/release/manifest'`; после манифеста: `ENOENT … packages/opencode/test/cli/package-docs-routing/cases.json` |
+| `skills-acceptance-turns.test.ts` | 8 → 8 → 0 | `ENOENT … package-docs-routing/cases.json`; от манифеста не зависят |
+| `bundled-ripgrep.test.ts` | 3 → 3 → 3 | как в B1.5: «ripgrep pins match the release…» сверяет текст `packages/core/src/ripgrep/binary.ts` другого формата; «glob uses the bundled rg…» и «glob without the bundled rg on PATH…» — `packages/core/src/effect/layer-node.ts` в v2.3.0 нет |
+| `cli-manifest.test.ts` | 1 → 1 → 1 | «archive verification preserves manifest modes under a private umask» — `Received promise that resolved`, базовое падение стенда |
+| `managed-work-entry.test.ts` | 1 → 1 → 1 | «actual managed entry reads live bridge work and dispatching over private IPC» — `Expected refusal` под root, базовое падение стенда |
+
+Восемь тестов `skills-acceptance-turns`, которые падали: «a modification uses the saved package on the second turn…»,
+«both adapters stage the selected external package…», «docs-after-edit keeps the edit fixture…», «edit-after-docs keeps
+the edit fixture…», «execution reuses the saved source…», «path turns bind their real source…», «scenario-create-path
+routes a text-only path…», «text-read routes a text-only path…». 24 `skills-acceptance` — 2 «live acceptance validates
+private OAuth and … endpoint» и 22 «live acceptance validates run|desktop case … before creating results».
+
+До решения о корпусе была проба с временной копией каталога 0.4 в `packages/opencode/` (в коммиты не попала): один
+`cases.json` давал `skills-acceptance` 25 / 0, весь каталог — оба файла 34 / 1 (не хватало `sales.csv`).
 
 `packages/desktop` (`LOGINOM_AI_AGENT_TEST_NODE` задан), против базы 536 / 4 / 0:
 
@@ -6754,21 +6784,22 @@ $ bun test --timeout 30000
  536 pass
  4 skip
  0 fail
-Ran 540 tests across 69 files. [7.45s]
+Ran 540 tests across 69 files. [7.45s]                 # на d5cd2b2acd то же, 536 / 4 / 0
 ```
 
 ### Приёмка
 
 ```text
-$ python3 -I scripts/upstream-sync/catalog-check.py                  # код 0, после правки catalog.md
+# всё ниже — на d5cd2b2acd, чистое дерево; на 7387ed17b5 результат тот же
+$ python3 -I scripts/upstream-sync/catalog-check.py                  # код 0
 against a6b15d33daf6: 440 divergent upstream files       # как в базе: package.json Desktop и bun.lock уже расходились
 $ python3 -I scripts/upstream-sync/apply-identity.py --check          # код 0
 would change: 0 files
-$ bun run check                                                       # код 0, на 7387ed17b5, чистое дерево
+$ bun run check                                                       # код 0
 Found 558 warnings and 0 errors.                          # база 515: +43 у manifest.ts, см. «Найдено»
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
-@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 174 files [518.44ms]
-@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [8.02s]
+@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 174 files [487.36ms]
+@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [10.13s]
  Tasks:    39 successful, 39 total
 Cached:    30 cached, 39 total                            # loginom-host и desktop — «cache miss, executing»
 ```
@@ -6779,35 +6810,43 @@ Cached:    30 cached, 39 total                            # loginom-host и desk
   с зависимостями, которых нет в v2. Пакетная зависимость — именно такой случай, и в 0.4 она была той же строкой.
   Запасной вариант — заменить в `manifest.ts` импорт на `../../../loginom-host/src/bundled-skills`. Он не трогает
   манифест upstream, но расходится с 0.4. Проверка выбора: lock сдвинулся ровно на одну строку в блоке Desktop.
-- **Корпус маршрутизации не переносил, 24 падения оставлены.** Задание исходило из того, что 24 падения зависят только
-  от манифеста, а у них две причины. Меньший вариант — сделать задачу строки B4.8b (файл и typecheck) и записать
-  остаток. Пункт 3 задания берёт тесты, только если они зависят от того же файла. После правки 24 и 8 падают на одном
-  корпусе, а его B1.5 и `guarantees.md` относят к B2. B2.5c оставил решение, где корпусу жить на v2, тому, кто переносит
-  `skills-acceptance`. Есть два способа, оба — решение владельца:
-  - **как есть** — `packages/opencode/test/cli/package-docs-routing/` (5 файлов). Даёт 34 из 35 (проба выше). Но под
-    маской рабочих пространств `packages/*` появляется каталог пакета, которого в v2 нет, а `fixtures` по-прежнему
-    указывают на отсутствующие `opencode/test/tool/fixtures/large-image.png` и `desktop/test/loginom/.../sales.csv`.
-    Фикстуры `desktop/test/loginom` ни одна задача B4 не берёт: п. 14 разведки B4.1 считает 41 файл «без фикстур»;
-  - **в `loginom-host`** — например `test/fixtures/package-docs-routing/`. Меняются данные `cases.json` (пути `fixtures`,
-    `edit_lgp` — на копию B2.5c), `script/skills-acceptance.ts:59`, шесть путей в `skills-acceptance-turns.test.ts` и
-    README скрипта, плюс две фикстуры из других мест 0.4.
+- **Корпус в `loginom-host`, а не в `packages/opencode/`** — решение координатора. Сначала был выбран меньший вариант:
+  перенести только манифест, а корпус записать как остаток. Этим и была первая версия раздела.
+- **`sales.csv` — в `fixtures/` корпуса**, а не в `test/fixtures/standalone-cli/A/`: корпус и все его входы лежат в
+  одном каталоге, имя файла то же.
+- **`large-image.png` не переносил.** `fixtures.png` в `cases.json` по-прежнему указывает на
+  `packages/opencode/test/tool/fixtures/large-image.png`: это фикстура upstream 0.4 на 2,6 МБ, в v2.3.0 её нет
+  (`git ls-files` пусто). Задание называло только корпус и `sales.csv`, а ни одному тесту PNG не нужен. Но живой прогон
+  скрипта копирует все записи `corpus.fixtures` (`script/skills-acceptance.ts:181-188`), поэтому до появления PNG он
+  упадёт на любом случае. Вопрос владельцу: перенести PNG в `fixtures/` корпуса (один файл и одна строка `cases.json`)
+  или заменить вход.
+- **Личный путь заменён на `<user>`** в README и provenance (выше, «Сканер секретов»). Это отступление от «как есть»:
+  исключение в `.gitleaksignore` запрещают правила, а обходить хук — задание. На тест не влияет: тест читает из provenance
+  только `sha256` фикстуры.
+- **Две копии `edit-source.lgp`**: корпусная и копия B2.5c в `fixtures/package-docs/` (байты одинаковые). Тест
+  `package-docs.test.ts` и его копию не трогал. Свести к одной — отдельная правка.
 - **Предупреждения oxlint у `manifest.ts` не правил**: файл переносится как есть, ошибок 0.
 
 ### Найдено, не чинил
 
-- `guarantees.md`, «Базовые падения стенда», B1.5 «TS2307 в `loginom-host/script`» и строка B4.8b разведки B4.1 приписывают
-  24 падения `skills-acceptance` одному манифесту. На деле есть вторая причина — корпус. Строка в `guarantees.md`
-  («`skills-acceptance` 24 … B1.5») по числу остаётся верной, но не по причине. Не менял: общий документ и чужие разделы.
+- `guarantees.md`, «Базовые падения стенда», теперь неверен: пишет, что на дереве v2 у `loginom-host` ещё 35 падений
+  (`skills-acceptance` 24, `skills-acceptance-turns` 8, `bundled-ripgrep` 3). Осталось 3 — `bundled-ripgrep`. Предлагаемый
+  текст: «на дереве v2 в `loginom-host` ещё 3 падения `bundled-ripgrep` (B1.5); `skills-acceptance` (24) и
+  `skills-acceptance-turns` (8) закрыты в B4.8b: манифест выпуска Desktop и корпус маршрутизации перенесены». Не менял:
+  общий документ, правку не просили. B1.5 и строка B4.8b разведки B4.1 тоже приписывают 24 падения одному манифесту.
+- `scripts/upstream-sync/revert-names.py`, `EXTRA_EDITS`, ищет в `skills-acceptance-turns.test.ts` старую строку пути
+  корпуса. Инструмент исторический (одноразовый, LAB-198) и уже ссылается на файлы, которых нет
+  (`desktop/scripts/prebuild.ts`). Не трогал.
 - `manifest.ts` добавляет 43 предупреждения oxlint (`anti-slop`): 41 `require-readable-spacing`, 1 `no-runtime-typeof`,
   1 `no-unknown-parameters`. По всему дереву стало 558 вместо 515.
 - `bun.lock` +1 строка может столкнуться с B2.3 при слиянии (`regenerate` по CAT-01).
 
 ### Не проверено
 
-- 24 теста `skills-acceptance` зелёными в дереве — только пробой с временным корпусом. Настоящая приёмка навыков
-  (модель, Docker-образ CLI, AppImage) не запускалась.
+- Настоящая приёмка навыков (модель, Docker-образ CLI, AppImage) не запускалась. Без `large-image.png` она упадёт
+  на копировании фикстур (выше).
 - Функции `manifest.ts` (`decodeManifest`, `verifyResourceTree`, `verifyWindowsApplication`) не проверены на настоящем
-  выпуске. Их тесты (`artifact.test.ts`) уходят с B5.2. В пробе тесты `skills-acceptance` файл только загружают: случаи
+  выпуске. Их тесты (`artifact.test.ts`) уходят с B5.2. Тесты `skills-acceptance` файл только загружают: случаи
   Desktop отказывают ещё на чтении `release-manifest.json` и до `decodeManifest` не доходят.
 - Сборка и упаковка Desktop с новой `devDependency` — только typecheck и тесты. `turbo typecheck:tsc` по всему
   дереву (CI) — только `typecheck:tsc` в `loginom-host`.
