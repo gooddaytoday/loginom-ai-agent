@@ -3339,6 +3339,7 @@ Found 517 warnings and 0 errors.                                    # в нов�
 - **Без `resolveDirectory`.** Сессии из каталогов без git остаются в проекте `global`, как в v1. v2 переносит их в
   проект каталога, когда тот разрешается (`Worktree.Event.Resolved` в `core/src/session/projector.ts`). Так результат не
   зависит от того, есть ли каталог на диске в момент переноса. Вживую перенос в проект каталога не проверялся.
+  **Поправка B3.1b:** для каталогов без git это неверно, см. «Находка» в разделе B3.1b.
 - **Одна транзакция на весь профиль, временный файл и замена в конце.** Сбой не оставляет базы, которую служба
   приняла бы за готовую. Цена — память и время на больших профилях, см. «Не проверено».
 - **Имя копии** — `loginom-ai-agent.v1-backup.db`: формат бэкенда v1, общий для 0.3.9 и 0.4. Если копия уже есть,
@@ -3600,3 +3601,182 @@ $ cd packages/server && bun run typecheck:tsc             # tsc -b — код 0
 - Правила сессии через HTTP `PATCH /api/session/:id` не отправлялись — только через сервис.
 - База приёмки — `93b90a5daa`. `oc2-migration` с тех пор ушла вперёд (B3.1, `05957cf699`, тот же журнал): при слиянии
   разделы журнала столкнутся.
+
+## B3.1b Предохранитель службы
+
+22.11.2026. Ветка `b31b-guard` от `oc2-migration` (`05957cf699`, влит B3.1), рабочее дерево `.claude/worktrees/b31`,
+переключено на новую ветку. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+
+Зачем: в сборке канала база 0.4 и база v2 — один файл (раздел B3.1). Если `serve` откроет непереносённую базу 0.4
+раньше `migrate`, миграции схемы v2 удалят таблицы сессий и ответят `completed` (S4). После этого `migrate` скажет
+`nothing to migrate`. Раздел B3.1 оставлял порядок запуска на B4; теперь служба защищает себя сама.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `e9bb640cb4` `feat(cli): migrate a 0.3.9 or 0.4 database before the server opens it` | `cli/src/server-process.ts` (+3), `server/src/legacy-migrate.ts` (`guard`, `backupPath`), `cli/src/commands/handlers/migrate.ts` (имя копии из `backupPath`), `cli/test/legacy-guard.test.ts` (новый) | `clean` |
+| следующий | этот раздел, `catalog.md` (CAT-12) | |
+
+### Где проверка и что делает
+
+Все запуски сервера продукта проходят через `processEffect` в `cli/src/server-process.ts`:
+
+- `serve --service` — фоновая служба: её запускают Desktop (`desktop/src/main/service/background-service.ts`) и CLI
+  (`service-config.ts`);
+- `serve` — автономный сервер `--standalone` (`services/standalone.ts`);
+- `serve --stdio`.
+
+Встроенный хост SDK (`sdk/src/internal/host.ts`, `createEmbeddedRoutes`) продукт не использует.
+
+Перед `import("@opencode/server/process")` добавлены три строки: комментарий, динамический импорт
+`@opencode/server/legacy-migrate` и `yield* LegacyMigrate.guard(databasePath(global.data))`. Вызов стоит после проверки
+действующей службы (`findIncumbent`): если служба уже работает, новый процесс выходит, ничего не открывая. Он стоит и
+после переменных окружения из конфига службы, поэтому путь тот же, что уйдёт в `start({ database })`.
+
+`guard(file)` в `server/src/legacy-migrate.ts`. Сначала признак: файл открывается на чтение через `bun:sqlite`, и
+переносится только база 0.3.9/0.4 (есть `project`, `session`, `message`, `part`, нет `session_v2`) — тот же признак,
+по которому `migrate` принимает источник. Затем перенос: `run({ source: file, target: file, backup: backupPath(file) })`,
+код `migrate` без изменений.
+
+- База 0.3.9/0.4 переносится, оригинал становится `loginom-ai-agent.v1-backup.db`, в журнал службы пишется
+  `logWarning` с итогами.
+- База v2, отсутствующий файл и файл, который не читается как база, проходят к серверу без записи, как раньше. Цена —
+  одно открытие файла на чтение при старте.
+- База в памяти и сборка Node — пропуск (Node не читает базу v1, см. ниже).
+- ошибка — `MigrateError`: «The Loginom AI Agent 0.3.9/0.4 database … could not be migrated, so the server does not
+  start: <причина>». `index.ts` печатает её в stderr (через этот канал Desktop видит причину сбоя запуска), код 1.
+  Временный файл удаляется, оригинал не меняется.
+
+Первый вариант вызывал `run` на любом файле. Полный прогон `cli` дал 3 новых падения в
+`test/service-lifecycle.test.ts`: `a server that fails to boot reports the failure without respawning`,
+`deleting a failed service registration stops its owner`, `a failed service stays registered and owns the selected
+port until stopped`. Эти тесты кладут каталог на место базы: сбой загрузки должен наступать после регистрации службы.
+`run` не мог открыть каталог и останавливал старт раньше регистрации, с сообщением о переносе. Поэтому сначала признак:
+нечитаемый файл — не база 0.4, его судьба — как в upstream. После правки эти три теста и новые проходят вместе
+(13 / 0).
+
+**Автоперенос, а не отказ.** Перенос внутри службы оказался не больше отказа. Общий код уже был в `server`,
+импорт тот же, что у `migrate`, слои не переставлялись. `guard` вызывается до сборки слоёв сервера, на `Global` процесса
+`serve`. Отказ «сначала `migrate`» был бы той же проверкой без переноса.
+
+### Тесты
+
+`cli/test/legacy-guard.test.ts`: запуск `serve --port 0` из исходников, `isolatedEnv`. `LOGINOM_AI_AGENT_DB` указывает
+на `<root>/loginom-ai-agent.db`, туда восстанавливается фикстура B3.1. Сессии читаются через `GET /api/session`.
+
+1. 0.4: служба отдаёт 3 сессии, хеш `loginom-ai-agent.v1-backup.db` равен оригиналу. Второй запуск на уже перенесённой
+   базе (v2): снова 3 сессии, копия та же.
+2. 0.3.9: 3 сессии, копия равна оригиналу.
+3. Перенос не удался (в базе 0.4 сессия `zzz`, её v2 не принимает): сервер не начал слушать, в stderr
+   `could not be migrated, so the server does not start: cannot copy session zzz`, код 1. Хеш оригинала тот же, других
+   файлов `*.db*` нет.
+
+Без перехвата эта база открылась бы штатным путём v2 и потеряла бы сессии, как в S4. Поэтому тест 3 проверяет и отказ,
+и сохранность.
+
+Мутации (`server-process.ts` подменялся на время прогона и возвращался):
+
+```text
+# проверка выключена: вызов guard закомментирован
+$ cd packages/cli && bun test --timeout 30000 test/legacy-guard.test.ts
+Expected length: 3
+Received length: 0
+(fail) serve on a 0.3.9/0.4 database > migrates a 0.4 profile first, keeps the original as the backup and later starts on the result as before
+Expected length: 3
+Received length: 0
+(fail) serve on a 0.3.9/0.4 database > migrates a 0.3.9 profile first
+Received: "http://127.0.0.1:32861"
+(fail) serve on a 0.3.9/0.4 database > does not start when the migration fails and leaves the original alone
+ 0 pass
+ 3 fail
+
+# ошибка переноса подавлена: guard(...).pipe(Effect.ignore)
+Received: "http://127.0.0.1:42431"
+(fail) serve on a 0.3.9/0.4 database > does not start when the migration fails and leaves the original alone
+ 2 pass
+ 1 fail
+```
+
+### Ручные проверки
+
+Собранный CLI `latest` (`opencode v2.3.0-b31b`, `script/build.ts --single --skip-install --skip-web-ui`). Профиль
+0.4 лежит в каталоге prod `<root>/data/loginom-ai-agent/loginom-ai-agent.db`, то есть по пути новой базы. Запуск
+`opencode session list --format json` из каталога сессий фикстуры, `env -i`, `HOME` и `XDG_*` указывают в корень,
+`LOGINOM_AI_AGENT_SERVICE_IDENTITY` и `_PORT` (U5) — свои. CLI сам поднял фоновую службу `serve --service`, как это
+делает Desktop. Служба перенесла базу перед открытием:
+
+- появилась `loginom-ai-agent.v1-backup.db` с хешем оригинала (`c36e2481…`);
+- в новой базе 3 сессии и 12 сообщений;
+- зарегистрирован `service-b31b-check.json`;
+- остановка — `opencode service stop`.
+
+`session list` при этом вернул `[]` — это не потеря, а находка ниже.
+
+Сборка Node (`script/build-node.ts --single --bundle-only --skip-install`): код 0, то же предупреждение о
+`transformSession`, что в B3.1. `serve --port 0` под Node 24.19.0 на пустом профиле стартует
+(`server listening on http://127.0.0.1:…`), проверка пропущена.
+
+### Находка: сессии 0.4 из каталогов без git не видны в списке сессий каталога
+
+Утверждение раздела B3.1 («Где решал сам», «Без `resolveDirectory`») неверно. Там сказано, что v2 переносит сессии
+проекта `global` в проект каталога, когда тот разрешается. Но `Worktree.Event.Resolved` публикуется только для
+проектов с VCS: `core/src/project.ts`, `persist` — `if (!project.vcs) return project`. Каталог без git получает свой
+проект `Hash.fast("directory:…")`, а сессии 0.4 этого каталога остаются в `global`. Проверено на собранном `latest`:
+
+- в базе после `session list` проект `074db918…` с `worktree` `/tmp/loginom-fixture/project` есть;
+- все три сессии по-прежнему `project_id = global`;
+- `session list` (сессии текущего проекта) — `[]`.
+
+`GET /api/session` из тестов отдаёт все сессии, поэтому тесты B3.1 и B3.1b это не ловят. Сессии из git-репозиториев
+не затронуты: 0.4 уже хранил их под ID проекта git. Исправление — шаг `resolveDirectory` из `V1Migration.run` (проект
+каталога через `Project.Service`, слой `Project.node` с `Bus`, `Database`, `FSUtil`, `Git`, `AppProcess`) в
+`legacy-migrate.ts`. Это за пределами B3.1b, не делал; предложение — отдельная задача до B3.3.
+
+### Приёмка
+
+База — `05957cf699`: `cli` 411 / 9 / 0, `server` 133 / 1 / 0, `catalog-check` 430 файлов (итог B3.1 в его разделе).
+Итог — `e9bb640cb4`, после него — только этот раздел и `catalog.md`. Сравнивались числа и имена упавших тестов.
+
+| Пакет | Команда | База | Итог |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 411 pass, 9 skip, 0 fail | 414 pass (+3 `legacy-guard`), 9 skip, 0 fail |
+| `server` | `bun test` | 133 pass, 1 skip, 0 fail | 133 pass, 1 skip, 0 fail |
+
+`core` и остальные пакеты не менялись.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 430 divergent upstream files                  # как на базе: server-process.ts уже расходился (CAT-12)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                                     # код 0
+$ cd packages/cli && bun typecheck; cd ../server && bun typecheck   # код 0 у обоих
+$ bun run check                                                     # код 0
+Found 517 warnings and 0 errors.                                    # как на базе; в изменённых файлах предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Место проверки — `cli/src/server-process.ts`, не `server`.** Здесь уже вычисляется путь базы (`databasePath`) и
+  отсюда идут все запуски сервера продукта. В `server/src/process.ts` или `routes.ts` проверке понадобилось бы имя копии
+  и правило каналов, а встроенный хост SDK, который продукт не использует, получил бы перенос, о котором не просил.
+  Правка upstream — три строки, запись CAT-12.
+- **Проверка на каждом старте, а не только при первом.** Признак переноса — сама база: v2 или нет. Отдельного флага
+  «перенос уже был» нет, поэтому база 0.4, подложенная на место позже, тоже поймается.
+- **Сборка Node пропускает проверку.** Под Node `#v1-migration` — пустой модуль, а `bun:sqlite` нет. Отказ стартовать
+  остановил бы и все базы v2. Продукт поставляет сборку Bun (B1.6); дыра S4 в сборке Node остаётся, она записана.
+- **Прерванная замена файлов не останавливает службу.** Если базы по пути нет, а копия `.v1-backup.db` есть (сбой
+  между двумя переименованиями `migrate`), `guard` файла не видит, и служба создаёт пустую базу. `migrate` в этом
+  случае отказывает и просит вернуть копию, служба — нет: копия может остаться и после того, как пользователь сам удалил
+  базу v2. Данные остаются в копии.
+
+### Не проверено
+
+- Windows и macOS; живые профили — B3.3.
+- Время старта службы на большом профиле: перенос идёт до прослушивания порта. Desktop ждёт регистрацию 120 с — B4.
+- Два одновременных переноса одной базы (служба и автономный сервер, служба и `migrate`). Временный файл общий, а
+  перенос не закрыт `Flock`: второй может удалить временный файл первого. Что тогда получится, не проверялось.
+- Сборка Node: проверка пропускается, дыра S4 остаётся.
+- Desktop: служба поднималась из CLI (`session list`), а не из окна приложения — B4.
