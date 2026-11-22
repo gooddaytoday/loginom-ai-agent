@@ -896,6 +896,39 @@ describe("loginom file profile tools (B2.5b1)", () => {
   }
 
   it.live(
+    "a symlink redirected during the read question fails the profile, and the other file is not profiled",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const first = test.dir + "/first.csv",
+          second = test.dir + "/second.csv",
+          alias = test.dir + "/alias.csv"
+        yield* Effect.promise(async () => {
+          await fs.writeFile(first, "region;amount\nNorth;25\n")
+          await fs.writeFile(second, "private;value\nhidden;1\n")
+          await fs.symlink(first, alias)
+        })
+        const ctx = yield* test.call()
+        test.hooks.ask = async (action) => {
+          if (action !== "read") return
+          await fs.rm(alias)
+          await fs.symlink(second, alias)
+        }
+        const error = yield* rejected(() =>
+          tools(test.files, test.profiles).loginom_file_profile.execute({ path: "alias.csv" }, ctx),
+        )
+        test.hooks.ask = undefined
+        expect(message(error)).toContain("LOGINOM_FILE_CHANGED")
+        expect(message(error)).not.toContain("hidden")
+        const stored = yield* Effect.promise(() =>
+          fs.readdir(path.join(test.profiles, ctx.sessionID)).catch(() => [] as string[]),
+        )
+        expect(stored).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "a scan stopped during its question stays partial; a profile of another session is unknown there",
     () =>
       Effect.gen(function* () {
