@@ -1,12 +1,13 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
-// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host lease arrives in stage B2.3, the Loginom tools
-// in B2.5.
+// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
+// (`./host`); this plugin leases it for its sessions (B2.3). The Loginom tools arrive in B2.5.
 import { join } from "node:path"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { fileTools } from "./file-profile"
+import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
 import { apply, bundled, hub } from "./skills"
@@ -64,13 +65,56 @@ export default Plugin.define({
         )
     })
 
-    // Local data files for Loginom (B2.5a). The Host lease is stage B2.3: until then `loginom_file_admit` answers
-    // LOGINOM_HOST_NOT_READY. The file profile tools (B2.5b1) need no Host. Like every `loginom_*` tool, they need the
-    // `loginom-automation` grant. `package_docs_run` (B2.5c) needs neither Host nor browser, only the `package-docs` grant.
+    // Host lease (B2.3, G3): one Host run per session execution, as 0.4 `turnLifecycle.acquireRun` held one per run. It
+    // is taken when the execution starts, or by the first tool that needs it if that comes first, and released when the
+    // execution succeeds, fails or is interrupted; a steer prompt joins the running execution and its lease. A plugin
+    // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`.
+    const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
+    const hold = (sessionID: string) => {
+      const current = leases.get(sessionID) ?? ServiceHost.acquire(sessionID)
+      leases.set(sessionID, current)
+      return current
+    }
+    const drop = async (sessionID: string) => {
+      const current = leases.get(sessionID)
+      leases.delete(sessionID)
+      const lease = await current
+      if (lease) await ServiceHost.release(lease)
+    }
+    const stop = new AbortController()
+    void (async () => {
+      const types = [
+        "session.execution.started",
+        "session.execution.succeeded",
+        "session.execution.failed",
+        "session.execution.interrupted",
+      ] as const
+      for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
+        if (event.type === "session.execution.started") void hold(event.data.sessionID)
+        else await drop(event.data.sessionID)
+      }
+    })().catch(() => undefined)
+    // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
+    // process has not seen a prompt for (resumed after a restart) uses its latest user message.
+    const tasks = new Map<string, string>()
+    const task = async (sessionID: string) =>
+      tasks.get(sessionID) ??
+      (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
+      ""
+
+    // Local data files for Loginom (B2.5a). `loginom_file_admit` takes the execution's Host lease and answers
+    // LOGINOM_HOST_NOT_READY only without one. The file profile tools (B2.5b1) need no Host. Like every `loginom_*` tool,
+    // they need the `loginom-automation` grant. `package_docs_run` (B2.5c) needs neither Host nor browser, only the
+    // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
     await ctx.tool.transform((editor) => {
-      editor.add(files.admitTool(() => undefined))
+      editor.add(
+        files.admitTool(async (sessionID) => {
+          const host = await hold(sessionID)
+          return host && { host, userMessage: await task(sessionID) }
+        }),
+      )
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
       editor.add(packageDocs(files, ctx.location.directory, resources))
     })
@@ -101,6 +145,7 @@ export default Plugin.define({
     // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
     // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
     await ctx.session.hook("prompt", (event) => {
+      tasks.set(event.sessionID, event.messageID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       const wizard = typeof value === "string" ? pending.get(value) : undefined
@@ -127,5 +172,10 @@ export default Plugin.define({
         return { granted: true }
       },
     })
+
+    return async () => {
+      stop.abort()
+      await Promise.all([...leases.keys()].map(drop))
+    }
   },
 })

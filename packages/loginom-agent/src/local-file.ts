@@ -256,7 +256,7 @@ export async function localFiles(
 
   // Model-facing name, description and input as in 0.4. Without a Host lease there is no Loginom run to admit into;
   // 0.4 did not offer the tool then.
-  const admitTool = (lease: (sessionID: string) => Lease | undefined): Info => ({
+  const admitTool = (lease: (sessionID: string) => Promise<Lease | undefined> | Lease | undefined): Info => ({
     name: "loginom_file_admit",
     description:
       "Register one local data file by its literal path (relative to the session directory or absolute), including files of several GiB. Files over 16 MiB use a private streaming snapshot, without sending bytes through IPC. Returns an input artifact for dock_artifact_deliver; does not upload it. Register each source separately, including equal filenames in different folders. For a local .lgp use loginom_dock_prepare with local_package_path.",
@@ -268,7 +268,7 @@ export async function localFiles(
     },
     options: { codemode: false },
     execute: async (input, call) => {
-      const current = lease(call.sessionID)
+      const current = await lease(call.sessionID)
       if (!current) throw Error(hostErrorText("LOGINOM_HOST_NOT_READY"))
       const path = (input as { path: string }).path
       await ask(call, { action: "loginom_file_admit", resources: ["*"], save: ["*"] }).catch((error) => {
