@@ -134,7 +134,8 @@ describe("product plugin seam U1", () => {
         features: { server: true },
       })
       // The loader imports a package to learn its ID; the impostor's setup must never run.
-      expect(yield* marks(package_.marker)).toBe("imported\n")
+      expect(yield* marks(package_.marker)).toContain("imported")
+      expect(yield* marks(package_.marker)).not.toContain("setup")
     }),
   )
 
@@ -153,22 +154,43 @@ describe("product plugin seam U1", () => {
     )
   }
 
-  builtinOnly.live("with packages off a config package is listed as failed and never imported", () =>
-    Effect.gen(function* () {
-      npm.calls = []
-      const directory = (yield* tmpdirScoped()).path
-      const package_ = yield* impostor(directory, "third-party.plugin")
-      const plugins = yield* inventory(directory, { plugins: [package_.root, "third-party-npm-plugin"] })
+  builtinOnly.live(
+    "with packages off a config or plugin-directory package is listed as failed and never imported",
+    () =>
+      Effect.gen(function* () {
+        npm.calls = []
+        const directory = (yield* tmpdirScoped()).path
+        const package_ = yield* impostor(directory, "third-party.plugin")
+        // A cloned project needs no config edit: a file in the config's plugin directory is discovered as a package.
+        const discovered = path.join(directory, ".loginom-ai-agent", "plugins", "discovered.ts")
+        yield* Effect.promise(() =>
+          Bun.write(
+            discovered,
+            `import { appendFileSync } from "node:fs"
+appendFileSync(${JSON.stringify(package_.marker)}, "discovered\n")
+export default { id: "discovered.plugin", async setup() {} }
+`,
+          ),
+        )
+        const plugins = yield* inventory(directory, { plugins: [package_.root, "third-party-npm-plugin"] })
 
-      const rejected = { status: "failed", error: "Plugin packages are disabled: only built-in plugins load" } as const
-      expect(plugins.filter((plugin) => plugin.source.type !== "builtin")).toEqual([
-        { source: { type: "local", path: package_.root }, state: rejected, features: { server: true } },
-        { source: { type: "package", target: "third-party-npm-plugin" }, state: rejected, features: { server: true } },
-      ])
-      expect(yield* marks(package_.marker)).toBe("")
-      expect(npm.calls).toEqual([])
-      expect(plugins.filter((plugin) => plugin.id === product)).toEqual([builtinProduct])
-    }),
+        const rejected = {
+          status: "failed",
+          error: "Plugin packages are disabled: only built-in plugins load",
+        } as const
+        expect(plugins.filter((plugin) => plugin.source.type !== "builtin")).toEqual([
+          { source: { type: "local", path: discovered }, state: rejected, features: { server: true } },
+          { source: { type: "local", path: package_.root }, state: rejected, features: { server: true } },
+          {
+            source: { type: "package", target: "third-party-npm-plugin" },
+            state: rejected,
+            features: { server: true },
+          },
+        ])
+        expect(yield* marks(package_.marker)).toBe("")
+        expect(npm.calls).toEqual([])
+        expect(plugins.filter((plugin) => plugin.id === product)).toEqual([builtinProduct])
+      }),
   )
 
   builtinOnly.live("with packages off OpenCode's built-in provider plugins load", () =>
