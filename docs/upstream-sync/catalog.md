@@ -11,7 +11,7 @@
 
 **Как сохраняется честность каталога.** `catalog.json` относит каждый такой файл к записи по маске пути; побеждает первая подходящая запись. `scripts/upstream-sync/catalog-check.py` завершается ошибкой, если файл не попал ни в одну запись, запись без `pending` осталась без файлов, у записи с `pending` появились файлы или идентификаторы в `catalog.json` и в этом документе разошлись. Проверка входит в процедуру ([procedure.md](procedure.md)), её результат на итоговом SHA — в отчёте. Число файлов в записях меняется с каждой правкой форка, поэтому документ его не хранит: состав по записям и задачи записей с `pending` выдаёт `python3 -I scripts/upstream-sync/catalog-check.py --summary`.
 
-**Имена.** Пакеты upstream носят имена OpenCode 2: область `@opencode/*`, пакет агента — `@opencode/cli` в `packages/cli`. Пакеты только форка сохраняют область `@loginom-ai-agent`. Каталог данных продукта — `loginom-ai-agent` (CAT-13). Внешние имена продукта (`LOGINOM_AI_AGENT_*`, `.loginom-ai-agent`, `loginom-ai-agent.json(c)`, `loginom-ai-agent.db`, `loginom-ai-agent.settings`, `loginom-ai-agent.updater`) применены к дереву v2 командой `apply-identity` (B1.4a, 330 файлов). Её правки лежат в записях по маскам путей: CAT-02 (46 файлов), CAT-09 (21), CAT-10 (74), CAT-11 (18), CAT-12 (166), CAT-13 (5). Что команда не меняет и что осталось руками — журнал переноса, раздел B1.4a.
+**Имена.** Пакеты upstream носят имена OpenCode 2: область `@opencode/*`, пакет агента — `@opencode/cli` в `packages/cli`. Пакеты только форка сохраняют область `@loginom-ai-agent`. Каталог данных продукта — `loginom-ai-agent` (CAT-13). Внешние имена продукта (`LOGINOM_AI_AGENT_*`, `.loginom-ai-agent`, `loginom-ai-agent.json(c)`, `loginom-ai-agent.db`, `loginom-ai-agent.settings`, `loginom-ai-agent.updater`) применены к дереву v2 командой `apply-identity` (B1.4a). Её правки лежат в записях по маскам путей: CAT-02, CAT-09…CAT-13. Что команда не меняет и что осталось руками — журнал переноса, раздел B1.4a.
 
 ## Политики владения
 
@@ -35,7 +35,7 @@
 
 ## CAT-02 CI, сборка, выпуск, гигиена репозитория
 
-- **Назначение.** `.gitignore`: блок `# Loginom AI Agent` из семи строк форка, в том числе `/packages/opencode/config.json` для пакета, которого в v2 нет. `.gitleaksignore`: версия форка. `.husky/pre-push`: версия v2.3.0 плюс первая строка `bun run secrets push "$1"`. `packages/cli/script/service-smoke.ts` и `packages/core/script/test.ts`: каталог продукта `loginom-ai-agent` вместо `opencode` (B1.3a). По смыслу это перевод из CAT-12, но маска `packages/*/script/**` стоит здесь раньше. Имена продукта от `apply-identity` (B1.4a) в 46 файлах: workflows и скрипты выпуска upstream в `.github/` (22), `script/` (4), скрипты пакетов (`packages/*/script/**`, `packages/cli/bin/**`) и конфиги Desktop `electron*.ts` с их тестами. Переменные `OPENCODE_ZIG_CPU` и `OPENCODE_REAL_ZIG` в workflows не переименованы: их читает только `process-daemon` (`build.rs`, `script/release-bin/zig`). `.gitleaksignore`: ещё блок из 8 отпечатков без коммита — строки тестов upstream с искусственными домашними каталогами, которые изменил `apply-identity` (B1.4a).
+- **Назначение.** `.gitignore`: блок `# Loginom AI Agent` из семи строк форка, в том числе `/packages/opencode/config.json` для пакета, которого в v2 нет. `.gitleaksignore`: версия форка. `.husky/pre-push`: версия v2.3.0 плюс первая строка `bun run secrets push "$1"`. `packages/cli/script/service-smoke.ts` и `packages/core/script/test.ts`: каталог продукта `loginom-ai-agent` вместо `opencode` (B1.3a). По смыслу это перевод из CAT-12, но маска `packages/*/script/**` стоит здесь раньше. Имена продукта от `apply-identity` (B1.4a): workflows и скрипты выпуска upstream в `.github/`, `script/`, скрипты пакетов (`packages/*/script/**`, `packages/cli/bin/**`) и конфиги Desktop `electron*.ts` с их тестами. Переменные `OPENCODE_ZIG_CPU` и `OPENCODE_REAL_ZIG` в workflows не переименованы: их читает только `process-daemon` (`build.rs`, `script/release-bin/zig`). `.gitleaksignore`: ещё блок из 8 отпечатков без коммита — строки тестов upstream с искусственными домашними каталогами, которые изменил `apply-identity` (B1.4a).
 - **Почему не вынесено.** Хук, `.gitignore` и список исключений сканера — по одному файлу на репозиторий. Скрипты пакетов upstream записывают путь каталога данных литералом.
 - **Компоненты.** `.gitignore`, `.gitleaksignore`, `.husky/pre-push`, `packages/cli/script/service-smoke.ts`, `packages/core/script/test.ts`; файлы, где `apply-identity` поменял имена (B1.4a).
 - **Проверка при обновлении.** `packages/product/test/repo-paths.test.ts` (ключи turbo, `--filter`, фильтры путей workflows, `working-directory`, пути в скриптах); `bun run secrets staged` и `bun run secrets range` по правилу В-93 (шаг 2.8 [процедуры](procedure.md)).
@@ -84,7 +84,7 @@
 
 ## CAT-09 Desktop: главный процесс, preload, renderer
 
-- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в 21 файле `src/`: переменные режимов разработки и тестов `LOGINOM_AI_AGENT_*`, файлы настроек `loginom-ai-agent.settings` и `loginom-ai-agent.updater`, каталог `.loginom-ai-agent`. До B1.4a у записи было `pending: B4`.
+- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в `src/`: переменные режимов разработки и тестов `LOGINOM_AI_AGENT_*`, файлы настроек `loginom-ai-agent.settings` и `loginom-ai-agent.updater`, каталог `.loginom-ai-agent`. До B1.4a у записи было `pending: B4`.
 - **Почему не вынесено.** Имена — литералы кода upstream.
 - **Компоненты.** Маска `packages/desktop/**` (после значков и ресурсов CAT-03, скриптов и `electron*.ts` CAT-02, файлов U5 CAT-13).
 - **Проверка при обновлении.** `apply-identity.py --check`; `bun test` и `bun typecheck` в `packages/desktop`.
@@ -93,7 +93,7 @@
 
 ## CAT-10 Веб-приложение, UI-кит, UI сессии
 
-- **Назначение.** Имена продукта от `apply-identity` (B1.4a): `app` — 72 файла (`loginom-ai-agent.json` в строках словарей и тестах, `LOGINOM_AI_AGENT_*` в тестах и e2e), `ui` — 2. До B1.4a у записи было `pending: этап C`.
+- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в `app` (`loginom-ai-agent.json` в строках словарей и тестах, `LOGINOM_AI_AGENT_*` в тестах и e2e) и `ui`. До B1.4a у записи было `pending: этап C`.
 - **Почему не вынесено.** Имена — литералы кода upstream.
 - **Компоненты.** Маски `packages/app/**`, `packages/ui/**`, `packages/session-ui/**`.
 - **Проверка при обновлении.** `apply-identity.py --check`; `bun test` и `bun typecheck` в `packages/app` и `packages/ui`.
@@ -102,7 +102,7 @@
 
 ## CAT-11 Терминальный интерфейс
 
-- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в 18 файлах: `LOGINOM_AI_AGENT_*`, каталог `.loginom-ai-agent`, `loginom-ai-agent.json`, `loginom-ai-agent.settings`. Файлы тем `src/theme/assets/opencode.json` и `assets/v2/opencode.json` и ссылки на них не менялись: это тема, а не конфиг. Тест `test/cli/tui/inline-tool-wrap-snapshot.test.tsx` исключён из команды: его снимок держит перенос строк образца. До B1.4a у записи было `pending: B1.4, B2.3, B2.5d`.
+- **Назначение.** Имена продукта от `apply-identity` (B1.4a): `LOGINOM_AI_AGENT_*`, каталог `.loginom-ai-agent`, `loginom-ai-agent.json`, `loginom-ai-agent.settings`. Файлы тем `src/theme/assets/opencode.json` и `assets/v2/opencode.json` и ссылки на них не менялись: это тема, а не конфиг. Тест `test/cli/tui/inline-tool-wrap-snapshot.test.tsx` исключён из команды: его снимок держит перенос строк образца. До B1.4a у записи было `pending: B1.4, B2.3, B2.5d`.
 - **Почему не вынесено.** Имена — литералы кода upstream.
 - **Компоненты.** Маска `packages/tui/**`.
 - **Проверка при обновлении.** `apply-identity.py --check`; `bun test` и `bun typecheck` в `packages/tui`.
@@ -111,7 +111,7 @@
 
 ## CAT-12 Ядро: идентичность и общие пакеты
 
-- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в 166 файлах пакетов `cli`, `core`, `server`, `client`, `util`, `gui-plugins`, `plugin`, `schema`, `script`, `simulation`: чтения и тесты `LOGINOM_AI_AGENT_*` (`OPENCODE_API_KEY` и `OPENCODE_GO_API_KEY` — ключи провайдеров, остались), каталог `.loginom-ai-agent`, файлы `loginom-ai-agent.json(c)` и `loginom-ai-agent.db`. Тесты upstream, где путь каталога данных записан литералом `opencode`, переведены на `loginom-ai-agent` (B1.3a): `packages/cli/test/{debug-config,debug-heap-dump,debug-paths,server-connection,service-lifecycle,service,upgrade}.test.ts`, `packages/core/test/preload.test.ts`, `packages/server/test/fetch.test.ts`, `packages/util/test/global.test.ts` (плюс проверка, что каталогов `opencode` нет). `packages/core/test/config/config.test.ts`: системный каталог и MDM-файл продукта (B1.3b). Сами каталоги — CAT-13.
+- **Назначение.** Имена продукта от `apply-identity` (B1.4a) в пакетах `cli`, `core`, `server`, `client`, `util`, `gui-plugins`, `plugin`, `schema`, `script`, `simulation`: чтения и тесты `LOGINOM_AI_AGENT_*` (`OPENCODE_API_KEY` и `OPENCODE_GO_API_KEY` — ключи провайдеров, остались), каталог `.loginom-ai-agent`, файлы `loginom-ai-agent.json(c)` и `loginom-ai-agent.db`. Тесты upstream, где путь каталога данных записан литералом `opencode`, переведены на `loginom-ai-agent` (B1.3a): `packages/cli/test/{debug-config,debug-heap-dump,debug-paths,server-connection,service-lifecycle,service,upgrade}.test.ts`, `packages/core/test/preload.test.ts`, `packages/server/test/fetch.test.ts`, `packages/util/test/global.test.ts` (плюс проверка, что каталогов `opencode` нет). `packages/core/test/config/config.test.ts`: системный каталог и MDM-файл продукта (B1.3b). Сами каталоги — CAT-13.
 - **Почему не вынесено.** Имена и пути — литералы кода и тестов upstream.
 - **Компоненты.** Файлы `apply-identity` и одиннадцать тестов выше; маска `packages/**` ловит остальное, что не забрали записи раньше.
 - **Проверка при обновлении.** `apply-identity.py --check`; `packages/cli/test/flag-identity.test.ts` (унаследованные `OPENCODE_*` не меняют каталоги, конфиг, БД и пароль продукта), `packages/product/test/names.test.ts` (код читает только `LOGINOM_AI_AGENT_*` и ключи провайдеров); `bun test` в `packages/cli`, `packages/core`, `packages/server`, `packages/util`.
