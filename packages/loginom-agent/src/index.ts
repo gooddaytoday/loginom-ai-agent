@@ -6,6 +6,7 @@ import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { fileTools } from "./file-profile"
 import { localFiles } from "./local-file"
 import { apply, bundled, hub } from "./skills"
 
@@ -62,9 +63,14 @@ export default Plugin.define({
     })
 
     // Local data files for Loginom (B2.5a). The Host lease is stage B2.3: until then `loginom_file_admit` answers
-    // LOGINOM_HOST_NOT_READY. Like every `loginom_*` tool, it needs the `loginom-automation` grant.
-    const files = await localFiles(ctx, join(Global.Path.data, "file-profiles"))
-    await ctx.tool.transform((editor) => editor.add(files.admitTool(() => undefined)))
+    // LOGINOM_HOST_NOT_READY. The file profile tools (B2.5b1) need no Host. Like every `loginom_*` tool, they need the
+    // `loginom-automation` grant.
+    const profiles = join(Global.Path.data, "file-profiles")
+    const files = await localFiles(ctx, profiles)
+    await ctx.tool.transform((editor) => {
+      editor.add(files.admitTool(() => undefined))
+      fileTools(files, profiles).forEach((tool) => editor.add(tool))
+    })
 
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.
     const hide = (event: SessionContext) => {

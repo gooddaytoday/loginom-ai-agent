@@ -26,6 +26,8 @@ import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { fileReferences } from "../../loginom-host/src/file-reference"
+import { fileTools } from "../../loginom-agent/src/file-profile"
+import { profileFile, sampleFile } from "../../loginom-agent/src/file-profile-core"
 import { localFiles, type Lease } from "../../loginom-agent/src/local-file"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
@@ -108,16 +110,6 @@ const boot = Effect.gen(function* () {
             asked.push({ sessionID: event.sessionID, action: event.action })
             await hooks.ask?.(event.action)
           })
-          // Stand-in for B2.5b's sample tool: its completed result is the receipt the module reads from history.
-          await ctx.tool.transform((editor) =>
-            editor.add({
-              name: "loginom_file_sample",
-              description: "Stand-in sample tool",
-              input: { type: "object", properties: { receipt: { type: "string" } }, required: ["receipt"] },
-              options: { codemode: false },
-              execute: async (input) => ({ content: (input as { receipt: string }).receipt }),
-            }),
-          )
           ready.resolve({ plugin: ctx, files: await localFiles(ctx, profiles) })
         },
       }),
@@ -177,6 +169,46 @@ const boot = Effect.gen(function* () {
     llm
       .requests()
       .pipe(Effect.map((all) => all.filter((request) => header(request) === sessionID && request.tools.length > 0)))
+  // Imports session `sessionID` (rules: allow everything) whose history holds one completed `loginom_file_sample` call
+  // with `content`, as 0.4's tests wrote that tool part. The product's own `loginom_file_sample` (last in `post`) keeps
+  // its profiles under the machine's data directory, outside the test's `profiles`.
+  const sampled = (sessionID: Session.ID, content: string) =>
+    Effect.gen(function* () {
+      const template = yield* create()
+      yield* Effect.promise(async () => {
+        const info = await (await handler(new Request(`http://opencode.local/api/session/${template}`))).json()
+        const response = await handler(
+          new Request("http://opencode.local/api/experimental/session/import", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              info: { ...info.data, id: sessionID },
+              location: { directory: dir },
+              messages: [
+                {
+                  id: "msg_sample",
+                  type: "assistant",
+                  agent: "build",
+                  model: model.ref,
+                  content: [
+                    {
+                      type: "tool",
+                      id: "call_sample",
+                      name: "loginom_file_sample",
+                      executed: true,
+                      state: { status: "completed", input: {}, content: [{ type: "text", text: content }] },
+                      time: { created: 1, ran: 1, completed: 2 },
+                    },
+                  ],
+                  time: { created: 1, completed: 2 },
+                },
+              ],
+            }),
+          }),
+        )
+        if (response.status !== 200) throw new Error(`import: ${response.status} ${await response.text()}`)
+      })
+    })
   return {
     dir,
     profiles,
@@ -188,6 +220,7 @@ const boot = Effect.gen(function* () {
     prompt,
     wizard,
     requests,
+    sampled,
     hooks,
     asked: (sessionID: string) => asked.filter((item) => item.sessionID === sessionID).map((item) => item.action),
   }
@@ -494,42 +527,29 @@ describe("loginom local file admission (B2.5a)", () => {
         Effect.gen(function* () {
           if (mode === "case" && process.platform !== "win32") return
           const test = yield* boot
-          const ctx = yield* test.call()
-          const other = yield* test.call()
-          const owner = mode === "other-session" ? other : ctx
-          const dir = path.join(test.profiles, owner.sessionID)
+          // The session whose history holds the sample's receipt.
+          const owner = Session.ID.create()
+          const dir = path.join(test.profiles, owner)
           const outside = dir + "-outside"
           const external = path.join(outside, "input.csv")
-          // 0.4 made the sample with B2.5b's `profileFile` and `sampleFile`; until then the receipt is written here: a
-          // sample file in the session's `file-profiles` and its SHA-256.
+          // As in 0.4: the sample comes from `profileFile` and `sampleFile`, and its receipt is their result.
           const sample = yield* Effect.promise(async () => {
             await fs.mkdir(outside, { recursive: true })
             await fs.writeFile(external, "outside")
-            await fs.writeFile(path.join(test.dir, "input.csv"), "region;amount\nNorth;25\nSouth;50\n")
-            await fs.mkdir(dir, { recursive: true })
-            const file = path.join(dir, `${randomUUID()}.sample.csv`)
-            const bytes = "region;amount\nNorth;25\n"
-            await fs.writeFile(file, bytes)
-            return { path: file, manifest: { sha256: createHash("sha256").update(bytes).digest("hex") } }
+            const source = path.join(test.dir, "input.csv")
+            await fs.writeFile(source, "region;amount\nNorth;25\nSouth;50\n")
+            const profile = await profileFile(source, dir)
+            return sampleFile(profile.profile_id, dir, { max_records: 1 })
           })
-          yield* test.wizard(
-            owner.sessionID,
-            "loginom-automation",
-            script(
-              {
-                tool: "loginom_file_sample",
-                input: { receipt: mode === "malformed" ? "invalid JSON" : JSON.stringify(sample) },
-              },
-              { text: "sampled" },
-            ),
-          )
+          yield* test.sampled(owner, mode === "malformed" ? "invalid JSON" : JSON.stringify(sample))
+          const ctx = yield* test.call(mode === "other-session" ? undefined : owner)
           const file =
             mode === "parent"
               ? path.join(dir, "..", path.basename(sample.path))
               : mode === "unissued"
                 ? path.join(dir, "unissued.csv")
                 : mode === "traversal"
-                  ? dir + "/../" + owner.sessionID + "/" + path.basename(sample.path)
+                  ? dir + "/../" + owner + "/" + path.basename(sample.path)
                   : mode === "case"
                     ? sample.path.toUpperCase()
                     : sample.path
@@ -771,6 +791,189 @@ describe("loginom local file admission (B2.5a)", () => {
         expect(JSON.stringify(grantedRequests[1].messages)).toContain("LOGINOM_HOST_NOT_READY")
         expect(JSON.stringify(grantedRequests[1].messages)).not.toContain("LOGINOM_SCOPE_DENIED")
         for (const sessionID of [plain, docs, granted]) expect(test.asked(sessionID)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+// The file profile tools of the product plugin (B2.5b1), ported from 0.4
+// `a080f7725c:packages/opencode/src/tool/loginom-file-profile.ts`; the profile core has its own test in
+// `packages/loginom-agent`. The harness builds the tools over its own `localFiles` and calls them with a synthetic tool
+// call, as the cases above call `admitTool`. The re-authorization cases come from 0.4 `test/session/profile-tools.test.ts`.
+describe("loginom file profile tools (B2.5b1)", () => {
+  const tools = (files: Parameters<typeof fileTools>[0], profiles: string) =>
+    Object.fromEntries(fileTools(files, profiles).map((tool) => [tool.name, tool]))
+  const content = (result: { content?: unknown }) => JSON.parse(String(result.content))
+
+  it.live(
+    "each tool asks for itself and re-authorizes the original; the sample's result admits the sample without a question",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const file = test.dir + "/input.csv"
+        yield* Effect.promise(() => fs.writeFile(file, "region;amount\nNorth;25\nSouth;50\n"))
+        const ctx = yield* test.call()
+        const tool = tools(test.files, test.profiles)
+        // A relative path resolves against the Location directory, not the service's working directory.
+        const profile = yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: "input.csv" }, ctx))
+        expect(profile.metadata).toEqual({ truncated: false })
+        const profiled = content(profile)
+        expect(profiled).toMatchObject({ format: "csv", identity: { canonical_path: file }, settings_complete: true })
+        const scan = content(
+          yield* Effect.promise(() => tool.loginom_file_scan.execute({ profile_id: profiled.profile_id }, ctx)),
+        )
+        expect(scan).toMatchObject({ profile_id: profiled.profile_id, status: "exact", records: 2 })
+        expect(scan.index).toBeUndefined()
+        const result = yield* Effect.promise(() =>
+          tool.loginom_file_sample.execute({ profile_id: profiled.profile_id, max_records: 1 }, ctx),
+        )
+        const sample = content(result)
+        expect(path.dirname(sample.path)).toBe(path.join(test.profiles, ctx.sessionID))
+        expect(sample).toMatchObject({ manifest_path: sample.path + ".manifest.json", offset_count: 2 })
+        expect(sample.manifest.offsets).toBeUndefined()
+        expect(sample.manifest.sha256).toBe(
+          createHash("sha256")
+            .update(yield* Effect.promise(() => fs.readFile(sample.path)))
+            .digest("hex"),
+        )
+        expect(test.asked(ctx.sessionID)).toEqual([
+          "loginom_file_profile",
+          "read",
+          "loginom_file_scan",
+          "read",
+          "loginom_file_sample",
+          "read",
+        ])
+        // The receipt stays far below the 50 KiB at which OpenCode cuts a result; a set `truncated` skips the cut.
+        expect(result.metadata).toEqual({ truncated: false })
+        expect(Buffer.byteLength(String(result.content))).toBeLessThan(8 * 1024)
+
+        // The same session with the call in its history: the result is the receipt that admits the sample.
+        yield* test.sessions.remove(ctx.sessionID)
+        yield* test.sampled(ctx.sessionID, String(result.content))
+        const admitted = yield* Effect.promise(() => test.files.authorize(sample.path, ctx))
+        expect(admitted.canonicalPath).toBe(sample.path)
+        expect(test.asked(ctx.sessionID).slice(6)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  for (const change of ["disappears", "changes", "is replaced", "symlink is redirected"] as const) {
+    const code = change === "disappears" ? "LOGINOM_FILE_NOT_FOUND" : "LOGINOM_FILE_CHANGED"
+    it.live(
+      `profile tools preserve ${code} when the original file ${change} before reauthorization`,
+      () =>
+        Effect.gen(function* () {
+          const test = yield* boot
+          const file = test.dir + "/profile-source.csv"
+          yield* Effect.promise(async () => {
+            if (change !== "symlink is redirected") return fs.writeFile(file, "region;amount\nNorth;1,25\n")
+            await fs.writeFile(file + ".target", "region;amount\nNorth;1,25\n")
+            await fs.symlink(file + ".target", file)
+          })
+          const ctx = yield* test.call()
+          const tool = tools(test.files, test.profiles)
+          const id = content(yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: file }, ctx)))
+            .profile_id
+          yield* Effect.promise(async () => {
+            if (change === "disappears") await fs.rm(file)
+            if (change === "changes") await fs.writeFile(file, "region;amount\nNorth;1,25\nSouth;2,5\n")
+            if (change === "is replaced") {
+              await fs.rename(file, file + ".old")
+              await fs.writeFile(file, "region;amount\nNorth;1,25\n")
+            }
+            if (change === "symlink is redirected") {
+              await fs.writeFile(file + ".new", "region;amount\nNorth;1,25\n")
+              await fs.rm(file)
+              await fs.symlink(file + ".new", file)
+            }
+          })
+          for (const name of ["loginom_file_scan", "loginom_file_sample"])
+            expect(message(yield* rejected(() => tool[name].execute({ profile_id: id }, ctx)))).toContain(code)
+        }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+      timeout,
+    )
+  }
+
+  it.live(
+    "a scan stopped during its question stays partial; a profile of another session is unknown there",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        yield* Effect.promise(() => fs.writeFile(test.dir + "/input.csv", "region;amount\nNorth;25\nSouth;50\n"))
+        const ctx = yield* test.call()
+        const tool = tools(test.files, test.profiles)
+        const id = content(yield* Effect.promise(() => tool.loginom_file_profile.execute({ path: "input.csv" }, ctx)))
+          .profile_id
+        const stop = new AbortController()
+        test.hooks.ask = async (action) => {
+          if (action === "read") stop.abort()
+        }
+        const scan = content(
+          yield* Effect.promise(() =>
+            tool.loginom_file_scan.execute({ profile_id: id }, { ...ctx, signal: stop.signal }),
+          ),
+        )
+        test.hooks.ask = undefined
+        expect(scan).toMatchObject({ profile_id: id, status: "partial", records_observed: 0 })
+        expect(scan.records).toBeUndefined()
+
+        const other = yield* test.call()
+        expect(yield* rejected(() => tool.loginom_file_scan.execute({ profile_id: id }, other))).toBeDefined()
+        expect(test.asked(other.sessionID)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the product's file profile tools are hidden and rejected without the loginom-automation grant (G1 gate)",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const profileTools = ["loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
+        // Each input fails inside its tool before a profile is written: the product's own tools keep profiles under
+        // the machine's data directory.
+        const calls = script(
+          { tool: "loginom_file_profile", input: { path: "missing.csv" } },
+          { tool: "loginom_file_scan", input: { profile_id: "unknown" } },
+          { tool: "loginom_file_sample", input: { profile_id: "unknown" } },
+          { text: "end" },
+        )
+        const refused = (requests: LLMRequest[]) => {
+          for (const name of profileTools) expect(names(requests[0])).not.toContain(name)
+          const answers = JSON.stringify(requests[3].messages)
+          for (const name of profileTools) expect(answers).toContain(`LOGINOM_SCOPE_DENIED: tool ${name}`)
+          expect(answers).not.toMatch(/LOGINOM_FILE_(?:NOT_FOUND|FORMAT_AMBIGUOUS)/)
+        }
+        // No grant, and package-docs: not offered, and every call is rejected by the gate before the tool runs.
+        const plain = yield* test.create()
+        yield* test.prompt(plain, calls)
+        refused(yield* test.requests(plain))
+        const docs = yield* test.create()
+        yield* test.wizard(docs, "package-docs", calls)
+        refused(yield* test.requests(docs))
+
+        // loginom-automation: 0.4's file tools, offered with the product's definitions, and each call reaches its tool.
+        const granted = yield* test.create()
+        yield* test.wizard(granted, "loginom-automation", calls)
+        const grantedRequests = yield* test.requests(granted)
+        expect(
+          names(grantedRequests[0])
+            .filter((name) => name.startsWith("loginom_file_"))
+            .sort(),
+        ).toEqual(["loginom_file_admit", "loginom_file_profile", "loginom_file_sample", "loginom_file_scan"])
+        for (const tool of fileTools(test.files, test.profiles))
+          expect(grantedRequests[0].tools.find((item) => item.name === tool.name)).toMatchObject({
+            description: tool.description,
+            inputSchema: tool.input,
+          })
+        const answers = JSON.stringify(grantedRequests[3].messages)
+        expect(answers).toContain("LOGINOM_FILE_NOT_FOUND")
+        expect(answers.split("unknown profile_id in this session")).toHaveLength(3)
+        expect(answers).not.toContain("LOGINOM_SCOPE_DENIED")
+        expect(test.asked(plain)).toEqual([])
+        expect(test.asked(docs)).toEqual([])
+        expect(test.asked(granted)).toEqual(["loginom_file_profile"])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
