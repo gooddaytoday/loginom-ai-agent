@@ -21,7 +21,7 @@
       ]
     },
     { "id": "CAT-04", "title": "Upstream endpoints: updates, installer, sharing", "paths": [], "pending": "B2.7d, B4.1" },
-    { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.3, B2.5, B2.6, B2.9" },
+    { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.5, B2.6, B2.9" },
     {
       "id": "CAT-06",
       "title": "Skills and commands",

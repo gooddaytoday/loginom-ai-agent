@@ -84,6 +84,17 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Loginom AI Agent (B3.1b): a 0.3.9/0.4 database at this path is migrated before v2 opens it, or the start fails.
       const { LegacyMigrate } = yield* Effect.promise(() => import("@opencode/server/legacy-migrate"))
       yield* LegacyMigrate.guard(databasePath(global.data))
+      // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
+      // process left before any Location activates or a suspended session resumes.
+      const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
+      const host = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          ServiceHost.start({ data: global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
+        ),
+        () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
+      )
+      if (host.recovered.length)
+        yield* Effect.logWarning("recovered Loginom Host leases of a stopped server", { sessions: host.recovered })
       const { start } = yield* Effect.promise(() => import("@opencode/server/process"))
       const environmentPassword = yield* Env.password
       // Keep the lease credential out of the environment inherited by tools.
