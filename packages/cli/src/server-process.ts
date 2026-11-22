@@ -135,6 +135,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           windows: {
             gitbash: process.env.LOGINOM_AI_AGENT_GIT_BASH_PATH,
           },
+          // Loginom AI Agent loads built-in server plugins only (В-80); there is no switch.
+          pluginPackages: false,
           fs: {
             filewatcher: !truthy(process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER),
             fff:

@@ -45,6 +45,8 @@ export const ServerOptions = Schema.Struct({
       gitbash: Schema.optional(Schema.String),
     }),
   ),
+  /** `false` loads built-in plugins only: config and plugin-directory packages are listed as failed, never imported. */
+  pluginPackages: Schema.optional(Schema.Boolean),
   fs: Schema.optional(
     Schema.Struct({
       filewatcher: Schema.optional(Schema.Boolean),

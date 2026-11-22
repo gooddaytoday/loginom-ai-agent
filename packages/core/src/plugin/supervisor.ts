@@ -10,6 +10,7 @@ import { Plugin } from "../plugin.js"
 import { InstancePlugins } from "./instance.js"
 import { PluginInternal } from "./internal.js"
 import { PluginModule } from "./module.js"
+import { PluginProduct } from "./product.js"
 import { SdkPlugins } from "./sdk.js"
 import { PluginUpdate } from "./update.js"
 import { Watcher } from "../filesystem/watcher.js"
@@ -24,6 +25,7 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
 ) {
   const matches = (selector: string, target: string) =>
     selector === "*" || (selector.endsWith(".*") ? target.startsWith(selector.slice(0, -1)) : selector === target)
+  const policy = yield* PluginProduct.Packages
   const definitions = [...pre, ...post]
   const enabled = new Set(definitions.map((plugin) => plugin.id))
   const packages = new Map<string, Plugin.Generation>()
@@ -48,6 +50,15 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
       operation.target.startsWith("opencode.")
     if (selectsPlugins) {
       matched.forEach((plugin) => enabled.add(plugin.id))
+      continue
+    }
+    // Built-in plugins only: list the package as failed before loading, so its module is never imported.
+    if (!policy.allowed) {
+      failures.set(operation.target, {
+        source: PluginModule.source(operation.target),
+        state: { status: "failed", error: "Plugin packages are disabled: only built-in plugins load" },
+        features: { server: true },
+      })
       continue
     }
 
@@ -249,6 +260,7 @@ const nodeDeps = [
   InstancePlugins.node,
   ConfigPluginSource.node,
   PluginUpdate.node,
+  PluginProduct.node,
   Bus.node,
   Npm.node,
   Watcher.node,
