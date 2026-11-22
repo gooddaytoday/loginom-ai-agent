@@ -287,7 +287,7 @@ export const dict = {
   "error.chain.responseBody": "Răspuns:\n{{body}}",
   "error.chain.didYouMean": "Ai vrut să scrii: {{suggestions}}",
   "error.chain.modelNotFound": "Modelul nu a fost găsit: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Verifică numele provider/model în config (opencode.json)",
+  "error.chain.checkConfig": "Verifică numele provider/model în config (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'Serverul MCP "{{name}}" a eșuat. Atenție, OpenCode nu suportă încă autentificarea MCP.',
   "error.chain.providerAuthFailed": "Autentificarea providerului a eșuat ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -596,7 +596,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP-uri",
   "settings.extensions.tab.skills": "Abilități",
   "settings.extensions.availableAll": "Disponibil pentru toate proiectele",
-  "settings.extensions.manageConfig": "Gestionează în opencode.json",
+  "settings.extensions.manageConfig": "Gestionează în loginom-ai-agent.json",
   "settings.extensions.addSkills": "Cum se adaugă abilități",
   "project.settings.extensions.description": "Vezi extensiile disponibile pentru acest proiect",
   "project.settings.extensions.tab.lsps": "LSP-uri",
@@ -766,8 +766,8 @@ export const dict = {
   "project.settings.color.description":
     "Folosit pentru pictograma proiectului când nu este setată nicio imagine personalizată",
   "project.settings.worktree.startup.description": "Rulează o dată după crearea unui nou arbore de lucru",
-  "project.settings.worktree.startup.hint.base": "Utilizați $OPENCODE_WORKTREE_BASE pentru arborele de lucru de bază.",
-  "project.settings.worktree.startup.hint.new": "Utilizați $OPENCODE_WORKTREE_PATH pentru noul arbore de lucru.",
+  "project.settings.worktree.startup.hint.base": "Utilizați $LOGINOM_AI_AGENT_WORKTREE_BASE pentru arborele de lucru de bază.",
+  "project.settings.worktree.startup.hint.new": "Utilizați $LOGINOM_AI_AGENT_WORKTREE_PATH pentru noul arbore de lucru.",
   "project.settings.extensions.empty.mcps.title": "Nu MCPs încă",
   "project.settings.extensions.empty.mcps.description": "MCPs disponibil pentru OpenCode va apărea aici",
   "project.settings.extensions.empty.plugins.title": "Nu există încă pluginuri",

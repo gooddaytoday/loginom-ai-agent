@@ -8,7 +8,7 @@ const MINIMUM_PROVIDERS = 100
 export const committedSnapshot = new URL("../src/models-dev/snapshot.txt", import.meta.url)
 
 export async function fetchModelsSnapshot() {
-  const source = process.env.OPENCODE_MODELS_URL || "https://models.opencode.ai"
+  const source = process.env.LOGINOM_AI_AGENT_MODELS_URL || "https://models.opencode.ai"
   const url = `${source}${ModelsDev.catalogPath}`
   const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
   if (!response.ok) throw new Error(`${url} returned ${response.status} ${response.statusText}`)
@@ -65,7 +65,7 @@ async function validateModelsSnapshot(text: string) {
 }
 
 export async function bundledModelsSnapshot() {
-  const file = process.env.OPENCODE_MODELS_SNAPSHOT
+  const file = process.env.LOGINOM_AI_AGENT_MODELS_SNAPSHOT
   if (!file) return Bun.file(committedSnapshot).text()
   const snapshot = await validateModelsSnapshot(await Bun.file(file).text())
   console.log(`bundling models.dev catalog from ${file} (${snapshot.providers} providers)`)

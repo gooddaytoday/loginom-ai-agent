@@ -65,8 +65,8 @@ export const dict = {
   "project.settings.color.description":
     "Bruges til projektikonet, når der ikke er indstillet et brugerdefineret billede",
   "project.settings.worktree.startup.description": "Kører én gang efter oprettelse af et nyt arbejdsområde",
-  "project.settings.worktree.startup.hint.base": "Brug $OPENCODE_WORKTREE_BASE til basisarbejdsområdet.",
-  "project.settings.worktree.startup.hint.new": "Brug $OPENCODE_WORKTREE_PATH til det nye arbejdsområde.",
+  "project.settings.worktree.startup.hint.base": "Brug $LOGINOM_AI_AGENT_WORKTREE_BASE til basisarbejdsområdet.",
+  "project.settings.worktree.startup.hint.new": "Brug $LOGINOM_AI_AGENT_WORKTREE_PATH til det nye arbejdsområde.",
   "project.settings.extensions.empty.mcps.title": "Ingen MCPs endnu",
   "project.settings.extensions.empty.mcps.description": "MCPs tilgængelig for OpenCode vises her",
   "project.settings.extensions.empty.plugins.title": "Ingen plugins endnu",
@@ -446,7 +446,7 @@ export const dict = {
   "error.chain.responseBody": "Svarindhold:\n{{body}}",
   "error.chain.didYouMean": "Mente du: {{suggestions}}",
   "error.chain.modelNotFound": "Model ikke fundet: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Kontrollér udbyder- og modelnavnene i din konfiguration (opencode.json)",
+  "error.chain.checkConfig": "Kontrollér udbyder- og modelnavnene i din konfiguration (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'MCP-server "{{name}}" fejlede. Bemærk, OpenCode understøtter ikke MCP-godkendelse endnu.',
   "error.chain.providerAuthFailed": "Udbydergodkendelse mislykkedes ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -823,7 +823,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP'er",
   "settings.extensions.tab.skills": "Færdigheder",
   "settings.extensions.availableAll": "Tilgængelig til alle projekter",
-  "settings.extensions.manageConfig": "Administrer i opencode.json",
+  "settings.extensions.manageConfig": "Administrer i loginom-ai-agent.json",
   "settings.extensions.addSkills": "Sådan tilføjer du færdigheder",
   "project.settings.extensions.description": "Se tilgængelige udvidelser til dette projekt",
   "project.settings.extensions.tab.lsps": "LSP'er",

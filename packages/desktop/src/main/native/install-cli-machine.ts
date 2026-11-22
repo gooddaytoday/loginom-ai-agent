@@ -4,7 +4,7 @@ export type InstallCliOutcome =
 
 /**
  * The macOS `Install CLI…` menu action. One installer runs at a time, and a click while it runs or while its result
- * dialog is open does nothing: two installers would write the same `~/.opencode/bin/opencode` and shell profiles.
+ * dialog is open does nothing: two installers would write the same `~/.loginom-ai-agent/bin/opencode` and shell profiles.
  */
 export type InstallCliState =
   | { readonly status: "idle"; readonly attempt: number }

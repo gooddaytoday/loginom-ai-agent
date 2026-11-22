@@ -233,7 +233,7 @@ const setup: Plugin.MainSetup = (ctx) => {
   if (!debugBuild(ctx.app)) return
 
   // The environment turns diagnostics on for this launch; otherwise the debug bar's stored toggle does.
-  const envInterval = memoryLogInterval(process.env.OPENCODE_DESKTOP_MEMORY_LOG)
+  const envInterval = memoryLogInterval(process.env.LOGINOM_AI_AGENT_DESKTOP_MEMORY_LOG)
   const interval = envInterval ?? 30_000
   // Without the launch switch, Chromium quantizes renderer heap sizes and refreshes them rarely.
   const precise = app.commandLine.hasSwitch("enable-precise-memory-info")

@@ -798,7 +798,7 @@ function resolveDirectory(directory: string) {
 
 function nextPath(options: Options, data: string) {
   if (options.nextDatabasePath) return options.nextDatabasePath
-  if (process.env.OPENCODE_DB === ":memory:") return undefined
+  if (process.env.LOGINOM_AI_AGENT_DB === ":memory:") return undefined
   return path.join(data, "opencode-next.db")
 }
 

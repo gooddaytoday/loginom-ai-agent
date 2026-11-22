@@ -360,8 +360,8 @@ test.each([false, true])("production footer preserves wrapped input and status o
 
 test("explicit theme refresh reloads custom colors without a palette event", async () => {
   await using tmp = await tmpdir()
-  const previous = process.env.OPENCODE_CONFIG_DIR
-  process.env.OPENCODE_CONFIG_DIR = tmp.path
+  const previous = process.env.LOGINOM_AI_AGENT_CONFIG_DIR
+  process.env.LOGINOM_AI_AGENT_CONFIG_DIR = tmp.path
   const app = await setup({ mono: false, theme: { name: "mini-refresh", mode: "dark" } })
   app.renderer.getPalette = async () => {
     throw new Error("no OSC response")
@@ -390,8 +390,8 @@ test("explicit theme refresh reloads custom colors without a palette event", asy
   } finally {
     app.footer.destroy()
     app.renderer.destroy()
-    if (previous === undefined) delete process.env.OPENCODE_CONFIG_DIR
-    else process.env.OPENCODE_CONFIG_DIR = previous
+    if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CONFIG_DIR
+    else process.env.LOGINOM_AI_AGENT_CONFIG_DIR = previous
   }
 })
 

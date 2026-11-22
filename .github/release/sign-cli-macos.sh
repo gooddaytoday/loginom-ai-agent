@@ -16,13 +16,13 @@ fi
 export COPYFILE_DISABLE=1
 for target in darwin-arm64 darwin-x64 darwin-x64-baseline; do
   work=$(mktemp -d)
-  tar -xzf "$in/opencode-cli-$target-$OPENCODE_VERSION.tgz" -C "$work"
+  tar -xzf "$in/opencode-cli-$target-$LOGINOM_AI_AGENT_VERSION.tgz" -C "$work"
   bin="$work/package/bin/opencode"
   file -b "$bin" | grep -q '^Mach-O' || die "$target is not a Mach-O binary"
   chmod 755 "$bin"
   codesign --force "$timestamp" --options runtime --entitlements "$release_dir/entitlements/cli.plist" --sign "$identity" "$bin"
   codesign --verify --strict --verbose=2 "$bin"
-  tar --no-mac-metadata -czf "$out/opencode-cli-$target-$OPENCODE_VERSION.tgz" -C "$work" package
+  tar --no-mac-metadata -czf "$out/opencode-cli-$target-$LOGINOM_AI_AGENT_VERSION.tgz" -C "$work" package
   touch -t 198001010000 "$bin"
   (cd "$work/package/bin" && zip -X -q "$out/opencode-$target.zip" opencode)
 done

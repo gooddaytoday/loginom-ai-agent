@@ -13,5 +13,5 @@ if ! dry_run; then
 fi
 
 push_git "git@github.com:anomalyco/homebrew-tap.git" \
-  "chore: update opencode-v2 to $OPENCODE_VERSION" bash "$release_dir/render-homebrew.sh" "$1" "$2"
+  "chore: update opencode-v2 to $LOGINOM_AI_AGENT_VERSION" bash "$release_dir/render-homebrew.sh" "$1" "$2"
 publish_update cli homebrew '{"package": "anomalyco/tap/opencode-v2"}'

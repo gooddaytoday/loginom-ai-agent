@@ -299,7 +299,7 @@ export const dict = {
   "error.chain.responseBody": "جواب کا متن:\n\u2068{{body}}\u2069",
   "error.chain.didYouMean": "کیا آپ کا مطلب ہے: \u2068{{suggestions}}\u2069؟",
   "error.chain.modelNotFound": "ماڈل نہیں ملا: \u2068{{provider}}\u2069/\u2068{{model}}\u2069",
-  "error.chain.checkConfig": "اپنی تشکیل (opencode.json) فراہم کنندہ/ماڈل کے نام چیک کریں۔",
+  "error.chain.checkConfig": "اپنی تشکیل (loginom-ai-agent.json) فراہم کنندہ/ماڈل کے نام چیک کریں۔",
   "error.chain.mcpFailed":
     'MCP سرور "\u2068{{name}}\u2069" ناکام ہو گیا۔ نوٹ، OpenCode ابھی تک MCP تصدیق کو سپورٹ نہیں کرتا ہے۔',
   "error.chain.providerAuthFailed":
@@ -575,7 +575,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCPs",
   "settings.extensions.tab.skills": "مہارتیں",
   "settings.extensions.availableAll": "تمام پروجیکٹس کے لیے دستیاب",
-  "settings.extensions.manageConfig": "opencode.json میں نظم کریں",
+  "settings.extensions.manageConfig": "loginom-ai-agent.json میں نظم کریں",
   "settings.extensions.addSkills": "مہارتیں شامل کرنے کا طریقہ",
   "project.settings.extensions.description": "اس پروجیکٹ کے لیے دستیاب ایکسٹینشنز دیکھیں",
   "project.settings.extensions.tab.lsps": "LSPs",
@@ -784,8 +784,8 @@ export const dict = {
   "project.settings.icon.description": "تجویز کردہ: 128×128px۔ تصویر اپ لوڈ کرنے کے لیے کلک کریں یا گھسیٹیں۔",
   "project.settings.color.description": "پروجیکٹ آئیکن کے لیے استعمال کیا جاتا ہے جب کوئی حسب ضرورت تصویر سیٹ نہ ہو۔",
   "project.settings.worktree.startup.description": "نیا ورک ٹری بنانے کے بعد ایک بار چلتا ہے۔",
-  "project.settings.worktree.startup.hint.base": "بیس ورک ٹری کے لیے $OPENCODE_WORKTREE_BASE استعمال کریں۔",
-  "project.settings.worktree.startup.hint.new": "نئے ورک ٹری کے لیے $OPENCODE_WORKTREE_PATH استعمال کریں۔",
+  "project.settings.worktree.startup.hint.base": "بیس ورک ٹری کے لیے $LOGINOM_AI_AGENT_WORKTREE_BASE استعمال کریں۔",
+  "project.settings.worktree.startup.hint.new": "نئے ورک ٹری کے لیے $LOGINOM_AI_AGENT_WORKTREE_PATH استعمال کریں۔",
   "project.settings.extensions.empty.mcps.title": "ابھی تک کوئی MCPs نہیں ہیں۔",
   "project.settings.extensions.empty.mcps.description": "OpenCode کو دستیاب MCPs یہاں ظاہر ہوں گے۔",
   "project.settings.extensions.empty.plugins.title": "ابھی تک کوئی پلگ ان نہیں ہے۔",

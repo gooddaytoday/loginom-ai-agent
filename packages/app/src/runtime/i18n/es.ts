@@ -67,8 +67,8 @@ export const dict = {
   "project.settings.color.description":
     "Se utiliza para el icono del proyecto cuando no se establece ninguna imagen personalizada.",
   "project.settings.worktree.startup.description": "Se ejecuta una vez después de crear un nuevo espacio de trabajo.",
-  "project.settings.worktree.startup.hint.base": "Utilice $OPENCODE_WORKTREE_BASE para el espacio de trabajo base.",
-  "project.settings.worktree.startup.hint.new": "Utilice $OPENCODE_WORKTREE_PATH para el nuevo espacio de trabajo.",
+  "project.settings.worktree.startup.hint.base": "Utilice $LOGINOM_AI_AGENT_WORKTREE_BASE para el espacio de trabajo base.",
+  "project.settings.worktree.startup.hint.new": "Utilice $LOGINOM_AI_AGENT_WORKTREE_PATH para el nuevo espacio de trabajo.",
   "project.settings.extensions.empty.mcps.title": "Aún no hay MCPs",
   "project.settings.extensions.empty.mcps.description": "MCPs disponible para OpenCode aparecerá aquí",
   "project.settings.extensions.empty.plugins.title": "Aún no hay complementos",
@@ -532,7 +532,7 @@ export const dict = {
   "error.chain.responseBody": "Cuerpo de la respuesta:\n{{body}}",
   "error.chain.didYouMean": "¿Quizá quisiste decir {{suggestions}}?",
   "error.chain.modelNotFound": "Modelo no encontrado: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Comprueba los nombres de proveedor/modelo en tu configuración (opencode.json)",
+  "error.chain.checkConfig": "Comprueba los nombres de proveedor/modelo en tu configuración (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'El servidor MCP "{{name}}" falló. Nota: OpenCode aún no admite la autenticación MCP.',
   "error.chain.providerAuthFailed": "Autenticación de proveedor fallida ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -845,7 +845,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP",
   "settings.extensions.tab.skills": "Habilidades",
   "settings.extensions.availableAll": "Disponible para todos los proyectos",
-  "settings.extensions.manageConfig": "Administrar en opencode.json",
+  "settings.extensions.manageConfig": "Administrar en loginom-ai-agent.json",
   "settings.extensions.addSkills": "Cómo agregar habilidades",
   "project.settings.extensions.description": "Ver extensiones disponibles para este proyecto",
   "project.settings.extensions.tab.lsps": "LSP",

@@ -375,7 +375,7 @@ function resourceMcpLayer(
     name?: string
     credentials?: Partial<Credential.Interface>
     bus?: Layer.Layer<Bus.Service>
-    /** `OPENCODE_FLAGS`, such as `-mcp_events`. */
+    /** `LOGINOM_AI_AGENT_FLAGS`, such as `-mcp_events`. */
     flags?: string
   },
 ) {

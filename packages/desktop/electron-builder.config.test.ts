@@ -19,22 +19,22 @@ const channels = [
 ] as const
 
 function load(channel: string, target?: string): Configuration {
-  const previous = process.env.OPENCODE_CHANNEL
-  const previousTarget = process.env.OPENCODE_TARGET
-  process.env.OPENCODE_CHANNEL = channel
+  const previous = process.env.LOGINOM_AI_AGENT_CHANNEL
+  const previousTarget = process.env.LOGINOM_AI_AGENT_TARGET
+  process.env.LOGINOM_AI_AGENT_CHANNEL = channel
 
-  if (target !== undefined) process.env.OPENCODE_TARGET = target
-  else delete process.env.OPENCODE_TARGET
+  if (target !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = target
+  else delete process.env.LOGINOM_AI_AGENT_TARGET
 
   try {
     return getConfig()
   } finally {
-    delete process.env.OPENCODE_CHANNEL
-    delete process.env.OPENCODE_TARGET
+    delete process.env.LOGINOM_AI_AGENT_CHANNEL
+    delete process.env.LOGINOM_AI_AGENT_TARGET
 
-    if (previous !== undefined) process.env.OPENCODE_CHANNEL = previous
+    if (previous !== undefined) process.env.LOGINOM_AI_AGENT_CHANNEL = previous
 
-    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
+    if (previousTarget !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = previousTarget
   }
 }
 

@@ -8,6 +8,6 @@ bash "$release_dir/verify-signatures-windows.sh" "$work"
 mkdir -p "$out"
 if [ ! -d "$work/cli" ]; then exit 0; fi
 for target in windows-arm64 windows-x64 windows-x64-baseline; do
-  tar -czf "$out/opencode-cli-$target-$OPENCODE_VERSION.tgz" -C "$work/cli/$target" package
+  tar -czf "$out/opencode-cli-$target-$LOGINOM_AI_AGENT_VERSION.tgz" -C "$work/cli/$target" package
   powershell -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "$work/cli/$target/package/bin/opencode.exe")' -DestinationPath '$(cygpath -w "$out/opencode-$target.zip")'"
 done

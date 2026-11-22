@@ -29,8 +29,8 @@ export const layer = Layer.effect(
     const fs = yield* FileSystem.FileSystem
     const global = yield* Global.Service
     const file = path.join(global.config, "cli.json")
-    const content = process.env.OPENCODE_CLI_CONFIG_CONTENT
-      ? Option.getOrUndefined(decode(parseRecord(process.env.OPENCODE_CLI_CONFIG_CONTENT)))
+    const content = process.env.LOGINOM_AI_AGENT_CLI_CONFIG_CONTENT
+      ? Option.getOrUndefined(decode(parseRecord(process.env.LOGINOM_AI_AGENT_CLI_CONFIG_CONTENT)))
       : undefined
 
     const readJson = Effect.fnUntraced(function* () {

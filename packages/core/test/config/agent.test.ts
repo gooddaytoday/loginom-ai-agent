@@ -442,9 +442,9 @@ permissions:
           yield* Effect.promise(async () => {
             await fs.mkdir(path.join(tmp.path, "agents", "team"), { recursive: true })
             await fs.mkdir(path.join(tmp.path, "modes"), { recursive: true })
-            await fs.mkdir(path.join(tmp.path, "agents", ".opencode", "node_modules", "probe"), { recursive: true })
+            await fs.mkdir(path.join(tmp.path, "agents", ".loginom-ai-agent", "node_modules", "probe"), { recursive: true })
             await fs.writeFile(
-              path.join(tmp.path, "agents", ".opencode", "node_modules", "probe", "README.md"),
+              path.join(tmp.path, "agents", ".loginom-ai-agent", "node_modules", "probe", "README.md"),
               "# Dependency README",
             )
             await fs.writeFile(
@@ -514,7 +514,7 @@ Use native v2 fields.`,
           expect(themed?.color).toBeUndefined()
           expect(yield* agents.get(Agent.ID.make("disabled"))).toBeUndefined()
           expect(yield* agents.get(Agent.ID.make("empty"))).toBeUndefined()
-          expect(yield* agents.get(Agent.ID.make(".opencode/node_modules/probe/README"))).toBeUndefined()
+          expect(yield* agents.get(Agent.ID.make(".loginom-ai-agent/node_modules/probe/README"))).toBeUndefined()
           expect(yield* agents.get(Agent.ID.make("plan"))).toMatchObject({ system: "Make a plan.", mode: "primary" })
         }),
       ),
@@ -691,7 +691,7 @@ Mixed fields.`,
           )
 
           yield* configTest.emitChange({ type: "create", path: path.join(tmp.path, "commands", "review.md") })
-          yield* configTest.emitChange({ type: "update", path: path.join(tmp.path, "opencode.json") })
+          yield* configTest.emitChange({ type: "update", path: path.join(tmp.path, "loginom-ai-agent.json") })
           yield* drain
           expect(reloads).toBe(0)
 

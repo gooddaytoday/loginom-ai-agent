@@ -197,7 +197,7 @@ type HarnessInput = {
 const setup = Effect.fnUntraced(function* (input?: HarnessInput) {
   const dir = yield* tmpdirScoped()
   if (input?.config)
-    yield* Effect.promise(() => Bun.write(path.join(dir.path, "opencode.json"), JSON.stringify(input.config)))
+    yield* Effect.promise(() => Bun.write(path.join(dir.path, "loginom-ai-agent.json"), JSON.stringify(input.config)))
   const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
   const global = yield* Layer.buildWithScope(tempGlobalLayer, yield* Effect.scope)
   const llmContext = yield* Layer.buildWithScope(llmLayer, yield* Effect.scope)

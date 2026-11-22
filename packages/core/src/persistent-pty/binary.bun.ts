@@ -6,7 +6,7 @@ import asset from "./pty-binding.js"
 export const available = true
 
 export async function resolveBinary(bin: string) {
-  if (process.env.OPENCODE_PTY_BIN) return process.env.OPENCODE_PTY_BIN
+  if (process.env.LOGINOM_AI_AGENT_PTY_BIN) return process.env.LOGINOM_AI_AGENT_PTY_BIN
   if (!asset) return "opencode-pty"
   if (typeof asset === "string") return asset
   return install(bin, asset)

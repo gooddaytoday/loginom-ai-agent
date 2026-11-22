@@ -288,7 +288,7 @@ export const dict = {
   "error.chain.responseBody": "Мақомоти вокуниш:\n{{body}}",
   "error.chain.didYouMean": "Оё шумо дар назар доштед: {{suggestions}}",
   "error.chain.modelNotFound": "Модели ёфт нашуд: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Номҳои провайдери конфигуратсияи худро (opencode.json) санҷед",
+  "error.chain.checkConfig": "Номҳои провайдери конфигуратсияи худро (loginom-ai-agent.json) санҷед",
   "error.chain.mcpFailed":
     'MCP сервери "{{name}}" ноком шуд. Дар хотир доред, ки OpenCode тасдиқи MCP-ро ҳанӯз дастгирӣ намекунад.',
   "error.chain.providerAuthFailed": "Аутентификатсияи провайдер ноком шуд ({{provider}}): {{message}}",
@@ -561,7 +561,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP-ҳо",
   "settings.extensions.tab.skills": "Малакаҳо",
   "settings.extensions.availableAll": "Барои ҳамаи лоиҳаҳо дастрас аст",
-  "settings.extensions.manageConfig": "Дар opencode.json идора кунед",
+  "settings.extensions.manageConfig": "Дар loginom-ai-agent.json идора кунед",
   "settings.extensions.addSkills": "Тарзи илова кардани малакаҳо",
   "project.settings.extensions.description": "Васеъкуниҳои барои ин лоиҳа дастрасро бинед",
   "project.settings.extensions.tab.lsps": "LSP-ҳо",
@@ -777,8 +777,8 @@ export const dict = {
   "project.settings.color.description":
     "Барои тасвири лоиҳа истифода мешавад, вақте ки ягон тасвири фармоишӣ муқаррар карда нашудааст",
   "project.settings.worktree.startup.description": "Пас аз сохтани дарахти нави корӣ як маротиба иҷро мешавад",
-  "project.settings.worktree.startup.hint.base": "Барои дарахти кории асосӣ $OPENCODE_WORKTREE_BASE-ро истифода баред.",
-  "project.settings.worktree.startup.hint.new": "Барои дарахти нави корӣ $OPENCODE_WORKTREE_PATH-ро истифода баред.",
+  "project.settings.worktree.startup.hint.base": "Барои дарахти кории асосӣ $LOGINOM_AI_AGENT_WORKTREE_BASE-ро истифода баред.",
+  "project.settings.worktree.startup.hint.new": "Барои дарахти нави корӣ $LOGINOM_AI_AGENT_WORKTREE_PATH-ро истифода баред.",
   "project.settings.extensions.empty.mcps.title": "Ҳанӯз MCP нест",
   "project.settings.extensions.empty.mcps.description": "MCP-ҳои барои OpenCode дастрас дар ин ҷо пайдо мешаванд",
   "project.settings.extensions.empty.plugins.title": "Ҳоло ягон плагинҳо нест",

@@ -62,7 +62,7 @@ const serviceLayer = Layer.effect(
     yield* Effect.logInfo("app starting", {
       version: VERSION,
       packaged: app.isPackaged,
-      onboardingTest: process.env.OPENCODE_TEST_ONBOARDING === "1",
+      onboardingTest: process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1",
       marks,
     })
     const fibers = yield* FiberSet.make()

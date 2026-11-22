@@ -67,7 +67,7 @@ const configError = (cause: unknown) =>
   })
 
 export const resolve = Effect.fn("DriveManifest.resolve")(function* () {
-  const name = yield* Config.schema(InstanceName, "OPENCODE_DRIVE").pipe(Effect.mapError(configError))
+  const name = yield* Config.schema(InstanceName, "LOGINOM_AI_AGENT_DRIVE").pipe(Effect.mapError(configError))
   if (name === "1") return defaults
 
   const state = yield* Config.String("XDG_STATE_HOME").pipe(

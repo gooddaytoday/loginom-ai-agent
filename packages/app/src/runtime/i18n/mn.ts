@@ -288,7 +288,7 @@ export const dict = {
   "error.chain.responseBody": "Хариу өгөх байгууллага:\n{{body}}",
   "error.chain.didYouMean": "Та: {{suggestions}} гэсэн үг үү",
   "error.chain.modelNotFound": "Загвар олдсонгүй: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Өөрийн тохиргооны (opencode.json) үйлчилгээ үзүүлэгч/загварын нэрийг шалгана уу",
+  "error.chain.checkConfig": "Өөрийн тохиргооны (loginom-ai-agent.json) үйлчилгээ үзүүлэгч/загварын нэрийг шалгана уу",
   "error.chain.mcpFailed":
     'MCP сервер "{{name}}" амжилтгүй боллоо. OpenCode нь MCP баталгаажуулалтыг хараахан дэмждэггүйг анхаарна уу.',
   "error.chain.providerAuthFailed":
@@ -564,7 +564,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP-үүд",
   "settings.extensions.tab.skills": "Ур чадварууд",
   "settings.extensions.availableAll": "Бүх төсөлд ашиглах боломжтой",
-  "settings.extensions.manageConfig": "opencode.json дотор удирдах",
+  "settings.extensions.manageConfig": "loginom-ai-agent.json дотор удирдах",
   "settings.extensions.addSkills": "Ур чадвар хэрхэн нэмэх вэ",
   "project.settings.extensions.description": "Энэ төсөлд ашиглах боломжтой өргөтгөлүүдийг харах",
   "project.settings.extensions.tab.lsps": "LSP-үүд",
@@ -773,8 +773,8 @@ export const dict = {
   "project.settings.icon.description": "Зөвлөж байна: 128×128 пиксел. Зураг оруулахын тулд дарж эсвэл чирнэ үү.",
   "project.settings.color.description": "Өөрчлөн зураг тогтоогоогүй үед төсөлд зориулсан дүрсэнд ашиглана",
   "project.settings.worktree.startup.description": "Шинэ ажлын мод үүсгэсний дараа нэг удаа ажиллана",
-  "project.settings.worktree.startup.hint.base": "Үндсэн ажиллах модыг заахын тулд $OPENCODE_WORKTREE_BASE-ийг ашигла.",
-  "project.settings.worktree.startup.hint.new": "Шинэ ажиллах модны хувьд $OPENCODE_WORKTREE_PATH-г ашиглана уу.",
+  "project.settings.worktree.startup.hint.base": "Үндсэн ажиллах модыг заахын тулд $LOGINOM_AI_AGENT_WORKTREE_BASE-ийг ашигла.",
+  "project.settings.worktree.startup.hint.new": "Шинэ ажиллах модны хувьд $LOGINOM_AI_AGENT_WORKTREE_PATH-г ашиглана уу.",
   "project.settings.extensions.empty.mcps.title": "Одоогоор MCP байхгүй",
   "project.settings.extensions.empty.mcps.description": "OpenCode-д зориулсан MCP-ууд энд гарч ирнэ",
   "project.settings.extensions.empty.plugins.title": "Одоогоор нэмэлтүүд байхгүй",

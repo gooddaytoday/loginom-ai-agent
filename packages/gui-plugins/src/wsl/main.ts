@@ -30,9 +30,9 @@ const setup: Plugin.MainSetup = (ctx) => {
 
   // Development builds of the desktop app can build the Linux CLI from this checkout.
   const local =
-    packaged || !process.env.OPENCODE_DESKTOP_WSL_CLI_BUILD || !process.env.OPENCODE_DESKTOP_WSL_CLI_OUTPUT
+    packaged || !process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD || !process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT
       ? undefined
-      : { script: process.env.OPENCODE_DESKTOP_WSL_CLI_BUILD, output: process.env.OPENCODE_DESKTOP_WSL_CLI_OUTPUT }
+      : { script: process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD, output: process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT }
 
   const log = <Data extends Readonly<Record<string, unknown>>>(level: "info" | "error", message: string, data: Data) =>
     desktopLog.write(level, `[wsl] ${message}`, data)

@@ -43,7 +43,7 @@ const directory = async () => {
 const settingsIn = (root: string): SettingsFiles => {
   const files = new Map<string, SettingsStore>()
 
-  return (file = "opencode.settings") => {
+  return (file = "loginom-ai-agent.settings") => {
     const existing = files.get(file)
 
     if (existing) return existing
@@ -174,20 +174,20 @@ describe("main plugin storage", () => {
     {
       name: "a key of the app's settings file",
       from: { settings: "ssh.servers" },
-      seed: { settings: [{ file: "opencode.settings", key: "ssh.servers", value: [{ id: "a", kept: 1 }] }] },
+      seed: { settings: [{ file: "loginom-ai-agent.settings", key: "ssh.servers", value: [{ id: "a", kept: 1 }] }] },
       id: "a",
       row: '[{"id":"a","kept":1}]',
     },
     {
       name: "a key of another settings file",
-      from: { settings: "ready", file: "opencode.updater" },
-      seed: { settings: [{ file: "opencode.updater", key: "ready", value: [{ id: "u" }] }] },
+      from: { settings: "ready", file: "loginom-ai-agent.updater" },
+      seed: { settings: [{ file: "loginom-ai-agent.updater", key: "ready", value: [{ id: "u" }] }] },
       id: "u",
       row: '[{"id":"u"}]',
     },
     {
       name: "a key of another state namespace",
-      from: { state: ["opencode.settings", "keepScreenActive"] },
+      from: { state: ["loginom-ai-agent.settings", "keepScreenActive"] },
       seed: { state: '[{"id":"s"}]' },
       id: "s",
       row: '[{"id":"s"}]',
@@ -197,34 +197,34 @@ describe("main plugin storage", () => {
       from: { settings: "ssh.servers" },
       seed: {
         renamed: '[{"id":"renamed"}]',
-        settings: [{ file: "opencode.settings", key: "ssh.servers", value: [{ id: "older" }] }],
+        settings: [{ file: "loginom-ai-agent.settings", key: "ssh.servers", value: [{ id: "older" }] }],
       },
       id: "renamed",
       row: '[{"id":"renamed"}]',
     },
     {
       name: "the newest home of a list that holds a value",
-      from: [{ state: ["opencode.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
-      seed: { settings: [{ file: "opencode.settings", key: "ssh.servers", value: [{ id: "older" }] }] },
+      from: [{ state: ["loginom-ai-agent.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
+      seed: { settings: [{ file: "loginom-ai-agent.settings", key: "ssh.servers", value: [{ id: "older" }] }] },
       id: "older",
       row: '[{"id":"older"}]',
     },
     {
       name: "the next home of a list when the first holds a value the schema rejects",
-      from: [{ state: ["opencode.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
+      from: [{ state: ["loginom-ai-agent.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
       seed: {
         state: '"off"',
-        settings: [{ file: "opencode.settings", key: "ssh.servers", value: [{ id: "older" }] }],
+        settings: [{ file: "loginom-ai-agent.settings", key: "ssh.servers", value: [{ id: "older" }] }],
       },
       id: "older",
       row: '[{"id":"older"}]',
     },
     {
       name: "the first home of a list when several hold a value",
-      from: [{ state: ["opencode.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
+      from: [{ state: ["loginom-ai-agent.settings", "keepScreenActive"] }, { settings: "ssh.servers" }],
       seed: {
         state: '[{"id":"newer"}]',
-        settings: [{ file: "opencode.settings", key: "ssh.servers", value: [{ id: "older" }] }],
+        settings: [{ file: "loginom-ai-agent.settings", key: "ssh.servers", value: [{ id: "older" }] }],
       },
       id: "newer",
       row: '[{"id":"newer"}]',
@@ -237,7 +237,7 @@ describe("main plugin storage", () => {
 
     input.seed.settings?.forEach((item) => settings(item.file).set(item.key, item.value))
 
-    if (input.seed.state) state.set("opencode.settings", "keepScreenActive", input.seed.state)
+    if (input.seed.state) state.set("loginom-ai-agent.settings", "keepScreenActive", input.seed.state)
 
     if (input.seed.renamed) state.set("extension.example", "servers", input.seed.renamed)
 
@@ -273,9 +273,9 @@ describe("main plugin storage", () => {
 /** Every older home the table seeds that still holds a value. */
 function homes(state: StateStore, settings: SettingsFiles) {
   return [
-    state.get("opencode.settings", "keepScreenActive"),
+    state.get("loginom-ai-agent.settings", "keepScreenActive"),
     state.get("extension.example", "servers"),
     settings().get("ssh.servers"),
-    settings("opencode.updater").get("ready"),
+    settings("loginom-ai-agent.updater").get("ready"),
   ].filter((value) => value !== null && value !== undefined)
 }

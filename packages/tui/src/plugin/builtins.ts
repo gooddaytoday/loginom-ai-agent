@@ -29,7 +29,7 @@ export const builtins = [
   Merman,
   Latex,
   // The storybook is a development tool; keep its route and palette commands out of
-  // normal launches and register it only for OPENCODE_STORY runs.
-  ...(process.env.OPENCODE_STORY ? [Storybook] : []),
+  // normal launches and register it only for LOGINOM_AI_AGENT_STORY runs.
+  ...(process.env.LOGINOM_AI_AGENT_STORY ? [Storybook] : []),
   DiffViewer,
 ]

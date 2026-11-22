@@ -4,7 +4,7 @@ import { pickerPlugin } from "./script/picker"
 import { nodePtyPackage } from "./script/utils"
 
 function resolveChannel() {
-  const raw = process.env.OPENCODE_CHANNEL
+  const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
 
   if (raw === "local" || raw === "dev" || raw === "beta" || raw === "prod") return raw
 
@@ -44,7 +44,7 @@ export default defineConfig(({ command }) => {
       },
       define: {
         // Local renderer/server mode still uses the dev application identity and updater policy.
-        "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
+        "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
       },
       build: {
         minify: command === "build",
@@ -106,10 +106,10 @@ export default defineConfig(({ command }) => {
         bundledDev: true,
       },
       define: {
-        "import.meta.env.OPENCODE_VERSION": JSON.stringify(process.env.OPENCODE_VERSION),
+        "import.meta.env.LOGINOM_AI_AGENT_VERSION": JSON.stringify(process.env.LOGINOM_AI_AGENT_VERSION),
         "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
-        "import.meta.env.OPENCODE_TEST_ONBOARDING": JSON.stringify(
-          command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
+        "import.meta.env.LOGINOM_AI_AGENT_TEST_ONBOARDING": JSON.stringify(
+          command === "serve" && process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1",
         ),
       },
       plugins: [pickerPlugin(), appPlugin, initialChunk],

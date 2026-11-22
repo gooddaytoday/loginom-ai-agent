@@ -241,8 +241,8 @@ const layer = Layer.effect(
             ChildProcess.make(windows ? command : "bash", windows ? [] : ["-lc", command], {
               cwd: result.directory,
               env: {
-                OPENCODE_WORKTREE_BASE: sourceDirectory,
-                OPENCODE_WORKTREE_PATH: result.directory,
+                LOGINOM_AI_AGENT_WORKTREE_BASE: sourceDirectory,
+                LOGINOM_AI_AGENT_WORKTREE_PATH: result.directory,
               },
               extendEnv: true,
               stdin: "ignore",

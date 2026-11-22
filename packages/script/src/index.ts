@@ -18,12 +18,12 @@ if (!semver.satisfies(process.versions.bun, expectedBunVersionRange)) {
 }
 
 const env = {
-  OPENCODE_CHANNEL: process.env["OPENCODE_CHANNEL"],
-  OPENCODE_VERSION: process.env["OPENCODE_VERSION"],
+  LOGINOM_AI_AGENT_CHANNEL: process.env["LOGINOM_AI_AGENT_CHANNEL"],
+  LOGINOM_AI_AGENT_VERSION: process.env["LOGINOM_AI_AGENT_VERSION"],
 }
 const CHANNEL = await (async () => {
-  if (env.OPENCODE_CHANNEL) return env.OPENCODE_CHANNEL
-  if (env.OPENCODE_VERSION && !env.OPENCODE_VERSION.startsWith("0.0.0-")) return "latest"
+  if (env.LOGINOM_AI_AGENT_CHANNEL) return env.LOGINOM_AI_AGENT_CHANNEL
+  if (env.LOGINOM_AI_AGENT_VERSION && !env.LOGINOM_AI_AGENT_VERSION.startsWith("0.0.0-")) return "latest"
   const branch = await $`git branch --show-current`.text().then((x) => x.trim())
   if (!branch) return "detached"
   const channel = branch.replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -34,8 +34,8 @@ const IS_PREVIEW = CHANNEL !== "latest"
 
 // The release workflow's plan job owns release versions; builds only read them.
 const VERSION = (() => {
-  if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
-  if (!IS_PREVIEW) throw new Error("OPENCODE_VERSION is required for latest-channel builds")
+  if (env.LOGINOM_AI_AGENT_VERSION) return env.LOGINOM_AI_AGENT_VERSION
+  if (!IS_PREVIEW) throw new Error("LOGINOM_AI_AGENT_VERSION is required for latest-channel builds")
   return `0.0.0-${CHANNEL}-${previewBuildNumber()}`
 })()
 

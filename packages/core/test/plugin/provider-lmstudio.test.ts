@@ -308,7 +308,7 @@ describe("LMStudioPlugin", () => {
   it.live("keeps sending the integration's env key after models load", () =>
     Effect.acquireUseRelease(
       Effect.sync(() => {
-        process.env.OPENCODE_TEST_LMSTUDIO_KEY = "env-key"
+        process.env.LOGINOM_AI_AGENT_TEST_LMSTUDIO_KEY = "env-key"
         const requests: Array<string | null> = []
         return {
           requests,
@@ -343,7 +343,7 @@ describe("LMStudioPlugin", () => {
             })
             editor.method.update({
               integrationID: Integration.ID.make("lmstudio"),
-              method: { type: "env", names: ["OPENCODE_TEST_LMSTUDIO_KEY"] },
+              method: { type: "env", names: ["LOGINOM_AI_AGENT_TEST_LMSTUDIO_KEY"] },
             })
           })
           yield* addPlugin(server.url.origin, "5 millis")
@@ -361,7 +361,7 @@ describe("LMStudioPlugin", () => {
         }),
       ({ server }) =>
         Effect.promise(() => server.stop(true)).pipe(
-          Effect.ensuring(Effect.sync(() => delete process.env.OPENCODE_TEST_LMSTUDIO_KEY)),
+          Effect.ensuring(Effect.sync(() => delete process.env.LOGINOM_AI_AGENT_TEST_LMSTUDIO_KEY)),
         ),
     ),
   )

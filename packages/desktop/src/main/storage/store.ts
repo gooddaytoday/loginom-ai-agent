@@ -21,8 +21,8 @@ export type SettingsStore = ReturnType<typeof createSettingsStore>
 //
 // We cannot instantiate the store at module load time because module import hoisting causes this
 // to run before app.setPath("userData", ...) has executed, which would result in files being
-// written to the default directory (e.g. bad: %APPDATA%\@opencode\desktop\opencode.settings vs
-// good: %APPDATA%\ai.opencode.desktop.dev\opencode.settings).
+// written to the default directory (e.g. bad: %APPDATA%\@opencode\desktop\loginom-ai-agent.settings vs
+// good: %APPDATA%\ai.opencode.desktop.dev\loginom-ai-agent.settings).
 export function getStore(name = SETTINGS_STORE) {
   const cached = cache.get(name)
 

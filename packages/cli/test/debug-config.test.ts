@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { OPENCODE_VERSION } from "../src/version"
+import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
 import { redactConfig } from "../src/commands/handlers/debug/redact"
 
 describe("debug config command", () => {
@@ -25,7 +25,7 @@ describe("debug config command", () => {
     const entries = [
       {
         type: "document",
-        path: path.join(project, "opencode.json"),
+        path: path.join(project, "loginom-ai-agent.json"),
         info: {
           permissions: [
             { action: "shell", resource: "*", effect: "ask" },
@@ -52,7 +52,7 @@ describe("debug config command", () => {
         if (url.pathname === "/api/info") {
           healthProbes += 1
           return Response.json({
-            version: OPENCODE_VERSION,
+            version: LOGINOM_AI_AGENT_VERSION,
             pid: process.pid,
             urls: [],
             paths: { tmp: "/tmp/opencode" },
@@ -68,7 +68,7 @@ describe("debug config command", () => {
       await fs.mkdir(path.dirname(registration), { recursive: true })
       await fs.writeFile(
         registration,
-        JSON.stringify({ version: OPENCODE_VERSION, url: server.url.toString(), pid: process.pid, password: "secret" }),
+        JSON.stringify({ version: LOGINOM_AI_AGENT_VERSION, url: server.url.toString(), pid: process.pid, password: "secret" }),
       )
       const result = await cli(["debug", "config"], project, { XDG_STATE_HOME: path.join(root, "state") })
 

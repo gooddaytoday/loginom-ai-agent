@@ -18,7 +18,7 @@ export type StartupTimer = "sidecar" | "hydration" | "fade"
 
 export type LocaleGate = { readonly settled: false } | { readonly settled: true; readonly value: Locale | undefined }
 
-/** Only the first-launch onboarding preview (`OPENCODE_TEST_ONBOARDING` on `/`) waits for the wordmark to draw. */
+/** Only the first-launch onboarding preview (`LOGINOM_AI_AGENT_TEST_ONBOARDING` on `/`) waits for the wordmark to draw. */
 export type DrawingPhase = "not-needed" | "pending" | "running" | "done"
 
 /**

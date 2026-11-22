@@ -145,10 +145,10 @@ function start(root: string, identity: string, port: number) {
       XDG_CONFIG_HOME: path.join(root, "config"),
       XDG_DATA_HOME: path.join(root, "data"),
       XDG_STATE_HOME: path.join(root, "state"),
-      OPENCODE_CONFIG_DIR: undefined,
-      OPENCODE_DB: undefined,
-      OPENCODE_TEST_HOME: undefined,
-      OPENCODE_DISABLE_MODELS_FETCH: "true",
+      LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
+      LOGINOM_AI_AGENT_DB: undefined,
+      LOGINOM_AI_AGENT_TEST_HOME: undefined,
+      LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
       LOGINOM_AI_AGENT_SERVICE_IDENTITY: identity,
       LOGINOM_AI_AGENT_SERVICE_PORT: String(port),
     },
@@ -188,7 +188,7 @@ async function options(root: string, channel: string, env: Record<string, string
     console.log(options.file)
   `
   // The trailing argument stands in for the CLI entrypoint that options() puts into the service command.
-  const define = `OPENCODE_CHANNEL=${JSON.stringify(channel)}`
+  const define = `LOGINOM_AI_AGENT_CHANNEL=${JSON.stringify(channel)}`
   const child = Bun.spawn([process.execPath, "--define", define, "-e", script, path.join(cli, "src/index.ts")], {
     cwd: cli,
     env: {
@@ -202,7 +202,7 @@ async function options(root: string, channel: string, env: Record<string, string
       XDG_CONFIG_HOME: path.join(root, "config"),
       XDG_DATA_HOME: path.join(root, "data"),
       XDG_STATE_HOME: path.join(root, "state"),
-      OPENCODE_CONFIG_DIR: undefined,
+      LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
       LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
       LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
       ...env,
@@ -221,7 +221,7 @@ async function options(root: string, channel: string, env: Record<string, string
 
 function openCodeDirectories(root: string) {
   return readdirSync(root, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && (entry.name === "opencode" || entry.name === ".opencode"))
+    .filter((entry) => entry.isDirectory() && (entry.name === "opencode" || entry.name === ".loginom-ai-agent"))
     .map((entry) => path.join(entry.parentPath, entry.name))
 }
 

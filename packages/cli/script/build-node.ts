@@ -31,10 +31,10 @@ const bundleOnly = process.argv.includes("--bundle-only")
 const single = process.argv.includes("--single")
 const skipInstall = process.argv.includes("--skip-install")
 const appArchiveOnly = process.argv.includes("--app-archive-only")
-const highlights = Script.preview ? undefined : embed(process.env.OPENCODE_RELEASE_NOTES)
-const requestedArchive = process.env.OPENCODE_APP_ARCHIVE
+const highlights = Script.preview ? undefined : embed(process.env.LOGINOM_AI_AGENT_RELEASE_NOTES)
+const requestedArchive = process.env.LOGINOM_AI_AGENT_APP_ARCHIVE
 const archivePath = requestedArchive ? path.resolve(dir, requestedArchive) : undefined
-const requested = process.env.OPENCODE_TARGET
+const requested = process.env.LOGINOM_AI_AGENT_TARGET
 const allTargets = [
   nodeTarget("linux", "arm64"),
   nodeTarget("linux", "x64"),
@@ -51,7 +51,7 @@ const targets = requested
 process.chdir(dir)
 if (!skipInstall) run(process.execPath, ["install", "--os=*", "--cpu=*"])
 if (appArchiveOnly) {
-  if (!archivePath) throw new Error("--app-archive-only requires OPENCODE_APP_ARCHIVE")
+  if (!archivePath) throw new Error("--app-archive-only requires LOGINOM_AI_AGENT_APP_ARCHIVE")
   await mkdir(path.dirname(archivePath), { recursive: true })
   await writeFile(archivePath, await buildAppArchive(Script.channel, Script.version))
   process.exit(0)

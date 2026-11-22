@@ -287,7 +287,7 @@ const withSession = <A, E, R>(
     if (autoBackground !== undefined)
       yield* Effect.promise(() =>
         Bun.write(
-          path.join(directory, "opencode.json"),
+          path.join(directory, "loginom-ai-agent.json"),
           JSON.stringify({ experimental: { shell_timeout_background: autoBackground } }),
         ),
       )
@@ -964,11 +964,11 @@ describe("ShellTool", () => {
             const sessions = yield* Session.Service
             yield* sessions.environment({
               sessionID,
-              variables: { OPENCODE_SESSION_ENV_TEST: "from-session" },
+              variables: { LOGINOM_AI_AGENT_SESSION_ENV_TEST: "from-session" },
             })
             const command = isWindows
-              ? "[Console]::Out.Write($env:OPENCODE_SESSION_ENV_TEST)"
-              : 'printf %s "$OPENCODE_SESSION_ENV_TEST"'
+              ? "[Console]::Out.Write($env:LOGINOM_AI_AGENT_SESSION_ENV_TEST)"
+              : 'printf %s "$LOGINOM_AI_AGENT_SESSION_ENV_TEST"'
 
             const settled = yield* executeTool(registry, call({ command }))
 
@@ -990,11 +990,11 @@ describe("ShellTool", () => {
             const sessions = yield* Session.Service
             yield* sessions.environment({
               sessionID,
-              variables: { AGENT: "0", OPENCODE: "0", AI_AGENT: "", OPENCODE_SESSION_ID: "stale" },
+              variables: { AGENT: "0", OPENCODE: "0", AI_AGENT: "", LOGINOM_AI_AGENT_SESSION_ID: "stale" },
             })
             const command = isWindows
-              ? '[Console]::Out.Write("$env:AGENT|$env:OPENCODE|$env:AI_AGENT|$env:OPENCODE_SESSION_ID")'
-              : 'printf %s "$AGENT|$OPENCODE|$AI_AGENT|$OPENCODE_SESSION_ID"'
+              ? '[Console]::Out.Write("$env:AGENT|$env:OPENCODE|$env:AI_AGENT|$env:LOGINOM_AI_AGENT_SESSION_ID")'
+              : 'printf %s "$AGENT|$OPENCODE|$AI_AGENT|$LOGINOM_AI_AGENT_SESSION_ID"'
             const settled = yield* executeTool(registry, call({ command }))
 
             expect(settled.status).toBe("completed")
@@ -1666,7 +1666,7 @@ describe("ShellTool", () => {
       return Effect.gen(function* () {
         yield* Effect.promise(() =>
           Bun.write(
-            path.join(tmp.path, "opencode.json"),
+            path.join(tmp.path, "loginom-ai-agent.json"),
             JSON.stringify({ tool_output: { max_lines: 2, max_bytes: 1_000 } }),
           ),
         )

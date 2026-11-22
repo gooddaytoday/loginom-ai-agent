@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # tag-release.sh: in a checkout of the dispatched dev commit, commits the release versions and changelog
-# (OPENCODE_RELEASE_NOTES) and pushes only the v<version> tag at it. Writes sha=<commit> to $GITHUB_OUTPUT.
+# (LOGINOM_AI_AGENT_RELEASE_NOTES) and pushes only the v<version> tag at it. Writes sha=<commit> to $GITHUB_OUTPUT.
 # Runs git only, with hooks disabled; no repository code.
 . "$(dirname "$0")/lib.sh"
 
-tag="v$OPENCODE_VERSION"
+tag="v$LOGINOM_AI_AGENT_VERSION"
 if ! dry_run; then
   umask 077
   ssh_dir=$(mktemp -d)
@@ -16,11 +16,11 @@ if ! dry_run; then
   git remote set-url origin git@github.com:anomalyco/opencode.git
 fi
 # @opencode/pty is versioned separately, by process-daemon-v<version> tags.
-git ls-files -z -- '*package.json' bun.lock ':!packages/process-daemon/**' | xargs -0 sed -i -E "s/\"version\": \"[^\"]+\"/\"version\": \"$OPENCODE_VERSION\"/g"
+git ls-files -z -- '*package.json' bun.lock ':!packages/process-daemon/**' | xargs -0 sed -i -E "s/\"version\": \"[^\"]+\"/\"version\": \"$LOGINOM_AI_AGENT_VERSION\"/g"
 
-if [ -n "${OPENCODE_RELEASE_NOTES:-}" ] && ! grep -qF -x "## $tag" CHANGELOG.md && ! grep -qF "## $tag " CHANGELOG.md; then
+if [ -n "${LOGINOM_AI_AGENT_RELEASE_NOTES:-}" ] && ! grep -qF -x "## $tag" CHANGELOG.md && ! grep -qF "## $tag " CHANGELOG.md; then
   notes=$(mktemp)
-  printf '%s\n' "$OPENCODE_RELEASE_NOTES" > "$notes"
+  printf '%s\n' "$LOGINOM_AI_AGENT_RELEASE_NOTES" > "$notes"
   awk -v entry="## $tag — $(date -u +%F)" -v notes="$notes" '
     function emit() { print entry; print ""; while ((getline line < notes) > 0) print line; print ""; done = 1 }
     !done && /^## / { emit() }

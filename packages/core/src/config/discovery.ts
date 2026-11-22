@@ -9,7 +9,7 @@ import { Location } from "../location.js"
 import { AbsolutePath } from "../schema.js"
 import type { Options } from "../config.js"
 
-export const names = ["opencode.json", "opencode.jsonc"]
+export const names = ["loginom-ai-agent.json", "loginom-ai-agent.jsonc"]
 
 // Fork (CAT-13): the system directory and MDM preferences carry the product's name and identifier, not OpenCode's.
 // Managed policy from them outranks user config, so OpenCode's policy on the same machine must not apply here.
@@ -84,7 +84,7 @@ export const discover = Effect.fn("ConfigDiscovery.discover")(function* (options
     globalRoots.slice(0, configDirectories.length).includes(current) || options?.project === false
       ? []
       : yield* fs.up({ targets: ["."], start: location.directory }).pipe(Effect.orDie)
-  const candidates = [".claude", ".agents", ".opencode", ...names.toReversed()]
+  const candidates = [".claude", ".agents", ".loginom-ai-agent", ...names.toReversed()]
   const discovered = yield* Effect.forEach(
     directories,
     (directory) =>
@@ -145,9 +145,9 @@ export const discover = Effect.fn("ConfigDiscovery.discover")(function* (options
     preferences,
     global: globalEnabled ? globalDirectory : undefined,
     explicit: options?.file ? AbsolutePath.make(path.resolve(options.file)) : undefined,
-    direct: visible.filter((item) => ![".agents", ".claude", ".opencode"].includes(path.basename(item))).toReversed(),
+    direct: visible.filter((item) => ![".agents", ".claude", ".loginom-ai-agent"].includes(path.basename(item))).toReversed(),
     project: yield* Effect.forEach(
-      visibleEntries.filter((entry) => path.basename(entry.item) === ".opencode").toReversed(),
+      visibleEntries.filter((entry) => path.basename(entry.item) === ".loginom-ai-agent").toReversed(),
       (entry) =>
         entry.missing
           ? Effect.succeed({ path: entry.item, present: false })

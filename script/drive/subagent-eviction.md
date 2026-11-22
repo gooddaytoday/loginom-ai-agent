@@ -17,8 +17,8 @@ and a dependency-installed V2 checkout. The script is an Effect program, run wit
 `opencode-drive run` (which typechecks before launch).
 
 ```sh
-OPENCODE_DRIVE_DB=proof.sqlite \
-OPENCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
+LOGINOM_AI_AGENT_DRIVE_DB=proof.sqlite \
+LOGINOM_AI_AGENT_DRIVE_MEDIA_DIR=$PWD/.drive-output \
 DEMO_LABEL=AFTER \
 opencode-drive run script/drive/subagent-eviction.ts
 ```
@@ -26,9 +26,9 @@ opencode-drive run script/drive/subagent-eviction.ts
 Run that same script against an immutable base checkout:
 
 ```sh
-OPENCODE_DEV=/path/to/base-checkout \
-OPENCODE_DRIVE_DB=proof.sqlite \
-OPENCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
+LOGINOM_AI_AGENT_DEV=/path/to/base-checkout \
+LOGINOM_AI_AGENT_DRIVE_DB=proof.sqlite \
+LOGINOM_AI_AGENT_DRIVE_MEDIA_DIR=$PWD/.drive-output \
 DEMO_LABEL=BEFORE \
 opencode-drive run script/drive/subagent-eviction.ts
 ```

@@ -102,7 +102,7 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   yield* Effect.logInfo("starting v2 background service")
   const path = yield* Path.Path
   const desktopCli = yield* DesktopCli.Service
-  const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
+  const isolated = !app.isPackaged && process.env.LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER === "1"
   const cli = yield* desktopCli.resolve
   const version = serviceVersion({ channel: CHANNEL, isolated, mode, version: cli.version })
 
@@ -111,7 +111,7 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
 
   const file =
     serviceFile() ??
-    (process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
+    (process.env.LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL === "local"
       ? path.join(
           process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
           "loginom-ai-agent",

@@ -20,7 +20,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
   const ready = builtin.storage.store("ready", {
     schema: Schema.NullOr(Schema.Struct({ version: Schema.String })),
     initial: null,
-    from: { settings: "ready", file: "opencode.updater" },
+    from: { settings: "ready", file: "loginom-ai-agent.updater" },
   })
 
   // electron-updater loads only in packaged builds, after the first window is up.

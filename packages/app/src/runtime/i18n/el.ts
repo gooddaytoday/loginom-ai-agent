@@ -290,7 +290,7 @@ export const dict = {
   "error.chain.responseBody": "Σώμα απόκρισης:\n{{body}}",
   "error.chain.didYouMean": "Μήπως εννοείτε: {{suggestions}}",
   "error.chain.modelNotFound": "Το μοντέλο δεν βρέθηκε: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Ελέγξτε τη διαμόρφωση (opencode.json) ονόματα παρόχου/μοντέλων",
+  "error.chain.checkConfig": "Ελέγξτε τη διαμόρφωση (loginom-ai-agent.json) ονόματα παρόχου/μοντέλων",
   "error.chain.mcpFailed":
     'MCP διακομιστής "{{name}}" απέτυχε. Σημείωση, το OpenCode δεν υποστηρίζει ακόμη έλεγχο ταυτότητας MCP.',
   "error.chain.providerAuthFailed": "Ο έλεγχος ταυτότητας παρόχου απέτυχε ({{provider}}): {{message}}",
@@ -600,7 +600,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP",
   "settings.extensions.tab.skills": "Δεξιότητες",
   "settings.extensions.availableAll": "Διαθέσιμο σε όλα τα έργα",
-  "settings.extensions.manageConfig": "Διαχείριση στο opencode.json",
+  "settings.extensions.manageConfig": "Διαχείριση στο loginom-ai-agent.json",
   "settings.extensions.addSkills": "Πώς να προσθέσετε δεξιότητες",
   "project.settings.extensions.description": "Προβολή επεκτάσεων που είναι διαθέσιμες σε αυτό το έργο",
   "project.settings.extensions.tab.lsps": "LSP",
@@ -772,8 +772,8 @@ export const dict = {
     "Χρησιμοποιείται για το εικονίδιο του έργου όταν δεν έχει οριστεί προσαρμοσμένη εικόνα",
   "project.settings.worktree.startup.description": "Εκτελείται μία φορά μετά τη δημιουργία ενός νέου δέντρου εργασίας",
   "project.settings.worktree.startup.hint.base":
-    "Χρησιμοποιήστε το $OPENCODE_WORKTREE_BASE για το βασικό δέντρο εργασίας.",
-  "project.settings.worktree.startup.hint.new": "Χρησιμοποιήστε το $OPENCODE_WORKTREE_PATH για το νέο δέντρο εργασίας.",
+    "Χρησιμοποιήστε το $LOGINOM_AI_AGENT_WORKTREE_BASE για το βασικό δέντρο εργασίας.",
+  "project.settings.worktree.startup.hint.new": "Χρησιμοποιήστε το $LOGINOM_AI_AGENT_WORKTREE_PATH για το νέο δέντρο εργασίας.",
   "project.settings.extensions.empty.mcps.title": "Όχι MCPs ακόμα",
   "project.settings.extensions.empty.mcps.description": "Το MCPs διαθέσιμο στο OpenCode θα εμφανιστεί εδώ",
   "project.settings.extensions.empty.plugins.title": "Δεν υπάρχουν πρόσθετα ακόμα",

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# publish-discord.sh: announces the v<version> release in Discord with OPENCODE_RELEASE_NOTES (DISCORD_WEBHOOK).
+# publish-discord.sh: announces the v<version> release in Discord with LOGINOM_AI_AGENT_RELEASE_NOTES (DISCORD_WEBHOOK).
 # Discord caps an embed description at 4096 characters, so longer notes are cut and link to the GitHub release.
 . "$(dirname "$0")/lib.sh"
 
-tag="v$OPENCODE_VERSION"
-payload=$(jq -n --arg tag "$tag" --arg notes "${OPENCODE_RELEASE_NOTES:-}" \
+tag="v$LOGINOM_AI_AGENT_VERSION"
+payload=$(jq -n --arg tag "$tag" --arg notes "${LOGINOM_AI_AGENT_RELEASE_NOTES:-}" \
   --arg url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" '
   ($notes | if length > 4000 then .[:4000] + "\n\n[Full release notes](\($url))" else . end) as $description |
   {

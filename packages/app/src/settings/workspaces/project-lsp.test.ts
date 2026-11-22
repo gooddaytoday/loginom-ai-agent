@@ -4,7 +4,7 @@ import { configuredLanguageServers } from "./project-lsp"
 
 const global: ConfigEntry = {
   type: "document",
-  path: "/config/opencode.json",
+  path: "/config/loginom-ai-agent.json",
   info: {
     lsp: {
       typescript: { command: ["typescript-language-server", "--stdio"], extensions: [".ts", ".tsx"] },
@@ -18,10 +18,10 @@ describe("configuredLanguageServers", () => {
     expect(
       configuredLanguageServers([
         global,
-        { type: "directory", path: "/project/.opencode" },
+        { type: "directory", path: "/project/.loginom-ai-agent" },
         {
           type: "document",
-          path: "/project/opencode.jsonc",
+          path: "/project/loginom-ai-agent.jsonc",
           info: {
             lsp: {
               typescript: { disabled: true },

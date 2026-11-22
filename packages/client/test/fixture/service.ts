@@ -12,8 +12,8 @@ if (mode === "record-start") {
   process.exit(1)
 }
 if (mode === "environment") {
-  await writeFile(registration + ".environment", process.env.OPENCODE_SERVICE_ENV_TEST ?? "")
-  await writeFile(registration + ".handoff", process.env.OPENCODE_PTY_HANDOFF ?? "null")
+  await writeFile(registration + ".environment", process.env.LOGINOM_AI_AGENT_SERVICE_ENV_TEST ?? "")
+  await writeFile(registration + ".handoff", process.env.LOGINOM_AI_AGENT_PTY_HANDOFF ?? "null")
 }
 if (mode === "signal") process.kill(process.pid, process.platform === "win32" ? "SIGTERM" : "SIGKILL")
 

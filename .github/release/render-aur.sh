@@ -6,15 +6,15 @@
 
 npm=$1 aur=$2
 name=opencode-beta
-pkgver="${OPENCODE_VERSION//-/.}"
+pkgver="${LOGINOM_AI_AGENT_VERSION//-/.}"
 if dry_run && [ ! -f "$aur/LICENSE" ]; then printf 'MIT License\n' > "$aur/LICENSE"; fi
 test -s "$aur/LICENSE" || die "The AUR repository has no LICENSE"
 printf '#!/bin/sh\nexec "$(dirname "$0")/opencode" "$@"\n' > "$aur/opencode2"
 sum() { sha256 "$1" | cut -c1-64; }
-x64=$(sum "$npm/opencode-cli-linux-x64-baseline-$OPENCODE_VERSION.tgz")
-arm64=$(sum "$npm/opencode-cli-linux-arm64-$OPENCODE_VERSION.tgz")
-x64_url="https://registry.npmjs.org/@opencode/cli-linux-x64-baseline/-/cli-linux-x64-baseline-$OPENCODE_VERSION.tgz"
-arm64_url="https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-$OPENCODE_VERSION.tgz"
+x64=$(sum "$npm/opencode-cli-linux-x64-baseline-$LOGINOM_AI_AGENT_VERSION.tgz")
+arm64=$(sum "$npm/opencode-cli-linux-arm64-$LOGINOM_AI_AGENT_VERSION.tgz")
+x64_url="https://registry.npmjs.org/@opencode/cli-linux-x64-baseline/-/cli-linux-x64-baseline-$LOGINOM_AI_AGENT_VERSION.tgz"
+arm64_url="https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-$LOGINOM_AI_AGENT_VERSION.tgz"
 license=$(sum "$aur/LICENSE")
 shim=$(sum "$aur/opencode2")
 

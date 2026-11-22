@@ -29,7 +29,7 @@ const authenticate = Effect.fn("cli.mcp.auth.run")(function* (name?: string) {
   if (!name && choices.length === 0) {
     log.warn("No OAuth-capable MCP servers configured")
     log.info(
-      `Remote MCP servers support OAuth by default. Add one with \`opencode mcp add\` or in opencode.json:\n${exampleConfig}`,
+      `Remote MCP servers support OAuth by default. Add one with \`opencode mcp add\` or in loginom-ai-agent.json:\n${exampleConfig}`,
     )
     outro("Done")
     return

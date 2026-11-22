@@ -1,11 +1,11 @@
 export * as ConfigFlag from "./flag.js"
 
-/** The `OPENCODE_FLAGS` entry that turns every flag on, as in `all,-media_blob`. It is not a flag key. */
+/** The `LOGINOM_AI_AGENT_FLAGS` entry that turns every flag on, as in `all,-media_blob`. It is not a flag key. */
 export const wildcard = "all"
 
 /**
  * Every feature flag, by key, with what it turns on. A flag is on in local and dev builds and off in released ones;
- * `experimental.<key>` in config and `OPENCODE_FLAGS` override that, and `OPENCODE_FLAGS=all` or
+ * `experimental.<key>` in config and `LOGINOM_AI_AGENT_FLAGS` override that, and `LOGINOM_AI_AGENT_FLAGS=all` or
  * `experimental.all_flags: true` turn every flag on. Read one with Core's `Flag.enabled("<key>")`.
  */
 export const registry = {

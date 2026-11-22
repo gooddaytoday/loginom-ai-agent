@@ -4,11 +4,11 @@ import { Llm, OpenCodeDriver } from "opencode-drive"
 const label = process.env.DEMO_LABEL ?? "AFTER"
 
 // Run from the repository root with `opencode-drive run script/drive/shell-output.ts`.
-// Set OPENCODE_DEV to an immutable base worktree and DEMO_LABEL=BEFORE for comparison.
+// Set LOGINOM_AI_AGENT_DEV to an immutable base worktree and DEMO_LABEL=BEFORE for comparison.
 // Only the conversation is simulated; shell execution and output reads are real.
 export default OpenCodeDriver.use(
   {
-    opencode: { dev: process.env.OPENCODE_DEV ?? process.cwd() },
+    opencode: { dev: process.env.LOGINOM_AI_AGENT_DEV ?? process.cwd() },
     keepArtifacts: true,
     tui: { recording: true, keypressOverlay: true, viewport: { cols: 90, rows: 30 } },
     config: { autoupdate: false, username: "Demo" },
