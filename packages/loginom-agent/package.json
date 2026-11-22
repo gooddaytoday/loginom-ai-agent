@@ -16,7 +16,10 @@
   "dependencies": {
     "@loginom-ai-agent/loginom-host": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
-    "@opencode/plugin": "workspace:*"
+    "@opencode/plugin": "workspace:*",
+    "@opencode/schema": "workspace:*",
+    "@opencode/util": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@tsconfig/bun": "catalog:",

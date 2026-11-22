@@ -1,9 +1,12 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
-// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host lease and Loginom tools arrive in stage B2.3
-// and B2.5.
+// reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host lease arrives in stage B2.3, the Loginom tools
+// in B2.5.
+import { join } from "node:path"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
+import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { localFiles } from "./local-file"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -57,6 +60,11 @@ export default Plugin.define({
           }),
         )
     })
+
+    // Local data files for Loginom (B2.5a). The Host lease is stage B2.3: until then `loginom_file_admit` answers
+    // LOGINOM_HOST_NOT_READY. Like every `loginom_*` tool, it needs the `loginom-automation` grant.
+    const files = await localFiles(ctx, join(Global.Path.data, "file-profiles"))
+    await ctx.tool.transform((editor) => editor.add(files.admitTool(() => undefined)))
 
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.
     const hide = (event: SessionContext) => {
