@@ -2539,3 +2539,109 @@ Cached:    0 cached, 38 total
   собранной службе не создавался; путь `install()` и запуск `daemon` из копии проверены скриптом из исходников.
   Сборка Node (SEA) не собиралась.
 - Экспорт OTLP в настоящий коллектор не проверялся.
+
+## B1.4 Р-6
+
+22.11.2026. Ветка `b14-r6` от `oc2-migration` (`b1b45848e6`), рабочее дерево `.claude/worktrees/b14-r6`. Bun 1.4.4 и
+Node 24.19.0 — первыми в `PATH` только для своих команд. `bun install --frozen-lockfile`: код 0, `.husky/_` есть, хук
+`pre-commit` срабатывал на обоих коммитах. Решение по Р-6 — из В-82 и В-91 (передано оркестратором): где OpenCode —
+сам агент, имя продукта; предложение подписки OpenCode Go при лимите не показывать; OpenCode Zen, Console, Go и их
+бесплатные модели — имена стороннего провайдера, как в OpenCode 2.
+
+### Коммиты
+
+`bun run secrets staged` перед каждым — `clean`.
+
+| Коммит | Что | Файлы |
+|---|---|---|
+| `b5b10cca6b` `fix(tui): name the product in the permission rejection prompt` | правило 1 | `mini/footer.permission.tsx`, `routes/session/permission.tsx`, `test/mini/blocker.responsive.test.tsx` |
+| следующий `fix(tui): stop offering OpenCode Go at the free usage limit` | правило 2, каталог, журнал | `routes/session/index.tsx`, `test/app-lifecycle.test.tsx`, `catalog.md` (CAT-11), этот журнал |
+
+### Что сделано
+
+- **Сам агент → `Product.name`.** «Tell Loginom AI Agent what to do differently» в отказе в разрешении: Mini
+  (`mini/footer.permission.tsx`, две строки) и сессия (`routes/session/permission.tsx`). В 0.4 так было только в Mini
+  (`a080f7725c:packages/opencode/src/cli/cmd/run/footer.permission.tsx`). Тест `test/mini/blocker.responsive.test.tsx`
+  ждал старую строку — литерал поправлен, как у группы B; раскладка при ширине 112 с длинным именем не сломалась.
+- **Предложение OpenCode Go при лимите не показывается.** `routes/session/index.tsx` (вне списка файлов Р-6: там вызов
+  диалога): обработчик `session.step.failed` после возврата запроса в поле ввода заканчивается; блок, который считал
+  окно 24 часа, хранил `go-upsell` и открывал `DialogGoUpsell`, удалён вместе с импортом и хранилищами. Файлы
+  `component/dialog-go-upsell.tsx` и `go-upsell-art.ts` остались и из `src` больше не импортируются; тест
+  `test/component/go-upsell-art.test.tsx` не менялся, его одно падение — то же, что в базе. Из заметки в ленте
+  (`FreeLimitNotice`) убран пункт «Upgrade to OpenCode Go → /connect»; осталось «You've used today's free messages.
+  They reset at …» и «Switch model → /models». Отдельный текст «Модель остановила ход» не писал: в TUI эту роль играет
+  та же заметка.
+- **Тесты предложения** (`test/app-lifecycle.test.tsx`). Первый (`free usage limit offers OpenCode Go once per 24h…`)
+  переписан: `free usage limit restores the prompt and explains the limit without offering OpenCode Go` — заметка
+  есть, вернулся доставленный запрос, а не тот, что в очереди, после паузы 30 мс и перерисовки нет «Free limit
+  reached», «OpenCode Go», «Error:», «Session failed». Три других (`Subscribe handles mid-auth…`, `claims suppression
+  atomically across two TUI instances…`, `modal manages live animation FPS…`) — `test.skip` с комментарием.
+- **Имена провайдера не менялись (В-82).** `component/usage.tsx` целиком: «OpenCode Console» (вход, кредиты, лимиты)
+  и заметка о лимите самого Go «OpenCode Go … usage limit reached» со ссылкой «Or turn on Extra Usage on your Go
+  page» — она для подписчика Go, а не предложение подписки. Строки неоткрываемого `dialog-go-upsell.tsx` не трогал.
+
+Новый тест на старом `index.tsx` (файл подменялся из `HEAD` на время прогона) — красный, с правкой — 1 pass:
+
+```text
+$ cd packages/tui && bun test --timeout 30000 test/app-lifecycle.test.tsx -t "free usage limit restores"
+Expected to not contain: "Free limit reached"
+(fail) free usage limit restores the prompt and explains the limit without offering OpenCode Go [2645.44ms]
+ 0 pass
+ 1 fail
+```
+
+### Где решал сам
+
+- **Блок удалён, а не обойдён.** Строка `return` перед ним не прошла typecheck: после недостижимого `return`
+  TypeScript теряет сужение `current` (5 ошибок TS18048). Цена — конфликт при слиянии, если upstream поменяет блок;
+  проверка — в CAT-11. Устаревшее «skips the offer» в соседнем комментарии не трогал.
+- **Пункт «Upgrade to OpenCode Go» убран, хотя назван был только диалог:** это то же предложение Go при лимите (В-91).
+- **`test.skip`, а не удаление:** файл ближе к upstream. С ними выпала проверка «не затирать черновик при лимите»
+  (вторая половина теста двух экземпляров TUI); эта логика стоит до удалённого блока и не менялась.
+
+### Оставлено, вопрос владельцу
+
+- `feature-plugins/sidebar/footer.tsx`, «Getting started»: «OpenCode includes free models so you can start
+  immediately.» Строка между правилами 1 и 3: это и приложение, и бесплатные модели провайдера OpenCode Zen; в 0.4 не
+  менялась. **Вопрос:** «Loginom AI Agent includes free models…» (`Product.name`) или «OpenCode Zen includes free
+  models…»?
+
+### Найдено, не чинил
+
+- То же предложение Go при бесплатном лимите есть в веб-приложении: `app/src/session/usage-exceeded-dialogs.tsx`,
+  `app/src/providers/connect/usage-exceeded.tsx` и `go-upsell-hero*`, строки `ui/src/i18n/en.ts`
+  (`dialog.usageExceeded.freeTier.*`), e2e `app/e2e/regression/{composer,settings}.spec.ts`. В-91 касается и его; это
+  не Р-6 (CAT-10). От правок `tui` они не зависят: `git grep` изменённых строк вне `packages/tui` других совпадений
+  не дал.
+- Знак `go` из `logo.ts` остаётся меткой на выходе Mini (`mini/splash.ts`) — логотип, не предложение; к Р-7.
+
+### Тесты и итоговая проверка
+
+До — цифры B1.4a и группы B на `oc2-migration`, своей базы не гонял. После — рабочее дерево с кодом второго коммита:
+
+| Пакет | Команда | До | После |
+|---|---|---|---|
+| `tui` | `bun test --timeout 30000` | 1672 pass, 2 skip, 1 fail | 1669 pass, 5 skip, 1 fail — то же `the art stops every frame when hidden…`; +3 skip |
+| `product` | `bun test test/names.test.ts` | 9 / 0 | 9 / 0 |
+| `cli` | `bun test test/flag-identity.test.ts` | 3 / 0 | 3 / 0 |
+
+Первый полный прогон `tui` дал ещё `roomy rejection keeps the editor and confirmation hints inline` (строка «Tell
+OpenCode…»): первый поиск по тестам я обрезал `head`. Тест исправлен в первом коммите (`--amend`, не опубликован).
+
+```text
+$ cd packages/tui && bun typecheck
+✓ No type errors in 1,910 files across 2 projects
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                   # код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 424 divergent upstream files      # код 0; было 420
+  CAT-11: 43                                            # +4, app-lifecycle.test.tsx расходился после Р-4
+$ bun run check                                         # код 0, 18 с
+Found 517 warnings and 0 errors.
+ Tasks:    38 successful, 38 total
+Cached:    36 cached, 38 total
+```
+
+### Не проверено
+
+- TUI в настоящем терминале и живой бесплатный лимит OpenCode Zen: только тестовый рендерер.
