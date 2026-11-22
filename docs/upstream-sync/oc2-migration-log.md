@@ -2556,7 +2556,7 @@ Cached:    0 cached, 38 total
 
 ### Что изменено
 
-`secrets.yml`, четыре строки:
+`secrets.yml`, четыре правки (пять строк с комментарием):
 
 - `bun-version: "1.4.4"`, как `packageManager`. Action `oven-sh/setup-bun` закреплён тем же SHA `0c5077e5…` (v2.2.0).
   Файл релиза `bun-v1.4.4/bun-linux-x64.zip` на GitHub есть (HTTP 200); как именно action его скачивает — не проверял.
@@ -2584,7 +2584,7 @@ CAT-01 в `catalog.md`; `catalog-check.py` — 420 расходящихся фа
 
 Предел теста: в чистом дереве `a pinned archive is skipped only at its pinned path` (`secret-scan.test.ts`, тест правки
 сканера B1.2s) упал по пределу 5 с по умолчанию: `this test timed out after 5000ms`. Он трижды запускает сканер с
-настоящим gitleaks. Три одиночных прогона без другой нагрузки: 4,83 / 4,93 / 5,05 с; рядом
+настоящим gitleaks. Три одиночных прогона без моих фоновых прогонов (load average 1,4 на 6 ядрах): 4,83 / 4,93 / 5,05 с; рядом
 `a merge beyond Git's default rename limit…` — 4,3 с и `exceptions are exact…` — 3,7 с. Запаса нет, первый push ветки
 переноса мог дать красный статус. В workflow — `--timeout 30000`, как в ручных прогонах пакета от 12 ноября: тесты и
 сканер не менялись, ни одна проверка не ослаблена, общий предел задаёт `timeout-minutes: 15`. Если владелец решит иначе,
@@ -2597,7 +2597,8 @@ CAT-01 в `catalog.md`; `catalog-check.py` — 420 расходящихся фа
 
 Правка действует только для push. PR в `loginom` проверяется событием `pull_request_target`: GitHub берёт workflow и
 checkout из базовой ветки `loginom`. PR переноса проверит прежний workflow (Bun 1.3.14, `@opencode-ai/script`,
-`bun typecheck`) на дереве `loginom`, где он согласован с деревом; новый workflow начнёт действовать для PR только после
+`bun typecheck`) на дереве `loginom`, где он согласован с деревом (`origin/loginom`: `packageManager` `bun@1.3.14`,
+пакет `@opencode-ai/script` со скриптом `typecheck: tsgo --noEmit`); новый workflow начнёт действовать для PR только после
 слияния переноса в `loginom`. Для PR переноса нужно, чтобы в `loginom` раньше попали правка сканера B1.2s,
 `.gitleaks-upstream` и записи `.gitleaksignore` (итог B1).
 
@@ -2624,29 +2625,38 @@ apt. Второй прогон (с `zip`, без `--timeout`): 70 pass, 1 fail �
 ## skip (PR only): Fetch PR objects without checking out untrusted code
 ## skip (action): oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
 ## run: Install scanner tooling only
+$ export TMPDIR="$RUNNER_TEMP"; echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+$ bun install --frozen-lockfile --ignore-scripts --filter @opencode/script
 bun install v1.4.4 (38afee6c8)
-warn: patches/…  no longer applies (…is no longer installed)      # 4 строки: пакетов нет в фильтре
+warn: patches/…  no longer applies (…is no longer installed)      # сокращено: 4 строки, пакетов нет в фильтре
 + @tsconfig/bun@1.0.9
 + @types/bun@1.4.3
 + semver@7.8.5
 14 packages installed [272.00ms]
+$ bun run secrets:install
 $ bun packages/script/src/install-gitleaks.ts
 Gitleaks 8.30.1 installed with verified checksum. Add <scratchpad>/b18-ci/home/.local/bin to PATH.
+$ echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 ## exit 0, 1.1 s: Install scanner tooling only
 ## run: Verify scanner behavior
+$ cd packages/script && bun test --timeout 30000                  # вывод тестов сокращён
  71 pass
  0 fail
  259 expect() calls
 Ran 71 tests across 5 files. [85.33s]
+$ bun check --no-script
 ✓ No type errors in 10 files [62.72ms]
 ## exit 0, 85.4 s: Verify scanner behavior
 ## run: Scan only incoming commits
+$ EVENT=push BEFORE=0000000000000000000000000000000000000000 BASE= HEAD=af21ac5ded…  <run шага из YAML>
+# ветка BEFORE=0…0: base=$(git merge-base origin/loginom "$HEAD") = dd2f949d11
+$ bun --no-install packages/script/src/secret-scan.ts range "$base" "$HEAD"
 {"status":"clean","commits":2583,"archives":46,"current_files":0,"skipped":[],"upstream_commits":6784,"upstream_findings":606,"upstream_missing":0,"elapsed_ms":51434}
 ## exit 0, 52.1 s: Scan only incoming commits
 ```
 
-Диапазон первого push ветки переноса (от `dd2f949d11`, 9365 коммитов, из них 6784 — история OpenCode до закрепления)
-чист и занимает 52 с при пределе задания 15 мин. На `35799e6bd3` тот же шаг: `clean`, 2582 коммита, 55 с.
+Диапазон первого push ветки переноса (от `dd2f949d11`: 2583 коммита форка и 6784 коммита истории OpenCode, снятые
+закреплением) чист и занимает 52 с при `timeout-minutes: 15`. На `35799e6bd3` тот же шаг: `clean`, 2582 коммита, 55 с.
 
 Проверка типов не холостая: временный файл `src/b18-negative.ts` с `const broken: number = "text"` в чистом дереве —
 `TS2322`, код 1; файл удалён.
@@ -2676,11 +2686,12 @@ Workflow v2.3.0 в дереве реагируют на push только в `de
 К сведению B5.1, не push:
 
 - `schedule` работает только из ветки по умолчанию (`loginom`): расписания `release.yml` (каждые 6 ч), `nightly-beta.yml`
-  и `triage-*` начнут срабатывать после слияния переноса в `loginom`.
+  и `triage-*` начнут срабатывать после слияния переноса в `loginom`. У `release.yml` и `nightly-beta.yml` первое
+  задание с `if: github.repository == 'anomalyco/opencode'` и в форке пропускается; у `triage-*` такого условия нет.
 - PR из ветки переноса в `loginom`: событие `pull_request` берёт workflow из PR — стартуют `check-test.yml` и
   `check-bot-scope.yml` на любой PR, по путям `check-docs`, `check-process-daemon`, `loginom-client-full`,
   `loginom-macos`, `loginom-windows`, `release-process-daemon`. `pull_request_target` (`secrets`, `triage-*`) — из
-  `loginom`.
+  `loginom`. Списки составлены по `on:`; условия `if:` заданий, кроме `github.repository` выше, не разбирал.
 
 ### Итоговая проверка
 
@@ -2689,6 +2700,8 @@ Workflow v2.3.0 в дереве реагируют на push только в `de
 ```text
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary
 against a6b15d33daf6: 420 divergent upstream files      # код 0; CAT-01: 6, как до задачи
+$ bun install --frozen-lockfile                         # код 0, проверка CAT-01
+Checked 1684 installs across 2059 packages (no changes)
 $ cd packages/script && bun check --no-script
 ✓ No type errors in 10 files                            # код 0
 $ bun run check                                         # код 0, 17 с; 37 из 38 задач из кэша turbo
