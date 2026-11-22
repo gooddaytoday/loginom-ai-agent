@@ -226,6 +226,12 @@ describe("loginom.product access and tool gate (G1)", () => {
         const asked = yield* test.requests(direct)
         expect(asked).toHaveLength(3)
         expect(names(asked[2])).not.toContain(probe)
+        // So does a manual compaction.
+        yield* test.sessions.compact({ sessionID: direct })
+        yield* test.sessions.wait(direct)
+        const compacted = (yield* test.requests(direct)).slice(3)
+        expect(compacted.length).toBeGreaterThan(0)
+        for (const request of compacted) expect(names(request)).not.toContain(probe)
 
         const codemode = yield* test.create("codemode")
         yield* test.prompt(

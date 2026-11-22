@@ -41,10 +41,11 @@ export default Plugin.define({
     const profile = (sessionID: string): Profile => granted.get(sessionID) ?? "default"
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
+    // Only tools registered without `codemode: false` are touched: a Promise-API update re-wraps the tool's executor.
     await ctx.tool.transform((editor) => {
       editor
         .list()
-        .filter((tool) => !permits("default", tool.id))
+        .filter((tool) => tool.options?.codemode !== false && !permits("default", tool.id))
         .forEach((tool) =>
           editor.update(tool.id, (item) => {
             item.options = { namespace: item.options?.namespace, permission: item.options?.permission, codemode: false }
