@@ -5,7 +5,8 @@ Upstream spells the product identity as OPENCODE_* variables, `.opencode` direct
 `opencode.db`. The fork ships LOGINOM_AI_AGENT_*, `.loginom-ai-agent`, `loginom-ai-agent.json(c)` and `loginom-ai-agent.db`
 (external names, never reverted; see docs/upstream-sync/adr-0001-modular-integration.md). After a merge, new upstream code
 and tests still carry the upstream spelling; this applies the fork's spelling to them. Third-party provider keys
-(OPENCODE_API_KEY, OPENCODE_GO_API_KEY) are not product names and stay. Visible brand text ("OpenCode" in UI strings and
+(OPENCODE_API_KEY, OPENCODE_GO_API_KEY) are not product names and stay; so do upstream URLs, theme files and the variables
+that only unprocessed code reads (see the constants below). Visible brand text ("OpenCode" in UI strings and
 documents) is a product decision per string and is NOT changed here; see catalog entry CAT-03.
 
 Usage: apply-identity.py --repo DIR [--since REV] [--check] [PATH ...]
@@ -23,12 +24,24 @@ import sys
 SOURCES = re.compile(
     r"^(packages/(ai|app|cli|client|core|desktop|gui-plugins|loginom-host|loginom-runtime|plugin[^/]*|product|schema|script|server|session-ui|"
     r"simulation|sdk|tui|ui|util)/(src|script|scripts|test|tests|e2e|test-browser|bin)/"
-    r"|packages/[^/]+/(package\.json|[^/]*\.config\.ts)$|script/|\.github/)"
+    r"|packages/[^/]+/(package\.json|[^/]*\.config(\.test)?\.ts|vite\.js)$|script/|\.github/)"
 )
 TEXT = re.compile(r"\.(ts|tsx|js|mjs|cjs|json|jsonc|yml|yaml|ps1|sh|txt|md)$")
 PROVIDER_KEYS = ("OPENCODE_API_KEY", "OPENCODE_GO_API_KEY")
-# Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose.
-EXCLUDED = (".github/archived/", "packages/cli/test/flag-identity.test.ts", "scripts/upstream-sync/")
+# Set by workflows and read only by packages/process-daemon (build.rs, script/release-bin/zig), which this tool does not
+# process: renaming one side would silently drop the setting (catalog entry CAT-13).
+UNPROCESSED_READERS = ("OPENCODE_ZIG_CPU", "OPENCODE_REAL_ZIG")
+# A name also starts right after an escape such as `\n` in a string or a regular expression.
+VARIABLE = re.compile(r"(?:\b|(?<=\\[nrt]))OPENCODE_[A-Z0-9_]+")
+# `.opencode` as a path segment, not a property (`?.opencode`, `...opencode`) or an escaped host (`console\.opencode\.ai`).
+PATH_NAME = re.compile(r"(?<![\w$.?!)\]])\.opencode(?=[/\s\"'`)]|\\(?!\.)|$)|opencode\.(json|db|settings|updater)")
+# Upstream URLs (`formulae.brew.sh/api/formula/opencode.json`) and theme files (`theme/assets/opencode.json`) keep their names.
+UNTOUCHED = re.compile(r"https?://[^\s\"'`<>]+|\bassets/[\w./-]*")
+# Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose; the TUI
+# snapshot test renders sample tool output that names OPENCODE_* variables, and its .snap file (not text here) wraps it;
+# the drizzle-kit config points at an upstream developer's own database, and a changed line would make that path ours.
+EXCLUDED = (".github/archived/", "packages/cli/test/flag-identity.test.ts", "packages/core/drizzle.config.ts",
+            "packages/tui/test/cli/tui/inline-tool-wrap-snapshot.test.tsx", "scripts/upstream-sync/")
 
 
 def wants(path):
@@ -37,12 +50,11 @@ def wants(path):
 
 
 def transform(text):
-    text = re.sub(r"\bOPENCODE_[A-Z0-9_]+", lambda m: m.group(0) if m.group(0) in PROVIDER_KEYS else "LOGINOM_AI_AGENT_" + m.group(0)[len("OPENCODE_"):], text)
-    text = re.sub(r"(?<![a-zA-Z0-9])\.opencode(?=[/\\\s\"'`)]|$)", ".loginom-ai-agent", text)
-    for source, target in (("opencode.json", "loginom-ai-agent.json"), ("opencode.db", "loginom-ai-agent.db"),
-                           ("opencode.settings", "loginom-ai-agent.settings"), ("opencode.updater", "loginom-ai-agent.updater")):
-        text = text.replace(source, target)
-    return text
+    keep = PROVIDER_KEYS + UNPROCESSED_READERS
+    text = VARIABLE.sub(lambda m: m.group(0) if m.group(0) in keep else "LOGINOM_AI_AGENT_" + m.group(0)[len("OPENCODE_"):], text)
+    untouched = [m.span() for m in UNTOUCHED.finditer(text)]
+    return PATH_NAME.sub(lambda m: m.group(0) if any(a <= m.start() < b for a, b in untouched)
+                         else m.group(0).replace("opencode", "loginom-ai-agent"), text)
 
 
 def main():

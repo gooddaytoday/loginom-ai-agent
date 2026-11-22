@@ -162,6 +162,54 @@ class ApplyIdentitySince(FixtureCase):
         self.assertIn("`ai.opencode.managed`", text)
 
 
+class ApplyIdentityRules(unittest.TestCase):
+    """B1.4a: what the first run over the OpenCode 2 tree broke, each case taken from the file where it happened."""
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("apply_identity", HERE / "apply-identity.py")
+        cls.ai = importlib.util.module_from_spec(spec); spec.loader.exec_module(cls.ai)
+
+    def assertKept(self, *texts):
+        for text in texts:
+            self.assertEqual(self.ai.transform(text), text)
+
+    def test_a_property_named_opencode_is_not_a_directory(self):
+        self.assertKept("expect(registered()?.opencode).toBe(first?.opencode)",       # tui/test/keymap.test.tsx
+                        'start("gpt", { openai: [key], ...opencode }, requests)',     # core/test/voice.test.ts
+                        "expect(allThemes().opencode).toBe(theme)", "value!.opencode")
+        self.assertEqual(self.ai.transform('path.join(dir, ".opencode") + " ~/.opencode/bin" + "C:\\\\me\\\\.opencode\\\\bin"'),
+                         'path.join(dir, ".loginom-ai-agent") + " ~/.loginom-ai-agent/bin" + "C:\\\\me\\\\.loginom-ai-agent\\\\bin"')
+
+    def test_an_escaped_upstream_host_keeps_its_name(self):
+        self.assertKept(r"server.replace(/^https:\/\/console\.opencode\.ai(?=\/|$)/, defaultServer)")   # core/src/console-access.ts
+
+    def test_upstream_urls_and_theme_files_keep_their_names(self):
+        self.assertKept('? "https://formulae.brew.sh/api/formula/opencode.json"',          # cli/src/services/updater.ts
+                        'import opencode from "./assets/v2/opencode.json" with { type: "json" }',   # tui/src/theme/index.ts
+                        "// (mirrors theme/assets/opencode.json) since")
+        self.assertEqual(self.ai.transform('fetch(`${url.origin}/config/opencode.json`); path.join(home, "opencode.db")'),
+                         'fetch(`${url.origin}/config/loginom-ai-agent.json`); path.join(home, "loginom-ai-agent.db")')
+
+    def test_a_name_after_an_escape_is_renamed_like_the_rest(self):
+        # gui-plugins/src/ssh/bootstrap.ts prints the frame end after `\n` and parses it after `\r?\n`.
+        self.assertEqual(self.ai.transform("printf '\\\\nOPENCODE_SSH_REGISTRATION_END\\\\n'\n/OPENCODE_SSH_REGISTRATION_BEGIN\\r?\\nOPENCODE_SSH_REGISTRATION_END/"),
+                         "printf '\\\\nLOGINOM_AI_AGENT_SSH_REGISTRATION_END\\\\n'\n/LOGINOM_AI_AGENT_SSH_REGISTRATION_BEGIN\\r?\\nLOGINOM_AI_AGENT_SSH_REGISTRATION_END/")
+        self.assertKept("VITE_OPENCODE_CHANNEL", "fooOPENCODE_X")
+
+    def test_variables_only_unprocessed_code_reads_keep_their_names(self):
+        self.assertKept("      OPENCODE_ZIG_CPU: baseline",                             # read by process-daemon/build.rs
+                        'echo "OPENCODE_REAL_ZIG=$(command -v zig)" >> "$GITHUB_ENV"',  # read by process-daemon/script/release-bin/zig
+                        "OPENCODE_API_KEY OPENCODE_GO_API_KEY")
+
+    def test_package_configs_their_tests_and_vite_js_are_covered(self):
+        self.assertTrue(self.ai.wants("packages/desktop/electron.vite.config.test.ts"))
+        self.assertTrue(self.ai.wants("packages/app/vite.js"))
+        self.assertFalse(self.ai.wants("packages/app/vite.icons.ts"))   # its placeholders pair with index.html, which is not text here
+        self.assertFalse(self.ai.wants("packages/tui/test/cli/tui/inline-tool-wrap-snapshot.test.tsx"))   # pairs with its .snap
+        self.assertFalse(self.ai.wants("packages/core/drizzle.config.ts"))   # an upstream developer's home path
+
+
 class GateCase(FixtureCase):
     """Tests of the acceptance gate: each builds a real Git merge, leaves a result the way a person would, and asserts the verdict."""
 
