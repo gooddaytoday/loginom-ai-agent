@@ -5569,3 +5569,522 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   `sdk` не запускались.
 - Установленная сборка: что сборщик CLI забирает `file-xlsx.ts` по динамическому импорту вместе с `htmlparser2` и
   `@zip.js/zip.js`, не проверял.
+
+## B4.1 Разведка Desktop
+
+22.11.2026. Ветка `b41-desktop-recon` от `oc2-migration` (`52c1f3403d`), рабочее дерево `.claude/worktrees/b41`. Это
+разведка: код продукта не менялся, коммит — только этот раздел. Bun 1.4.4 переносной — первым в `PATH` только для своих
+команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` появился. `packages/loginom-agent` (B2.5b2) не
+трогал.
+
+Прочитано: план этапа B — раздел B4.1 и «Итог B1»; решения В-79, В-82, В-85, В-86, В-87, В-95; этот журнал — всё, что
+адресовано B4 (B1.2a, B1.2b, B1.3a, B1.4a, B1.4c, B2.4, B3.1, B3.1b, B3.2, B3.3); отчёт spike, разделы B0.1 и B0.4
+(`origin/stage-b-checks`); Desktop 0.4 на точке отсечения `a080f7725c` с тестовым каталогом
+`docs/testing/loginom-ai-agent/{README,windows-release-coverage}.md`; Desktop v2.3.0 в дереве переноса.
+
+Ссылки вида `файл:строка` без префикса — по дереву `oc2-migration`, с префиксом «0.4:» — по `a080f7725c`. Объём 0.4 —
+строки файла целиком (`git show … | wc -l`), правки файлов upstream — `git diff --stat 810c0eba1a a080f7725c`.
+
+### Главное
+
+- **Desktop v2.3.0 — другой код.** `main/` разложен на `lifecycle/`, `service/`, `storage/`, `plugin/`, `windows/`
+  и автоматы состояний. Ни одна из правок 0.4 в 90 файлах upstream Desktop (B1.2b) на v2 не накладывается: файлы
+  удалены или переписаны. Переносится поведение — в новые файлы форка и точечные правки upstream. Файлами переходят
+  только новые файлы форка, не связанные с главным процессом: тесты рантайма, `bundle-loginom.ts`, манифест выпуска.
+- **Host уходит в службу.** В 0.4 Host Loginom живёт в главном процессе Electron (`createLoginomHost` с кодеком
+  `safeStorage`) и отдаёт порт HostPort sidecar-у через `MessageChannelMain` (0.4: `server.ts:78-79`,
+  `sidecar.ts:71-76`): sidecar — `utilityProcess` того же Electron. На v2 служба — отдельный процесс Bun
+  (`spawn(..., { detached: true })`, `client/src/service-contender.ts:19-24`), и по каталогу Host живёт в плагине
+  службы (CAT-11, B2.3). Поэтому `main/loginom/*` 0.4 в Desktop v2 почти не нужен: остаются путь к ресурсам, кодек
+  учётных данных и запуск службы. Как служба прочтёт пароль Loginom, зашифрованный `safeStorage`, — вопрос 4.
+- **Находка, потеря данных.** Desktop v2 кладёт копию CLI в `<userData>/cli/<версия>-<арх>/` и при каждом старте
+  удаляет все остальные каталоги в `<userData>/cli/` (`service/cli-stages.ts:6-30`). Профиль автономного CLI 0.4 лежит
+  в `<appData>/com.loginom.aiagent/cli/profiles/default` (`product/src/cli-profile.ts`), то есть внутри userData Desktop
+  0.4 (B3.3). Как только Desktop получит `appId` продукта, первый запуск упакованной сборки удалит профиль CLI 0.4:
+  подключение с паролем, базу, конфиг. Проба ниже это подтверждает. Правка — до смены `appId` (B4.2).
+- **Р-10 мельче, чем записано.** Вход в OpenCode Console завершается опросом по коду устройства
+  (`app/src/providers/connect/controller.ts:344-349`, `460-526`), а ссылка `opencode://console/authorized?window=…`
+  только возвращает фокус окну (`lifecycle/deep-link.ts`, `deep-links/machine.ts:56-57`). Своя схема продукта вход не
+  ломает, теряется только возврат в окно. Своя схема нужна и сама по себе: дашборды 0.4 открывались ссылкой
+  `loginom-ai-agent://dashboard?…`.
+- **Упакованная сборка v2 обновляется с opencode.ai.** Обновлятор включён в любой упакованной сборке
+  (`gui-plugins/src/updater/main.ts:13`), лента — `publish.url` из `electron-builder.config.ts:222-268`
+  (`https://opencode.ai/update/api/…`), `verifyUpdateCodeSignature: false` (`:182`). Без правки установленный продукт
+  предложит поставить поверх себя OpenCode Desktop. Ещё два обращения к opencode.ai: «Что нового»
+  (`updater/whats-new.tsx:8`) и значок уведомлений (`renderer/platform/notifications.ts:18`).
+- **LIFE-01 упирается в бюджет остановки.** Desktop ждёт участников `Shutdown` не дольше 10 с
+  (`lifecycle/index.ts:50-59`), а служба участником не является — участвуют только GUI-плагины
+  (`plugin/index.ts:70-75`). `Service.stop` шлёт SIGTERM, ждёт до 5 с, затем SIGKILL и ещё до 5 с
+  (`client/src/promise/service.ts:153-165`, `service-timing.ts:22-23`). Host закрывает рантаймы и Chromium до 30–60 с
+  (`loginom-host/AGENTS.md`). «Нет оставленных исполнителей и браузеров» требует и мягкой остановки B2.3b, и
+  согласованного бюджета (B4.10).
+- **Оценка.** В шлюзе B — 18 задач, 13,5–20 дней; вне шлюза — 7 задач, 6,5–10 дней, из них рекомендую в B4 пять
+  (4–6,5 дня). План: B4 — 8,5–15 (B1.2b). Шлюз B один выше верха плана на 5 дней; с рекомендованным вне шлюза B4
+  выходит 17,5–26,5 дня. Сборка macOS в CI и скрипты выпуска Desktop переданы B5 (ниже), в эти дни не входят.
+
+### Пробы
+
+Код не менялся, файлы проб — в `<scratchpad>`, в git не идут.
+
+**`cleanStages` и профиль CLI 0.4.** Скрипт создаёт во временном каталоге `<userData>/cli/profiles/default/{loginom/connection/connection.json,data}`
+и ступень `<userData>/cli/2.3.0-x64/opencode-cli`, как их раскладывают `cli-profile.ts` и `installCli`
+(`service/desktop-cli.ts:144-166`), и вызывает настоящий `cleanStages` из дерева с `keep: ["2.3.0-x64"]`, как
+`background-service.ts:91-96`:
+
+```text
+$ bun run <scratchpad>/clean-stages-probe.ts
+before: 2.3.0-x64 profiles
+after:  2.3.0-x64
+```
+
+**База Desktop на `52c1f3403d`** (`packages/desktop`, `LOGINOM_AI_AGENT_TEST_NODE` задан):
+
+```text
+$ bun typecheck
+✓ No type errors in 3,503 files across 2 projects [4.11s]
+$ bun test --timeout 30000
+ 529 pass
+ 4 skip
+ 0 fail
+ 1754 expect() calls
+Ran 533 tests across 68 files. [7.66s]
+```
+
+Окно под Xvfb не запускал: B0.1 и B0.4 уже проверили окно и установленную сборку v2.3.0 с правками spike, а здесь
+нового кода нет. Сборка `electron-vite` и упаковка не запускались.
+
+### Карта: 0.4 → v2.3.0 → перенос
+
+Объём «перенос» — оценка новых и изменённых строк кода без тестов; дни — агенто-дни, экспертно.
+
+#### 1. Подключение с поколениями (`main/loginom/*`) и место Host
+
+- **0.4.** `loginom/desktop-service.ts` (44 строки: пути Electron, `safeStorage`, `createLoginomHost`,
+  `verifyDesktopResources`), `loginom/ipc.ts` (55: IPC `loginom-read/status/check/save/cancel-pending/acknowledge-recovery`
+  с проверкой отправителя), пять реэкспортов из `loginom-host/src/connection` и `host-port`, `loginom/AGENTS.md` (13).
+  Тесты — 778 строк (`connection-service` 458, `host-port` 130, `recovery-store` 105, `connection-store` 50,
+  `credentials` 35); они проверяют общий код `loginom-host` через реэкспорты Desktop. Связка — 0.4: `index.ts:220-237`
+  (`stopSidecars` закрывает Host), `:415-418` (Host и IPC), `server.ts:78-79`, `sidecar.ts:71-76`; preload и типы —
+  +69 строк.
+- **v2.3.0.** Ничего: `safeStorage` не используется, IPC Loginom нет. Служба — отдельный процесс, порт `MessageChannelMain`
+  к ней не передать.
+- **Перенос.** Логика поколений и восстановления — в плагине службы (B2.3); IPC формы и preload — этап C. Форма в B не
+  нужна: PKG-02 из установленного Desktop проверяется вызовом RPC плагина, как B3.3 вызывал IPC окна 0.4 (B4.14c).
+  В Desktop остаются: путь `resources/loginom` (B4.8a), кодек учётных данных и его перенос (B4.13, вопрос 4).
+  Тесты 0.4 `src/main/loginom/*.test.ts` проверяют код `loginom-host` — их место в `loginom-host/test` вместе с B2.3,
+  а не в Desktop.
+- **Объём.** В Desktop — 60–150 строк в зависимости от ответа на вопрос 4. **Проверка.** Тесты B4.13; PKG-02 — B4.14c.
+
+#### 2. Учётные данные: `safeStorage` (DPAPI на Windows, Keychain на macOS)
+
+- **0.4.** Кодек `loginom-host/src/connection/credentials.ts` (47): Linux — открытый `{apiKey, password}` в файле
+  `0600`, Windows и macOS — `{encrypted: base64(safeStorage.encryptString(...))}`; отказ без защиты —
+  `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`. Хранилище — `<userData>/loginom/connection/` с маркером
+  `v040-migration.json` (B3.2). Автоматическая часть SEC-01 — `test/loginom/safe-storage-smoke.cjs` (62) в CAND:
+  производственный кодек в закреплённом Electron, запись, чтение новым процессом, отказ.
+- **v2.3.0.** `safeStorage` нет. Electron 44.9.1 вместо 42.3.3.
+- **Перенос.** Служба Bun не откроет записи `{encrypted}`. По устройству Chromium (`os_crypt`) ключ `safeStorage` на
+  Windows лежит в `<userData>/Local State` под DPAPI, на macOS — в Keychain под именем приложения (документация
+  Electron; здесь не проверялось). Значит, userData и `app.setName` Desktop v2 должны совпасть с 0.4 —
+  `<appData>/com.loginom.aiagent[.beta|.dev]` и `Loginom AI Agent[ Beta| Dev]` (B4.2). Варианты чтения — вопрос 4.
+- **Объём.** 100–200 строк (вариант А вопроса 4). **Проверка.** `safe-storage-smoke.cjs` на v2 плюс чтение Electron 44
+  записей, сделанных Electron 42 в том же профиле (B4.14a); юнит-тест переноса (B4.13).
+
+#### 3. Прокси: `proxy-relay`, системный прокси Windows, передача службе
+
+- **0.4.** `system-proxy.ts` (163), `proxy-env.ts` (88), `proxy-relay.ts` (441) и `proxy-relay.node.ts` (468, реле
+  для PAC через `session.resolveProxy` Chromium); тесты 326; связка в 0.4: `index.ts:259-290`, `:350-365`, `:488-580`.
+  Определение прокси — общий код `loginom-host/src/system-proxy` (им пользуется и CLI). Прокси применяется только к
+  sidecar (`createSidecarEnv`), при выходе sidecar до готовности — один перезапуск без прокси. Ручные проверки:
+  `test/loginom/{system-proxy,sidecar-proxy-contract,no-proxy-contract,startup-failure}.mjs`, `environment-proxy.ts`.
+- **v2.3.0.** Только переменные окружения: `lifecycle/environment.ts:73-101` (`setGlobalProxyFromEnv`, loopback в
+  `NO_PROXY`). Служба наследует окружение главного процесса и `EnsureOptions.env` (`client/src/service.ts:28-35`).
+- **Перенос.** Определить прокси общим кодом `loginom-host` до `Service.ensure` и передать службе через `env`; один
+  повтор без прокси. Реле для PAC — отдельно и позже. Файлы форка `src/main/loginom/proxy.ts`, вызов — в
+  `service/background-service.ts`. В-86 прокси не называет — вне шлюза (вопрос 6).
+- **GUI-плагин не подходит:** контекст главного процесса плагина (`plugin/src/gui/main.ts`: хранилище, журнал, окна,
+  адрес службы, меню) не влияет на окружение, с которым запускается служба.
+- **Объём.** 150–250 строк без реле, реле — ещё около 900. **Проверка.** Перенесённый `system-proxy.test.ts`; на стенде
+  — шаг 7 чек-листа Windows.
+
+#### 4. Политика обновлений, `appId` и лента
+
+- **0.4.** `update-policy.ts` (508: подписанный манифест `.sig`, источники GitHub, S3 и generic, политика администратора
+  `policy.json`), `updater.ts` (337), `updater-controller.ts` (163), `updater-subscriptions.ts` (20); тесты 1 361 строка
+  (`update-sources` 787, `updater-controller` 325, `update-policy` 233, `updater-subscriptions` 16); `test/loginom/updater/*` (328). Публичная лента
+  выключена: `Product.updateFeed` — `null`, если сборка не задала адрес; `electron-builder` пишет заглушку
+  `https://updates.invalid/` (0.4: `electron-builder.config.ts`). `appId` — `com.loginom.aiagent[.beta|.dev]`.
+- **v2.3.0.** Обновлятор — GUI-плагин `gui-plugins/src/updater` (3 043 строки с тестами и словарями) на
+  `electron-updater`: лента из `app-update.yml`, его пишет `publish` в `electron-builder.config.ts:222-268`
+  (opencode.ai), `User-Agent` `opencode/…/desktop` (`updater/platform.ts:17`), кэш установщика
+  `%LOCALAPPDATA%\@opencodedesktop-updater` из имени пакета (`script/pack.ts:76`, Р-11). `appId` —
+  `ai.opencode.desktop[.beta|.dev]` (`constants.ts:17-26`, `electron-builder.config.ts:43-47`).
+- **Перенос.** В шлюзе B: `appId` и имена (B4.2, B4.5a), лента — только `Product.updateFeed`, без неё обновлятор
+  выключен, `User-Agent` и кэш под продукт, без «Что нового» и удалённого значка (B4.12). Подписанный манифест,
+  `policy.json` и источники — с UPDATE-01 в этапе C (вопрос 5). Правки `gui-plugins` — запись CAT-04: в ней сейчас
+  `pending: B2.7d, B4.1`, а `catalog-check.py` не принимает запись с `pending` и файлами одновременно. Из B4.12 и B2.7d
+  первая снимает `pending`, вторая дописывает запись.
+- **GUI-плагин.** Обновлятор уже GUI-плагин upstream, поэтому в B — точечная правка его файлов. Свой встроенный
+  плагин обновлений вместо upstream — вариант для паритета политики в этапе C: регистрация встроенного плагина — тоже
+  правка upstream (`gui-plugins/src/main.ts`), зато код политики остаётся в файле форка.
+- **Объём.** В шлюзе — 40–80 строк; паритет политики — 600–900 строк и 3–5 дней. **Проверка.** Тест: без ленты
+  обновлятор выключен и запросов нет; `electron-builder.config.test.ts` — лента и кэш продукта.
+
+#### 5. Поиск своей службы по файлу регистрации (U5, В-79, В-95)
+
+- **0.4.** Не было: sidecar — дочерний `utilityProcess`, порт свободный (`LOGINOM_AI_AGENT_PORT` или порт 0,
+  0.4: `index.ts:516-530`).
+- **v2.3.0 с B1.3a и B1.4c.** `service/service-identity.ts` (28): каталог канала и имя `service-<identity>.json`
+  из `LOGINOM_AI_AGENT_SERVICE_IDENTITY`; вызовы — `sidecar-probe.ts` (зонд при старте) и `background-service.ts:111`.
+  Identity и порт никто не задаёт, поэтому окно ищет `service.json`, а все каналы слушают порт `0xc0de` (B1.4c).
+  Зонд `startSidecarProbe` (`index.ts:26`) идёт до `preferApplicationEnvironment`, которая на Windows удаляет
+  `XDG_STATE_HOME` (`lifecycle/environment.ts:48`). `Service.ensure` запускает службу без своего `env`
+  (`background-service.ts:62-76`).
+- **Перенос.** Identity и порт — константы канала в `service-identity.ts`, а не окружение главного процесса: тогда зонд
+  видит их сразу. Службе — через `Service.ensure({ env })` вместе с `LOGINOM_AI_AGENT_RESOURCES` (B2.4: «кто ставит её
+  службе v2 — B4»). Каталог состояния на Windows считать так же, как служба после удаления `XDG_STATE_HOME`. Номера —
+  контракт с B2.7c (вопрос 7). Дочерние процессы службы наследуют identity (B1.3a): CLI из терминала Desktop задаёт обе
+  переменные сам — это B2.7c.
+- **Хвост B1.4c `service-prod.json`.** CLI, собранный с каналом `prod`, называет файл `service-prod.json`, а окно prod
+  без identity ищет `service.json`. С identity (B4.9) обе стороны берут `service-<identity>.json`, имя канала в файле
+  роли не играет; выбор `latest` или `prod` для сборки CLI остаётся B5.
+- **Объём.** 30–60 строк. **Проверка.** `service-identity.test.ts`: файл и порт по каналу; окно не берёт `service.json`
+  чужой службы; две службы — Desktop и профиль CLI — с разными портами.
+
+#### 6. Перенос 0.4 до старта службы
+
+- **0.4.** Desktop ничего не делал: бэкенд v1 сам мигрировал свою базу. (`migrate.ts` 0.4 — перенос Tauri upstream, к
+  делу не относится.)
+- **v2.3.0 с B3.1b.** Служба сама переносит базу 0.3.9/0.4 до прослушивания порта (`cli/src/server-process.ts`,
+  `LegacyMigrate.guard`) и при ошибке не стартует; причина — в stderr, а он попадает в ошибку запуска, которую видит Desktop
+  (`client/src/service-contender.ts:124-126`). Desktop ждёт регистрацию 120 с (`service-timing.ts:21`). В upstream есть показ
+  прогресса своего переноса v1 → v2 (`renderer/migration-status.tsx`, `/api/experimental/migration/v1`), но перенос
+  форка идёт до прослушивания, и окно прогресса не видит.
+- **Перенос.** Отдельного шага в Desktop не нужно: «запуск `migrate` до старта службы» закрыт предохранителем B3.1b.
+  Остаётся время: на большом профиле перенос может не уложиться в 120 с. Замер и решение — вне шлюза (ВШ-7 в таблице
+  «вне шлюза»).
+- **Объём.** 0 в шлюзе. **Проверка.** B4.14b: установленный Desktop на профиле 0.4 из B3.3 поднимает службу, сессии на
+  месте.
+
+#### 7. Desktop-часть дашбордов (В-85)
+
+- **0.4.** `dashboard-target.ts` (52: готовит рабочий каталог дашборда по снимку через Host — `status`, `settled`,
+  `catalog`, `readDashboard`), `deep-links.ts` (28: очередь ссылок `loginom-ai-agent://`, холодный старт с
+  `dashboard?`); тесты 273; связка — 0.4: `index.ts:431-441`; ручная GUI-проверка `test/loginom/dashboard-chat.ts` (353).
+- **v2.3.0.** Ничего; своя очередь ссылок v2 знает только возврат из Console.
+- **Перенос.** Host в службе, поэтому подготовка цели — RPC плагина (B2.9). В Desktop — регистрация схемы
+  (B4.4), очередь ссылок и мост к RPC; показ и «Изменить в чате» — интерфейс, этап C. Не в приёмке шлюза (вопрос 9).
+- **GUI-плагин.** Ссылки протокола принимает `lifecycle` (`DeepLinks`), у API плагина главного процесса такого хука
+  нет — очередь ссылок остаётся в коде форка. Мост к RPC плагина службы мог бы жить в GUI-плагине (у него есть адрес и
+  заголовки службы, `serverEndpoints`), но B0.1 показал, что встроенному GUI-плагину `ctx.client` запрещён; решать
+  вместе с интерфейсом этапа C.
+- **Объём.** 60–100 строк. **Проверка.** Перенесённые `dashboard-target.test.ts` и `deep-links.test.ts`.
+
+#### 8. Жизнь службы (В-87): остановка при выходе, запрет переподключения, мягкая остановка
+
+- **0.4.** `shutdown.ts` (54, тест 192): `before-quit` откладывает выход, закрывает окна (до 2 с), останавливает sidecar
+  (до 6 с) и Host, затем выходит (0.4: `index.ts:307-325`, `:220-237`). Ручная проверка `test/loginom/shutdown-validation.mjs`
+  (189): после выхода нет процессов приложения и портов. Падение окна: sidecar — `utilityProcess`, умирает вместе с
+  Electron; рантаймы Host следят за родителем (`test/loginom/parent-crash.ts`).
+- **v2.3.0.** Автомат выхода `lifecycle/machine.ts` (271): `before-quit` откладывается, пока не остановлены участники
+  `Shutdown` (`lifecycle/shutdown.ts`), не дольше 10 с. Тот же путь — выход из сеанса Windows (`session-end`, у него нет
+  `before-quit`, `machine.ts:41`) и передача управления установщику обновления (`restart`, с `resume` при сбое).
+  Участники — только GUI-плагины. Служба не останавливается (B0.4). Закрытие окна обрывает поток событий, окно зовёт
+  `AppReconnectService` (`ipc-handlers/app.ts:27`), и `BackgroundServiceMachine` снова вызывает `Service.ensure`; состояние
+  `disposed` наступает только при закрытии слоя (`background-service-machine.ts:344`), то есть после `will-quit`.
+- **Перенос.** Служба — участник `Shutdown` в `background-service.ts`: `stop` — запрет переподключения и остановка по
+  файлу U5 (мягкий сигнал B2.3b, жёсткое завершение — запасной путь), `resume` — снова `ensure`. Участник, а не
+  `before-quit`: так служба останавливается и при выходе из сеанса Windows, и перед установкой обновления. В автомате —
+  состояние «останавливается», в котором переподключение отклоняется. Бюджет 10 с в `lifecycle/index.ts` — правка
+  upstream (CAT-09), если мягкая остановка с закрытием рантаймов Host дольше.
+- **GUI-плагин.** Встроенный плагин главного процесса уже участник `Shutdown` и знает адрес службы, так что мог бы
+  звать мягкую остановку в `onCleanup`. Но запрет переподключения всё равно правка `BackgroundService` upstream, а
+  регистрация встроенного плагина — ещё одна правка (`gui-plugins/src/main.ts`). Меньше правок даёт участник в
+  `background-service.ts`.
+- **Объём.** 80–150 строк. **Проверка.** Тесты автомата и участника; B4.14b — после выхода нет службы, рантаймов и
+  Chromium, повторный запуск не оживляет службу; на Windows — после B2.3b.
+
+#### 9. Бренд: имя и `appId`, схема, кэш обновлятора, имя встроенного CLI (Р-9, Р-10, Р-11, BRAND-01)
+
+- **0.4.** `constants.ts` (13, имена из `Product`), имена в `electron-builder.config.ts` (`productName`,
+  `executableName`, `shortcutName`, `protocols` — `loginom-ai-agent`, Linux — slug канала для `/opt`), значки и ресурсы
+  (228 файлов `icons/`, `resources/`), `uninstall-uri.nsh` снимает ключ протокола.
+- **v2.3.0.** `OpenCode` и `ai.opencode.desktop` — `constants.ts:11-26`, `windows/early.ts:98`,
+  `windows/appearance.ts:29`, `renderer/index.html:7`, `renderer/migration-status.tsx`; схема `opencode` —
+  `lifecycle/environment.ts:62-63`, `lifecycle/index.ts:106`, `lifecycle/deep-link.ts:5`,
+  `electron-builder.config.ts:175-178,240,259`; встроенный CLI `opencode-cli(.exe)` и `opencode-cli.version` —
+  `electron-builder.config.ts:104-127`, `service/desktop-cli.ts:87-109`, `service/sidecar-probe.ts:35`,
+  `script/utils.ts:86-124`; имя пользователя Basic `opencode` — `service/sidecar-credentials.ts:41` (вслед за B2.7a).
+  Пункты меню и подсказки macOS — английские строки в `app/src/runtime/i18n/desktop-native.ts:235-302` (12 с
+  `OpenCode`) и ключи `desktop.*` в словарях остальных языков (около 6 строк на язык, 59 файлов); строки обновлятора — `gui-plugins/src/updater/i18n/*.ts`. Манифест
+  `desktop/package.json`: `@opencode/desktop`, автор и `homepage` OpenCode (CAT-01).
+- **Перенос.** B4.2–B4.7, B4.11 — таблица задач. Словари отнесены к этапу C (CAT-10), но BRAND-01 Desktop в шлюзе B:
+  ключи `desktop.*` и строки обновлятора — в B, `en` и `ru` (вопрос 8).
+- **Объём.** 150–250 строк кода и конфигурации, плюс значки. **Проверка.** `electron-builder.config.test.ts`; grep
+  собранного `app.asar` и ресурсов на `OpenCode`, `opencode-cli`, `ai.opencode`; SMK — ключ протокола и запись
+  «Установленные приложения» (B4.14c).
+
+#### 10. Ресурсы Loginom в сборке, проверка при установке (PKG-01/02)
+
+- **0.4.** `scripts/bundle-loginom.ts` (36, тест 39) — обёртка над общим `loginom-host/script/stage-resources.ts`;
+  `extraResources` `resources/loginom` (Node, Chromium, рантайм, справка, навыки); NSIS `customInstall` запускает
+  `<app> --verify-resources` и прерывает установку при отказе (0.4: `resources/uninstall-uri.nsh`), а главный процесс
+  выходит до блокировки единственного экземпляра (0.4: `index.ts:185-193`, `verifyDesktopResources` с прогревом
+  Chromium на Windows). Скрипты выпуска `scripts/release/*` (715 строк, тесты 596) — B5. Импорты `loginom-host` в
+  файлы Desktop 0.4 исключены из typecheck до B4 (B1.2a): `script/skills-acceptance.ts` → `desktop/scripts/release/manifest`
+  (24 падения `skills-acceptance.test.ts`), `script/system-proxy-smoke.ts` → `desktop/src/main/proxy-env`.
+- **v2.3.0.** Упаковывается только CLI (`electron-builder.config.ts:104-110`); `installer.nsh` (242) — свои
+  `customInit`, `customInstall` (`icacls`), `customUnInstall` (ступени обновления).
+- **Перенос.** B4.8a — ресурсы и `--verify-resources`; B4.8b — `scripts/release/manifest.ts` для `loginom-host`
+  (исключение `system-proxy-smoke.ts` остаётся до прокси); `customInstall` форка вливается в `installer.nsh` (B4.5a).
+- **Хвост B3.3: `paths.data` в манифесте Windows.** 0.4: `scripts/release/write-manifest.ts:176-181` пишет для Windows
+  `config`, `data` и `state` — `%APPDATA%/com.loginom.aiagent`. На v2 данные и состояние службы — каталоги продукта
+  от домашнего каталога (`%USERPROFILE%\.local\share\loginom-ai-agent`, `…\state\…`, конфиг — `%USERPROFILE%\.config\…`,
+  B1.3a), в `%APPDATA%` — только userData Desktop. Исправить при переносе `write-manifest.ts` (B5.2, ниже).
+- **Объём.** 80–150 строк. **Проверка.** `bundle-loginom.test.ts`; `loginom-host` — 24 теста `skills-acceptance` и
+  typecheck без исключения; SMK — `installer-resource-cache`, `bundled-help-manifest` (B4.14c).
+
+#### 11. userData и профиль CLI 0.4
+
+- **0.4.** userData — `<appData>/<appId>` (0.4: `index.ts:178-181`); профиль CLI — `<appData>/<appId>/cli/profiles/default`.
+- **v2.3.0.** То же правило (`lifecycle/configure.ts:47`), ступени CLI — в `<userData>/cli/` (выше, «Пробы»).
+- **Перенос.** Ступени — в каталог, которого нет в 0.4, а `cleanStages` удаляет только каталоги вида ступени (B4.2).
+  Каталог `cli/` в userData продукта общий с B2.7c: если профиль CLI v2 останется в `<appData>/com.loginom.aiagent/cli/profiles/`,
+  правило то же.
+- **Объём.** 10–20 строк. **Проверка.** Тест: профиль CLI переживает `cleanStages`; мутация — без защиты он удалён.
+
+#### 12. Деинсталлятор, сторож, дескрипторы, медленный первый старт (вне шлюза по плану)
+
+- **Деинсталлятор (REMOVE-01).** После удаления остаются ключ `HKCU\Software\Classes\opencode`, копия установщика
+  230 МиБ в кэше обновлятора и живая служба из копии CLI в userData (B0.4). `customUnInstall` v2 их не трогает
+  (`installer.nsh:56-60`), `customCheckAppRunning` завершает только процессы из `$INSTDIR`. В 0.4 ключ снимал
+  `uninstall-uri.nsh`. Вопрос 2.
+- **Сторож.** В 0.4 после падения окна не оставалось ничего (`utilityProcess` и слежение рантаймов за родителем). На v2
+  служба `detached`, без слежения за родителем: после `kill -9` окна служба, рантаймы Host и Chromium живут до
+  перезагрузки. Вопрос 3.
+- **Дескрипторы на Linux.** Служба наследует 84 дескриптора окна, в том числе сокет DevTools (B0.4). Переходят те, у
+  которых нет `CLOEXEC`: Node помечает так свои, Chromium — не все. Лечение — запуск через обёртку,
+  закрывающую лишние дескрипторы, или их закрытие в начале службы. 0,5–1 день.
+- **Первый старт на Windows — 19 с** (B0.4, повторный — 1 с): первый запуск exe 240 МБ из свежей копии в userData;
+  вероятно, проверка антивирусом. Разбор — 0,5–1 день; с переносом B3.1b время растёт ещё.
+
+#### 13. Состояние окна 0.4 и журналы (этап C)
+
+- Настройки и состояние окна 0.4 лежат в userData файлами `loginom-ai-agent.{global,workspace.*,draft.*,window.*}.dat`
+  (0.4: `app/src/utils/persist.ts:27-28,352-363`). Импорт v2 берёт только `default.dat` и `opencode.*.dat`
+  (`storage/legacy.ts:91-93`) — при обновлении с 0.4 язык, проекты и черновики окна не перейдут. Это UPDATE-01, этап C;
+  правка — имя файла при импорте, 0,5 дня.
+- Журналы Desktop 0.4: `logs/<run>/`, удержание 100 МБ и 7 дней, `crash.log` (`log-retention.ts` 146, `logging.ts`
+  341). У v2 свои журналы (`native/logging.ts`, 434). LOG-01 в В-86 нет — этап C.
+
+#### 14. Тесты `desktop/test/loginom` (41 файл без фикстур)
+
+| Группа | Файлы | Куда |
+|---|---|---|
+| Автотесты без Desktop | `committed-hash-attributes.test.mjs`, `observed-click.test.ts` (+ `observed-click.ts`), `runtime-acceptance-contract.test.ts` | B4.14d, как есть |
+| Инструменты Host и рантайма без Desktop | `runtime-acceptance.ts`, `runtime-smoke.ts`, `parent-crash.ts`, `cold-readback.mjs`, `environment-proxy.ts`, `no-proxy-contract.mjs` | B4.14d, как есть |
+| SEC-01 в CAND | `safe-storage-smoke.cjs` — только Electron и кодек Desktop | B4.14a |
+| Установленные сборки | `windows-installed-smoke.{ps1,py,test.ps1}`, `windows-sidecar-smoke.{mjs,test.mjs}`, `docker/{Dockerfile,installed-smoke.mjs,run-matrix.ts}`, `shutdown-validation.mjs` | B4.14b, B4.14c: окно и API v2, служба U5 |
+| Окно 0.4 (`window.api.*`, Playwright `_electron`) или API бэкенда v1 | `gui-smoke`, `settings-ux`, `settings-live`, `recovery-ui`, `crash-logging`, `startup-failure`, `chatgpt-proxy`, `chatgpt-schema`, `desktop-oauth`, `desktop-oracle`, `xiaomi-smoke`, `macos-multichat`, `package-docs-permissions`, `product-skills-smoke`, `dashboard-chat`, `system-proxy.mjs`, `sidecar-proxy-contract.mjs`, `updater/*` | этап C (формы, окно) или вместе со своей функцией (прокси, обновления, дашборды) |
+
+Переменные тестов сменились: корень профиля — `LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` вместо `LOGINOM_AI_AGENT_TEST_ROOT`
+(`lifecycle/configure.ts:66-86`); `LOGINOM_AI_AGENT_TEST_ONBOARDING` на v2 значит onboarding OpenCode и база в памяти.
+
+#### 15. Первый запуск: мастер 0.4 и onboarding v2
+
+- **0.4.** Мастер Loginom при первом запуске (UI-01: три поля подключения); PKG-01 ждёт: «Открывается мастер».
+  `install-state.ts` 0.4 по файлам userData решал, первый ли это запуск.
+- **v2.3.0.** Мастера Loginom нет (В-10, план B: «Мастера первого запуска нет»). Onboarding OpenCode при первом запуске
+  создаёт проект по умолчанию в «Документах» (`lifecycle/onboarding.ts:70-75`); первый запуск определяется по
+  файлам userData (`storage/install-state.ts`). При обновлении с 0.4 файлы `*.dat` в userData есть — onboarding не
+  запустится.
+- **Перенос.** Кода в B нет. Меняется критерий приёмки: PKG-01 на v2 не может ждать мастер. Вопрос 10.
+
+### Задачи B4.2…
+
+Не больше пяти файлов на задачу. «Шлюз B» — входит ли результат в приёмку по В-86: LIFE-01, BRAND-01, PKG-01/02,
+автоматическая часть SEC-01, сборка трёх платформ, тесты `desktop/test/loginom`. Каталог: `packages/desktop/**` —
+CAT-09, `electron*.ts` — CAT-02, значки и ресурсы — CAT-03, файлы U5 — CAT-13, манифесты — CAT-01; новые файлы форка
+каталогом не описываются. Модульные `AGENTS.md` Desktop 0.4 (упаковка, подключение) переносятся с кодом своих задач,
+проверка ссылок — B6.3.
+
+| № | Задача | Файлы | Зависит от | Размер, дни | Шлюз B | Проверка |
+|---|---|---|---|---|---|---|
+| B4.2 | `appId` и userData продукта без потери профиля CLI 0.4 | `src/main/constants.ts`, `service/desktop-cli.ts` (каталог ступеней), `service/cli-stages.ts`, `service/cli-stages.test.ts` (новый), `catalog.md` | — | S, 0,5–1 | да: данные (B3.3, B2.7c), BRAND-01 | профиль CLI переживает `cleanStages`, мутация краснит; userData prod — `<appData>/com.loginom.aiagent` |
+| B4.3 | Имя в окнах (Р-9) | `windows/early.ts`, `windows/appearance.ts`, `renderer/index.html`, `renderer/migration-status.tsx` | B4.2 | S, 0,5 | да: BRAND-01 | grep; заголовок окна в B4.14b |
+| B4.4 | Схема протокола продукта (Р-10) | `lifecycle/environment.ts`, `lifecycle/index.ts`, `lifecycle/deep-link.ts`, `lifecycle/deep-link.test.ts` | вопрос 1 | S, 0,5 | да: BRAND-01 (URI scheme) | тест разбора; ключ протокола в SMK |
+| B4.5a | Упаковка продукта: имена, лента-заглушка, кэш обновлятора (Р-11), NSIS (`--verify-resources`, ключ протокола) | `electron-builder.config.ts`, `electron-builder.config.test.ts`, `package.json`, `script/pack.ts`, `resources/windows/installer.nsh` | B4.2; вопрос 2 | M, 1–1,5 | да: PKG, BRAND-01, три платформы | тест конфига; сборка в CI — B5.1 |
+| B4.5b | Упаковка Linux и macOS как в 0.4: права `chrome-sandbox` (`afterPack`, `4755`), `depends` для deb, `npmRebuild: false`, `entitlements`, `hardenedRuntime`, `signIgnore` ресурсов Loginom, arm64 | `electron-builder.config.ts`, `electron-builder.config.test.ts`, `scripts/linux-permissions.ts` (+ тест), `resources/entitlements.plist` | B4.5a, B4.8a | M, 1–1,5 | да: три платформы, PKG-02 на Linux | тест конфига; права в собранном deb (B4.14b) |
+| B4.6 | Значки и метаданные продукта | код: `script/copy-icons.ts`, `script/copy-metainfo.ts`, `scripts/generate-icons.ts`, `scripts/icons.test.ts`, `scripts/copy-icons.test.ts`; набор ресурсов из 0.4: `icons/**`, `resources/*.metainfo.xml` | — | S, 0,5–1 | да: BRAND-01 | `icons.test.ts`, `copy-icons.test.ts` |
+| B4.7 | Встроенный CLI под именем продукта, имя пользователя Basic | `script/utils.ts`, `script/build.ts`, `service/desktop-cli.ts`, `service/sidecar-probe.ts`, `service/sidecar-credentials.ts` | B2.7a (имя бинарника и пользователя) | S, 0,5–1 | да: BRAND-01 (процессы) | grep; процессы в SMK |
+| B4.8a | Ресурсы Loginom в сборке и `--verify-resources` | `scripts/bundle-loginom.ts` (+ тест), `script/build.ts`, `src/main/loginom/resources.ts` (новый), `src/main/index.ts` (+3) | B1.6, B4.5a | M, 1–1,5 | да: PKG-01/02 | `bundle-loginom.test.ts`; SMK |
+| B4.8b | Манифест выпуска для `loginom-host` | `scripts/release/manifest.ts` (из 0.4), `loginom-host/tsconfig.json` | — | S, 0,5 | да: тесты `loginom-host` | 24 теста `skills-acceptance`, typecheck |
+| B4.9 | Своя служба: identity, порт, окружение | `service/service-identity.ts`, `service/background-service.ts`, `service/service-identity.test.ts`, `catalog.md` (CAT-13) | вопрос 7 (с B2.7c), B4.8a | S, 0,5–1 | да: LIFE-01, BRAND-01 | файл и порт по каналу; чужой `service.json` не подхватывается |
+| B4.10 | Остановка службы с приложением, запрет переподключения | `service/background-service.ts`, `service/background-service-machine.ts` (+ тест), `lifecycle/index.ts` (бюджет), тест участника | B4.9; B2.3b (Windows), B2.3 (Host закрывает рантаймы) | M, 1–2 | да: LIFE-01 | автомат и участник; B4.14b |
+| B4.11 | Словарь Desktop и обновлятора: `en`, `ru` | `app/src/runtime/i18n/{desktop-native,ru}.ts`, `desktop-native.test.ts`, `gui-plugins/src/updater/i18n/{en,ru}.ts` | вопрос 8 | S, 0,5 | да: BRAND-01 (меню, About) | `desktop-native.test.ts`; grep |
+| B4.12 | Лента обновлений продукта, без обращений к opencode.ai | `gui-plugins/src/updater/{main,platform,whats-new}.ts(x)`, `renderer/platform/notifications.ts`, `catalog.md` (CAT-04) | B4.5a; вопрос 5 | S, 0,5–1 | да: BRAND-01, UPDATE-01 «не заменяется OpenCode» | без ленты обновлятор выключен; запросов к opencode.ai нет |
+| B4.13 | Учётные данные Desktop для службы | `src/main/loginom/credentials.ts`, `src/main/loginom/credential-migration.ts` (+ тест), `src/main/desktop.ts` (+2) | вопрос 4, B2.3, B4.2 | M, 1,5–2 | да: SEC-01 (авто), PKG-02 | юнит-тест; B4.14a |
+| B4.14a | Автоматическая часть SEC-01 | `test/loginom/safe-storage-smoke.cjs` | B4.2, B4.13 | S, 0,5 | да: SEC-01 | чтение Electron 44 записей Electron 42; шаг CAND — B5.1 |
+| B4.14d | Тесты и инструменты 0.4 без Desktop — копия как есть (исключение из правила пяти файлов, как ресурсы B4.6) | 10 файлов п. 14: три автотеста с `observed-click.ts`, шесть инструментов Host и рантайма | — | S, 0,5 | да: тесты `desktop/test/loginom` | `bun test` и `node --test` в `packages/desktop` |
+| B4.14b | LIFE-01 и установленный Linux | `test/loginom/shutdown-validation.mjs`, `docker/{Dockerfile,installed-smoke.mjs,run-matrix.ts}` | B4.5a, B4.5b, B4.8a, B4.10 | M, 1–1,5 | да: LIFE-01, PKG-01 | Xvfb, AppImage и deb; профиль 0.4 из B3.3 |
+| B4.14c | Установленный smoke Windows на v2 | `test/loginom/windows-installed-smoke.{ps1,py,test.ps1}`, `windows-sidecar-smoke.{mjs,test.mjs}` | B4.5a, B4.8a, B4.9, B4.10; B2.3 (RPC подключения) | M, 1,5–2 | да: PKG-01/02, BRAND-01, LIFE-01 | `winstand`; шаг CAND — B5.1 |
+
+Итого в шлюзе: 18 задач, 13,5–20 дней. Можно начинать без ответов владельцу: B4.2, B4.3, B4.6, B4.8b, B4.14d; после
+ответов — остальное. Порядок: B4.2 → (B4.3, B4.5a) → B4.8a → B4.5b → B4.9 → B4.10 → B4.14b, B4.14c; B4.13 — после
+проектирования B2.3.
+
+**Передано другим задачам** (файлы форка 0.4 в `scripts/`, CAT-02 относил их к B4; отклонение — на согласование):
+
+| Что | Куда | Почему |
+|---|---|---|
+| `scripts/build-macos.ts`, `check-macos.ts`, `build-command.ts` (+ тест) | B5.1 | вход сборки macOS в CI: Desktop DMG/ZIP и CLI TAR.GZ из одного коммита; это «сборка трёх платформ», но работа CI |
+| `scripts/release/{write-manifest,verify-artifact}.ts`, тесты `artifact`, `notes`; `afterAllArtifactBuild` (blockmap AppImage); подпись Windows `signWindows` | B5.2 | REL: SHA256 и манифест выпуска, подпись — в CI; `write-manifest.ts` — с правкой путей Windows (п. 10) |
+| `scripts/macos-smoke*.{ts,mjs}`, `macos-upgrade.mjs`, `release/verify-macos.ts` | этап G | установленная macOS |
+| Правки upstream `scripts/{prebuild,predev,prepare,utils,finalize-latest-*,copy-bundles}.ts` 0.4 | B4.8a, B5 | на v2 их место заняли `script/build.ts`, `dev.ts`, `pack.ts`; из правок нужна только сборка ресурсов Loginom |
+
+### Вне шлюза B — объём владельцу
+
+ВШ — номер пункта этой таблицы, не решение владельца.
+
+| № | Что | Цена | Рекомендация |
+|---|---|---|---|
+| ВШ-1 | Деинсталлятор Windows (REMOVE-01): ключ протокола, копия установщика, служба | 0,5 дня (ключ и кэш, в B4.5a) или 1–1,5 (со службой) | ключ и кэш — в B4.5a (вопрос 2) |
+| ВШ-2 | Сторож службы при падении окна | 1,5–2 дня, правка upstream (CAT-13) | в B4 вне приёмки (вопрос 3) |
+| ВШ-3 | Дескрипторы окна у службы на Linux | 0,5–1 дня | вместе с ВШ-2 |
+| ВШ-4 | Первый старт службы на Windows 19 с | 0,5–1 дня, разбор | до B6 |
+| ВШ-5 | Системный прокси службы (без реле PAC) | 1,5–2 дня; реле — ещё 1,5 | после шлюза B (вопрос 6) |
+| ВШ-6 | Desktop-часть дашбордов: очередь ссылок и мост к RPC | 1–1,5 дня, после B2.9 | в B4 (вопрос 9) |
+| ВШ-7 | Время старта службы при переносе большого профиля 0.4 | 0,5–1 дня: замер; при > 60 с — прогресс или срок ожидания | до B6 |
+| — | Паритет политики обновлений (подпись, `policy.json`, источники) | 3–5 дней | этап C, с UPDATE-01 (вопрос 5) |
+| — | Импорт состояния окна 0.4 (`*.dat`) | 0,5 дня | этап C, с UPDATE-01 |
+| — | Журналы Desktop 0.4 (удержание, `crash.log`, LOG-01) | 1–2 дня | этап C |
+| — | Перенос каталога установки NSIS 0.4 (`customInit`) и обновление 0.4.x → v2 | — | этап C, UPDATE-01 |
+
+Итого ВШ-1…ВШ-7: 6,5–10 дней (ВШ-1 — по полной цене). Рекомендую в B4 вне приёмки ВШ-2, ВШ-3, ВШ-4, ВШ-6, ВШ-7 — 4–6,5
+дня; ВШ-1 по варианту Б вопроса 2 уже входит в B4.5a; ВШ-5 — после шлюза B.
+
+### Вопросы владельцу для checkpoint B4.1
+
+1. **Схема `opencode://` и вход в OpenCode Console (Р-10).** По коду вход завершается опросом, ссылка `opencode://`
+   только возвращает фокус окну; приложение добавляет к адресу Console `client_id=opencode-desktop` и `return_window`
+   (`app/src/providers/connect/controller.ts:447-452`).
+   - А. Только `loginom-ai-agent`. Вход в Console работает; кнопка возврата на странице Console откроет установленный
+     OpenCode Desktop или ничего. Цена — 0,5 дня (B4.4).
+   - Б. Регистрировать и `opencode`. Ключ `HKCU\Software\Classes\opencode` общий с OpenCode Desktop: кто запустился
+     последним, тот и владеет, удаление одного ломает другой. Нарушает BRAND-01 (URI scheme), REMOVE-01 не может снять
+     ключ безопасно. +0,5 дня и этот риск.
+   - В. А, плюс в этапе C Desktop перестаёт просить у Console ссылку возврата. Правка `app`, 0,25 дня.
+   - **Рекомендация:** А сейчас, В — в этапе C.
+2. **Деинсталлятор Windows (REMOVE-01) в B.** После B4.10 служба при штатном закрытии уже остановлена, живой она
+   остаётся только после падения окна.
+   - А. Всё в B: остановка службы по файлу U5, ключ протокола, копия установщика. 1–1,5 дня и 20 минут стенда.
+   - Б. В B только ключ протокола (макрос 0.4) и копия установщика, в `installer.nsh` (B4.5a). 0,5 дня. Служба при
+     удалении — вместе со сторожем.
+   - В. Всё в этапе C.
+   - **Рекомендация:** Б.
+3. **Сторож службы при падении окна.** В 0.4 после падения ничего не оставалось, на v2 остаются служба, рантаймы и
+   Chromium.
+   - А. Не делать в B: LIFE-01 требует только штатного закрытия.
+   - Б. Служба следит за pid окна, который Desktop передаёт при запуске, и мягко останавливается без него. Правка
+     upstream `cli`/`server` (CAT-13); на Windows — после B2.3b. 1,5–2 дня.
+   - В. Следующий запуск гасит осиротевшую службу. Почти бесполезно: следующий запуск и так подхватывает её зондом.
+   - **Рекомендация:** Б, в B4, но вне приёмки шлюза — паритет с 0.4 при падении.
+4. **Как служба получит пароль Loginom из хранилища Desktop.** Решается вместе с проектированием B2.3.
+   - А. Однократно переписать записи Desktop в конверт CLI `loginom-cli-secrets-v1` (DPAPI CurrentUser, Keychain;
+     Linux — тот же конверт с открытым текстом). Делает главный процесс до старта службы: читает `safeStorage`, пишет
+     новое поколение; прежние файлы поколений остаются. Служба знает один кодек — `cliCredentials`. Цена: 1,5–2 дня.
+     Минус: откат на 0.4 не прочтёт новое активное поколение.
+   - Б. Главный процесс расшифровывает при каждом старте и передаёт пароль службе приватным RPC, только в памяти;
+     сохранение новых настроек снова идёт через Desktop. 2–3 дня; служба зависит от живого окна, кодеков два.
+   - В. Host остаётся в главном процессе, как в 0.4, а плагин службы обращается к нему по приватному локальному
+     каналу. 4–6 дней; противоречит CAT-11 и B2.3.
+   - **Рекомендация:** А. Для любого варианта userData и имя приложения Desktop v2 должны совпасть с 0.4 (B4.2).
+5. **Политика обновлений.**
+   - А. В B — только лента продукта (без неё обновлятор выключен, как в 0.4), без обращений к opencode.ai, кэш под
+     продукт (B4.12, 0,5–1 дня). Подписанный манифест, `policy.json` администратора и источники GitHub/S3 — в этапе C
+     с UPDATE-01, 3–5 дней.
+   - Б. Полный паритет в B: ещё 3–5 дней.
+   - **Рекомендация:** А.
+6. **Системный прокси службы** (B2.8 отдал вопрос B4.1).
+   - А. Вне шлюза B, после него: отдельная задача — определение общим кодом `loginom-host`, передача через `env`,
+     один повтор без прокси. 1,5–2 дня; реле PAC — позже, ещё 1,5.
+   - Б. В шлюзе B: те же дни прибавятся к шлюзу.
+   - **Рекомендация:** А: В-86 прокси не называет, шаг 7 чек-листа Windows — стенд Desktop.
+7. **Identity и порт службы Desktop** — контракт с B2.7c (В-95).
+   - А. Постоянная identity `desktop` и постоянные порты по каналу ниже 28672 (блок сдвига Windows); у профилей CLI —
+     свой диапазон.
+   - Б. Порт из хеша identity в диапазоне. B1.3a это отверг: порт «не явно».
+   - В. Порт в настройках Desktop с заменой при занятости. +1 день, форма — этап C.
+   - **Рекомендация:** А, числа — в B4.9 после проверки занятости на стендах. Риск: чужая программа на том же порту —
+     служба не стартует, окно показывает ошибку.
+8. **Словарь Desktop для BRAND-01.** Строки меню, About и подсказок macOS лежат в словаре `app`, а словари отнесены к
+   этапу C.
+   - А. В B — ключи `desktop.*` и обновлятор на `en` и `ru` (0,5 дня), остальные 57 языков — этап C.
+   - Б. Все 59 языков скриптом в B: 1 день плюс сверка переводов.
+   - **Рекомендация:** А.
+9. **Desktop-часть дашбордов (В-85).** Подготовка цели переезжает в плагин (B2.9), показ — этап C.
+   - А. В B4 после B2.9: очередь ссылок `loginom-ai-agent://dashboard` и мост к RPC, проверка юнит-тестами. 1–1,5 дня,
+     вне приёмки шлюза.
+   - Б. Перенести вместе с интерфейсом в этап C.
+   - **Рекомендация:** А: так велит В-85, а схема уже будет своя (B4.4).
+
+10. **Критерий PKG-01 без мастера.** PKG-01 0.4 ждёт «Открывается мастер», а мастера в B нет (В-10).
+   - А. Для v2: «Открывается окно приложения; первый запуск создаёт проект по умолчанию, как в OpenCode 2; отсутствие
+     связи с Loginom обозначено отдельно» — без мастера. Цена 0.
+   - Б. Свой экран первого запуска Loginom — этап C, вместе с формой подключения.
+   - **Рекомендация:** А для шлюза B; Б — решение этапа C.
+
+### Оценка
+
+| | Задач | Дни |
+|---|---|---|
+| В шлюзе B | 18 | 13,5–20 |
+| Вне шлюза, рекомендую в B4 (ВШ-2, ВШ-3, ВШ-4, ВШ-6, ВШ-7) | 5 | 4–6,5 |
+| Вне шлюза, все ВШ-1…ВШ-7 | 7 | 6,5–10 |
+| B4 по рекомендациям | 23 | 17,5–26,5 |
+| План (B1.2b) | — | 8,5–15 |
+
+Шлюз B больше плана на 5 дней снизу и сверху. Причины — работа, которой при оценке не было: остановка службы
+(LIFE-01, В-87), перенос учётных данных из-за переезда Host в службу, защита профиля CLI, перенос установленных проверок
+на v2, упаковка Linux и macOS заново на конфиге v2. Ушло из B4 в этап C: формы, UPDATE-01 с политикой обновлений, импорт состояния окна. Стенд Windows для
+B4.14c — в днях задачи.
+
+### Риски B4
+
+| Риск | Мера |
+|---|---|
+| Первый запуск упакованной сборки с `appId` продукта удаляет профиль CLI 0.4 | B4.2 до B4.5a и до любой упакованной сборки с `com.loginom.aiagent` |
+| Записи `safeStorage` 0.4 не читаются в Electron 44 или при другом userData | B4.2 — тот же userData и то же имя; B4.14a — чтение записей Electron 42 |
+| Упакованная сборка предлагает обновиться до OpenCode | B4.5a и B4.12 до первой упакованной сборки, которая уходит из лаборатории |
+| Мягкая остановка с закрытием рантаймов дольше 10 с, служба добивается SIGKILL, Chromium остаётся | бюджет в B4.10 вместе с B2.3b |
+| B4 ждёт контрактов B2: место Host и RPC подключения (B2.3), мягкая остановка (B2.3b), имя бинарника и пользователя (B2.7a), порты профилей (B2.7c), дашборды (B2.9) | вопросы 4, 7 и 9 до старта; без них параллельно B2 идут B4.2, B4.3, B4.6, B4.8b, B4.14d |
+| Порт службы занят чужой программой | ошибка в окне; иначе — вариант В вопроса 7 |
+| Перенос большого профиля 0.4 дольше 120 с ожидания Desktop | ВШ-7 |
+| Playwright `_electron` и Electron 44 в перенесённых проверках | B4.14b, B4.14c; не проверялось |
+
+### Где решал сам
+
+- **Host — в службе.** Так записано в каталоге (CAT-11) и в плане B2.3; вариант «Host в главном процессе» вынесен в
+  вопрос 4 только как запасной.
+- **Шлюз — строго по В-86.** Что В-86 не называет (прокси, сторож, деинсталлятор, дашборды, политика обновлений), — в
+  таблице «вне шлюза» с вопросом, даже если план называл это в B4.
+- **Лента обновлений — в шлюзе B**, хотя UPDATE-01 — этап C: без этой правки установленный продукт заменяется
+  OpenCode, это BRAND-01 и безопасность, а не паритет обновлений.
+- **PKG-02 без формы** — через RPC плагина в службе Desktop, как B3.3 вызывал IPC окна 0.4. Поэтому `ipc.ts` и preload
+  Desktop в шлюз B не попадают.
+- **Тесты подключения 0.4** из `src/main/loginom/*.test.ts` отнесены к `loginom-host` (B2.3): они проверяют общий код.
+- **Окно под Xvfb не запускал**, вместо этого — проба `cleanStages` и база тестов Desktop.
+- **Скрипты сборки macOS и выпуска — в B5 и этап G**, хотя CAT-02 относил скрипты Desktop к B4: это работа CI и
+  установленной macOS, а не Desktop. Таблица «Передано другим задачам» — на согласование.
+
+### Не проверено
+
+- Всё, кроме двух проб, — по коду: упакованная сборка, окно, Windows и macOS не запускались.
+- Совместимость записей `safeStorage` Electron 42 → 44 и привязка ключа к `Local State` и к имени приложения — по
+  устройству Chromium и документации Electron.
+- Вход в Console без ссылки возврата — по коду (`controller.ts`), без реального входа.
+- Время закрытия рантаймов Host при остановке службы, время переноса большого профиля, первый старт на Windows.
+- Сборка `electron-vite` не запускалась. Тесты и инструменты 0.4, отмеченные «как есть» (B4.14d), на дереве v2 не
+  запускались.
+- `bun run check` на ветке с этим разделом — код 0: `Found 517 warnings and 0 errors`, `Tasks: 39 successful, 39 total`
+  (все из кэша turbo: код не менялся).
