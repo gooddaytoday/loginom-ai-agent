@@ -820,6 +820,7 @@
       "name": "@opencode/tui",
       "version": "2.3.0",
       "dependencies": {
+        "@loginom-ai-agent/product": "workspace:*",
         "@opencode/client": "workspace:*",
         "@opencode/core": "workspace:*",
         "@opencode/latex": "workspace:*",

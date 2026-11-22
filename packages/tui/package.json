@@ -49,6 +49,7 @@
     }
   },
   "dependencies": {
+    "@loginom-ai-agent/product": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/core": "workspace:*",
     "@opencode/latex": "workspace:*",
