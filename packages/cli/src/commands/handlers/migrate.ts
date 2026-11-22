@@ -38,6 +38,9 @@ export default Runtime.handler(
                   (result.summary.schema ? ` (schema ${result.summary.schema})` : ""),
                 `  Written: ${result.summary.migrated.sessions} sessions, ${result.summary.migrated.messages} messages` +
                   (result.summary.present ? `; ${result.summary.present} sessions were already present` : ""),
+                ...(result.summary.credentials?.length
+                  ? [`  Provider credentials: ${result.summary.credentials.join(", ")}`]
+                  : []),
                 ...(result.summary.backup ? [`  Original kept as ${result.summary.backup}`] : []),
                 ...(result.summary.warnings.length
                   ? [

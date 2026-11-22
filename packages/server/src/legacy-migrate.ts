@@ -1,15 +1,17 @@
 export * as LegacyMigrate from "./legacy-migrate"
 
-// Loginom AI Agent: moves the sessions of a 0.3.9 or 0.4.x profile (OpenCode v1 schema) into an OpenCode 2 database.
-// The v2 server cannot do it in place: the fork's own `migration` table sends the v2 schema migrations down the
-// "replay the V1 squash" branch, which drops the v1 tables before `V1Migration` looks for them (spike S4). So the
-// legacy file is only ever read here, with bun:sqlite, and never handed to `Database.layer`.
+// Loginom AI Agent: moves the sessions and provider keys of a 0.3.9 or 0.4.x profile (OpenCode v1 schema) into an
+// OpenCode 2 database. The v2 server cannot do it in place: the fork's own `migration` table sends the v2 schema
+// migrations down the "replay the V1 squash" branch, which drops the v1 tables before `V1Migration` looks for them
+// (spike S4). So the legacy file is only ever read here, with bun:sqlite, and never handed to `Database.layer`. The
+// profile's configuration and own skills stay where they are: OpenCode 2 reads the same channel directory.
 import { Cause, Effect, Fiber, Layer, Option } from "effect"
 import { eq, sql } from "drizzle-orm"
 import { existsSync, renameSync, rmSync } from "node:fs"
 import path from "node:path"
 import type { Database as SQLiteDatabase } from "bun:sqlite"
 import { Database } from "@opencode/core/database/database"
+import { importLegacyCredentials } from "@opencode/core/database/migration/20260805200742_import_legacy_credentials"
 import { storedAbsolutePath } from "@opencode/core/database/path"
 import { V1Migration } from "@opencode/core/database/v1-migration"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -43,6 +45,11 @@ export type Summary = {
   readonly migrated: { readonly sessions: number; readonly messages: number }
   readonly present: number
   readonly warnings: ReadonlyArray<V1Migration.Warning>
+  /**
+   * Integrations that hold a credential in the target once the copy commits; never the credentials themselves. Absent
+   * from the markers of earlier development builds.
+   */
+  readonly credentials?: ReadonlyArray<string>
 }
 
 export type Result =
@@ -270,6 +277,10 @@ function copy(
             }).pipe(Effect.catchCause(failWith(`cannot copy session ${session.id}`))),
           )
           const copied = results.filter((item) => item !== undefined)
+          // 0.4 kept the provider keys in auth.json beside its database. OpenCode 2 imports that file only when it
+          // creates an empty database, and from its own data directory, so a profile from another directory or one
+          // added to an existing database would arrive without them. An integration with a credential keeps it.
+          yield* importLegacyCredentials(tx, path.join(path.dirname(location.source), "auth.json"))
           const summary: Summary = {
             ...location,
             ...(read.schema ? { schema: read.schema } : {}),
@@ -277,6 +288,9 @@ function copy(
             migrated: { sessions: copied.length, messages: copied.reduce((total, item) => total + item.messages, 0) },
             present: results.length - copied.length,
             warnings: copied.flatMap((item) => item.warnings),
+            credentials: (yield* tx.all<{ id: string }>(
+              sql`SELECT DISTINCT integration_id AS id FROM credential WHERE integration_id IS NOT NULL ORDER BY id`,
+            )).map((row) => row.id),
           }
           // The marker commits with the rows: a rerun finds it and leaves both databases alone.
           yield* tx
