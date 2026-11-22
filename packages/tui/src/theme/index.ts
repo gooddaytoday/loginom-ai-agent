@@ -25,7 +25,7 @@ let opencodeTheme: (ThemeDocument & {
 
 export function getOpenCodeTheme() {
   if (opencodeTheme) return opencodeTheme
-  const document = parseThemeDocument(opencode, "opencode") as NonNullable<typeof opencodeTheme>
+  const document = parseThemeDocument(opencode, "loginom-ai-agent") as NonNullable<typeof opencodeTheme>
   opencodeTheme = document
   return document
 }
@@ -43,12 +43,12 @@ function listThemes(): Record<string, ThemeDocumentSource> {
   // Priority: defaults < custom files < generated system.
   const themes: Record<string, ThemeDocumentSource> = {
     ...DEFAULT_THEMES,
-    opencode: getOpenCodeTheme(),
+    "loginom-ai-agent": getOpenCodeTheme(),
     ...customThemes,
   }
   return {
     ...themes,
-    system: systemTheme ?? themes.system ?? themes.opencode,
+    system: systemTheme ?? themes.system ?? themes["loginom-ai-agent"],
   }
 }
 

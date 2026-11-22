@@ -17,8 +17,8 @@ test("rejects unrecognized theme structures", () => {
   expect(() => parseTheme({ version: 3 })).toThrow("Invalid theme")
 })
 
-test("registers opencode as a native V2 theme", () => {
-  expect(allThemes().opencode).toBe(getOpenCodeTheme())
+test("registers loginom-ai-agent as a native V2 theme", () => {
+  expect(allThemes()["loginom-ai-agent"]).toBe(getOpenCodeTheme())
   expect(parseTheme(getOpenCodeTheme()).base).toBeDefined()
 })
 
@@ -77,7 +77,7 @@ test("replacement sources receive independent parse caches", () => {
 
 test("hasTheme checks theme presence", () => {
   expect(hasTheme("missing-theme")).toBe(false)
-  expect(hasTheme("opencode")).toBe(true)
+  expect(hasTheme("loginom-ai-agent")).toBe(true)
 })
 
 test("resolveTheme rejects circular color refs", () => {
