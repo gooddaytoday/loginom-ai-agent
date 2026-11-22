@@ -6639,7 +6639,7 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 и `packages/loginom-host/src` (B2.3) не трогал.
 
 **Итог: манифест и корпус маршрутизации перенесены, падения `skills-acceptance*` ушли.** `loginom-host`: база 507 / 12 / 37,
-итог 539 / 12 / 5 — остались пять базовых падений. У 24 падений `skills-acceptance` было две причины, а не одна:
+итог 539 / 12 / 5 — остались пять базовых падений (`guarantees.md` обновлён). У 24 падений `skills-acceptance` было две причины, а не одна:
 манифест Desktop и корпус маршрутизации пакета `opencode` 0.4. Первая версия раздела (`7ef86332a7`) перенесла только
 манифест. По решению координатора корпус перенесён в той же ветке в `packages/loginom-host/test/fixtures/package-docs-routing/`;
 вместе с ним ушли и 8 падений `skills-acceptance-turns`.
@@ -6652,7 +6652,9 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 | `7387ed17b5` `chore(loginom-host): type-check skills-acceptance again` | `loginom-host/tsconfig.json`: из `exclude` убран `script/skills-acceptance.ts` |
 | `7ef86332a7` `docs(upstream-sync): record B4.8b release manifest` | первая версия раздела; CAT-01 и список новых файлов в `catalog.md` |
 | `d5cd2b2acd` `test(loginom-host): carry the 0.4 skills routing corpus` | корпус из 0.4 и `sales.csv` в `test/fixtures/package-docs-routing/`; пути в `cases.json`, скрипте, README скрипта и `skills-acceptance-turns.test.ts` |
-| следующий | этот раздел, переписан под корпус |
+| `62e481bee0` `docs(upstream-sync): record the B4.8b routing corpus` | этот раздел, переписан под корпус |
+| `2ba95f7f07` `test(loginom-host): carry the image fixture of the routing corpus` | `fixtures/large-image.png` из 0.4 без изменений, путь `png` в `cases.json` |
+| следующий | этот раздел: PNG и `guarantees.md`; строка базовых падений `loginom-host` в `guarantees.md` |
 
 ### Что перенесено
 
@@ -6712,15 +6714,17 @@ $ ../../node_modules/.bin/tsc6 --noEmit -p .   # код 0
 | Файл в `test/fixtures/package-docs-routing/` | Откуда (`a080f7725c`) | Отличие от 0.4 |
 |---|---|---|
 | `README.md` | `packages/opencode/test/cli/package-docs-routing/README.md` | строка 63: личный домашний каталог → `/home/<user>/` |
-| `cases.json` | то же, `cases.json` | три пути в `fixtures`: `edit_lgp`, `csv`, `text` |
+| `cases.json` | то же, `cases.json` | все четыре перенесённых пути в `fixtures`: `edit_lgp`, `csv`, `text`, `png` |
 | `fixtures/edit-source.lgp` | то же, `fixtures/` | нет |
 | `fixtures/edit-source.provenance.json` | то же, `fixtures/` | строки 64–65 (`evidence_root`, `staged_eval_input`): домашний каталог → `/home/<user>/` |
 | `fixtures/read-control.txt` | то же, `fixtures/` | нет |
 | `fixtures/sales.csv` | `packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv` | нет |
+| `fixtures/large-image.png` | `packages/opencode/test/tool/fixtures/large-image.png` (2 688 401 байт; в `desktop/test/loginom/fixtures` 0.4 копии нет) | нет |
 
-Файлы клались `git show a080f7725c:<путь>`, до правок id блобов всех шести (`git ls-files -s`) совпали с `git ls-tree
+Файлы клались `git show a080f7725c:<путь>`, до правок id блобов всех семи (`git ls-files -s`) совпали с `git ls-tree
 a080f7725c`. `fixtures.lgp` (`packages/loginom-host/test/fixtures/package-docs/nested.lgp`) уже на месте и не менялся.
-`fixtures.png` — см. «Где решал сам».
+Все пять путей `fixtures` из корня репозитория — файлы (`os.path.isfile`): живой прогон копирует их все
+(`script/skills-acceptance.ts:181-188`).
 
 Пути вне корпуса: `script/skills-acceptance.ts:59` и строка 4 `script/skills-acceptance/README.md`. В
 `test/skills-acceptance-turns.test.ts` семь URL: шесть `cases.json` и один `edit-source.provenance.json`,
@@ -6738,6 +6742,8 @@ $ bun run secrets range 82f7d909ec HEAD
 {"status":"clean","commits":4,"archives":1,"current_files":0,"skipped":[],"upstream_commits":0,"upstream_findings":0,"upstream_missing":0,…}
 ```
 
+PNG (`2ba95f7f07`): `staged` и хук — `clean`.
+
 ### Тесты
 
 `loginom-host`, `LOGINOM_AI_AGENT_TEST_NODE` — переносной Node 24.19.0, перед этим `npm ci` клиента `loginom-runtime`
@@ -6753,6 +6759,9 @@ $ xvfb-run -a bun test test/skills-acceptance.test.ts          # d5cd2b2acd
  0 fail
 $ bun test test/skills-acceptance-turns.test.ts                  # d5cd2b2acd, все 10 по именам — pass
  10 pass
+ 0 fail
+$ xvfb-run -a bun test test/skills-acceptance.test.ts test/skills-acceptance-turns.test.ts   # 2ba95f7f07, с PNG
+ 35 pass
  0 fail
 ```
 
@@ -6790,7 +6799,7 @@ Ran 540 tests across 69 files. [7.45s]                 # на d5cd2b2acd то ж
 ### Приёмка
 
 ```text
-# всё ниже — на d5cd2b2acd, чистое дерево; на 7387ed17b5 результат тот же
+# всё ниже — на 2ba95f7f07, чистое дерево; на 7387ed17b5 и d5cd2b2acd результат тот же
 $ python3 -I scripts/upstream-sync/catalog-check.py                  # код 0
 against a6b15d33daf6: 440 divergent upstream files       # как в базе: package.json Desktop и bun.lock уже расходились
 $ python3 -I scripts/upstream-sync/apply-identity.py --check          # код 0
@@ -6798,8 +6807,8 @@ would change: 0 files
 $ bun run check                                                       # код 0
 Found 558 warnings and 0 errors.                          # база 515: +43 у manifest.ts, см. «Найдено»
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
-@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 174 files [487.36ms]
-@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [10.13s]
+@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 174 files [552.51ms]
+@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [10.23s]
  Tasks:    39 successful, 39 total
 Cached:    30 cached, 39 total                            # loginom-host и desktop — «cache miss, executing»
 ```
@@ -6814,12 +6823,9 @@ Cached:    30 cached, 39 total                            # loginom-host и desk
   перенести только манифест, а корпус записать как остаток. Этим и была первая версия раздела.
 - **`sales.csv` — в `fixtures/` корпуса**, а не в `test/fixtures/standalone-cli/A/`: корпус и все его входы лежат в
   одном каталоге, имя файла то же.
-- **`large-image.png` не переносил.** `fixtures.png` в `cases.json` по-прежнему указывает на
-  `packages/opencode/test/tool/fixtures/large-image.png`: это фикстура upstream 0.4 на 2,6 МБ, в v2.3.0 её нет
-  (`git ls-files` пусто). Задание называло только корпус и `sales.csv`, а ни одному тесту PNG не нужен. Но живой прогон
-  скрипта копирует все записи `corpus.fixtures` (`script/skills-acceptance.ts:181-188`), поэтому до появления PNG он
-  упадёт на любом случае. Вопрос владельцу: перенести PNG в `fixtures/` корпуса (один файл и одна строка `cases.json`)
-  или заменить вход.
+- **`large-image.png`** сначала не переносил: задание называло только корпус и `sales.csv`, тестам PNG не нужен. Но живой
+  прогон копирует все записи `corpus.fixtures`, и без PNG он падал бы на любом случае. По решению координатора PNG перенесён
+  (`2ba95f7f07`) — фикстура upstream 0.4 на 2,6 МБ, в v2.3.0 её нет.
 - **Личный путь заменён на `<user>`** в README и provenance (выше, «Сканер секретов»). Это отступление от «как есть»:
   исключение в `.gitleaksignore` запрещают правила, а обходить хук — задание. На тест не влияет: тест читает из provenance
   только `sha256` фикстуры.
@@ -6829,11 +6835,10 @@ Cached:    30 cached, 39 total                            # loginom-host и desk
 
 ### Найдено, не чинил
 
-- `guarantees.md`, «Базовые падения стенда», теперь неверен: пишет, что на дереве v2 у `loginom-host` ещё 35 падений
-  (`skills-acceptance` 24, `skills-acceptance-turns` 8, `bundled-ripgrep` 3). Осталось 3 — `bundled-ripgrep`. Предлагаемый
-  текст: «на дереве v2 в `loginom-host` ещё 3 падения `bundled-ripgrep` (B1.5); `skills-acceptance` (24) и
-  `skills-acceptance-turns` (8) закрыты в B4.8b: манифест выпуска Desktop и корпус маршрутизации перенесены». Не менял:
-  общий документ, правку не просили. B1.5 и строка B4.8b разведки B4.1 тоже приписывают 24 падения одному манифесту.
+- `guarantees.md`, «Базовые падения стенда»: строка про 35 падений `loginom-host` на дереве v2 заменена по решению
+  координатора — осталось 3 `bundled-ripgrep`, всего 5 базовых падений пакета вместе с `cli-manifest` (umask) и
+  `managed-work-entry` (под root), `skills-acceptance` и `skills-acceptance-turns` закрыты в B4.8b. B1.5 и строка B4.8b
+  разведки B4.1 приписывают 24 падения одному манифесту; чужие разделы не менял.
 - `scripts/upstream-sync/revert-names.py`, `EXTRA_EDITS`, ищет в `skills-acceptance-turns.test.ts` старую строку пути
   корпуса. Инструмент исторический (одноразовый, LAB-198) и уже ссылается на файлы, которых нет
   (`desktop/scripts/prebuild.ts`). Не трогал.
@@ -6843,8 +6848,8 @@ Cached:    30 cached, 39 total                            # loginom-host и desk
 
 ### Не проверено
 
-- Настоящая приёмка навыков (модель, Docker-образ CLI, AppImage) не запускалась. Без `large-image.png` она упадёт
-  на копировании фикстур (выше).
+- Настоящая приёмка навыков (модель, Docker-образ CLI, AppImage) не запускалась. Пути всех фикстур корпуса проверены
+  только на существование.
 - Функции `manifest.ts` (`decodeManifest`, `verifyResourceTree`, `verifyWindowsApplication`) не проверены на настоящем
   выпуске. Их тесты (`artifact.test.ts`) уходят с B5.2. Тесты `skills-acceptance` файл только загружают: случаи
   Desktop отказывают ещё на чтении `release-manifest.json` и до `decodeManifest` не доходят.
