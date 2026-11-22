@@ -1,6 +1,6 @@
 // Profiles, exact scans and samples of local CSV/TXT files (B2.5b1), ported from 0.4
 // `packages/opencode/src/tool/loginom-file-profile-core.ts` unchanged except import paths. XLSX goes to `./file-xlsx`
-// exactly as in 0.4; until B2.5b2 ports that module, it refuses every workbook.
+// by dynamic import, exactly as in 0.4 (B2.5b2).
 import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { mkdir, open, readFile, readdir, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
