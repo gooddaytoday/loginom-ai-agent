@@ -116,7 +116,8 @@
 - **Компоненты.** Файлы `apply-identity` и одиннадцать тестов выше; маска `packages/**` ловит остальное, что не забрали записи раньше.
 - **Проверка при обновлении.** `apply-identity.py --check`; `packages/cli/test/flag-identity.test.ts` (унаследованные `OPENCODE_*` не меняют каталоги, конфиг, БД и пароль продукта), `packages/product/test/names.test.ts` (код читает только `LOGINOM_AI_AGENT_*` и ключи провайдеров); `bun test` в `packages/cli`, `packages/core`, `packages/server`, `packages/util`.
 - **Политика.** `merge` + `apply-identity.py` для нового кода.
-- **Не перенесено из 0.4.** Файлы БД `opencode-<канал>.db` и журнала `opencode-<канал>.log` локальных каналов, кэш id проекта `.git/opencode`, видимое имя `OpenCode` в CLI — ручные задачи B1.4 (журнал, раздел B1.4a).
+- **Не перенесено из 0.4.** Файлы БД `opencode-<канал>.db` и журнала `opencode-<канал>.log` локальных каналов, видимое имя `OpenCode` в CLI — ручные задачи B1.4 (журнал, раздел B1.4a).
+- **Оставлено как в 0.4.** Кэш id проекта `.git/opencode` в репозитории пользователя (`core/src/project.ts`, `core/src/git.ts`): v2 его только читает как прежний id (`previous`), писателя в v2 нет. Файл писали OpenCode 1 и сам продукт 0.4 (`a080f7725c:packages/core/src/project.ts`). Переименование сделало бы чтение мёртвым, а репозитории 0.4 потеряли бы прежний id (B1.4, Р-14).
 
 ## B1.6: генератор комплекта Bun
 
