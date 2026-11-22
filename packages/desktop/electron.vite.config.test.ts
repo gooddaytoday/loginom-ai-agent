@@ -15,28 +15,28 @@ const load = async (command: "build" | "serve") => ({
 const bundled = ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"]
 
 test("minifies only builds, previews onboarding only in development, and ships sourcemaps and public assets", async () => {
-  const previous = process.env.OPENCODE_TEST_ONBOARDING
-  const previousTarget = process.env.OPENCODE_TARGET
+  const previous = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING
+  const previousTarget = process.env.LOGINOM_AI_AGENT_TARGET
 
   try {
-    process.env.OPENCODE_TEST_ONBOARDING = "1"
+    process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING = "1"
 
     for (const command of ["build", "serve"] as const) {
       const result = await load(command)
 
       for (const target of [result.config.main, result.config.preload, result.config.renderer])
         expect(target?.build?.minify).toBe(command === "build")
-      expect(result.config.renderer?.define?.["import.meta.env.OPENCODE_TEST_ONBOARDING"]).toBe(
+      expect(result.config.renderer?.define?.["import.meta.env.LOGINOM_AI_AGENT_TEST_ONBOARDING"]).toBe(
         JSON.stringify(command === "serve"),
       )
     }
 
-    delete process.env.OPENCODE_TEST_ONBOARDING
+    delete process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING
     const serve = await load("serve")
-    expect(serve.config.renderer?.define?.["import.meta.env.OPENCODE_TEST_ONBOARDING"]).toBe("false")
+    expect(serve.config.renderer?.define?.["import.meta.env.LOGINOM_AI_AGENT_TEST_ONBOARDING"]).toBe("false")
 
     for (const item of CLI_BINARIES) {
-      process.env.OPENCODE_TARGET = item.target
+      process.env.LOGINOM_AI_AGENT_TARGET = item.target
       const main = (await load("build")).config.main
       expect(main?.build?.externalizeDeps).toEqual({
         exclude: bundled,
@@ -44,12 +44,12 @@ test("minifies only builds, previews onboarding only in development, and ships s
       })
     }
   } finally {
-    delete process.env.OPENCODE_TEST_ONBOARDING
-    delete process.env.OPENCODE_TARGET
+    delete process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING
+    delete process.env.LOGINOM_AI_AGENT_TARGET
 
-    if (previous !== undefined) process.env.OPENCODE_TEST_ONBOARDING = previous
+    if (previous !== undefined) process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING = previous
 
-    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
+    if (previousTarget !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = previousTarget
   }
 
   const renderer = (await load("build")).config.renderer
@@ -77,13 +77,13 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
     "@lydell/node-pty-win32-x64",
   ])
 
-  const previousTarget = process.env.OPENCODE_TARGET
+  const previousTarget = process.env.LOGINOM_AI_AGENT_TARGET
   // Build against the opposite architecture to prove cross-packaging resolves the target's native package, not the host's.
   const crossTarget = process.arch === "arm64" ? "windows-x64" : "windows-arm64"
   const crossNodePty = nodePtyPackage(crossTarget)
 
   try {
-    process.env.OPENCODE_TARGET = crossTarget
+    process.env.LOGINOM_AI_AGENT_TARGET = crossTarget
     const result = await load("build")
 
     if (!result.config.main) throw new Error("Missing main-process build configuration")
@@ -124,8 +124,8 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
     expect(modules.some((id) => id.includes("/node_modules/msgpackr"))).toBe(false)
     expect(chunks.some((chunk) => chunk.code.includes("msgpackr"))).toBe(false)
   } finally {
-    delete process.env.OPENCODE_TARGET
+    delete process.env.LOGINOM_AI_AGENT_TARGET
 
-    if (previousTarget !== undefined) process.env.OPENCODE_TARGET = previousTarget
+    if (previousTarget !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = previousTarget
   }
 }, 30_000)

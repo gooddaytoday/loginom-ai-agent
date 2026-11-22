@@ -83,7 +83,7 @@ export type PluginHost = ReturnType<typeof createHost>
 type Loaded = {
   readonly setup: Plugin.MainSetup
   readonly i18n?: BuiltinCatalog
-  /** A plugin's options from `opencode.json`; built-ins have none. */
+  /** A plugin's options from `loginom-ai-agent.json`; built-ins have none. */
   readonly options?: PluginOptions
   /** The client of the server that runs a plugin, read each time; built-ins have none. */
   readonly client?: () => OpenCodeClient | undefined

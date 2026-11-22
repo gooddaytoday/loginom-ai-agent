@@ -20,13 +20,13 @@ afterAll(async () => {
   resources.renderer.destroy()
   await resources.renderer.closed
 })
-const previousConfig = process.env.OPENCODE_CONFIG_DIR
+const previousConfig = process.env.LOGINOM_AI_AGENT_CONFIG_DIR
 beforeAll(() => {
-  process.env.OPENCODE_CONFIG_DIR = tmp.path
+  process.env.LOGINOM_AI_AGENT_CONFIG_DIR = tmp.path
 })
 afterAll(async () => {
-  if (previousConfig === undefined) delete process.env.OPENCODE_CONFIG_DIR
-  else process.env.OPENCODE_CONFIG_DIR = previousConfig
+  if (previousConfig === undefined) delete process.env.LOGINOM_AI_AGENT_CONFIG_DIR
+  else process.env.LOGINOM_AI_AGENT_CONFIG_DIR = previousConfig
   await tmp[Symbol.asyncDispose]()
 })
 

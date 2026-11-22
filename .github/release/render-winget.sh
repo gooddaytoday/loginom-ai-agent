@@ -6,11 +6,11 @@
 
 cli=$1 desktop=$2 out=$3
 sum() { sha256 "$1" | cut -c1-64 | tr a-f A-F; }
-base="https://opencode.ai/files/bin/$OPENCODE_VERSION"
+base="https://opencode.ai/files/bin/$LOGINOM_AI_AGENT_VERSION"
 date=$(date -u +%F)
 header() {
   printf '# yaml-language-server: $schema=https://aka.ms/winget-manifest.%s.1.12.0.schema.json\n\nPackageIdentifier: %s\nPackageVersion: %s\n' \
-    "$2" "$1" "$OPENCODE_VERSION"
+    "$2" "$1" "$LOGINOM_AI_AGENT_VERSION"
 }
 footer() { printf 'ManifestType: %s\nManifestVersion: 1.12.0\n' "$1"; }
 manifests() {

@@ -13,7 +13,7 @@ import { testEffect } from "../../core/test/lib/effect"
 
 const it = testEffect(NodeServices.layer)
 
-declare const OPENCODE_CLI_NAME: string | undefined
+declare const LOGINOM_AI_AGENT_CLI_NAME: string | undefined
 
 function fixture(
   respond: (command: {
@@ -643,7 +643,7 @@ windows("windows links the curl binary before the installer replaces it", () =>
       false,
       "@opencode/cli",
       undefined,
-      (_root, home) => Effect.succeed(path.join(home, ".opencode", "bin", "opencode.exe")),
+      (_root, home) => Effect.succeed(path.join(home, ".loginom-ai-agent", "bin", "opencode.exe")),
     )
     layout.executable = test.executable
     layout.cache = test.global.cache
@@ -670,7 +670,7 @@ unix("curl method detection resolves symlinked home directories", () =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem
           const realHome = path.join(root, "real-home")
-          const bin = path.join(realHome, ".opencode", "bin", "opencode")
+          const bin = path.join(realHome, ".loginom-ai-agent", "bin", "opencode")
           yield* fs.makeDirectory(path.dirname(bin), { recursive: true })
           yield* fs.symlink(realHome, home)
           return bin
@@ -714,7 +714,7 @@ test("Node distribution honors the compile-time CLI name", async () => {
       "test",
       import.meta.path,
       "--define",
-      'OPENCODE_CLI_NAME="opencode2-node"',
+      'LOGINOM_AI_AGENT_CLI_NAME="opencode2-node"',
       "--test-name-pattern",
       "^Node distribution resolves the published npm package$",
     ],
@@ -731,7 +731,7 @@ test("Node distribution honors the compile-time CLI name", async () => {
   expect(stderr).toContain("1 pass")
 })
 
-if (typeof OPENCODE_CLI_NAME === "string" && OPENCODE_CLI_NAME === "opencode2-node") {
+if (typeof LOGINOM_AI_AGENT_CLI_NAME === "string" && LOGINOM_AI_AGENT_CLI_NAME === "opencode2-node") {
   it.live("Node distribution resolves the published npm package", () =>
     Effect.gen(function* () {
       const test = yield* fixture(

@@ -154,7 +154,7 @@ const shellConfigs = Effect.fnUntraced(function* (home: string) {
 function cleanShellConfig(content: string) {
   const lines = content.split("\n")
   const entry = (line: string) =>
-    /^(?:export PATH=|fish_add_path\s)/.test(line.trim()) && line.includes(".opencode/bin")
+    /^(?:export PATH=|fish_add_path\s)/.test(line.trim()) && line.includes(".loginom-ai-agent/bin")
   return lines
     .filter((line, index) => !entry(line) && !(line.trim() === "# opencode" && entry(lines[index + 1] ?? "")))
     .join("\n")

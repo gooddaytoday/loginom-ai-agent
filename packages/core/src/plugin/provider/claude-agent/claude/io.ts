@@ -18,7 +18,7 @@ export interface Interface {
 }
 
 export const real: Interface = {
-  which: () => process.env.OPENCODE_CLAUDE_PATH || which("claude") || undefined,
+  which: () => process.env.LOGINOM_AI_AGENT_CLAUDE_PATH || which("claude") || undefined,
   env: () => process.env,
   sessionExists: async (sessionID) => {
     const { getSessionInfo } = await ClaudeSDK.load()

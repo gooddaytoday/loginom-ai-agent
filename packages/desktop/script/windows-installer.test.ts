@@ -84,7 +84,7 @@ windows(
     const installer = await harness()
 
     const succeed = async (cmd: string[]) => {
-      const result = await installer.run(cmd, { OPENCODE_INSTALLER_TEST_ROOT: installer.dir })
+      const result = await installer.run(cmd, { LOGINOM_AI_AGENT_INSTALLER_TEST_ROOT: installer.dir })
       expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0)
 
       return result.stdout
@@ -96,7 +96,7 @@ windows(
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        `(Get-Acl -LiteralPath (Join-Path $env:OPENCODE_INSTALLER_TEST_ROOT '${file}')).Sddl`,
+        `(Get-Acl -LiteralPath (Join-Path $env:LOGINOM_AI_AGENT_INSTALLER_TEST_ROOT '${file}')).Sddl`,
       ])
 
     try {

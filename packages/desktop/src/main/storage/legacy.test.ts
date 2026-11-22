@@ -51,7 +51,7 @@ describe("legacy store import", () => {
     writeStore(root, "opencode.global.dat", JSON.stringify({ model: "m", layout: { sidebar: 1 } }))
     writeStore(root, "opencode.window.w1.dat", JSON.stringify({ tabs: "[]" }))
     writeStore(root, "default.dat", JSON.stringify({ "settings.v3": "{}" }))
-    writeStore(root, "opencode.settings", JSON.stringify({ keep: true }))
+    writeStore(root, "loginom-ai-agent.settings", JSON.stringify({ keep: true }))
     writeStore(root, "unrelated.txt", "x")
 
     const result = await run(database.db, root)
@@ -63,7 +63,7 @@ describe("legacy store import", () => {
       { name: "opencode.global.dat", key: "model", value: "m" },
       { name: "opencode.window.w1.dat", key: "tabs", value: "[]" },
     ])
-    expect(listing(root)).toEqual(["opencode.settings", "unrelated.txt"])
+    expect(listing(root)).toEqual(["loginom-ai-agent.settings", "unrelated.txt"])
   })
 
   test("does not overwrite state that already exists", async () => {

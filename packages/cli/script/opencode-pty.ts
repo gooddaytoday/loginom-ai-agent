@@ -27,9 +27,9 @@ export async function resolveOpencodePty(target: Target): Promise<OpencodePtyAss
     .map((value) => (value === "glibc" ? "gnu" : value))
     .join("-")
   const name = `@opencode/pty-${suffix}`
-  const local = process.env.OPENCODE_PTY_BIN
+  const local = process.env.LOGINOM_AI_AGENT_PTY_BIN
   if (local && (target.platform !== process.platform || target.arch !== process.arch))
-    throw new Error("OPENCODE_PTY_BIN can only be embedded in a build for the current platform and architecture")
+    throw new Error("LOGINOM_AI_AGENT_PTY_BIN can only be embedded in a build for the current platform and architecture")
   const source = local
     ? path.resolve(local)
     : pty.resolve(`${name}/bin/${target.platform === "win32" ? "opencode-pty.exe" : "opencode-pty"}`)

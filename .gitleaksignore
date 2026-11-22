@@ -479,3 +479,14 @@ f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/br
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:55
+
+# apply-identity on OpenCode v2.3.0 (B1.4a): upstream test fixtures whose lines it renamed, so they are no longer
+# identical to the pinned upstream file. Synthetic home directories of users test, kit, me and new; reviewed line by line.
+packages/app/e2e/regression/session-summary.spec.ts:personal-home-path:813
+packages/app/e2e/regression/session-summary.spec.ts:personal-windows-home-path:813
+packages/app/e2e/regression/settings.spec.ts:personal-home-path:31
+packages/app/e2e/regression/settings.spec.ts:personal-home-path:1244
+packages/core/test/config/config.test.ts:personal-windows-home-path:1620
+packages/desktop/src/main/native/install-cli-machine.test.ts:personal-home-path:32
+packages/desktop/src/main/native/install-cli-machine.test.ts:personal-home-path:35
+packages/gui-plugins/src/details/config-file.test.ts:personal-home-path:4

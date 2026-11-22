@@ -108,8 +108,7 @@ describe("environment variable names", () => {
   const SOURCES =
     /^(packages\/(ai|app|cli|client|core|desktop|gui-plugins|loginom-host|loginom-runtime|plugin[^/]*|product|schema|script|server|simulation|util)\/(src|script|scripts)\/)/
 
-  // Fails until B1.4 applies apply-identity to the OpenCode 2 tree; B1.4 removes `.failing`.
-  test.failing("source code reads no OPENCODE_* variable except third-party provider keys", () => {
+  test("source code reads no OPENCODE_* variable except third-party provider keys", () => {
     const offenders: string[] = []
     for (const path of tracked.filter((item) => SOURCES.test(item) && /\.(ts|tsx|js|mjs)$/.test(item))) {
       for (const match of read(path).matchAll(/\bOPENCODE_[A-Z0-9_]+/g)) {

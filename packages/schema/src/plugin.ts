@@ -37,7 +37,7 @@ export const GuiBundle = Schema.Struct({
   code: Schema.String,
   /** An opaque value that changes whenever the plugin, its options or its bundle change. */
   revision: Schema.String,
-  /** The plugin's options from its `opencode.json` entry, as its server entry receives them. */
+  /** The plugin's options from its `loginom-ai-agent.json` entry, as its server entry receives them. */
   options: Schema.Record(Schema.String, Schema.Json),
 }).annotate({ identifier: "Plugin.GuiBundle" })
 

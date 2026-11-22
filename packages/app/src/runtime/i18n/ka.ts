@@ -287,7 +287,7 @@ export const dict = {
   "error.chain.responseBody": "პასუხის სხეული:\n{{body}}",
   "error.chain.didYouMean": "იგულისხმეთ: {{suggestions}}",
   "error.chain.modelNotFound": "მოდელი ვერ მოიძებნა: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "შეამოწმეთ თქვენი კონფიგურაცია (opencode.json) პროვაიდერის/მოდელების სახელები",
+  "error.chain.checkConfig": "შეამოწმეთ თქვენი კონფიგურაცია (loginom-ai-agent.json) პროვაიდერის/მოდელების სახელები",
   "error.chain.mcpFailed":
     'MCP სერვერი "{{name}}" ვერ მოხერხდა. შენიშვნა, OpenCode ჯერ არ უჭერს მხარს MCP ავთენტიფიკაციას.',
   "error.chain.providerAuthFailed": "პროვაიდერის ავთენტიფიკაცია ვერ მოხერხდა ({{provider}}): {{message}}",
@@ -559,7 +559,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP-ები",
   "settings.extensions.tab.skills": "უნარები",
   "settings.extensions.availableAll": "ხელმისაწვდომია ყველა პროექტისთვის",
-  "settings.extensions.manageConfig": "მართეთ opencode.json-ში",
+  "settings.extensions.manageConfig": "მართეთ loginom-ai-agent.json-ში",
   "settings.extensions.addSkills": "როგორ დავამატოთ უნარები",
   "project.settings.extensions.description": "იხილეთ ამ პროექტისთვის ხელმისაწვდომი გაფართოებები",
   "project.settings.extensions.tab.lsps": "LSP-ები",
@@ -771,8 +771,8 @@ export const dict = {
   "project.settings.color.description":
     "გამოიყენება პროექტის იკონისთვის, როდესაც არ არის მითითებული პერსონალური სურათი",
   "project.settings.worktree.startup.description": "चलता ერთჯერადად ახალი სამუშაო ნიშის შექმნის შემდეგ",
-  "project.settings.worktree.startup.hint.base": "გამოიყენეთ $OPENCODE_WORKTREE_BASE ბაზური სამუშაო ნიშისთვის.",
-  "project.settings.worktree.startup.hint.new": "გამოიყენეთ $OPENCODE_WORKTREE_PATH ახალი სამუშაო ნიშისთვის.",
+  "project.settings.worktree.startup.hint.base": "გამოიყენეთ $LOGINOM_AI_AGENT_WORKTREE_BASE ბაზური სამუშაო ნიშისთვის.",
+  "project.settings.worktree.startup.hint.new": "გამოიყენეთ $LOGINOM_AI_AGENT_WORKTREE_PATH ახალი სამუშაო ნიშისთვის.",
   "project.settings.extensions.empty.mcps.title": "ჯერ არ არსებობს MCPs",
   "project.settings.extensions.empty.mcps.description": "MCPs, რომლებიც ხელმისაწვდომია OpenCode-ისთვის, გამოჩნდება აქ",
   "project.settings.extensions.empty.plugins.title": "ჯერ არ არის პლაგინები",

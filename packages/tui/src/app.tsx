@@ -162,7 +162,7 @@ const appBindingCommands = [
   "variant.cycle",
   "variant.list",
   "provider.connect",
-  "opencode.settings",
+  "loginom-ai-agent.settings",
   "opencode.status",
   "opencode.update",
   "server.pair",
@@ -272,7 +272,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
             }),
           )
         }
-        if (process.env.OPENCODE_DRIVE) {
+        if (process.env.LOGINOM_AI_AGENT_DRIVE) {
           const { Drive } = yield* Effect.promise(() => import("@opencode/simulation/frontend"))
           return yield* Drive.create(options, input.app.version)
         }
@@ -366,21 +366,21 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                             >
                               <TuiStartupProvider
                                 value={{
-                                  initialRoute: process.env.OPENCODE_STORY
+                                  initialRoute: process.env.LOGINOM_AI_AGENT_STORY
                                     ? {
                                         type: "plugin",
                                         id: "opencode.storybook",
                                         name: "storybook",
-                                        // OPENCODE_STORY=1 opens the index; any other value opens that story.
+                                        // LOGINOM_AI_AGENT_STORY=1 opens the index; any other value opens that story.
                                         data:
-                                          process.env.OPENCODE_STORY === "1"
+                                          process.env.LOGINOM_AI_AGENT_STORY === "1"
                                             ? undefined
-                                            : { story: process.env.OPENCODE_STORY },
+                                            : { story: process.env.LOGINOM_AI_AGENT_STORY },
                                       }
-                                    : process.env.OPENCODE_ROUTE
-                                      ? JSON.parse(process.env.OPENCODE_ROUTE)
+                                    : process.env.LOGINOM_AI_AGENT_ROUTE
+                                      ? JSON.parse(process.env.LOGINOM_AI_AGENT_ROUTE)
                                       : undefined,
-                                  skipInitialLoading: Boolean(process.env.OPENCODE_FAST_BOOT),
+                                  skipInitialLoading: Boolean(process.env.LOGINOM_AI_AGENT_FAST_BOOT),
                                 }}
                               >
                                 <ClipboardProvider value={clipboard}>
@@ -735,7 +735,7 @@ function App() {
     if (config.data.highlights === false) return
     if (route.data.type !== "home" || dialog.stack.length > 0 || promptRef.current?.current.text) return
     if (args.prompt || args.continue || args.sessionID || args.newSessionID) return
-    if (process.env.OPENCODE_DRIVE || process.env.OPENCODE_STORY || process.env.OPENCODE_ROUTE) return
+    if (process.env.LOGINOM_AI_AGENT_DRIVE || process.env.LOGINOM_AI_AGENT_STORY || process.env.LOGINOM_AI_AGENT_ROUTE) return
     void claim(storage, {
       version: app.version,
       count: items.length,
@@ -1041,7 +1041,7 @@ function App() {
           ]
         : []),
       {
-        name: "opencode.settings",
+        name: "loginom-ai-agent.settings",
         title: "Open settings",
         suggested: true,
         slash: { name: "settings" },

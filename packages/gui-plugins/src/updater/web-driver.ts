@@ -5,7 +5,7 @@ import type { WebUpdateEffect, WebUpdateEvent, WebUpdateState, WebWorker } from 
 const CHECK_INTERVAL_MS = 10 * 60_000
 
 /** The channel the app's windows share to reload together after a reset. */
-const RESET_CHANNEL = "opencode.updater.reset"
+const RESET_CHANNEL = "loginom-ai-agent.updater.reset"
 
 /** How long `applying` waits for the new worker to take over before reloading anyway. */
 const APPLY_TIMEOUT_MS = 10_000

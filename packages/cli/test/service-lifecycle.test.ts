@@ -5,7 +5,7 @@ import { Effect, Schema } from "effect"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { OPENCODE_VERSION } from "../src/version"
+import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
 import { isolatedEnv } from "./fixture/environment"
 
 // Real `serve --service` processes driven by the real CLI commands and client. Only behavior that
@@ -24,7 +24,7 @@ serviceTest(
     await Promise.all([
       cli(home, "service", "start"),
       cli(home, "service", "start"),
-      ...Array.from({ length: 3 }, () => ensure(home, OPENCODE_VERSION)),
+      ...Array.from({ length: 3 }, () => ensure(home, LOGINOM_AI_AGENT_VERSION)),
     ])
 
     await settled(home)
@@ -61,7 +61,7 @@ serviceTest(
   async () => {
     await using home = await serviceHome()
     const old = Bun.spawn(
-      [process.execPath, "--define", 'OPENCODE_VERSION:"2.0.0-old"', home.entry, "serve", "--service"],
+      [process.execPath, "--define", 'LOGINOM_AI_AGENT_VERSION:"2.0.0-old"', home.entry, "serve", "--service"],
       { env: home.env, stdout: "ignore", stderr: "ignore" },
     )
     const before = await settled(home, "2.0.0-old")
@@ -69,7 +69,7 @@ serviceTest(
     await Promise.all([ensure(home), cli(home, "service", "start")])
     expect((await settled(home, "2.0.0-old")).pid).toBe(before.pid)
 
-    await Promise.all([ensure(home, OPENCODE_VERSION), ensure(home), cli(home, "service", "start")])
+    await Promise.all([ensure(home, LOGINOM_AI_AGENT_VERSION), ensure(home), cli(home, "service", "start")])
 
     const after = await settled(home)
     expect(after.pid).not.toBe(before.pid)
@@ -98,7 +98,7 @@ serviceTest(
     await expect(ensure(home)).rejects.toThrow("incompatible health protocol")
     expect(old.exitCode).toBe(null)
 
-    await ensure(home, OPENCODE_VERSION)
+    await ensure(home, LOGINOM_AI_AGENT_VERSION)
     await old.exited
     await settled(home)
     await stopped(home)
@@ -186,7 +186,7 @@ async function serviceHome(options: { readonly failBoot?: boolean } = {}) {
   // Servers spawned through this home's entry carry its path, so `servers()` sees only this home.
   const homeEntry = path.join(root, "opencode.ts")
   await fs.writeFile(homeEntry, `import ${JSON.stringify(entry)}\n`)
-  const overrides = options.failBoot ? { OPENCODE_DB: path.join(root, "database") } : {}
+  const overrides = options.failBoot ? { LOGINOM_AI_AGENT_DB: path.join(root, "database") } : {}
   const home = {
     root,
     port,
@@ -229,7 +229,7 @@ function ensure(home: Home, version?: string) {
 }
 
 /** One live server, registered and ready with the expected version on the configured port. */
-async function settled(home: Home, version = OPENCODE_VERSION) {
+async function settled(home: Home, version = LOGINOM_AI_AGENT_VERSION) {
   const state = await observe(home, (state) => isSettled(home, state, version))
   if (state.info === undefined) throw new Error("Settled service has no registration")
   return state.info
@@ -240,7 +240,7 @@ async function steady(home: Home) {
   const info = await settled(home)
   await Bun.sleep(5_500)
   const state = await snapshot(home)
-  expect({ settled: isSettled(home, state, OPENCODE_VERSION), id: state.info?.id }).toEqual({
+  expect({ settled: isSettled(home, state, LOGINOM_AI_AGENT_VERSION), id: state.info?.id }).toEqual({
     settled: true,
     id: info.id,
   })

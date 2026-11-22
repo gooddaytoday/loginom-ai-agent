@@ -66,8 +66,8 @@ export const dict = {
   "project.settings.color.description":
     "Wordt gebruikt voor het projectpictogram als er geen aangepaste afbeelding is ingesteld",
   "project.settings.worktree.startup.description": "Wordt één keer uitgevoerd na het maken van een nieuwe werkruimte",
-  "project.settings.worktree.startup.hint.base": "Gebruik $OPENCODE_WORKTREE_BASE voor de basiswerkruimte.",
-  "project.settings.worktree.startup.hint.new": "Gebruik $OPENCODE_WORKTREE_PATH voor de nieuwe werkruimte.",
+  "project.settings.worktree.startup.hint.base": "Gebruik $LOGINOM_AI_AGENT_WORKTREE_BASE voor de basiswerkruimte.",
+  "project.settings.worktree.startup.hint.new": "Gebruik $LOGINOM_AI_AGENT_WORKTREE_PATH voor de nieuwe werkruimte.",
   "project.settings.extensions.empty.mcps.title": "Nog geen MCPs",
   "project.settings.extensions.empty.mcps.description": "MCPs beschikbaar voor OpenCode wordt hier weergegeven",
   "project.settings.extensions.empty.plugins.title": "Nog geen plug-ins",
@@ -496,7 +496,7 @@ export const dict = {
   "error.chain.responseBody": "Antwoordtekst:\n{{body}}",
   "error.chain.didYouMean": "Bedoelde je: {{suggestions}}",
   "error.chain.modelNotFound": "Model niet gevonden: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Controleer de provider- en modelnamen in je configuratie (opencode.json)",
+  "error.chain.checkConfig": "Controleer de provider- en modelnamen in je configuratie (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'MCP-server "{{name}}" is mislukt. Let op: OpenCode ondersteunt nog geen MCP-authenticatie.',
   "error.chain.providerAuthFailed": "Authenticatie bij aanbieder mislukt ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -772,7 +772,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP's",
   "settings.extensions.tab.skills": "Vaardigheden",
   "settings.extensions.availableAll": "Beschikbaar voor alle projecten",
-  "settings.extensions.manageConfig": "Beheer in opencode.json",
+  "settings.extensions.manageConfig": "Beheer in loginom-ai-agent.json",
   "settings.extensions.addSkills": "Hoe vaardigheden toe te voegen",
   "project.settings.extensions.description": "Bekijk de extensies die beschikbaar zijn voor dit project",
   "project.settings.extensions.tab.lsps": "LSP's",

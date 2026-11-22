@@ -217,7 +217,7 @@ test("accepts every v2-only named command ID", () => {
     "diff.first",
     "diff.last",
     "diff.mark_reviewed",
-    "opencode.settings",
+    "loginom-ai-agent.settings",
     "service.restart",
     "session.cd",
     "app.scrap",

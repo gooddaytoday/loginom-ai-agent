@@ -25,7 +25,7 @@ export function requireVersion(version: string) {
 
 export function discoverScript(options: { fromPath?: boolean; cache?: { directory: string; prefix: string } } = {}) {
   return `cli=${options.fromPath ? "$(command -v opencode || true)" : '""'}
-if [ -z "$cli" ] && [ -x "$HOME/.opencode/bin/opencode" ]; then cli="$HOME/.opencode/bin/opencode"; fi
+if [ -z "$cli" ] && [ -x "$HOME/.loginom-ai-agent/bin/opencode" ]; then cli="$HOME/.loginom-ai-agent/bin/opencode"; fi
 ${
   options.cache
     ? `if [ -z "$cli" ]; then
@@ -69,7 +69,7 @@ if [ "$arch" = x64 ]; then target="$target-baseline"; fi
 if [ "$os" = linux ]; then
   if [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); then target="$target-musl"; fi
 fi
-printf 'OPENCODE_REMOTE_TARGET=%s\\n' "$target"
+printf 'LOGINOM_AI_AGENT_REMOTE_TARGET=%s\\n' "$target"
 `
 
 export function archiveUrl(target: string, version: string) {
@@ -89,12 +89,12 @@ export function installScript(input: { version: string; directory?: string; sour
   if (input.source.type === "installer")
     return `set -eu
 curl -fsSL https://raw.githubusercontent.com/anomalyco/opencode/v2/install | bash -s -- ${input.source.binary ? `--binary ${input.source.binary}` : `--version ${quote(version)}`}
-${verifyScript('"$HOME/.opencode/bin/opencode"', version)}
+${verifyScript('"$HOME/.loginom-ai-agent/bin/opencode"', version)}
 `
 
   return `set -eu
 umask 077
-destination="$HOME"/${quote(`${input.directory ?? ".opencode/bin"}/opencode`)}
+destination="$HOME"/${quote(`${input.directory ?? ".loginom-ai-agent/bin"}/opencode`)}
 mkdir -p "$(dirname "$destination")"
 stage=$(mktemp -d "$(dirname "$destination")/.install-XXXXXX")
 trap 'rm -rf "$stage"' EXIT

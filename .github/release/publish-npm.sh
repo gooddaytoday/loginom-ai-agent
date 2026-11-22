@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# publish-npm.sh <build-npm dir> <signed dir>...: publishes every release tarball to npm with OPENCODE_NPM_TAG.
+# publish-npm.sh <build-npm dir> <signed dir>...: publishes every release tarball to npm with LOGINOM_AI_AGENT_NPM_TAG.
 # Names, the version and the package set come from this script, never from the tarballs: each tarball's
 # package.json is read as data and must match. macOS and Windows CLI packages must come from a signed dir.
 . "$(dirname "$0")/lib.sh"
@@ -10,7 +10,7 @@ targets="linux-arm64 linux-x64 linux-x64-baseline linux-arm64-musl linux-x64-mus
 expected="@opencode/cli"
 for target in $targets; do expected="$expected @opencode/cli-$target"; done
 for lib in schema codemode theme ai util protocol client plugin plugin-browser core simulation server sdk ui; do expected="$expected @opencode/$lib"; done
-if [ "$OPENCODE_CHANNEL" != latest ]; then
+if [ "$LOGINOM_AI_AGENT_CHANNEL" != latest ]; then
   expected="$expected @opencode/cli-node"
   for target in linux-arm64 linux-x64 darwin-arm64 windows-arm64 windows-x64; do expected="$expected @opencode/cli-node-$target"; done
 fi
@@ -37,7 +37,7 @@ for file in "${files[@]}"; do
   case "$name:$file" in
     @opencode/cli-darwin-*:"$npm_dir"/* | @opencode/cli-windows-*:"$npm_dir"/*) die "$name is not signed" ;;
   esac
-  [ "$version" = "$OPENCODE_VERSION" ] || die "$name has version $version, expected $OPENCODE_VERSION"
+  [ "$version" = "$LOGINOM_AI_AGENT_VERSION" ] || die "$name has version $version, expected $LOGINOM_AI_AGENT_VERSION"
   [ "$config" = false ] || die "$name sets publishConfig beyond access"
   [ "$install" = false ] || [ "$name" = @opencode/cli ] || [ "$name" = @opencode/cli-node ] || die "$name has an install script"
   printf '%s\t%s\n' "$name" "$file" >> "$list"
@@ -55,13 +55,13 @@ cat "$packages" "$wrappers"
 printf 'registry=https://registry.npmjs.org/\n' > "$RUNNER_TEMP/npmrc"
 export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc"
 cd "$(mktemp -d)"
-flags=(--tag "$OPENCODE_NPM_TAG" --access public --ignore-scripts)
+flags=(--tag "$LOGINOM_AI_AGENT_NPM_TAG" --access public --ignore-scripts)
 if dry_run; then flags+=(--dry-run); else flags+=(--provenance); fi
 
 publish() {
   while IFS=$'\t' read -r name file; do
-    if ! dry_run && npm view "$name@$OPENCODE_VERSION" version > /dev/null 2>&1; then
-      echo "already published $name@$OPENCODE_VERSION"
+    if ! dry_run && npm view "$name@$LOGINOM_AI_AGENT_VERSION" version > /dev/null 2>&1; then
+      echo "already published $name@$LOGINOM_AI_AGENT_VERSION"
       continue
     fi
     npm publish "$file" "${flags[@]}"
@@ -76,9 +76,9 @@ wait_for_registry() {
   if dry_run; then return; fi
   while IFS= read -r name; do
     for attempt in $(seq 1 180); do
-      if npm view --prefer-online "$name@$OPENCODE_VERSION" version > /dev/null 2>&1; then break; fi
-      if [ "$attempt" = 180 ]; then die "$name@$OPENCODE_VERSION did not appear in the registry"; fi
-      echo "waiting for $name@$OPENCODE_VERSION"
+      if npm view --prefer-online "$name@$LOGINOM_AI_AGENT_VERSION" version > /dev/null 2>&1; then break; fi
+      if [ "$attempt" = 180 ]; then die "$name@$LOGINOM_AI_AGENT_VERSION did not appear in the registry"; fi
+      echo "waiting for $name@$LOGINOM_AI_AGENT_VERSION"
       sleep 10
     done
   done < <(cut -f1 "$1")

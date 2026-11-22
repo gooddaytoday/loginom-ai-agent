@@ -17,7 +17,7 @@ it.live("lists configured skills", () =>
       ),
     )
     yield* Effect.promise(() =>
-      fs.writeFile(path.join(tmp.path, "opencode.json"), JSON.stringify({ skills: [path.join(tmp.path, "skills")] })),
+      fs.writeFile(path.join(tmp.path, "loginom-ai-agent.json"), JSON.stringify({ skills: [path.join(tmp.path, "skills")] })),
     )
     const server = yield* serveRoutes({
       database: { path: ":memory:" },

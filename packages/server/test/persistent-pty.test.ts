@@ -14,7 +14,7 @@ import { it } from "../../core/test/lib/effect"
 import { ServerProcess } from "../src/process"
 
 // These tests drive Unix shell commands, so they skip Windows; the package resolves no binary on unsupported platforms.
-const binary = process.platform === "win32" ? undefined : (process.env.OPENCODE_PTY_BIN ?? binaryPath)
+const binary = process.platform === "win32" ? undefined : (process.env.LOGINOM_AI_AGENT_PTY_BIN ?? binaryPath)
 const smoke = binary !== undefined && existsSync(binary) ? it.live : it.live.skip
 
 smoke(
@@ -621,12 +621,12 @@ smoke(
 function testDirectory() {
   return Effect.acquireRelease(
     Effect.promise(async () => {
-      const environment = { binary: process.env.OPENCODE_PTY_BIN, shell: process.env.SHELL }
+      const environment = { binary: process.env.LOGINOM_AI_AGENT_PTY_BIN, shell: process.env.SHELL }
       const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-pty-server-test-"))
-      process.env.OPENCODE_PTY_BIN = binary
+      process.env.LOGINOM_AI_AGENT_PTY_BIN = binary
       process.env.SHELL = "/bin/sh"
       return {
-        database: path.join(root, "opencode.db"),
+        database: path.join(root, "loginom-ai-agent.db"),
         directory: path.join(root, "runtime"),
         environment,
         root,
@@ -635,7 +635,7 @@ function testDirectory() {
     (fixture) =>
       Effect.promise(async () => {
         await fs.rm(fixture.root, { recursive: true, force: true })
-        restore("OPENCODE_PTY_BIN", fixture.environment.binary)
+        restore("LOGINOM_AI_AGENT_PTY_BIN", fixture.environment.binary)
         restore("SHELL", fixture.environment.shell)
       }),
   )

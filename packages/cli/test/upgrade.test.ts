@@ -87,17 +87,17 @@ async function cli(args: string[], env: Record<string, string> = {}, entry = "fi
   const root = await mkdtemp(path.join(os.tmpdir(), "opencode-upgrade-"))
   try {
     const child = Bun.spawn(
-      [process.execPath, "--define", 'OPENCODE_VERSION="0.0.0-beta-old"', path.join(import.meta.dir, entry), ...args],
+      [process.execPath, "--define", 'LOGINOM_AI_AGENT_VERSION="0.0.0-beta-old"', path.join(import.meta.dir, entry), ...args],
       {
         cwd: path.join(import.meta.dir, ".."),
         env: {
           ...process.env,
-          OPENCODE_TEST_HOME: root,
+          LOGINOM_AI_AGENT_TEST_HOME: root,
           XDG_DATA_HOME: path.join(root, "data"),
           XDG_CONFIG_HOME: path.join(root, "config"),
           XDG_CACHE_HOME: path.join(root, "cache"),
           XDG_STATE_HOME: path.join(root, "state"),
-          OPENCODE_DISABLE_AUTOUPDATE: "1",
+          LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE: "1",
           ...env,
         },
         stdout: "pipe",

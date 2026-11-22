@@ -1,5 +1,5 @@
 import { Global } from "@opencode/util/global"
-import { OPENCODE_CHANNEL, OPENCODE_VERSION } from "../version"
+import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "../version"
 import { Hash } from "@opencode/util/hash"
 import { Service } from "@opencode/client/effect/service"
 import { Effect, FileSystem, Option, Schedule, Schema } from "effect"
@@ -48,13 +48,13 @@ export function identity(env: Record<string, string | undefined> = process.env) 
   return { name, port: Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : undefined }
 }
 
-export function filename(channel = OPENCODE_CHANNEL, service = identity()) {
+export function filename(channel = LOGINOM_AI_AGENT_CHANNEL, service = identity()) {
   if (service) return `service-${service.name}.json`
   if (channel === "latest" || channel === "dev" || channel === "beta" || channel === "next") return "service.json"
   return `service-${channel.replace(/[^a-zA-Z0-9._-]/g, "-")}.json`
 }
 
-export function defaultPort(channel = OPENCODE_CHANNEL, platform = process.platform, service = identity()) {
+export function defaultPort(channel = LOGINOM_AI_AGENT_CHANNEL, platform = process.platform, service = identity()) {
   // A stated port is used as given; the product states one below 0x8000, the same on every platform.
   if (service?.port) return service.port
   const port = channelPort(channel)
@@ -72,15 +72,15 @@ function channelPort(channel: string) {
   return 10_000 + (Number.parseInt(Hash.fast(channel).slice(0, 8), 16) % 50_000)
 }
 
-export function legacyFilename(channel = OPENCODE_CHANNEL, service = identity()) {
+export function legacyFilename(channel = LOGINOM_AI_AGENT_CHANNEL, service = identity()) {
   if (service || channel === "latest" || channel === "local") return
   return `service-${Hash.fast(channel)}.json`
 }
 
 export function versionBelongsToChannel(
   version: string | undefined,
-  channel = OPENCODE_CHANNEL,
-  installedVersion = OPENCODE_VERSION,
+  channel = LOGINOM_AI_AGENT_CHANNEL,
+  installedVersion = LOGINOM_AI_AGENT_VERSION,
 ) {
   if (version === undefined) return false
   if (version === installedVersion) return true
@@ -92,8 +92,8 @@ export function versionBelongsToChannel(
 export const migrateRegistration = Effect.fnUntraced(function* (
   legacy: string,
   file: string,
-  channel = OPENCODE_CHANNEL,
-  installedVersion = OPENCODE_VERSION,
+  channel = LOGINOM_AI_AGENT_CHANNEL,
+  installedVersion = LOGINOM_AI_AGENT_VERSION,
 ) {
   const fs = yield* FileSystem.FileSystem
   const text = yield* fs.readFileString(legacy).pipe(Effect.option)
@@ -139,7 +139,7 @@ const paths = Effect.gen(function* () {
     legacyRegistrationFiles: [
       ...(legacy ? [path.join(global.state, legacy)] : []),
       // Under an identity, `service.json` belongs to another product or profile.
-      ...(name !== "service.json" && OPENCODE_CHANNEL !== "local" && !identity()
+      ...(name !== "service.json" && LOGINOM_AI_AGENT_CHANNEL !== "local" && !identity()
         ? [path.join(global.state, "service.json")]
         : []),
     ],
@@ -161,7 +161,7 @@ export const options = Effect.fnUntraced(function* (input: { readonly checkVersi
   yield* Effect.forEach(legacyRegistrationFiles, (legacy) => migrateRegistration(legacy, file))
   return {
     file,
-    version: input.checkVersion ? OPENCODE_VERSION : undefined,
+    version: input.checkVersion ? LOGINOM_AI_AGENT_VERSION : undefined,
     env: processEnv((yield* read()).env),
     command: [...selfCommand(), "serve", "--service"],
   }

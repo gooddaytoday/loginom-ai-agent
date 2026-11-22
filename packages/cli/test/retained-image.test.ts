@@ -67,7 +67,7 @@ windows("installed accepts package-manager and curl binaries only", () =>
     yield* Effect.addFinalizer(() => Effect.sync(() => (process.execPath = original)))
     const cases = [
       [path.join(home, ".bun", "install", "global", "node_modules", "@opencode", "cli", "bin", "opencode.exe"), true],
-      [path.join(home, ".opencode", "bin", "opencode.exe"), true],
+      [path.join(home, ".loginom-ai-agent", "bin", "opencode.exe"), true],
       [
         path.join(
           home,

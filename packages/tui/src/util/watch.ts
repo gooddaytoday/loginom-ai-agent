@@ -8,7 +8,7 @@ import { watch, type WatchListener } from "node:fs"
  * so both paths close the watch and log. Honors the server's disable switch.
  */
 export function safeWatch(target: string, listener: WatchListener<string>) {
-  const disabled = process.env.OPENCODE_FILEWATCHER_DISABLE ?? process.env.OPENCODE_DISABLE_FILEWATCHER
+  const disabled = process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER
   if (disabled === "1" || disabled?.toLowerCase() === "true") return
   try {
     const watcher = watch(target, listener)

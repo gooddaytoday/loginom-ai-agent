@@ -300,7 +300,7 @@ export const dict = {
   "error.chain.responseBody": "ལན་འདེབས་ཕུང་པོ།:\n{{body}}",
   "error.chain.didYouMean": "ཁྱོད་ཀྱིས་: {{suggestions}} ཟེར་སླབ་དགོཔ་ཨིན་ན?",
   "error.chain.modelNotFound": "དཔེ་ཚད་འཚོལ་མ་ཐོབ།: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "ཁྱོད་ཀྱི་རིམ་སྒྲིག་ (opencode.json) བྱིན་མི་/དཔེ་ཚད་མིང་ཚུ་ཞིབ་དཔྱད་འབད།",
+  "error.chain.checkConfig": "ཁྱོད་ཀྱི་རིམ་སྒྲིག་ (loginom-ai-agent.json) བྱིན་མི་/དཔེ་ཚད་མིང་ཚུ་ཞིབ་དཔྱད་འབད།",
   "error.chain.mcpFailed":
     'MCP སར་བར་ "{{name}}" འཐུས་ཤོར་བྱུང་ཡོདཔ། དྲན་འཛིན་ OpenCode གིས་ ད་ལྟོ་ཡང་ MCP བདེན་བཤད་ལུ་རྒྱབ་སྐྱོར་མི་འབད།',
   "error.chain.providerAuthFailed": "བྱིན་མི་བདེན་བཤད་འཐུས་ཤོར་བྱུང་ཡོདཔ།({{provider}}): {{message}}",
@@ -591,7 +591,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCPs",
   "settings.extensions.tab.skills": "རིག་རྩལ་ཚུ།",
   "settings.extensions.availableAll": "ལས་གཞི་ཆ་མཉམ་ལུ་འཐོབ་ཚུགས།",
-  "settings.extensions.manageConfig": "opencode.json ནང་འཛིན་སྐྱོང་འཐབ།",
+  "settings.extensions.manageConfig": "loginom-ai-agent.json ནང་འཛིན་སྐྱོང་འཐབ།",
   "settings.extensions.addSkills": "རིག་རྩལ་ཚུ་ག་དེ་སྦེ་ཁ་སྐོང་རྐྱབ་ནི་ཨིན་ན།",
   "project.settings.extensions.description": "ལས་གཞི་འདི་ལུ་འཐོབ་ཚུགས་པའི་རྒྱ་བསྐྱེད་ཚུ་བལྟ།",
   "project.settings.extensions.tab.lsps": "LSPs",
@@ -769,8 +769,8 @@ export const dict = {
   "project.settings.color.description":
     "སྲོལ་སྒྲིག་གཟུགས་བརྙན་གཞི་སྒྲིག་མ་འབད་བའི་སྐབས་ལས་འགུལ་ངོས་དཔར་གྱི་དོན་ལུ་ལག་ལེན་འཐབ་ཡོདཔ་ཨིན།",
   "project.settings.worktree.startup.description": "ལཱ་གི་ཤིང་གསརཔ་གསར་བསྐྲུན་འབད་བའི་ཤུལ་ལས་ཚར་གཅིག་གཡོག་བཀོལཝ་ཨིན།",
-  "project.settings.worktree.startup.hint.base": "གཞི་རྟེན་ལཱ་ཤིང་གི་དོན་ལུ་ $OPENCODE_WORKTREE_BASE ལག་ལེན་འཐབ།",
-  "project.settings.worktree.startup.hint.new": "ལཱ་གི་ཤིང་གསརཔ་གི་དོན་ལུ་ $OPENCODE_WORKTREE_PATH ལག་ལེན་འཐབ།",
+  "project.settings.worktree.startup.hint.base": "གཞི་རྟེན་ལཱ་ཤིང་གི་དོན་ལུ་ $LOGINOM_AI_AGENT_WORKTREE_BASE ལག་ལེན་འཐབ།",
+  "project.settings.worktree.startup.hint.new": "ལཱ་གི་ཤིང་གསརཔ་གི་དོན་ལུ་ $LOGINOM_AI_AGENT_WORKTREE_PATH ལག་ལེན་འཐབ།",
   "project.settings.extensions.empty.mcps.title": "ད་ལྟོ་ MCPs མེད།",
   "project.settings.extensions.empty.mcps.description": "MCPs ལུ་ཐོབ་ཚུགས་པའི་ OpenCode འདི་ན་འབྱུངམ་ཨིན།",
   "project.settings.extensions.empty.plugins.title": "ད་ལྟོ་པ་ལག་ཨིནསི་མེད།",

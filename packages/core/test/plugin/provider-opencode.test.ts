@@ -2538,7 +2538,7 @@ for (const key of [undefined, "secret"]) {
   testEffect(Layer.empty).effect(
     `disabled free models with ${key ? "an API key" : "a Console login after startup"}`,
     () =>
-      withEnv({ OPENCODE_DISABLE_FREE_MODELS: "true", OPENCODE_API_KEY: key }, () =>
+      withEnv({ LOGINOM_AI_AGENT_DISABLE_FREE_MODELS: "true", OPENCODE_API_KEY: key }, () =>
         Effect.gen(function* () {
           const catalog = yield* Provider.Service
           const models = yield* Model.Service

@@ -4,23 +4,23 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
-const catalog = process.env.OPENCODE_MODELS_SNAPSHOT
+const catalog = process.env.LOGINOM_AI_AGENT_MODELS_SNAPSHOT
 // Resolved before spawning: the binary runs from a temporary directory.
 const binary = process.argv[2] && path.resolve(process.argv[2])
-if (!catalog || !binary) throw new Error("Usage: OPENCODE_MODELS_SNAPSHOT=<catalog> catalog-smoke.ts <binary>")
+if (!catalog || !binary) throw new Error("Usage: LOGINOM_AI_AGENT_MODELS_SNAPSHOT=<catalog> catalog-smoke.ts <binary>")
 
 const providers: Record<string, { env?: string[] }> = await Bun.file(catalog).json()
 const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "opencode-catalog-smoke-")))
 // Credentials for every provider make the model list cover the whole catalog.
 const env = {
-  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("OPENCODE_MODELS"))),
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LOGINOM_AI_AGENT_MODELS"))),
   ...Object.fromEntries(
     Object.values(providers).flatMap((provider) => (provider.env ?? []).map((key) => [key, "smoke"])),
   ),
   HOME: root,
   USERPROFILE: root,
-  OPENCODE_DB: path.join(root, "opencode.db"),
-  OPENCODE_DISABLE_MODELS_FETCH: "1",
+  LOGINOM_AI_AGENT_DB: path.join(root, "loginom-ai-agent.db"),
+  LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
   XDG_CACHE_HOME: path.join(root, "cache"),
   XDG_CONFIG_HOME: path.join(root, "config"),
   XDG_DATA_HOME: path.join(root, "data"),
@@ -28,7 +28,7 @@ const env = {
 }
 
 const bundled = models({})
-const fetched = models({ OPENCODE_MODELS_PATH: path.resolve(catalog) })
+const fetched = models({ LOGINOM_AI_AGENT_MODELS_PATH: path.resolve(catalog) })
 await fs.rm(root, { recursive: true, force: true })
 if (bundled.length === 0) throw new Error(`${binary} listed no models`)
 if (bundled.join("\n") !== fetched.join("\n")) {

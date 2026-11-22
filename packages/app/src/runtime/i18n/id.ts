@@ -338,7 +338,7 @@ export const dict = {
   "error.chain.responseBody": "Isi respons:\n{{body}}",
   "error.chain.didYouMean": "Maksud Anda: {{suggestions}}",
   "error.chain.modelNotFound": "Model tidak ditemukan: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Periksa nama penyedia/model di konfigurasi Anda (opencode.json)",
+  "error.chain.checkConfig": "Periksa nama penyedia/model di konfigurasi Anda (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'Server MCP "{{name}}" gagal. Catatan: OpenCode belum mendukung autentikasi MCP.',
   "error.chain.providerAuthFailed": "Autentikasi penyedia gagal ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -470,7 +470,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP",
   "settings.extensions.tab.skills": "Keahlian",
   "settings.extensions.availableAll": "Tersedia untuk semua proyek",
-  "settings.extensions.manageConfig": "Kelola di opencode.json",
+  "settings.extensions.manageConfig": "Kelola di loginom-ai-agent.json",
   "settings.extensions.addSkills": "Cara menambahkan keahlian",
 
   "project.settings.extensions.description": "Lihat ekstensi yang tersedia untuk proyek ini",
@@ -841,8 +841,8 @@ export const dict = {
   "project.settings.icon.description": "Disarankan: 128×128px. Klik atau seret untuk mengunggah gambar.",
   "project.settings.color.description": "Digunakan untuk ikon proyek saat tidak ada gambar khusus yang disetel",
   "project.settings.worktree.startup.description": "Dijalankan sekali setelah membuat worktree baru",
-  "project.settings.worktree.startup.hint.base": "Gunakan $OPENCODE_WORKTREE_BASE untuk worktree dasar.",
-  "project.settings.worktree.startup.hint.new": "Gunakan $OPENCODE_WORKTREE_PATH untuk worktree baru.",
+  "project.settings.worktree.startup.hint.base": "Gunakan $LOGINOM_AI_AGENT_WORKTREE_BASE untuk worktree dasar.",
+  "project.settings.worktree.startup.hint.new": "Gunakan $LOGINOM_AI_AGENT_WORKTREE_PATH untuk worktree baru.",
   "project.settings.extensions.empty.mcps.title": "Belum ada MCP",
   "project.settings.extensions.empty.mcps.description": "MCP yang tersedia untuk OpenCode akan muncul di sini",
   "project.settings.extensions.empty.plugins.title": "Belum ada plugin",

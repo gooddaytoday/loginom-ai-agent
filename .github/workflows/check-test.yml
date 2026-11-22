@@ -128,7 +128,7 @@ jobs:
           fi
           GITHUB_ACTIONS=false bun turbo test --concurrency=3
         env:
-          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
+          LOGINOM_AI_AGENT_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
       - name: Verify packed codemode package
         if: runner.os == 'Linux'

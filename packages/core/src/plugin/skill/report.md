@@ -35,10 +35,10 @@ Collect these values when possible:
 - Install/channel context: include whether this appears to be local, dev, beta,
   or release if the version output or environment reveals it.
 - Active plugins: inspect opencode config for configured plugins when possible.
-  Check likely config locations such as `opencode.json`, `opencode.jsonc`,
-  `.opencode/opencode.json`, and `~/.config/opencode/opencode.json`. Record
-  configured plugin entries, local plugin files under `.opencode/plugin/` or
-  `.opencode/plugins/`, and note if plugin status could not be determined.
+  Check likely config locations such as `loginom-ai-agent.json`, `loginom-ai-agent.jsonc`,
+  `.loginom-ai-agent/loginom-ai-agent.json`, and `~/.config/opencode/loginom-ai-agent.json`. Record
+  configured plugin entries, local plugin files under `.loginom-ai-agent/plugin/` or
+  `.loginom-ai-agent/plugins/`, and note if plugin status could not be determined.
 
 If a diagnostic command fails, include `Unavailable` with the reason instead of
 guessing.

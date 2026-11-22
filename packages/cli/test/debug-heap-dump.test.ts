@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { ServiceConfig } from "../src/services/service-config"
-import { OPENCODE_VERSION } from "../src/version"
+import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
 import { isolatedEnv } from "./fixture/environment"
 import { tmpdir } from "./fixture/tmpdir"
 
@@ -79,7 +79,7 @@ test("explains when the server predates heap dumps", async () => {
   using server = fake(() => new Response(null, { status: 404 }))
 
   const result = await cli(root.path, ["debug", "heap-dump", "--server", server.url.href], {
-    OPENCODE_PASSWORD: "secret",
+    LOGINOM_AI_AGENT_PASSWORD: "secret",
   })
 
   expect(result.stderr.trim()).toBe(
@@ -95,7 +95,7 @@ function fake(handle: (request: Request) => Response) {
     port: 0,
     fetch: (request) =>
       new URL(request.url).pathname === "/api/info"
-        ? Response.json({ version: OPENCODE_VERSION, pid: process.pid, urls: [] })
+        ? Response.json({ version: LOGINOM_AI_AGENT_VERSION, pid: process.pid, urls: [] })
         : handle(request),
   })
 }

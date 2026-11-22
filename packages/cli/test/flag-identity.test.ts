@@ -55,9 +55,7 @@ describe("inherited OpenCode environment", () => {
     })
   })
 
-  // Fails until B1.4 gives the readers the product names with apply-identity (src/index.ts, src/database-path.ts,
-  // src/env.ts, packages/util/src/global.ts). B1.4 removes `.failing`.
-  test.failing("moves no location or credential", () => {
+  test("moves no location or credential", () => {
     const { root, paths, password } = probes.inherited
     expect({ home: paths.home, config: paths.config, db: path.dirname(paths.db), password }).toEqual({
       home: root,
@@ -67,7 +65,7 @@ describe("inherited OpenCode environment", () => {
     })
   })
 
-  test.failing("does not override the product variables when both are set", () => {
+  test("does not override the product variables when both are set", () => {
     const { paths, password } = probes.both
     expect({ config: paths.config, db: paths.db, password }).toEqual({
       config: product.LOGINOM_AI_AGENT_CONFIG_DIR,

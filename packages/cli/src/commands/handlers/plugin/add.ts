@@ -44,7 +44,7 @@ export default Runtime.handler(
 )
 
 // The server lists packages with a server or GUI part, and the TUI loads their TUI parts from that list; the desktop
-// app reads GUI parts only from the global opencode.json. Only a TUI-only package belongs in the TUI's own config.
+// app reads GUI parts only from the global loginom-ai-agent.json. Only a TUI-only package belongs in the TUI's own config.
 export function configurationTarget(entrypoints: Host.Entrypoints) {
   if (entrypoints.server || entrypoints.gui) return "server" as const
   if (entrypoints.tui) return "tui" as const

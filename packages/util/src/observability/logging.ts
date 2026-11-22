@@ -157,12 +157,12 @@ function lineStart(handle: FileSystem.File, from: number) {
 }
 
 const stderrLogger = Logger.make((options) => {
-  if (process.env.OPENCODE_PRINT_LOGS !== "1") return
+  if (process.env.LOGINOM_AI_AGENT_PRINT_LOGS !== "1") return
   process.stderr.write(formatter().log(options) + "\n")
 })
 
 export function minimumLogLevel() {
-  const value = process.env.OPENCODE_LOG_LEVEL?.toUpperCase()
+  const value = process.env.LOGINOM_AI_AGENT_LOG_LEVEL?.toUpperCase()
   const levels = {
     DEBUG: "Debug",
     INFO: "Info",

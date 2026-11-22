@@ -128,7 +128,7 @@ describe("OptimizePlugin", () => {
         SessionSystemPrompt.render(PROMPT_GPT, Object.keys(event.tools)),
         "Project instructions",
       ])
-      expect(event.system[0]?.text).not.toContain("${OPENCODE_TOOL_GUIDANCE}")
+      expect(event.system[0]?.text).not.toContain("${LOGINOM_AI_AGENT_TOOL_GUIDANCE}")
       expect(Object.keys(event.tools).sort()).toEqual(["edit", "glob", "grep", "patch", "read", "shell", "write"])
     }),
   )

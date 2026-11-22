@@ -11,14 +11,14 @@ linux=("$linux_x64/opencode-desktop-linux-x86_64.AppImage" "$linux_x64/opencode-
 linux_arm=("$linux_arm64/opencode-desktop-linux-arm64.AppImage" "$linux_arm64/opencode-desktop-linux-arm64.deb" "$linux_arm64/opencode-desktop-linux-aarch64.rpm")
 # Dev and beta skip the .app.tar.gz, which only the retired Tauri updater feed read.
 bundles=()
-case "$OPENCODE_CHANNEL" in
+case "$LOGINOM_AI_AGENT_CHANNEL" in
   dev | beta) ;;
   *) bundles=("$macos/opencode-desktop-mac-arm64.app.tar.gz" "$macos/opencode-desktop-mac-x64.app.tar.gz") ;;
 esac
 
 feed() {
   for file in "$@"; do
-    jq -n --arg url "https://opencode.ai/files/bin/$OPENCODE_VERSION/$(basename "$file")" \
+    jq -n --arg url "https://opencode.ai/files/bin/$LOGINOM_AI_AGENT_VERSION/$(basename "$file")" \
       --arg sha512 "$(openssl dgst -sha512 -binary "$file" | base64 | tr -d '\n')" --argjson size "$(size "$file")" \
       '{url: $url, sha512: $sha512, size: $size}'
   done | jq -s --arg date "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" '{files: ., releaseDate: $date}'

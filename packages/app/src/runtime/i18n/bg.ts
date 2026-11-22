@@ -288,7 +288,7 @@ export const dict = {
   "error.chain.responseBody": "Тяло на отговора:\n{{body}}",
   "error.chain.didYouMean": "Може би имахте предвид: {{suggestions}}",
   "error.chain.modelNotFound": "Моделът не е намерен: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Проверете имената на доставчика/модела на вашата конфигурация (opencode.json).",
+  "error.chain.checkConfig": "Проверете имената на доставчика/модела на вашата конфигурация (loginom-ai-agent.json).",
   "error.chain.mcpFailed":
     'MCP сървър "{{name}}" не успя. Имайте предвид, че OpenCode все още не поддържа MCP удостоверяване.',
   "error.chain.providerAuthFailed": "Неуспешно удостоверяване на доставчика ({{provider}}): {{message}}",
@@ -567,7 +567,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCPs",
   "settings.extensions.tab.skills": "Умения",
   "settings.extensions.availableAll": "Предлага се за всички проекти",
-  "settings.extensions.manageConfig": "Управление в opencode.json",
+  "settings.extensions.manageConfig": "Управление в loginom-ai-agent.json",
   "settings.extensions.addSkills": "Как да добавите умения",
   "project.settings.extensions.description": "Вижте разширенията, налични за този проект",
   "project.settings.extensions.tab.lsps": "LSPs",
@@ -776,8 +776,8 @@ export const dict = {
   "project.settings.color.description":
     "Използва се за иконата на проекта, когато няма зададено персонализирано изображение",
   "project.settings.worktree.startup.description": "Изпълнява се веднъж след създаването на ново работно дърво",
-  "project.settings.worktree.startup.hint.base": "Използвайте $OPENCODE_WORKTREE_BASE за основното работно дърво.",
-  "project.settings.worktree.startup.hint.new": "Използвайте $OPENCODE_WORKTREE_PATH за новото работно дърво.",
+  "project.settings.worktree.startup.hint.base": "Използвайте $LOGINOM_AI_AGENT_WORKTREE_BASE за основното работно дърво.",
+  "project.settings.worktree.startup.hint.new": "Използвайте $LOGINOM_AI_AGENT_WORKTREE_PATH за новото работно дърво.",
   "project.settings.extensions.empty.mcps.title": "Все още няма MCP сървъри",
   "project.settings.extensions.empty.mcps.description": "Наличните за OpenCode MCP сървъри ще се показват тук",
   "project.settings.extensions.empty.plugins.title": "Все още няма добавки",

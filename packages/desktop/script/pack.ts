@@ -5,8 +5,8 @@ import path from "node:path"
 import { getConfig } from "../electron-builder.config"
 import { getCurrentCli, resolveChannel } from "./utils"
 
-// Packages the built app (out/) for OPENCODE_TARGET into dist/desktop at the repository root, unsigned:
-// macOS: the .app as a tarball. Windows: the unpacked app in app/, or with OPENCODE_DESKTOP_APP, the NSIS
+// Packages the built app (out/) for LOGINOM_AI_AGENT_TARGET into dist/desktop at the repository root, unsigned:
+// macOS: the .app as a tarball. Windows: the unpacked app in app/, or with LOGINOM_AI_AGENT_DESKTOP_APP, the NSIS
 // installer around that (signed) app. Linux: AppImage, deb and rpm. The release workflow signs afterwards.
 const dir = path.resolve(import.meta.dir, "..")
 
@@ -20,7 +20,7 @@ const os =
     ["win32", "win"],
   ]).get(cli.os) ?? "linux"
 
-const app = process.env.OPENCODE_DESKTOP_APP
+const app = process.env.LOGINOM_AI_AGENT_DESKTOP_APP
 
 const flags = [`--${os}`, `--${cli.cpu}`, "--publish", "never", "--config", "electron-builder.config.ts"]
 

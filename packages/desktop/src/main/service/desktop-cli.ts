@@ -48,7 +48,7 @@ export const layer = Layer.effect(
       const home = app.getPath("home")
       yield* runInstaller(cli.binary, home)
 
-      return path.join(home, ".opencode", "bin", "opencode")
+      return path.join(home, ".loginom-ai-agent", "bin", "opencode")
     })
 
     return Service.of({ resolve, install })
@@ -56,8 +56,8 @@ export const layer = Layer.effect(
 )
 
 const make = Effect.fn("DesktopCli.resolve")(function* () {
-  const development = !app.isPackaged && process.env.OPENCODE_DESKTOP_CLI_DEV
-  const version = process.env.OPENCODE_VERSION ?? "local"
+  const development = !app.isPackaged && process.env.LOGINOM_AI_AGENT_DESKTOP_CLI_DEV
+  const version = process.env.LOGINOM_AI_AGENT_VERSION ?? "local"
 
   const cli = development
     ? {
@@ -69,12 +69,12 @@ const make = Effect.fn("DesktopCli.resolve")(function* () {
           "run",
           "--cwd",
           development,
-          "--define=OPENCODE_VERSION=process.env.OPENCODE_VERSION",
+          "--define=LOGINOM_AI_AGENT_VERSION=process.env.LOGINOM_AI_AGENT_VERSION",
           "src/index.ts",
         ],
         binary: undefined,
       }
-    : yield* resolveBundledCli(!app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1")
+    : yield* resolveBundledCli(!app.isPackaged && process.env.LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER === "1")
 
   return cli satisfies Resolved
 })
@@ -214,7 +214,7 @@ const runInstaller = Effect.fn("DesktopCli.installForUser")(function* (binary: s
     child.stdin.on("error", () => {})
     child.stdin.end(installer)
 
-    // A timeout or the app quitting leaves no installer writing into ~/.opencode behind.
+    // A timeout or the app quitting leaves no installer writing into ~/.loginom-ai-agent behind.
     return Effect.sync(() => {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
     })

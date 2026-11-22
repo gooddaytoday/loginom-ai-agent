@@ -190,7 +190,7 @@ export const OpencodePlugin = define<
 >({
   id: "opencode.provider.opencode",
   effect: Effect.fn(function* (ctx) {
-    const disableFree = ["1", "true"].includes(process.env.OPENCODE_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
+    const disableFree = ["1", "true"].includes(process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
     const client = yield* HttpClient.HttpClient
     // Every request here goes to the Console, which reads the User-Agent to tell which OpenCode a member runs
     // and whether it evaluates the policies it is being sent.

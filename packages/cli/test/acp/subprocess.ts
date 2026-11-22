@@ -71,7 +71,7 @@ export async function createAcpFixture(
       })
     },
   })
-  await Bun.write(path.join(config, "opencode.json"), JSON.stringify(verifierConfig(`http://127.0.0.1:${llm.port}/v1`)))
+  await Bun.write(path.join(config, "loginom-ai-agent.json"), JSON.stringify(verifierConfig(`http://127.0.0.1:${llm.port}/v1`)))
   await Bun.write(models, "{}")
 
   const processes = new Set<AcpProcess>()
@@ -83,10 +83,10 @@ export async function createAcpFixture(
       const acp = spawnAcp({
         env: isolatedEnv(root, {
           USERPROFILE: root,
-          OPENCODE_CONFIG: undefined,
-          OPENCODE_CONFIG_CONTENT: undefined,
-          OPENCODE_DISABLE_AUTOUPDATE: "true",
-          OPENCODE_MODELS_PATH: models,
+          LOGINOM_AI_AGENT_CONFIG: undefined,
+          LOGINOM_AI_AGENT_CONFIG_CONTENT: undefined,
+          LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE: "true",
+          LOGINOM_AI_AGENT_MODELS_PATH: models,
         }),
       })
       processes.add(acp)

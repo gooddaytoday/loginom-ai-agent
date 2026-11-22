@@ -22,7 +22,7 @@ const environment = {
     }),
   ),
   HOME: home,
-  OPENCODE_TEST_HOME: home,
+  LOGINOM_AI_AGENT_TEST_HOME: home,
   XDG_CONFIG_HOME: path.join(home, ".config"),
   XDG_DATA_HOME: path.join(home, ".local", "share"),
   XDG_CACHE_HOME: path.join(home, ".cache"),

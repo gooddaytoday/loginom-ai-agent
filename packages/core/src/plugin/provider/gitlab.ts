@@ -25,7 +25,7 @@ const methodID = Integration.MethodID.make("pkce")
 // need their own application; override with GITLAB_OAUTH_CLIENT_ID in that case.
 const bundledClientID = "fd180700a8f9c5d5557aca231632dd0611a1135a3bb510a741d5a988a3394fa7"
 // Application used by every opencode-gitlab-auth release (and gitlab-ai-provider's
-// OPENCODE_GITLAB_AUTH_CLIENT_ID). Refresh tokens stay bound to the issuing
+// LOGINOM_AI_AGENT_GITLAB_AUTH_CLIENT_ID). Refresh tokens stay bound to the issuing
 // application, so credentials created by that plugin must refresh with it.
 const legacyClientID = "1d89f9fdb23ee96d4e603201f6861dab6e143c5c3c00469a018a2d94bdc03d4e"
 const gitlabComHost = "gitlab.com"

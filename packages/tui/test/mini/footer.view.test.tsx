@@ -64,8 +64,8 @@ afterAll(async () => {
 async function nativeLightTheme() {
   await using tmp = await tmpdir()
   await Bun.write(`${tmp.path}/themes/mini-native-light.json`, JSON.stringify({ light: {} }))
-  const previous = process.env.OPENCODE_CONFIG_DIR
-  process.env.OPENCODE_CONFIG_DIR = tmp.path
+  const previous = process.env.LOGINOM_AI_AGENT_CONFIG_DIR
+  process.env.LOGINOM_AI_AGENT_CONFIG_DIR = tmp.path
   try {
     return await resolveRunTheme(
       {
@@ -78,8 +78,8 @@ async function nativeLightTheme() {
       { name: "mini-native-light" },
     )
   } finally {
-    if (previous === undefined) delete process.env.OPENCODE_CONFIG_DIR
-    else process.env.OPENCODE_CONFIG_DIR = previous
+    if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CONFIG_DIR
+    else process.env.LOGINOM_AI_AGENT_CONFIG_DIR = previous
   }
 }
 

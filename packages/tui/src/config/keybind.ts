@@ -57,7 +57,7 @@ export const Definitions = {
   "command.palette.show": keybind("ctrl+p", "List available commands"),
   "help.show": keybind("none", "Open help dialog"),
   "docs.open": keybind("none", "Open documentation"),
-  "opencode.settings": keybind("none", "Open settings"),
+  "loginom-ai-agent.settings": keybind("none", "Open settings"),
   "server.pair": keybind("none", "Pair device"),
   "service.restart": keybind("none", "Restart service"),
   "location.reload": keybind("none", "Reload configuration"),

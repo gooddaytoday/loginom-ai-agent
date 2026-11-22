@@ -95,7 +95,7 @@ function provide(node: Spec.Any, handlers: ReadonlyArray<LazyHandler>): Provided
     ? node.spec.pipe(
         Command.withHandler((input) =>
           Effect.gen(function* () {
-            if (yield* PrintLogs) process.env.OPENCODE_PRINT_LOGS = "1"
+            if (yield* PrintLogs) process.env.LOGINOM_AI_AGENT_PRINT_LOGS = "1"
             const module = yield* Effect.promise(handler.load)
             return yield* module.default(input)
           }),

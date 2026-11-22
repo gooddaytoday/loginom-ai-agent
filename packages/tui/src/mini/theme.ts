@@ -321,7 +321,7 @@ async function themeSource(
   if (name === "system" && colors) return generateSystem(colors, mode)
   const { Global } = await import("@opencode/util/global")
   const custom = await discoverThemes(
-    configDirectories(process.env.OPENCODE_CONFIG_DIR ?? Global.Path.config, process.cwd()),
+    configDirectories(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? Global.Path.config, process.cwd()),
   )
   const source = custom[name] ?? allThemes()[name] ?? getOpenCodeTheme()
   return isThemeSource(source) ? source : getOpenCodeTheme()

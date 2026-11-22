@@ -183,7 +183,7 @@ function createStartupDriver(input: {
     initialUrl: input.initialUrl,
     route: input.route,
     firstLaunch: input.firstLaunch,
-    preview: import.meta.env.OPENCODE_TEST_ONBOARDING,
+    preview: import.meta.env.LOGINOM_AI_AGENT_TEST_ONBOARDING,
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   })
 

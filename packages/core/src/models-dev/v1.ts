@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect"
 
-// models.dev v1 catalogs (`/api.json`), still accepted from OPENCODE_MODELS_PATH and custom
-// OPENCODE_MODELS_URL mirrors. They are converted to the v2 shape, then decoded like any v2 catalog.
+// models.dev v1 catalogs (`/api.json`), still accepted from LOGINOM_AI_AGENT_MODELS_PATH and custom
+// LOGINOM_AI_AGENT_MODELS_URL mirrors. They are converted to the v2 shape, then decoded like any v2 catalog.
 // v1 can't say everything v2 does (one API per model, broad modality kinds), so a converted catalog
 // behaves as v1 did.
 

@@ -399,7 +399,7 @@ export const Plugin = {
                         invocation.env.AGENT = "1"
                         invocation.env.OPENCODE = "1"
                         invocation.env.AI_AGENT ||= "opencode"
-                        invocation.env.OPENCODE_SESSION_ID = context.sessionID
+                        invocation.env.LOGINOM_AI_AGENT_SESSION_ID = context.sessionID
                         // Asking for permission can take a while; a stop then ends the call before any command starts.
                         finalTimeout = yield* restore(
                           Effect.raceFirst(

@@ -11,7 +11,7 @@ it.live("lists configured models filtered by type", () =>
     const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-model-endpoint-")))
     yield* Effect.promise(() =>
       fs.writeFile(
-        path.join(tmp.path, "opencode.json"),
+        path.join(tmp.path, "loginom-ai-agent.json"),
         JSON.stringify({
           providers: {
             custom: {

@@ -83,11 +83,11 @@ const skipComponentsLab = {
 }
 
 export const channel = (() => {
-  const raw = process.env.OPENCODE_CHANNEL
+  const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
 
   if (raw === "local" || raw === "dev" || raw === "beta" || raw === "prod") return raw
 
-  if (process.env.OPENCODE_CHANNEL === "latest") return "prod"
+  if (process.env.LOGINOM_AI_AGENT_CHANNEL === "latest") return "prod"
 
   return "dev"
 })()

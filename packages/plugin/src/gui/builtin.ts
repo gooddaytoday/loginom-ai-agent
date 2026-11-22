@@ -331,7 +331,7 @@ export function builtinContext(ctx: Context): BuiltinContext {
  * builtinMainContext(ctx).storage.store("keepScreenActive", {
  *   schema: Schema.Boolean,
  *   initial: false,
- *   from: { state: ["opencode.settings", "keepScreenActive"] },
+ *   from: { state: ["loginom-ai-agent.settings", "keepScreenActive"] },
  * })
  * ```
  */
@@ -339,11 +339,11 @@ export type MainStoreFrom =
   | {
       /** The key in the settings file, e.g. `ssh.servers`. */
       readonly settings: string
-      /** Another settings file of the desktop app, e.g. `opencode.updater`. Defaults to the app's settings file. */
+      /** Another settings file of the desktop app, e.g. `loginom-ai-agent.updater`. Defaults to the app's settings file. */
       readonly file?: string
     }
   | {
-      /** The storage namespace and the key in it, e.g. `["opencode.settings", "keepScreenActive"]`. */
+      /** The storage namespace and the key in it, e.g. `["loginom-ai-agent.settings", "keepScreenActive"]`. */
       readonly state: readonly [namespace: string, key: string]
     }
 

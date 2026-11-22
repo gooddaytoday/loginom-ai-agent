@@ -66,8 +66,8 @@ export const dict = {
   "project.settings.color.description":
     "Usado para o ícone do projeto quando nenhuma imagem personalizada está definida",
   "project.settings.worktree.startup.description": "Executa uma vez após a criação de uma novo espaço de trabalho",
-  "project.settings.worktree.startup.hint.base": "Use $OPENCODE_WORKTREE_BASE para o espaço de trabalho base.",
-  "project.settings.worktree.startup.hint.new": "Use $OPENCODE_WORKTREE_PATH para o novo espaço de trabalho.",
+  "project.settings.worktree.startup.hint.base": "Use $LOGINOM_AI_AGENT_WORKTREE_BASE para o espaço de trabalho base.",
+  "project.settings.worktree.startup.hint.new": "Use $LOGINOM_AI_AGENT_WORKTREE_PATH para o novo espaço de trabalho.",
   "project.settings.extensions.empty.mcps.title": "Ainda não há MCPs",
   "project.settings.extensions.empty.mcps.description": "MCPs disponível para OpenCode aparecerá aqui",
   "project.settings.extensions.empty.plugins.title": "Ainda não há plug-ins",
@@ -499,7 +499,7 @@ export const dict = {
   "error.chain.responseBody": "Corpo da resposta:\n{{body}}",
   "error.chain.didYouMean": "Você quis dizer: {{suggestions}}",
   "error.chain.modelNotFound": "Modelo não encontrado: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Verifique os nomes de provedor/modelo na sua configuração (opencode.json)",
+  "error.chain.checkConfig": "Verifique os nomes de provedor/modelo na sua configuração (loginom-ai-agent.json)",
   "error.chain.mcpFailed": 'Servidor MCP "{{name}}" falhou. Nota: OpenCode ainda não suporta autenticação MCP.',
   "error.chain.providerAuthFailed": "Autenticação do provedor falhou ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
@@ -790,7 +790,7 @@ export const dict = {
   "settings.extensions.tab.mcps": "MCP",
   "settings.extensions.tab.skills": "Habilidades",
   "settings.extensions.availableAll": "Disponível para todos os projetos",
-  "settings.extensions.manageConfig": "Gerenciar em opencode.json",
+  "settings.extensions.manageConfig": "Gerenciar em loginom-ai-agent.json",
   "settings.extensions.addSkills": "Como adicionar habilidades",
   "project.settings.extensions.description": "Ver extensões disponíveis para este projeto",
   "project.settings.extensions.tab.lsps": "LSPs",

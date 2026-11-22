@@ -13,7 +13,7 @@ files=$(upload_files "${cli[@]}")
 publish_update cli npm '{"package": "@opencode/cli"}'
 publish_update cli opencode "$(jq -n --argjson files "$files" '{files: $files}')"
 
-if [ "$OPENCODE_CHANNEL" != latest ]; then
+if [ "$LOGINOM_AI_AGENT_CHANNEL" != latest ]; then
   node=()
   for target in linux-arm64 linux-x64; do node+=("$archives/opencode2-node-$target.tar.gz"); done
   for target in darwin-arm64 windows-arm64 windows-x64; do node+=("$archives/opencode2-node-$target.zip"); done

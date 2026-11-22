@@ -24,22 +24,22 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/Flag") {}
 
 /**
- * `OPENCODE_FLAGS`, a comma-separated list such as `schedules,-media_blob`; a leading `-` turns a flag off, and
+ * `LOGINOM_AI_AGENT_FLAGS`, a comma-separated list such as `schedules,-media_blob`; a leading `-` turns a flag off, and
  * `all` turns every flag on unless the same list opts one out, as in `all,-media_blob`.
  */
 export const Overrides = Context.Reference<string | undefined>("@opencode/Flag/Overrides", {
-  defaultValue: () => process.env.OPENCODE_FLAGS,
+  defaultValue: () => process.env.LOGINOM_AI_AGENT_FLAGS,
 })
 
 // Any other channel, such as a release or a branch preview build, keeps flags off so none turns on by accident.
 const onByDefault = (channel: string) => channel === "local" || channel === "dev"
 
 /**
- * Resolves every flag: `OPENCODE_FLAGS` (`-key`, then `all`), then `experimental.<key>` from the highest-priority
+ * Resolves every flag: `LOGINOM_AI_AGENT_FLAGS` (`-key`, then `all`), then `experimental.<key>` from the highest-priority
  * document that sets `experimental` (the same document every other `experimental` setting reads), then `all_flags: true`
  * from the highest-priority document that sets `all_flags`, so a global switch survives a project's own `experimental`
  * block, then on for local and dev builds. `all_flags: false` falls through rather than turning flags off.
- * A remote kill switch belongs above `OPENCODE_FLAGS` here.
+ * A remote kill switch belongs above `LOGINOM_AI_AGENT_FLAGS` here.
  */
 export function resolve(input: {
   readonly entries: readonly Entry[]

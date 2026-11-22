@@ -75,7 +75,7 @@ export async function environment(file: string, env?: Readonly<Record<string, st
     record !== undefined && record.expiresAt > Date.now() && (current === undefined || same(record.source, current))
       ? record.handoff
       : undefined
-  return { ...env, OPENCODE_PTY_HANDOFF: handoff == null ? undefined : JSON.stringify(handoff) }
+  return { ...env, LOGINOM_AI_AGENT_PTY_HANDOFF: handoff == null ? undefined : JSON.stringify(handoff) }
 }
 
 export async function complete(file: string, info: Info) {

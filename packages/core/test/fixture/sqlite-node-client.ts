@@ -87,5 +87,5 @@ const global = Global.layerWith({
   repos: dir,
 })
 
-const database = Database.layer({ path: join(dir, "opencode.db") }).pipe(Layer.provide(global))
+const database = Database.layer({ path: join(dir, "loginom-ai-agent.db") }).pipe(Layer.provide(global))
 console.log(JSON.stringify(await Effect.runPromise(program.pipe(Effect.provide(database)))))

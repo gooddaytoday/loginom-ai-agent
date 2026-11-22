@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "node:path"
-import { OPENCODE_VERSION } from "../src/version"
+import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
 import type { FormFields } from "@opencode/client"
 
 const consoleForm = [
@@ -359,7 +359,7 @@ function authServer(fetch: (request: Request, url: URL) => Response | Promise<Re
 }
 
 function status() {
-  return Response.json({ version: OPENCODE_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp/opencode" } })
+  return Response.json({ version: LOGINOM_AI_AGENT_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp/opencode" } })
 }
 
 function located<T>(data: T) {

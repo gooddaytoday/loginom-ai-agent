@@ -121,7 +121,7 @@ function parseReadableProviderModelNotFoundError(errorInput: ProviderModelNotFou
   const m = errorInput.data.modelID.trim()
   const list = (errorInput.data.suggestions ?? []).map((v) => v.trim()).filter(Boolean)
   const body = tr(translator, "error.chain.modelNotFound", `Model not found: ${p}/${m}`, { provider: p, model: m })
-  const tail = tr(translator, "error.chain.checkConfig", "Check your config (opencode.json) provider/model names")
+  const tail = tr(translator, "error.chain.checkConfig", "Check your config (loginom-ai-agent.json) provider/model names")
 
   if (list.length) {
     const suggestions = list.slice(0, 5).join(", ")

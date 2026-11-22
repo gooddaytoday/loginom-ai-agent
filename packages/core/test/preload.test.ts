@@ -9,7 +9,7 @@ describe("Core test environment", () => {
   })
 
   test("isolates global home and XDG roots", () => {
-    const home = process.env.OPENCODE_TEST_HOME
+    const home = process.env.LOGINOM_AI_AGENT_TEST_HOME
     expect(home).toBeDefined()
     if (!home) return
 
@@ -20,9 +20,9 @@ describe("Core test environment", () => {
     expect(Global.Path.cache).toBe(path.join(home, ".cache", "loginom-ai-agent-dev"))
     expect(Global.Path.state).toBe(path.join(home, ".local", "state", "loginom-ai-agent-dev"))
     expect(os.tmpdir()).toBe(path.join(home, "tmp"))
-    expect(process.env.OPENCODE_CONFIG_DIR).toBe(Global.Path.config)
-    expect(process.env.OPENCODE_CONFIG).toBeUndefined()
-    expect(process.env.OPENCODE_CONFIG_CONTENT).toBeUndefined()
+    expect(process.env.LOGINOM_AI_AGENT_CONFIG_DIR).toBe(Global.Path.config)
+    expect(process.env.LOGINOM_AI_AGENT_CONFIG).toBeUndefined()
+    expect(process.env.LOGINOM_AI_AGENT_CONFIG_CONTENT).toBeUndefined()
     expect(process.env.AWS_REGION).toBeUndefined()
     expect(process.env.GOOGLE_VERTEX_PROJECT).toBeUndefined()
     expect(process.env.NPM_CONFIG_REGISTRY).toBeUndefined()

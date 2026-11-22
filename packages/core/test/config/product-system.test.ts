@@ -57,7 +57,7 @@ describe("product system configuration", () => {
             .mkdir(path.join(programData, name), { recursive: true })
             .then(() =>
               fs.writeFile(
-                path.join(programData, name, "opencode.json"),
+                path.join(programData, name, "loginom-ai-agent.json"),
                 JSON.stringify({ policies: [{ action: "tool.use", resource, effect: "deny" }] }),
               ),
             )

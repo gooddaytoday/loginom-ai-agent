@@ -158,7 +158,7 @@ export const mainWindows = Effect.fn("Window.make")(function* (input: {
     }
 
     const focusForTests = () => {
-      if (app.isPackaged || process.env.OPENCODE_TEST_ONBOARDING !== "1") return
+      if (app.isPackaged || process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING !== "1") return
 
       if (process.platform === "darwin") app.focus({ steal: true })
       win.focus()

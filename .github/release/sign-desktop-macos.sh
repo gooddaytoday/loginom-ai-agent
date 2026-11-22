@@ -12,7 +12,7 @@ mkdir -p "$out"
 apps=$(mktemp -d)
 identity=- timestamp=--timestamp=none
 zip_level=() dmg_level=() preview=false
-case "$OPENCODE_CHANNEL" in dev | beta) preview=true ;; esac
+case "$LOGINOM_AI_AGENT_CHANNEL" in dev | beta) preview=true ;; esac
 if [ "$preview" = true ]; then zip_level=(--zlibCompressionLevel 1) dmg_level=(-imagekey zlib-level=1); fi
 if ! dry_run; then
   identity=$(security find-identity -v -p codesigning build.keychain | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n 1)

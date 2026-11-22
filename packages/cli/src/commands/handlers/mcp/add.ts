@@ -39,10 +39,10 @@ export default Runtime.handler(
 
 export async function resolveConfigPath(directory: string) {
   const candidates = [
-    path.join(directory, "opencode.json"),
-    path.join(directory, "opencode.jsonc"),
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
+    path.join(directory, "loginom-ai-agent.json"),
+    path.join(directory, "loginom-ai-agent.jsonc"),
+    path.join(directory, ".loginom-ai-agent", "loginom-ai-agent.json"),
+    path.join(directory, ".loginom-ai-agent", "loginom-ai-agent.jsonc"),
   ]
   for (const candidate of candidates) {
     if (

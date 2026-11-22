@@ -7,4 +7,4 @@ image="$1/opencode-image.tar"
 skopeo inspect --raw "oci-archive:$image" | jq .
 if dry_run; then exit 0; fi
 printf '%s' "$GH_TOKEN" | skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-skopeo copy --all "oci-archive:$image" "docker://ghcr.io/anomalyco/opencode:$OPENCODE_VERSION"
+skopeo copy --all "oci-archive:$image" "docker://ghcr.io/anomalyco/opencode:$LOGINOM_AI_AGENT_VERSION"

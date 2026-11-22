@@ -33,7 +33,7 @@ import type {
   SetSessionModeRequest,
   SetSessionModeResponse,
 } from "@agentclientprotocol/sdk"
-import { OPENCODE_VERSION } from "../version"
+import { LOGINOM_AI_AGENT_VERSION } from "../version"
 import { ACPCapabilities, type Capabilities } from "./capabilities"
 import type { ACPCatalog } from "./catalog"
 import { ACPClient } from "./client"
@@ -141,7 +141,7 @@ export function make(input: {
         },
         authMethods: [authMethod],
         _meta: { steering: { supported: true } },
-        agentInfo: { name: "OpenCode", version: OPENCODE_VERSION },
+        agentInfo: { name: "OpenCode", version: LOGINOM_AI_AGENT_VERSION },
       }
     }),
     authenticate: Effect.fnUntraced(function* (params) {

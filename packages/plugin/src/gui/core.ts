@@ -38,10 +38,10 @@ export type Catalog = {
   readonly [locale: string]: Messages
 }
 
-/** A JSON value, as plugin options in `opencode.json` hold. */
+/** A JSON value, as plugin options in `loginom-ai-agent.json` hold. */
 export type Json = string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json }
 
-/** A plugin's options from its `opencode.json` entry, as server and TUI plugins receive them. */
+/** A plugin's options from its `loginom-ai-agent.json` entry, as server and TUI plugins receive them. */
 export type PluginOptions = { readonly [key: string]: Json }
 
 /** The running app. One shape in the window and in main, with the fields server and TUI plugins get in `ctx.app`. */
@@ -328,7 +328,7 @@ export interface IpcProvider<S extends IpcSpec> {
  */
 export interface BaseContext {
   /**
-   * The plugin's options from `opencode.json`, as `ctx.options` in its server and TUI halves. Empty for a built-in.
+   * The plugin's options from `loginom-ai-agent.json`, as `ctx.options` in its server and TUI halves. Empty for a built-in.
    *
    * @example
    * ```ts

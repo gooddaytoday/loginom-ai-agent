@@ -2,7 +2,7 @@ import { NodeFileSystem } from "@effect/platform-node"
 import { validateRoutes } from "@opentunnel/client/effect"
 import { Service, type Info } from "@opencode/client/effect/service"
 import { Global } from "@opencode/util/global"
-import { OPENCODE_VERSION } from "../src/version"
+import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
 import { expect, test } from "bun:test"
 import { Deferred, Effect, FileSystem, Schedule, Schema } from "effect"
 import { NetAddress } from "effect/net"
@@ -162,14 +162,14 @@ test("service config manages environment variables", async () => {
   const layer = Global.layerWith({ config: path.join(root, "config"), state: path.join(root, "state") })
   try {
     await Effect.runPromise(
-      ServiceConfig.set("env", "OPENCODE_SERVICE_ENV_TEST", "configured").pipe(
+      ServiceConfig.set("env", "LOGINOM_AI_AGENT_SERVICE_ENV_TEST", "configured").pipe(
         Effect.provide(layer),
         Effect.provide(NodeFileSystem.layer),
       ),
     )
     expect(
       await Effect.runPromise(
-        ServiceConfig.get("env", "OPENCODE_SERVICE_ENV_TEST").pipe(
+        ServiceConfig.get("env", "LOGINOM_AI_AGENT_SERVICE_ENV_TEST").pipe(
           Effect.provide(layer),
           Effect.provide(NodeFileSystem.layer),
         ),
@@ -181,10 +181,10 @@ test("service config manages environment variables", async () => {
           ServiceConfig.options().pipe(Effect.provide(layer), Effect.provide(NodeFileSystem.layer)),
         )
       ).env,
-    ).toEqual({ OPENCODE_SERVICE_ENV_TEST: "configured" })
+    ).toEqual({ LOGINOM_AI_AGENT_SERVICE_ENV_TEST: "configured" })
 
     await Effect.runPromise(
-      ServiceConfig.unset("env", "OPENCODE_SERVICE_ENV_TEST").pipe(
+      ServiceConfig.unset("env", "LOGINOM_AI_AGENT_SERVICE_ENV_TEST").pipe(
         Effect.provide(layer),
         Effect.provide(NodeFileSystem.layer),
       ),
@@ -552,7 +552,7 @@ test("the original managed service contender binds when the occupied port is rel
     registration,
     JSON.stringify({
       id: "stale",
-      version: OPENCODE_VERSION,
+      version: LOGINOM_AI_AGENT_VERSION,
       url: "http://127.0.0.1:1",
       pid: 2_147_483_647,
       password: "stale",
@@ -587,7 +587,7 @@ test("the original managed service contender binds when the occupied port is rel
       await fetch(new URL("/api/info", endpoint.url), { headers: Service.headers(endpoint) }).then((response) =>
         response.json(),
       ),
-    ).toMatchObject({ pid: contender.pid, version: OPENCODE_VERSION, urls: [endpoint.url] })
+    ).toMatchObject({ pid: contender.pid, version: LOGINOM_AI_AGENT_VERSION, urls: [endpoint.url] })
     expect(contender.exitCode).toBe(null)
     await Effect.runPromise(Service.stop({ file: registration }).pipe(Effect.provide(NodeFileSystem.layer)))
     expect(await waitForExit(contender)).toBe(true)
@@ -622,7 +622,7 @@ test("unresponsive managed port occupancy reports a bounded conflict", async () 
   )
   const stale = {
     id: "stale",
-    version: OPENCODE_VERSION,
+    version: LOGINOM_AI_AGENT_VERSION,
     url: "http://127.0.0.1:1",
     pid: process.pid,
     password: "stale",
@@ -673,7 +673,7 @@ test("port contender recognizes an incumbent registered during the bind race", a
       requests.count += 1
       if (requests.count === 2) recognizing.resolve()
       return Response.json(
-        { version: OPENCODE_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp/opencode" } },
+        { version: LOGINOM_AI_AGENT_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp/opencode" } },
         { status: 503 },
       )
     },
@@ -687,7 +687,7 @@ test("port contender recognizes an incumbent registered during the bind race", a
     registration,
     JSON.stringify({
       id: "stale",
-      version: OPENCODE_VERSION,
+      version: LOGINOM_AI_AGENT_VERSION,
       url: "http://127.0.0.1:1",
       pid: 2_147_483_647,
       password: "stale",
@@ -704,7 +704,7 @@ test("port contender recognizes an incumbent registered during the bind race", a
     await Bun.sleep(8_000)
     const info = {
       id: "incumbent",
-      version: OPENCODE_VERSION,
+      version: LOGINOM_AI_AGENT_VERSION,
       url: `http://127.0.0.1:${listener.port}`,
       pid: process.pid,
       password: "incumbent",
@@ -740,7 +740,7 @@ test("service registration replaces a stale owner with the bound address", async
     )
     expect(await Bun.file(registration).json()).toEqual({
       id: "owner",
-      version: OPENCODE_VERSION,
+      version: LOGINOM_AI_AGENT_VERSION,
       url: "http://127.0.0.1:4321",
       pid: process.pid,
       password: "secret",
@@ -851,9 +851,9 @@ function serviceEnv(root: string) {
     ...process.env,
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: transpilerCache,
     HOME: root,
-    OPENCODE_CONFIG_DIR: undefined,
-    OPENCODE_DB: path.join(root, "opencode.db"),
-    OPENCODE_TEST_HOME: root,
+    LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
+    LOGINOM_AI_AGENT_DB: path.join(root, "loginom-ai-agent.db"),
+    LOGINOM_AI_AGENT_TEST_HOME: root,
     XDG_CACHE_HOME: path.join(root, "cache"),
     XDG_CONFIG_HOME: path.join(root, "config"),
     XDG_DATA_HOME: path.join(root, "data"),
@@ -869,7 +869,7 @@ async function startManagedService(prefix: string, failBoot = false) {
   if (failBoot) await fs.mkdir(path.join(root, "database"))
   await fs.writeFile(path.join(root, "config", "loginom-ai-agent-dev", "service-local.json"), JSON.stringify({ port }))
   const owner = Bun.spawn([process.execPath, path.join(import.meta.dir, "../src/index.ts"), "serve", "--service"], {
-    env: failBoot ? { ...serviceEnv(root), OPENCODE_DB: path.join(root, "database") } : serviceEnv(root),
+    env: failBoot ? { ...serviceEnv(root), LOGINOM_AI_AGENT_DB: path.join(root, "database") } : serviceEnv(root),
     stderr: "pipe",
     stdout: "ignore",
   })

@@ -21,7 +21,7 @@ export default Runtime.handler(
         answer: [],
       })
     }
-    process.env.OPENCODE_CLIENT = "acp"
+    process.env.LOGINOM_AI_AGENT_CLIENT = "acp"
     const endpoint = yield* Standalone.start()
     const client = yield* OpenCode.make({ baseUrl: endpoint.url }).pipe(
       Effect.provideServiceEffect(

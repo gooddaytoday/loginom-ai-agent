@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # verify-artifacts.sh <dir>: checks every artifact downloaded into <dir>/<name> against its SHA256SUMS and that it
 # holds exactly the listed files. Artifacts made by sign jobs (sign-*) must also match the manifest digest their
-# job reported (OPENCODE_DIGESTS="name=digest ..."), so an artifact replaced after that job finished is rejected.
-# Deploy jobs set OPENCODE_REQUIRE_DIGESTS=true: every artifact must match a reported digest, because the digest
+# job reported (LOGINOM_AI_AGENT_DIGESTS="name=digest ..."), so an artifact replaced after that job finished is rejected.
+# Deploy jobs set LOGINOM_AI_AGENT_REQUIRE_DIGESTS=true: every artifact must match a reported digest, because the digest
 # is what ties the bytes to the build job that made them.
 . "$(dirname "$0")/lib.sh"
 
@@ -12,7 +12,7 @@ root=$(posix "$1")
 if [ -f "$root/SHA256SUMS" ]; then
   lone=$(sha256 "$root/SHA256SUMS" | cut -c1-64)
   name=""
-  for pair in ${OPENCODE_DIGESTS:-}; do
+  for pair in ${LOGINOM_AI_AGENT_DIGESTS:-}; do
     if [ "${pair#*=}" = "$lone" ]; then name=${pair%%=*}; fi
   done
   [ -n "$name" ] || die "The downloaded artifact's SHA256SUMS does not have a reported digest"
@@ -24,10 +24,10 @@ shopt -s nullglob
 for dir in "$root"/*/; do
   name=$(basename "$dir")
   digest=""
-  for pair in ${OPENCODE_DIGESTS:-}; do
+  for pair in ${LOGINOM_AI_AGENT_DIGESTS:-}; do
     if [ "${pair%%=*}" = "$name" ]; then digest=${pair#*=}; fi
   done
-  if [ "${OPENCODE_REQUIRE_DIGESTS:-false}" = true ]; then
+  if [ "${LOGINOM_AI_AGENT_REQUIRE_DIGESTS:-false}" = true ]; then
     [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || die "Missing digest for $name"
   else
     case "$name" in sign-*) [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || die "Missing digest for $name" ;; esac

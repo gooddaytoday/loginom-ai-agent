@@ -2,11 +2,11 @@ import { app } from "electron"
 
 type Channel = "local" | "dev" | "beta" | "prod"
 
-const raw = import.meta.env.OPENCODE_CHANNEL
+const raw = import.meta.env.LOGINOM_AI_AGENT_CHANNEL
 
 export const CHANNEL: Channel = raw === "local" || raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
 
-export const VERSION = app.isPackaged ? app.getVersion() : (process.env.OPENCODE_VERSION ?? app.getVersion())
+export const VERSION = app.isPackaged ? app.getVersion() : (process.env.LOGINOM_AI_AGENT_VERSION ?? app.getVersion())
 
 const appNames: Record<string, string> = {
   dev: "OpenCode Dev",

@@ -8,7 +8,7 @@ import { debugBuild, memoryLogInterval } from "@opencode/gui-plugins/debug/optio
 import { APP_ID, APP_NAME, CHANNEL } from "../constants"
 import { remoteDebuggingPort } from "../diagnostics/options"
 
-const testOnboarding = process.env.OPENCODE_TEST_ONBOARDING === "1"
+const testOnboarding = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
 
 const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 
@@ -20,7 +20,7 @@ export function configureApplication() {
     process.chdir(homedir())
   } catch {}
 
-  process.env.OPENCODE_DISABLE_EMBEDDED_WEB_UI = "true"
+  process.env.LOGINOM_AI_AGENT_DISABLE_EMBEDDED_WEB_UI = "true"
 
   app.setName(APP_NAME)
   app.setAppUserModelId(APP_ID)
@@ -32,7 +32,7 @@ export function configureApplication() {
   if (process.platform === "linux") app.commandLine.appendSwitch("disable-smooth-scrolling")
 
   const build = { packaged: app.isPackaged, channel: CHANNEL }
-  const debugPort = remoteDebuggingPort(build, process.env.OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT)
+  const debugPort = remoteDebuggingPort(build, process.env.LOGINOM_AI_AGENT_DESKTOP_REMOTE_DEBUGGING_PORT)
 
   if (debugPort) app.commandLine.appendSwitch("remote-debugging-port", debugPort)
 
@@ -40,7 +40,7 @@ export function configureApplication() {
     app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1")
 
   // Precise heap sizes need a launch switch. The debug bar's toggle starts the log without one.
-  if (debugBuild(build) && memoryLogInterval(process.env.OPENCODE_DESKTOP_MEMORY_LOG) !== undefined)
+  if (debugBuild(build) && memoryLogInterval(process.env.LOGINOM_AI_AGENT_DESKTOP_MEMORY_LOG) !== undefined)
     app.commandLine.appendSwitch("enable-precise-memory-info")
 
   const testRoot = createTestRoot()
@@ -66,7 +66,7 @@ export function acquireApplicationLock() {
 function createTestRoot() {
   const root = testOnboarding
     ? path.join(tmpdir(), `opencode-onboarding-${randomUUID()}`)
-    : process.env.OPENCODE_DESKTOP_TEST_ROOT
+    : process.env.LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT
 
   if (!root) return undefined
 
@@ -75,7 +75,7 @@ function createTestRoot() {
   for (const dir of ["data", "config", "cache", "state", "desktop", "session", "documents"])
     mkdirSync(path.join(root, dir), { recursive: true })
 
-  if (testOnboarding) process.env.OPENCODE_DB = ":memory:"
+  if (testOnboarding) process.env.LOGINOM_AI_AGENT_DB = ":memory:"
 
   process.env.XDG_DATA_HOME = path.join(root, "data")
   process.env.XDG_CONFIG_HOME = path.join(root, "config")

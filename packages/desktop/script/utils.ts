@@ -10,7 +10,7 @@ const Manifest = Schema.fromJsonString(Schema.Struct({ version: Schema.NonEmptyS
 export type Channel = "dev" | "beta" | "prod"
 
 export function resolveChannel(): Channel {
-  const raw = process.env.OPENCODE_CHANNEL
+  const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
 
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
 
@@ -69,7 +69,7 @@ function nativeTarget() {
   throw new Error(`Unsupported platform: ${platform}/${arch}`)
 }
 
-export function getCurrentCli(target = process.env.OPENCODE_TARGET ?? nativeTarget()) {
+export function getCurrentCli(target = process.env.LOGINOM_AI_AGENT_TARGET ?? nativeTarget()) {
   const binaryConfig = CLI_BINARIES.find((item) => item.target === target)
 
   if (!binaryConfig) throw new Error(`CLI configuration not available for target '${target}'`)

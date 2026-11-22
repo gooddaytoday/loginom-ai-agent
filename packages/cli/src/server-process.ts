@@ -4,7 +4,7 @@ import { NodeServices } from "@effect/platform-node"
 import { Service } from "@opencode/client/effect/service"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
-import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_VERSION } from "./version"
+import { LOGINOM_AI_AGENT_ARTIFACT, LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "./version"
 import { AppProcess } from "@opencode/util/process"
 import { randomBytes, randomUUID } from "node:crypto"
 import { Effect, Option, Redacted, Schema } from "effect"
@@ -36,7 +36,7 @@ export const run = Effect.fnUntraced(function* (options: Options) {
       LayerNode.compile(LayerNode.group([Global.node, AppProcess.node]), {
         replacements: [
           Global.node.replace(
-            Global.layerWith(process.env.OPENCODE_CONFIG_DIR ? { config: process.env.OPENCODE_CONFIG_DIR } : {}),
+            Global.layerWith(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ? { config: process.env.LOGINOM_AI_AGENT_CONFIG_DIR } : {}),
           ),
         ],
       }),
@@ -46,8 +46,8 @@ export const run = Effect.fnUntraced(function* (options: Options) {
 })
 
 const processEffect = Effect.fnUntraced(function* (options: Options) {
-  const inherited = process.env.OPENCODE_PTY_HANDOFF
-  delete process.env.OPENCODE_PTY_HANDOFF
+  const inherited = process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
+  delete process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
   const handoff =
     inherited === undefined
       ? undefined
@@ -85,8 +85,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const environmentPassword = yield* Env.password
       // Keep the lease credential out of the environment inherited by tools.
       if (options.mode === "stdio") {
-        delete process.env.OPENCODE_PASSWORD
-        delete process.env.OPENCODE_SERVER_PASSWORD
+        delete process.env.LOGINOM_AI_AGENT_PASSWORD
+        delete process.env.LOGINOM_AI_AGENT_SERVER_PASSWORD
       }
       const password =
         options.mode === "service"
@@ -101,46 +101,46 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const launch = start(
         {
           app: {
-            name: process.env.OPENCODE_CLIENT ?? OPENCODE_ARTIFACT,
-            version: OPENCODE_VERSION,
-            channel: OPENCODE_CHANNEL,
+            name: process.env.LOGINOM_AI_AGENT_CLIENT ?? LOGINOM_AI_AGENT_ARTIFACT,
+            version: LOGINOM_AI_AGENT_VERSION,
+            channel: LOGINOM_AI_AGENT_CHANNEL,
           },
           hostname,
           port,
           cors: options.cors ?? config.cors,
           password,
           pty: { handoff },
-          simulation: truthy(process.env.OPENCODE_SIMULATE),
+          simulation: truthy(process.env.LOGINOM_AI_AGENT_SIMULATE),
           database: {
             path: databasePath(global.data),
           },
           models: {
-            url: process.env.OPENCODE_MODELS_URL,
-            file: process.env.OPENCODE_MODELS_PATH,
-            fetch: !truthy(process.env.OPENCODE_DISABLE_MODELS_FETCH),
+            url: process.env.LOGINOM_AI_AGENT_MODELS_URL,
+            file: process.env.LOGINOM_AI_AGENT_MODELS_PATH,
+            fetch: !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH),
           },
           config: {
-            directory: process.env.OPENCODE_CONFIG_DIR,
+            directory: process.env.LOGINOM_AI_AGENT_CONFIG_DIR,
             project: !truthy(
-              process.env.OPENCODE_CONFIG_PROJECT_DISABLE ?? process.env.OPENCODE_DISABLE_PROJECT_CONFIG,
+              process.env.LOGINOM_AI_AGENT_CONFIG_PROJECT_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG,
             ),
             // .claude is only read for skills, so both flags gate the same roots.
             claude: !(
-              truthy(process.env.OPENCODE_DISABLE_CLAUDE_CODE) ||
-              truthy(process.env.OPENCODE_DISABLE_CLAUDE_CODE_SKILLS)
+              truthy(process.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE) ||
+              truthy(process.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS)
             ),
-            file: process.env.OPENCODE_CONFIG,
-            content: process.env.OPENCODE_CONFIG_CONTENT,
+            file: process.env.LOGINOM_AI_AGENT_CONFIG,
+            content: process.env.LOGINOM_AI_AGENT_CONFIG_CONTENT,
           },
           windows: {
-            gitbash: process.env.OPENCODE_GIT_BASH_PATH,
+            gitbash: process.env.LOGINOM_AI_AGENT_GIT_BASH_PATH,
           },
           fs: {
-            filewatcher: !truthy(process.env.OPENCODE_FILEWATCHER_DISABLE ?? process.env.OPENCODE_DISABLE_FILEWATCHER),
+            filewatcher: !truthy(process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER),
             fff:
-              process.env.OPENCODE_DISABLE_FFF === undefined
+              process.env.LOGINOM_AI_AGENT_DISABLE_FFF === undefined
                 ? process.platform !== "win32"
-                : !truthy(process.env.OPENCODE_DISABLE_FFF),
+                : !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_FFF),
           },
         },
         serviceOptions === undefined

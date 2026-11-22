@@ -395,7 +395,7 @@ export interface BridgePluginGui {
   readonly revision: string
   /** The bundle's CommonJS code. */
   readonly code: string
-  /** The plugin's options from `opencode.json`, its GUI's `ctx.options`. */
+  /** The plugin's options from `loginom-ai-agent.json`, its GUI's `ctx.options`. */
   readonly options: PluginOptions
 }
 

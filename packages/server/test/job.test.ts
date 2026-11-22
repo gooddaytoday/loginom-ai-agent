@@ -38,7 +38,7 @@ it.live("lists background jobs by session, kind, and descendants until completio
     const handler = yield* ServerFetch.make(
       {
         app: { version: "test" },
-        database: { path: path.join(dir, "opencode.db") },
+        database: { path: path.join(dir, "loginom-ai-agent.db") },
         config: { directory: global, project: false, claude: false },
         models: { fetch: false },
         fs: { filewatcher: false },
