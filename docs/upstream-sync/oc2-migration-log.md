@@ -4229,7 +4229,9 @@ $ bun run typecheck:tsc                                   # tsc: loginom-agent, 
 |---|---|
 | `4698e1e9ce` `feat(loginom-agent): local file admission and loginom_file_admit (B2.5a)` | `packages/loginom-agent/src/{local-file,file-snapshot,file-profile-core}.ts`, регистрация в `src/index.ts`, зависимости `@opencode/schema`, `@opencode/util`, `effect`, `bun.lock` +3; `packages/server/test/loginom-local-file.test.ts` |
 | `e8a0445591` `test(core): count the product plugin's loginom_file_admit among location tools` | тест upstream `packages/core/test/location-layer.test.ts` +2, путь в CAT-07 (`catalog.json`) |
-| следующий | этот раздел, CAT-05 и CAT-07 в `catalog.md`, строка G1 и «Как запускать» в `guarantees.md` |
+| `0d10d160b9` `docs(upstream-sync): record B2.5a loginom-local-file` | этот раздел (первая версия), CAT-05 и CAT-07 в `catalog.md`, строка G1 и «Как запускать» в `guarantees.md` |
+| `258ced929c` `test(server): permission replies and stopped calls in local file admission` | ответ на запрос права (отказ с отзывом и без) и остановка вызова |
+| следующий | уточнения этого раздела |
 
 ### Правки файлов upstream
 
@@ -4334,9 +4336,11 @@ against a6b15d33daf6: 437 divergent upstream files       # код 0; как на
 | `loginom_file_admit asks for itself, then admits…` | `admitTool` с подставной арендой: запросы `loginom_file_admit`, затем `read`; ответ `{ source_path, artifact }`, `metadata` `{ generation, truncated: false }`, приём `["local-file", messageID, id]`; без аренды — `LOGINOM_HOST_NOT_READY` без запросов; правило `loginom_file_admit deny` — `LOGINOM_FILE_ACCESS_DENIED` с путём, приёма нет |
 | `the product's loginom_file_admit is hidden and rejected without the loginom-automation grant (G1 gate)` | настоящий инструмент плагина продукта: без допуска и с `package-docs` — нет в запросе к модели, вызов — `LOGINOM_SCOPE_DENIED`, до инструмента не дошёл; с `loginom-automation` — в запросе с описанием и схемой 0.4, вызов дошёл до инструмента (`LOGINOM_HOST_NOT_READY`) |
 | `permission.evaluate contract` | порядок, на котором стоит проверка «только запрет»: хук с `allow` отвечает на `ask` без вопроса (ничего не ждёт ответа), запрет правилом сессии хук не перебивает (`BlockedError`) |
+| `a rejection with feedback fails with the file and the next step; a plain rejection stays the decline…` (`258ced929c`) | настоящий вопрос (`read` файла `*.env` в сессии без своих правил), ответ через `permission.reply`: отказ с отзывом — `Tool.Error` с `Permission.CorrectedError`, текстом 0.4 (код, отзыв, путь, подсказка про `--file`) и `metadata` `{ permissionDenied: true }`; отказ без отзыва — сам `Permission.DeclinedError`, по нему v2 останавливает шаг |
+| `a stopped call admits nothing…` (`258ced929c`) | остановленный сигнал: `authorize` сразу бросает, запросов нет; остановка во время вопроса `read` — `LOGINOM_UPLOAD_CANCELLED` до резерва; остановка во время резерва Host — `LOGINOM_UPLOAD_CANCELLED` и `discardReference` резерва |
 
-Итого в файле 29 тестов: 28 pass, 1 skip (под root); в полном прогоне `server` файл занял 10,3 с. Устойчивость:
-`bun test --rerun-each 5 test/loginom-local-file.test.ts` — 140 pass, 5 skip, 0 fail за 28 с.
+Итого в файле 31 тест: 30 pass, 1 skip (под root). Устойчивость на `258ced929c`:
+`bun test --rerun-each 5 test/loginom-local-file.test.ts` — 150 pass, 5 skip, 0 fail за 27,7 с.
 
 ### Мутации
 
@@ -4358,6 +4362,15 @@ test/loginom-local-file.test.ts` из `packages/server`, файл возвращ
 === M10 permits always true (access.ts)  27/1: G1 gate
 ```
 
+На `258ced929c` (два новых теста, 30 pass в M0):
+
+```text
+=== M7 permissionFailure untouched       28/2: loginom_file_admit asks for itself…, a rejection with feedback…
+=== M11 no abort check before reserving  29/1: a stopped call admits nothing…
+=== M12 no discard after reserving       29/1: a stopped call admits nothing…
+=== M13 no throwIfAborted                29/1: a stopped call admits nothing…
+```
+
 ### Приёмка
 
 Полные прогоны по одному пакету подряд, `bun test` из каталога пакета, junit на каждый пакет; падения сравнивались по
@@ -4369,7 +4382,8 @@ test/loginom-local-file.test.ts` из `packages/server`, файл возвращ
 | Пакет | База `7791ebdad6` | Итог |
 |---|---|---|
 | `loginom-agent` | 11 pass, 0 fail | 11 pass, 0 fail (новых тестов в пакете нет) |
-| `server` | 144 pass, 1 skip, 0 fail | 172 pass (+28 новых), 2 skip (+1: «reports denied» под root), 0 fail; `loginom-access.test.ts` 9/0, как на базе |
+| `server` | 144 pass, 1 skip, 0 fail | на `4698e1e9ce`: 172 pass (+28 новых), 2 skip (+1: «reports denied» под root), 0 fail; `loginom-access.test.ts` 9/0, как на базе. На `258ced929c`: 174 pass, 2 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 / 0 (B2.4) | 40 / 0 на `258ced929c` |
 | `cli` | 414 pass, 9 skip, 0 fail | 414 pass, 9 skip, 0 fail |
 | `core` | 7125 pass, 354 skip, 3 fail | на `4698e1e9ce`: 7124 pass, 4 fail — новое `LocationServiceMap > isolates provider state by location` (см. «Правки файлов upstream»); на `e8a0445591`: 7125 pass, 354 skip, 3 fail — те же, что на базе: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` (под root) |
 | `loginom-host` | 506 pass, 12 skip, 38 fail | 506 pass, 12 skip, 38 fail — список падений совпал по именам |
@@ -4394,6 +4408,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 @loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 198 files
  Tasks:    39 successful, 39 total                        # 32 из кэша turbo
 ```
+
+Повтор `bun run check` на `258ced929c` с этим разделом: код 0, `Found 517 warnings and 0 errors`, 39/39 задач (36 из
+кэша turbo).
 
 Без `node_modules` клиента `loginom-runtime` (свежее дерево, до `npm ci`): `core/test/plugin/product.test.ts` — 6 pass,
 0 fail; `server/test/loginom-local-file.test.ts` — зелёный.
@@ -4434,6 +4451,10 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Агент `build` в v2.3.0 разрешает всё (`* * allow`), кроме чтения файлов окружения (`*.env`, `*.env.*`) — в том числе
   `read` и `external_directory` вне проекта. Значит, `loginom_file_admit` с правилами по умолчанию читает любой такой
   файл без вопроса, как и `read` v2. Разрешения продукта («Читать файлы проекта») — B2.6.
+- Контракт квитанции для B2.5b: среда v2 урезает результат инструмента до 2000 строк или 50 КиБ (`ToolOutput.truncate`
+  в `session/runner/step.ts`) до записи `state.content`. Квитанция `loginom_file_sample` должна в это укладываться
+  целиком, иначе её JSON не разберётся и файл выборки будет спрашивать `read`; либо B2.5b кладёт квитанцию в `metadata`
+  результата (её среда не урезает), и чтение в `local-file.ts` меняется вместе с ним.
 - После сжатия истории файл, разрешённый по выборке или вложению до сжатия, снова требует вопроса: `session.context`
   отдаёт сообщения от последнего сжатия. Ошибка в безопасную сторону.
 - По коду, не прогоном: форк сессии копирует сообщения родителя, и вложение родителя в форке разрешает файл без вопроса.
@@ -4449,4 +4470,6 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Настоящий Host и аренда (B2.3), настоящий `loginom_file_sample` и профили (B2.5b), вложения с квитанцией (B2.5d).
 - Путь ссылки (больше 16 МиБ) через сам инструмент — только через функции модуля (`admit`, `admitReference`).
 - Windows и macOS: случаи `case` и `directory-symlink` с junction; установленная сборка, Desktop; настоящая модель.
-- Тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), кроме `bun run check`.
+- Тесты пакетов, зависящих от `core` (`tui`, `simulation`, `desktop`), кроме `bun run check`. Поиск по тестам всех
+  пакетов (списки инструментов вида `"webfetch",`) нашёл только тесты `core` (прошли целиком) и списки разрешений для
+  интерфейса в `tui/test/util/permission.test.ts` и `session-ui` — реестр инструментов они не перечисляют.
