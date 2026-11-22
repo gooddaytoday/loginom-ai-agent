@@ -7,7 +7,7 @@ import path from "node:path"
 import { tempGlobalLayer } from "../../core/test/fixture/global"
 import { tmpdir } from "../../core/test/fixture/tmpdir"
 import { LegacyMigrate } from "../src/legacy-migrate"
-import { restoreLegacy } from "./fixture/legacy/restore"
+import { legacyDirectories, restoreLegacy } from "./fixture/legacy/restore"
 
 const migrate = (input: LegacyMigrate.Input) =>
   Effect.runPromiseExit(LegacyMigrate.run(input).pipe(Effect.provide(tempGlobalLayer)))
@@ -68,8 +68,8 @@ describe("LegacyMigrate", () => {
     if (Exit.isFailure(exit) || !("summary" in exit.value)) return
     expect(exit.value.status).toBe("migrated")
     expect(exit.value.summary).toMatchObject({
-      rows: { sessions: 3, messages: 9, parts: 25 },
-      migrated: { sessions: 3 },
+      rows: { sessions: 4, messages: 11, parts: 29 },
+      migrated: { sessions: 4 },
       present: 0,
       warnings: [],
       backup,
@@ -83,7 +83,7 @@ describe("LegacyMigrate", () => {
     expect(rows(source, "SELECT id FROM session_message WHERE type IN ('user', 'assistant') ORDER BY id")).toEqual(
       rows(backup, "SELECT id FROM message ORDER BY id"),
     )
-    expect(expectPartsMigrated(backup, source)).toBe(25)
+    expect(expectPartsMigrated(backup, source)).toBe(29)
 
     const migrated = await hash(source)
     const again = await migrate({ source, target: source, backup })
@@ -106,8 +106,33 @@ describe("LegacyMigrate", () => {
     expect(Exit.isSuccess(exit) && exit.value.status).toBe("migrated")
     expect(await hash(source)).toBe(original)
     expect((await fs.readdir(dir.path)).sort()).toEqual(["loginom-ai-agent-local.db", "loginom-ai-agent.db"])
-    expect(rows(target, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 3 }])
-    expect(expectPartsMigrated(source, target)).toBe(25)
+    expect(rows(target, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 4 }])
+    expect(expectPartsMigrated(source, target)).toBe(29)
+  })
+
+  test("gives the sessions of a directory without git that directory's project, as OpenCode 2 does", async () => {
+    // 0.4 kept them under global; OpenCode 2 lists the sessions of a directory by its own project.
+    await using dir = await tmpdir("loginom-migrate-")
+    const source = path.join(dir.path, "legacy.db")
+    const target = path.join(dir.path, "next.db")
+    await restoreLegacy("0.4", source, dir.path)
+    const directories = legacyDirectories(dir.path)
+
+    const exit = await migrate({ source, target, backup: path.join(dir.path, "unused.db") })
+
+    expect(failure(exit)).toBe("the migration succeeded")
+    const owners = rows<{ directory: string; project_id: string; worktree: string; vcs: string | null }>(
+      target,
+      "SELECT DISTINCT s.directory, s.project_id, p.worktree, p.vcs FROM session_v2 s JOIN project p ON p.id = s.project_id ORDER BY s.directory",
+    )
+    expect(owners.map((owner) => ({ ...owner, project_id: owner.project_id === "global" ? "global" : "own" }))).toEqual(
+      [
+        { directory: directories.project, project_id: "own", worktree: directories.project, vcs: null },
+        { directory: directories.repo, project_id: "own", worktree: directories.repo, vcs: "git" },
+      ],
+    )
+    // The repository keeps the project 0.4 gave it.
+    expect(owners[1].project_id).toBe(rows<{ id: string }>(source, "SELECT id FROM project WHERE vcs = 'git'")[0].id)
   })
 
   test("adds another profile to an existing database in place and skips sessions it already holds", async () => {
@@ -127,14 +152,14 @@ describe("LegacyMigrate", () => {
 
     expect(Exit.isSuccess(same) && "summary" in same.value && same.value.summary).toMatchObject({
       migrated: { sessions: 0, messages: 0 },
-      present: 3,
+      present: 4,
     })
     expect(Exit.isSuccess(other) && "summary" in other.value && other.value.summary).toMatchObject({
-      migrated: { sessions: 3 },
+      migrated: { sessions: 4 },
       present: 0,
     })
-    expect(rows(target, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 6 }])
-    expect(expectPartsMigrated(older, target)).toBe(25)
+    expect(rows(target, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 8 }])
+    expect(expectPartsMigrated(older, target)).toBe(29)
   })
 
   test("two migrations of one database at once run one after the other", async () => {
@@ -155,7 +180,7 @@ describe("LegacyMigrate", () => {
       "migrated",
     ])
     expect(await hash(backup)).toBe(original)
-    expect(rows(source, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 3 }])
+    expect(rows(source, "SELECT COUNT(*) AS n FROM session_v2")).toEqual([{ n: 4 }])
   })
 
   test("an OpenCode 2 database at its own path has nothing to migrate", async () => {
@@ -194,7 +219,7 @@ describe("LegacyMigrate", () => {
     const source = path.join(dir.path, "loginom-ai-agent.db")
     const target = path.join(dir.path, "loginom-ai-agent-local.db")
     await restoreLegacy("0.4", source)
-    // OpenCode 2 accepts only session IDs that start with "ses"; this one sorts after the three good sessions.
+    // OpenCode 2 accepts only session IDs that start with "ses"; this one sorts after the good sessions.
     const db = new Database(source)
     db.run(
       "INSERT INTO session SELECT 'zzz', project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url, summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write, revert, permission, agent, model, time_created, time_updated, time_compacting, time_archived FROM session LIMIT 1",

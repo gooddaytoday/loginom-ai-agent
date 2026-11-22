@@ -38,7 +38,7 @@ describe("migrate", () => {
     const { stdout, stderr, code, data } = runs.migrated
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
     expect(stdout).toContain(`Migrated ${path.join(data, "loginom-ai-agent.db")}`)
-    expect(stdout).toContain("Written: 3 sessions")
+    expect(stdout).toContain("Written: 4 sessions")
     expect(stdout).toContain(`Original kept as ${path.join(data, "loginom-ai-agent.v1-backup.db")}`)
     expect(runs.migrated.files["loginom-ai-agent.v1-backup.db"]).toBe(originals.good)
     expect(stdout).toContain("User plugins are not migrated")

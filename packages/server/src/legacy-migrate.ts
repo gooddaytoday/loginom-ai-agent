@@ -4,7 +4,7 @@ export * as LegacyMigrate from "./legacy-migrate"
 // The v2 server cannot do it in place: the fork's own `migration` table sends the v2 schema migrations down the
 // "replay the V1 squash" branch, which drops the v1 tables before `V1Migration` looks for them (spike S4). So the
 // legacy file is only ever read here, with bun:sqlite, and never handed to `Database.layer`.
-import { Cause, Effect } from "effect"
+import { Cause, Effect, Fiber, Layer, Option } from "effect"
 import { eq, sql } from "drizzle-orm"
 import { existsSync, renameSync, rmSync } from "node:fs"
 import path from "node:path"
@@ -12,14 +12,20 @@ import type { Database as SQLiteDatabase } from "bun:sqlite"
 import { Database } from "@opencode/core/database/database"
 import { storedAbsolutePath } from "@opencode/core/database/path"
 import { V1Migration } from "@opencode/core/database/v1-migration"
+import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { EventSequenceTable } from "@opencode/core/event/sql"
 import { KVTable } from "@opencode/core/kv/sql"
+import { Project } from "@opencode/core/project"
+import { ProjectTable } from "@opencode/core/project/sql"
+import { AbsolutePath } from "@opencode/core/schema"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionSchema } from "@opencode/core/session/schema"
 import { SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { ProjectID } from "@opencode/schema/project-id"
+import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Flock } from "@opencode/util/flock"
-import type { Global } from "@opencode/util/global"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Global } from "@opencode/util/global"
 
 export type Input = {
   /** The legacy database. It is only read; it stays where it is or, when it is the target itself, becomes `backup`. */
@@ -137,6 +143,7 @@ function copy(
   location: Pick<Summary, "source" | "target" | "backup">,
 ) {
   return Effect.gen(function* () {
+    const global = yield* Global.Service
     const legacy = yield* Effect.acquireRelease(
       attempt(`cannot read ${location.source}`, () => openReadOnly(Sqlite, location.source)),
       (opened) => Effect.sync(opened.close),
@@ -148,8 +155,20 @@ function copy(
     const parts = legacy.db.query<V1Migration.SourcePart, [string]>(
       "SELECT id, message_id, session_id, time_created, time_updated, data FROM part WHERE session_id = ?",
     )
+    const known = new Map(read.projects.map((project) => [project.id, project.worktree]))
     const written = yield* Effect.gen(function* () {
       const db = (yield* Database.Service).db
+      // As V1Migration.run: v1 kept the sessions of a directory without git under the global project, v2 gives that
+      // directory its own project and lists its sessions there. Resolved before the transaction, without persisting.
+      const owners = yield* resolveOwners(
+        read.sessions.flatMap((session) =>
+          (session.project_id === ProjectID.global || !known.has(session.project_id)) &&
+          session.workspace_id === null &&
+          storedAbsolutePath(session.directory)
+            ? [session.directory]
+            : [],
+        ),
+      )
       return yield* db.transaction((tx) =>
         Effect.gen(function* () {
           const now = Date.now()
@@ -170,7 +189,6 @@ function copy(
             INSERT OR IGNORE INTO project (id, worktree, time_created, time_updated, time_active, sandboxes)
             VALUES (${ProjectID.global}, ${path.parse(destination).root}, ${now}, ${now}, ${now}, '[]')
           `)
-          const known = new Map(read.projects.map((project) => [project.id, project.worktree]))
           const results = yield* Effect.forEach(read.sessions, (session) =>
             Effect.gen(function* () {
               const id = SessionSchema.ID.make(session.id)
@@ -182,6 +200,22 @@ function copy(
                 !session.directory || storedAbsolutePath(session.directory)
                   ? session.directory
                   : (storedAbsolutePath(known.get(projectID) ?? path.parse(destination).root) ?? "")
+              const owner =
+                projectID === ProjectID.global && session.workspace_id === null && directory === session.directory
+                  ? owners.get(directory)
+                  : undefined
+              if (owner)
+                yield* tx
+                  .insert(ProjectTable)
+                  .values({
+                    id: owner.project.id,
+                    worktree: owner.project.canonical,
+                    vcs: owner.project.vcs?.type,
+                    sandboxes: [],
+                    time_active: session.time_updated,
+                  })
+                  .onConflictDoNothing()
+                  .run()
               yield* tx.run(sql`
                 INSERT INTO session_v2 (
                   id, project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
@@ -189,8 +223,8 @@ function copy(
                   tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
                   revert, permission, agent, model, time_created, time_updated, time_compacting, time_archived
                 ) VALUES (
-                  ${session.id}, ${projectID}, ${session.workspace_id}, ${session.parent_id}, ${session.slug},
-                  ${directory}, ${session.path}, ${session.title}, ${session.version}, ${session.share_url},
+                  ${session.id}, ${owner?.project.id ?? projectID}, ${session.workspace_id}, ${session.parent_id},
+                  ${session.slug}, ${directory}, ${owner?.path ?? session.path}, ${session.title}, ${session.version}, ${session.share_url},
                   ${session.summary_additions}, ${session.summary_deletions}, ${session.summary_files},
                   ${session.summary_diffs}, ${session.metadata}, ${session.cost}, ${session.tokens_input},
                   ${session.tokens_output}, ${session.tokens_reasoning}, ${session.tokens_cache_read},
@@ -253,7 +287,14 @@ function copy(
         }),
       )
     }).pipe(
-      Effect.provide(Database.layer({ path: destination })),
+      Effect.provide(
+        AppNodeBuilder.build(LayerNode.group([Database.node, Project.node, FSUtil.node]), [
+          Database.node.replace(
+            Database.layer({ path: destination }).pipe(Layer.provide(Layer.succeed(Global.Service, global))),
+          ),
+          Global.node.replace(Layer.succeed(Global.Service, global)),
+        ]),
+      ),
       Effect.catchCause(failWith(`cannot write ${destination}`)),
     )
     // Count again on the closed file: that is what the next server start sees.
@@ -284,6 +325,49 @@ function copy(
       )
     return written.summary
   }).pipe(Effect.scoped)
+}
+
+// One lookup per directory. A lookup that hangs (a dead network mount) stops the rest, which stay global.
+function resolveOwners(directories: ReadonlyArray<string>) {
+  return Effect.gen(function* () {
+    const owners = new Map<string, { readonly project: Project.Resolved; readonly path: string } | undefined>()
+    for (const directory of new Set(directories)) {
+      const resolved = yield* resolveDirectory(directory)
+      if (Option.isNone(resolved)) {
+        yield* Effect.logWarning("Stopped resolving 0.4 session directories after a timeout", { directory })
+        return owners
+      }
+      owners.set(directory, resolved.value)
+    }
+    return owners
+  })
+}
+
+// Copied from V1Migration.run (not exported there): any failure keeps the session under global, and the lookup runs
+// detached so a filesystem or git call that ignores interruption cannot stall the migration.
+function resolveDirectory(directory: string) {
+  return Effect.gen(function* () {
+    const fiber = yield* Effect.forkDetach(
+      Effect.gen(function* () {
+        const fs = yield* FSUtil.Service
+        const normalized = yield* fs
+          .realPath(path.resolve(FSUtil.windowsPath(directory)))
+          .pipe(Effect.orElseSucceed(() => undefined))
+        if (!normalized || !(yield* fs.isDir(normalized))) return
+        const projects = yield* Project.Service
+        const project = yield* projects.resolve(AbsolutePath.make(normalized), { persist: false })
+        return { project, path: path.relative(project.directory, normalized).replaceAll("\\", "/") }
+      }),
+    )
+    const result = yield* Fiber.join(fiber).pipe(
+      Effect.catchDefect((defect) =>
+        Effect.logWarning("Failed to resolve 0.4 session directory", { directory, defect }).pipe(Effect.as(undefined)),
+      ),
+      Effect.timeoutOption("5 seconds"),
+    )
+    if (Option.isNone(result)) yield* Effect.forkDetach(Fiber.interrupt(fiber))
+    return result
+  })
 }
 
 function readLegacy(db: SQLiteDatabase, source: string) {

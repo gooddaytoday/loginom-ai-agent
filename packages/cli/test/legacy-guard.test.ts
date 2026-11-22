@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { restoreLegacy } from "../../server/test/fixture/legacy/restore"
+import { legacyDirectories, restoreLegacy } from "../../server/test/fixture/legacy/restore"
 import { isolatedEnv } from "./fixture/environment"
 
 // A server started before `migrate` must not open a 0.3.9/0.4 database as its own: the v2 schema migrations would drop
@@ -11,8 +11,6 @@ import { isolatedEnv } from "./fixture/environment"
 // refuses to start. The migration itself is covered in packages/server/test/legacy-migrate.test.ts.
 const cli = path.join(import.meta.dir, "..")
 const password = "legacy-guard-test"
-// The directory the fixture sessions were recorded in.
-const project = "/tmp/loginom-fixture/project"
 const roots: string[] = []
 
 afterAll(async () => {
@@ -24,10 +22,10 @@ describe("serve on a 0.3.9/0.4 database", () => {
     const root = await profile("0.4")
     const original = await hash(path.join(root, "loginom-ai-agent.db"))
 
-    expect(await sessions(root)).toHaveLength(3)
+    expect(await sessions(root)).toHaveLength(4)
     expect(await hash(path.join(root, "loginom-ai-agent.v1-backup.db"))).toBe(original)
 
-    expect(await sessions(root)).toHaveLength(3)
+    expect(await sessions(root)).toHaveLength(4)
     expect(await hash(path.join(root, "loginom-ai-agent.v1-backup.db"))).toBe(original)
   }, 60_000)
 
@@ -35,9 +33,46 @@ describe("serve on a 0.3.9/0.4 database", () => {
     const root = await profile("0.3.9")
     const original = await hash(path.join(root, "loginom-ai-agent.db"))
 
-    expect(await sessions(root)).toHaveLength(3)
+    expect(await sessions(root)).toHaveLength(4)
     expect(await hash(path.join(root, "loginom-ai-agent.v1-backup.db"))).toBe(original)
   }, 60_000)
+
+  test.each(["0.4", "0.3.9"] as const)(
+    "lists %s sessions in the session list of their own directory, next to a new session made there",
+    async (version) => {
+      const root = await profile(version)
+      const directories = legacyDirectories(root)
+      const db = new Database(path.join(root, "loginom-ai-agent.db"), { readonly: true })
+      const recorded = db.query<{ id: string; directory: string }, []>("SELECT id, directory FROM session").all()
+      db.close()
+      const child = serve(root)
+      try {
+        const url = await listening(child)
+        if (!url) throw new Error(`server did not start: ${await new Response(child.stderr).text()}`)
+        // What `session list` asks for: the sessions of the project its directory resolves to.
+        const listed = await Promise.all(
+          [directories.project, directories.repo].map(async (directory) => {
+            const call = api(url, directory)
+            const project = (await call("GET", "/api/location")).project.id as string
+            const created = (await call("POST", "/api/session", { location: { directory } })).data.id as string
+            const sessions = (await call("GET", `/api/session?project=${encodeURIComponent(project)}`)).data as {
+              id: string
+            }[]
+            return {
+              listed: sessions.map((session) => session.id).sort(),
+              expected: [...recorded.filter((row) => row.directory === directory).map((row) => row.id), created].sort(),
+            }
+          }),
+        )
+        expect(listed.map((item) => item.listed)).toEqual(listed.map((item) => item.expected))
+        expect(listed.map((item) => item.expected.length)).toEqual([4, 2])
+      } finally {
+        child.kill("SIGTERM")
+        await child.exited
+      }
+    },
+    60_000,
+  )
 
   test("does not start when the migration fails and leaves the original alone", async () => {
     const root = await profile("0.4")
@@ -66,7 +101,7 @@ describe("serve on a 0.3.9/0.4 database", () => {
 async function profile(version: "0.3.9" | "0.4") {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "loginom-legacy-guard-")))
   roots.push(root)
-  await restoreLegacy(version, path.join(root, "loginom-ai-agent.db"))
+  await restoreLegacy(version, path.join(root, "loginom-ai-agent.db"), root)
   return root
 }
 
@@ -89,7 +124,7 @@ async function sessions(root: string) {
     const response = await fetch(new URL("/api/session", url), {
       headers: {
         authorization: `Basic ${btoa(`opencode:${password}`)}`,
-        "x-opencode-directory": encodeURIComponent(project),
+        "x-opencode-directory": encodeURIComponent(root),
       },
     })
     if (!response.ok) throw new Error(`GET /api/session: ${response.status} ${await response.text()}`)
@@ -110,6 +145,23 @@ async function listening(child: Bun.Subprocess<"ignore", "pipe", "pipe">) {
     if (url) return url
   }
   return undefined
+}
+
+function api(base: string, directory: string) {
+  return async (method: string, route: string, body?: unknown) => {
+    const response = await fetch(new URL(route, base), {
+      method,
+      headers: {
+        authorization: `Basic ${btoa(`opencode:${password}`)}`,
+        "content-type": "application/json",
+        "x-opencode-directory": encodeURIComponent(directory),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`${method} ${route}: ${response.status} ${text}`)
+    return text ? JSON.parse(text) : undefined
+  }
 }
 
 async function hash(file: string) {

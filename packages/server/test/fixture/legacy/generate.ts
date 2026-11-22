@@ -5,13 +5,13 @@
 // The profile lives under a fixed neutral root so the database holds no machine-specific paths.
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { legacyDirectories, recorded } from "./restore"
 
 const [checkout, output] = process.argv.slice(2)
 if (!checkout || !output) throw new Error("usage: bun generate.ts <fork checkout> <output .sql>")
-const root = "/tmp/loginom-fixture"
-const project = path.join(root, "project")
+const root = recorded
 rmSync(root, { recursive: true, force: true })
-mkdirSync(project, { recursive: true })
+const { project, repo } = legacyDirectories(root)
 writeFileSync(path.join(project, "notes.txt"), "Fixture attachment: three rows of sample data.\n")
 
 type Step = { tool: string; input: unknown } | { text: string }
@@ -97,8 +97,8 @@ const env = {
 mkdirSync(env.TMPDIR, { recursive: true })
 
 // The model answers from this process, so the CLI runs asynchronously.
-const run = async (args: string[]) => {
-  const child = Bun.spawn(["bun", "run", "src/index.ts", "run", "--format", "json", "--dir", project, ...args], {
+const run = async (args: string[], directory = project) => {
+  const child = Bun.spawn(["bun", "run", "src/index.ts", "run", "--format", "json", "--dir", directory, ...args], {
     cwd: path.join(checkout, "packages", "opencode"),
     env,
     stdout: "pipe",
@@ -162,6 +162,8 @@ try {
     server.kill()
     await server.exited
   }
+  // In a git repository 0.4 keeps the session under the project of its root commit, not under global.
+  await run([script([{ text: "Answer from the repository." }], "Fourth session: in a git repository.")], repo)
 } finally {
   model.stop(true)
 }
