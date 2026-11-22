@@ -564,7 +564,7 @@ const setup: Plugin.MainSetup = (ctx) => {
   const stored = builtinMainContext(ctx).storage.store("keepScreenActive", {
     schema: Schema.Boolean,
     initial: false,
-    from: { state: ["opencode.settings", "keepScreenActive"] },
+    from: { state: ["loginom-ai-agent.settings", "keepScreenActive"] },
   })
 
   const cli = ctx.cli
