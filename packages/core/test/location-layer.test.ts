@@ -547,7 +547,10 @@ describe("LocationServiceMap", () => {
             "edit",
             "glob",
             "grep",
-            "loginom_file_admit", // Fork: a tool of the built-in product plugin (U1, CAT-07)
+            "loginom_file_admit", // Fork: tools of the built-in product plugin (U1, CAT-07)
+            "loginom_file_profile",
+            "loginom_file_sample",
+            "loginom_file_scan",
             "patch",
             "question",
             "read",
@@ -567,7 +570,10 @@ describe("LocationServiceMap", () => {
             "edit",
             "glob",
             "grep",
-            "loginom_file_admit", // Fork: a tool of the built-in product plugin (U1, CAT-07)
+            "loginom_file_admit", // Fork: tools of the built-in product plugin (U1, CAT-07)
+            "loginom_file_profile",
+            "loginom_file_sample",
+            "loginom_file_scan",
             "patch",
             "question",
             "read",
