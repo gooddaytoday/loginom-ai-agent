@@ -1460,7 +1460,8 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
 | Коммит | Что | `bun run secrets staged` |
 |---|---|---|
 | `fb6a8e7401` `feat: keep prod, beta and dev storage in separate directories` | `util`, Desktop, манифесты, `bun.lock`, тесты | `clean` |
-| следующий `docs` | `catalog.md` (CAT-01, CAT-13), этот раздел | |
+| `66823bfb50` `docs(migration): record B1.4c channel storage and its checks` | `catalog.md` (CAT-01, CAT-13), этот раздел | `clean` |
+| следующие | кэш транспилятора в тесте Desktop; уточнения раздела после ревью | |
 
 ### Способ и почему
 
@@ -1469,12 +1470,12 @@ cd packages/loginom-host && LOGINOM_AI_AGENT_NODE_SOURCE=x LOGINOM_AI_AGENT_BROW
 
 - Сборка CLI уже подставляет `OPENCODE_CHANNEL` во весь бандл (`cli/script/build.ts`, `vite.node.config.ts`); по ней
   upstream уже выбирает имя БД и файл регистрации (`cli/src/version.ts`). `util/src/global.ts` читает ту же константу
-  тем же способом, что `version.ts` (`typeof … === "string"`). Нового ключа define и нового механизма нет; массовое
-  переименование `OPENCODE_*` (B1.4a) переименует define и чтение вместе.
+  тем же способом, что `version.ts` (`typeof … === "string"`). Нового ключа define и нового механизма нет.
 - Переменная окружения не годится. `Global` считает пути при импорте модуля, раньше любого кода CLI. Окружение
   наследуют дочерние процессы: CLI из терминала Desktop взял бы канал Desktop. Пользователь мог бы перевести prod на
   данные dev. Так было в 0.4 (`a080f7725c:packages/core/src/global.ts`, `LOGINOM_AI_AGENT_CHANNEL ?? "prod"`, задавал
-  Desktop). Но CLI 0.4 брал канал из константы сборки (`standalone.ts`, `InstallationChannel`, `local` → dev).
+  Desktop). CLI 0.4 брал канал из той же переменной, а без неё — из константы сборки (`standalone.ts`, `cliChannel()`:
+  `LOGINOM_AI_AGENT_CHANNEL ?? InstallationChannel`, `local` → dev).
 - Зависимость `util → product` вместо литерала правила: правило каталога одно, в `product`. `product` своих
   зависимостей не имеет, цикла нет. `bun run build` и `bun run typecheck:dist` в `packages/util` — код 0, TS6059 нет.
   Desktop тоже берёт правило из `product` (`devDependencies`, пакет попадает в бандл main, как остальные workspace-пакеты).
@@ -1615,10 +1616,12 @@ opencode v0.0.0-beta-202611221116
 
 - Канал — константа сборки, правило — из `product` через зависимость `util` (выше). Desktop тоже зависит от `product`.
 - `latest` → `prod` сводится в `util/src/global.ts`, а не в `productChannel`: контракт `product` без изменений.
-- Запуск из исходников — канал dev. Тесты upstream из исходников ждут `loginom-ai-agent-dev`.
+- **Спорное:** запуск из исходников — канал dev. Отсюда правки ожиданий в тестах upstream: они ждут
+  `loginom-ai-agent-dev`.
 - Системный каталог, MDM, `process-daemon` и `fallback()` клиента от канала не зависят (выше). **Спорное:** одна политика
   администратора на три канала. План B1.3b называл MDM для beta и dev задачей B1.4; сделано меньшее, как в 0.4.
-- `serviceFile()` Desktop теперь возвращает файл всегда, а не только под identity. Ветка `service-local.json` переехала
+- **Спорное:** контракт шва B1.3a изменён — `serviceFile()` Desktop теперь возвращает файл всегда, а не только под
+  identity. Ветка `service-local.json` переехала
   туда же из `background-service.ts`; пустой `XDG_STATE_HOME` там теперь, как у CLI, значит «не задан».
 - `service-smoke.ts` ищет каталог по маске, а не знает канал бинарника: канал задаёт CI.
 
@@ -1633,8 +1636,15 @@ opencode v0.0.0-beta-202611221116
   запуска из исходников он разойдётся с `Global`. Вызовов на дереве нет, только тест `product`; связку дашбордов делает
   B2.9.
 - `names.test.ts`, проверка `OPENCODE_*` (`test.failing` до B1.4): совпадений на 12 больше — `OPENCODE_CHANNEL` в
-  `util/src/global.ts`, `service-identity.ts` и тесте Desktop, `OPENCODE_DESKTOP_SERVER_CHANNEL` переехал. B1.4a
-  переименует их вместе с define в `cli/script/build.ts`, `vite.node.config.ts` и `electron.vite.config.ts`.
+  `util/src/global.ts`, `service-identity.ts` и тесте Desktop, `OPENCODE_DESKTOP_SERVER_CHANNEL` переехал.
+- **Риск при слиянии с B1.4a (`b14a-identity-script`), текстового конфликта не будет.** `wants()` в
+  `apply-identity.py` покрывает и ключи define (`cli/script/build.ts`, `cli/vite.node.config.ts`,
+  `desktop/electron.vite.config.ts` — маски `script/` и `packages/*/*.config.ts`), и мои чтения (`util/src`,
+  `desktop/src`, тесты). Проверено копией регулярки `SOURCES`, скрипт не запускался. Но на ветке B1.4a чтений
+  `OPENCODE_CHANNEL` в `util/src/global.ts` и `service-identity.ts` нет. После слияния ключи define станут
+  `LOGINOM_AI_AGENT_CHANNEL`, а чтения останутся `OPENCODE_CHANNEL`: все сборки молча уйдут в каталог dev. Тесты
+  этого не поймают: тест и чтение переименуются или не переименуются вместе. После слияния нужен прогон
+  `apply-identity` по всему дереву и `debug paths` собранного CLI.
 
 ### Не проверено
 
