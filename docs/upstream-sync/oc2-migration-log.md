@@ -3977,3 +3977,258 @@ Found 517 warnings and 0 errors.                                    # как н�
 - Каталог без git, которого не было на диске в момент переноса и который появился позже. Сессии остаются в `global`:
   у проекта без VCS нет события, которое бы их забрало, как и у upstream после `V1Migration.run`.
 - Список сессий в окне Desktop: проверены запросы API, как их делает `session list`.
+
+## B3.2 Конфиг и учётные данные
+
+22.11.2026. Ветка `b32-config` от `oc2-migration` (`21693f0f99`), рабочее дерево `.claude/worktrees/b32`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_`
+появился, хук `pre-commit` срабатывал на каждом коммите. `packages/loginom-agent` и `core/src/session/skill.ts` (B2.4)
+не трогал.
+
+### Коммиты
+
+| Коммит | Файлы | `bun run secrets staged` |
+|---|---|---|
+| `f3b614156f` `feat(server): move the provider keys of a 0.4 profile with its sessions` | `server/src/legacy-migrate.ts`, `cli/src/commands/handlers/migrate.ts`, `server/test/legacy-profile.test.ts` (новый), `cli/test/legacy-profile.test.ts` (новый), фикстуры `server/test/fixture/legacy/0.4-config.jsonc`, `0.4-auth.json` и их генератор `generate-settings.ts` | `clean` |
+| следующий | этот раздел; `catalog.json` и `catalog.md`: CAT-08 больше не ждёт B3.2, в CAT-12 — вызов `importLegacyCredentials` | |
+
+### Где что лежало в 0.4 и где это читает v2
+
+Точка отсечения `a080f7725c`; `product/src/{index,cli-profile}.ts` и `loginom-host/src/connection/*` на `21693f0f99`
+те же (`git diff a080f7725c 21693f0f99` — одна строка импорта в `connection-service.ts`).
+
+| Что | 0.4 (Desktop и бэкенд v1, канал X) | v2 | Итог |
+|---|---|---|---|
+| Конфиг | `$XDG_CONFIG_HOME/loginom-ai-agent[-beta\|-dev]/loginom-ai-agent.json(c)` (`core/src/global.ts`, `opencode/src/config/config.ts`) | тот же каталог канала (`util/src/global.ts`, B1.4c), те же имена (`core/src/config/discovery.ts`) | на месте, v2 читает и пишет сам |
+| Ключи провайдеров | `$XDG_DATA_HOME/<канал>/auth.json`, открытый JSON `0600` на всех ОС (`opencode/src/auth/index.ts`) | таблица `credential` базы v2 | переносится в базу |
+| Свои навыки | `<каталог конфига>/{skill,skills}/**/SKILL.md` (`opencode/src/skill/index.ts`, `ConfigPaths.directories`) | `<каталог конфига>/skill`, `/skills` (`core/src/config/plugin/skill.ts`) | на месте |
+| Подключение Loginom Desktop | `<appData>/com.loginom.aiagent[.beta\|.dev]/loginom/connection/` — userData Electron (`desktop/src/main/index.ts`: `app.setPath("userData", join(appData, appId))`; `desktop-service.ts`: корень Host `userData/loginom`; `host.ts`: `connectionStore(join(root, "connection"))`) | читателя нет: Desktop v2 — B4 | на месте, B4 |
+| Подключение Loginom CLI | `<appData>/com.loginom.aiagent[.beta\|.dev]/cli/profiles/default/loginom/connection/` (`product/src/cli-profile.ts`, `opencode/src/cli/profile.ts`) | читателя нет: профили CLI — B2.7c | на месте, B2.7c |
+
+`<appData>` — `$XDG_CONFIG_HOME` или `~/.config` на Linux, `%APPDATA%` на Windows, `~/Library/Application Support` на
+macOS. Каталог данных и конфига бэкенда — `xdg-basedir` в 0.4 и `#global-roots` в v2, на всех ОС `~/.local/share` и
+`~/.config`; правило каналов одно (раздел B3.1, B1.4c). У автономного CLI 0.4 конфиг, данные, навыки и подключение —
+в своём профиле `<appData>/com.loginom.aiagent*/cli/profiles/default/{config,data,loginom}`; весь профиль ждёт B2.7c,
+его базу `migrate` берёт явным аргументом (B3.1).
+
+### Что сделано
+
+**Ключи провайдеров — свой шаг.** `copy` в `server/src/legacy-migrate.ts`, в той же транзакции, что сессии и метка:
+`importLegacyCredentials(tx, <каталог источника>/auth.json)` — функция upstream из миграции
+`20260805200742_import_legacy_credentials`, экспортирована, правки upstream нет. Интеграция, у которой в базе уже есть
+ключ, его сохраняет (так делает сама функция). В `Summary` добавлено поле `credentials` — ID интеграций с ключом в
+целевой базе после переноса, без самих ключей. Оно пишется в метку `kv` и в журнал службы (`guard`), `migrate` печатает
+строку `  Provider credentials: stub`. В метках, записанных до этой правки, поля нет; поле необязательное.
+
+**Срабатывает ли `import_legacy_credentials` на нашем пути.** Миграция читает `<global.data>/auth.json` и выполняется
+только при создании пустой базы (`core/src/database/migration.ts`, `apply`: `schema.up`, затем `legacyCredentials.up`)
+или при догоняющих миграциях базы, где её ID ещё нет (`applyOnly`).
+
+| Путь | Срабатывает без правки | Почему |
+|---|---|---|
+| Предохранитель и `migrate` без аргумента: источник = цель = база канала | да | `.migrating` создаётся пустой, `global.data` = каталог источника |
+| `migrate <база>` из другого каталога, цели нет | нет | читается `auth.json` каталога канала, а не профиля источника |
+| `migrate <база>` в существующую базу v2 | нет | `applyOnly` видит ID в таблице `migration` и миграцию не выполняет |
+| штатный путь S4 (база 0.4 открыта службой без предохранителя) | да | в 38 записях 0.4 этого ID нет, `applyOnly` её выполняет; сессии при этом теряются |
+
+Последняя строка — по мутации M3 ниже: провайдер получил ключ, а `migrate` ответил `is already an OpenCode 2 database`.
+
+**Конфиг, навыки и подключения — без шага.** Они уже лежат там, где их читает v2 или где их ждут B4 и B2.7c. Тесты
+закрепляют это поведение; это поведение upstream и B1.4c, а не код этой задачи.
+
+### Фикстуры
+
+`server/test/fixture/legacy/generate-settings.ts` запускает `serve` самого 0.4 (`git worktree add --detach <scratchpad>/b32-v04
+a080f7725c`, `bun install --frozen-lockfile` и `npm ci --ignore-scripts --omit=dev` в `loginom-runtime/client`, Bun 1.4.3,
+как в B3.1) и вызывает его API так, как это делали настройки Desktop 0.4: `PUT /auth/stub` с ключом, затем
+`PATCH /global/config` с провайдером (диалог «Свой сервер», `app/src/components/dialog-custom-provider.tsx`), затем
+`shell` (общие настройки) и `model`. Файлы, которые записал 0.4, скопированы как есть:
+
+```text
+0.4-config.jsonc   $schema urn:loginom-ai-agent:config, disabled_providers [], provider.stub {name, npm @ai-sdk/openai-compatible,
+                   options.baseURL http://127.0.0.1:4010/v1, models.stub-model.name}, shell /bin/bash, model stub/stub-model
+0.4-auth.json      {"stub": {"type": "api", "key": "fixture-provider-key"}}
+```
+
+Ключ выдуманный. Сканер (`bun run secrets staged`) — `clean`. Проверка, что сканер такие файлы читает: тот же
+`auth.json` со случайным ключом из 32 символов в индексе дал `{"file":…,"line":4,"rule":"generic-api-key"}` и
+`"status":"findings"`; файл удалён из индекса и с диска.
+
+### Тесты
+
+`server/test/legacy-profile.test.ts` (новый, в процессе, 3 теста):
+
+1. Конфиг 0.4 в глобальном каталоге сервера v2 (`ServerProcess.start`, `config.directory`). `GET /api/config` отдаёт
+   документ файла, ключи 0.4 приведены: `provider` → `providers`, `npm` → `package: "aisdk:@ai-sdk/openai-compatible"`,
+   `options.baseURL` → `settings.baseURL`, `model: "stub/stub-model"` → `{providerID, model}`, `$schema` и `shell` как
+   есть, пустой `disabled_providers` политик не даёт. Запись — `PATCH /api/experimental/config` (`Config.update` v2):
+   файл совпадает с исходным побайтно, кроме значения `shell` (и перевода строки в конце); ключи 0.4 v2 не переписывает.
+   Новая Location читает записанный файл так же, с новым `shell`.
+2. Профиль 0.4 с `auth.json` рядом, перенос на место: `credentials: ["stub"]`, в `credential` — `stub`, `API key`,
+   `{type: "key", key}`; повтор — `already-migrated`, хеш базы тот же, `credentials` из метки те же.
+3. Профиль 0.3.9 без `auth.json` создаёт базу v2 без ключей; второй профиль (0.4 с `auth.json`) добавляется в неё —
+   `stub` появился; копия того же профиля с другим ключом: 4 сессии уже есть, ключ `stub` прежний.
+
+`global.data` в этих тестах — пустой временный каталог, поэтому импорт при создании базы шаг не подменяет.
+
+`cli/test/legacy-profile.test.ts` (новый, 1 тест, ~5 с): весь профиль 0.4 канала в каталогах сборки (запуск из
+исходников — канал dev, `LOGINOM_AI_AGENT_DISABLE_CHANNEL_DB=1`, без `LOGINOM_AI_AGENT_CONFIG_DIR` и `_DB`, то есть как
+в установленной сборке): база и `auth.json` в `data/loginom-ai-agent-dev`, конфиг 0.4 (порт подставного провайдера
+вместо `4010`) и свой навык `skills/sales-summary/SKILL.md` в `config/loginom-ai-agent-dev`, хранилища подключения
+Desktop и CLI в формате 0.4 для Linux (открытые записи, каталоги `0700`, файлы `0600`, маркер `v040-migration.json`) в
+`config/com.loginom.aiagent.dev/…`.
+
+1. `serve` (предохранитель переносит базу). `GET /api/skill` — навык `sales-summary` из каталога конфига, путь и текст
+   как есть. Сессия и запрос модели без входа по ключу: подставной провайдер, описанный конфигом 0.4, получил запросы, у
+   всех `authorization: Bearer fixture-provider-key`.
+2. После остановки: конфиг, навык, `auth.json` и все файлы обоих хранилищ подключения — те же содержимое и права.
+3. `migrate`: код 0, `Already migrated …`, `  Provider credentials: stub`; хеши всех `*.db*` каталога данных и файлы
+   из п. 2 не изменились.
+
+### Мутации
+
+Файл подменялся `sed` на время прогона и возвращался из копии.
+
+```text
+# M1. Свой шаг убран (строка importLegacyCredentials закомментирована)
+$ cd packages/server && bun test test/legacy-profile.test.ts
+- [ "stub" ]
++ []
+(fail) 0.4 profile > its provider keys move with the sessions into the database at its own path, and a rerun changes nothing
+(fail) 0.4 profile > a profile added to an existing database brings its keys, and an integration that has one keeps it
+ 1 pass
+ 2 fail
+$ cd packages/cli && bun test --timeout 60000 test/legacy-profile.test.ts
+ 1 pass
+ 0 fail          # на месте ключи приносит импорт при создании пустой базы, см. таблицу выше
+
+# M2. Свой шаг и импорт upstream при создании базы (`legacyCredentials.up(tx)` в core/src/database/migration.ts) убраны
+$ cd packages/cli && bun test --timeout 60000 test/legacy-profile.test.ts
+error: expect(received).toBe(expected)   # authorizations.every(… === "Bearer fixture-provider-key")
+Expected: true
+Received: false
+ 0 pass
+ 1 fail
+
+# M3. Предохранитель выключен (вызов LegacyMigrate.guard в cli/src/server-process.ts закомментирован)
+Expected to contain: "Already migrated …/data/loginom-ai-agent-dev/loginom-ai-agent.db"
+Received: "…/loginom-ai-agent.db is already an OpenCode 2 database; nothing to migrate.\n"
+ 0 pass
+ 1 fail          # провайдер и навык до этого места прошли: штатный путь ключи импортирует, сессии теряет
+
+# M4. Каталог конфига v2 не совпадает с каталогом 0.4 (`config: path.join(config, "elsewhere")` в util/src/global.ts)
+error: Timed out waiting for condition   # навык sales-summary не появился в GET /api/skill
+ 0 pass
+ 1 fail
+```
+
+M4 показывает, на чём держится «на месте» для конфига и навыков: на общем каталоге канала (B1.4c, его охраняет
+`util/test/product-channel.test.ts`).
+
+### Приёмка
+
+База — `21693f0f99` (`cli` 416 / 9 / 0, `server` 142 / 1 / 0 — итог B3.1c; после него только документы). Итог — `f3b614156f`,
+после него — только этот раздел и `catalog.*`.
+
+| Пакет | Команда | База | Итог |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 416 pass, 9 skip, 0 fail | 417 pass (+1 `legacy-profile`), 9 skip, 0 fail |
+| `server` | `bun test` | 142 pass, 1 skip, 0 fail | 145 pass (+3 `legacy-profile`), 1 skip, 0 fail |
+| `product` | `bun test` | 58 pass, 3 fail (`repo-paths`, В-95) | 58 pass, 3 fail — те же |
+| `loginom-host` | `bun test test/connection-migration.test.ts test/cli-credentials.test.ts` | — | 41 pass, 2 skip, 0 fail (не менялся) |
+
+`core` не менялся. Устойчивость: `--rerun-each 5` — `server/test/legacy-profile.test.ts` 15 pass / 0 fail (5,4 с),
+`cli/test/legacy-profile.test.ts` 5 pass / 0 fail (23 с).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 430 divergent upstream files                  # как на базе: правки только в файлах форка
+  CAT-08: 0 (pending: B2.7, B2.8)                                    # было: B2.7, B2.8, B3.2
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ cd packages/server && bun typecheck && bun run typecheck:tsc      # код 0 у обеих, 1583 файла
+$ cd packages/cli && bun typecheck && bun run typecheck:tsc         # код 0 у обеих, 2151 файл
+$ bun install --frozen-lockfile                                     # код 0
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                                     # код 0
+Found 517 warnings and 0 errors.                                    # как на базе; в изменённых файлах предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Подключения Loginom не переносятся, остаются на месте.** Задание предлагало перенести их в нейтральное место
+  продукта, если места на v2 ещё нет. Оставил на месте, потому что:
+  - оба хранилища уже лежат в каталоге продукта `<appData>/com.loginom.aiagent[.beta|.dev]`, а не OpenCode;
+  - модуль 0.4 запрещает переносить профиль Desktop (`a080f7725c:packages/desktop/src/main/loginom/AGENTS.md`:
+    «do not relocate it»);
+  - формат и код чтения не менялись: `connection-store.ts`, `credentials.ts`, `cli-credentials.ts` те же, что в 0.4. Записи
+    обоих видов (Desktop Linux и `loginom-cli-secrets-v1`) пишут и читают тесты 0.4 `loginom-host/test/connection-migration.test.ts`
+    и `cli-credentials.test.ts`, тоже без изменений; на итоговом дереве — 41 pass, 2 skip, 0 fail. Прямые тесты Desktop
+    (`desktop/src/main/loginom/*.test.ts`) в дереве v2 удалены вместе с кодом, они вернутся с B4;
+  - путь CLI считает тот же `cliProfile()`, который унаследует B2.7c;
+  - Desktop и CLI — независимые профили (корневой `AGENTS.md`). Одна нейтральная копия слила бы два хранилища в одно и
+    продублировала бы открытые пароли Linux;
+  - записи Desktop на Windows и macOS расшифровывает только `safeStorage` того же приложения Electron, копия вне Desktop
+    бесполезна.
+
+  Кто подхватит: B4 — `userData/loginom/connection` Desktop. Если userData v2 Desktop будет
+  `<appData>/<appId продукта>`, как в 0.4, хранилище уже на месте, иначе B4 переносит каталог `loginom/` из старого
+  userData. B2.7c — `cliProfile(channel).loginom/connection`. Тест `cli/test/legacy-profile.test.ts` проверяет, что
+  перенос их не трогает.
+- **Что лежит в хранилищах (для B4 и B2.7c).**
+  - Каталог `connection/`: `connection.json` (активное поколение), `pending.json` (отложенная смена),
+    `generations/<n>.json`, маркер `v040-migration.json`. Рядом в корне Host — журнал восстановления `recovery/`,
+    квитанции и кэши (`inputs`, `file-references`, `knowledge/<n>`, `runtime`, `validation`).
+  - Запись: `generation`, `revision`, `url`, `urlSource?`, `username`, `secrets`.
+  - `secrets` Desktop: на Linux открыто `{apiKey, password}`. На Windows и macOS —
+    `{encrypted: base64(safeStorage.encryptString(JSON {apiKey, password}))}`, то есть DPAPI и Keychain через Electron;
+    перенос — B4. `apiKey` — ключ службы знаний старых сборок, в 0.4 уже не используется.
+  - `secrets` CLI: `{format: "loginom-cli-secrets-v1", protection, payload}`, где `protection` — `plaintext` (Linux),
+    `dpapi` (Windows, `cli-dpapi.ts`) или `keychain` (macOS, `cli-keychain.ts`, `keychain-envelope.ts`).
+  - Маркер `v040-migration.json` обязателен: без него `initialize()` удаляет подключения не к `app.loginom.ai`. Права
+    `0700`/`0600` проверяются при чтении. Поэтому каталог при переносе копируется целиком, с маркером и правами.
+  - Ключи провайдеров (`auth.json`) Desktop 0.4 не шифровал: это файл бэкенда, открытый JSON `0600` на всех ОС.
+- **Конфиг и свои навыки не копируются.** v2 читает тот же каталог канала. «Пишется на v2» — это существующий
+  `Config.update` (`PATCH /api/experimental/config`, сейчас только `shell`) по файлу 0.4. Правок upstream нет, CAT-08 больше
+  не ждёт B3.2 (`catalog.json`, `catalog.md`).
+- **Импорт ключей из `auth.json` рядом с источником, а не из `global.data`.** Так ключи идут за своим профилем во всех
+  ветках `run`. На месте это тот же файл, что читает импорт при создании базы, и повторный вызов ничего не добавляет.
+  Если в профиле канала уже есть ключ той же интеграции, он остаётся: при слиянии профилей ключ цели главнее.
+- **Ошибки `auth.json` — как у upstream.** Нет файла или он не читается — ключей нет. Не JSON-объект — предупреждение в
+  журнал. Запись неизвестного вида пропускается. Перенос это не останавливает: 0.4 в этих случаях тоже работал без
+  ключей (`Auth.all` — `orElseSucceed({})`). Ошибка записи в базу откатывает всю транзакцию, как раньше.
+- **`credentials` в отчёте — все интеграции с ключом в цели**, а не только из этого `auth.json`. На месте это ровно
+  ключи 0.4; при слиянии в существующую базу в список попадут и её прежние ключи. Иначе пришлось бы второй раз читать и
+  разбирать `auth.json`.
+- **`auth.json` остаётся на диске**, как у upstream после импорта. v2 его больше не читает.
+- **Фикстуры конфига и ключей записал сам 0.4**, а не руками: формат файла (порядок ключей, отступы, нет перевода строки
+  в конце) — его.
+- **Свои навыки с зарезервированными именами.** В 0.4 их отбрасывал `skillSource.admits`, на v2 это делает B2.4 (`admits` в
+  `loginom-agent/src/skills.ts`). B2.4 в базе нет, поэтому здесь фильтр не проверить; навык с обычным именем проверен.
+
+### Найдено, не чинил
+
+- 0.4 читал и `config.json` в каталоге конфига (слабее `loginom-ai-agent.json(c)`), v2 — нет
+  (`core/src/config/discovery.ts`, `names`). Такой файл в профиле продукта мог появиться только руками или из
+  TOML-конфига OpenCode старше 2025 года. Сам 0.4 его не создавал: если файла конфига нет, он создаёт
+  `loginom-ai-agent.jsonc`. Не переношу; `migrate` по-прежнему называет плагины из него (B3.1).
+- 0.4 всегда читал `~/.loginom-ai-agent` (`ConfigPaths.directories`, кроме профиля CLI). v2 находит его, только когда
+  проект лежит под домашним каталогом (обход вверх от каталога проекта, `ConfigDiscovery.discover`). Навыки и конфиг
+  оттуда для проектов вне дома пропадут.
+- Сервер v2 не перечитывает конфиг соседних Location после `PATCH /api/experimental/config`, если наблюдатель файлов
+  выключен (`fs.filewatcher: false` в тесте). Первый вариант теста ждал новое значение в той же Location и упал по
+  тайм-ауту. В продукте наблюдатель включён; проверял чтение новой Location.
+
+### Не проверено
+
+- Windows и macOS: `%APPDATA%`, `~/Library/Application Support`, ключи `safeStorage`, DPAPI и Keychain CLI. Живые
+  профили — B3.3.
+- Ключи OAuth и `wellknown` из `auth.json` (`openai` → метод `chatgpt-browser` и другие). Импорт — код upstream, тест
+  покрывает только `api`.
+- Профиль CLI 0.4 целиком (конфиг, навыки, подключение) — B2.7c; его `auth.json` переносится только вместе с базой
+  явным `migrate <база>`.
+- Желательно ли при слиянии профилей переносить ключи CLI в профиль канала. Сделано так, потому что `migrate <база>`
+  B3.1 уже сливает сессии.
+- Сборка Node: предохранитель и `migrate` там не работают (B3.1b); перенос ключей под Node не запускался.
+- Установленная сборка: проверен запуск из исходников, канал dev.

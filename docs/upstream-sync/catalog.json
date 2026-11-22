@@ -31,7 +31,7 @@
         "packages/server/src/routes.ts", "packages/cli/src/server-process.ts"
       ]
     },
-    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7, B2.8, B3.2" },
+    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7, B2.8" },
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
