@@ -4,7 +4,7 @@
   "fixtures": {
     "edit_lgp": "packages/loginom-host/test/fixtures/package-docs-routing/fixtures/edit-source.lgp",
     "lgp": "packages/loginom-host/test/fixtures/package-docs/nested.lgp",
-    "png": "packages/opencode/test/tool/fixtures/large-image.png",
+    "png": "packages/loginom-host/test/fixtures/package-docs-routing/fixtures/large-image.png",
     "csv": "packages/loginom-host/test/fixtures/package-docs-routing/fixtures/sales.csv",
     "text": "packages/loginom-host/test/fixtures/package-docs-routing/fixtures/read-control.txt"
   },
