@@ -1,7 +1,7 @@
 # Проверки skills настоящей моделью
 
 Запускать `bun script/skills-acceptance.ts` из `packages/loginom-host`.
-Корпус — `packages/opencode/test/cli/package-docs-routing/cases.json`.
+Корпус — `packages/loginom-host/test/fixtures/package-docs-routing/cases.json`.
 Результаты, профили, контейнеры и рабочие каталоги принадлежат этому запуску.
 Пользовательский launcher и профили не изменяются.
 
