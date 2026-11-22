@@ -5415,3 +5415,157 @@ $ oxlint scripts/live-profiles/live.mjs; prettier --check …         # 0 warnin
 - Сессии git-репозитория на Windows: на стенде нет git.
 - Большие профили, вложения больше 10 МБ, база 0.4 с непустым `-wal`.
 - Сборка Node.
+
+## B2.5b2 loginom-file-xlsx
+
+22.11.2026. Ветка `b25b2-file-xlsx` от `oc2-migration` (`5c96248c24`: B2.5b1 влит), то же рабочее дерево
+`.claude/worktrees/b25b`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Основа — 0.4 `a080f7725c`:
+`packages/opencode/src/tool/loginom-file-xlsx.ts` (1168 строк), тест `test/tool/loginom-file-xlsx.test.ts` (430 строк).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `d102b77443` `feat(loginom-agent): XLSX profiles, scans and samples for the file tools (B2.5b2)` | `packages/loginom-agent/src/file-xlsx.ts` — модуль 0.4 вместо заглушки B2.5b1; зависимости `htmlparser2`, `@zip.js/zip.js` в `package.json`, `bun.lock` +2; тест `test/file-xlsx.test.ts`; в `test/file-profile-core.test.ts` случай заглушки сужен до OLE; случай XLSX через инструменты в `packages/server/test/loginom-local-file.test.ts` |
+| `d4084687ce` `test(loginom-agent): cover the XLSX shared string guard and ZIP expansion limit` | два новых случая в `test/file-xlsx.test.ts` (без них мутации X6 и X8 ничего не краснили) |
+| `9752db1767` `docs(upstream-sync): record B2.5b2 loginom-file-xlsx` | этот раздел (первая версия), CAT-05 в `catalog.md`, строка G1 в `guarantees.md` |
+| `c816dfb4de` `docs(loginom-agent): the profile core comment names the ported XLSX module` | комментарий в начале `file-profile-core.ts` (говорил, что книги получают отказ) |
+| следующий | уточнения этого раздела |
+
+### Что поменялось против 0.4 и почему
+
+- **Модуль** — файл 0.4 без изменений, кроме комментария в начале (`diff` с файлом 0.4 — только эти две строки). API v2
+  модулю ничего не меняет: он работает с диском, а вызов, права, отмену и результат делают инструменты B2.5b1
+  (`file-profile.ts`), ядро вызывает модуль тем же динамическим импортом, что и в 0.4. Имена, описания и схемы трёх
+  инструментов не менялись (сверены скриптом с 0.4 после нормализации пробелов: совпадают).
+- **Зависимости** — версии 0.4 (`packages/opencode/package.json` на `a080f7725c`): `htmlparser2` 8.0.2 (MIT) и
+  `@zip.js/zip.js` 2.7.62 (BSD-3-Clause). Обе уже были в `bun.lock` дерева v2 (`htmlparser2` — у `core`,
+  `@zip.js/zip.js` — у `loginom-host`), новых пакетов нет:
+
+  ```text
+  $ git diff 5c96248c24 d102b77443 -- bun.lock
+  @@ -505,7 +505,9 @@
+           "@opencode/util": "workspace:*",
+  +        "@zip.js/zip.js": "2.7.62",
+           "effect": "catalog:",
+  +        "htmlparser2": "8.0.2",
+  $ bun install --frozen-lockfile                        # на c816dfb4de
+  Checked 1687 installs across 2060 packages (no changes)
+  ```
+
+  По коду, не прогоном: модуль загружается лениво (динамический импорт из ядра только для ZIP), так что зависимости
+  не грузятся при старте плагина.
+- **Профиль допуска** — `loginom-automation`, как в 0.4; новых инструментов нет, шлюз B2.2 и тест шлюза B2.5b1 те же.
+
+### Предел 50 КиБ для XLSX
+
+Как и у CSV (раздел B2.5b1): инструменты возвращают `truncated: false`, среда v2 такой результат не урезает
+(контрактный тест B2.5b1). Страница профиля XLSX ограничена тем же правилом 0.4 (`xlsxReply`: инвентарь листов и первые
+строки урезаются после 4500 и 6500 байт, колонки переносятся на следующую страницу после 7900); случай 0.4 «wide worksheet
+profiles within 8 KiB» проходит. Замер скриптом через `fileTools` на фикстурах `imports-excel`: `wide16.xlsx` —
+профиль 5696 байт, проход 281, выборка 1421; `headers11.xlsx` — 2415, 281, 1425; `sales-a.xlsx` — 1729, 280, 1422;
+`named.xlsx` — 2124, 280, 1420. Каждый результат — одна строка. Манифест выборки XLSX несёт `offsets` (строки листа),
+инструмент их убирает, как и у CSV.
+
+### Тесты
+
+`packages/loginom-agent/test/file-xlsx.test.ts` — файл 0.4 без изменений, кроме трёх относительных путей (ядро,
+`loginom-runtime/client/lib/imports-excel-parameters.mjs`, фикстуры `docs/node-development/nodes/imports-excel/…`) и
+комментария в начале. Все 18 случаев 0.4 (с `test.each`) проходят на v2. Новых случаев два: `a sample before the
+exact scan refuses an incomplete shared string index` (выборка до точного прохода при общих строках сверх быстрого
+бюджета) и `a highly compressed worksheet over 8 MiB is refused as ZIP expansion` (лист из 10 МиБ правильного XML `<b/>`
+со сжатием больше 200). Первую проверку случаи 0.4 не задевают (выборка там идёт после точного прохода), вторую
+подстраховывают другие пределы XML; их мутации ничего не краснили. Модулю проверки параметров Excel из клиента
+`loginom-runtime` нужны только встроенные модули Node, `npm ci` клиента ему не нужен.
+
+`packages/loginom-agent/test/file-profile-core.test.ts`: случай B2.5b1 `a workbook is refused before the XLSX module is
+ported` заменён на `a legacy OLE workbook is refused` — ZIP теперь идёт в модуль XLSX (покрыт `file-xlsx.test.ts`),
+отказ OLE — код ядра 0.4.
+
+`packages/server/test/loginom-local-file.test.ts`, `describe` B2.5b1 — новый случай `an XLSX workbook goes through the
+same tools, and its sample's result admits the XLSX sample (B2.5b2)`: фикстура 0.4 `wide16.xlsx` (16 колонок, 2 записи)
+через `fileTools` стенда — профиль `xlsx` с полными настройками, проход `exact` на 2 записи, выборка `.xlsx` в
+`file-profiles/<сессия>` (манифест без `offsets`, SHA-256 совпадает с файлом), вопросы как у CSV, оба результата меньше
+8 КиБ и с `truncated: false`; затем результат выборки в истории сессии разрешает файл выборки без вопроса.
+
+### Мутации
+
+На `d102b77443`: мутация вносилась `perl` в файл дерева, запускались `bun test test/file-xlsx.test.ts
+test/file-profile-core.test.ts` из `packages/loginom-agent` и `bun test --timeout 30000 test/loginom-local-file.test.ts`
+из `packages/server`, файл возвращался `git checkout`; после последней — `git status` без изменений кода.
+
+```text
+=== X0 none                                   agent 37/0; server 40 pass, 1 skip, 0 fail
+=== X1 ZIP signature not dispatched (core)    agent 19/18: все 18 случаев 0.4; server 39/1: случай XLSX через инструменты
+=== X2 XML depth limit off                    agent 36/1: ZIP expansion, XML depth, cell size and DTD limits
+=== X3 DTD refusal off                        agent 36/1: ZIP expansion, XML depth, cell size and DTD limits
+=== X4 unchanged() always passes              agent 36/1: changed source invalidates profile pages, scans and samples
+=== X5 sample keeps a formula without cache   agent 36/1: formula without cache is explicit incompleteness…
+=== X6 sample without the SST guard           agent 37/0 — не поймана
+=== X7 temporary SST index not removed        agent 34/3: container relationships…, ZIP expansion…, large SST…
+=== X8 ZIP expansion ratio check off          agent 37/0 — не поймана
+```
+
+На `d4084687ce` (два новых случая): X6 — 19/1 (`a sample before the exact scan refuses…`), X8 — 19/1 (`a highly
+compressed worksheet…`); остальные не перемерял — новые случаи их код не трогают.
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, `bun test` из каталога пакета, junit; падения сравнивались по именам. База —
+числа `5c96248c24` из задания и прогоны B2.5b1 (код `loginom-host` с тех пор не менялся), итог — `d4084687ce`. До
+прогонов — `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` Node 24.19.0 (в дереве с B2.5b1);
+`LOGINOM_AI_AGENT_TEST_NODE` — этот Node; `loginom-host` — под `xvfb-run -a`; `core` — `bun run script/test.ts`.
+
+| Пакет | База `5c96248c24` | Итог `d4084687ce` |
+|---|---|---|
+| `loginom-agent` | 30 pass, 0 fail | 50 pass (+20: 18 случаев 0.4 и 2 новых), 0 fail; случай заглушки заменён случаем OLE |
+| `server` | 186 pass, 2 skip, 0 fail | 187 pass (+1), 2 skip, 0 fail |
+| `loginom-host` | 506 pass, 12 skip, 38 fail | 506 pass, 12 skip, 38 fail — список падений совпал по именам |
+| `product` | 58 pass, 3 fail (`repo-paths`, В-95) | на `c816dfb4de`: 58 pass, 3 fail — те же |
+| `core` | 7125 pass, 354 skip, 3 fail (B2.5b1, база) | 7125 pass, 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+
+Без `node_modules` клиента `loginom-runtime` (каталог временно убран, на `c816dfb4de`): `loginom-agent` — 50 pass,
+0 fail; `core/test/plugin/product.test.ts` — 6 pass, 0 fail.
+
+Тесты по-прежнему не пишут в каталог данных машины: после прогонов `/root/.local/share/loginom-ai-agent-dev/file-profiles`
+не существует.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py
+against a6b15d33daf6: 437 divergent upstream files       # код 0; CAT-01: 8, CAT-05: 0 (pending: B2.3, B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                    # код 0
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc   # на d4084687ce
+✓ No type errors in 207 files                            # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck && bun run typecheck:tsc         # на d4084687ce
+✓ No type errors in 1,604 files across 2 projects        # tsc -b — код 0
+$ bun run check                                          # код 0, на d4084687ce с этим разделом
+Found 517 warnings and 0 errors.                          # как в B2.5b1; у новых и изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 207 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+### Где решал сам
+
+- **Тест 0.4 — в `packages/loginom-agent`**, как тест ядра в B2.5b1: случаи вызывают только функции ядра и модуля.
+- **Случай XLSX через инструменты — один**, на фикстуре 0.4 из `docs`: пакет `server` от `@zip.js/zip.js` не зависит, а
+  строить книгу в тесте сервера ради этого не стал. Остальное поведение XLSX покрывает тест 0.4.
+- **Случай заглушки в тесте ядра сужен до OLE**, как записано в B2.5b1.
+
+### Найдено, не чинил
+
+- По коду: вторая проверка `authorized_path` внутри `profileXlsx` недостижима для подмены — ядро проверяет тот же
+  `realpath` раньше, до выбора модуля; мутация только её ничего не краснит (как вторая проверка у CSV в B2.5b1).
+- По коду, как в 0.4: временный каталог `.xlsx-<uuid>` (индекс общих строк) удаляется в `close`; при падении процесса он
+  остаётся в `file-profiles/<сессия>`, как и остальное содержимое этого каталога (B2.5b1).
+
+### Не проверено
+
+- Настоящие книги Excel сверх фикстур 0.4 (шифрованные, с макросами, очень большие), производительность на книгах в
+  сотни МиБ — только пределы из теста 0.4.
+- Успешный вызов настоящего инструмента продукта через модель (как в B2.5b1), Host, Windows и macOS, Desktop; `cli` и
+  `sdk` не запускались.
+- Установленная сборка: что сборщик CLI забирает `file-xlsx.ts` по динамическому импорту вместе с `htmlparser2` и
+  `@zip.js/zip.js`, не проверял.

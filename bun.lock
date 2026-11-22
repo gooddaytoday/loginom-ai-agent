@@ -505,7 +505,9 @@
         "@opencode/plugin": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@opencode/util": "workspace:*",
+        "@zip.js/zip.js": "2.7.62",
         "effect": "catalog:",
+        "htmlparser2": "8.0.2",
       },
       "devDependencies": {
         "@tsconfig/bun": "catalog:",
