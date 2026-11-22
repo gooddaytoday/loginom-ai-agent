@@ -5005,7 +5005,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 |---|---|
 | `d102b77443` `feat(loginom-agent): XLSX profiles, scans and samples for the file tools (B2.5b2)` | `packages/loginom-agent/src/file-xlsx.ts` — модуль 0.4 вместо заглушки B2.5b1; зависимости `htmlparser2`, `@zip.js/zip.js` в `package.json`, `bun.lock` +2; тест `test/file-xlsx.test.ts`; в `test/file-profile-core.test.ts` случай заглушки сужен до OLE; случай XLSX через инструменты в `packages/server/test/loginom-local-file.test.ts` |
 | `d4084687ce` `test(loginom-agent): cover the XLSX shared string guard and ZIP expansion limit` | два новых случая в `test/file-xlsx.test.ts` (без них мутации X6 и X8 ничего не краснили) |
-| следующий | этот раздел, CAT-05 в `catalog.md`, строка G1 в `guarantees.md` |
+| `9752db1767` `docs(upstream-sync): record B2.5b2 loginom-file-xlsx` | этот раздел (первая версия), CAT-05 в `catalog.md`, строка G1 в `guarantees.md` |
+| `c816dfb4de` `docs(loginom-agent): the profile core comment names the ported XLSX module` | комментарий в начале `file-profile-core.ts` (говорил, что книги получают отказ) |
+| следующий | уточнения этого раздела |
 
 ### Что поменялось против 0.4 и почему
 
@@ -5024,11 +5026,12 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   +        "@zip.js/zip.js": "2.7.62",
            "effect": "catalog:",
   +        "htmlparser2": "8.0.2",
-  $ bun install
+  $ bun install --frozen-lockfile                        # на c816dfb4de
   Checked 1687 installs across 2060 packages (no changes)
   ```
 
-  Модуль загружается лениво (динамический импорт из ядра), так что зависимости не грузятся при старте плагина.
+  По коду, не прогоном: модуль загружается лениво (динамический импорт из ядра только для ZIP), так что зависимости
+  не грузятся при старте плагина.
 - **Профиль допуска** — `loginom-automation`, как в 0.4; новых инструментов нет, шлюз B2.2 и тест шлюза B2.5b1 те же.
 
 ### Предел 50 КиБ для XLSX
@@ -5095,7 +5098,11 @@ compressed worksheet…`); остальные не перемерял — нов
 | `loginom-agent` | 30 pass, 0 fail | 50 pass (+20: 18 случаев 0.4 и 2 новых), 0 fail; случай заглушки заменён случаем OLE |
 | `server` | 186 pass, 2 skip, 0 fail | 187 pass (+1), 2 skip, 0 fail |
 | `loginom-host` | 506 pass, 12 skip, 38 fail | 506 pass, 12 skip, 38 fail — список падений совпал по именам |
+| `product` | 58 pass, 3 fail (`repo-paths`, В-95) | на `c816dfb4de`: 58 pass, 3 fail — те же |
 | `core` | 7125 pass, 354 skip, 3 fail (B2.5b1, база) | 7125 pass, 354 skip, 3 fail — те же `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+
+Без `node_modules` клиента `loginom-runtime` (каталог временно убран, на `c816dfb4de`): `loginom-agent` — 50 pass,
+0 fail; `core/test/plugin/product.test.ts` — 6 pass, 0 fail.
 
 Тесты по-прежнему не пишут в каталог данных машины: после прогонов `/root/.local/share/loginom-ai-agent-dev/file-profiles`
 не существует.
@@ -5136,3 +5143,5 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   сотни МиБ — только пределы из теста 0.4.
 - Успешный вызов настоящего инструмента продукта через модель (как в B2.5b1), Host, Windows и macOS, Desktop; `cli` и
   `sdk` не запускались.
+- Установленная сборка: что сборщик CLI забирает `file-xlsx.ts` по динамическому импорту вместе с `htmlparser2` и
+  `@zip.js/zip.js`, не проверял.
