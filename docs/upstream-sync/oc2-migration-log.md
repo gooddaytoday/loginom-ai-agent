@@ -6579,6 +6579,13 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 `product` (`bun test`, пакет не менялся) — 58 pass, 3 fail: те же три `repo-paths.test.ts` (В-95), на базе так же.
 
+Другие удаления в userData (grep `recursive: true`, `rmSync`, `fs.remove`, `rm(` по `desktop/src/main` и `gui-plugins/src`):
+рекурсивно каталоги внутри userData удаляет только `cleanStages`. Остальные: `native/logging.ts` — записи старше 7 дней
+внутри `<userData>/logs`; `storage/legacy.ts` — только `default.dat` и `opencode.*.dat` после импорта в SQLite (файлы 0.4
+`loginom-ai-agent.*.dat` под маску не попадают; перенос настроек — B4.1, отдельная задача); `windows/index.ts` — файл
+состояния окна; `gui-plugins` — свои временные каталоги. До `<userData>/cli` не доходит ни одно. Читателей старого пути
+ступени вне `desktop/src` нет (`git grep` по `opencode-cli` и `"cli",` в скриптах, `.github`, `perf`).
+
 ### Где решал сам
 
 - **`cli-stages.test.ts` не новый.** Задание называет его новым, а файл есть в v2.3.0. Меньший вариант — дописать в него
@@ -6612,6 +6619,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   имя записи Keychain у запуска из исходников на macOS не совпадут с `app.setName`.
 - `script/copy-metainfo.ts:7-9` — id и имя в metainfo Linux; комментарий `storage/store.ts:25` называет
   `%APPDATA%\ai.opencode.desktop.dev`.
+- Вне `packages/desktop`: `nix/desktop.nix` (id и значки `ai.opencode.desktop`) и комментарий
+  `.github/release/render-winget.sh:39` — упаковка upstream, выпуск продукта ими не пользуется (B5).
 
 ### Не проверено
 
