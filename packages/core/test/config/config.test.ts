@@ -272,7 +272,7 @@ describe("Config", () => {
           ).toEqual([global])
           expect(
             (yield* watcher.subscriptions()).filter((subscription) =>
-              subscription.path.includes(`${path.sep}.opencode${path.sep}`),
+              subscription.path.includes(`${path.sep}.loginom-ai-agent${path.sep}`),
             ),
           ).toEqual([])
         })

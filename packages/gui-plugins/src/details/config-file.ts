@@ -25,7 +25,7 @@ export function serviceConfigFile(entries: readonly ConfigEntry[], service: "mcp
 export function globalConfigDirectory(entries: readonly ConfigEntry[], directory: string) {
   const root = entries.find((entry) => entry.type === "directory")
 
-  return root && !/[\\/]\.opencode[\\/]?$/.test(root.path) ? root.path.replace(/[\\/]+$/, "") : directory
+  return root && !/[\\/]\.loginom-ai-agent[\\/]?$/.test(root.path) ? root.path.replace(/[\\/]+$/, "") : directory
 }
 
 function configDocuments(entries: readonly ConfigEntry[]) {
