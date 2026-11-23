@@ -11579,3 +11579,221 @@ CAT-01 — зависимость `app` → `product` и `packages/app/package.j
 - e2e — на dev-сервере Vite с Chromium 1248 вместо ожидаемого 1223 (ссылки в каталоге браузеров в scratchpad).
   `bun run check` e2e не запускает.
 - Замер strobe не запускал: сессионный код не менялся.
+
+## B4.11c О программе: остатки
+
+23.11.2026. Ветка `b411c-about-rest` от `oc2-migration` (`4733cbaf19`), рабочее дерево `.claude/worktrees/b411c`. Bun
+1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0,
+`.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/cli` и
+`packages/loginom-host` не трогал. Окно Desktop не запускалось.
+
+Основание — сообщение координатора: зависимость `app` → `product`, строка марки без замены и `https://loginom.ru/` из
+B4.11b приняты; со страницы «О программе» убрать бренд OpenCode, атрибуцию OpenCode дать записью в сведениях о лицензиях
+(MIT требует сохранять уведомление).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `ba73560831` `feat(app): OpenCode credited in the notices, About without its colophon (B4.11c)` | About, запись лицензии OpenCode, Help на главной, ссылка страницы ошибки, словари, e2e |
+| `1edd91d91d` `test(app): readable spacing in the About notices e2e (B4.11c)` | две пустые строки в e2e: `anti-slop(require-readable-spacing)` в `bun run check` |
+| следующий | этот раздел; CAT-10 в `catalog.md` |
+
+Файлы кода — пять: `settings/about/about.tsx`, `settings/about/notices/notices.ts`, `home/projects/controller.tsx`,
+`shell/errors/error.tsx`, `e2e/regression/settings.spec.ts`. Словари — `en.ts`, `ru.ts`. Корневой `LICENSE` не менялся.
+
+### Страница «О программе»
+
+| Элемент | Было (`4733cbaf19`) | Стало |
+|---|---|---|
+| «First published in Missouri, USA», «First illustrated in London, England» | блок `settings-about-publication` | нет |
+| слоган «AI can’t build great software, without you» | строка | нет |
+| «© Anomaly Innovations, Inc.» и `anomaly-brush.svg` | блок `settings-about-copyright` | нет; импорт логотипа убран, файл SVG остался без импортёров |
+| значок MIT (`legal.svg`) | есть | есть — сведения о лицензии |
+
+Ключи `settings.about.{firstPublished,firstIllustrated,tagline,copyright}` в словарях остались — страница их не
+показывает, как `settings.about.trademark` после B4.11b.
+
+### Запись OpenCode в сведениях о лицензиях
+
+Первая запись `notices` в `settings/about/notices/notices.ts`:
+
+- имя `OpenCode`, ссылка `https://github.com/anomalyco/opencode`, лицензия `MIT License`;
+- текст — `import opencodeLicense from "../../../../../../LICENSE?raw"`, то есть корневой `LICENSE` без копии
+  («MIT License / Copyright (c) 2025 opencode / …»); правка `LICENSE` при обновлении upstream попадёт в запись сама;
+- пояснение — новый ключ `settings.about.notices.opencode`: `en` «Loginom AI Agent is built on it.» по образцу
+  `settings.about.notices.eigenpal`. В `ru` ключей сведений о лицензиях нет и не было, берётся `en`.
+
+Сборка `vite build` (`packages/app`, каталог `dist` по умолчанию, удалён после проверки) — код 0, `✓ built in 20.44s`;
+текст `LICENSE` дословно лежит в чанке диалога:
+
+```text
+$ bun run build
+✓ built in 20.44s
+PWA v1.3.0
+precache  2799 entries (36955.67 KiB)
+$ bun -e '<чанк с "Copyright (c) 2025 opencode" содержит корневой LICENSE>'
+dist/_assets/dialog-B-FM5oMM.js
+verbatim in chunk: true
+```
+
+Первая попытка с `--outDir` в scratchpad упала в шаге PWA (`Couldn't find configuration for either precaching or
+runtime caching`): шаблоны PWA ищут файлы относительно `dist`. Это следствие моего каталога, а не правки.
+
+### Help на главной и страница ошибки
+
+| Место | Было | Стало | 0.4 |
+|---|---|---|---|
+| `home/projects/controller.tsx:105` `utility.help` | `https://opencode.ai/desktop-feedback` | `Product.support` | `onOpenHelp={() => platform.openExternal(Product.support)}` (`pages/layout.tsx:2238`) |
+| `shell/errors/error.tsx:501` кнопка «сообщить» | `https://opencode.ai/desktop-feedback` | `Product.support` | `platform.openExternal(Product.support)` (`pages/error.tsx:358`) |
+| `error.page.report.prefix` `en` | `Please report this error to the OpenCode team` | `… to the Loginom AI Agent team` | дословно 0.4 |
+| `error.page.report.prefix` `ru` | `… команде OpenCode` | `… команде Loginom AI Agent` | дословно 0.4 |
+
+Подпись кнопки «on Discord» / «в Discord» и значок Discord — как в 0.4: в 0.4 они так же вели на `Product.support`
+(GitHub issues). Не менял — задание просит «как в 0.4»; несоответствие подписи и ссылки — ниже.
+
+### Ссылки на opencode.ai в `app/src`
+
+```text
+$ cd packages/app && git grep -n 'opencode\.ai' -- src ':!src/runtime/i18n/*.ts' ':!**/*.test.ts' ':!**/*.test.tsx' ':!**/*.stories.tsx' ':!**/*.stories.ts'
+src/components-lab/dialog-story-runtime.tsx:478:            url: "https://opencode.ai/auth/authorize",
+src/providers/connect/dialog.tsx:1179:            <Button onClick={() => platform.openExternal("https://opencode.ai/console")}>
+src/runtime/platform/web.ts:31:        icon: "https://opencode.ai/favicon-96x96-v3.png",
+src/session/composer/free-limit-panel.tsx:13:const GO_URL = "https://opencode.ai/go"
+src/session/composer/go-limit-tray.tsx:34:    link: workspace ? `https://opencode.ai/console/${encodeURIComponent(workspace)}/go` : "https://opencode.ai/console",
+src/session/usage-exceeded-dialogs.tsx:19:const GO_URL = "https://opencode.ai/go"
+src/settings/appearance/appearance.tsx:116:                  <ExternalLink class="settings-link" href="https://opencode.ai/docs/themes">
+src/settings/providers/console-extensions.ts:6:const CONSOLE_URL = "https://opencode.ai/console"
+src/settings/providers/extensions.tsx:277:                <ExternalLink class="settings-extension-link text-13-regular" href="https://opencode.ai/docs/skills">
+src/settings/workspaces/project-extensions.tsx:513:                  <ExternalLink class="settings-extension-link" href="https://opencode.ai/docs/skills">
+$ grep -n 'opencode\.ai' src/runtime/i18n/en.ts src/runtime/i18n/ru.ts
+# пусто, код 1
+```
+
+Оставлены, с причиной:
+
+| Место | Причина |
+|---|---|
+| `components-lab/dialog-story-runtime.tsx:478` | подставной ответ сервера для историй (`*.standalone.stories.tsx`), в приложение не входит |
+| `providers/connect/dialog.tsx:1179`, `settings/providers/console-extensions.ts:6` | OpenCode Console — кабинет провайдера OpenCode, который пользователь подключает сам; судьба провайдера OpenCode в продукте — этап C |
+| `session/composer/free-limit-panel.tsx:13`, `go-limit-tray.tsx:34`, `session/usage-exceeded-dialogs.tsx:19` | подписка OpenCode Go: показывается только при лимитах моделей провайдера OpenCode; этап C |
+| `settings/appearance/appearance.tsx:116`, `settings/providers/extensions.tsx:277`, `settings/workspaces/project-extensions.tsx:513` | документация тем и навыков OpenCode; своей документации тем и навыков у продукта нет, настройки — этап C |
+| `runtime/platform/web.ts:31` | значок уведомления веб-платформы грузится с opencode.ai. Только веб-версия в браузере: Desktop шлёт уведомления своей платформой. Это обращение к серверу OpenCode при каждом уведомлении в вебе — предлагаю отдельной задачей вместе со значками (B4.6) |
+
+### Тесты
+
+`e2e/regression/settings.spec.ts`, тест «about names the product, credits OpenCode only in the notices and asks GitHub
+for nothing» (бывший «about names the product and asks GitHub for nothing» из B4.11b). Добавлены проверки:
+
+- на странице нет `opencode`, `anomaly`, `missouri`, `london`, `without you` в любом регистре;
+- на странице ровно одна картинка — значок лицензии;
+- в диалоге сведений о лицензиях есть запись со ссылкой `OpenCode` на `https://github.com/anomalyco/opencode` и
+  текстом `MIT License`; её `<pre>` после раскрытия «License text» равен корневому `LICENSE`
+  (`readFile(new URL("../../../../LICENSE", import.meta.url))`).
+
+Ссылки Help на главной и страницы ошибки проверены `grep` выше: тестов на эти кнопки в e2e нет, шестой файл кода не
+нужен.
+
+```text
+$ PLAYWRIGHT_BROWSERS_PATH=<scratch> PLAYWRIGHT_PORT=3413 bunx playwright test e2e/regression/settings.spec.ts \
+    -g "about names the product|Copied tooltip closes|every page scrolls inside settings"
+# итог ba73560831 и 1edd91d91d, тёплый dev-сервер
+  4 passed (34.4s)
+# база 4733cbaf19 = дерево 97dfecfebf: тот же набор — 4 passed (B4.11b)
+```
+
+Холодный старт dev-сервера: первый тест падает на ожидании `settings-screen` (30 с), а в журнале сервера — «Failed to
+run dependency scan … PARSE_ERROR Unexpected JSX expression» в `ui/src/components/file-icon.tsx:20`. Это есть и без
+правки (B4.11b, оба холодных прогона); повтор на тёплом сервере проходит.
+
+### Мутации
+
+`mutate.py` из scratchpad: одна замена, прогон e2e-теста About, возврат исходных байтов; после всех `git status` —
+только файлы задачи.
+
+```text
+=== E1: строка «First published in Missouri, USA» снова на странице
+expect(locator).not.toContainText(expected) failed
+Received string: "…Loginom AI AgentFirst published in Missouri, USAloginom.ru…"        1 failed
+=== E2: слоган снова на странице
+Received string: "…Third-party noticesAI can’t build great software, without you"      1 failed
+=== E3: строка «© Anomaly Innovations, Inc.» снова на странице
+Received string: "…Third-party notices© Anomaly Innovations, Inc."                     1 failed
+=== E4: вторая картинка (логотип) снова на странице
+expect(locator).toHaveCount(expected) failed  Expected: 1  Received: 2               1 failed
+=== E5: запись лицензии переименована (нет записи OpenCode)
+expect(locator).toHaveAttribute(expected) failed  Expected: "https://github.com/anomalyco/opencode"   1 failed
+=== E6: текст записи — LICENSE.trim() (не дословно)
++ Received  + 0                                                                    1 failed
+```
+
+`grep` выше ловит возврат ссылок: мутация того же вида для `titlebar.tsx` показана в B4.11b.
+
+### Приёмка
+
+```text
+# база 4733cbaf19                                   # итог 1edd91d91d
+$ cd packages/app && bun typecheck
+✓ No type errors in 2,391 files across 1 project   ✓ No type errors in 2,391 files across 1 project
+$ bun run test                                      # test:unit, затем test:browser
+ 2719 pass  0 fail  (275 files)                    2719 pass  0 fail  (275 files)
+ 360 pass  0 fail  (58 files)                      360 pass  0 fail  (58 files)
+$ cd packages/desktop && bun typecheck
+✓ No type errors in 3,505 files across 2 projects  ✓ No type errors in 3,505 files across 2 projects
+$ bun test
+ 540 pass  4 skip  0 fail  (69 files)              540 pass  4 skip  0 fail  (69 files)
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 479 divergent upstream files       # база 476: +3
+  CAT-10: 87                                              # база 84: notices.ts, controller.tsx, error.tsx
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
+would change: 0 files
+$ bun run check                                                       # код 0, на 1edd91d91d
+Found 558 warnings and 0 errors.                          # на ba73560831 было 560: пробелы в e2e, исправлены
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/app:typecheck: ✓ No type errors in 2,391 files across 1 project [4.60s]
+@opencode/desktop:typecheck: ✓ No type errors in 3,505 files across 2 projects [6.78s]
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check`: мои строки чистые; у `about.tsx` остаётся строка 54 upstream (`writeClipboardText`), как на базе.
+
+### Каталог
+
+`catalog.json` не менялся: все файлы — CAT-10 (`packages/app/**`). В `catalog.md` CAT-10: остатки About, запись
+лицензии OpenCode из корневого `LICENSE`, Help на главной и ссылка страницы ошибки; проверка при обновлении — новое имя
+e2e-теста и его проверки.
+
+### Где решал сам
+
+- **Текст лицензии — импорт корневого `LICENSE`, не копия.** Копия в `notices/` могла бы разойтись с файлом. Импорт
+  `?raw` вне пакета проверен typecheck (`*?raw` из `vite/client`), dev-сервером и сборкой.
+- **Пояснение к записи — без имени OpenCode** («Loginom AI Agent is built on it.»), чтобы тест словаря About из B4.11b
+  остался без нового исключения.
+- **Ссылка записи — `github.com/anomalyco/opencode`:** исходный проект, сведения в лицензиях допустимы; на opencode.ai
+  не ведёт.
+- **`legal.svg` оставлен** — значок MIT, сведения о лицензии.
+- **Подпись «в Discord» и значок Discord на странице ошибки не менял** — как в 0.4.
+- **`anomaly-brush.svg`, `animated-wordmark.tsx`, `contributors.ts` с тестом** — файлы upstream без импортёров; удаление
+  дало бы лишние файлы и конфликты при обновлении.
+
+### Найдено, не чинил
+
+- **Страница ошибки:** «Please report this error to the Loginom AI Agent team on Discord» со значком Discord ведёт на
+  GitHub issues продукта — так было и в 0.4. Подпись `error.page.report.discord` и значок стоит сменить. Там же
+  `Logo` из `@opencode/ui/logo` (`error.tsx:409`) — слово-знак `opencode`: те же контуры букв, что в
+  `settings/about/animated-wordmark.tsx`. Это бренд OpenCode на странице ошибки, вне задачи.
+- **Уведомления веб-версии** берут значок с `https://opencode.ai/favicon-96x96-v3.png` (таблица выше).
+- **Остальные 57 языков:** `error.page.report.prefix` и `settings.about.*` говорят OpenCode — этап C. Например, `de`:
+  «OpenCode, der Open-Source-Coding-Agent» на странице «О программе», «Bitte melden Sie diesen Fehler dem
+  OpenCode-Team» на странице ошибки.
+
+### Не проверено
+
+- Страница на `ru` в браузере: e2e идёт на `en`; описание `ru` — из B4.11b, тест словаря.
+- Кнопки Help на главной и «сообщить» на странице ошибки в браузере не нажимались — только `grep` и typecheck.
+- Настоящее окно Desktop и сборка `electron-vite` рендерера Desktop с импортом корневого `LICENSE` — B4.14b; собиралась
+  только веб-сборка `app`.
+- e2e — на dev-сервере Vite с Chromium 1248 вместо ожидаемого 1223 (ссылки в каталоге браузеров в scratchpad).
