@@ -17842,3 +17842,383 @@ $ df -h /
 `node_modules` клиента `loginom-runtime/client`. `git status --ignored` показывает только `.husky/_`, `node_modules` и
 кэши `.turbo` от `bun run check`. Настоящие `~/.local/share` и `~/.config` не трогались: всё шло в контейнерах с
 собственным домашним каталогом.
+
+## B4.14c Установленный Windows
+
+23–24.11.2026. Ветка `b414c-installed-windows` от `oc2-migration` (`982bb2b111`), рабочее дерево `.claude/worktrees/b414c`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите.
+Эталон 0.4 — `v0.4.0`: `desktop/test/loginom/windows-installed-smoke.{ps1,py,test.ps1}`, `windows-sidecar-smoke.{mjs,test.mjs}`,
+`script/build-windows.ps1`, `.github/workflows/loginom-windows.yml`. `cli`, `core` и `loginom-host/test` (B2.7a7) не трогал.
+
+**Модель.** Настоящую модель не вызывал. Профиль 0.4 записала подставная модель `live.mjs` (B3.3) в процессе обвязки:
+8 вызовов, как в B3.3 на Windows. Прогоны v2 не отправляют ни одного запроса к модели. Это проверяет `no-model-calls`: число
+сообщений ассистента во всех сессиях службы на каждом запуске. На чистом профиле — 0, 0, 0; на профиле 0.4 — 5, 5, 5,
+то есть только перенесённые из 0.4. Стенд выходит в интернет, его трафик не снимался. Окно чистого профиля показывает
+модель по умолчанию «Big Pickle» (ниже, «Найдено»).
+
+Прочитано: этот журнал — B4.1 (п. 14, строка B4.14c), B4.5a, B4.8a, B4.9, B4.10, B4.13, B4.14b, B3.3, B2.3b;
+`docs/testing/loginom-ai-agent/README.md` (PKG-01, PKG-02, BRAND-01, LIFE-01) и `windows-release-coverage.md`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `a5c0fcd2bd` `test(desktop): port the installed Windows smoke to Desktop v2 (B4.14c)` | пять файлов `test/loginom/windows-{installed,sidecar}-smoke.*` |
+| `ae446e891d` `test(desktop): run the Windows smoke as an ordinary account in an SSH session (B4.14c)` | правки по первым прогонам на стенде (ниже) |
+| `3f46c1375c` `test(desktop): prove the soft stop, the moved connection and no model call on Windows (B4.14c)` | мягкая остановка, перенос подключения, нет вызова модели, журнал службы в `logs.zip` |
+| следующий | этот раздел |
+
+Код продукта не менялся. `catalog.json` и `catalog.md` — тоже: это новые файлы форка в тестовом каталоге Desktop.
+
+### Что перенесено из 0.4 и что изменилось
+
+| Файл | 0.4 (`v0.4.0`) | v2 |
+|---|---|---|
+| `windows-installed-smoke.ps1` | тихая установка `/S /currentuser`; кеш проверки и прогрев Chromium установщиком; запись «Установленные приложения», ярлык, нет `mcp.loginom.ai`. Запуск с `--inspect-brk` и подставным подключением, `server ready` в `main.log`. Закрытие `WM_CLOSE` или `app.quit()` через инспектор, после — нет процессов из каталога установки, код 0. Удаление: ключ схемы снят, ярлык снят, данные пользователя на месте. Профиль — `LOGINOM_AI_AGENT_TEST_ROOT` | те же проверки установки и удаления. Профиль — настоящий профиль учётной записи: переменная тестового корня на v2 другая (B4.1 п. 14), а профиль 0.4 переносится из настоящего userData. Добавлены проверки: `ordinary-user`; `port-not-excluded` (разбор `netsh … excludedportrange`) и `port-free`; `installed-apps-names` и `executable-names` (имена записи и exe, нет OpenCode); `updater-cache-installer` после установки и `updater-cache-removed` после удаления (В-97 п. 2); повторный `verify-resources`; `resource-hashes` всех файлов манифеста; `bundled-chromium`; `process-names` и `process-descriptions` (что показывает Диспетчер задач); `no-opencode-places`. PKG-01 и LIFE-01 — `-Runs` запусков подряд (ниже). `-Connection` — профиль с подключением 0.4: `connection-moved`, Help на каждом запуске, `store-04-unchanged`. `-Mutation` — шесть мутаций для приёмки |
+| `windows-sidecar-smoke.mjs` | через инспектор главного процесса подкладывал шифрованное подключение, ждал `window.api.loginom.status()`, проверял навыки sidecar и `loginom_read` справки по сценарию подставной модели | sidecar и `window.api.loginom` в v2 нет. Команды на Node установки: `resources` — `verifyResources` (все хеши) и запуск Chromium из ресурсов; `service` — `/api/info` своей службы с паролем из регистрации, совпадение pid, навыки продукта в `/api/skill` (ровно из манифеста и из каталога установки), счёт сессий и сообщений ассистента; `renderer` и `close` — через CDP. Вызов `loginom_read` снят: подключение через окно 0.4 не подложить, а ход модели — это вызов модели (как в B4.14b) |
+| `windows-sidecar-smoke.test.mjs` | `checkBundledSkills` (`source: bundled`, `digest`), `checkHelpResult` | `checkBundledSkills` под `Skill.Info` v2 (`path`, `content`): имена и число — из манифеста, путь — `skills/<имя>/SKILL.md` в ресурсах установки; навык того же имени из профиля или встроенный не засчитывается |
+| `windows-installed-smoke.test.ps1` | URI, строка старта, `crash.log`, `mcp.loginom.ai`, WARN зависимостей | URI, строка старта v2 (`app starting { version, packaged: true` и `v2 CLI background service ready`), `excludedportrange`, роли процессов, `crash.log` (в т. ч. запись v2 с отступом), `mcp.loginom.ai` |
+| `windows-installed-smoke.py` | SSH-алиас с ключом, `C:/lab/loginom-smoke/<uuid>` | плюс `--login` и `--password-file` для обычной учётной записи (пароль через `SSH_ASKPASS`, не печатается), `--remote-root`, `--runs`, `--close-method`, `--mutation`, `--connection` |
+
+**Запуск в PKG-01 и LIFE-01.** Каждый запуск проверяет:
+
+- окно приложения есть, renderer загрузил приложение, мастера нет;
+- своя служба записала `service-desktop.json`, отвечает на порту канала, в `main.log` — `v2 CLI background service ready`;
+- Node host запущен, при `-Connection` — и Help;
+- окно закрывается `WM_CLOSE`, приложение выходит с кодом 0;
+- через 5 с нет ни службы, ни Node host, ни Help, ни Electron, ни процессов из каталога установки и userData;
+- регистрации нет, порты службы и CDP закрыты;
+- в журнале службы ровно одна новая строка `message="shutdown started" reason="service stop"`: служба остановлена запросом
+  B2.3b, а не `TerminateProcess`;
+- каждый следующий запуск — новая служба.
+
+**Что пришлось поменять по первым прогонам** (`ae446e891d`):
+
+- **WMI под обычной учётной записью недоступен.** По SSH `Get-CimInstance Win32_Process` отвечает `Отказано в доступе`
+  (`0x80041003`), так же `Win32_OperatingSystem`. Процессы теперь — снимок Toolhelp с путём и командной строкой своих
+  процессов (`QueryFullProcessImageName`, `NtQueryInformationProcess`). Порты — `IPGlobalProperties`, версия ОС — реестр.
+  Скрипт 0.4 работал только под администратором раннера CI.
+- **В сеансе 0 окно невидимо.** Вход по SSH — сеанс 0, неинтерактивная оконная станция. Окно `Chrome_WidgetWin_1`
+  «Loginom AI Agent», 1040×776, у главного процесса есть, приложение пишет `main window visible`, а `IsWindowVisible` —
+  false. В 0.4 по той же причине `.py` закрывал через инспектор. PKG-01 теперь берёт окно по классу и размеру и требует
+  строку `main window visible` в `main.log`; видимость требуется только в интерактивном сеансе.
+- **`/api/skill`** — с `location[directory]`, ответ `{ location, data }`.
+- **Запись `crash reporter started`** в v2 с отступом.
+- **Заголовок окна.** До загрузки страницы окно называется по каналу («Loginom AI Agent Dev»), после — «Loginom AI Agent»
+  (B4.3). Принимаются оба, второй читается после загрузки.
+
+### Сборка установщика
+
+Установщик собран на Linux кросс-сборкой, `<scratchpad>/b414c/build.sh`, канал `dev`, umask 022. Настройка инструментов
+заняла около 15 минут без wine, rcedit и подписи, так что порог «больше двух часов» не наступил.
+
+1. **Встроенный CLI** — как в B3.3: `LOGINOM_AI_AGENT_TARGET=windows-x64-baseline LOGINOM_AI_AGENT_CHANNEL=dev bun run
+   script/build.ts --skip-web-ui` в `packages/cli`, 34 с. Без `--skip-install`: сборка ставит пакеты всех платформ.
+   Версия — `0.0.0-dev-…` (без `LOGINOM_AI_AGENT_VERSION`, как в B4.14b).
+2. **Node и Chromium — из тех же источников, что 0.4.** В `loginom-windows.yml` 0.4 это `actions/setup-node` 24.19.0 и
+   `playwright install chromium` на раннере Windows.
+   - `node-v24.19.0-win-x64.zip` — с nodejs.org, SHA-256 архива сверен с `SHASUMS256.txt`. `node.exe` — `3602f2bb…0237`,
+     это пин `native-resource-candidates.ts` для `win32-x64`.
+   - Chromium 1246 — командой `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=win64 PLAYWRIGHT_BROWSERS_PATH=<каталог> node
+     playwright-core/cli.js install chromium`: `chromium-1246`, `chromium_headless_shell-1246`, `ffmpeg-1011`.
+     `chrome.exe` — `e3390ab4…ff37`, тоже пин.
+   - `winldd-1007` playwright ставит только при `process.platform === "win32"`. Поэтому он скачан с того же CDN и разложен
+     так, как его кладёт playwright: `PrintDeps.exe` и два маркера.
+3. **Ресурсы Loginom.** `stageResources` запрещает кросс-сборку (`LOGINOM_NATIVE_RESOURCES_UNAVAILABLE`). На время сборки
+   в дерево положена заплатка, после сборки она снята `git checkout` и в коммиты не входила:
+   `<scratchpad>/b414c/cross-staging.patch`, три файла, +24 −13.
+   - `stage-resources.ts`:
+     - запрет снят только при `B414C_CROSS=win32-x64`;
+     - `npm ci` шаблона дашбордов и `runtime/client` запускает Node машины сборки с `--os=win32 --cpu=x64 --no-bin-links`;
+     - `node --version` не вызывается: `node.exe` закреплён хешем строкой ниже;
+     - ветки `chrome-sandbox`, Keychain и путь `LICENSE` Node выбираются по целевой платформе, а не по `process.platform`.
+   - `ripgrep-resource.ts`: zip ripgrep для Windows распаковывает `unzip` (GNU tar zip не читает).
+   - `bundle-loginom.ts`: цель `win32-x64` при той же переменной.
+4. **Desktop** — `bun run build` с `LOGINOM_AI_AGENT_TARGET=windows-x64`, 35 с. `script/utils.ts` (`windowsify`) называет
+   CLI по ОС машины сборки, поэтому `resources/loginom-ai-agent-cli` переименован в `.exe`.
+5. **NSIS** — `bunx electron-builder --win nsis --x64 --publish never "-c.productName=Loginom AI Agent Dev"`, 244 с.
+   - Ресурсы exe правит `resedit` (JS), `makensis` — сборка для Linux из кэша electron-builder.
+   - Деинсталлятор electron-builder на Linux получает, запуская NSIS-заглушку через `wine`. Wine здесь нет. Набор
+     `toolsets.wine` 1.0.1 у electron-builder 64-битный и даже `makensis.exe` не запустил (`failed to load …/ntdll.dll`).
+   - Поэтому `wine` в `PATH` сборки — заглушка `<scratchpad>/b414c/shim/`. Она вынимает деинсталлятор из заглушки
+     собственным `UninstallerReader` electron-builder, так же, как он делает на macOS начиная с Catalina.
+   - Подписи нет: сертификата нет.
+6. **`productName`.** Конфиг выбирает его по `process.platform` машины сборки: на Linux — slug. Первая сборка
+   (`a13c0539…7480`) поэтому вышла с `loginom-ai-agent-dev` в записи «Установленные приложения», в имени деинсталлятора и
+   в `ProductName`/`FileDescription` exe. Сборка на Windows дала бы `Loginom AI Agent Dev`. Итоговая сборка
+   (`dc7c436d…df9`) — с `-c.productName=…`, остальное то же. На первой прогнаны отладочный прогон `dbg1` и мутации M1–M4,
+   M-BRAND, M-REMOVE.
+
+```text
+npm ci 2 s · cli build 34 s · desktop build 35 s · pack 244 s
+560240109  loginom-ai-agent-win-x64.exe  dc7c436d398d1e70efd438d1a6ab797e8daca4f1f8a3ff9853722c0cad730df9   # итоговый
+560239041  loginom-ai-agent-win-x64.exe  a13c053963c443943a1e12fec94a0e0d90b7d4afc89cfe31b7431f1370357480   # первый, slug
+resource-manifest.json: target win32-x64, node bin/node.exe, browser browsers/chromium-1246/chrome-win64/chrome.exe,
+  12380 files, platformAcceptance pending
+win-unpacked: ELF 0, symlinks 0; app.asar.unpacked — только @lydell/node-pty-win32-x64
+app-update.yml: url https://updates.invalid/, updaterCacheDirName '@loginom-ai-agentdesktop-updater'
+```
+
+**Ресурсы против Windows 0.4.0.** Манифест 0.4.0 из установки администратора стенда (только чтение) сравнён по путям и
+хешам:
+
+```text
+browsers:  0.4.0 605   new 605   same-hash 605
+dashboard: 0.4.0 6577  new 6577  same-hash 6564   # нативные @esbuild/win32-x64, @rollup/rollup-win32-x64-*
+runtime:   0.4.0 4816  new 4798  same-hash 4253   # нет 18 файлов node_modules/.bin (обёртки npm Windows: *.cmd, *.ps1, sh)
+bin 1/1, ripgrep 1/1, help 312/312 — те же; licenses 12 (9 тех же); skills 73 (навыки v2 другие)
+```
+
+Chromium, ffmpeg, winldd, Node и ripgrep — те же байты, что в 0.4.0. Состав шаблона дашбордов с нативными пакетами
+`win32-x64` тоже совпал. Отличие одно — `--no-bin-links`: обёрток `.bin` нет. `npm` на Linux записал бы туда символьные
+ссылки, а не обёртки Windows. Рантайм их не вызывает.
+
+**Чем этот установщик не равен выпускному.** Из коммита он не воспроизводится: нужны заплатка, заглушка `wine` и
+`-c.productName`. Выпускной установщик Windows собирается на Windows, как 0.4 (`script/build-windows.ps1`) — это B5.1.
+
+**Место на Linux.** Кросс-установка `bun install --os=* --cpu=* --libc=*` опустила свободное место с 17 до 6–8 ГБ. Сразу
+после сборки CLI удалены записи кэша Bun чужих платформ (не `linux-x64` и не `win32-x64`) и их каталоги в
+`node_modules/.bun`. После упаковки удалено и остальное, что добавила установка, в том числе
+`bun-windows-x64-baseline-v1.4.4`, затем `bun install --frozen-lockfile`. Кэш Bun по именам записей — как до задачи.
+Из `~/.cache` удалены добавленные `electron-v44.9.1-win32-x64.zip`, `electron-builder/wine@1.0.1` с архивом и zip
+ripgrep для Windows. Так обе сборки.
+
+### Стенд
+
+`winstand`: Windows 11 Pro 26200.9974 (25H2), x64, процессор `QEMU Virtual CPU version 2.5+`.
+
+- **Учётная запись.** Обычная, временная: `Проверка Б414`, только в группе «Пользователи»,
+  `IsInRole(Administrator)` — false, DPAPI в сеансе работает (230 байт).
+- **Вход.** Создана копией `scripts/live-profiles/windows.ps1` (B3.3) со своим именем и корнем `C:\lab\b414c`. Вход — SSH
+  по паролю через `SSH_ASKPASS`, как в B3.3: пароль случайный, лежал в `C:\lab\b414c\secret` (только администраторы и
+  SYSTEM) и в файле `0600` в scratchpad. Не печатался.
+- **Каталог.** Всё своё — в `C:\lab\b414c\u`.
+- **Передача.** Установщик ушёл через туннель кусками по 20 МБ с повторами и собран на стенде, хеш тот же. Первая сборка
+  — за 26 мин, итоговая — за 7,4 мин. Скорость менялась от 0,12 до 2 МБ/с, туннель один раз оборвался.
+
+**Порт 28290.** `netsh int ipv4 show excludedportrange protocol=tcp` — таблица пустая, резервов нет. Порт не слушается до
+установки. Так в снимке «до» и в каждом прогоне (`port-not-excluded`, `port-free`).
+
+```text
+Protocol tcp Port Exclusion Ranges
+
+Start Port    End Port
+----------    --------
+
+* - Administered port exclusions.
+```
+
+### Матрица
+
+Итоговый установщик `dc7c436d…df9`, учётная запись `Проверка Б414`, сеанс 0, без прокси. Отчёты — `report.json`
+каждого прогона:
+
+| Прогон | Профиль | Скрипт | Итог |
+|---|---|---|---|
+| `final-a2` | чистый, 3 запуска | `3f46c1375c` | PASS, кроме `process-descriptions` WARN |
+| `final-b` | профиль 0.4, перенесённый в dev, 3 запуска, `-Connection` | `3f46c1375c` | PASS, кроме `process-descriptions` WARN |
+| `final-a` | чистый, 3 запуска | `ae446e891d` + ожидание ярлыков | PASS, кроме `process-descriptions` WARN; без проверок `3f46c1375c` |
+| `dbg1` | чистый, 3 запуска, первый установщик | промежуточный | PASS, кроме трёх проверок имён (slug первой сборки) |
+
+Первая попытка `final-a` оборвалась вместе с туннелем ещё на установке. Отчёта нет, прогон повторён. До `dbg1` два прогона
+первого установщика упали на ошибках самого смоука (окно в сеансе 0, ответ `/api/skill`), их исправил `ae446e891d`.
+Других прогонов итогового установщика не было.
+
+| Случай | Прогоны | Итог | Ключевое |
+|---|---|---|---|
+| Установка обычным пользователем | 3 итоговых + `dbg1` + 6 мутаций | PASS | `NSIS /S /currentuser exited 0 after 175.5 s, including --verify-resources` (160–250 с) |
+| PKG-01 окно | 9 запусков итоговых прогонов + 3 `dbg1` | PASS | окно `Chrome_WidgetWin_1` 1040×776 за 0,4–0,5 с, «Loginom AI Agent Dev» → «Loginom AI Agent», `main window visible`; renderer `oc://renderer/index.html`, мастера нет; служба на `:28290` за 29 с на первом запуске чистого профиля (12 с на профиле 0.4), затем 0,6–0,8 с. Видимость окна в сеансе 0 не доказуема (`visible: false`) |
+| PKG-02 | 3 итоговых | PASS | установщик провёл проверку (кеш на 12380 файлов, прогрев Chromium `ready`), повторный `--verify-resources` — 0, 12380 хешей, `manifestHash 2be5e3a7…d741`, встроенный Chromium 154.0.8037.0 запустился headless |
+| BRAND-01: запись, exe, ярлык, схема | 3 итоговых | PASS | `Loginom AI Agent Dev 2.3.0`, `Publisher: Loginom`; exe — `ProductName`/`FileDescription` «Loginom AI Agent Dev»; `Loginom AI Agent Dev.lnk` на рабочем столе и в меню «Пуск»; `HKCU\Software\Classes\loginom-ai-agent\shell\open\command` → `"…\installed\loginom-ai-agent-dev.exe" "%1"`; мест OpenCode нет |
+| BRAND-01: Диспетчер задач | 3 итоговых | частично, WARN | образы `loginom-ai-agent-dev.exe` «Loginom AI Agent Dev», `node.exe` «Node.js JavaScript Runtime» (Node host и Help), `conhost.exe`; служба `loginom-ai-agent-cli.exe` — **«Bun»** |
+| LIFE-01 | 9 закрытий итоговых прогонов + 3 `dbg1` | PASS 12/12 | выход 0 за 0,28–1,37 с; через 5 с ничего; регистрации нет; порты закрыты; каждый запуск — новая служба; в `final-a2` и `final-b` служба остановлена запросом 6 из 6 |
+| Удаление | 3 итоговых | PASS | каталог и запись удалены; ключ `HKCU\Software\Classes\loginom-ai-agent` удалён; `%LOCALAPPDATA%\@loginom-ai-agentdesktop-updater` с копией `installer.exe` — удалён (после установки был); ярлыки удалены; данные пользователя на месте |
+| Профиль 0.4, DPAPI B4.13 | `final-b`, 3 запуска | PASS | `moved`, поколение 2, конверт `dpapi`; затем `current`, `current`; Help на 3 из 3; хранилище 0.4 побайтно то же; база 0.4 перенесена предохранителем с копией `v1-backup.db`; 3 сессии, 5 сообщений ассистента |
+
+Строка первого запуска `final-a2` (дословно, путь профиля — `%USERPROFILE%`):
+
+```text
+{"run": 1, "relaunch": false, "status": "PASS", "main": 10552, "window": {"title": "Loginom AI Agent Dev", "size": "1040x776", "visible": false, "session": 0, "seconds": 0.5, "titleLoaded": "Loginom AI Agent"}, "service": {"pid": 9072, "previous": {}, "port": 28290, "version": "0.0.0-dev-202611232147"}, "sessions": {"count": 0, "assistantMessages": 0}, "skills": ["loginom-automation", "loginom-dashboard", "package-docs"], "renderer": {"url": "oc://renderer/index.html", "title": "Loginom AI Agent", "wizard": false, "text": "Projects Add project Settings Help"}, "before": {"electron": 5, "service": 1, "node-host": 1, "other": 1}, "exit": {"code": 0, "seconds": 1.33}, "remaining": [], "stopRequests": 1, "registration": "removed"}
+```
+
+`final-b`, LIFE-01 и перенос:
+
+```text
+life-01-run-1 PASS exit 0 in 1.37 s; before {"electron":5,"service":1,"node-host":1,"other":1,"help":1}; service 4996
+life-01-run-2 PASS exit 0 in 0.34 s; before {"electron":5,"service":1,"node-host":1,"other":1,"help":1}; service 8960
+life-01-run-3 PASS exit 0 in 0.28 s; before {"electron":5,"service":1,"node-host":1,"other":1,"help":1}; service 8872
+connection-moved PASS {"states":["moved","current","current"],"generation":2,"url":"http://127.0.0.1:9/","protection":"dpapi"}
+no-model-calls PASS assistant messages per launch: 5, 5, 5
+store-04-unchanged PASS %APPDATA%\com.loginom.aiagent.dev\loginom\connection read only (B4.13)
+[01:49:26.087] [info]  (main)    Loginom connection of 0.4 for the service { state: 'moved', generation: 2 }
+timestamp=2026-11-23T22:49:38.414Z level=WARN run=c98511a6 message="migrated a Loginom AI Agent 0.3.9/0.4 database before opening it" source="%USERPROFILE%\\.local\\share\\loginom-ai-agent-dev\\loginom-ai-agent.db" … backup="%USERPROFILE%\\.local\\share\\loginom-ai-agent-dev\\loginom-ai-agent.v1-backup.db"
+timestamp=2026-11-23T22:49:49.394Z level=INFO run=c98511a6 message="shutdown started" reason="service stop" role=server
+timestamp=2026-11-23T22:50:03.474Z level=INFO run=f6b7c55e message="shutdown started" reason="service stop" role=server
+timestamp=2026-11-23T22:50:16.457Z level=INFO run=2b905ab6 message="shutdown started" reason="service stop" role=server
+# хранилище службы после прогона (phase.ps1 store-hash):
+record: generation=2 url=http://127.0.0.1:9/ user=b33 secrets=format,protection,payload protection=dpapi
+```
+
+**Как сделан профиль 0.4.** Под той же учётной записью:
+
+1. Поставлен 0.4.0 из `C:\lab` (копия, SHA-256 `f75e780f…be4b`, как в B3.3), `/S /currentuser`, 443 с.
+2. `live.mjs old` (B3.3) на Node из 0.4.0: 3 сессии, 9 сообщений, 22 части, 8 вызовов подставной модели. Подключение
+   сохранено с выдуманным стендом `http://127.0.0.1:9/` (`LOGINOM_LOGIN_UNAVAILABLE`, `saved: starting`), `secrets:
+   {encrypted}` — это `safeStorage`, то есть DPAPI.
+3. 0.4.0 удалён своим деинсталлятором. Данные остались, его копия установщика в кэше обновлятора тоже осталась (B0.4).
+4. Каталоги переименованы в имена канала dev 0.4, как в B4.14b: `%APPDATA%\com.loginom.aiagent` →
+   `com.loginom.aiagent.dev`; `.local\share`, `.config` и `.cache` `loginom-ai-agent` → `loginom-ai-agent-dev`.
+   `Local State` (ключ `safeStorage` под DPAPI) переехал вместе с userData.
+5. Снята нетронутая копия; перед `final-b` и M5 профиль возвращался из неё.
+
+Обновления NSIS тем же каналом поверх 0.4.0 нет: 0.4.0 — prod, сборка — dev. Перед установкой v2 0.4.0 удалён.
+
+### Мутации
+
+Мутации — параметр `-Mutation` смоука. Они портят только одноразовую установку. M1 и M3 — правка байтов той же длины в
+установленном `app.asar`, как в B4.14b: целостность asar у сборки не включена. M5 — шаг `phase.ps1` перед прогоном. По
+одному запуску каждая.
+
+- M1–M4, M-BRAND и M-REMOVE шли на первом установщике (`a13c…`, скрипт `ae446e891d`). Его зелёный контроль на тех же
+  проверках — `dbg1`: тот же установщик, все проверки, кроме трёх имён, PASS.
+- M5 шла на итоговом установщике (скрипт `3f46c1375c`), её контроль — `final-b`.
+- Три красные проверки имён (`installed-apps`, `install-path`, `executable-names`) есть в каждом прогоне первого
+  установщика, и мутации к ним отношения не имеют.
+
+| Случай | Мутация | Итог (дословно) |
+|---|---|---|
+| LIFE-01 | M1 `NoServiceStop`: в `stopService()` `await e.stop({file:…()})` → `void 0` | красный: `OWN_PROCESSES_REMAIN: 11156:service 4744:node-host 1648:other` (выход 0 за 0,87 с, служба, Node host и `conhost` живы) |
+| PKG-01 | M3 `NoRenderer`: `src="./assets/main-…js"` в `index.html` → несуществующий файл | красный: `probe renderer: exit 1 RENDERER_NOT_LOADED`; окна недостаточно |
+| PKG-02 | M4 `SkillByte`: один бит `skills/loginom-automation/SKILL.md` | красный: `verify-resources exit=1 Error: LOGINOM_RESOURCE_HASH_MISMATCH`, `probe resources: exit 1 LOGINOM_RESOURCE_HASH_MISMATCH`; служба без навыков продукта |
+| BRAND-01 | M-BRAND `ForeignScheme`: после запуска ключ схемы переписан на `notepad.exe` | красный: `uri-scheme-registered FAIL "C:\WINDOWS\System32\notepad.exe" "%1"`. Деинсталлятор чужой ключ оставил, поэтому краснеет и `uri-scheme-removed`; удалён следующим запуском и удалением |
+| Удаление | M-REMOVE `LockedUpdaterCache`: `installer.exe` в кэше обновлятора открыт без общего доступа на время удаления | красный: `updater-cache-removed FAIL %LOCALAPPDATA%\@loginom-ai-agentdesktop-updater` |
+| Профиль 0.4, DPAPI | M5: из перенесённого профиля удалён `Local State` | красный: `Loginom connection of 0.4 not moved to the service { state: 'failed', step: 'read', reason: 'LOGINOM_STORE_READ_FAILED' }`, `HELP_NOT_STARTED`; у службы только маркер `v040-migration.json` |
+
+### Приёмка
+
+`bun typecheck` новые файлы не видит (`include` пакета — `src`, `perf`). `bun test` подхватывает
+`windows-sidecar-smoke.test.mjs` (+2 теста). База — то же дерево без этого файла, `LOGINOM_AI_AGENT_TEST_NODE` — Node
+24.19.0.
+
+| `desktop` | `982bb2b111` | итог |
+|---|---|---|
+| `bun typecheck` | 3 370 файлов, ошибок нет | 3 370 файлов, ошибок нет |
+| `bun test --timeout 30000` | 610 pass, 4 skip, 0 fail (614 тестов, 78 файлов) | 612 pass, 4 skip, 0 fail (616, 79) |
+
+`windows-installed-smoke.test.ps1` — на стенде, Windows PowerShell 5.1, обычная учётная запись, `rg.exe` из установки:
+все разделы `PASS`, код 0. `node --test windows-sidecar-smoke.test.mjs` — 2 pass.
+
+Итоговая проверка — на `3f46c1375c`. Перед тестами `desktop` выполнен `npm ci --ignore-scripts` клиента
+`loginom-runtime/client`: без него `credential-migration.test.ts` не собирает Node host (`Could not resolve: "yaml"`).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 609 divergent upstream files                      # новые файлы форка не считаются
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # код 0
+would change: 0 files
+$ oxlint и prettier --check двух файлов .mjs                             # 0 warnings, чисто; .ps1 и .py не линтуются
+$ bun run check                                                         # код 0, 18 с
+Found 905 warnings and 0 errors.                                        # в test/loginom/windows-* — ни одного
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,370 files across 2 projects [4.85s]
+ Tasks:    39 successful, 39 total
+$ bun run secrets range 982bb2b111 HEAD
+{"status":"clean","commits":3,…}
+```
+
+### Где решал сам
+
+- **Кросс-сборка с заплаткой в scratchpad, а не сборка на стенде.** На стенде нет Bun, Node и git, а канал к нему медленный.
+  Заплатка меняет только выбор платформы, данные ресурсов совпали с 0.4.0 побайтно (выше). Заплатку не коммитил:
+  запрет кросс-сборки — общий контракт с CLI.
+- **`-c.productName` при упаковке** вместо правки конфига: так сборка на Linux даёт те же имена, что сборка на Windows.
+  Конфиг не менял.
+- **Обычная учётная запись и SSH по паролю, как в B3.3.** Задание требует установку от обычного пользователя, а при
+  входе по ключу (S4U), по B3.3, DPAPI может быть недоступен. Отсюда сеанс 0 и невидимое окно.
+- **Настоящий профиль учётной записи, а не тестовый корень.** Учётная запись одноразовая, а перенос 0.4 читает настоящий
+  userData.
+- **`loginom_read` снят**, как в B4.14b: без окна 0.4 подключение не подложить, а ход модели — это вызов модели.
+- **Описание процесса «Bun» — WARN, а не FAIL.** Это дефект сборки CLI, а не Desktop. Он виден в каждом отчёте, решение —
+  за владельцем.
+- **Чужая установка 0.4.0 администратора стенда** (`HKCU` пользователя `user`, `%LOCALAPPDATA%\Programs\@loginom-ai-agentdesktop`)
+  не тронута. Задание просит удалить «прежнюю установку» и не трогать чужие программы. Выбран меньший вариант: она
+  не мешала, потому что все прогоны шли под своей учётной записью. Её манифест только прочитан.
+- **Мутации на первом установщике.** Runtime-код у двух сборок одинаков, отличаются имена exe и записи. Контроль — `dbg1`.
+- **Проверка ERROR-строк журналов оставлена** (как в 0.4), хотя на медленном первом старте она иногда краснеет (ниже).
+
+### Найдено, не чинил
+
+- **BRAND-01: служба в Диспетчере задач называется «Bun».** Встроенный CLI — исполняемый файл Bun без своих
+  `FileDescription`/`ProductName`. Чинить в сборке CLI (`build.ts`, параметры Windows у `bun build --compile`) — B2.7a или
+  B5.
+- **Сборка Windows возможна только на Windows** без заплаток. Причины: `stageResources` запрещает кросс-сборку,
+  `productName` в `electron-builder.config.ts` и `windowsify` в `script/utils.ts` зависят от ОС сборки, деинсталлятору
+  нужен wine. Для B5.1 это ожидаемо: 0.4 собирался на раннере Windows.
+- **Окно чистого профиля предлагает модель «Big Pickle».** Это бесплатная модель OpenCode по умолчанию, к ней уйдёт первый
+  запрос пользователя без настроенного провайдера. Здесь запросов не было. Это поведение onboarding v2, вопрос — этап C.
+- **Ошибки renderer на медленном первом старте**: `[plugin] debug.memory Error: Ipc "debug.memory" did not answer the
+  subscribe`, то же у `debug.heap` и `updater`. Видел в двух прогонах мутаций (M-REMOVE, M5), в итоговых — нет.
+  `no-error-lines` в этих прогонах красный.
+- **Первый старт службы — 29 с** на чистом профиле (12 с на профиле 0.4), следующие — 0,6–0,8 с. B0.4 видел 19 с:
+  вероятно, антивирус проверяет свежую копию CLI в `cli-stages`.
+- **Win32-OpenSSH завершает процессы сеанса, когда сеанс закрывается.** Деинсталлятор NSIS перезапускает себя и сразу
+  возвращает код. Если сеанс тут же кончается, удаление обрывается: так вышло с первым удалением 0.4.0 — каталог и запись
+  остались, повтор с ожиданием в сеансе прошёл. Смоук ждёт удаления в своём сеансе.
+- **Деинсталлятор удаляет ярлыки после записи и каталога**, на несколько секунд позже. Один прогон (M4) увидел их на
+  месте. Смоук теперь ждёт до 30 с.
+- **`Release-Profile` из `windows.ps1` B3.3** дублирует 100 описателей. На этой учётной записи понадобилось 128 выгрузок:
+  входов по SSH было больше. В копии задачи — 600. Файл B3.3 не менял.
+
+### Не проверено
+
+- **Видимое окно.** Все прогоны — в сеансе 0. Окно с размером и заголовком есть, `main window visible` в журнале, renderer
+  загружен, но на экране интерактивного сеанса его никто не видел.
+- **Выпускной установщик.** Сборка на Windows (B5.1), подпись и SmartScreen — нет. Обёрток `.bin` в `runtime/client`
+  этой сборки нет.
+- **Обновление NSIS тем же каналом** 0.4.0 prod → v2 prod: перенос каталога `@loginom-ai-agentdesktop` в `customInit` —
+  только по коду (B4.5a).
+- **Каналы prod и beta**, установка в каталог по умолчанию `%LOCALAPPDATA%\Programs\…` — нет. Все установки шли в
+  `/D=C:\lab\b414c\u\runs\…\installed`.
+- **Chromium Host и стенд Loginom.** Подключение к выдуманному стенду, Help запускался, браузер Host — нет. LIFE-01
+  проверен на Node host и Help.
+- **Другие способы выхода**: выход из сеанса Windows, `taskkill`, падение окна — только `WM_CLOSE`.
+- **Кеш проверки установщика и Host.** Кеш установщик пишет, а читает ли его Host службы при первом старте, не
+  разбиралось (B4.8a).
+- **Сетевой трафик стенда** не снимался.
+- **macOS** — B4.14 macOS и этап G.
+
+### Уборка
+
+**Стенд.**
+
+1. Каждый прогон удалял свою установку деинсталлятором (`silent-uninstall` PASS везде). Оборванный туннелем прогон
+   оставил живой установщик; он остановлен, каталог прогона удалён, записи «Установленные приложения» он записать не
+   успел.
+2. `account-delete`: процессов учётной записи нет; профиль выгружен за 128 выгрузок и удалён; учётная запись удалена;
+   ни папки в `C:\Users`, ни ключа `ProfileList`, ни файла пароля не осталось.
+3. `clean`: `C:\lab\b414c` удалён. Удалены и `%TEMP%` администратора со скриптом и снимками.
+
+Снимок «до» (22:56 по времени стенда) и «после» (02:13), только чтение:
+
+```text
+users, administrators, usersGroup, profiles, usersDirs, userRights, tasks, taskFolders, services, firewallRules (469),
+listening (24), lab (32), uninstall (33), run, processes, userUninstall (Loginom AI Agent 0.4.0 администратора),
+userClasses, userPrograms, userLocal, userRoaming, excludedPorts (0): same
+freeGB: 45.5 -> 45.4
+```
+
+Остались системные следы, удаление которых требует прав администратора (как в B0.2, B0.4, B3.3):
+
+- Prefetch: `LOGINOM*` ×66, `CHROME.EXE` ×78, `NODE.EXE` ×13, `UNINSTALL LOGINOM…` ×12, `DESKTOP…` ×2, `UN_A.EXE`;
+- журналы событий входа и User Profile Service.
+
+В `C:\ProgramData`, `%PUBLIC%`, `C:\Windows\Temp` после начала работы новое — только
+`C:\ProgramData\regid.1991-06.com.microsoft`: его ведёт Windows.
+
+**Linux.** Сборки, установщики, скачанные Node и браузеры, файл пароля, `node_modules` клиента `loginom-runtime/client`
+удалены. В дереве удалены выходы сборки: `resources/{loginom,icons,loginom-ai-agent-cli*,*.metainfo.xml}`,
+`packages/cli/{dist,.cache}`, `packages/dashboard/dist`, `out/`. `git status --ignored` — только `.husky/_` и
+`node_modules`. В настоящих `~/.local/share` и `~/.config` за время работы изменился только журнал канала `local` в
+`~/.local/share/loginom-ai-agent-dev/log`. Записи в нём в 21:07–21:12 и 22:44–22:58 UTC. В это время на Linux шли
+только мои прогоны на стенде, так что это запуски CLI из исходников другой задачи, как в B4.14b.
