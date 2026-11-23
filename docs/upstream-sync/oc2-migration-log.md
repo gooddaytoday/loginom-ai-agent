@@ -12381,3 +12381,288 @@ and permits a real status retry» (`5798d9f9e0`): после повтора `sta
   и Linux; на Linux ветки `darwin` не исполняются.
 - Тестов манифеста выпуска в v2 нет (`artifact.test.ts` 0.4 — B5.2), `verifyResourceTree` не исполняет ни один тест: путь
   в тексте ошибки проверен только разовым запуском выше и typecheck `loginom-host` и `desktop`.
+
+## B4.5a Упаковка продукта
+
+23.11.2026. Ветка `b45a-desktop-pack` от `oc2-migration` (`324ddef077`), рабочее дерево `.claude/worktrees/b45a`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, 1600 пакетов, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите.
+`packages/cli` и `packages/loginom-agent` (B2.7a4b) не трогал. Эталон 0.4 — `v0.4.0`: `electron-builder.config.ts` с
+тестом, `external-names.test.ts`, `package.json`, `resources/uninstall-uri.nsh`. Основание — В-97 пп. 1, 2, 5.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `6ba028b96a` `feat(desktop): package under the product names, scheme and installer (B4.5a)` | конфиг, манифест, `pack.ts`, `installer.nsh`, тесты; удалён ярлык OpenCode |
+| следующий | этот раздел; CAT-01, CAT-02, CAT-03 в `catalog.md` |
+
+Файлы кода — четыре: `electron-builder.config.ts`, `package.json`, `script/pack.ts`, `resources/windows/installer.nsh`.
+Тесты — `electron-builder.config.test.ts` и `script/windows-installer.test.ts` (+2 строки). Ресурс
+`resources/linux/opencode-desktop.desktop` удалён.
+
+### Пункты задания
+
+| № | Было (v2.3.0) | Стало |
+|---|---|---|
+| 1. Имена | `ai.opencode.desktop[.beta\|.dev]`, `OpenCode[ Beta\| Dev]`; Windows — `OpenCode.exe`; Linux — исполняемый `ai.opencode[.desktop.beta\|…]`, пакеты `opencode[-beta\|-dev]`; артефакт `opencode-desktop-${os}-${arch}.${ext}`; автор `OpenCode <hello@opencode.ai>`, `homepage` `https://opencode.ai` | из `packages/product` по каналу, как в 0.4: `appId` — `Product.channels`; `productName` — `productName(канал)`, на Linux — `productSlug(канал)` (каталог `/opt/loginom-ai-agent[-beta\|-dev]`), отображаемое имя — в `extraMetadata.productName` и `Name` ярлыка `.desktop`; `win.executableName`, `linux.executableName`, `deb`/`rpm.packageName` — slug; `nsis.shortcutName` — имя канала; `artifactName` — `Product.artifactName`; `extraMetadata.name` — `@loginom-ai-agent/desktop`; в манифесте `author` `{ "name": "Loginom" }`, `homepage` `https://loginom.ru/`; `linux.maintainer` `Loginom` |
+| 2. Схема | `protocols` `opencode` (`:175-178`, beta `:240`, prod `:259`) | `{ name: Product.name, schemes: [Product.scheme] }` — `loginom-ai-agent` во всех каналах |
+| 3. Кэш (Р-11) | `pack.ts:76` — из имени пакета `@opencode/desktop`: `@opencodedesktop-updater` | electron-builder и `pack.ts` берут имя из `extraMetadata.name`: `@loginom-ai-agentdesktop-updater`, как у опубликованных установщиков 0.4 (`v0.4.0:packages/desktop/external-names.test.ts`) |
+| 4. Лента | `https://opencode.ai/update/api/{dev,beta,latest}/desktop/opencode/` | `LOGINOM_AI_AGENT_UPDATE_FEED` (без пробелов) или заглушка `https://updates.invalid/`, как в 0.4. Та же переменная задаёт `Product.updateFeed` при сборке: B4.12 включает обновлятор только с ней, без неё он выключен и заглушку не запрашивает |
+| 5. NSIS | `customInstall` — `icacls` и выход из общего каталога; `customUnInstall` — только ступени обновления | `customInstall` последним шагом запускает `"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --verify-resources` и при отказе или ошибке запуска — сообщение, `SetErrorLevel 1`, `Abort` (код 0.4, сообщения `VerifyResources*` на всех языках NSIS, `ru` — перевод 0.4). `customUnInstall` вне обновления: ступени, ключ `HKCU\Software\Classes\loginom-ai-agent`, если его команда ведёт в `$INSTDIR` (макрос 0.4 `removeProtocolKey`), и каталог кэша обновлятора — родитель `$LOCALAPPDATA\${APP_INSTALLER_STORE_FILE}`: копия установщика `installer.exe` и загрузки `pending\` |
+| 6. Встроенный CLI | `opencode-cli(.exe)`, `opencode-cli.version` | без изменений, записано: имя `loginom-ai-agent-cli` (B2.7a) есть у автономного CLI, а файл встроенного CLI пишут `script/utils.ts` и `script/build.ts` и читают `service/desktop-cli.ts`, `service/sidecar-probe.ts` — B4.7. Правка только конфига сломала бы `afterPack` и запуск службы |
+
+`--verify-resources` в главном процессе ещё нет. Установщик ключ вызывает, проверку держит тест конфига (ниже) — как в
+задании:
+
+```text
+$ git grep -n -e verify-resources -e verifyDesktopResources 324ddef077 -- packages/desktop; echo $?
+1                                                         # совпадений нет
+```
+
+План этапа B (раздел B4) требований к B4.5a сверх таблицы B4.1 не добавляет: «ключ протокола `opencode` и кэш
+обновлятора `@opencodedesktop-updater` — под имя продукта», деинсталлятор — по В-97 п. 2; `signIgnore` дашбордов — B4.5b.
+
+### Тесты
+
+`electron-builder.config.test.ts`, таблица каналов с литералами 0.4 (`com.loginom.aiagent[.beta|.dev]`, `Loginom AI Agent[ Beta| Dev]`,
+`loginom-ai-agent[-beta|-dev]`):
+
+- «channel identity for $channel» (переписан): `appId`, `productName` (slug на Linux), `extraMetadata.productName`,
+  `artifactName`, `protocols`, `win.executableName`, `nsis.shortcutName`, лента — заглушка без переменной и адрес из
+  `LOGINOM_AI_AGENT_UPDATE_FEED` с пробелами по краям; `desktopName`, исполняемый Linux без `.desktop`, `Name` и
+  `StartupWMClass` ярлыка, `packageName` deb и rpm; пакеты ставят только metainfo своего канала (было: prod ставит ярлык
+  OpenCode); флаг `_build_id_links` первым в rpm.
+- «the $channel packaging names nothing of OpenCode but the bundled CLI» (новый): каждый ключ и строковое значение JSON
+  конфига без абсолютного пути пакета; совпадения `/opencode/i` (ловит `OpenCode`, `opencode`, `ai.opencode`, `opencode.ai`,
+  `@opencodedesktop-updater`) равны списку исключений — `!resources/opencode-cli*`, `opencode-cli`, `opencode-cli.exe`,
+  `opencode-cli.version` (B4.7).
+- «the $channel installer keeps the 0.4 directory and updater cache names» (новый, из `external-names.test.ts` 0.4):
+  `Packager` и `AppInfo` electron-builder по конфигу канала — каталог установки `@loginom-ai-agentdesktop`, кэш
+  `@loginom-ai-agentdesktop-updater`. Только он видит имя, которое конфиг не называет прямо (пакет из `package.json`).
+- «the installer verifies the installed app, and the uninstaller removes the scheme and updater cache» (новый): текст
+  макросов `nsis.include` — `ExecWait … --verify-resources` после `leaveSharedInstall`, за ним `${If} ${Errors}`,
+  `${If} $0 != 0`, `SetErrorLevel 1`, `Abort`; `customUnInstall` начинается с `${IfNot} ${isUpdated}` и им же
+  заканчивается, внутри — `removeProtocolKey`, `GetParentPath` кэша и `RMDir /r`; ключ в `removeProtocolKey` —
+  `Software\Classes\${Product.scheme}`; сообщения проверки на каждом языке `bundledLanguages` (тест 0.4).
+- Удалён «legacy Linux launcher stays hidden»: ярлык OpenCode больше не ставится, файл удалён.
+- `script/windows-installer.test.ts`, тест прав (только Windows): `customInstall` теперь запускает приложение, поэтому
+  в `app\OpenCode.exe` кладётся заглушка — NSIS-сборка того же стенда с `SetErrorLevel 0`.
+
+```text
+$ cd packages/desktop && bun test electron-builder.config.test.ts script/windows-installer.test.ts
+# база 324ddef077                       # итог 6ba028b96a
+ 11 pass  4 skip  0 fail                 17 pass  4 skip  0 fail      # 4 skip — тесты Windows
+$ bun test electron-builder.config.test.ts --timeout 30000 --rerun-each 10 --randomize
+ 170 pass
+ 0 fail
+Ran 170 tests across 1 file. [2.06s]                      # самый долгий — первый тест AppInfo, 0,79 с (загрузка electron-builder)
+```
+
+### Мутации
+
+Скрипт `<scratchpad>/mutate.sh`: правка `perl` одного файла, `bun test electron-builder.config.test.ts`, возврат из копии;
+после — `git status` по коду чистый.
+
+```text
+=== M1 scheme opencode                                   6 fail  (identity ×3, names ×3)
+=== M2 upstream feed (opencode.ai/update/api/latest)     6 fail  (identity ×3, names ×3)
+=== M3 no package name in extraMetadata                  3 fail  (0.4 directory and updater cache ×3)
+=== M4 package name @opencode/desktop                    6 fail  (names ×3, cache ×3)
+=== M5 appId ai.opencode.desktop                         6 fail
+=== M6 no win.executableName                             3 fail
+=== M7 artifactName opencode-desktop                     6 fail
+=== M8 legacy launcher in prod deb                       2 fail  (identity prod, names prod)
+=== M9 no --verify-resources                             1 fail  (installer)
+=== M10 no Abort                                         1 fail
+=== M11 verify before leaving the shared directory       1 fail
+=== M12 no protocol key removal                          1 fail
+=== M13 no updater cache removal                         1 fail
+=== M14 cache removed on updates too                     1 fail
+=== M15 opencode protocol key                            1 fail
+=== M16 language without verify messages                 1 fail
+```
+
+### NSIS: компиляция на Linux
+
+Установщик на Linux не запустить, но `makensis` electron-builder для Linux есть (`nsis-3.0.4.1`, скачан
+`getMakeNsisPath`). Стенд `<scratchpad>/nsis-check/compile.ts` повторяет обвязку `windows-installer.test.ts` (флаги
+electron-builder, `StdUtils`, только английский) и собирает два варианта: установщик с `customInit`, `customInstall`,
+`customCheckAppRunning`, `customInstallStagedApp` и деинсталлятор (`BUILD_UNINSTALLER`) с `customUnInstall`:
+
+```text
+--- new (6ba028b96a)                     --- base (324ddef077)
+=== installer: exit 0                    === installer: exit 0
+75 warnings:                             (нет)
+=== uninstaller: exit 0                  === uninstaller: exit 0
+75 warnings:                             (нет)
+```
+
+Все 75 — `LangString "appRunning|appClosing|appCannotBeClosed" is not set in language table of language …` (3 строки
+стенда × 25 языков): сообщения проверки заводят таблицы языков, которых стенд не загружает. В сборке electron-builder
+загружены все языки, а строки стенда есть у шаблона на каждом; своих предупреждений у макросов нет. Стенд Windows
+`makensis` зовёт без `-WX`, electron-builder — с `-WX`, поэтому тест языков держит сообщения на всех языках.
+
+### Сборка Linux
+
+`--linux dir` для `prod` во временный каталог scratchpad (`<scratchpad>/linux-build.sh`): `copy-icons.ts prod`;
+вместо встроенного CLI — копия `node` (x64 ELF, `afterPack` требует непустой файл своей архитектуры) и
+`opencode-cli.version` `stand-in`; `bunx electron-vite build` (27 с); `bunx electron-builder --linux dir --x64 --publish never
+--config electron-builder.config.ts -c.directories.output=<tmp>` (33 с; Electron 44.9.1 — архив этой версии был в
+`~/.cache/electron`, журнал сборки пишет `downloaded`, сеть не проверял). Код 0.
+
+```text
+linux-unpacked/loginom-ai-agent                         # исполняемый файл
+linux-unpacked/resources/app-update.yml:
+provider: generic
+url: https://updates.invalid/
+channel: latest
+updaterCacheDirName: '@loginom-ai-agentdesktop-updater'
+asar/package.json: name @loginom-ai-agent/desktop, productName Loginom AI Agent, desktopName com.loginom.aiagent.desktop,
+                   version 2.3.0, homepage https://loginom.ru/, author {name: Loginom}
+```
+
+Поиск по распакованному `app.asar` (`@electron/asar` `extractAll`), `app.asar.unpacked` и `app-update.yml`
+(`<scratchpad>/asar-scan.py`, файл встроенного CLI — заглушка, не искался):
+
+```text
+== OpenCode
+  asar/node_modules: 1 files, 1 hits          # electron-updater: комментарий патча upstream «OpenCode: skip NSIS's CRC check»
+  asar/resources: 2 files, 5 hits             # installer.nsh: комментарий upstream (3); icons/icon.icon/icon.json "name" (2) — B4.6
+  out/main code: 7 files, 48 hits             # класс клиента OpenCode (@opencode/client), тема oc-2, корневой install,
+                                              # английские словари GUI-плагинов (WSL, SSH, pairing — ниже)
+  out/main i18n en/ru: 2 files, 11 hits       # ru: error.* 4, onboarding.* 7 (WSL)
+  out/main i18n other languages: 183 files, 977 hits
+  out/renderer code: 338 files, 2950 hits     # в том числе 2576 карт исходников out/renderer/**/*.map
+  out/renderer i18n en/ru: 4 files, 29 hits   # ru: dialog 2, error 5, onboarding 7, project 4, provider 1, server 2, session 1, settings 5
+  out/renderer i18n other languages: 305 files, 2569 hits
+== opencode-cli
+  out/main code: 2 files, 6 hits              # desktop-cli.ts, sidecar-probe.ts: opencode-cli(.exe), opencode-cli-dev, .version — B4.7
+== ai.opencode
+  (нет)
+== opencode.ai
+  out/main code: 2 files, 5 hits              # корневой install (opencode.ai/v2/install, update/api/latest/cli/npm, docs), $schema темы
+  out/renderer code: 138 files, 154 hits      # console, go, docs, favicon, settings.about.website
+  out/renderer i18n other languages: 62 files, 62 hits
+== @opencodedesktop
+  asar/resources: 1 files, 1 hits             # installer.nsh: комментарий upstream об общем каталоге
+```
+
+Плюс в `resources/` рядом с `app.asar` — файлы `opencode-cli`, `opencode-cli.version` (B4.7). `ai.opencode` нет нигде;
+`opencode.ai` и `@opencodedesktop-updater` в `app-update.yml` нет. Остальное — словари и код `app` (этап C, В-97 п. 8;
+ключи `desktop.*` `en`/`ru` — B4.11), встроенный CLI (B4.7), значки (B4.6). Сборка и распаковка удалены, `out/`,
+`resources/icons`, заглушка CLI — тоже; `git status --ignored packages/desktop` без них.
+
+### Приёмка
+
+`packages/desktop`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0:
+
+```text
+# база 324ddef077
+$ bun typecheck
+✓ No type errors in 3,505 files across 2 projects
+$ bun test --timeout 30000
+ 540 pass  4 skip  0 fail  (544 tests, 69 files)
+# итог 6ba028b96a (и после сборки Linux в этом дереве)
+$ bun typecheck
+✓ No type errors in 3,505 files across 2 projects
+$ bun run typecheck:tsc                                   # код 0
+$ bun test --timeout 30000
+ 546 pass  4 skip  0 fail  (550 tests, 69 files)          # −1 ярлык OpenCode, +3 имена, +3 кэш, +1 установщик
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 481 divergent upstream files       # база 479: +installer.nsh, +удалённый opencode-desktop.desktop
+  CAT-01: 10
+  CAT-02: 54
+  CAT-03: 28                                              # база 26
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0, и на коде, и с этим разделом
+would change: 0 files
+```
+
+```text
+$ bun run check                                                        # код 0, на 6ba028b96a
+Found 558 warnings and 0 errors.                          # как на базе (B1.9)
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,505 files across 2 projects [4.93s]
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` и `oxlint` по изменённым TS-файлам: чисто, кроме двух предупреждений `require-readable-spacing` в
+строках upstream `windows-installer.test.ts` (284 и 288; на базе те же, 282 и 286).
+
+### Каталог
+
+`catalog.json` не менялся: `package.json` — CAT-01, `electron-builder.config*.ts`, `script/**` — CAT-02, `resources/**` —
+CAT-03. В `catalog.md`: CAT-01 — автор и сайт Desktop, имя пакета в упаковке; CAT-02 — упаковка Desktop, проверка тестом
+конфига, «не перенесено» с адресами B4.5b, B4.7, B4.8a, B4.12; CAT-03 — `installer.nsh` и удалённый ярлык, проверка и
+политика. CAT-04 (`pending: B2.7d, B4.1`) не трогал: файлов у записи нет, `pending` снимает B4.12.
+
+### Где решал сам
+
+- **Кэш — имя 0.4, а не по каналу.** «Имя продукта» для Р-11 — `@loginom-ai-agentdesktop-updater`: так его называли
+  опубликованные установщики 0.4 (`external-names.test.ts`). То же имя пакета даёт `APP_FILENAME` `@loginom-ai-agentdesktop`,
+  общий каталог установки каналов 0.4, и `customInit` upstream переносит такую установку в каталог по `appId`. С другим
+  именем перенос не сработал бы, а кэш 0.4 (230 МиБ) не удалил бы ни один деинсталлятор. Цена: каналы делят кэш, как в
+  0.4, и удаление одного канала удаляет копию установщика и загрузки другого — тот скачает обновление целиком.
+- **Имя рабочего пакета `@opencode/desktop` не менял:** его называют фильтры turbo, workflows и `bun.lock`. Имя в упаковке —
+  `extraMetadata.name`, как в 0.4; `pack.ts` берёт его из конфига.
+- **`artifactName` — `Product.artifactName`.** В списке п. 1 его нет, но приёмка требует конфиг без `opencode`, а
+  установщик `opencode-desktop-win-x64.exe` пользователь видит. Product CI `loginom-windows.yml:389` уже ждёт
+  `loginom-ai-agent-win-x64.exe`. Скрипты выпуска upstream ждут `opencode-desktop-*` (ниже).
+- **`linux.maintainer`.** Автор 0.4 — без адреса, и без сопровождающего electron-builder не собирает deb и rpm
+  (`FpmTarget`: `Please specify author 'email'`). В 0.4 — `deb.maintainer`; rpm в v2 тоже есть, поэтому — `linux`.
+- **Ярлык OpenCode удалён, а не оставлен.** Пакеты prod ставили `/usr/share/applications/opencode-desktop.desktop` с
+  `Exec=/opt/OpenCode/ai.opencode`; продукт этим путём не устанавливался. Файл без потребителя маска `resources/**/*`
+  клала бы в `app.asar`.
+- **Проверка — последней в `customInstall`,** после выхода из общего каталога. При отказе повторный запуск установщика
+  ставит в каталог по `appId`; если проверять раньше, старая копия в общем каталоге осталась бы навсегда (`customInit`
+  уже снял её запись удаления). Обновление и так заменяет файлы до проверки.
+- **Кэш удаляется каталогом** (`installer.exe` и `pending\`), только вне обновления: при обновлении новый установщик
+  запущен из `pending\`.
+- **Схема в NSIS — литерал** `loginom-ai-agent`, как в 0.4: NSIS не видит `packages/product`. Тест связывает литерал с
+  `Product.scheme`.
+- **Проверка NSIS — текстом макросов.** `packages/desktop/AGENTS.md` запрещает тесты-поиски по исходникам, но задание
+  отдаёт проверку тесту конфига, а установщик на Linux не запускается. Тест проверяет присутствие и порядок шагов, не
+  отсутствие; поведение на Windows — `windows-installer.test.ts` и SMK (B4.14c).
+- **`windows-installer.test.ts` — тест, не шестой файл кода:** без заглушки его тест прав на Windows краснеет.
+- **`description` манифеста не добавлял** (в 0.4 был): в списке п. 1 его нет. electron-builder пишет «description is
+  missed in the package.json», в том числе в выводе нового теста `AppInfo`.
+- **Заметки об упаковке из `v0.4.0:packages/desktop/AGENTS.md` не переносил:** файла нет в списке задачи. Правило,
+  которое касается этой упаковки, — `productName` на Linux равен slug, `extraMetadata.productName` и `Name` ярлыка —
+  отображаемое имя, «Keep this separation when updating electron-builder», — исполнено в конфиге и держится тестом
+  «channel identity» и записью CAT-02. Остальные заметки — deb и `/opt` 0.1.2, выпуск, macOS, прокси, журналы — к B4.5b,
+  B4.14b и B5. Перенос раздела в модульный `AGENTS.md` — с B4.5b или B6.3.
+
+### Найдено, не чинил
+
+- **Установщик до B4.8a запустит окно.** Пока главный процесс не знает `--verify-resources`, `ExecWait` запускает
+  приложение как обычно и ждёт его закрытия; установка завершится, когда пользователь закроет окно. Установщик Windows
+  для людей — только после B4.8a.
+- **deb и rpm до B4.6 не соберутся.** `fpm` ставит `resources/com.loginom.aiagent*.metainfo.xml`, а
+  `script/copy-metainfo.ts` пишет `resources/ai.opencode.desktop*.metainfo.xml` (по коду; `--linux dir` fpm не вызывает).
+- **Скрипты выпуска upstream** ждут `opencode-desktop-*`: `.github/release/{publish-desktop,sign-desktop-macos,render-winget,publish-github-release}.sh`,
+  `.github/workflows/release.yml:458` (`opencode-desktop-mac-*.app.tar` от `pack.ts`). Продукт ими не выпускается — B5.1.
+- **Обновлятор до B4.12** читает `app-update.yml` и обращается к `https://updates.invalid/` (домен `.invalid` не
+  разрешается); прочие адреса `gui-plugins/src/updater` — B4.12.
+- **Адреса opencode.ai в главном процессе.** `service/desktop-cli.ts:8` встраивает корневой скрипт `install`
+  (`import installer from "../../../../../install?raw"`) с `https://opencode.ai/v2/install`,
+  `https://opencode.ai/update/api/latest/cli/npm` (`install:179`) и `https://opencode.ai/docs`. Desktop запускает его
+  только с `--binary <встроенный CLI>` (`desktop-cli.ts:200`), а с `--binary` скрипт ничего не скачивает (`install:72-73`),
+  так что запроса нет — есть только текст в `app.asar`. Тексты `install` — B2.7a8, установка CLI из Desktop — B4.7.
+- **`OpenCode` в английских словарях GUI-плагинов**, которые B4.11 не трогала (она — `desktop.*` и обновлятор):
+  `gui-plugins/src/{wsl,details,pairing,terminal,ssh,browser}/i18n/en.ts` — 10, 7, 4, 3, 1, 1 строк (WSL «Updating
+  OpenCode…», `error.opencodeNotInstalled`, `screenActive.description`, сервер pairing и SSH); `ru` — `wsl` 10, `ssh` 1.
+  Пользователь английского и русского интерфейса видит их в WSL, SSH и сопряжении. Задачи нет — владельцу.
+- `@electron/rebuild` (`npmRebuild` по умолчанию) при сборке Linux пересобрал нативные зависимости в `node_modules` этого
+  дерева; тесты после этого — те же 546/4/0. `npmRebuild: false` — B4.5b.
+
+### Не проверено
+
+- Установщик Windows не собирался и не запускался: проверка ресурсов, `Abort`, снятие ключа схемы и удаление кэша — по
+  тексту макросов, компиляции `makensis` на Linux и коду 0.4; тесты `windows-installer.test.ts` (и новая заглушка) на
+  Linux пропускаются. Каталог установки `%LOCALAPPDATA%\Programs\com.loginom.aiagent` и перенос из
+  `@loginom-ai-agentdesktop` — по коду `customInit` и `AppInfo`.
+- macOS, AppImage, deb и rpm не собирались; Linux — только `--linux dir` с заглушкой CLI.
+- Регистрация схемы в ОС и запись «Установленные приложения» — SMK B4.14c.
