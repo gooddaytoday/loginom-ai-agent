@@ -91,7 +91,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Loginom AI Agent (B3.1b): a 0.3.9/0.4 database at this path is migrated before v2 opens it, or the start fails.
       const { LegacyMigrate } = yield* Effect.promise(() => import("@opencode/server/legacy-migrate"))
       yield* LegacyMigrate.guard(databasePath(global.data))
-      // Loginom AI Agent (B2.7a2): a built product CLI takes its resources from next to its binary.
+      // Loginom AI Agent (B2.7a2, B2.7a2b): a built product CLI takes the resources next to its binary, or stops here.
       if (profile) yield* CliResources.apply()
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
