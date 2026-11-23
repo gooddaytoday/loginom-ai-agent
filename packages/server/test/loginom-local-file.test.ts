@@ -498,12 +498,12 @@ describe("loginom local file admission (B2.5a)", () => {
     timeout,
   )
 
-  // 0.4 bound an attachment to a receipt (`stable` re-verified it after authorization, `changed` failed on it). OpenCode
-  // 2 keeps the attached file's URI as its source and has no field for a receipt: those two checks wait for B2.5d. The
-  // file the user attached authorizes without asking; a missing file and a deny rule still fail. `other` and `env` are
-  // new: the attachment authorizes only its own file, and the rules-only check of a file the build agent would ask
-  // about (`*.env`) asks nothing either.
-  for (const mode of ["stable", "deleted", "deny", "other", "env"] as const)
+  // 0.4 bound an attachment to a receipt: `stable` re-verified it after authorization, `changed` failed on it. On
+  // OpenCode 2 the module takes the receipt itself when the prompt is admitted (B2.5d). The file the user attached
+  // authorizes without asking; a changed or missing file and a deny rule fail. `other` and `env` are new: the
+  // attachment authorizes only its own file, and the rules-only check of a file the build agent would ask about
+  // (`*.env`) asks nothing either.
+  for (const mode of ["stable", "changed", "deleted", "deny", "other", "env"] as const)
     it.live(
       `attachment authorization: ${mode}`,
       () =>
@@ -518,22 +518,41 @@ describe("loginom local file admission (B2.5a)", () => {
           // `env` keeps only the build agent's rules, so a `*.env` read would ask.
           const ctx = yield* test.call(mode === "env" ? yield* test.create([]) : undefined)
           yield* test.prompt(ctx.sessionID, script({ text: "attached" }), [{ uri: pathToFileURL(file).href }])
+          if (mode === "changed") yield* Effect.promise(() => fs.writeFile(file, "amount\n999\n"))
           if (mode === "deleted") yield* Effect.promise(() => fs.rm(file))
           if (mode === "deny")
             yield* test.sessions.setPermissions({
               sessionID: ctx.sessionID,
               permissions: [{ action: "read", resource: "*", effect: "deny" }],
             })
-          const error = yield* rejected(() => test.files.authorize(mode === "other" ? other : file, ctx))
+          const authorized = yield* Effect.promise(() =>
+            test.files.authorize(mode === "other" ? other : file, ctx).then(
+              (value) => ({ value, error: undefined }),
+              (error: unknown) => ({ value: undefined, error }),
+            ),
+          )
           // Attached input never asks again; another file does.
           expect(test.asked(ctx.sessionID)).toEqual(mode === "other" ? ["read"] : [])
-          if (mode === "stable" || mode === "other" || mode === "env") {
-            expect(error).toBeUndefined()
+          if (mode === "stable") {
+            if (!authorized.value) throw authorized.error
+            // The receipt is checked again before admission: a change after authorization fails it.
+            const verify = authorized.value.verifyAttachment
+            expect(yield* rejected(verify)).toBeUndefined()
+            yield* Effect.promise(() => fs.writeFile(file, "after authorization"))
+            expect(message(yield* rejected(verify))).toContain("LOGINOM_FILE_CHANGED")
             return
           }
-          expect(error).toBeDefined()
-          expect(message(error)).toContain(
-            { deleted: "LOGINOM_FILE_NOT_FOUND", deny: "LOGINOM_FILE_ACCESS_DENIED" }[mode],
+          if (mode === "other" || mode === "env") {
+            expect(authorized.error).toBeUndefined()
+            return
+          }
+          expect(authorized.error).toBeDefined()
+          expect(message(authorized.error)).toContain(
+            {
+              changed: "LOGINOM_FILE_CHANGED",
+              deleted: "LOGINOM_FILE_NOT_FOUND",
+              deny: "LOGINOM_FILE_ACCESS_DENIED",
+            }[mode],
           )
         }).pipe(Effect.provideService(Flag.Overrides, undefined)),
       timeout,
