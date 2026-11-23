@@ -6,7 +6,7 @@ import path from "node:path"
 import { ReadStream } from "node:tty"
 import { LOGINOM_AI_AGENT_VERSION } from "./version"
 
-export const INTERACTIVE_INPUT_ERROR = "opencode mini requires a controlling terminal for input"
+export const INTERACTIVE_INPUT_ERROR = "loginom-ai-agent-cli mini requires a controlling terminal for input"
 
 export type InteractiveStdin = {
   stdin: NodeJS.ReadStream

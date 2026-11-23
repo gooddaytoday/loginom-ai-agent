@@ -42,7 +42,7 @@ export const run = Effect.fnUntraced(function* (input: {
     Effect.catchCause((cause) =>
       Cause.hasInterruptsOnly(cause)
         ? Effect.failCause(cause)
-        : Effect.logError("remote access tunnel stopped; run `opencode service set remote true` to retry", { cause }),
+        : Effect.logError("remote access tunnel stopped; run `loginom-ai-agent-cli service set remote true` to retry", { cause }),
     ),
   )
 })
