@@ -346,7 +346,7 @@ function api(base: string, directory: string, password: string) {
     const response = await fetch(new URL(route, base), {
       method,
       headers: {
-        authorization: `Basic ${btoa(`opencode:${password}`)}`,
+        authorization: `Basic ${btoa(`loginom-ai-agent:${password}`)}`,
         "content-type": "application/json",
         "x-opencode-directory": encodeURIComponent(directory),
       },

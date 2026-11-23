@@ -225,7 +225,7 @@ it.live("elects one scheduler leader when two server processes boot against a du
     const base = `http://127.0.0.1:${"port" in first.address ? first.address.port : 0}`
     const api = OpenCode.make({
       baseUrl: base,
-      headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+      headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
     })
 
     yield* Effect.promise(async () => {

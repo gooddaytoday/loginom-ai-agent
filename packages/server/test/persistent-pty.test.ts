@@ -32,14 +32,14 @@ smoke(
         fs: { filewatcher: false },
       })
       const base = HttpServer.formatAddress(server.address)
-      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("opencode:secret")}` } })
+      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } })
       const sessionID = "ses_terminal_read"
       expect(yield* Effect.promise(() => client.experimental.persistentPty.read({ sessionID }))).toBeNull()
       expect(existsSync(fixture.directory)).toBeFalse()
       yield* Effect.promise(async () => {
         for (const lines of ["0", "-1", "1.5", "65536", "nope"]) {
           const response = await fetch(`${base}/api/experimental/session/${sessionID}/terminal/read?lines=${lines}`, {
-            headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+            headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
           })
           expect(response.status).toBe(400)
           await response.arrayBuffer()
@@ -148,7 +148,7 @@ smoke(
         fs: { filewatcher: false },
       })
       const base = HttpServer.formatAddress(server.address)
-      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("opencode:secret")}` } })
+      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } })
       const sessionID = Session.ID.make("ses_persistent_pty_rename")
       const terminal = yield* Effect.promise(() =>
         client.experimental.persistentPty.create({
@@ -196,7 +196,7 @@ smoke(
       const missing = yield* Effect.promise(async () => {
         const response = await fetch(new URL("/api/experimental/persistent-pty/pty_persistent_1", base), {
           method: "PUT",
-          headers: { authorization: `Basic ${btoa("opencode:secret")}`, "content-type": "application/json" },
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}`, "content-type": "application/json" },
           body: JSON.stringify({ title: "nope" }),
         })
         await response.arrayBuffer()
@@ -238,7 +238,7 @@ it.live("renames without a feature check and hides unknown terminals", () =>
 
     const missing = yield* Effect.promise(async () => {
       const response = await fetch(new URL("/api/experimental/persistent-pty/pty_persistent_99", base), {
-        headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+        headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
       })
       await response.arrayBuffer()
       return response.status
@@ -286,7 +286,7 @@ smoke(
         const response = yield* Effect.promise(async () => {
           const response = await fetch(new URL(createPath, base), {
             method: "POST",
-            headers: { authorization: `Basic ${btoa("opencode:secret")}`, "content-type": "application/json" },
+            headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}`, "content-type": "application/json" },
             body: JSON.stringify({ command: "/bin/sh", args: [], cwd, title: "invalid", env: {} }),
           })
           return { status: response.status, body: await response.json() }
@@ -662,7 +662,7 @@ function request(base: string, method: string, pathname: string, body?: unknown,
       const response = await fetch(new URL(pathname, base), {
         method,
         headers: {
-          authorization: `Basic ${btoa("opencode:secret")}`,
+          authorization: `Basic ${btoa("loginom-ai-agent:secret")}`,
           ...headers,
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
@@ -680,7 +680,7 @@ function request(base: string, method: string, pathname: string, body?: unknown,
 
 async function openEventStream(base: string) {
   const response = await fetch(new URL("/api/event", base), {
-    headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+    headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
   })
   if (!response.ok || !response.body) throw new Error(`Persistent PTY event stream failed (${response.status})`)
   const reader = response.body.getReader()

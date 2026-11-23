@@ -49,7 +49,7 @@ it.live("integration policy filters /connect and blocks denied integrations and 
           new Request(url, {
             method,
             headers: {
-              authorization: `Basic ${btoa("opencode:secret")}`,
+              authorization: `Basic ${btoa("loginom-ai-agent:secret")}`,
               ...(body === undefined ? {} : { "content-type": "application/json" }),
             },
             body: body === undefined ? undefined : JSON.stringify(body),

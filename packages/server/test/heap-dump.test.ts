@@ -7,7 +7,7 @@ import { tmpdir } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServerFetch } from "../src/fetch"
 
-const authorization = `Basic ${btoa("opencode:secret")}`
+const authorization = `Basic ${btoa("loginom-ai-agent:secret")}`
 
 const server = Effect.fnUntraced(function* (root: string) {
   const log = path.join(root, "log")

@@ -1,5 +1,6 @@
 export * as SidecarCredentials from "./sidecar-credentials"
 
+import { ServerUsername } from "@opencode/schema/server-username"
 import type { ServerReadyData } from "../../shared/ipc-contract"
 
 export type Data = ServerReadyData & { password: string | null }
@@ -38,5 +39,5 @@ export function authorization(sidecar: Data | undefined, url: string) {
 
   if (new URL(url).origin !== sidecar.url) return
 
-  return `Basic ${Buffer.from(`opencode:${sidecar.password}`).toString("base64")}`
+  return `Basic ${Buffer.from(`${ServerUsername.current()}:${sidecar.password}`).toString("base64")}`
 }

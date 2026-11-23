@@ -70,7 +70,7 @@ it.live("handler spans nest under their request, not under server startup", () =
     const response = yield* Effect.promise(() =>
       fetch(new URL("/api/session", HttpServer.formatAddress(server.address)), {
         method: "POST",
-        headers: { authorization: `Basic ${btoa("opencode:secret")}`, "content-type": "application/json" },
+        headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}`, "content-type": "application/json" },
         body: JSON.stringify({ title: "Traced" }),
       }),
     )

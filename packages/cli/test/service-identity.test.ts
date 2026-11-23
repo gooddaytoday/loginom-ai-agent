@@ -122,7 +122,7 @@ async function expectOwnServices(services: Awaited<ReturnType<typeof start>>[], 
     const info = infos[index]
     expect(info.pid).toBe(service.child.pid)
     const answer = await fetch(new URL("/api/info", info.url), {
-      headers: { authorization: "Basic " + btoa(`opencode:${info.password}`) },
+      headers: { authorization: "Basic " + btoa(`loginom-ai-agent:${info.password}`) },
     }).then((response) => response.json())
     expect(answer).toMatchObject({ pid: service.child.pid })
     // The service password sits in the service's config file and its registration; only the user may read either.

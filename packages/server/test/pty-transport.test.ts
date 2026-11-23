@@ -29,7 +29,7 @@ live(
         fs: { filewatcher: false },
       })
       const base = HttpServer.formatAddress(server.address)
-      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("opencode:secret")}` } })
+      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } })
       const location = { directory }
       const terminal = yield* Effect.acquireRelease(
         Effect.promise(() =>
@@ -147,7 +147,7 @@ live(
         fs: { filewatcher: false },
       })
       const base = HttpServer.formatAddress(server.address)
-      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("opencode:secret")}` } })
+      const client = OpenCode.make({ baseUrl: base, headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } })
       const location = { directory }
       yield* Effect.promise(async () => {
         const terminal = await client.pty.create({

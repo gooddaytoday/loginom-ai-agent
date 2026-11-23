@@ -3,7 +3,7 @@ export * as PtyHandoff from "./pty-handoff.js"
 import type { PersistentPty } from "@opencode/schema/persistent-pty"
 import { readFile, rename, rm, writeFile } from "node:fs/promises"
 import type { Info } from "./service.js"
-import { headers } from "./service-probe.js"
+import { headers, username } from "./service-probe.js"
 
 type Sidecar = {
   readonly source: Pick<Info, "id" | "pid" | "url">
@@ -23,7 +23,7 @@ export async function prepare(file: string, info: Info, timeout: number) {
     baseUrl: info.url,
     headers: headers({
       url: info.url,
-      auth: info.password === undefined ? undefined : { type: "basic", username: "opencode", password: info.password },
+      auth: info.password === undefined ? undefined : { type: "basic", username: username(), password: info.password },
     }),
   })
   const handoff = await client.experimental.persistentPty

@@ -213,7 +213,7 @@ it.live("serves the HttpApi and enforces Basic auth like the Node server", () =>
     const response = yield* Effect.promise(() =>
       handler(
         new Request("http://opencode.local/api/info", {
-          headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
         }),
       ),
     )
@@ -290,7 +290,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
           const response = yield* Effect.promise(() =>
             handler(
               new Request("http://opencode.local/api/info", {
-                headers: { origin, authorization: `Basic ${btoa("opencode:secret")}` },
+                headers: { origin, authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
               }),
             ),
           )
@@ -301,7 +301,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
             handler(
               new Request("http://opencode.local/api/experimental/persistent-pty/pty_missing/connect-token", {
                 method: "POST",
-                headers: { origin, authorization: `Basic ${btoa("opencode:secret")}`, "x-opencode-ticket": "1" },
+                headers: { origin, authorization: `Basic ${btoa("loginom-ai-agent:secret")}`, "x-opencode-ticket": "1" },
               }),
             ),
           )
@@ -332,7 +332,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
           const connect = yield* Effect.promise(() =>
             handler(
               new Request("http://opencode.local/api/pty/pty_missing/connect", {
-                headers: { origin, authorization: `Basic ${btoa("opencode:secret")}` },
+                headers: { origin, authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
               }),
             ),
           )
@@ -341,7 +341,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
           const persistentConnect = yield* Effect.promise(() =>
             handler(
               new Request("http://opencode.local/api/experimental/persistent-pty/pty_missing/connect?cursor=-1", {
-                headers: { origin, authorization: `Basic ${btoa("opencode:secret")}` },
+                headers: { origin, authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
               }),
             ),
           )
@@ -352,7 +352,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
     const loaded = yield* Effect.promise(() =>
       handler(
         new Request("http://opencode.local/api/debug/location", {
-          headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
         }),
       ).then((response) => response.json()),
     )
@@ -363,7 +363,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
         new Request("http://opencode.local/api/pty", {
           method: "POST",
           headers: {
-            authorization: `Basic ${btoa("opencode:secret")}`,
+            authorization: `Basic ${btoa("loginom-ai-agent:secret")}`,
             "content-type": "application/json",
           },
           body: JSON.stringify({ command: process.execPath, args: ["-e", "setInterval(() => {}, 1000)"] }),
@@ -375,7 +375,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
         new Request(`http://opencode.local/api/pty/${created.data.id}/connect-token`, {
           method: "POST",
           headers: {
-            authorization: `Basic ${btoa("opencode:secret")}`,
+            authorization: `Basic ${btoa("loginom-ai-agent:secret")}`,
             "x-opencode-ticket": "1",
           },
         }),
@@ -385,7 +385,7 @@ it.live("applies custom CORS origins to HTTP responses and PTY ticket checks", (
       handler(
         new Request(`http://opencode.local/api/pty/${created.data.id}`, {
           method: "DELETE",
-          headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
         }),
       ),
     )

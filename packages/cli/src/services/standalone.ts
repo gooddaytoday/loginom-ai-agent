@@ -1,3 +1,4 @@
+import { ServerUsername } from "@opencode/schema/server-username"
 import { CrossSpawnSpawner } from "@opencode/util/cross-spawn-spawner"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Deferred, Effect, Fiber, Schema, Stream } from "effect"
@@ -79,7 +80,7 @@ const makeEndpoint = Effect.fn("cli.standalone.endpoint")(
     const ready = yield* Effect.tryPromise(() => decodeReady(output))
     return {
       url: ready.url,
-      auth: { type: "basic" as const, username: "opencode", password },
+      auth: { type: "basic" as const, username: ServerUsername.current(), password },
       pid: proc.pid,
       exited: proc.exitCode,
     }
