@@ -90,7 +90,7 @@ function fixture(
     const paths: Array<string | undefined> = []
     const manifest = path.join(modules, ...name.split("/"), "package.json")
     const updater = yield* Updater.Service.pipe(
-      Effect.provide(Updater.layer),
+      Effect.provide(Updater.upstreamLayer),
       Effect.provide(
         LayerNode.compile(EffectFlock.node, {
           replacements: [Global.node.replace(Layer.succeed(Global.Service, global))],
@@ -258,6 +258,8 @@ it.live("npm upgrades fail when the running copy keeps its old version", () =>
     expect(error.message).toBe(
       `npm reported success, but ${yield* test.fs.realPath(test.executable)} is still version 2.2.7.`,
     )
+    // Loginom AI Agent (B2.7d): the updater's messages name the product command.
+    expect(error).toMatchObject({ retry: expect.stringMatching(/, then run loginom-ai-agent-cli upgrade again\.$/) })
   }),
 )
 
