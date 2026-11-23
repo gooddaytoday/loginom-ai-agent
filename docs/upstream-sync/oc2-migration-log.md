@@ -14336,3 +14336,152 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Поиск значков OpenCode — по файлам: SVG в коде компонентов и ресурсы, встроенные Vite как `data:`, он не видит
   (знаки `logo.tsx` — в «Найдено»).
 - Значок веб-уведомлений в браузере не смотрел: строка `web.ts`, файл в `app/public` и тест его байтов.
+
+## B4.6b Значок окна, категория, заставка
+
+23.11.2026. Ветка `b46b-icons-rest` от `oc2-migration` (`9b948ce975`, B4.6 влит), рабочее дерево `.claude/worktrees/b46b`.
+Задача оркестратора по паритету с `v0.4.0`: значок окна установленной сборки, категория Linux, знак на заставке запуска.
+Bun 1.4.4 и Node 24.19.0 — первыми в `PATH` только для своих команд; `bun install --frozen-lockfile` — код 0, `.husky/_`
+есть; база тестов — в этом дереве до правок. `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите.
+Настоящая модель не вызывалась: приложение не запускалось.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `5eaa602d66` `feat(desktop): ship the window icons and the 0.4 Linux category (B4.6b)` | `electron-builder.config.ts` (+6 −1), тест конфига |
+| `ae699ed0e2` `fix(ui): draw the product mark on the startup splash (B4.6b)` | `ui/src/components/logo.tsx` (+4 −3), `ui/src/assets/loginom/loginom-icon.svg` (файл 0.4), строка генератора, тест заставки |
+| следующий | этот раздел; `catalog.md` (CAT-02, CAT-10) |
+
+Файлов кода пять: `electron-builder.config.ts`, `electron-builder.config.test.ts`, `ui/src/components/logo.tsx`,
+`desktop/scripts/generate-icons.ts` (+3 −2), `app/test-browser/logo-splash.test.ts` (новый). Ресурс —
+`loginom-icon.svg` 0.4 (тот же блоб, что `apps/loginom-site/assets/loginom-icon.svg`).
+
+### Пункты
+
+| № | 0.4 (`v0.4.0`) | v2 (`9b948ce975`) | Стало |
+|---|---|---|---|
+| 1. Значок окна | `extraResources` `{ from: "resources/icons", to: "icons" }`; `setDockIcon` пропускал установленное приложение (`645da9ebfd`) | `windows/early.ts:86` и `windows/appearance.ts:152` берут `process.resourcesPath/icons/icon.{png,ico}`, а туда ничего не кладётся; `setDockIcon` без проверки `isPackaged` молчит только потому, что `dock.png` нет | `{ from: "resources/icons", to: "icons", filter: ["**/*", "!dock.png"] }` |
+| 2. Категория Linux | `Office` | `Development` | `Office` |
+| 3. Заставка запуска | `Splash` из `ui/logo.tsx` — `<image href={loginom-icon.svg}>` (`645da9ebfd`); заставка в `desktop/src/renderer/index.tsx:362` | `Splash` — знак OpenCode путями SVG; заставка — `desktop/src/renderer/startup/splash.tsx:60` | `Splash` — `<image href={icon}>` из `ui/src/assets/loginom/loginom-icon.svg`, `viewBox` 1024; правка `ui` — 4 строки |
+
+**`dock.png` не кладётся — отступление от буквы 0.4.** 0.4 клал весь каталог и добавлял в `setDockIcon` проверку
+`app.isPackaged`; без неё запись 0.4 заменила бы в Dock установленного приложения ICNS пакета на `dock.png`. Проверка —
+шестой файл кода (`windows/appearance.ts`), поэтому взял фильтр: поведение то же, что в 0.4, — установленное приложение
+`dock.png` не ставит (`nativeImage` пустой, и `setDockIcon` ничего не меняет). `scripts/release/manifest.ts:222` 0.4 ждёт
+`resources/icons/icon.ico` в артефакте Windows — теперь он там будет.
+
+**Категория macOS** (`public.app-category.developer-tools` в v2, `productivity` в 0.4) — не в задании, не менял.
+
+### Тесты
+
+- `electron-builder.config.test.ts`: «shared packaging defaults» — `extraResources` с записью значков; «the $channel
+  packaging icons are in the staged 0.4 icon set» (×3) — запись `to: "icons"` одна, и `FileMatcher` electron-builder по
+  её `from` и `filter` на настоящем наборе `copyIcons` отдаёт `icon.png`, `icon.ico`, `linux/512x512.png` и не отдаёт
+  `dock.png`; Linux-таблица каналов (переименована в «declare the 0.4 category and depends, rebuild nothing») —
+  `category` `Office`.
+- `app/test-browser/logo-splash.test.ts` (новый): настоящий `Splash`, скомпилированный `babel-preset-solid`, как в
+  `project-avatar-hover.test.ts` (общий hyperscript-preload на `logo.tsx` и до правки падает `ReferenceError` рантайма JSX),
+  в happy-dom: путей нет, `href` картинки — `loginom-icon.svg`, и её текст равен
+  `apps/loginom-site/assets/loginom-icon.svg`. `bun test` отдаёт на импорт `.svg` путь к файлу.
+- `bun scripts/generate-icons.ts --check` — `Verified 98 icon assets` (97 + копия в `ui`).
+
+Мутации (`<scratchpad>/b46b/mut/mutate.py`: одна правка, тест конфига и тест заставки, `git checkout HEAD`; после —
+`git status` пуст):
+
+```text
+=== M0 none: config 27 pass / 0 fail; splash 1 pass / 0 fail
+=== M1 no icons next to app.asar (v2): config 23 pass / 4 fail        # shared defaults; значки упаковки ×3
+=== M2 dock.png ships too: config 23 pass / 4 fail                     # то же
+=== M3 only the Linux sizes ship: config 23 pass / 4 fail              # то же
+=== M4 icons beside app.asar, not in icons/: config 23 pass / 4 fail   # то же
+=== M5 Linux category Development (v2): config 24 pass / 3 fail        # Linux ×3
+=== M6 Splash is the OpenCode mark (v2): splash 0 pass / 1 fail
+=== M7 splash asset is the OpenCode favicon: splash 0 pass / 1 fail
+=== M8 Splash draws another asset: splash 0 pass / 1 fail
+```
+
+### Сборка `--linux dir`
+
+`<scratchpad>/b46b/build.sh` на `ae699ed0e2`, канал `dev`, umask `0077`, источники Node и Chromium — как в B4.8a: CLI
+(17 с), `bun run build` (34 с), `bunx electron-builder --linux dir --x64 --publish never` (30 с); все шаги — код 0.
+
+```text
+== resources/icons beside app.asar
+755 icons
+644 icons/icon.icns
+644 icons/icon.ico
+644 icons/icon.png
+755 icons/linux
+644 icons/linux/{16x16,24x24,32x32,48x48,64x64,96x96,128x128,256x256,512x512}.png
+== equal to icons/dev: icon.png, icon.ico, linux/512x512.png
+== whole tree: entries without o+r: 0
+== renderer (app.asar/out/renderer/assets/main-*.js)
+<svg data-component=logo-splash viewBox="0 0 1024 1024" …><image width=1024 height=1024>   # шаблон Splash
+z(n,`href`,E6t)        # E6t — data:image/svg+xml, 2067 символов: Vite встроил SVG в 1 699 байт;
+                       # после раскодирования равен loginom-icon.svg с точностью до кавычек и пробелов
+path "M60 80H20V40H60V80Z" (знак OpenCode на заставке): не найден
+```
+
+Значок окна приложение находит по коду: в установленной сборке `app.isPackaged`, `iconsDir` —
+`process.resourcesPath/icons` (`appearance.ts:151-157`, `early.ts:86`), файл — `icon.png` на Linux и macOS и `icon.ico`
+на Windows; оба лежат в `resources/icons` рядом с `app.asar`. Приложение не запускал. `Categories=Office` в ярлыке
+`--linux dir` не проверить (ярлык пишут deb и AppImage), проверено тестом конфига. Сборка, `out/`,
+`resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`, `packages/dashboard/dist`
+удалены; `git status --ignored` — только `.husky/_` и `node_modules`.
+
+### Приёмка
+
+База — `9b948ce975`, итог — `ae699ed0e2`, `<scratchpad>/b46b/run-tests.sh`.
+
+| Команда | `9b948ce975` | `ae699ed0e2` |
+|---|---|---|
+| `desktop`: `bun typecheck` | 3 519 файлов, ошибок нет | то же |
+| `desktop`: `bun test --timeout 30000` | 573 pass, 4 skip, 0 fail (577, 74 файла) | 573 pass, 4 skip, 0 fail (577, 74); expect 2 218 → 2 236 |
+| `app`: `bun typecheck` | 2 391 файл, ошибок нет | то же |
+| `app`: `bun run test` | unit 2 719 pass; browser 360 pass (58 файлов) | unit 2 719 pass; browser 361 pass (59): +1 заставка |
+| `ui`: `bun typecheck` | 264 файла, ошибок нет | то же |
+| `ui`: `bun test src` | 620 pass, 0 fail | 620 pass, 0 fail |
+
+Временный `tsconfig` с конфигом, его тестом и генератором (`tsc --noEmit`, удалён): две ошибки базы (B4.5b), новых нет.
+`prettier --check` по пяти файлам — чисто; `oxlint` — те же два `prefer-effect-match` генератора (B4.6).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary         # код 0
+against a6b15d33daf6: 544 divergent upstream files                    # база 543: +ui/src/components/logo.tsx (CAT-10)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+```
+
+```text
+$ bun run check                                                       # код 0, на ae699ed0e2 с этим разделом
+Found 554 warnings and 0 errors.                                      # в файлах B4.6b — только два генератора (B4.6)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`catalog.json` не менялся. `catalog.md`: CAT-02 — значки рядом с `app.asar` без `dock.png`, категория, проверка; CAT-10 —
+`Splash` и тест заставки.
+
+### Осталось от бренда OpenCode в Desktop (не здесь)
+
+- **B4.11d:** 12 файлов бренда OpenCode из `app/public` в `app.asar/out/renderer` (`favicon{,-v3}.{ico,svg}`,
+  `favicon-96x96{,-v3}.png`, `apple-touch-icon{,-v3}.png`, `web-app-manifest-{192x192,512x512}.png`,
+  `social-share{,-zen}.png`) и ссылки на них в `desktop/src/renderer/index.html` (0.4 ссылался на `loginom-favicon-*`);
+  аватар проекта OpenCode с `https://opencode.ai/favicon.svg` (`ui/src/data-display/project-avatar/project-avatar.tsx:83`).
+- **B4.12:** значок уведомлений Desktop с `https://opencode.ai/favicon-96x96-v3.png`
+  (`desktop/src/renderer/platform/notifications.ts:18`).
+- **Тот же `logo.tsx`:** `Mark` (знак OpenCode; `app/src/runtime/plugin/side-region.tsx:444`; 0.4 его тоже заменил) и
+  `Logo` (страница ошибки, B4.11d).
+- **Заставка первого запуска** (`startup/splash.tsx:82`) рисует `Wordmark` из `ui/src/typography/wordmark` — слово
+  «opencode» путями SVG. Её видят на свежей установке: пока в настройках нет `FIRST_LAUNCH_ONBOARDING_COMPLETE_KEY`
+  (`main/windows/bootstrap.ts`) и адрес — `/` (`selectFirstLaunchSplash`, `startup/machine.ts:435`); `Splash` —
+  при остальных запусках. В 0.4 такой заставки не было; слово-знак нового чата — этап C (CAT-10).
+- **`ui/package.json` `files`** без `src/assets/loginom/*` (0.4 добавлял): форк `@opencode/ui` не публикует, сборку
+  Desktop это не задевает.
+
+### Не проверено
+
+- Значок окна на живом окне (Linux, Windows) и Dock установленного приложения на macOS: приложение не запускалось,
+  macOS и Windows не собирались.
+- `Categories=Office` в ярлыке deb и AppImage — только тест конфига.
