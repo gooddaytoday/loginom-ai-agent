@@ -8568,3 +8568,201 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   умолчания для их действий — через API.
 - `explore` проверен запросами API от его имени (`agent: "explore"`), не через инструмент `subagent`.
 - Тесты `tui`, `desktop`, `simulation`, `sdk`.
+
+## B2.6a2 Каталоги продукта, расписание, S2
+
+22.11.2026. Ветка `b26a2-followup` от `oc2-migration` (`ca4fddcbe6`: B2.6a, B2.7c, B2.7a1 поверх B2.5d), рабочее дерево
+`.claude/worktrees/b26a`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile` — без изменений, `.husky/_` есть; клиент `packages/loginom-runtime/client` — `npm ci
+--ignore-scripts` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Задание — три
+части по итогам B2.6a: узкие разрешения чтения каталогов продукта вне проекта, проверки `run` расписания выключены всегда,
+причина нестабильного `S2 synthetic wake`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `e66133f8bb` `feat(loginom-agent): own directories readable outside the project; schedule run checks never run (B2.6a2)` | `ownRead` и запрет проверки расписания в `packages/loginom-agent/src/permissions.ts`, каталоги и инструмент вызова в `src/index.ts`; тесты `packages/loginom-agent/test/permissions.test.ts`, `packages/server/test/loginom-permissions.test.ts`, случай в `loginom-dock-catalog.test.ts`; тест upstream `packages/server/test/schedule.test.ts` |
+| `5c088e20ac` `fix(loginom-agent): an execution takes its Host lease at its first step boundary` | аренда в хуке `context` (`src/index.ts`); `packages/server/test/loginom-host-lease.test.ts` |
+| следующий | этот раздел, CAT-05 и CAT-07 в `catalog.md` |
+
+### 1. Каталоги продукта вне проекта
+
+Без вопроса «вне проекта» агент читает три каталога: `<data>/tool-output` (полный текст большого результата: туда его
+кладут урезание ядра и `dock.ts`), `<LOGINOM_AI_AGENT_RESOURCES>/skills` (файлы встроенных навыков, каталог B2.4) и
+`~/.loginom-ai-agent/plan` (планы режима `plan`, тот же путь, что в `core/src/plugin/plan.ts`). Пути — `Global.Path` пакета
+`util`, как у `file-profiles` и `dock.ts`.
+
+- Снимается только вопрос `external_directory` инструментов чтения — `read`, `glob`, `grep` (`ownRead`), и только если
+  каждый его ресурс (`<каталог>/*`, как называет `FileAccess`) лежит внутри одного из трёх каталогов, с границей по `/`:
+  `tool-output-other` — чужой каталог.
+- Запись — как раньше: `external_directory` у `write`, `edit`, `patch` и у команд по-прежнему спрашивает. Правило в
+  конфиге этого не различило бы: `FileAccess` задаёт для чтения и записи один и тот же вопрос. Поэтому решает хук: плагин
+  запоминает инструмент вызова в `execute.before` (ключ — сообщение и ID вызова, как `source` запроса права) и забывает в
+  `execute.after`.
+- Правила не менялись; `classify` и таблица — как в B2.6a.
+
+### 2. Проверки `run` расписания — никогда
+
+Запрос права `shell` без `source` задаёт только проверка расписания (`core/src/schedule/check.ts`: при создании и на каждом
+срабатывании); команда агента всегда идёт с `source` вызова. Хук отвечает на такой запрос `deny` с текстом
+`LOGINOM_SCHEDULE_RUN_DENIED: schedule checks do not run terminal commands in Loginom AI Agent; use a code check`, при
+включённом терминале тоже. Под `Permission.Unattended` запрет хука остаётся запретом.
+
+- Создание через HTTP — 403 `ForbiddenError`. Терминал включён — текст продукта. Терминал выключен — правило
+  `shell * deny` срабатывает раньше хуков, и текст ядра: `Permission denied: shell`.
+- Срабатывание старой проверки — `lastOutcome: "failed"`, команда не выполняется.
+
+### 3. `S2 synthetic wake`
+
+Причина — в коде аренды (B2.3/B2.5d), а не в тесте. Плагин брал аренду на `session.execution.started`, а на границе шага
+(хук `context`, через `dock.refresh`) — только после handshake Host. Подписка `ctx.event.subscribe` становится активной
+не сразу: `Stream.toAsyncIterableWith` подписывается на шину при первом `next()`, уже после возврата `setup`. Исполнение,
+которое начинается вместе с активацией location (синтетическое сообщение, возобновление), событие `started` не
+получает. Если в этот момент Host ещё в handshake, исполнение остаётся без аренды до следующего шага.
+
+Журнал аренды (отладочный вывод в плагине и тесте, в коммиты не вошёл), `--rerun-each 6` случая:
+
+```text
+DBG plugin subscribing 1795402023636
+DBG hold 1795402023778 ses_… false            # успешный прогон: аренду взял хук context, Host уже подключён
+DBG holding 1795402023882 true                 # события started у плагина нет ни в одном прогоне
+DBG plugin event 1795402023954 session.execution.succeeded ses_…
+DBG plugin subscribing 1795402024310
+DBG holding 1795402024450 true                 # падение: hold не вызывался вовсе — handshake закончился после шага
+DBG no lease 1795402044476 true
+```
+
+До правки: `bun test --rerun-each 20 test/loginom-host-lease.test.ts` — 146 pass, 14 fail (`S2 synthetic wake` 12,
+`S2 interruption` 2 — та же причина: проверка аренды сразу после запроса модели). Порядок с `loginom-dock-catalog`
+(B2.6a) — только другая скорость активации.
+
+Правка — `void hold(event.sessionID)` в начале хука `context`: аренда исполнения стартует на каждой границе шага и не ждёт
+handshake. Если Host ещё в handshake, `ServiceHost.acquire` дождётся его в фоне. Модель при этом не ждёт: каталог Dock
+по-прежнему читается, только когда Host подключён. Подписка на события остаётся — повторный `hold` возвращает ту же аренду.
+
+Тест: `boot` получил `handshake`. В `S2 synthetic wake` Host держится в handshake, пока не началась работа инструмента.
+Тест проверяет, что аренды ещё нет («Host в handshake никого не держит», B2.5d), отпускает handshake и ждёт запись аренды.
+Остальные случаи начинаются, когда Host подключён (`ServiceHost.connected()`), — как предполагает их аренда при приёме
+промпта. Таймауты не менялись.
+
+### Тесты
+
+`packages/loginom-agent/test/permissions.test.ts` (11 тестов, +2): `ownRead` — `read`, `glob`, `grep` в каждом из трёх
+каталогов (и с путём Windows); соседний `tool-output-other`, родительский каталог, смешанные ресурсы, пустой список,
+запись (`write`, `edit`, `patch`, `shell`, без инструмента) и не тот вопрос — нет; `settle` разрешает такое чтение и
+подагенту; проверка расписания без `source` — `deny` с текстом и при `allow`, и при `ask` правил.
+
+`packages/server/test/loginom-permissions.test.ts` (9 тестов):
+
+| Тест | Что проверяет |
+|---|---|
+| каталоги продукта (новый) | каталоги вне проекта: ресурсы (`LOGINOM_AI_AGENT_RESOURCES`) и дом (`LOGINOM_AI_AGENT_TEST_HOME`) во временном каталоге рядом с проектом, файл в `<data>/tool-output` машины (случай его удаляет). Настоящий `read` файла навыка, плана и результата — три `completed` без вопроса (вопрос держал бы сессию). `read` соседнего каталога и `write` в каталог планов — открытый вопрос `external_directory`, после отказа файла нет |
+| расписание (переписан) | терминал выключен и включён (правило сессии `shell allow`): создание проверки `run` — 403, текст ядра и текст продукта соответственно, расписаний нет. Проверки, записанные в базу как до B2.6a2, на срабатывании (такт планировщика вызывает тест) — `failed` в обеих сессиях, меток нет; выполненная проверка дала бы `checked` |
+| контракт `permission.evaluate` | без части про `Unattended`: её покрывает случай расписания (сессия разрешает `shell`, запрещает только хук) |
+
+`packages/server/test/loginom-dock-catalog.test.ts`, новый случай: сессия с умолчаниями продукта, Host по сценарию отдаёт
+большой ответ со сводкой, `dock.ts` кладёт полный текст в `<data>/tool-output`, модель читает его по пути из ответа
+(`@retained` в сценарии) — `completed`, содержимое на месте. Хук стенда видит `external_directory ask` от правил: вопрос
+снят продуктом.
+
+`packages/server/test/loginom-host-lease.test.ts`: `boot({ sent, handshake })`, ожидание подключения Host. `S2 synthetic
+wake` переписан, как в разделе 3.
+
+Тест upstream `packages/server/test/schedule.test.ts` (CAT-07, +15 −23 к B2.6a; к v2.3.0 — +20 −24):
+
+- каталог `enabled` — снова строка upstream, без `permission: { shell: "allow" }` из B2.6a;
+- `until: { run }` — теперь `ForbiddenError`;
+- такт в `ServerProcess` — проверка `code` (`return false`) вместо `run: "false"`;
+- выбор одного лидера — проверка `code`, итог `done`/`checked`, без файла-метки.
+
+### Мутации
+
+Скрипт во временном каталоге: замена строки в файле дерева на `5c088e20ac`, прогоны `bun test test/permissions.test.ts`
+(`loginom-agent`), `bun test --timeout 30000 test/loginom-permissions.test.ts test/loginom-dock-catalog.test.ts -t B2.6a2` и
+`bun test --rerun-each 3 test/loginom-host-lease.test.ts -t "synthetic wake"` (`server`), возврат `git checkout`; после
+последней мутации `git status packages/loginom-agent/src` чистый.
+
+```text
+=== N0 none                                unit 11/0; server B2.6a2 3/0; synthetic x3 3/0
+=== N1 own reads not waived                unit 11/0; server 1/2: ответ Dock, каталоги продукта
+=== N2 a write in own dirs waived too      unit 10/1 (ownRead); server 2/1: каталоги продукта (запись)
+=== N3 no directory boundary               unit 10/1 (ownRead: tool-output-other)
+=== N4 schedule run check follows the rules unit 10/1 (settle); server 2/1: расписание
+=== N5 no lease at the step boundary       synthetic x3 0/3
+=== N6 call tool not recorded              unit 11/0; server 1/2: ответ Dock, каталоги продукта
+```
+
+Устойчивость (критерий задания), `5c088e20ac`:
+
+```text
+$ bun test --rerun-each 50 test/loginom-host-lease.test.ts
+ 400 pass, 0 fail                                         # 191 с
+$ for i in 1..10: bun test test/loginom-dock-catalog.test.ts test/loginom-host-lease.test.ts
+ 21 pass, 0 fail — все 10 прогонов
+```
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `5c088e20ac`, база — отдельное дерево на `ca4fddcbe6` во временном каталоге.
+
+| Пакет | База `ca4fddcbe6` | Итог `5c088e20ac` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 67 pass, 0 fail | 69 pass (+2: `ownRead`), 0 fail |
+| `server` (`bun test`) | 259 pass, 3 skip, 1 fail — `S2 synthetic wake` | 262 pass (+2: каталоги продукта, ответ Dock; `S2 synthetic wake` больше не падает), 3 skip, 0 fail |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail — те же три | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 430 pass, 9 skip, 0 fail | 430 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | 40 pass, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 453 divergent upstream files       # код 0; как в базе (schedule.test.ts уже в CAT-07)
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+  CAT-07: 9
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ cd packages/loginom-agent && bun run typecheck
+✓ No type errors in 225 files
+$ cd packages/server && bun run typecheck
+✓ No type errors in 1,638 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.6a; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 225 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+### Где решал сам
+
+- **Чтение отличается от записи по инструменту вызова, а не по правилу.** Узкое `external_directory <каталог>/* allow`
+  сняло бы вопрос и с записи; задание требует «запись — как раньше».
+- **Пути — из `Global.Path` пакета `util`**, а не из сервиса `Global` ядра: плагину ядро недоступно. В продукте пути
+  совпадают; в тестах сервера `Global` ядра подменён, и `<data>/tool-output` плагина — каталог данных машины (как у
+  `dock.ts`, B2.5d).
+- **Каталог навыков — из переменной ресурсов**, даже если каталог не прошёл проверку: это всё равно каталог установки.
+- **Запрос `shell` без `source` = проверка расписания.** Других таких запросов на сервере нет. Запрос права через API
+  клиента без `source` тоже получит отказ.
+- **Тест лидера в `schedule.test.ts`** переведён на проверку `code`: проверка `run` больше не выполняется, и второй запуск
+  проверки нечем сосчитать (`checks` и `runCount` при гонке двух лидеров дают те же значения). Случай теперь проверяет
+  только итог `done`/`checked` при двух серверах.
+
+### Согласовать с владельцем
+
+- Текст 403 при выключенном терминале — `Permission denied: shell` из ядра: запрет правилом решается до хуков, и текста
+  продукта не получить без правки ядра (причина для правила). Поясняющий текст запрета — тема B2.6b.
+- `server/test/schedule.test.ts` (CAT-07): тест лидера больше не ловит двойной запуск проверки (см. выше).
+
+### Найдено, не чинил
+
+- Проверка `run` без внешних программ (`cd /tmp`, `X=1`, `export X=1`) права `shell` не спрашивает (`ShellParse` не находит
+  команд): такая проверка создаётся и «выполняется» встроенной командой оболочки, как в B2.6a. Программ она не запускает.
+- Вложенный вызов CodeMode получает ID внешнего `execute` (spike S11): чтение из CodeMode распознаётся по последнему
+  вложенному инструменту. `read`, `glob` и `grep` в CodeMode не входят (`codemode: false` у прямых инструментов), так что
+  на сегодня это не влияет.
+- Регистр путей на Windows не учитывается (`ownRead` сравнивает строки).
+
+### Не проверено
+
+- Windows и macOS, установленная сборка, Desktop; настоящая модель.
+- `glob` и `grep` в своих каталогах — только юнит-тест `ownRead`; через сервер проверен `read`.
