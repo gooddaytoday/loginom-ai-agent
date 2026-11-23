@@ -354,7 +354,9 @@ const scanShell = Effect.fnUntraced(function* (command: string) {
   const external = Array.dedupe(
     [target, ...directories].flatMap((item) => (item.externalDirectory ? [item.externalDirectory.resource] : [])),
   )
-  const commands = Array.dedupe(parsed.commands.map((item) => item.resource))
+  // Fork (B2.6a2, CAT-07): a check that names no program (`cd src > out`, `[[ -e f ]]`) still runs in a shell, so it
+  // asks for `shell` with its whole text.
+  const commands = parsed.commands.length > 0 ? Array.dedupe(parsed.commands.map((item) => item.resource)) : [command]
   return { shell, cwd: target.absolute, workspaceID: location.workspaceID, external, commands }
 })
 

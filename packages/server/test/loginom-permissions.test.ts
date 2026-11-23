@@ -22,6 +22,7 @@ import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { scheduleRunDenied, table, type Kind } from "../../loginom-agent/src/permissions"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
 
@@ -428,30 +429,40 @@ describe("loginom.product permissions (B2.6a)", () => {
         const on = yield* test.create("terminal on")
         yield* test.sessions.setPermissions({ sessionID: on, permissions: allow })
         const marker = (name: string) => path.join(test.dir, name)
-        const run = (name: string) => `printf x >> ${JSON.stringify(marker(name))} && false`
-        const create = (sessionID: Session.ID, name: string) =>
-          test.call("/api/experimental/schedule", {
-            sessionID,
-            when: { in: "1 second" },
-            if: { run: run(name) },
-            prompt: "never",
-          })
+        // A program, and a check that names none (`cd . > file` creates the file, and the parser finds no command).
+        const runs = {
+          program: (name: string) => `printf x >> ${JSON.stringify(marker(name))} && false`,
+          builtin: (name: string) => `cd . > ${JSON.stringify(marker(name))}`,
+        }
+        const states = { off, on }
         // Off: the product's `shell * deny` rule refuses it before any hook. On: the product's hook refuses it.
-        const refusedOff = yield* create(off, "created-off")
-        expect([refusedOff.status, refusedOff.body.message]).toEqual([403, "Permission denied: shell"])
-        const refusedOn = yield* create(on, "created-on")
-        expect([refusedOn.status, refusedOn.body.message]).toEqual([403, scheduleRunDenied])
+        const reasons = { off: "Permission denied: shell", on: scheduleRunDenied }
+        const names: string[] = []
+        for (const [state, sessionID] of Object.entries(states) as ["off" | "on", Session.ID][])
+          for (const [kind, run] of Object.entries(runs)) {
+            const name = `created-${state}-${kind}`
+            names.push(name)
+            const refused = yield* test.call("/api/experimental/schedule", {
+              sessionID,
+              when: { in: "1 second" },
+              if: { run: run(name) },
+              prompt: "never",
+            })
+            expect([name, refused.status, refused.body.message]).toEqual([name, 403, reasons[state]])
+          }
         for (const sessionID of [off, on])
           expect((yield* test.call(`/api/experimental/schedule?sessionID=${sessionID}`)).body).toEqual({ data: [] })
 
-        // Checks stored before: at their tick neither runs. A check that ran would end `checked` (`false` exits 1);
-        // `failed` is its refused permission. On the session that allows `shell`, only the hook refuses it, although
-        // nobody is present to answer (`Permission.Unattended`): a hook's deny holds there too.
-        const storedOff = yield* test.stored(off, run("stored-off"))
-        const storedOn = yield* test.stored(on, run("stored-on"))
-        expect(yield* test.outcome(storedOff)).toBe("failed")
-        expect(yield* test.outcome(storedOn)).toBe("failed")
-        for (const name of ["created-off", "created-on", "stored-off", "stored-on"])
+        // Checks stored before: at their tick none runs. A check that ran would end `checked` or `fired`; `failed` is its
+        // refused permission. On the session that allows `shell`, only the hook refuses it, although nobody is present
+        // to answer (`Permission.Unattended`): a hook's deny holds there too.
+        for (const [state, sessionID] of Object.entries(states) as ["off" | "on", Session.ID][])
+          for (const [kind, run] of Object.entries(runs)) {
+            const name = `stored-${state}-${kind}`
+            names.push(name)
+            expect([name, yield* test.outcome(yield* test.stored(sessionID, run(name)))]).toEqual([name, "failed"])
+          }
+        for (const name of names)
           expect([name, yield* Effect.promise(() => Bun.file(marker(name)).exists())]).toEqual([name, false])
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
@@ -473,26 +484,50 @@ describe("loginom.product permissions (B2.6a)", () => {
         // The machine's data directory keeps a large tool result, as OpenCode and `dock.ts` do; the case removes it.
         const result = path.join(Global.Path.data, "tool-output", `b26a2-${crypto.randomUUID()}.txt`)
         yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(result, { force: true })))
-        yield* Effect.promise(() =>
-          Promise.all(
-            [guide, plan, neighbour, result].map((file) =>
-              fs.mkdir(path.dirname(file), { recursive: true }).then(() => Bun.write(file, `${path.basename(file)}\n`)),
-            ),
-          ),
+        // The verified bundled catalog of B2.4, so the `skill` tool lists the reference file itself.
+        const skills = ["loginom-automation", "package-docs", "loginom-dashboard"].map((name) =>
+          path.join(resources, "skills", name, "SKILL.md"),
         )
+        yield* Effect.promise(async () => {
+          await Promise.all(
+            [guide, plan, neighbour, result, ...skills].map((file) =>
+              fs
+                .mkdir(path.dirname(file), { recursive: true })
+                .then(() =>
+                  Bun.write(
+                    file,
+                    path.basename(file) === "SKILL.md"
+                      ? `---\nname: ${path.basename(path.dirname(file))}\ndescription: Bundled.\n---\n\nBUNDLED\n`
+                      : `${path.basename(file)}\n`,
+                  ),
+                ),
+            ),
+          )
+          await Bun.write(
+            path.join(resources, "resource-manifest.json"),
+            JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
+          )
+        })
         const test = yield* boot()
 
         const reader = yield* test.create("own")
         yield* test.prompt(
           reader,
           script(
-            { tool: "read", input: { path: guide } },
+            // The reference file as the loaded skill lists it to the model.
+            { tool: "skill", input: { id: "loginom-automation" } },
+            { tool: "read", input: { path: "@listed" } },
             { tool: "read", input: { path: plan } },
             { tool: "read", input: { path: result } },
             { text: "end" },
           ),
         )
-        expect((yield* test.tools(reader)).map((part) => part.state.status)).toEqual(Array(3).fill("completed"))
+        const parts = yield* test.tools(reader)
+        expect(parts.map((part) => part.state.status)).toEqual(Array(4).fill("completed"))
+        expect(JSON.stringify(parts[0].state.status === "completed" ? parts[0].state.content : "")).toContain(guide)
+        expect(JSON.stringify(parts[1].state.status === "completed" ? parts[1].state.content : "")).toContain(
+          "guide.md",
+        )
 
         // A neighbouring directory asks; so does writing into the plans.
         for (const step of [
@@ -591,7 +626,10 @@ function respond(request: LLMRequest) {
   const step = steps[request.messages.slice(user + 1).filter((message) => message.role === "assistant").length]
   if (!step) return TestLLM.text("done", "text_done")
   if ("text" in step) return TestLLM.text(step.text, `text_${crypto.randomUUID()}`)
-  return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, step.input ?? {})
+  // `@listed` stands for the first file a loaded skill listed to the model.
+  const listed = JSON.stringify(request.messages).match(/<file>(.+?)<\/file>/)?.[1]
+  const input = JSON.parse(JSON.stringify(step.input ?? {}).replaceAll('"@listed"', JSON.stringify(listed ?? "")))
+  return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, input)
 }
 
 function text(message: LLMRequest["messages"][number]) {
