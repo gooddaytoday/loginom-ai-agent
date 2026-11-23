@@ -323,7 +323,7 @@ export function createHost(input: {
     if (!endpoint) return undefined
 
     const authorization = endpoint.password
-      ? `Basic ${Buffer.from(`opencode:${endpoint.password}`).toString("base64")}`
+      ? SidecarCredentials.remote(endpoint.password)
       : SidecarCredentials.authorization(sidecar, endpoint.url)
 
     return {

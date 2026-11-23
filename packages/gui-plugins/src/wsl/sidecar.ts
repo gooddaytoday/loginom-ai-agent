@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { createServer } from "node:net"
 import { Predicate } from "effect"
+import { ServerUsername } from "@opencode/schema/server-username"
 import type { MainContext } from "@opencode/plugin/gui/main"
 import { type WslCommandLine, type WslRuntime, shellEscape, wslArgs } from "./runtime"
 
@@ -128,7 +129,7 @@ function stop(child: ChildProcess) {
 }
 
 async function checkHealth(url: string, password: string) {
-  const auth = Buffer.from(`opencode:${password}`).toString("base64")
+  const auth = Buffer.from(`${ServerUsername.fallback}:${password}`).toString("base64")
 
   return fetch(new URL("/api/info", url), {
     method: "GET",

@@ -87,7 +87,7 @@ describe("debug config command", () => {
       expect(result.stdout).not.toContain("Bearer example")
       expect(requested?.pathname).toBe("/api/config")
       expect(requested?.searchParams.get("location[directory]")).toBe(project)
-      expect(authorization).toEqual([`Basic ${btoa("opencode:secret")}`])
+      expect(authorization).toEqual([`Basic ${btoa("loginom-ai-agent:secret")}`])
       expect(healthProbes).toBe(1)
     } finally {
       server.stop(true)

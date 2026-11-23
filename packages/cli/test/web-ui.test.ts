@@ -65,7 +65,7 @@ describe("web UI", () => {
         }),
       )
       const response = yield* Effect.promise(() =>
-        fetch(new URL("/api/info", origin), { headers: { authorization: `Basic ${btoa("opencode:secret")}` } }),
+        fetch(new URL("/api/info", origin), { headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } }),
       )
       expect(response.status).toBe(200)
       expect(yield* Effect.promise(() => response.json())).toHaveProperty("pid")
@@ -73,7 +73,7 @@ describe("web UI", () => {
       const pairing = yield* Effect.promise(() =>
         fetch(new URL("/api/pair", origin), {
           method: "POST",
-          headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
         }).then((response) => response.json() as Promise<{ code: string }>),
       )
       const redirect = yield* Effect.promise(() =>

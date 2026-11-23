@@ -123,7 +123,7 @@ async function sessions(root: string) {
     if (!url) throw new Error(`server did not start: ${await new Response(child.stderr).text()}`)
     const response = await fetch(new URL("/api/session", url), {
       headers: {
-        authorization: `Basic ${btoa(`opencode:${password}`)}`,
+        authorization: `Basic ${btoa(`loginom-ai-agent:${password}`)}`,
         "x-opencode-directory": encodeURIComponent(root),
       },
     })
@@ -152,7 +152,7 @@ function api(base: string, directory: string) {
     const response = await fetch(new URL(route, base), {
       method,
       headers: {
-        authorization: `Basic ${btoa(`opencode:${password}`)}`,
+        authorization: `Basic ${btoa(`loginom-ai-agent:${password}`)}`,
         "content-type": "application/json",
         "x-opencode-directory": encodeURIComponent(directory),
       },

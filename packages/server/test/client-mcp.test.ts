@@ -23,7 +23,7 @@ declare const WebSocket: {
   new (url: string | URL, options?: Bun.WebSocketOptions): globalThis.WebSocket
 }
 
-const authorization = `Basic ${btoa("opencode:secret")}`
+const authorization = `Basic ${btoa("loginom-ai-agent:secret")}`
 
 const serve = Effect.fnUntraced(function* () {
   const directory = (yield* tmpdirScoped("opencode-client-mcp-")).path

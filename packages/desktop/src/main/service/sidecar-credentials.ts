@@ -1,5 +1,6 @@
 export * as SidecarCredentials from "./sidecar-credentials"
 
+import { ServerUsername } from "@opencode/schema/server-username"
 import type { ServerReadyData } from "../../shared/ipc-contract"
 
 export type Data = ServerReadyData & { password: string | null }
@@ -38,5 +39,14 @@ export function authorization(sidecar: Data | undefined, url: string) {
 
   if (new URL(url).origin !== sidecar.url) return
 
-  return `Basic ${Buffer.from(`opencode:${sidecar.password}`).toString("base64")}`
+  return `Basic ${Buffer.from(`${ServerUsername.current()}:${sidecar.password}`).toString("base64")}`
+}
+
+/**
+ * The Basic credential for a server of this build that is not Desktop's own service: one in WSL, over SSH or added by
+ * the user (Loginom AI Agent, B2.7a11). Its environment is not Desktop's, so it keeps the default user, as the renderer
+ * does (`authTokenFromCredentials` in packages/app).
+ */
+export function remote(password: string) {
+  return `Basic ${Buffer.from(`${ServerUsername.fallback}:${password}`).toString("base64")}`
 }

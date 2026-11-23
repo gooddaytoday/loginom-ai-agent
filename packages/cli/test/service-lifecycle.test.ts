@@ -303,7 +303,7 @@ async function snapshot(home: Home) {
             auth:
               info.password === undefined
                 ? undefined
-                : { type: "basic", username: "opencode", password: info.password },
+                : { type: "basic", username: "loginom-ai-agent", password: info.password },
           }),
           signal: AbortSignal.timeout(1_000),
         })

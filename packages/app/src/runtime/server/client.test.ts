@@ -121,11 +121,11 @@ test("rotates the HTTP client with the endpoint", async () => {
   expect(requests).toEqual([
     {
       url: "http://127.0.0.1:4100/api/info",
-      authorization: `Basic ${btoa("opencode:first")}`,
+      authorization: `Basic ${btoa("loginom-ai-agent:first")}`,
     },
     {
       url: "http://127.0.0.1:4200/api/info",
-      authorization: `Basic ${btoa("opencode:second")}`,
+      authorization: `Basic ${btoa("loginom-ai-agent:second")}`,
     },
   ])
 })

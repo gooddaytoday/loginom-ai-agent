@@ -284,7 +284,7 @@ async function serve(bin, old, model, state, name, prompt) {
       const response = await fetch(new URL(route, base), {
         method,
         headers: {
-          authorization: `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`,
+          authorization: `Basic ${Buffer.from(`loginom-ai-agent:${password}`).toString("base64")}`,
           "content-type": "application/json",
           ...(directory ? { "x-opencode-directory": encodeURIComponent(directory) } : {}),
         },

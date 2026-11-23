@@ -30,7 +30,7 @@ test("prints the snapshot path from the registered server without replacing it",
     stdout: "/server/log/heap-1-2.heapsnapshot",
   })
   expect(requests).toEqual([
-    { method: "POST", path: "/api/debug/heap-dump", authorization: `Basic ${btoa("opencode:secret")}` },
+    { method: "POST", path: "/api/debug/heap-dump", authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
   ])
   expect(await Bun.file(registration.file).json()).toEqual(registration.info)
 })

@@ -46,7 +46,7 @@ describe("readLocalImage", () => {
     expect(requests[0].url.pathname).toBe(`/api/fs/read/${encoded}`)
     expect([...requests[0].url.searchParams]).toEqual([["location[directory]", directory]])
     expect(requests[0].init?.method).toBe("GET")
-    expect(new Headers(requests[0].init?.headers).get("authorization")).toBe(`Basic ${btoa("opencode:secret")}`)
+    expect(new Headers(requests[0].init?.headers).get("authorization")).toBe(`Basic ${btoa("loginom-ai-agent:secret")}`)
     expect(new Headers(requests[0].init?.headers).has("x-opencode-capabilities")).toBe(false)
     expect(requests[0].init?.signal).toBe(signal)
   })
@@ -181,7 +181,7 @@ describe("readLocalImage", () => {
       expect(cache.peek(`media:${hashA}`, "image/png")).toBe(first)
       expect(requests).toHaveLength(1)
       expect(requests[0].url.pathname).toBe(`/api/experimental/media/${hashA}`)
-      expect(new Headers(requests[0].init?.headers).get("authorization")).toBe(`Basic ${btoa("opencode:secret")}`)
+      expect(new Headers(requests[0].init?.headers).get("authorization")).toBe(`Basic ${btoa("loginom-ai-agent:secret")}`)
 
       const urlB = await cache.load(`media:${hashB}`, "image/png")
       expect(urlB).toStartWith("blob:")

@@ -104,8 +104,16 @@ export async function requestStop(info: Info, timeout = defaultEnsureTiming.requ
 function endpointOf(info: Info) {
   return {
     url: info.url,
-    auth: info.password === undefined ? undefined : { type: "basic", username: "opencode", password: info.password },
+    auth: info.password === undefined ? undefined : { type: "basic", username: username(), password: info.password },
   } satisfies Endpoint
+}
+
+/**
+ * The server's Basic user (Loginom AI Agent, B2.7a11): a copy of `ServerUsername.current()` from packages/schema, since
+ * the Promise service entry bundles no module of `schema` (test/import-boundaries.test.ts).
+ */
+export function username() {
+  return process.env.LOGINOM_AI_AGENT_SERVER_USERNAME || "loginom-ai-agent"
 }
 
 /** Create HTTP authentication headers for a service endpoint. */

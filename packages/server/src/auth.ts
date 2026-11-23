@@ -1,5 +1,6 @@
 export * as ServerAuth from "./auth"
 
+import { ServerUsername } from "@opencode/schema/server-username"
 import { Context, Layer, Option, Redacted } from "effect"
 import { createHmac, timingSafeEqual } from "node:crypto"
 
@@ -17,7 +18,7 @@ export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 export class Config extends Context.Service<Config, Info>()("@opencode/ServerAuthConfig") {
   static configLayer(input: Pick<Info, "password">) {
-    return Layer.succeed(this, this.of({ ...input, username: "opencode" }))
+    return Layer.succeed(this, this.of({ ...input, username: ServerUsername.current() }))
   }
 
   static get layer() {

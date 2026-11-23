@@ -63,7 +63,7 @@ const server = Bun.serve({
       return Response.json({ handoff: null })
     }
     if (pathname === "/api/experimental/persistent-pty/handoff" && mode === "handoff") {
-      if (request.method !== "POST" || request.headers.get("authorization") !== "Basic " + btoa("opencode:private"))
+      if (request.method !== "POST" || request.headers.get("authorization") !== "Basic " + btoa("loginom-ai-agent:private"))
         return new Response(null, { status: 401 })
       await writeFile(registration + ".prepared", JSON.stringify(handoff))
       return Response.json({ handoff })
@@ -76,7 +76,7 @@ const server = Bun.serve({
       pathname === "/api/experimental/service/stop" &&
       (mode === "soft" || mode === "soft-hung" || mode === "stop-hanging")
     ) {
-      if (request.method !== "POST" || request.headers.get("authorization") !== "Basic " + btoa("opencode:private"))
+      if (request.method !== "POST" || request.headers.get("authorization") !== "Basic " + btoa("loginom-ai-agent:private"))
         return new Response(null, { status: 401 })
       await writeFile(registration + ".soft-stop", "")
       if (mode === "stop-hanging") return new Promise<Response>(() => {})

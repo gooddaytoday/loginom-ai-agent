@@ -162,7 +162,7 @@ async function call(info: Info, directory: string, method: string, route: string
   const response = await fetch(new URL(route, info.url), {
     method,
     headers: {
-      authorization: `Basic ${btoa(`opencode:${info.password}`)}`,
+      authorization: `Basic ${btoa(`loginom-ai-agent:${info.password}`)}`,
       "content-type": "application/json",
       "x-opencode-directory": encodeURIComponent(directory),
     },

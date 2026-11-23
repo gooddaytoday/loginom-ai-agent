@@ -445,7 +445,7 @@ test("concurrent service processes elect one server", async () => {
     expect(await Bun.file(registration + ".lock").exists()).toBe(false)
     expect(
       await fetch(new URL("/api/info", info.url), {
-        headers: { authorization: "Basic " + btoa(`opencode:${info.password}`) },
+        headers: { authorization: "Basic " + btoa(`loginom-ai-agent:${info.password}`) },
       }).then((response) => response.json()),
     ).toMatchObject({
       version: info.version,
@@ -821,7 +821,7 @@ async function waitForInfo(file: string, accept: (info: Info) => boolean = () =>
 async function waitForFailed(info: Info) {
   for (let attempt = 0; attempt < 400; attempt++) {
     const status = await fetch(new URL("/api/info", info.url), {
-      headers: { authorization: "Basic " + btoa(`opencode:${info.password}`) },
+      headers: { authorization: "Basic " + btoa(`loginom-ai-agent:${info.password}`) },
     })
       .then((response) => response.status)
       .catch(() => undefined)

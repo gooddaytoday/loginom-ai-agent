@@ -40,7 +40,7 @@ try {
   const registration = await waitForRegistration()
   const info = await Schema.decodeUnknownPromise(Service.Info)(await Bun.file(registration).json())
   if (info.id === undefined || info.password === undefined) throw new Error("Registration is missing service identity")
-  const credential = btoa(`opencode:${info.password}`)
+  const credential = btoa(`loginom-ai-agent:${info.password}`)
   const headers = { authorization: "Basic " + credential }
   const token = encodeURIComponent(credential)
   const serverInfo = await waitForReady(info.url, headers)
