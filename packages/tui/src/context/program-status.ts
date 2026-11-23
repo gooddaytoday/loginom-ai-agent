@@ -1,3 +1,4 @@
+import { Product } from "@loginom-ai-agent/product"
 import type { ProgramStatus, ProgramStatusKind } from "@opentui/core"
 import { createHash } from "node:crypto"
 import { createEffect, onCleanup } from "solid-js"
@@ -7,7 +8,8 @@ export type PendingSession = { id: string; title?: string } & (
   | { state: "working" }
 )
 
-const APP = "opencode"
+// The protocol wants a stable program identifier, such as `cargo`: the product slug, not its display name.
+const APP = Product.slug
 const ROOT = ""
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()

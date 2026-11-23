@@ -1170,7 +1170,7 @@ function App() {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl(Product.documentation).catch(() => {})
           dialog.clear()
         },
         category: "System",
