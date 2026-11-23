@@ -10086,3 +10086,129 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Отказ внутри CodeMode и у подагента — только по коду (тот же путь `Tool.execute` и хуки). `patch`, `websearch`,
   `glob`, `grep`, MCP — форма ошибки по коду (`toolFailure` и `mapError` хранят причину), тестом не проверены.
 - `dashboard_publish` и `dashboard_delete` (B2.9) — только таблица.
+
+## B2.6b2 Запреты в контексте и признак отказа
+
+22.11.2026. Ветка `b26b2-deny-context` от `oc2-migration` (`be3bcb7bab`: B2.6b и B2.7a3b), рабочее дерево
+`.claude/worktrees/b26b`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile` — без изменений, `.husky/_` есть; клиент `packages/loginom-runtime/client` — `npm ci
+--ignore-scripts` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Задание —
+решения владельца по вопросам B2.6b (ux-spec, «По третьему прогону»: при «Запрещено» агент не делает и говорит, что в
+«Разрешениях» это запрещено; после «Отклонить» в ленте «Вы отклонили: …»): строка модели о запрещённых видах без правки
+ядра и признак отказа для клиентов. Изменение контракта `execute.after` и продолжение хода в TUI и ACP приняты.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `573fafa74a` `feat(loginom-agent): name the kinds the settings deny to the model; mark refused calls (B2.6b2)` | `deniedKinds`, `deniedKindsText`, `refusalMetadata` и копия `Wildcard.match` в `packages/loginom-agent/src/permissions.ts`; правила `build`, строка в хуке `context` и метаданные в `execute.before`/`execute.after` — `src/index.ts`; тесты — `test/permissions.test.ts` (+2), проверки в случаях B2.6b `packages/server/test/loginom-dock-catalog.test.ts` и `loginom-permissions.test.ts` |
+| следующий | этот раздел, CAT-05 в `catalog.md` |
+
+### Как устроено
+
+- **Строка модели.** Хук `context` на каждой границе шага считает виды, у которых правила запрещают каждую строку
+  таблицы B2.6a — так пишет «Запрещено» настройка. Если такие есть, в системную часть запроса добавляется одна строка:
+  `LOGINOM_PERMISSIONS_DENIED: в «Разрешениях» запрещено: «Сохранять пакеты в Loginom». Не пытайтесь делать эти
+  действия и не обходите их другими инструментами. Если задача их требует, скажите пользователю, что это запрещено в
+  «Разрешениях» и разрешить может только он сам, и продолжайте без них.` Без запретов строки нет.
+- **Чьи правила.** Правила агента по умолчанию `build` после преобразования плагина (общий `* * allow`, умолчания
+  продукта, `permissions` конфига — настройки) и правила сессии (`session.get`), позже — сильнее, как в
+  `Permission.evaluate`. Собственные запреты других агентов (`plan` — запись, `explore` — `* * deny`) строку не дают:
+  это не настройка, и у них свои подсказки. Правила `build` плагин запоминает в своём преобразовании агентов (оно
+  последнее, конфиг к этому времени уже добавлен).
+- **Сравнение правил** — копия `Wildcard.match` ядра (`core/src/util/wildcard.ts`, 11 строк): плагин ядро не
+  импортирует, а проверка через `permission.assert` на каждом шаге дала бы хукам `permission.evaluate` других плагинов
+  лишние запросы (случай B2.6a в `loginom-dock-catalog.test.ts` записывает каждый).
+- **Терминал не называется**: он выключен по умолчанию, строка была бы в каждом разговоре.
+- **Признак отказа.** Вызов, который отклонил пользователь или запретило правило (B2.6b: `execute.after` и вызов
+  скрытого инструмента в `execute.before`), получает в метаданных `permissionDenied: true` (ключ 0.4,
+  `session/tools.ts`, и `permissionFailure` B2.5a) и `permissionRefusal: "declined" | "denied"` — для строк ленты «Вы
+  отклонили: …» и «Не сделал: … — в «Разрешениях» это запрещено». Метаданные вызова уже есть в схеме (`Tool.Metadata`,
+  запись `failTool`); публичная схема и клиент не менялись, `bun run generate` не нужен. Прочие метаданные ошибки
+  сохраняются. «Сказать иначе» и запрет с причиной признака не получают — их текст продукт не трогает.
+
+### Тесты
+
+`packages/loginom-agent/test/permissions.test.ts`, `describe("denied kinds in the context (B2.6b2)")`, 2 теста: без
+запретов — ничего; «Запрещено» вида — он; два вида; одна строка вида — нет; разрешение сессии после запрета — нет;
+`* * deny` — все виды, кроме терминала; шаблон `web*`; текст называет виды подписями настроек; метаданные отказа и
+запрета.
+
+Случаи B2.6b получили проверки:
+
+| Случай | Что добавлено |
+|---|---|
+| «Запрещено» у сохранения (`loginom-dock-catalog`) | каждый запрос к модели содержит строку с «Сохранять пакеты в Loginom»; оба вызова — `permissionRefusal: "denied"` |
+| «Отклонить» (`loginom-dock-catalog`) | ни один запрос не содержит `LOGINOM_PERMISSIONS_DENIED`; оба вызова — `"declined"` |
+| запрет не пользователя (`loginom-dock-catalog`) | признака нет |
+| встроенные инструменты (`loginom-permissions`) | запреты отдельных файлов и сайта — строки нет; пять вызовов: `declined`, затем четыре `denied`, у всех `permissionDenied: true`. Вторая сессия с правилом сессии `edit * deny` — каждый запрос называет «Создавать и менять файлы проекта», вызов скрытого `write` — `denied` |
+
+### Мутации
+
+Скрипт во временном каталоге (как в B2.6b): замена строки в файле дерева на `573fafa74a`, прогоны `bun test
+test/permissions.test.ts` (`loginom-agent`) и `bun test --timeout 30000 test/loginom-dock-catalog.test.ts
+test/loginom-permissions.test.ts -t B2.6b` (`server`), возврат исходного текста файла; после последней мутации
+`git diff HEAD -- packages/` пуст.
+
+```text
+=== N0 none                                  unit 16/0; server 6/0
+=== N1 no context line                       unit 16/0; server 4/2: встроенные (правило сессии), «Запрещено»
+=== N2 the line always                       unit 16/0; server 4/2: встроенные, «Отклонить»
+=== N3 session rules ignored                 unit 16/0; server 5/1: встроенные (правило сессии)
+=== N4 settings not taken from build         unit 16/0; server 5/1: «Запрещено» (правила конфига)
+=== N5 one entry denies the kind             unit 15/1 (виды); server 5/1: встроенные
+=== N6 the terminal named                    unit 15/1 (виды); server 4/2: встроенные, «Запрещено»
+=== N7 no metadata after                     unit 16/0; server 3/3: встроенные, «Запрещено», «Отклонить»
+=== N8 decline and deny not told apart       unit 15/1 (метаданные); server 4/2: встроенные, «Отклонить»
+=== N9 no metadata on a hidden tool          unit 16/0; server 4/2: встроенные (скрытый write), «Запрещено»
+```
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `573fafa74a`, база — отдельное дерево на `be3bcb7bab` во временном каталоге,
+в одной очереди после мутаций.
+
+| Пакет | База `be3bcb7bab` | Итог `573fafa74a` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 72 pass, 0 fail | 74 pass (+2: виды в контексте), 0 fail |
+| `server` (`bun test`) | 269 pass, 3 skip, 0 fail | 269 pass, 3 skip, 0 fail (новые проверки — в случаях B2.6b) |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 451 pass, 9 skip, 0 fail | 451 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | 40 pass, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 455 divergent upstream files       # код 0, как в базе: файлов upstream не менял
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 225 files                             # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck
+✓ No type errors in 1,638 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.6b; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 225 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+### Где решал сам
+
+- **«Запрещено» вида — все его строки таблицы**, как их пишет настройка. Запрет одной строки (например, только
+  `loginom_dock_action_run`) вид не называет: объяснение даст сам вызов (B2.6b).
+- **Источник — правила `build` и сессии**, а не правила текущего агента: иначе `plan` и подагенты получали бы строку про
+  «Разрешения» за свои собственные запреты.
+- **Копия `Wildcard.match`** вместо проверки через `permission.assert` (см. выше). Если upstream изменит сопоставление,
+  строка может разойтись с решением ядра; сам запрет решает ядро.
+- **Строка — на каждой границе шага**, рядом с подсказками Dock (`dock.system`): изменение настроек действует со
+  следующего шага.
+
+### Найдено, не чинил
+
+- Если конфиг выключит агента `build` (`agents.build.disabled`), правил настроек плагин не получит, и строки не будет.
+
+### Не проверено
+
+- Настоящая модель: следует ли она строке и говорит ли пользователю о запрете.
+- Кнопки и строки ленты по признаку (этап C), Desktop, CLI, установленная сборка, Windows и macOS.
