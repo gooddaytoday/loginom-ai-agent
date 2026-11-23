@@ -9,6 +9,7 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path
+import re
 
 
 def audit(journal, config):
@@ -49,7 +50,8 @@ def audit(journal, config):
             try:
                 reply = json.JSONDecoder().raw_decode(result)[0]
             except (ValueError, TypeError):
-                reply = {}
+                code = re.search(r'\b[A-Z][A-Z0-9]+(?:_[A-Z0-9]+)+\b', result)
+                reply = {'code': code.group()} if state.get('status') == 'error' and code else {}
         else:
             reply = result
         if not isinstance(reply, dict):
