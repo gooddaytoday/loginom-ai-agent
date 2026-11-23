@@ -1,5 +1,6 @@
 export * as Standalone from "./standalone"
 
+import path from "node:path"
 import { productChannel } from "@loginom-ai-agent/product"
 import { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "./version"
@@ -30,6 +31,45 @@ export async function early(args: string[]) {
       { version: LOGINOM_AI_AGENT_VERSION, channel },
     ),
   )
+}
+
+/**
+ * The arguments for the CLI and the project directory of a `run`, from the flags of the product CLI that OpenCode 2 lacks
+ * (B2.7a4). The headless flags are accepted and dropped: OpenCode 2's server starts the Host (`loginom-agent`), so the
+ * browser mode is not passed on yet. `run --dir` sets the directory OpenCode 2 takes from `PWD`, and `run --variant`
+ * joins `--model` as `provider/model#variant`, the way `evals` and `run-check.py` pass them to 0.4. Fails with
+ * `CLI_ARGUMENT_INVALID` (exit code 2).
+ */
+export function forward(args: string[], cwd: string) {
+  const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
+  const options = args.slice(0, boundary)
+  if (headless.every((flag) => options.includes(flag)))
+    throw new Error("CLI_ARGUMENT_INVALID: --headless and --no-headless exclude each other")
+  const rest = options.filter((value) => !headless.includes(value))
+  if (rest[0] !== "run") return { args: [...rest, ...args.slice(boundary)] }
+  const dir = take(rest, "--dir")
+  // `default` is the model's own setting, as OpenCode 2 reads a `#default` variant.
+  const variant = take(rest, "--variant")
+  if (variant !== undefined && variant !== "default") {
+    const model = take(rest, "--model") ?? take(rest, "-m")
+    if (model === undefined || model.includes("#"))
+      throw new Error("CLI_ARGUMENT_INVALID: --variant needs --model provider/model without a variant")
+    rest.push("--model", `${model}#${variant}`)
+  }
+  return {
+    args: [...rest, ...args.slice(boundary)],
+    directory: dir === undefined ? undefined : path.resolve(cwd, dir),
+  }
+}
+
+// Removes `--name value` or `--name=value` from `options` and returns the value.
+function take(options: string[], name: string) {
+  const index = options.findIndex((value) => value === name || value.startsWith(name + "="))
+  if (index < 0) return undefined
+  const [option, next] = options.splice(index, options[index] === name ? 2 : 1)
+  if (option !== name) return option!.slice(name.length + 1)
+  if (next === undefined) throw new Error(`CLI_ARGUMENT_INVALID: ${name} needs a value`)
+  return next
 }
 
 // The command tree without its handlers and without the layers of `index.ts` (paths, config, log): the CLI framework

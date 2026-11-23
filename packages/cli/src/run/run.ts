@@ -9,6 +9,7 @@ import { ServerConnection } from "../services/server-connection"
 import { createWorktreeLocation, parseSessionTargetModel, resolveSessionTarget } from "../session-target"
 import { toolInlineInfo } from "@opencode/tui/mini/tool"
 import { runNonInteractivePrompt } from "./noninteractive"
+import { RunProduct } from "./product"
 import { UI } from "./ui"
 import { Env } from "../env"
 import { errorMessage } from "../util/error"
@@ -64,11 +65,15 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
   const argument = input.message.join(" ") || undefined
   // With a message argument, stdin is extra context: a shell pipe is read in full, but the open, silent
   // stdin that spawn's default stdio gives a child must not hold the run.
+  // Loginom AI Agent (B2.7a4): Ctrl+C while the prompt is still read from stdin cancels the run, as 0.4's did; the read
+  // alone would hold the run, and with it the private server, until the shutdown deadline.
   const piped = process.stdin.isTTY
     ? undefined
-    : argument
-      ? await readStdinIfReady(PIPED_INPUT_GRACE_MS)
-      : await readStdin()
+    : await Promise.race([
+        argument ? readStdinIfReady(PIPED_INPUT_GRACE_MS) : readStdin(),
+        new Promise<undefined>((resolve) => signal.addEventListener("abort", () => resolve(undefined), { once: true })),
+      ])
+  if (signal.aborted) return
   const message = mergeInput(argument, piped)
   if (!message?.trim()) fail("You must provide a message")
   const files = await Promise.all(input.file.map((file) => prepareFile(file, root)))
@@ -191,7 +196,8 @@ async function prepareFile(input: string, directory: string): Promise<FilePart> 
           ? "text/plain"
           : detected
     const name = path.basename(file)
-    if (mime === "text/plain") return { text: `<file name="${name}">\n${text}\n</file>` }
+    // Loginom AI Agent (B2.7a4): the product CLI attaches every file, as 0.4 did, so a Dock run admits it (B2.5d).
+    if (mime === "text/plain" && !RunProduct.enabled()) return { text: `<file name="${name}">\n${text}\n</file>` }
     return { attachment: { uri: `data:${mime};base64,${bytes.toString("base64")}`, name } }
   } finally {
     await handle.close()
@@ -228,15 +234,18 @@ async function renderToolError(part: SessionMessageAssistantTool, directory: str
 export function reportRunError(input: Pick<RunCommandInput, "format">, message: string, sessionID?: string) {
   // Keep a failure code already reported, such as the private server's (`services/standalone.ts`).
   process.exitCode ||= 1
+  // Loginom AI Agent (B2.7a4): as 0.4's product CLI, the reason goes to stderr as well, with 0.4's fields in the event.
+  const product = RunProduct.enabled()
   if (input.format === "json") {
     process.stdout.write(
       JSON.stringify({
         type: "error",
         timestamp: Date.now(),
         sessionID: sessionID ?? "",
-        error: { type: "unknown", message },
+        error: product ? RunProduct.error({ type: "unknown", message }) : { type: "unknown", message },
       }) + "\n",
     )
+    if (product) process.stderr.write(message + "\n")
     return
   }
   UI.error(message)

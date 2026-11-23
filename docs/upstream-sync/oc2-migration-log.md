@@ -10212,3 +10212,349 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Настоящая модель: следует ли она строке и говорит ли пользователю о запрете.
 - Кнопки и строки ленты по признаку (этап C), Desktop, CLI, установленная сборка, Windows и macOS.
+
+## B2.7a4 run --format json
+
+22.11.2026. Ветка `b27a4-run-json` от `oc2-migration` (`7bbbe29a8c`), рабочее дерево `.claude/worktrees/b27a4`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` и `bun install
+--frozen-lockfile` в `evals` — в этом дереве и в дереве базы `<scratchpad>/b27a4-base` (`7bbbe29a8c`, detached).
+`packages/loginom-agent` и `core` (B2.6b) не трогал. Основа — 0.4 на `a080f7725c`: `opencode/src/cli/{standalone-run,
+standalone-cancellation,run-outcome}.ts`, `cmd/run.ts` (ветки `LOGINOM_AI_AGENT_CLI_ROOT`), тесты
+`test/cli/{standalone,standalone-preflight,standalone-file-errors,run-outcome}.test.ts`; дизайн §10–11. Настоящая модель не
+вызывалась: модель — HTTP-заглушка OpenAI-совместимого API по сценарию (`cli/test/fixture/product-run.ts`, как
+`model()` в `cli-standalone.test.ts`, с вызовами инструментов; `TestLLM` из тестов `server` живёт в процессе сервера и
+к процессу CLI не подключается).
+
+### B2.7a4: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `9c4a1aa335` `feat(cli): run --headless --format json of the product CLI with 0.4's events and exit codes (B2.7a4)` | файлы форка `cli/src/standalone.ts` (+40, флаги), `cli/src/loginom-cli.ts` (+6 −2), `cli/src/run/product.ts` (новый, 177: итог, события, коды); правки upstream `cli/src/run/noninteractive.ts` (+49 −5, крючки), `cli/src/run/run.ts` (+9 −1); тесты `cli/test/{cli-run,run/product}.test.ts`, `cli/test/fixture/product-run.ts` (новые); записанные потоки `evals/fixtures/events/cli-run/*` | `clean` |
+| `396686ac11` `fix(evals): run the product CLI of OpenCode 2 from source and read its run events (B2.7a4)` | `evals/src/{cli,profile}.ts`, `evals/script/run-node-selection-attempt.ts`; тесты `evals/test/cli.test.ts`, `evals/test/cli-run-events.test.ts` (новый) | `clean` |
+| `a2dd07913d` `chore(cli): name the 0.4 build script without a repository path (B2.7a1)` | комментарий в `cli/script/build.ts` (строка `repo-paths` B2.7a1) | `clean` |
+| `84b7b65395` `test(cli): a subagent's declined permission fails the product run (B2.7a4)` | случай в `run/product.test.ts` после мутации M5 (ниже) | `clean` |
+| `7998ed8bfc` `fix(cli): cancel run while it still reads its prompt from stdin (B2.7a4)` | `cli/src/run/run.ts` (+5 −3), случай в `cli-run.test.ts` | `clean` |
+| `a39be1eac5` `docs(upstream-sync): record run --headless --format json of the product CLI on OpenCode 2 (B2.7a4)` | этот раздел, `catalog.md` (CAT-08, CAT-12) | `clean` |
+| `34d0a5c8ba` `fix(cli): a question the product run cancels does not fail it (B2.7a4)` | `cli/src/run/product.ts` (+2), случай в `run/product.test.ts`; случаи Ctrl+C — только вне Windows, без проверки по часам (после ревью) | `clean` |
+| следующий | поправки этого раздела после ревью | |
+
+Правки upstream — `run/noninteractive.ts` и `run/run.ts`, обе по смыслу CAT-08 (`pending`), по маске — CAT-12; описаны в
+`catalog.md`, `catalog.json` не менялся (как B2.7a1). `run/run.ts` уже расходился с upstream (B2.7a1), новый расходящийся
+файл — `noninteractive.ts`: `catalog-check.py` — 454 → 455, код 0.
+
+### B2.7a4: пункты задания
+
+| Пункт | Итог |
+|---|---|
+| 1. `--headless`, `--file`, коды §10, SIGINT | `--headless`/`--no-headless` принимаются (вместе — `CLI_ARGUMENT_INVALID`, код 2), на режим браузера Host пока не влияют («Где решал сам»). `--file` у продукта — всегда вложение. Коды 0/1/2/4/130 — по итогу прогона (таблица ниже). SIGINT — 130 и `CLI_CANCELLED`, профиль освобождён; найден и исправлен зависающий отказ во время чтения stdin |
+| 2. Офлайн-сверка событий | CLI продукта выдаёт то, что читают `evals/src/cli.ts` и `run-check.py` (таблица ниже); потоки записаны с настоящего CLI, `evals` и читатели `run-check.py` проверяются по ним, тест CLI краснеет, если CLI перестанет давать их форму |
+| 3. Режим source `evals` | `bun run src/loginom-cli.ts` из `packages/cli`; строки `repo-paths` `evals/*` ушли |
+| 4. `PROFILE_BUSY` в `run-node-selection-attempt.ts` | на стороне потребителя: отказ профиля — код выхода 3 без сверки stderr |
+| 5. Тесты 0.4 | 7 из 23 относятся к `run`: 4 перенесены процессными тестами, 2 — случаями итога по записанным вызовам, 1 не перенесён (таблица ниже); плюс `run-outcome.test.ts` 0.4 |
+| 6. `--dangerously-skip-permissions` | отвечает «один раз» на вопросы; запрет политики конфига, выключенный терминал и `codemode: false` не снимает — тест |
+
+### B2.7a4: аргументы потребителей
+
+Обе командные строки на базе — ошибка разбора, код 1, событий нет (проба `<scratchpad>/b27a4-runs/probe.ts`, вход продукта
+из исходников):
+
+```text
+$ loginom-cli.ts run --headless --format json --model test/test-model --variant default --title eval-x --dir <project> -- hi
+ERRORS
+  Unrecognized flag: --headless in command opencode run
+  Unrecognized flag: --variant in command opencode run
+  Unrecognized flag: --dir in command opencode run          # код 1
+```
+
+v2 убрал `--dir` и `--variant` у `run` (каталог — из `PWD`, вариант — `--model провайдер/модель#вариант`), `--headless` у
+него не было. Вход продукта (`Standalone.forward`, до разбора) теперь:
+
+| Флаг | Что делает |
+|---|---|
+| `--headless`, `--no-headless` (до `--`, у любой команды) | снимаются; оба вместе — `CLI_ARGUMENT_INVALID: --headless and --no-headless exclude each other`, код 2, профиль не открывается |
+| `run --dir <каталог>` | `PWD` = каталог относительно текущего (`run/run.ts` берёт проект из `PWD`) |
+| `run --variant <имя>` | дописывается к `--model`/`-m`: `провайдер/модель#имя`; `default` — без варианта (так v2 читает `#default`); без `--model` или с уже указанным вариантом — код 2 |
+
+`evals` и `run-check.py` ставят дочернему процессу `cwd`, а окружение берут родительское, со старым `PWD`; без `--dir`
+прогон v2 ушёл бы в каталог родителя. Тест запускает CLI с `PWD` каталога `packages/cli` и проверяет, что `read
+note.txt` читает файл проекта.
+
+### B2.7a4: события
+
+Что читают потребители — и что выдаёт `run --format json` CLI продукта (`LOGINOM_AI_AGENT_CLI_ROOT` задан входом продукта;
+Desktop и `index.ts` без профиля — как upstream):
+
+| Читает | Кто | 0.4 | v2 на базе | Теперь |
+|---|---|---|---|---|
+| `session.status`: первый `busy`, последний `idle` (покрытие провайдера), `retry` (свидетельство лимитов) | `evals` | есть | нет; повтор — событие `retry` | `busy` при доставке промпта, `retry` рядом с `retry`, `idle` в конце (и при отмене) |
+| `error.name`, `error.data.message`, `error.data.statusCode` | `evals` (`failureKind`, 429) | есть | `error: {type, message}` | оба набора полей: имя — код продукта (`CLI_*`, `LOGINOM_*`) или имя 0.4 для ошибок провайдера (`provider.auth` → `ProviderAuthError`, `provider.no-route` → `ProviderModelNotFoundError`, прочие `provider.*` → `APIError` со `statusCode`) |
+| ошибки итога `CLI_PERMISSION_REJECTED`, `CLI_TOOL_FAILED`, `CLI_CANCELLED`, `LOGINOM_RECOVERY_REQUIRED` | `evals` (`failureKind`) | есть | нет | есть (коды ниже) |
+| `tool_use`: `part.type`, `tool`, `state.status`, `input`, `output`, `error` (строка) | оба | есть | есть | без изменений |
+| `output` завершённого инструмента — JSON-квитанция с начала строки (`raw_decode`) | `run-check.py` | есть | есть (текст содержимого инструмента) | без изменений; проверено на ответе `webfetch` |
+| `step_finish`: `cost`, `tokens.{input,output,reasoning}`; `text`: `part.text` | `evals`, `run-check.py` | есть | есть | без изменений |
+| `sessionID` в каждом событии, одна сессия, каждая строка — JSON | оба | есть | есть | без изменений |
+| порученная сессия (`task`) — покрытие неполное | `evals` | `task` | инструмент `subagent` | на стороне `evals`: `task` или `subagent` |
+| код выхода 0 у успешного прогона | `run-check.py` (`phase`) | есть | есть | без изменений |
+
+Порядок у продукта: `session.status busy` → шаги (`step_start`, `tool_use`, `text`, `step_finish`) → `session.status idle`
+→ ошибки итога. 0.4 печатал `CLI_PERMISSION_REJECTED` в момент отказа, здесь — после `idle` («Где решал сам»).
+
+### B2.7a4: коды выхода
+
+| Итог прогона | Событие `error` | Код | Проверка |
+|---|---|---|---|
+| сессия завершилась успешно, неисправленных ошибок нет | — | 0 | процесс (аргументы `run-check.py`) |
+| ошибка сессии (провайдер и пр.) | её тип и имя 0.4 | 1 | процесс (401 → `ProviderAuthError`) |
+| отклонённый вопрос разрешения (без флага; и у подагента) или отказ по правилу (`permission.rejected`) | `CLI_PERMISSION_REJECTED` | 1 | процесс; подагент — подменённый сервер |
+| ошибка инструмента, не исправленная тем же вызовом или чтением исправленного пути (`run-outcome` 0.4) | `CLI_TOOL_FAILED` | 1 | процесс (аргументы `evals`), 0.4-случаи по записям |
+| `loginom_dock_prepare` без подключения (`LOGINOM_CONFIG_REQUIRED`) | то же | 2 | по записанным вызовам |
+| `loginom_dock_prepare`: Help не готов, вход или браузер отказали | `LOGINOM_CONNECTION_NOT_READY` | 1 | по записанным вызовам |
+| вызов Loginom с ошибкой `LOGINOM_CALL_UNCERTAIN` или `LOGINOM_RECOVERY_REQUIRED` | `LOGINOM_RECOVERY_REQUIRED` | 4 (поверх прочего) | по записанным вызовам |
+| вопрос модели (`question`), который прогон отменил, а модель ответила без него | — | 0 | по записанным вызовам; проба (ниже) |
+| Ctrl+C (SIGINT) | `CLI_CANCELLED` (в JSON; в тексте — в stderr) | 130 | процесс: во время ответа модели и во время чтения stdin |
+| `--headless` с `--no-headless`, `--variant` без `--model` | — (stderr `CLI_ARGUMENT_INVALID: …`) | 2 | процесс и единичные |
+| профиль занят (B2.7a1) | причина частного сервера | 3 | `cli-profile-service.test.ts` (B2.7a1) |
+
+Ошибки v2 до сессии (`File not found`, сервер не поднялся) у продукта идут и в stderr, как у `failure()` 0.4.
+
+**Вопрос модели — найдено после ревью и исправлено (`34d0a5c8ba`).** 0.4 запрещал `question` в `run` правилом, и инструмента
+у модели не было. v2 его предлагает, а `run` отменяет форму с просьбой продолжить без ответа: вызов заканчивается ошибкой.
+Без исключения такой вызов считался неисправленной ошибкой инструмента — проба `<scratchpad>/b27a4-runs/scenarios.ts
+question` до исправления: `tool_use question error "This non-interactive run cannot ask the user questions…"`, затем
+ответ модели, итог `CLI_TOOL_FAILED`, код 1. Теперь `question` в итог не входит.
+
+**Отмена во время чтения stdin — найдено и исправлено.** `run` без сообщения читает промпт из stdin до конца потока.
+Если поток — открытая труба, Ctrl+C не прерывал чтение: прогон и частный сервер держались до 10 с `ShutdownDeadline`, и
+процесс выходил с кодом 1, оставив частный сервер с защёлкой профиля (проба `<scratchpad>/b27a4-runs/probe-stdin.ts`):
+
+```text
+# до исправления: SIGINT через 6 с после запуска
+{"code":1,"afterSignalMs":11529,"stderr":"shutdown did not finish within 10s; exiting. Still pending:\n  14.9s  child 251521 running: …/bun …/loginom-cli.ts se…","writer":true}
+# после
+{"code":130,"afterSignalMs":143,"stdout":"","stderr":"","writer":false,"requests":0}
+```
+
+Чтение теперь уступает сигналу отмены, как `readPromptStdin` 0.4 (`run/run.ts`). Это аналог теста 0.4 «bootstrap carries
+an early signal into stdin admission».
+
+### B2.7a4: сверка с потребителями
+
+Потоки записаны с настоящего CLI (`UPDATE_EVENT_FIXTURES=1 bun test test/cli-run.test.ts` в `packages/cli`) в
+`evals/fixtures/events/cli-run/{success,tool-failed,permission-rejected,provider-auth,cancelled}.jsonl` и `.exit`; путей
+временных каталогов и ключей в них нет. Обычный прогон того же теста сравнивает с ними форму каждого события (тип, поля,
+значения `type`/`status`/`tool`/`name`/`reason`, порядок) и код выхода; у `cancelled` — только статусы и ошибки (когда
+начинается шаг до прерывания, зависит от времени).
+
+`evals/test/cli-run-events.test.ts` читает их кодом `evals` и `run-check.py`:
+
+| Поток | Код | `parseEvents` / `failureKind` | `run-check.py` |
+|---|---|---|---|
+| `success` (аргументы `run-check.py`) | 0 | сессия `ses_…`, ошибок нет, покрытие провайдера `complete`, `read` и `webfetch` завершены, токены 30/6/0, ответ «Ответ: 4.» | `records`: 11 событий, сессия — та же, `model_replies` — квитанция `{"operation_id":"fixture-operation","status":"SUCCEEDED"}`, ответ — последний `text` |
+| `tool-failed` (аргументы `evals`) | 1 | `CLI_TOOL_FAILED` → `tool` | — |
+| `permission-rejected` | 1 | `CLI_PERMISSION_REJECTED` → `permission` | — |
+| `provider-auth` | 1 | `ProviderAuthError` → `provider` | — |
+| `cancelled` | 130 | `CLI_CANCELLED` → `cancelled` | — |
+
+Короткий прогон `evals` на новом CLI — собственный `runAgent` `evals` (его аргументы, надзор процессов, разбор, `run.json`)
+против входа продукта из исходников и заглушки модели (`<scratchpad>/b27a4-runs/evals-accept.ts`). `runAgent` отказывает
+режиму source, а режиму binary нужен bubblewrap, которого здесь нет (`which bwrap` пуст), поэтому CLI передан явной
+командой; всё после запуска — код `evals`:
+
+```text
+{"exitCode":0,"sessionId":"ses_df8e89fbeffe69VY0YSyiTVBlu","errors":[],"failureKind":"other",
+ "tools":[{"tool":"read","status":"completed"}],"tokens":{"input":20,"output":4,"reasoning":0},
+ "finalText":"Сумма qty: 3.","coverage":{"provider":"complete",…},"processCleanup":"confirmed",
+ "stderrHead":"","runJson":true,"writer":false}
+```
+
+`run-check.py` — командная строка `run-check.py:2656` целиком (`--headless --format json --dir --model --variant medium
+--dangerously-skip-permissions --file`) в `cli-run.test.ts`, её поток — `success.jsonl` выше, код 0 (`phase` требует 0).
+Собранный бинарник не собирался: вход тот же (`loginom-cli.ts`), флаги разбирает он.
+
+### B2.7a4: тесты 0.4
+
+Семь из 23 тестов, отложенных B2.7a3, относятся к `run`:
+
+| 0.4 | На v2 |
+|---|---|
+| `standalone` «bootstrap carries an early signal into stdin admission and releases its handler» | `cli-run.test.ts` «Ctrl+C while run waits for its prompt on stdin…»: 130, защёлка снята, модель не спрошена (с исправлением выше; без него — красный, M18) |
+| `standalone` «Ctrl+C during provider metadata fetch drains cleanup and releases the writer» | для `run`: «Ctrl+C while the model answers…»: 130, `CLI_CANCELLED`, `busy`/`idle`, защёлка снята, следующий `run` на профиле — 0 |
+| `standalone-preflight` «lazy scenario preparation preserves standalone connection exit» (unconfigured, help-unavailable, browser-unavailable) | по записанным вызовам (`run/product.test.ts`): `LOGINOM_CONFIG_REQUIRED` → 2, `LOGINOM_CONNECTION_NOT_READY` и отказы входа/браузера → 1. Сквозь процесс — нет: из исходников у сервера нет ресурсов и Host |
+| `standalone-preflight` «a real Help refusal does not turn an ordinary standalone answer into a connection failure» | там же: ошибка `loginom_read` не даёт ни ошибки подключения, ни кода; сквозь процесс — нет (Host) |
+| `standalone-file-errors` missing, directory, denied | `cli-run.test.ts`: код 1, только событие `error`, причина в stderr, модель не спрошена, защёлка снята. Тексты v2 (`File not found: …`, `Cannot attach a directory, special file, or file larger than 10 MiB: …`), не коды `LOGINOM_FILE_*`. `denied` пропускается под root (root читает файл без прав; тесты шли под root) |
+| `standalone-file-errors` «--file over 10 MiB sends a durable reference» | **не перенесён**: v2 отказывает файлу больше 10 МиБ до модели (`run/run.ts`); ссылка с квитанцией вместо снимка — `referenceParts`, вынесено в B2.5d (оценка S) |
+
+Два теста `standalone` об отмене `providers login`/`auth login` (метаданные провайдера, команда учётных данных) — не `run`:
+отмену любой команды v2 даёт `runMain` (130), команда учётных данных — поток upstream; не переносил.
+
+`run-outcome.test.ts` 0.4 перенесён в `run/product.test.ts` с `read` v2 (`path` вместо `filePath`). Не перенесены случаи
+ошибки смещения («Offset N is out of range…», 3 теста и 2 группы `test.each`): `read` v2 за концом файла возвращает пустую
+страницу без ошибки (`core/src/tool/read-filesystem.ts`), чинить нечего. «a missing read is repaired in %s» (другой
+`messageID`) слит: в наблюдаемом вызове `messageID` нет.
+
+### B2.7a4: `--dangerously-skip-permissions`
+
+`cli-run.test.ts`, профиль с политикой конфига `tool.use` `edit:*blocked*` → `deny` (замена запрета администратора:
+B2.6c не сделана), с флагом:
+
+| Вызов модели | Что стоит на пути | Итог |
+|---|---|---|
+| `write allowed.txt` | вопрос `edit` (умолчание B2.6a) | флаг ответил «один раз» — файл создан |
+| `write blocked.txt` | запрет политики («Blocked by configuration policy») | не выполнен |
+| `execute`: `tools.write({path: 'codemode.txt'})` | `write` — прямой инструмент, `codemode: false` | «Unknown tool 'write'» — не выполнен |
+| `shell touch shell.txt` | терминал выключен (B2.6a) | «No tool named "shell"…» — не выполнен |
+
+В каталоге проекта после прогона — только `allowed.txt`, код не 0. Проверяется только, выполнился ли вызов: текст отказа и
+то, что делает ход дальше, меняет B2.6b.
+
+### B2.7a4: мутации
+
+`<scratchpad>/b27a4-runs/mutate.py`: одна замена строки, тесты, `git checkout` файла; на коммитах выше. Без мутаций —
+`run/product.test.ts` 44/0, `cli-run.test.ts` 10/0, `evals/test/cli.test.ts` 48/0 (2 skip), `cli-run-events.test.ts` 6/0.
+После прогона `git status` — только несохранённые документы.
+
+| Мутация | Тесты | Итог |
+|---|---|---|
+| M1 восстановление даёт 1 вместо 4 | `run/product` | **40/2** |
+| M2 `LOGINOM_CONFIG_REQUIRED` даёт 1 вместо 2 | `run/product` | **41/1** |
+| M3 отказ разрешения больше не мешает «исправить» чтение | `run/product` | **40/2** |
+| M4 `provider.auth` без имени `ProviderAuthError` | `cli-run` «provider failure» | **0/1** |
+| M5 отказ вопроса не помечает прогон (`reject`) | `run/product` | **42/1** (подагент; до этого случая выживала — главный сеанс видит отказ по ошибке инструмента) |
+| M6 флаг больше не отвечает «один раз» | `cli-run` «lifts neither» | **0/1** |
+| M7 отмена без `CLI_CANCELLED` | `cli-run` «Ctrl» (оба случая Ctrl+C) | **1/1**: во время ответа модели |
+| M8 нет `session.status busy` | `cli-run` «run-check» | **0/1** |
+| M9 вызовы инструментов не наблюдаются | `cli-run` «arguments of evals» | **0/1** (код 0) |
+| M10 ошибки без полей 0.4 | `cli-run` «arguments of evals» | **0/1** |
+| M11 текстовый `--file` снова вклеивается в промпт | `cli-run` «run-check» | **0/1** |
+| M12 `--dir` не задаёт `PWD` | `cli-run` «run-check» | **0/1** |
+| M13 `--headless` не снимается | `cli-run` «run-check» | **0/1** (ошибка разбора) |
+| M14 `CLI_ARGUMENT_INVALID` — код 1 | `cli-run` «invalid arguments» | **0/1** |
+| M15 политика `tool.use` не запрещает (`core/src/config/plugin/policy.ts`) | `cli-run` «lifts neither» | **0/1** |
+| M16 `evals`: `subagent` не снимает покрытие | `evals/test/cli` | **0/1** |
+| M17 `evals`: режим source снова `src/standalone.ts` | `evals/test/cli` | **0/1** |
+| M18 чтение stdin не уступает отмене | `cli-run` «stdin» | **0/1** (и после `34d0a5c8ba`, без проверки по часам) |
+| M19 отменённый вопрос снова неисправленная ошибка | `run/product` | **43/1** |
+
+### B2.7a4: приёмка
+
+`repo-paths.test.ts` (`packages/product`), по строкам. Падающих тестов по-прежнему три (их держат строки B5.1):
+
+| Строка | База | Теперь | Чья |
+|---|---|---|---|
+| `evals/src/cli.ts: "packages", "opencode"` | есть | нет | B2.7a4 |
+| `evals/src/profile.ts: packages/opencode` | есть | нет | B2.7a4 |
+| `evals/test/cli.test.ts: "packages", "opencode"`, `…: packages/opencode` | есть | нет | B2.7a4 |
+| `packages/cli/script/build.ts: packages/opencode` (комментарий B2.7a1) | есть | нет | B2.7a1 (`a2dd07913d`) |
+| `scripts/node-acceptance/tests/required-checks.test.mjs: packages/opencode` | есть | есть | B2.7a10 по нарезке (фикстуры теста) |
+| `script/test-windows-profile.ps1: packages/opencode` | есть | есть | хвост B2.7c (с B5.1) |
+| workflows `loginom-windows.yml`, `windows-native-check.yml` (`packages/opencode`, пути `--filter`, `paths`), `loginom-macos.yml` (`--filter`) | есть | есть | B5.1 |
+
+Полные прогоны по пакетам (`<scratchpad>/b27a4-runs/suites.sh`): база — `7bbbe29a8c` в `<scratchpad>/b27a4-base`, итог —
+`7998ed8bfc`; `LOGINOM_AI_AGENT_TEST_NODE` задан. Падения сравнивались по именам.
+
+| Пакет | Команда | `7bbbe29a8c` | `7998ed8bfc` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 451 pass, 9 skip, 0 fail | 504 pass, 9 skip, 0 fail (+43 `run/product`, +10 `cli-run`; upstream `run/noninteractive.test.ts` без изменений и зелёный) |
+| `product` | `bun test` | 60 pass, 3 fail (`repo-paths`) | 60 pass, 3 fail — те же три теста, строки выше |
+| `evals` | `bun run test:unit` | 1317 pass, 66 skip, 24 fail | 1323 pass, 66 skip, 24 fail (+6 `cli-run-events`) |
+
+`evals`: 23 падения общие (калибровка, `unzip`, архив профиля, `loadSlots` и др. — в коде B2.7a4 не участвуют). Одно —
+только на базе («a third infrastructure error during the journal read…», `campaign-admission`), одно — только в итоге
+(«main: отказ архива исходного infra_error…», `infra-retry`): итог шёл параллельно с прогонами базы и `cli`, отдельно этот
+тест в итоге — 3 из 3 pass.
+
+```text
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,213 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc         # код 0
+$ cd evals && bun run typecheck                    # tsc --noEmit, код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 455 divergent upstream files                  # было 454: +cli/src/run/noninteractive.ts
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # без изменений
+$ bun run check                                     # код 0, с этим разделом в дереве
+Found 558 warnings and 0 errors.                    # как на базе (B2.7a3); в файлах B2.7a4 предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+`prettier`: файлы `packages/cli` отформатированы (`noninteractive.ts`, `run.ts`, `standalone.ts`, `loginom-cli.ts` и до
+правок проходили `--check`); `evals` — в стиле соседнего кода (`prettier` там не применяют).
+
+### B2.7a4: где решал сам
+
+- **`--dir` и `--variant` — на стороне CLI, во входе продукта**, а не у потребителей и не в `commands.ts`: ни одного файла
+  upstream, `evals`, `run-check.py` и `run-node-selection-attempt.ts` передают их без изменений, и явный каталог снимает
+  ловушку старого `PWD`. В справке `run --help` этих флагов нет (справка — дерево команд v2).
+- **`--headless` принимается и ничего не меняет.** Host запускает сервер (`cli/src/server-process.ts` →
+  `ServiceHost.start`), режим браузера задан в `loginom-agent/src/host.ts` (`headless: false`), а `loginom-agent` правит
+  B2.6b. Передать режим можно только частному серверу (служба профиля одна на все прогоны, её Host уже запущен) —
+  переменной окружения и чтением в `host.ts`. Сделать после B2.6b; пока `run --headless` открывает видимый браузер, когда
+  дойдёт до Loginom.
+- **Режим продукта — по `LOGINOM_AI_AGENT_CLI_ROOT`**, как в 0.4: его ставит вход продукта и наследуют процессы профиля.
+  CLI Desktop (`index.ts`) печатает поток upstream; тесты upstream `noninteractive.test.ts` не менялись и проходят.
+- **Поля 0.4 — рядом с полями v2**, а не вместо них: поток v2 остаётся валидным для его читателей.
+- **Ошибки итога — после `idle`**, одним местом; 0.4 печатал `CLI_PERMISSION_REJECTED` в момент отказа. `evals` порядок
+  ошибок не читает.
+- **Код 4 — по потоку**, а не по состоянию Host в конце, как в 0.4: Host у сервера, маршрута о его восстановлениях нет.
+  Признак — ошибка вызова `loginom_*` с `LOGINOM_CALL_UNCERTAIN` или `LOGINOM_RECOVERY_REQUIRED` (их отдаёт
+  `host-port.ts`). Восстановление, из-за которого аренда Host отказана до вызова (модель получает только подсказку),
+  кода 4 не даёт.
+- **Коды Loginom сравниваются как есть.** `LOGINOM_CONFIG_REQUIRED` и коды входа/браузера — точным совпадением текста
+  ошибки, как в 0.4; восстановление — по началу строки. Текст ошибки вызова Dock на v2 — голый код: у этих кодов нет
+  `reasons` в `loginom-host/src/errors.ts`, поэтому `hostErrorText` не дописывает `: {…}`, а `dock.ts` бросает
+  `Error(hostErrorText(…))`. Что сообщение `Error` плагина доходит до `state.error.message` без приставки, проверено
+  локально (не закоммичено): в `server/test/loginom-dock-catalog.test.ts` проверка `toContain` ошибки
+  `local_package_path requires open_package…` заменена на `toMatch(/^local_package_path requires …\. Путь: \//)` — 1 pass.
+- **Код 2 — только `LOGINOM_CONFIG_REQUIRED` и `CLI_ARGUMENT_INVALID` входа.** Ошибка разбора флагов v2 по-прежнему 1
+  (§10: 2) — правка фреймворка CLI, не `run`.
+- **При Ctrl+C код 130 даже с восстановлением**: его ставит `runMain` (`index.ts`); событие `LOGINOM_RECOVERY_REQUIRED`
+  перед `CLI_CANCELLED` всё равно печатается. В 0.4 оставался 4.
+- **`--file` у продукта — всегда вложение `data:` с именем** (текстовый файл — `text/plain`, модель видит «Attached file:
+  …» и содержимое), как снимок 0.4; иначе CSV становился текстом промпта, и прогон Dock его не допускал (B2.5d берёт
+  вложения `inline` с именем).
+- **Отмена во время чтения stdin исправлена** (правка upstream `run/run.ts`): это отложенный тест 0.4 этой задачи, и
+  без исправления зависший прогон держит частный сервер и защёлку профиля.
+- **Строка `build.ts` (B2.7a1)** исправлена отдельным коммитом: комментарий, путь 0.4 без `packages/`.
+- **Строка 208 `run-node-selection-attempt.ts`** — по коду выхода 3: на v2 код 3 даёт только занятый профиль (B2.7a1),
+  частный сервер выходит до приёма промпта. Тест на неё не добавлял (нужен полный сценарий с манифестом ресурсов).
+- **`evals`, режим source:** кроме входа — `LOGINOM_AI_AGENT_RESOURCES` (v2 читает ресурсы из неё); прежний
+  `LOGINOM_AI_AGENT_CLI_BUNDLE` оставлен: по нему надзор процессов находит браузер.
+- **`catalog.md` правлен вне своего раздела журнала** (CAT-08, CAT-12): общее правило — каждая правка upstream
+  записана в каталоге; `catalog.json` не менялся.
+- **Ctrl+C-случаи — только вне Windows** (`test.if`): там сигнал завершает процесс сразу, пути отмены нет.
+- **Файлов кода больше пяти нарезки:** `standalone.ts`, `loginom-cli.ts` (флаги во входе продукта), новый `run/product.ts`
+  (чтобы правка upstream была крючками), строка `run-node-selection-attempt.ts` (пункт 4 задания); `commands/handlers/run.ts`
+  не понадобился.
+
+### B2.7a4: согласовать с владельцем
+
+- **`run --command loginom-automation`** (вопрос B2.7a3) по-прежнему открыт; `run-node-selection-attempt.ts` его передаёт,
+  и на v2 это ошибка разбора.
+- **Режим браузера `--headless`** — после B2.6b (выше); у службы профиля Host один на все прогоны.
+
+### B2.7a4: найдено, не чинил
+
+- **Подготовка `evals` на v2 не пройдёт:** `ensureProfile`/`verifyProfile` зовут `loginom status/setup --format json`
+  (B2.7b), `assertAuth` — `providers status --provider … --format json` (общий OAuth, `shared-oauth-status-v1`) или ищет
+  ключ в `<профиль>/data/auth.json`, а v2 держит ключи в базе (`credential`) и команды `providers` не имеет; подсказка
+  `providers login`. Прогон агента (`runAgent`) на v2 работает (выше). Нужны B2.7b и решение о проверке учётных данных.
+- **`run-node-selection-attempt.ts` на v2:** кроме `--command`, `readSelectionSnapshot` читает таблицы v1
+  `session`/`message`/`part`.
+- **Без `--title` v2 просит модель придумать заголовок** — отдельный запрос без инструментов на каждый прогон
+  (`run-check.py` `--title` не передаёт).
+- **`todowrite` в `run` продукта** (находка B2.7a3) не запрещён: в список задания не входил.
+- **`--file`:** любой сбой открытия v2 называет «File not found» (и `EACCES`); `.lgp` уходит байтами, а не путём, как в 0.4
+  (`packageParts`, B2.5d).
+
+### B2.7a4: не проверено
+
+- Собранный CLI (`build-cli.ts`) — только вход из исходников.
+- `evals`: сопоставление процессов профиля по входу `loginom-cli.ts` (`evals/src/profile.ts:235`), путь
+  `LOGINOM_AI_AGENT_RESOURCES` до сервера в режиме source, ветка `PROFILE_BUSY` в `evals/src/report.ts` (теперь держится
+  на строке причины в stderr у продукта) — тестами не проверены.
+- Полные прогоны пакетов — на `7998ed8bfc`; после него (`34d0a5c8ba`) — только `run/product`, `cli-run` и upstream
+  `run/noninteractive.test.ts`: 77 pass, 0 fail.
+- Настоящий Host и Loginom: коды 2 и 4 и ошибки `loginom_*` — по записанным вызовам, не сквозь процесс; `--headless`.
+- `denied` у `--file` — тесты шли под root. Windows и macOS.
+- `evals` в режиме binary с bubblewrap и его `main()` (подготовка профиля — выше); строка 208 `run-node-selection-attempt.ts`.

@@ -19,7 +19,7 @@ import { Product } from "@loginom-ai-agent/product"
 
 const dir = path.resolve(import.meta.dirname, "..")
 // Loginom AI Agent (B2.7a): `--standalone` builds the product CLI from its entry, which applies the CLI profile, as 0.4 did
-// (`a080f7725c:packages/opencode/script/build.ts`). The default build stays the CLI that Desktop bundles.
+// (0.4 `opencode/script/build.ts` at `a080f7725c`). The default build stays the CLI that Desktop bundles.
 const standalone = process.argv.includes("--standalone")
 const binary = standalone ? Product.cliExecutable : "opencode"
 const outdir = path.resolve(

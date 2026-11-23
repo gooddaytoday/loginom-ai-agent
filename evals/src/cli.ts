@@ -54,7 +54,8 @@ export function parseEvents(text: string, secrets: string[] = []) {
   const sessionId = events.find(event => typeof event.sessionID === "string")?.sessionID
   const statuses = events.filter(event => event.type === "session.status")
   const providerComplete = Boolean(sessionId) && statuses[0]?.status?.type === "busy" && statuses.at(-1)?.status?.type === "idle" &&
-    events.every(event => event.sessionID === undefined || event.sessionID === sessionId) && !tools.some(part => part.tool === "task") &&
+    // A delegated session's model work is not in this stream: `task` in 0.4, `subagent` on OpenCode 2.
+    events.every(event => event.sessionID === undefined || event.sessionID === sessionId) && !tools.some(part => part.tool === "task" || part.tool === "subagent") &&
     events.length === text.split("\n").filter(line => line.trim()).length
   const steps = events.filter((event) => event.type === "step_finish").map((event) => event.part)
   const sum = (pick: (part: Part | undefined) => number | undefined) =>
@@ -134,12 +135,14 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
   if (config.slotsFile && config.agent.cliMode === "binary" &&
     Object.entries(isolated).some(([name, value]) => /^(?:https?_proxy|all_proxy)$/i.test(name) && value !== ""))
     isolated.NODE_USE_ENV_PROXY = "1"
+  // The product CLI entry of OpenCode 2 (B2.7a4) reads its resources from LOGINOM_AI_AGENT_RESOURCES; the bundle
+  // variable is what the process supervisor reads the browser from.
   if (config.agent.cliMode === "source")
     return {
       mode: "source" as const,
-      cmd: ["bun", "run", "src/standalone.ts"],
-      cwd: path.join(repoRoot, "packages", "opencode"),
-      env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
+      cmd: ["bun", "run", "src/loginom-cli.ts"],
+      cwd: path.join(repoRoot, "packages", "cli"),
+      env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle, LOGINOM_AI_AGENT_RESOURCES: config.agent.bundle },
     }
   if (config.agent.cliMode === "binary") return { mode: "binary" as const, cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
   return { mode: "fake" as const, cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }

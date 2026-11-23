@@ -1,0 +1,3 @@
+{"type":"session.status","timestamp":1795414321337,"sessionID":"ses_df8f799bcffe4L2ySNWzriga9X","status":{"type":"busy"}}
+{"type":"session.status","timestamp":1795414321401,"sessionID":"ses_df8f799bcffe4L2ySNWzriga9X","status":{"type":"idle"}}
+{"type":"error","timestamp":1795414321402,"sessionID":"ses_df8f799bcffe4L2ySNWzriga9X","error":{"type":"CLI_CANCELLED","message":"CLI_CANCELLED","name":"CLI_CANCELLED","data":{"message":"CLI_CANCELLED"}}}
