@@ -31,6 +31,7 @@
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/platform-node": "catalog:",
     "@loginom-ai-agent/loginom-agent": "workspace:*",
+    "@loginom-ai-agent/loginom-host": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/plugin": "workspace:*",
