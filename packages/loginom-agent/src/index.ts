@@ -13,6 +13,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { classify, grantable, settle, withDefaults, type Kind } from "./permissions"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -38,6 +39,28 @@ const runner = {
 
 // Prompt metadata key that carries the wizard's one-time token to the `prompt` hook; the hook removes it.
 const token = "loginom.runner"
+
+// «Разрешать в этом разговоре» (B2.6a): the answer to one open request that also allows its kind for the rest of the
+// session. The button is stage C.
+const permission = {
+  id: "loginom.permission",
+  methods: {
+    conversation: {
+      input: {
+        type: "object",
+        properties: { sessionID: { type: "string" }, requestID: { type: "string" } },
+        required: ["sessionID", "requestID"],
+        additionalProperties: false,
+      },
+      output: { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] },
+      // The terminal (В-31) and a request the product does not ask by default are answered one at a time.
+      errors: {
+        not_grantable: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
+      },
+    },
+  },
+  events: {},
+} as const
 
 export default Plugin.define({
   id: "loginom.product",
@@ -135,6 +158,35 @@ export default Plugin.define({
           await task(event.sessionID),
         )
         .catch(() => undefined)
+    })
+
+    // Product permissions (B2.6a, `./permissions`): the defaults go into every agent's rules, the hook settles what rules
+    // cannot express. It is registered before `localFiles`, whose rules-only check then still turns a remaining `ask`
+    // into `allow`. Conversation grants are memory only, keyed by the exact session ID, like access grants: a restart
+    // asks again, and a subagent's or a fork's session holds none.
+    const subagents = new Set<string>()
+    const conversation = new Map<string, Set<Kind>>()
+    await ctx.agent.transform((editor) => {
+      subagents.clear()
+      editor.list().forEach((agent) => {
+        if (agent.mode === "subagent") subagents.add(agent.id)
+        editor.update(agent.id, (item) => {
+          item.permissions.splice(
+            0,
+            item.permissions.length,
+            ...withDefaults(item.permissions).map((rule) => ({ ...rule })),
+          )
+        })
+      })
+    })
+    await ctx.permission.hook("evaluate", (event) => {
+      const settled = settle(
+        event,
+        event.agent !== undefined && subagents.has(event.agent),
+        conversation.get(event.sessionID) ?? new Set(),
+      )
+      event.effect = settled.effect
+      if (settled.message) event.message = settled.message
     })
 
     // Local data files for Loginom (B2.5a). `loginom_file_admit` takes the execution's Host lease and answers
@@ -245,6 +297,28 @@ export default Plugin.define({
           .prompt({ sessionID: input.sessionID, text: input.text, metadata: { [token]: key } })
           .finally(() => pending.delete(key))
         return { granted: true }
+      },
+    })
+    await ctx.rpc.register(permission, {
+      conversation: async (value, call) => {
+        const input = value as { sessionID: string; requestID: string }
+        const request = await ctx.permission.get(input)
+        const entry = classify(request.action, request.resources)
+        if (!entry || !grantable(entry))
+          return call.error("not_grantable", `${request.action} is asked for every time`, { action: request.action })
+        conversation.set(input.sessionID, new Set([...(conversation.get(input.sessionID) ?? []), entry.kind]))
+        // The request itself and the session's other open requests the grant now covers are answered once; nothing is
+        // saved for the project, unlike OpenCode's `always`.
+        const open = await ctx.permission.list({ sessionID: input.sessionID })
+        await Promise.all(
+          open
+            .filter((item) => {
+              const other = classify(item.action, item.resources)
+              return item.id === request.id || (grantable(other) && other?.kind === entry.kind)
+            })
+            .map((item) => ctx.permission.reply({ sessionID: input.sessionID, requestID: item.id, decision: "once" })),
+        )
+        return { kind: entry.kind }
       },
     })
 

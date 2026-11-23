@@ -635,6 +635,56 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
+
+  it.live(
+    "a Dock call names what it acts on, so the product's permission kinds tell a save and an export apart (B2.6a)",
+    () =>
+      Effect.gen(function* () {
+        const tool = (name: string, properties: Record<string, unknown>) => ({
+          name,
+          description: `${name} tool`,
+          inputSchema: { type: "object", properties: { host_context_token: { type: "string" }, ...properties } },
+        })
+        const host = scriptedHost({
+          catalog: () => [
+            tool("dock_prepare", { intent: { type: "string" } }),
+            tool("dock_node_apply", { target: { type: "object" } }),
+            tool("dock_action_run", { action_key: { type: "string" } }),
+          ],
+        })
+        const asked: { action: string; resources: readonly string[] }[] = []
+        const test = yield* boot(host, (ctx) =>
+          ctx.permission.hook("evaluate", (event) =>
+            Effect.sync(() => {
+              if (event.action.startsWith("loginom_dock_"))
+                asked.push({ action: event.action, resources: event.resources })
+            }),
+          ),
+        )
+        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "Демо.lgp"), "LGP package bytes"))
+        const id = yield* test.create("kinds")
+        yield* test.wizard(
+          id,
+          script(
+            { tool: "loginom_dock_node_apply", input: { target: { kind: "new", type: "exports.text" } } },
+            { tool: "loginom_dock_node_apply", input: { target: { kind: "new", type: "transform.sort" } } },
+            { tool: "loginom_dock_action_run", input: { action_key: "package.save_as" } },
+            { tool: "loginom_dock_prepare", input: { intent: "open_package", local_package_path: "Демо.lgp" } },
+            { tool: "loginom_dock_prepare", input: { intent: "open_package" } },
+            { text: "end" },
+          ),
+        )
+        expect((yield* test.calls(id)).map((part) => part.state.status)).toEqual(Array(5).fill("completed"))
+        expect(asked).toEqual([
+          { action: "loginom_dock_node_apply", resources: ["exports.text"] },
+          { action: "loginom_dock_node_apply", resources: ["transform.sort"] },
+          { action: "loginom_dock_action_run", resources: ["*"] },
+          { action: "loginom_dock_prepare", resources: ["local_package"] },
+          { action: "loginom_dock_prepare", resources: ["*"] },
+        ])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
 })
 
 describe("OpenCode hooks the Dock catalog relies on (contract)", () => {

@@ -238,7 +238,11 @@ export async function dockTools(input: {
         )
     }
     const packagePath = localPackage ? (args.local_package_path as string) : undefined
-    await input.files.ask(call, { action: key, resources: ["*"], save: ["*"] }).catch((error) => {
+    // The resource tells the product's permission kinds apart (B2.6a): an uploaded local package is a save, an export
+    // node writes outside the package.
+    const target = name === "dock_node_apply" ? (args.target as { type?: unknown } | undefined)?.type : undefined
+    const resource = localPackage ? "local_package" : typeof target === "string" ? target : "*"
+    await input.files.ask(call, { action: key, resources: [resource], save: ["*"] }).catch((error) => {
       throw packagePath ? permissionFailure(resolve(directory, packagePath), error) : error
     })
     const forwarded = { ...args }

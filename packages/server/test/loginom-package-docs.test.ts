@@ -161,8 +161,10 @@ const boot = Effect.gen(function* () {
   const harness = yield* Effect.promise(() => ready.promise)
   const sessions = Context.get(context, Session.Service)
   const handler = Context.get(context, HttpRouter.HttpRouter).asHttpEffect().pipe(HttpEffect.toWebHandlerWith(context))
-  // 0.4's session had no rules of its own unless the case gave some; the agent's rules apply.
-  const create = (permissions: Permission.Rule[] = []) =>
+  // 0.4's session had no rules of its own unless the case gave some; the agent's rules apply. 0.4's `build` wrote without a
+  // question; the product's default asks (B2.6a), so a session for `build` allows `edit` as 0.4 did, and the case's rules
+  // follow. Another agent keeps its own rules (`plan` denies writing).
+  const create = (permissions: Permission.Rule[] = [], build = true) =>
     Effect.gen(function* () {
       const session = yield* sessions.create({
         title: "package docs",
@@ -170,7 +172,10 @@ const boot = Effect.gen(function* () {
         model: model.ref,
         location,
       })
-      yield* sessions.setPermissions({ sessionID: session.id, permissions })
+      yield* sessions.setPermissions({
+        sessionID: session.id,
+        permissions: [...(build ? [{ action: "edit", resource: "*", effect: "allow" as const }] : []), ...permissions],
+      })
       return session.id
     })
   const prompt = (sessionID: Session.ID, text: string, files?: { uri: string }[]) =>
@@ -178,7 +183,7 @@ const boot = Effect.gen(function* () {
   // 0.4 `prepare`: a session with the case's rules and, optionally, the user's attachment in its history.
   const prepare = (options: { attachment?: string; permissions?: Permission.Rule[]; agent?: string } = {}) =>
     Effect.gen(function* () {
-      const sessionID = yield* create(options.permissions)
+      const sessionID = yield* create(options.permissions, options.agent === undefined)
       if (options.attachment) yield* prompt(sessionID, script({ text: "attached" }), [{ uri: options.attachment }])
       return {
         sessionID,
