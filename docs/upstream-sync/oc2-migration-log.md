@@ -18042,3 +18042,241 @@ CAT-12, абзац «подпись входа и ошибки ACP»: спосо
 - ACP с настоящим клиентом (Zed и т. п.) и запуск `terminal-auth`; собранный standalone-бинарник — не собирался.
 - Метка в оболочках установленного 0.4 — только чтением кода, 0.4 не запускался.
 - Тесты гонялись только на Linux; ветка PowerShell новой проверки `$env:LOGINOM_AI_AGENT` — нет.
+
+## B2.7a10b Встроенный ripgrep и required-checks
+
+23.11.2026. Задача B2.7a10b, ветка `b27a10b-bundled-ripgrep` от `oc2-migration` (`490facc2be`), рабочее дерево
+`.claude/worktrees/b27a10b`. Эталон 0.4 — `v0.4.0` (`a63462dde1`). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд; `bun install --frozen-lockfile` — код 0, `.husky/_` появился. `npm ci --ignore-scripts
+--offline` клиента `packages/loginom-runtime/client` — в этом дереве и в дереве базы `<scratchpad>/b27a10b/base`
+(`490facc2be`, detached; после приёмки удалено). Настоящий `HOME` читали только установки: `bun install` — кэш Bun
+(в этом дереве без `unshare`, пакеты из кэша за 1 с; в базе — под `unshare -n`), `npm ci --offline` — кэш `/root/.npm`
+(`--logs-dir` в scratchpad). Тесты — с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE`
+задан, `LOGINOM_AI_AGENT_RIPGREP_CACHE` — копия архива ripgrep 15.1.0 в scratchpad (SHA256 совпал с пином), и под
+`unshare -n` (поднят только `lo`): сети у тестов нет. Модель не вызывалась: `serve` поднимается без сессий и промптов.
+`packages/desktop/test/loginom/*` (B4.14c) не трогал.
+
+Прочитано: этот журнал — B2.7a7, a10, a12 («Найдено, не чинил», «Вопрос владельцу»); `catalog.md` (CAT-07);
+`scripts/node-acceptance/{required-checks.py,required-checks.md}`, его тест. 0.4 — `v0.4.0:packages/opencode/src/cli/
+{standalone-run.ts,standalone-bundle.ts}`, `desktop/src/main/{proxy-env.ts,server.ts,loginom/desktop-service.ts}`,
+`core/src/ripgrep/binary.ts`, `git ls-tree v0.4.0 packages/opencode/src`. v2 — `cli/src/{server-process.ts,resources.ts,
+loginom-cli.ts}`, `desktop/src/main/{loginom/resources.ts,service/background-service.ts}`,
+`client/src/{effect/service.ts,service-contender.ts}`, `core/src/{ripgrep.ts,ripgrep/binary.ts,util/which.ts,
+filesystem/search.ts}`, `loginom-host/{src/bundled-ripgrep.ts,script/stage-resources.ts,script/build-cli.ts}`,
+`desktop/scripts/bundle-loginom.ts`, `loginom-agent/src/host.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `9e1528b21b` `fix(cli): put the bundled ripgrep of the resources on PATH (B2.7a10b)` | `cli/src/server-process.ts` (+4); тест `cli/test/bundled-ripgrep.test.ts` |
+| `a0ffe520ce` `fix(node-acceptance): stop on the v2 agent packages (B2.7a10b)` | `scripts/node-acceptance/required-checks.py` (+3 −1); тест `required-checks.test.mjs` |
+| `c54d432223` `docs(upstream-sync): record bundled ripgrep and required-checks (B2.7a10b)` | этот раздел; CAT-07 в `catalog.md` |
+| `89efe9f9bf` `test(cli): skip the bundled ripgrep test where no rg is pinned (B2.7a10b)` | пропуск на архитектуре без пина, как в тесте `loginom-host` |
+| следующий | уточнения этого раздела |
+
+Файлов кода два (предел — пять); остальное — тесты и документы.
+
+### Часть 1. Откуда 0.4 брал ripgrep
+
+Ядро 0.4 само ресурсов не знало: `core/src/ripgrep/binary.ts` искал `rg` по `PATH` (`which`), иначе качал с GitHub.
+Путь давали входы продукта — корень ресурсов, тот же, что в `LOGINOM_AI_AGENT_RESOURCES`, плюс `<ресурсы>/ripgrep`
+в конец `PATH` функцией `withBundledRipgrep` (`loginom-host/src/bundled-ripgrep.ts`, в v2 без изменений):
+
+| Вход 0.4 | Корень ресурсов | Вызов |
+|---|---|---|
+| CLI продукта | `standaloneBundle()`: `resources/loginom` рядом с бинарником после `cli-manifest`; из исходников — `LOGINOM_AI_AGENT_CLI_BUNDLE` | `standalone-run.ts:67-68`: `process.env.LOGINOM_AI_AGENT_RESOURCES = …`, `withBundledRipgrep(process.env, …)` |
+| Desktop | `loginomResources()`: `<resourcesPath>/loginom`; из исходников — `desktop/resources/loginom` | `proxy-env.ts` `sidecarEnvironment`: то же в окружении сайдкара |
+
+Значит, путь шёл не из переменной: вход знал корень, ставил переменную и `PATH` вместе. Системный `rg` раньше в `PATH`
+выигрывал.
+
+### Часть 1. v2
+
+Во входах продукта ядро v2 работает только в сервере `serve`: в `packages/cli` его запускает лишь
+`cli/src/server-process.ts` (`@opencode/server/process`), Desktop, TUI, `run` и `mini` обращаются к службе или к
+дочернему `serve --stdio` (`cli/src/services/standalone.ts`). Сервер
+встраивает ещё SDK (`sdk/src/internal/host.ts`), но его не импортирует ни один пакет продукта. Корень ресурсов приходит
+в `serve` как `LOGINOM_AI_AGENT_RESOURCES`:
+
+| Вход v2 | Откуда переменная |
+|---|---|
+| Служба Desktop | `LoginomResources.serviceEnvironment` (B4.8a, только собранное приложение) → `spawnServiceContender`: `{ ...process.env, ...env }` |
+| Собранный CLI | `CliResources.apply()` (B2.7a2): проверенные `resources/loginom` рядом с бинарником |
+| Из исходников, `evals` | явное значение |
+
+Правка — в `server-process.ts` сразу после `CliResources.apply()` (и после сохранённого окружения службы):
+`if (LOGINOM_AI_AGENT_RESOURCES) withBundledRipgrep(process.env, …)` — от профиля не зависит, поэтому покрывает и
+службу Desktop без профиля CLI. Ядро не менялось: `RipgrepBinary` по-прежнему ищет `rg` в `PATH` (`which` читает
+`process.env.PATH` при первом поиске), затем в `<cache>/bin`, затем качает. Порядок как в 0.4: системный `rg` →
+встроенный → скачанный.
+
+**Скачивания в сборке продукта нет**, пока ресурсы на месте: собранный CLI без полного артефакта не стартует
+(`LOGINOM_BUNDLE_INCOMPLETE`), `cli-manifest` и `resource-manifest` хэшируют `ripgrep/rg`. Сборка по умолчанию без
+продукта (`opencode` из исходников без `LOGINOM_AI_AGENT_RESOURCES`) ведёт себя как upstream: качает `rg` с GitHub со
+сверкой SHA256, без сети поиск файлов падает (третий тест ниже), `glob` — тоже (тест B2.7a10 в `loginom-host`).
+
+**Ресурсы Desktop и CLI (п. 2).** Добавлять нечего: `loginom-host/script/stage-resources.ts:123-124` кладёт
+`ripgrep/rg` и `licenses/ripgrep/*` без условия по `flavor`; его вызывают `desktop/scripts/bundle-loginom.ts`
+(`flavor: "desktop"`, B4.8a) и `loginom-host/script/build-cli.ts` (`flavor: "cli"`, B2.7a2).
+
+### Часть 1. Тест
+
+`packages/cli/test/bundled-ripgrep.test.ts` (Linux): настоящий `serve --port 0` дочерним процессом, `PATH` — пустой
+каталог (в тесте `Bun.which("rg", { PATH })` — `null`), `LOGINOM_AI_AGENT_DISABLE_FFF=1` (иначе поиск файлов API идёт
+через fff, а не ripgrep), все `*_PROXY` — на подставной TCP-сервер, который записывает первую строку каждого соединения и
+закрывает его. Проект с `src/table.csv`, запрос `GET /api/fs/find?query=table`. `rg` — выпуск по пину, разложенный
+`stageRipgrep` из кэша сборки. Новое условие набора `cli`: архив ripgrep в кэше (`LOGINOM_AI_AGENT_RIPGREP_CACHE` или
+`~/.cache/loginom-bootstrap/ripgrep`), иначе `beforeAll` скачает его с GitHub — как тест `loginom-host` B2.7a10; на базе
+набору `cli` архив не был нужен. Только Linux с пином (`linux-x64`); иначе файл пропускается. Дочерних `serve` — три:
+третий, контрольный, показывает, что подставной сервер действительно видит скачивание, иначе первые два могли бы
+пройти впустую.
+
+| Тест | Ожидание |
+|---|---|
+| сервер с ресурсами (`src/index.ts`, `LOGINOM_AI_AGENT_RESOURCES`, без профиля — как служба Desktop и запуск из исходников) | `200`, `["src/table.csv"]`, соединений нет, `rg*` в кэше нет |
+| собранный CLI (Bun жёсткой ссылкой `bin/loginom-ai-agent-cli`, `src/loginom-cli.ts`, артефакт с `ripgrep/rg` и манифестами, переменная не задана) | то же |
+| без ресурсов | не `200`, подставной сервер видел `CONNECT github.com:443 HTTP/1.1` |
+
+```text
+$ unshare -n sh -c '. env.sh && ip link set lo up && cd packages/cli && bun test test/bundled-ripgrep.test.ts'
+ 3 pass
+ 0 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [9.78s]
+```
+
+### Часть 2. `required-checks`
+
+В 0.4 RULES ставил `main-chat-approval` на `packages/opencode/**`; `core`, `cli`, `server`, `tui` в 0.4 уже были и в
+правило не входили. Куда ушёл код `packages/opencode/src` 0.4 — `git ls-tree v0.4.0 packages/opencode/src` (436 файлов)
+и поиск переименований:
+
+```text
+$ git diff -M30% -l0 --diff-filter=R --name-status v0.4.0 490facc2be -- packages/opencode/src \
+    packages/{core,server,cli,loginom-agent,util,ai,plugin,tui,app,ui,desktop,codemode,simulation,schema,protocol,client}/src \
+    packages/plugins packages/product
+```
+
+| 0.4 `packages/opencode/src/…` | v2 | Файлов (≥30 %) |
+|---|---|---|
+| `cli/cmd/run/*` (интерактивный `run`) | `tui/src/mini/*` | 20 (30–75 %) |
+| `acp/`, `cli/`, `cli/cmd/debug/` | `cli/src/…` | 4 |
+| `session/prompt/*.txt`, `tool/apply_patch.txt` | `core/src/…` | 5 |
+| `tool/loginom-file-*`, `session/{loginom-result,browser-recovery}.ts`, `util/file-snapshot.ts` | `loginom-agent/src/…` | 5 |
+| `server/**` (57 маршрутов) | `server` — переписан, переименований нет | 0 |
+
+В `util`, `ai`, `plugin`, `plugins`, `app`, `ui`, `desktop`, `codemode`, `simulation`, а вторым прогоном — в
+`dashboard`, `loginom-host`, `loginom-runtime`, `sdk`, `session-ui`, `gui-plugins`, `data`, `plugin-browser`,
+`process-daemon` переименований из `packages/opencode/src` нет и при 30 %. Остальной код upstream переписал без следа
+переименований; `server` взят по заданию (маршруты HTTP 0.4 — `server/routes/**`).
+
+Ноль переименований — слабый довод, поэтому файлы продукта 0.4 без пары проверены по экспортам (`git grep -w` по
+`packages`, без тестов): `toolPolicy`, `turnLifecycle` → `loginom-agent/src/dock.ts`, `index.ts`, `local-file.ts`;
+`skillSource` → `loginom-agent/src/skills.ts`; `installationNode` → `cli/src/services/product-updater.ts` — все в
+правиле. `attachmentResolver`, `toolContributor`, `pluginDependency`, `dashboardRules`/`dashboardRoot`/
+`isDashboardWork`/`dashboardPathError` (`product/dashboard-session.ts`), `Dashboard*Tool` (`tool/dashboard.ts`),
+`dashboardFlag` (`cli/standalone-dashboard.ts`) в v2 нет — не перенесены. Логика черновика дашборда
+(`dashboard/src/agent/*`) и в 0.4 жила в `packages/dashboard` (от `v0.4.0` — одна строка), а не в `packages/opencode`.
+
+Правило теперь: `packages/core/**`, `packages/server/**`, `packages/cli/**`, `packages/loginom-agent/**`,
+`packages/tui/src/mini/**` (вместо `packages/opencode/**`), остальное как было (`protocol`, `schema`, `client/src/generated*`,
+контракты). Из `tui` — только `src/mini`: это и есть код `packages/opencode` 0.4; остальной `tui` в 0.4 уже был своим
+пакетом. `app`, `ui`, `desktop` не добавлены.
+
+Тест `required-checks.test.mjs`: в `public/agent stop` по пути на каждый новый шаблон (`core/src/ripgrep/binary.ts`,
+`server/src/handlers/fs.ts`, `cli/src/server-process.ts`, `loginom-agent/src/index.ts`, `tui/src/mini/runtime.ts`);
+новый цикл `no agent stop` — `tui/src/app.tsx`, `app/src/app.tsx`, `ui/src/actions/button/button.tsx`,
+`desktop/src/main/index.ts`, `client/src/effect/client.ts` без `main-chat-approval`. `node --test`: база — 65 pass,
+итог — 75 pass, 0 fail.
+
+### Мутации
+
+`<scratchpad>/b27a10b/mutate.py`: одна правка в дереве, адресный тест, файл возвращается из `HEAD`; после прогона дерево
+чистое. Без мутаций адресные тесты зелёные (3 из 3, 75 из 75).
+
+| Мутация | Тест | Итог |
+|---|---|---|
+| M1 вызов не подключён (строки удалены) | `bundled-ripgrep` | **2 fail** (оба положительных: `status: 500`, `requests: ["CONNECT github.com:443 HTTP/1.1"]`) |
+| M2 вызов только при профиле CLI | `bundled-ripgrep` | **1 fail** (сервер с ресурсами без профиля) |
+| M3 вызов до `CliResources.apply()` | `bundled-ripgrep` | **1 fail** (собранный CLI) |
+| M4 `PATH` дописан в копию окружения | `bundled-ripgrep` | **2 fail** |
+| M5–M9 без `core` / `server` / `cli` / `loginom-agent` / `tui/src/mini` | `required-checks` | **по 1 fail** — свой путь в `public/agent stop` |
+| M10 весь `packages/tui/**` | `required-checks` | **1 fail** (`no agent stop: packages/tui/src/app.tsx`) |
+| M11 снова `packages/opencode/**` | `required-checks` | **5 fail** (все новые пути) |
+| M12 `packages/**` | `required-checks` | **7 fail** (5 `no agent stop` и 2 теста `verify`) |
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b27a10b/suites.sh`): база — `490facc2be` в `<scratchpad>/b27a10b/base`, итог —
+`a0ffe520ce`; `bun test --timeout 60000` по пакетам, база и итог подряд на той же машине, каждый под `unshare -n` со
+свежими временными `HOME`/`TMPDIR`/`XDG_*`. Падения сравнивались по именам.
+
+| Пакет | `490facc2be` | `a0ffe520ce` |
+|---|---|---|
+| `cli` | 587 pass, 9 skip, 0 fail, 2427 expect | 590 pass, 9 skip, 0 fail, 2434 expect (+3 теста `bundled-ripgrep`) |
+| `core` | 7124 pass, 354 skip, 4 fail, 96630 expect | 7124 pass, 354 skip, 4 fail, 96105 expect; падения те же |
+| `loginom-host` | 546 pass, 13 skip, 2 fail, 3374 expect | то же; падения те же |
+| `scripts/node-acceptance` (`node --test tests/*.test.mjs`) | 819 pass, 0 fail | 829 pass, 0 fail (+10 в `required-checks`) |
+
+Падения `core` на обоих — те же четыре, что в B2.7a7 (`isolates global home and XDG roots`, `ShellParse > extracts
+static directory targets…`, два `fails … on unwritable lock roots`); `loginom-host` на обоих — `archive verification
+preserves manifest modes under a private umask`, `actual managed entry reads live bridge work…`. Число `expect` у `core`
+плавает и на базе (B2.7a7). Новых падений нет. `repo-paths.test.ts` (`packages/product`): 6 pass, 3 fail на базе и на
+итоге, списки в падениях совпадают — новых `packages/opencode` в скриптах нет.
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,227 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 609 divergent upstream files                  # как на базе: server-process.ts уже в CAT-07
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun run check                                     # код 0, на a0ffe520ce перед коммитом журнала, под unshare -n
+Found 905 warnings and 0 errors.                    # предупреждений в изменённых файлах нет
+ Tasks:    39 successful, 39 total                  # 38 из кэша turbo
+```
+
+`prettier --check` `bundled-ripgrep.test.ts` проходит; `server-process.ts` не проходил и на базе (строки `apply-identity`),
+свои строки — в форме prettier. `oxlint` двух файлов `cli` — 0 предупреждений.
+
+После `89efe9f9bf` (только условие пропуска теста): `bun typecheck` `cli` — 0 ошибок, `bundled-ripgrep` — 3 pass,
+M1–M3 снова красные (2, 1, 1 fail). На `c54d432223` повторно: `catalog-check.py` — код 0, 609 файлов;
+`apply-identity --check` — 0 файлов.
+
+### Каталог
+
+CAT-07, «Компоненты»: `cli/src/server-process.ts` — ещё +4 (B2.7a10b, `rg` ресурсов в `PATH`), тест форка
+`cli/test/bundled-ripgrep.test.ts`; «Политика»: строки встроенного `rg` — `fork-owned`. `catalog.json` не менялся:
+`server-process.ts` уже в CAT-07, `scripts/` и новый тест — файлы форка.
+
+### Где решал сам
+
+- **Вызов в `server-process.ts`, а не в ядре.** Как в 0.4: ядро не знает ресурсов продукта, вход кладёт `rg` в `PATH`.
+  Одна точка закрывает все три входа, потому что ядро v2 работает только в `serve`. Переменная продукта в `core`
+  была бы правкой upstream без нужды.
+- **Условие — переменная, а не профиль.** Служба Desktop профиля CLI не имеет (M2).
+- **Поиск файлов API вместо `glob` с подставной моделью.** Тот же `RipgrepBinary` процесса; `glob` через модель —
+  сессия, промпт и потоковый ответ ради того же пути. fff выключен переменной, иначе `fs.find` ripgrep не трогает.
+- **`tui/src/mini/**`, а не весь `tui` и не ничего.** Задание: «другие, если их код был там». Код `mini` пришёл из
+  `packages/opencode/src/cli/cmd/run` 0.4 (20 файлов); остальной `tui` — нет. Меньший полный вариант — только этот
+  каталог.
+- **`server` без переименований — по заданию.** Маршруты 0.4 жили в `packages/opencode/src/server`.
+- **Не стал менять `required-checks.md`:** он отсылает к таблице RULES, путей не перечисляет.
+
+### Найдено, не чинил
+
+- **Desktop из исходников** в v2 службе ресурсов не даёт (B4.8a: «run from source adds nothing»), в 0.4 давал
+  `desktop/resources/loginom`. Без явного `LOGINOM_AI_AGENT_RESOURCES` такая служба качает `rg`, как upstream.
+- **`complete()` Desktop** (`desktop/src/main/loginom/resources.ts`) перед стартом службы проверяет манифест, Node, вход
+  Host и помощник macOS, но не `ripgrep/rg`; его хэш проверяет `--verify-resources` установщика. Если файл пропадёт
+  после установки, ядро тихо уйдёт качать.
+- **Ядро по-прежнему может качать**, если в ресурсах нет `rg`: запрета скачивания в сборке продукта нет и в 0.4 не было.
+- На этой ветке правка `cli/src/server-process.ts` сама попадает под новое правило `main-chat-approval`.
+
+### Не проверено
+
+- Собранные установленные артефакты (Desktop, CLI) — не собирались; полная раскладка ресурсов
+  (`stage-resources.test.ts`, нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`) — пропущена, как на базе.
+- Инструменты `glob` и `grep` с моделью — только общий `RipgrepBinary` через `fs.find`.
+- Только Linux; ключ `Path` Windows и `rg.exe` — чтением кода (`withBundledRipgrep` не менялся с 0.4).
