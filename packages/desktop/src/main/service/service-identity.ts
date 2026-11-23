@@ -41,6 +41,17 @@ export function serviceFile() {
 }
 
 /**
+ * The data directory of Desktop's service, as the CLI takes it (`Global.Path.data` in packages/util): its Host keeps the
+ * Loginom connection in `<data>/loginom` (B2.3). Read at call time, after the shell environment is in place, as the
+ * service inherits it.
+ */
+export function serviceData() {
+  const data = process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share")
+
+  return path.join(data, directory)
+}
+
+/**
  * Stops Desktop's own service, the one registered in `serviceFile()`, when the app quits (B4.10): the stop request of
  * B2.3b first, which lets the service close its plugins and Loginom runtimes on Windows too, then SIGTERM and SIGKILL if
  * it does not answer or exit in time. The service of OpenCode, of a CLI profile or of another channel is not touched.
