@@ -14,6 +14,7 @@ import {preflightBooleanBindings} from '../lib/variable-binding-source.mjs';
 import {booleanBindingSchema} from '../lib/variable-binding-parameters.mjs';
 import {validateGroupingParameters} from '../lib/grouping-parameters.mjs';
 import {validateSortingParameters} from '../lib/sorting-parameters.mjs';
+import {compactNodeResult} from '../lib/user-results.mjs';
 for(const cleanup of [true,false])test('proved native error uses NODE_EXECUTION_FAILED and standard release; cleanup='+cleanup,async()=>{
  const f=fixture(),message='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
  f.drivers.finish=async()=>{throw Object.assign(Error(message),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message,native:{source:'loginom_error_toast'}}});};
@@ -47,6 +48,20 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+test('successful text preview tells the caller to continue on its existing import node',async()=>{
+ const f=fixture(),r=request();
+ r.parameters={preview_only:true};r.finish='close';r.read.ports=[];
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',execution_started:false,
+  settings_applied:false,draft_discarded:true,server_profile:{destination:'/example/input.csv'}});
+ const result=await f.run(r);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(result.node.node_id,'node1');
+ assert.equal(result.configuration.status,'discarded');
+ assert.equal(result.next_step?.tool,'dock_node_apply');
+ assert.match(result.next_step.instruction,/target.kind="existing".*target.ref.*node/);
+ const reply=compactNodeResult({operation_id:r.operation_id,state:'settled',outcome:{status:result.status,output:result}});
+ assert.deepEqual(reply.next_step,result.next_step);
+});
 for(const [type,mode,parameter] of [['transform.group_data','aggregate','/sort_result'],['transform.sorting','keys','/compare_with_locale']])
 test(type+' target preflight retains the builtin source node required by v040',async()=>{
  const f=fixture(),p=request(),source={document_id:'doc',workflow_id:'workflow',node_id:'variables'},table={...source,node_id:'table'};

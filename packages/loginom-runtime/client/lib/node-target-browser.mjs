@@ -246,11 +246,27 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const p=await locator.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;
       const hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw new Error('Target is covered');return{x,y};});return p;
   };
-  const drag=async(source,to)=>{const from=await point(source);remaining();const current=await read(page,task);
+  const drag=async(source,to,paletteTid)=>{
+    let previous;
+    // The accordion can keep scrolling after the selected palette row becomes visible.
+    const from=paletteTid?await wait('stable_palette_row',async()=>{
+      const next=await point(source);
+      const stable=previous?.x===next.x&&previous.y===next.y;
+      previous=next;
+      return stable?next:null;
+    }):await point(source);
+    remaining();const current=await read(page,task);
     // Deselection can replace node SVG after its first readback. Only moves
     // permit fresh node drawing epochs; root/document and all graph data match.
     if(task.effect.kind==='move'?!sameGraph(gestureBefore,current):JSON.stringify(current)!==JSON.stringify(gestureBefore))throw new Error('Graph or DOM epoch changed before drag');
-    await page.mouse.move(from.x,from.y);held=true;effectPossible=true;
+    await page.mouse.move(from.x,from.y);
+    if(paletteTid){
+      placementNavigation.palette_source={tid:paletteTid,point:from};
+      await ensureContext();
+      if(!await source.evaluate((row,p)=>row.contains(document.elementFromPoint(p.x,p.y)),from))
+        throw Error('Palette row moved before mouse down');
+    }
+    remaining();held=true;effectPossible=true;
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
   try {
     const before=await read(page,task);
@@ -339,7 +355,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }
-      await drag(find(palette),target);
+      await drag(find(palette),target,palette);
     }else if(kind==='rename'){
       const tid=await targetTid(p.ref);await point(find(tid+';Label;Label'));effectPossible=true;
       await find(tid+';Label;Label').dblclick({timeout:remaining()});transient=true;
@@ -586,7 +602,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
       const baseline=after,node=created[0],canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
-      if(settleJavascript && (node.type!==p.type || pendingNode && node.ref.node_id!==pendingNode))throw Error('Created JavaScript rendering owner changed');
+      if(node.type!==p.type){
+        outcome={after,create_mismatch:{expected:p.type,actual:node.type}};
+        throw Error('Created node type mismatch: expected '+p.type+', observed '+node.type);
+      }
+      if(settleJavascript && pendingNode && node.ref.node_id!==pendingNode)throw Error('Created JavaScript rendering owner changed');
       const visibility=await revealPosition({page,root:canvas,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(baseline,await read(page,task)))throw Error('Graph changed while revealing created node');}});
       placementNavigation.node_visibility=visibility;
@@ -595,7 +615,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
     outcome={status:'SUCCEEDED',effect_possible:true,after};
-  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
+  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;

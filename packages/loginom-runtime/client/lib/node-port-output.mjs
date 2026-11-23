@@ -407,7 +407,8 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
    const batchProxy=interfaceId===71?bg.rpc?.TIBGDataSourceRpcCachedInternal_Proxy:null;
-   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
+   const getValueAsString=interfaceId===71?bg.rpc?.TIBGDataSource_Proxy?.prototype?.GetValueAsString:null;
+   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
   const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
@@ -515,7 +516,14 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     // Settle every started full-text RPC before refusing or disposing its column.
     const fullValues=await Promise.allSettled(rawValues.map(async(raw,column)=>{
      if(!['string','variant'].includes(schema[column].type)||typeof raw!=='string'||raw.length<5000&&!raw.endsWith('…'))return raw;
-     live();stable();const full=await items[column].AsString(row);live();stable();
+     live();stable();
+     if(direct&&typeof items[column].AsString!=='function'){
+      // Interface 71 can expose metadata-only columns. Its cached instance getter returns the same prefix as GetValues.
+      const text={$:null};
+      const present=await sourceBaseline.getValueAsString.call(dataSource,row,column,text);live();stable();
+      need(present===true&&typeof text.$==='string','string_value');return text.$;
+     }
+     const full=await items[column].AsString(row);live();stable();
      need(typeof full==='string','string_value');return full;
     }));
     need(fullValues.every(item=>item.status==='fulfilled'),'cell_read_failed');

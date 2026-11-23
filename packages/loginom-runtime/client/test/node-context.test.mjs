@@ -149,6 +149,24 @@ test('D52 input breadcrumb binding requires the exact native node, port and open
  }
 });
 
+test('text export context retains the diagram port and its separate wizard index',async()=>{
+ const f=fixture(),p=f.enterInputBreadcrumbs();
+ p.opening.node.FIconCls='bg-vendor-icon-exporttextfile';
+ p.opening.port.FPortIndex=0;
+ p.opening.wizardIndex=1;
+ p.portTree.FIndex=1;
+ const result=await readPreparedNodeContext(f.page,f.binding);
+ assert.equal(result.verified,true);
+ assert.equal(result.input_port.port,0);
+ assert.equal(result.input_port.native_index,1);
+
+ p.opening.port.FPortIndex=1;
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ p.opening.port.FPortIndex=0;
+ p.portTree.FIndex=0;
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+});
+
 test('native input ancestry binds each exact indexed opening with the same component proof',async()=>{
  for(const index of [0,1,2]) {
   const f=fixture(),p=f.enterInputBreadcrumbs();

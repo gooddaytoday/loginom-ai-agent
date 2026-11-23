@@ -382,6 +382,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       ...['GroupDataWizard;pedSortResult','SortingWizard;SortingColumnCollection;chkLocaleAware'].flatMap(base=>['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(part=>{const owner='[data-tid$=";WizrdMCF;'+base+';'+part+'"]';return [owner,owner+' input',owner+' [data-recordid]'];})),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl','cbbFileInfoColumnsType;ValueControl','cbbMaxThreadCount;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
+      '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;cntConnection"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl;DisplayEl"]',
       ...['',';DisplayEl'].map(suffix=>'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;chkParallelProcessing;ValueControl'+suffix+'"]'),
@@ -1762,6 +1763,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       wizard.completion={fields,ready:Object.values(fields).every(f=>f.status==='observed' && !f.truncated && f.enabled && f.value && !/[\0\r\n]/.test(f.value))
         && ['Автоматическая метка','Пользовательская метка'].includes(fields.label_mode.value),settings_applied:false};
     }
+    if(wizard.status==='observed' && wizard.stage==='python_code') {
+      const buttons=(tids.get(wizard.root_tid+';btnError')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&enabled(e)&&!sensitive(e));
+      const message=buttons.length===1?buttons[0].getAttribute('data-qtip'):null;
+      if(typeof message==='string'&&message.length>0&&message.length<=4096)
+        wizard.python_validation={status:'observed',root_ref:wizard.root_ref,message,source:'loginom_wizard_error_tooltip'};
+    }
     if(wizard.status==='observed' && wizard.stage==='calculator') {
       const base=wizard.root_tid+';CalcDataWizard;';
       const errorButtons=tids.get(wizard.root_tid+';btnError')??[];
@@ -2070,6 +2077,24 @@ function readRenderedInputMapping(observation) {
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;';
       const fields=Object.fromEntries(Object.entries({source_path:'edtFileName;ValueControl',connection:'edtConnection',
         encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl',file_info:'cbbFileInfoColumnsType;ValueControl',max_threads:'cbbMaxThreadCount;ValueControl'}).map(([name,key])=>{
+        if(name==='connection' && globalThis.bg?.app?.IsFileConnectionHidden===true){
+          const rows=tids.get(base+'cntConnection')??[];
+          const owners=tids.get(base+key)??[];
+          const row=rows[0],owner=owners[0];
+          if(rows.length===1 && owners.length===1 && wizardForms[0].contains(row) && row.contains(owner)
+            && !sensitive(owner) && getComputedStyle(row).display==='none'){
+            const native=globalThis.Ext?.getCmp?.(row.id);
+            const inputs=[...owner.querySelectorAll('input:not([type="hidden"])')];
+            charge(inputs.length);
+            const input=inputs[0];
+            // Loginom hides this native row for the default local file storage.
+            if(native?.el?.dom===row && native.hidden===true && inputs.length===1
+              && !sensitive(input) && input.readOnly && input.value==='Локальное'){
+              return [name,{status:'observed',value:'Локальное',value_length_utf16:'Локальное'.length,
+                truncated:false,enabled:false,read_only:true,value_kind:'default_local_storage'}];
+            }
+          }
+        }
         if(name==='source_path'){
           const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
           const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
@@ -4770,13 +4795,34 @@ function readRenderedInputMapping(observation) {
         }
         else if (task.action.verb === 'fill') {
           await clickTarget(1);
-          await first.press('ControlOrMeta+A', { timeout: timeout() });
-          if (!(await first.evaluate(element => document.activeElement === element))) fail('UI_FOCUS_CHANGED', 'The observed editor lost keyboard focus');
-          timeout();
-          // Loginom's transient rename editor commits real keyboard input; fill()
-          // alone did not update its component model in live acceptance.
-          if (task.action.text) await page.keyboard.type(task.action.text, { delay: 0 });
-          else await first.press('Backspace', { timeout: timeout() });
+          const dateEditor=current.ui.elements.find(item=>item.ref===task.action.ref)?.date_time_cell;
+          if(dateEditor?.role==='format_editor'){
+            // Input events query the preset list and can expand a valid custom format.
+            const applied=await first.evaluate((input,{text,recordId})=>{
+              const suffix=';tbl;celleditor;FormatStrEditor;cbx';
+              const owner=input.closest('[data-tid$="'+suffix+'"]');
+              if(!owner||document.activeElement!==input||input.readOnly)return false;
+              const gridTid=owner.getAttribute('data-tid').slice(0,-suffix.length);
+              const panel=owner.closest('[data-tid='+JSON.stringify(gridTid)+']');
+              const getCmp=id=>globalThis.Ext?.getCmp?.(id);
+              const grid=panel&&getCmp(panel.id),combo=getCmp(owner.id);
+              const editor=grid?.findPlugin?.('cellediting');
+              const record=editor?.context?.record;
+              if(grid?.el?.dom!==panel||editor?.editing!==true||editor.context.column?.dataIndex!=='DoString'
+                ||!record?.isModel||String(record.internalId)!==recordId||record.data.Func!==18||record.data.ISO8601!==false
+                ||combo?.el?.dom!==owner||combo.inputEl?.dom!==input||combo.forceSelection!==false||typeof combo.setValue!=='function')return false;
+              combo.setValue(text);
+              return input.value===text;
+            },{text:task.action.text,recordId:dateEditor.record_id});
+            if(!applied)fail('DATE_FORMAT_EDITOR_CHANGED','The native date format editor or its exact value changed');
+          } else {
+            await first.press('ControlOrMeta+A', { timeout: timeout() });
+            if (!(await first.evaluate(element => document.activeElement === element))) fail('UI_FOCUS_CHANGED', 'The observed editor lost keyboard focus');
+            timeout();
+            // Transient rename editors need real keyboard input to update their model.
+            if (task.action.text) await page.keyboard.type(task.action.text, { delay: 0 });
+            else await first.press('Backspace', { timeout: timeout() });
+          }
         } else if (task.action.verb === 'drag') {
           await page.mouse.move(targets[0].point.x, targets[0].point.y);
           timeout(); mouseHeld = true;
@@ -4972,10 +5018,13 @@ function readRenderedInputMapping(observation) {
                   const text=root.innerText;
                   return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
                 },dialogTid);
-                const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
+                const message=await readError();
+                const quoted=/Ошибка разбора выражения\s*(?:"([^"\r\n]{1,256})"|«([^»\r\n]{1,256})»)/.exec(message??'');
+                const nameOrLabel=quoted?.[1]??quoted?.[2];
+                const expressions=task.snapshot.node_calculator?.expressions?.filter(e=>e.name===nameOrLabel||e.label===nameOrLabel);
                 if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
                   ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1
-                  ||task.snapshot.node_calculator?.verified!==true||!task.snapshot.node_calculator.expressions.some(e=>e.name===field))break;
+                  ||!nameOrLabel||task.snapshot.node_calculator?.verified!==true||expressions?.length!==1)break;
                 const checked=await readUi();
                 if(!owned(checked)||checked.ui.masks.length||!same(checked.ui.dialogs,popup.ui.dialogs)
                   ||!same(checked.dom_epoch,popup.dom_epoch)||await readError()!==message)break;
@@ -4985,7 +5034,7 @@ function readRenderedInputMapping(observation) {
                   state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
                 if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Calculator preview error changed before OK');
                 timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
-                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:field,source:'loginom_calculator_preview_error_dialog'};
+                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:expressions[0].name,source:'loginom_calculator_preview_error_dialog'};
                 record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
               } finally {postActionRoot=wizardRoot;}
               if(calculatorDialogFailure) {
@@ -5427,16 +5476,17 @@ function readRenderedInputMapping(observation) {
           // a timeout never grants another gesture or an applied claim.
           for(let attempt=0;attempt<(task.opening_timeout_ms?225:24) && unchangedContext(observed)
             && (!destination(observed.wizard.stage) || observed.ui.masks.length);attempt++) {
-            const calculatorValidation=current.wizard.stage==='calculator';
-            const validation=calculatorValidation?observed.wizard.calculator_validation:observed.wizard.source_validation;
+            const kind=current.wizard.stage==='calculator'?'calculator':current.wizard.stage==='python_code'?'python':'source';
+            const validationKey=kind+'_validation',validation=observed.wizard[validationKey];
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
-              && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
+              && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref
+              &&(kind!=='python'||!same(current.wizard.python_validation,validation))) {
               // Confirm the owned error once more without issuing another gesture.
               timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readStepUi(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
-                && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
-                observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
-                fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
+                && same(fresh.wizard[validationKey],validation)) {
+                observed=fresh;record('wizard_'+kind+'_validation_failed',validation);
+                fail('WIZARD_'+kind.toUpperCase()+'_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
             } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readStepUi(await readUi()); }

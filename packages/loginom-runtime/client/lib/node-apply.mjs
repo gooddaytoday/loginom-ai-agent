@@ -546,6 +546,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    if(request.target.kind==='new'&&request.parameters.preview_only===true&&state.output?.server_profile)result.next_step={
+      tool:'dock_node_apply',original_operation_id:operation.id,
+      instruction:'To import this file, continue with a NEW operation_id, target.kind="existing" and target.ref set to this receipt\'s node. '
+        +'The preview leaves that node in the graph and discards the preview settings. Reuse the verified source and supply the full import settings.',
+    };
     if(['imports.text','imports.excel'].includes(request.target.type)&&operation.importBindingInventory)result.configuration.bindings=structuredClone(operation.importBindingInventory);
     const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
     if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);

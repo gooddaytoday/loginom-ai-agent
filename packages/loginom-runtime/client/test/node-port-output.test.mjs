@@ -7,7 +7,7 @@ import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
-function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,batch}={}) {
+function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,batch,getValueAsString}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const rpcCalls=[],uiCalls=[],disposed=[],elements=new Map();
  const el=tid=>{const e={id:tid,getAttribute:k=>k==='data-tid'?tid:null,classList:{contains:k=>k==='x-tab-active'},getBoundingClientRect:()=>({width:100,height:100}),contains:x=>e===x||e.children?.includes(x)};elements.set(tid,e);return e;};
@@ -44,7 +44,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -108,6 +108,28 @@ test('reads a completed interface 71 table in one server batch at the requested 
  assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
  assert.deepEqual(result.output.sample.map(row=>row.map(cell=>cell.value??null)),[['one',-0,'9007199254740993','two',true],[null,1.2345678901234567,'0','three',null]]);
  assert.equal(result.output.sample[0][1].decimal,'-0');assert.deepEqual(f.rpcCalls,[]);
+});
+
+test('interface 71 reads full text from the bound source when the column only exposes metadata',async()=>{
+ const text='{"response":"'+'я'.repeat(7000)+'"}',prefix=text.slice(0,4999)+'…',calls=[];
+ const f=fixture({rows:[[],[]],types:[4,5],batch:async(_source,_offset,_count,...out)=>{
+  const matrices=[[[false],[false]],[],[],[],[[0]],[[prefix]],[]];
+  out.forEach((arg,i)=>{arg.value=matrices[i];});
+ },getValueAsString:async function(row,column,out){
+  assert.equal(this,f.dataSource);calls.push([row,column]);out.$=text;return true;
+ }});
+ const r=await f.run({port:0,execution,rowOffset:1,sampleRows:1,requireExactNumbers:true});
+ assert.equal(r.verified,true,JSON.stringify(r));assert.equal(r.output.sample[0][1].value,text);
+ assert.deepEqual(calls,[[1,1]]);assert.equal(r.cleanup_complete,true);
+});
+
+test('interface 71 rejects a missing full string without publishing the batch prefix',async()=>{
+ const f=fixture({rows:[[]],types:[5],batch:async(_source,_offset,_count,...out)=>{
+  const matrices=[[[false]],[],[],[],[],[['prefix…']],[]];
+  out.forEach((arg,i)=>{arg.value=matrices[i];});
+ },getValueAsString:async(_row,_column,out)=>{out.$='';return false;}});
+ const r=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.equal(r.verified,false);assert.equal(r.output,undefined);assert.equal(r.cleanup_complete,true);
 });
 
 test('does not return a fresh table when the server batch omits a null flag',async()=>{

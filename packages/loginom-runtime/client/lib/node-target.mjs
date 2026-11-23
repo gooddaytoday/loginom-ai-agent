@@ -32,6 +32,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref))return null;
   const keep=(g,ids,edges=[])=>({nodes:g.nodes.filter(n=>!ids.includes(n.ref.node_id)).map(domainNode),links:g.links.filter(e=>!edges.includes(edgeKey(e))),variable_links:(g.variable_links??[]).filter(e=>!edges.includes(edgeKey(e)))});
   if(kind==='create'){
+    if(effect.receipt?.create_mismatch)return null;
     const added=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
     if(added.length!==1 || added[0].type!==p.type)return null;
     const id=added[0].ref.node_id,auto=after.links.filter(e=>!before.links.some(b=>edgeKey(b)===edgeKey(e)));
@@ -241,7 +242,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           try{await record({operation_id:effect.id,phase:'node_target_link_graph_refused',internal_provenance:'node_target_v1',before:snapshot(before),after:snapshot(after)});}
           catch{/* Keep the original reconciliation refusal if evidence is unavailable. */}
         }
-        throw new Error('Graph effect needs reconciliation');
+        throw new Error(receipt?.create_mismatch?receipt.error:'Graph effect needs reconciliation');
       }
       state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
       state.pending = null; state.last_graph=structuredClone(after);
@@ -565,7 +566,11 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
     await inspectNodeTarget({request,operation,adapter,record,deadline});
   check();
   const target=operation.targetPhase;
-  if(target?.pending)throw Error('Original target effect remains unresolved');
+  if(target?.pending){
+    const receipt=target.pending.receipt;
+    if(receipt?.create_mismatch)throw Error(receipt.error+'; inspect the unexpected node in the original workflow before continuing');
+    throw Error('Original target effect remains unresolved');
+  }
   const first=await adapter.observe(value,deadline,signal);
   check();
   const quiet=g=>g?.complete===true&&g.interaction_ready===true&&g.document_id===request.document_id&&same(g.workflow_ref,request.workflow_ref)

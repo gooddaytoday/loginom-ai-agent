@@ -465,6 +465,40 @@ test('input port binds its own group and socket without accepting the output eng
  f.wizard.FModelEnginePort=f.wizard.FModelSocket;f.wizard.FModelSocket={};
  assert.equal((await f.run()).verified,false);assert.equal(f.gestures.length,2);
 });
+
+for(const wizardIndex of [0,1])test(`text export opens its input with a hidden connection at wizard index ${wizardIndex}`,async()=>{
+ const f=fixture('input');
+ f.node.FIconCls='bg-vendor-icon-exporttextfile';
+ await f.page.evaluate(()=>{globalThis.bg.app.IsFileConnectionHidden=true;},null);
+ f.portTree.FIndex=wizardIndex;
+
+ const r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.equal(r.port,0);
+ assert.equal(r.native_index,wizardIndex);
+ assert.equal(f.port.FPortIndex,0);
+ assert.equal((await f.run()).replayed,true);
+ assert.equal(f.gestures.length,2);
+
+ f.portTree.FModelNodePort={};
+ assert.equal((await f.run()).verified,false);
+ assert.equal(f.gestures.length,2);
+});
+
+test('text export rejects an unrelated input index even when the connection is hidden',async()=>{
+ const f=fixture('input');
+ f.node.FIconCls='bg-vendor-icon-exporttextfile';
+ await f.page.evaluate(()=>{globalThis.bg.app.IsFileConnectionHidden=true;},null);
+ f.portTree.FIndex=2;
+ assert.match((await f.run()).error,/Opened port wizard owner differs/);
+});
+
+test('a different wizard index still refuses when the connection is visible',async()=>{
+ const f=fixture('input');
+ f.node.FIconCls='bg-vendor-icon-exporttextfile';
+ f.portTree.FIndex=1;
+ assert.match((await f.run()).error,/Opened port wizard owner differs/);
+});
 test('unresolved opposite-direction port opening prevents a new gesture',async()=>{
  const f=fixture('input');f.flags.foreignMenu=true;await f.run();
  f.task.direction='output';f.task.operation_id='another';f.flags.foreignMenu=false;

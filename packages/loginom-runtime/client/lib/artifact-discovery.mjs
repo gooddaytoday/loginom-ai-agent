@@ -288,7 +288,7 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
   return true;
  };
  try {
-  let reset=false;
+  let reset=false,missingRowRefreshed=false;
   for(let step=0;step<96&&Date.now()<deadline;step++) {
    const readiness=await waitReady(page,task,deadline,trace);
    const directory=await settledDirectory();
@@ -348,6 +348,11 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
    },{tid:gridTid,reset,epoch:roots.output.dom_epoch});
    uncertain=false;
    if(!move.applied&&move.code==='DISCOVERY_EPOCH_CHANGED')continue;
+   // A settled nonempty listing can still predate a successful upload.
+   if(!move.applied&&move.code==='DISCOVERY_FILE_NOT_FOUND'&&readiness.complete===true
+      &&!missingRowRefreshed&&refreshes<20&&await refreshDirectory()){
+    missingRowRefreshed=true;reset=false;continue;
+   }
    if(!move.applied)return result(move.code);
    moved=true;reset=move.reset;
    trace.push({event:'artifact_discovery_scroll',grid_tid:gridTid,directory:task.artifact.upload.directory,...move});

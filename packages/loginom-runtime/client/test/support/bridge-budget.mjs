@@ -19,7 +19,8 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 test('user-v1 final reply budgets and prepare knowledge admission over real MCP',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'loginom-bridge-budget-'));
  const resources=await createBundledSkillFixture(t);
- const compatibility={profile_id:'loginom-7.4.2-linux-chromium-ru',loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
+ const platform={darwin:'macos',linux:'linux',win32:'windows'}[process.platform];
+ const compatibility={profile_id:`loginom-7.4.2-${platform}-chromium-ru`,loginom_build:'7.4.2',platform,browser:'chromium'};
  const catalog=await createActionCatalogFixture(compatibility);
  const openPackage=process.env.LOGINOM_TEST_OPEN_PACKAGE==='1';
  const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;

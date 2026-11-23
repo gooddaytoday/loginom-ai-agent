@@ -153,7 +153,8 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
     validateTextImportPatch({source:{source_path:storageProof.destination}});
     return verified({source:structuredClone(storageProof)});
   }
-  const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),'Verified upload operation is missing or ambiguous');
+  const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),
+    'Verified upload operation is missing or ambiguous. Use output.upload_operation_id from the successful dock_artifact_deliver receipt.');
   const proof=verifiedLocalDelivery(u.artifact,u.outcome);
   requireValue(u.outcome.operation_id===s.upload_operation_id&&u.artifact.artifact_id===s.artifact_id
     &&proof.destination===(parameters.settings.source?.source_path??proof.destination)
@@ -431,7 +432,7 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
-  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path or delivery[/encoding]; Close, reuse node.';
+  parameterSchema.properties.preview_only.description='Preview unknown format. Close and reuse the receipt node as target.ref.';
   parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id; source_path only.';
   parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source.';
   parameterSchema.properties.settings.description='New source/format+columns/detection; existing patch.';

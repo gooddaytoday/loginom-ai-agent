@@ -1854,6 +1854,33 @@ test('replacement type portal exposes only items owned by the selected field and
  }
 });
 
+for(const mode of ['owned','hidden','foreign','transient'])
+test('Python Next reports only a stable error from the owned wizard: '+mode,async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';PythonCodeWizard;cmpCodeCM';
+ const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ let error,waits=0;
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{
+  await click(...args);
+  error=page.add('button',c.base+';btnError','Подробнее',undefined,mode==='foreign'?undefined:c.form);
+  error.attrs['data-qtip']='Исполняемый файл python3 не найден';
+  if(mode==='hidden')error.style.display='none';
+ };
+ page.waitForTimeout=async ms=>{
+  page.clock.advance(ms);waits++;
+  if(mode==='transient'&&waits===1){error.remove();c.marker.remove();page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);}
+ };
+ const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'done'},snapshot);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(mode==='owned'){
+  assert.equal(result.error.code,'WIZARD_PYTHON_VALIDATION_FAILED');
+  assert.equal(result.error.message,'Исполняемый файл python3 не найден');
+  assert.equal(waits,1);
+ }else if(mode==='transient')assert.equal(result.status,'SUCCEEDED');
+ else assert.equal(result.error.code,'WIZARD_STEP_NOT_CONFIRMED');
+});
+
 test('calculator Preview rejects a native formula error before Next or Done',async()=>{
  const page=new Page(),c=wizardStepFixture(page);
  c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
@@ -1933,18 +1960,19 @@ test('calculator Preview accepts only its native modal and closes with an observ
 });
 
 test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
- for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','foreign_message','other_field','changed_owner']) {
+ for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','display_label','ambiguous_label','foreign_message','other_field','changed_owner']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
-  // Journal C: native preview reports the malformed quoted id expression.
-  const message='Loginom '+build+' Настройка прервана 1. Ошибка разбора выражения "id" 1.1. Некорректный символ "\\ " Технические подробности OK';
+  const usesLabel=['display_label','ambiguous_label'].includes(fault);
+  const label='Стандартная ошибка доли A';
+  const message='Loginom '+build+' Настройка прервана 1. Ошибка разбора выражения "'+(usesLabel?label:'id')+'" 1.1. Неправильно расставлены скобки Технические подробности OK';
   const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
   const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
    async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
   const snapshot=(await execute({mode:'observe'})).output;
-  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'id',
-   formula:String.raw`Val(RegExMatchedSubExp("\"id\":([0-9]+)", Values, 1))`}]};
+  snapshot.node_calculator={verified:true,expressions:[{name:usesLabel?'se_A':fault==='other_field'?'Other':'id',label,
+   formula:'Sqrt(1/2'},...(fault==='ambiguous_label'?[{name:'se_B',label,formula:'Sqrt(1/3)'}]:[])]};
   const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);
    if(dialog){dialog.remove();return;}
@@ -1957,10 +1985,11 @@ test('observed Preview parse-error msgbox is read and dismissed before a typed r
   };
   page.waitForTimeout=async ms=>page.clock.advance(ms);
   const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
-  assert.equal(result.error.code,fault==='none'?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
-  assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
-  if(fault==='none') {
-   assert.equal(result.output.wizard.calculator_validation.field_name,'id');
+  const owned=['none','display_label'].includes(fault);
+  assert.equal(result.error.code,owned?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,owned?2:1);
+  if(owned) {
+   assert.equal(result.output.wizard.calculator_validation.field_name,usesLabel?'se_A':'id');
    assert.equal(result.output.wizard.calculator_validation.message,message);
    assert.equal(result.output.ui.dialogs.length,0);
   }
@@ -3889,6 +3918,32 @@ function importSourceFixture(page) {
   const display=page.add('span',base+'edtFirstLineAsTitle;ValueControl;DisplayEl','',undefined,header);display.attrs.class='x-form-checkbox';
   return {base,form,inputs,owners,header,native,display};
 }
+
+test('text import observes native local storage when Loginom hides its connection row',async()=>{
+  for(const mode of ['local','external','unverified','duplicate']) {
+    const page=new Page(),c=importSourceFixture(page);
+    const row=page.add('div',c.base+'cntConnection','',undefined,c.form);
+    row.id='connection-row';
+    row.style={display:'none'};
+    c.owners.connection.remove();
+    row.append(c.owners.connection);
+    if(mode==='external')c.inputs.connection.value='FTP';
+    if(mode==='duplicate')page.add('div',c.base+'edtConnection','',undefined,row);
+    page.context.bg.app.IsFileConnectionHidden=true;
+    page.context.Ext={getCmp:id=>id===row.id?{hidden:mode!=='unverified',el:{dom:row}}:null};
+
+    const snapshot=await page.observe();
+    const field=snapshot.wizard.import_source.fields.connection;
+    if(mode!=='local'){
+      assert.notEqual(field.status,'observed',mode);
+      continue;
+    }
+    assert.equal(field.status,'observed');
+    assert.equal(field.value,'Локальное');
+    assert.equal(field.enabled,false);
+    assert.equal(field.input_ref,undefined);
+  }
+});
 
 test('source code page selection verifies the original field after one native choice',async()=>{
   for(const mode of ['applied','delayed','unchanged','replaced']) {
@@ -8635,6 +8690,41 @@ for(const suffix of ['', '-1'])test('reform literal node cache picker uses the e
  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
  const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
  assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('date string-format editor sets the exact draft without invoking preset search',async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.viewportSize=()=>({width:1000,height:800});
+ const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:900,height:500});
+ const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:850,height:470},form);
+ const panel=page.add('div',base+'grdDataFormat','',{x:40,y:100,width:710,height:300},root);
+ panel.id='matrix';
+ page.add('div',base+'grdDataFormat;tbl','',{x:40,y:100,width:710,height:280},panel);
+ const editor=page.add('div',base+'grdDataFormat;tbl;celleditor;FormatStrEditor;cbx','',{x:450,y:126,width:180,height:25},panel);
+ editor.id='format-combo';
+ const input=page.add('input',null,'',{x:452,y:128,width:160,height:20},editor);
+ input.attrs.type='text';input.value='';
+ let record={isModel:true,internalId:'r0',data:{Func:18,ISO8601:false}};
+ const grid={el:{dom:panel},findPlugin:()=>({editing:true,context:{column:{dataIndex:'DoString'},record}})};
+ const combo={el:{dom:editor},inputEl:{dom:input},forceSelection:false,
+  setValue:text=>{page.events.push('format_set');input.value=text;}};
+ page.context.Ext={getCmp:id=>({'matrix':grid,'format-combo':combo})[id]};
+
+ const before=await page.observe();
+ const owned=before.ui.elements.find(e=>e.date_time_cell?.role==='format_editor');
+ assert.ok(owned?.allowed_actions.includes('fill'),JSON.stringify({stage:before.wizard.stage,field:owned}));
+ const result=await page.act({verb:'fill',ref:owned.ref,text:'%Y-%m'},before);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(input.value,'%Y-%m');
+ assert.deepEqual(page.events.filter(e=>e==='format_set'||e==='keyboard_type'),['format_set']);
+
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{await click(...args);record={...record,internalId:'other'};};
+ const after=await page.observe();
+ const changed=await page.act({verb:'fill',ref:owned.ref,text:'%Y'},after);
+ assert.equal(changed.error?.code,'DATE_FORMAT_EDITOR_CHANGED');
+ assert.equal(input.value,'%Y-%m');
+ assert.equal(page.events.filter(e=>e==='format_set').length,1);
 });
 
 test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{

@@ -229,8 +229,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 | Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
-Новый CSV/TXT: автоопределение Loginom по [справке](references/nodes/imports.text.md).
-Import edits on the SAME existing node: resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches). Only unchanged Execute may omit source. After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip), settings.format (explicit decimal_separator "." or ",", never "Не задано (…)"), and columns or auto_detect_columns:"new"/"all". Reuse the verified delivery; do not upload again.
+Новый CSV/TXT с полной схемой из задания или проверенного образца: задай `settings.columns` с именами и типами при первом импорте. Для неизвестной схемы используй [автоопределение Loginom](references/nodes/imports.text.md).
+Import edits on the SAME existing node: resend exact parameters.source from the verified receipt with settings. To execute a saved Import unchanged, use `parameters:{settings:{}}`. After preview_only/Close, reuse the returned node with target.kind="existing" and target.ref=node. Send complete settings.source (encoding, first_line_as_title, rows_to_skip), settings.format (explicit decimal_separator "." or ",", never "Не задано (…)"), and columns or auto_detect_columns:"new"/"all". Reuse the verified delivery; do not upload again.
 Превью усечено (`columns_omitted>0`): не спрашивай имена; `auto_detect_columns:"new"`
 без `columns`, все имена/типы — из readback/порта после Execute. Правки — того же узла.
 Локальный образец сверь; серверный не скачивай по умолчанию. Типы пользователя главнее.
@@ -291,8 +291,9 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 отказов управляемого runtime. Единственное исключение — временное восстановление
 через `loginom_dock_browser_recovery`, когда `next_step` Dock называет этот
 инструмент ([Подготовка и отмена](references/browser.md)). Не создавай узлы через
-`node.add` и связи через `link.create` в action API. Зависимые операции выполняй
-последовательно.
+`node.add` и связи через `link.create` в action API. В одном браузере запускай
+по одной операции с узлом, даже если узлы независимы. Дождись итогового статуса
+через `loginom_dock_node_wait` перед следующей операцией.
 
 `LOGINOM_FILE_CHANGED` требует нового вложения; `LOGINOM_FILE_NOT_FOUND` — восстановления
 исходника или нового пути. Не обновляй старый отпечаток и не обходи явный deny.
@@ -312,6 +313,9 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 ## Завершение
 
 Сопоставь каждый требуемый результат с выполненным узлом и прочитанным выходом.
+Собери значения для отчёта до Save. Сохранение может переоткрыть пакет и сбросить
+активные выходы. После Save используй проверенные квитанции и выгрузки. Повторно
+выполняй узлы только для новых расчётов или когда пользователь просит свежий результат.
 Все новые показатели вычисляй в сценарии; при неполной выборке не дополняй её
 невидимыми строками. Сохрани пакет через `package.save_checkpoint` и дождись
 квитанции. Если пользователь не указал путь для изменённого локального пакета,
