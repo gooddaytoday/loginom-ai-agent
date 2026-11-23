@@ -25,7 +25,11 @@ it.live("manages schedules through the experimental API when enabled and honors 
     const disabled = path.join(dir, "disabled")
     yield* Effect.promise(async () => {
       await Promise.all([global, enabled, disabled].map((item) => fs.mkdir(item, { recursive: true })))
-      await fs.writeFile(path.join(enabled, "loginom-ai-agent.json"), JSON.stringify({ experimental: { schedules: true } }))
+      // The product's terminal is off by default (B2.6a); the shell checks below need it on.
+      await fs.writeFile(
+        path.join(enabled, "loginom-ai-agent.json"),
+        JSON.stringify({ experimental: { schedules: true }, permission: { shell: "allow" } }),
+      )
       await fs.writeFile(path.join(disabled, "loginom-ai-agent.json"), JSON.stringify({ experimental: { schedules: false } }))
     })
     const handler = yield* ServerFetch.make({

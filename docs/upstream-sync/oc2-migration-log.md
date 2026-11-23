@@ -8305,3 +8305,266 @@ $ bun run check                                     # код 0
 Found 558 warnings and 0 errors.                    # как на базе (B2.7c)
  Tasks:    39 successful, 39 total
 ```
+
+## B2.6a Разрешения: сопоставление и умолчания
+
+22.11.2026. Ветка `b26a-permissions` от `oc2-migration` (`78bd7fc55f`: B2.1…B2.5d, B3, B4.2, B4.8b, B2.3, B2.3b), рабочее
+дерево `.claude/worktrees/b26a`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите.
+Основа: ux-spec «Настройки → Разрешения» и итерация 9, решения В-22, В-30, В-31, В-68, В-69, В-75, решение 12 (оба файла
+есть только в ветке `prototype-source`, `7575419c60`; в `oc2-migration` их нет), подписи видов в прототипе
+(`apps/loginom-agent-prototype/site/settings.js`, `permissionKinds`), 0.4 `a080f7725c` (`product/tool-policy.ts` — это
+шлюз G1, B2.2; разрешений продукта в 0.4 не было: агент `build` OpenCode разрешал всё, Dock спрашивал `loginom_<имя>` с
+ресурсом `*`, у сессии дашборда — правило `dashboard_publish ask`), spike B0.3/S11.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `e4091feac7` `feat(loginom-agent): product permission kinds, defaults and the conversation grant (B2.6a)` | `packages/loginom-agent/src/permissions.ts` (новый), правила, хук и RPC в `src/index.ts`, ресурс вызова Dock в `src/dock.ts`; тесты `packages/loginom-agent/test/permissions.test.ts`, `packages/server/test/loginom-permissions.test.ts` (новые), случай в `loginom-dock-catalog.test.ts`, правки `loginom-package-docs.test.ts` и `loginom-access.test.ts` |
+| `14bbb5351a` `test(core): sessions that run shell commands turn the product's terminal on` | тесты upstream `packages/core/test/shell-restart.test.ts` (+4) и `packages/server/test/schedule.test.ts` (+5 −1), оба — в CAT-07 (`catalog.json`) |
+| `8a00e486df` `docs(upstream-sync): record B2.6a permission kinds and defaults` | этот раздел (первая версия), CAT-05 и CAT-07 в `catalog.md`, уточнён комментарий к `external_directory` в `permissions.ts` |
+| `203bee96c9` `test(sdk): the lazy provisioning case turns the product's terminal on and answers it` | тест upstream `packages/sdk/test/embedded.test.ts` (+12 −1), в CAT-07 |
+| `49e645d482` `docs(upstream-sync): B2.6a sdk case, product directories outside the project, 0.4 profiles` | уточнения этого раздела и CAT-07 в `catalog.md` |
+| следующий | повтор `bun run check` в «Приёмке» |
+
+### Виды действий и инструменты
+
+Таблица — `table` в `packages/loginom-agent/src/permissions.ts`: действие разрешения (то, что инструмент передаёт в
+`permission.assert`), ресурс, вид и умолчание. Действие не из таблицы к видам не относится и живёт по правилам OpenCode.
+
+| Вид (ux-spec) | Инструменты и операции → действие разрешения | Умолчание |
+|---|---|---|
+| «Читать файлы проекта» | `read`, `glob`, `grep`; `loginom_file_admit`, `loginom_file_profile`, `loginom_file_scan`, `loginom_file_sample` (каждый ещё спрашивает `read` файла); `package_docs_run` спрашивает `read` сам | разрешено |
+| — то же, вне проекта | `external_directory`: его спрашивает `FileAccess` v2 перед любым путём вне location и проекта (чтение, запись, `glob`/`grep`, каталог команды) | спрашивать |
+| «Создавать и менять файлы проекта» | `edit`: инструменты `edit`, `write`, `patch`, `experimental_image_generate` (запись файла), `package_docs_run` (`.work`, отчёт) | спрашивать |
+| «Сохранять пакеты в Loginom» | `loginom_dock_action_run` (в профиле `user` Dock только `package.save_as` и `package.save_checkpoint`); `loginom_dock_prepare` с `local_package_path` (копия локального пакета уходит в Loginom, В-75; ресурс `local_package`); `dashboard_publish`, `dashboard_delete` (B2.9) | спрашивать |
+| «Запускать сценарии с выгрузками» | `loginom_dock_node_apply` с узлом `exports.text`, `exports.excel`, `exports.lgd` (ресурс — тип узла) | спрашивать |
+| «Открывать сайты» | `webfetch` (и `fetch` в CodeMode, и загрузка картинки по адресу у `experimental_image_generate`), `websearch` | спрашивать |
+| «Терминал» | `shell` (инструмент `shell` и проверка расписания `if`/`until: { run }`) | выключен |
+| вне видов | `question`, `skill`, `subagent`, `todowrite`, `execute` CodeMode, инструменты CodeMode `opencode_*`, MCP `<сервер>_<инструмент>`, локальная справка `loginom_find`…`loginom_dock_diagnostics`, остальные операции Dock (`dock_prepare` пакета сервера, `dock_action_describe`, `dock_node_apply` не выгрузки, `dock_node_read/resume/delete/status/wait/cancel/stop`, `dock_artifact_deliver*`, `dock_storage_*`, `dock_workspace_observe`, `dock_operation_*`, `dock_clipboard_transfer`, `dock_browser_recovery`) | как в OpenCode |
+
+Ресурс вызова Dock (`src/dock.ts`): тип узла у `dock_node_apply`, `local_package` у `dock_prepare` с локальным пакетом,
+иначе `*`, как было. Ответы и `save: ["*"]` не менялись.
+
+### Как устроено
+
+- **Умолчания — правила агента.** Преобразование агентов плагина (последний в `post`) вставляет правила таблицы в каждого
+  агента сразу после общего `* * allow` OpenCode (`withDefaults`). Позже стоят собственные правила агента (`*.env` спрашивает,
+  `plan` запрещает запись), `permissions` конфига (механизм настроек по ux-spec) и правила сессии — они перекрывают
+  умолчания; запрет из конфига или сессии ядро решает до хуков. Ядро само прячет `shell`, пока последнее правило для него —
+  `shell * deny` (`whollyDisabled` в `core/src/tool.ts`), в том числе из каталога CodeMode.
+- **Хук `permission.evaluate`** (`settle`) — только то, чего правила не выражают:
+  - разрешение «в этом разговоре» превращает `ask` в `allow` для вида, если продукт спрашивает его по умолчанию (не
+    терминал и не вопрос самого OpenCode про `*.env`);
+  - команда агента в терминале (запрос с `source` вызова) спрашивает всегда: `allow` из конфига, сессии или сохранённого
+    `always` становится `ask` (В-31). Проверка расписания (`source` нет) идёт по правилам;
+  - подагент (`mode: "subagent"`, например `explore`) терминала не получает (`deny` с текстом
+    `LOGINOM_TERMINAL_DENIED`), а его собственные `allow` для сайтов и чтения вне проекта становятся `ask`.
+
+  Хук стоит до `localFiles`: проверка «только запрет» B2.5a по-прежнему превращает оставшийся `ask` в `allow`.
+- **«Разрешать в этом разговоре»** — RPC `loginom.permission.conversation {sessionID, requestID}`: отвечает `once` на этот
+  запрос и на другие открытые запросы сессии того же вида, запоминает вид для сессии (память экземпляра, точный ID сессии,
+  как допуск B2.2) и возвращает `{ kind }`. Терминал и вопрос, который продукт по умолчанию не задаёт, — объявленная ошибка
+  RPC `not_grantable` с действием. В отличие от `always`, ничего не сохраняется для проекта. Кнопка — этап C.
+- **Терминал включает пользователь** правилом `shell` в конфиге (`ask` или `allow`); выключенный — правило `shell * deny`
+  умолчаний, ядро его не показывает модели и отклоняет и запрос инструмента, и проверку расписания — при создании и на
+  каждом срабатывании, в том числе без присутствия пользователя (`Permission.Unattended` не перекрывает запрет).
+
+### Расхождения со спецификацией (ux-spec не менял)
+
+- Таблицы «инструмент → вид» в ux-spec нет: там шесть видов, умолчания и механизм (правила `permissions` конфига). Таблица
+  — в коде и выше. ux-spec и `decisions.md` в дереве переноса отсутствуют.
+- «Разрешать в этом разговоре»: в ux-spec (лента, итерация 3) — «always в рамках сессии», в итерации 9 — ответ `once` плюс
+  правило `allow` разговору через `session.permissions`. Сделано: `once` плюс разрешение в плагине, не правило сессии —
+  правила сессии присылает клиент (пробел доверия), и их видно и можно менять снаружи.
+- Нет вида для: загрузки файла данных в Loginom (`loginom_file_admit`, `dock_artifact_deliver` — отнесены к чтению и к
+  «вне видов»), удаления в Loginom (`dashboard_delete` отнесён к сохранению: при «Разрешено» удалит без вопроса, ux-spec
+  про удаление говорит «спрашивает»), отправки данных стороннему сервису через подключение MCP (итерация 9: правило `ask`
+  — этап E), скачивания из Loginom (`dock_storage_download_*`), правки узлов в открытой копии без сохранения.
+- Выгрузка — по типу узла, без `finish`: настройка узла выгрузки без запуска тоже спрашивает.
+- «Чтение вне проекта» в ux-spec отдельно не названо; `external_directory` спрашивает и перед записью вне проекта — запись
+  туда спрашивает дважды (`external_directory`, затем `edit`).
+- Для подагентов строже, чем в ux-spec: «Разрешено» из конфига у них снова спрашивает, терминала нет и при включённом.
+- Закрытый контур («терминал выключен всегда») и запрет администратора — режим сети (B2.8, F) и B2.6c, здесь не сделаны.
+
+### Тесты
+
+`packages/loginom-agent/test/permissions.test.ts` (9 тестов, без сервера): каждый вид — его действия и ресурсы, в том
+числе `dashboard_publish` и `dashboard_delete`, выгрузки по типу узла и локальный пакет; что к видам не относится;
+умолчания; место умолчаний в правилах агента; что покрывает разрешение «в этом разговоре»; ответы `settle`.
+
+`packages/server/test/loginom-permissions.test.ts` (8 тестов) — настоящий сервер (`createEmbeddedRoutes`, канал `dev`,
+планировщик запущен), конфиг проекта `loginom-ai-agent.json` в каталоге location, модель `TestLLM` по сценарию. Запрос права —
+через API `POST /api/session/:id/permission` (`Permission.ask`: правила и хуки `permission.evaluate`, как у инструмента),
+ответы — `POST …/reply`, разрешение — RPC.
+
+| Тест | Что проверяет |
+|---|---|
+| умолчания | файлы проекта (`read`, `glob`, `grep`, `loginom_file_profile`) — `allow`; по запросу на каждый вид из таблицы — `ask`; `shell` с `source` и без — `deny`; `dock_prepare` пакета сервера, `dock_node_apply` не выгрузки, `question` — `allow`. Настоящий `read`: файл проекта — без вопроса, файл вне проекта — открытый запрос `external_directory`, после `once` чтение выполнено. Модели `shell` не предлагается, вызов `touch` ничего не создал |
+| «в этом разговоре» | на каждый вид: `ask` → RPC → `200 { output: { kind } }`, открытых запросов нет, повтор — `allow`, остальные виды — `ask`, терминал — `deny`, другая сессия того же проекта — `ask`; `GET /api/permission/saved` пуст; разрешение отвечает и на другие открытые запросы того же вида, а запрос сайта остаётся |
+| «один раз» | на каждый вид: `once` отвечает на запрос, следующий снова `ask`; сохранённых правил нет |
+| запрет | `permissions` конфига с `deny` на все действия таблицы, кроме терминала: каждый вид и чтение файла проекта — `deny`, вопросов нет; RPC на несуществующий запрос — не 200 |
+| терминал включён | конфиг `shell: allow`: `shell` предлагается; команда агента всё равно спрашивает; RPC — ошибка `not_grantable` с `action: "shell"`, запрос остаётся; ответ `always` — команда выполнена, следующая снова спрашивает; после `once` оба вызова `completed`, сохранено одно правило |
+| подагент | при включённом терминале запросы от имени `explore`: `webfetch`, `websearch`, `external_directory` — `ask` (у `explore` свои `allow`), `read` файла проекта — `allow`, `shell` — `deny`; тот же `shell` от `build` — `ask` |
+| расписание | терминал выключен: создание с `if: { run }` — 403, расписаний нет. Создано, пока правило сессии `shell allow` включало терминал, затем правило снято: на срабатывании `lastOutcome: "failed"`, файла-метки нет; контрольная сессия с правилом — метка появилась |
+| контракт `permission.evaluate` | плагин-проба без правил продукта: хук превращает `allow` в `ask` (открытый запрос); `deny` с текстом — вызов инструмента падает с этим текстом; расписание, созданное при `allow`, на срабатывании под `Permission.Unattended` хук запрещает — `failed`, метки нет |
+
+`packages/server/test/loginom-dock-catalog.test.ts`, новый случай: Host по сценарию, плагин стенда записывает каждый запрос
+`loginom_dock_*` в хуке `permission.evaluate`: `dock_node_apply` с `exports.text` и `transform.sort`, `dock_action_run`,
+`dock_prepare` с локальным пакетом и без — ресурсы `exports.text`, `transform.sort`, `*`, `local_package`, `*`; все пять
+вызовов `completed`.
+
+Изменённые тесты:
+
+- `loginom-package-docs.test.ts`: сессия для `build` разрешает `edit`, как разрешал агент 0.4, правила случая — после; без
+  этого 20 случаев падали: 16 ждали ответа на вопрос записи 30 с, 4 — с другим исходом из-за того же вопроса. Сессия случая `plan` правил не получает (его собственный запрет записи
+  проверяется).
+- `loginom-access.test.ts`, S1: в списке инструментов первого запроса больше нет `shell`.
+- upstream `server/test/schedule.test.ts`: каталог `enabled` получил `permission: { shell: "allow" }` — первый случай
+  проверяет срабатывание проверок `run`, остальные случаи файла уже включали терминал так же.
+- upstream `core/test/shell-restart.test.ts`: четыре случая создают сессию с правилом `shell * allow` (без него модель не
+  получает `shell`, и случаи ждали 30 с).
+- upstream `sdk/test/embedded.test.ts`, «blocks the model-selected first tool on lazy provisioning»: конфиг включает терминал
+  (`shell ask`), тест отвечает `once` на вопрос команды до ожидания подготовки рабочего пространства — вопрос задаётся раньше,
+  чем команда доходит до него (без этого: «first tool did not provision»).
+
+### Мутации
+
+Скрипт во временном каталоге: мутация — замена строки в файле дерева на `14bbb5351a`, прогон
+`bun test test/permissions.test.ts` из `packages/loginom-agent` и `bun test --timeout 30000 test/loginom-permissions.test.ts
+test/loginom-dock-catalog.test.ts` из `packages/server`, возврат файла `git checkout`; после последней мутации
+`git status packages/loginom-agent/src` чистый.
+
+```text
+=== M0 none                                unit 9/0; server 20/0
+=== M1 defaults not inserted               unit 9/0; server 16/4: умолчания, расписание, «в этом разговоре», «один раз»
+=== M2 defaults placed last                unit 8/1 (место умолчаний); server 17/3: запрет, подагент, терминал включён
+=== M3 hook does nothing                   unit 9/0; server 17/3: подагент, терминал включён, «в этом разговоре»
+=== M4 grant ignored                       unit 7/2 (settle); server 19/1: «в этом разговоре»
+=== M5 agent command not forced to ask     unit 8/1 (settle, терминал); server 19/1: терминал включён
+=== M6 subagent not tightened              unit 8/1 (settle, подагент); server 19/1: подагент
+=== M7 subagent terminal not denied        unit 8/1 (settle, терминал); server 19/1: подагент
+=== M8 terminal grantable                  unit 8/1 (grantable); server 19/1: терминал включён
+=== M9 terminal asks instead of off        unit 8/1 (умолчания); server 17/3: умолчания, расписание, «в этом разговоре»
+=== M10 outside reads allowed              unit 6/3; server 16/4: подагент, умолчания, «в этом разговоре», «один раз»
+=== M11 dock resource always *             unit 9/0; server 19/1: случай Dock (ресурсы)
+=== M12 grant answers only its request     unit 9/0; server 19/1: «в этом разговоре» (открытые запросы того же вида)
+=== M13 export kind lost                   unit 8/1 (умолчания); server 17/3: умолчания, «в этом разговоре», «один раз»
+```
+
+M9 — «терминал по умолчанию выключен». Случай расписания на ней красный; по коду — на срабатывании: `ask` под
+`Unattended` становится `allow` (создание через HTTP с `ask` и так даёт 403), какое утверждение упало, не смотрел.
+Порядок хука и `localFiles` мутацией не проверен: для основного агента хук продукта `allow` в `ask` не превращает (кроме
+`shell`), и проверки «только запрет» B2.5a от порядка не зависят.
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `14bbb5351a`; база — отдельное дерево на `78bd7fc55f` во временном каталоге
+(`server` и `cli` прогнаны там же; для `loginom-agent` и `core` — числа задания).
+
+| Пакет | База `78bd7fc55f` | Итог `14bbb5351a` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 58 pass, 0 fail (задание) | 67 pass (+9: `permissions.test.ts`), 0 fail |
+| `server` (`bun test`) | задание: 249 / 3 / 0; прогон здесь: 250 pass, 3 skip, 1 fail из 254 | 259 pass (+9: `loginom-permissions` 8, случай Dock 1), 3 skip, 1 fail из 263 — тот же `S2 synthetic wake` |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail (задание) | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 420 pass, 9 skip, 0 fail | 420 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | на `14bbb5351a`: 39 / 1 (`lazy provisioning`, см. «Тесты»); на `203bee96c9`: 40 pass, 0 fail |
+
+`server`, `S2 synthetic wake` (`loginom-host-lease.test.ts`, B2.5d): падает и в базе, если в том же процессе раньше прошёл
+`loginom-dock-catalog.test.ts` (`bun test test/loginom-dock-catalog.test.ts test/loginom-host-lease.test.ts` в дереве базы
+— 18 pass, 1 fail); файл `loginom-host-lease.test.ts` отдельно — 8 / 0 три раза подряд на `14bbb5351a`. Не чинил.
+
+Промежуточный прогон до правок тестов (на коде `e4091feac7` без адаптаций): `server` — 23 падения (20 в
+`loginom-package-docs`, S1 в `loginom-access`, первый случай `schedule.test.ts`, тот же `S2 synthetic wake`), `core` — 7 (три
+базовых и четыре `shell-restart`). После адаптаций — таблица выше.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 452 divergent upstream files       # код 0, на 203bee96c9; база 450: + shell-restart, embedded (sdk)
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+  CAT-07: 9                                               # было 6: + shell-restart, schedule, embedded
+  CAT-12: 181                                             # было 182: schedule.test.ts перешёл в CAT-07
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 224 files                             # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck
+✓ No type errors in 1,636 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.5d; у новых и изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 224 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+Повтор `bun run check` на `203bee96c9` с уточнениями раздела: код 0, `Found 558 warnings and 0 errors`, 39/39 задач (38 из
+кэша turbo).
+
+### Где решал сам
+
+- **Умолчания — правила, а не хук.** Хук не видит, откуда пришёл `allow`: от общего `* * allow` или от правила
+  пользователя. Если бы умолчания задавал хук, настройка «Разрешено» правилом конфига не работала бы, а тесты с правилами
+  сессии `* * allow` (B2.2…B2.5) повисли бы на вопросах. Цена — подагенты: их собственные правила стоят позже умолчаний,
+  поэтому для них хук ужесточает сам.
+- **Терминал — правило `shell * deny`**, а не только запрет в хуке: ядро прячет инструмент, а команда без внешних программ
+  (`cd`, `X=1`, `export` — `ShellParse` не находит в ней команд) разрешения не спрашивает вовсе и выполнилась бы.
+- **Проверка расписания при включённом терминале идёт по правилам**, вопрос «каждый раз» — только у команды агента:
+  иначе одобренную проверку нельзя было бы создать через HTTP (вопрос в запросе без состояния — 403), а тесты upstream
+  расписаний с `shell: "allow"` перестали бы проходить.
+- **Подагентам терминал не даётся никогда** — меньший вариант: продукт не знает, включён ли терминал, когда правило `allow`
+  пришло от самого `explore`.
+- **Разрешение «в этом разговоре» — по виду**, а не по действию; вопросы OpenCode про `*.env` им не снимаются. Память, а не
+  хранилище: после перезапуска службы спросит снова; подсессия и форк — другие ID, разрешения у них нет.
+- **Словарь ресурсов Dock** (`local_package`, тип узла) — новый: правило вида может отличить сохранение и выгрузку только
+  по ресурсу. Вопросы тех же вызовов в той же последовательности.
+- **`dock_action_run` целиком — сохранение**: в профиле продукта Dock принимает только `package.save_*`.
+- **Тесты upstream включают терминал сами** (`shell-restart`, первый случай `schedule.test.ts`), как уже делали остальные
+  случаи расписаний: плагин продукта встроен в каждую location, поведение OpenCode в библиотеке он не сохраняет.
+
+### Согласовать с владельцем (общие контракты)
+
+- Новый RPC `loginom.permission.conversation {sessionID, requestID} → { kind }`, ошибка `not_grantable` — для кнопки
+  «Разрешать в этом разговоре» (этап C).
+- Ресурсы вопросов Dock: `local_package` и тип узла вместо `*` у `dock_prepare` и `dock_node_apply`.
+- Таблица видов (выше): `loginom_file_admit` — чтение, `dashboard_delete` — сохранение, `external_directory` — чтение.
+- Тесты upstream в CAT-07: `core/test/shell-restart.test.ts`, `server/test/schedule.test.ts`, `sdk/test/embedded.test.ts`.
+- **Каталоги продукта вне проекта теперь спрашивают «вне проекта».** `FileAccess` исключений не делает (по коду; тест —
+  чтение файла вне проекта): полный текст большого ответа в `<data>/tool-output` (на него указывают урезание ядра и
+  `dock.ts`), файлы рядом со `SKILL.md` встроенных навыков под `LOGINOM_AI_AGENT_RESOURCES`, план режима `plan`. Модель,
+  которая читает их `read`, получит вопрос `external_directory`. Предложение: узкие правила `allow` для
+  `<resources>/skills/*` и `<data>/tool-output/*` (оценка S; `classify` тогда искать с конца, как правила).
+- **Профили 0.4 после переноса (B3.2).** `permission: "allow"` или `{"*": "allow"}` становится правилом `* * allow` конфига
+  позже умолчаний и снимает все вопросы, кроме команды терминала агента; `bash: allow` (→ `shell allow`) включает терминал.
+  Что писал Desktop 0.4 в профиль, не проверял.
+
+### Найдено, не чинил
+
+- Включённый терминал: одобренная при создании проверка `run` срабатывает потом каждый раз без вопроса
+  (`Permission.Unattended`); создать её через HTTP при `shell: ask` нельзя (403).
+- Ответ `always` клиента по-прежнему сохраняет правило для проекта у всех видов, кроме терминала: интерфейс этапа C не
+  должен его предлагать (В-22), сервер его не запрещает.
+- Правила сессии от клиента (`shell * allow`) включают терминал этой сессии — как настройка пользователя; запрет
+  администратора — B2.6c.
+- `--dangerously-skip-permissions` отвечает `once` на вопросы; выключенный терминал — запрет, а не вопрос, флаг его не
+  включает (B2.7a: прогонам `evals` с командами терминал нужно включить конфигом).
+- Режим `plan` пишет план в `~/.loginom-ai-agent/plan` — вне проекта: теперь каждый раз спрашивает `external_directory`.
+- RPC на запрос, которого уже нет, отвечает ошибкой `rpc.internal`, а не объявленной ошибкой.
+- Вопрос подагента приходит в его подсессии: разрешение «в этом разговоре» родителя его не покрывает.
+- `server`, `S2 synthetic wake`: падает после `loginom-dock-catalog.test.ts` в том же процессе, в базе тоже (см. «Приёмка»).
+- Команда пользователя (`!cmd`, `core/src/session/shell.ts`) разрешений не спрашивает: выключенный терминал её не трогает,
+  как велит В-69 (по коду).
+
+### Не проверено
+
+- Кнопки и тексты в окне (этап C), Desktop, CLI с `--dangerously-skip-permissions`, установленная сборка, Windows и macOS.
+- Настоящая модель и настоящий Host: вызовы Dock — Host по сценарию, `dashboard_*` — только таблица и API (B2.9).
+- Действия настоящих инструментов проверены тестом только у `read` (`external_directory`) и `shell`; `edit`, `write`,
+  `patch` → `edit`, `webfetch`, `websearch`, `glob`, `grep`, MCP, `experimental_image_generate`, `fetch` в CodeMode — по коду,
+  умолчания для их действий — через API.
+- `explore` проверен запросами API от его имени (`agent: "explore"`), не через инструмент `subagent`.
+- Тесты `tui`, `desktop`, `simulation`, `sdk`.

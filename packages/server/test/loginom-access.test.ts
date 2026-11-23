@@ -273,7 +273,8 @@ describe("loginom.product access and tool gate (G1)", () => {
         const [first, second] = yield* test.requests(direct)
         expect(names(first)).not.toContain(probe)
         expect(names(first)).not.toContain("loginom_probe_codemode")
-        expect(names(first)).toEqual(expect.arrayContaining(["read", "shell", "subagent", "skill"]))
+        // The terminal is off by default (B2.6a), so `shell` is not offered.
+        expect(names(first)).toEqual(expect.arrayContaining(["read", "subagent", "skill"]))
         // The CodeMode catalog in the instructions never names a tool that needs a grant (spike S1 finding).
         expect(system(first)).not.toContain("loginom_probe")
         expect(JSON.stringify(second.messages)).toContain(denied)

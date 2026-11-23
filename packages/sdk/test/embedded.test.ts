@@ -630,7 +630,12 @@ it.live(
         yield* Effect.promise(() => fs.mkdir(configDirectory))
         const opencode = yield* fixture.sdk.OpenCode.create(
           {
-            config: { directory: configDirectory, project: false, content: "{}" },
+            // The product turns the terminal off by default (B2.6a); this test turns it on.
+            config: {
+              directory: configDirectory,
+              project: false,
+              content: JSON.stringify({ permissions: [{ action: "shell", resource: "*", effect: "ask" }] }),
+            },
             workspaceProviders: { fake: driver },
           },
           {
@@ -650,6 +655,12 @@ it.live(
         expect(calls).toEqual([])
 
         yield* opencode.sessions.prompt({ sessionID: session.id, text: "Run echo" })
+        // The product asks for every terminal command of the agent (B2.6a): answer once, before the
+        // command reaches the workspace.
+        const asked = yield* opencode.permission
+          .list({ sessionID: session.id })
+          .pipe(Effect.repeat({ until: (items) => items.length > 0, schedule: Schedule.spaced("10 millis") }))
+        yield* opencode.permission.reply({ sessionID: session.id, requestID: asked[0].id, decision: "once" })
         // The model-selected shell tool is the first execution-plane demand: it alone
         // starts provisioning and blocks inside the tool call until the provider is ready.
         yield* Deferred.await(createStarted).pipe(

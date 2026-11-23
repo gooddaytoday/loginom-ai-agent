@@ -36,7 +36,9 @@
       "title": "Providers, plugins, proxy",
       "paths": [
         "packages/core/src/plugin/internal.ts", "packages/core/src/plugin/supervisor.ts", "packages/server/src/options.ts",
-        "packages/server/src/routes.ts", "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts"
+        "packages/server/src/routes.ts", "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts",
+        "packages/core/test/shell-restart.test.ts", "packages/server/test/schedule.test.ts",
+        "packages/sdk/test/embedded.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7, B2.8" },
