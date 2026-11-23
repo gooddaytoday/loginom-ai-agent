@@ -59,8 +59,20 @@ def audit(journal, config):
         bodies = [reply]
         if isinstance(reply.get('result'), dict):
             bodies.append(reply['result'])
+        if isinstance(reply.get('structuredContent'), dict):
+            bodies.append(reply['structuredContent'])
+        for block in reply.get('content', []):
+            if block.get('type') == 'text':
+                try:
+                    body = json.loads(block['text'])
+                except (ValueError, KeyError):
+                    continue
+                if isinstance(body, dict):
+                    bodies.append(body)
         bad = next((b for b in bodies if b.get('status') in
-                    ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS', 'REJECTED')), None)
+                    ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS', 'REJECTED')
+                    or b.get('result_delivery') == 'refused'
+                    or isinstance(b.get('error'), dict) and b['error'].get('code')), None)
         if state.get('status') == 'error' or bad is not None:
             error = (bad or reply).get('error') or {}
             code = (bad or reply).get('code') or (error.get('code') if isinstance(error, dict) else None)
