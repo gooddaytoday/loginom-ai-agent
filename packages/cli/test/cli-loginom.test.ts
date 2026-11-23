@@ -218,9 +218,15 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       state: expect.stringMatching(/^(starting|ready)$/),
       browser: { state: "verified" },
     })
-    // The validation login got the connection from stdin.
+    // The validation login got the connection from stdin, and the browser mode from the command line.
     expect(await records(fixture.validations)).toEqual([
-      expect.objectContaining({ validation: true, url: login.url, username: login.username, password: login.password }),
+      expect.objectContaining({
+        validation: true,
+        headless: true,
+        url: login.url,
+        username: login.username,
+        password: login.password,
+      }),
     ])
     const connection = path.join(fixture.profile, "loginom", "connection")
     const saved = JSON.parse(await fs.readFile(path.join(connection, "connection.json"), "utf8"))
@@ -238,6 +244,11 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       JSON.stringify({ url: login.url, username: login.username, password: "", apiKey: "fixture-legacy-key" }),
     )
     expect(again).toMatchObject({ code: 0, json: { generation: 2, hasPassword: false } })
+    expect((await records(fixture.validations)).at(-1)).toMatchObject({
+      validation: true,
+      headless: false,
+      password: "",
+    })
     expect((await fs.readdir(path.join(connection, "generations"))).sort()).toEqual(["1.json", "2.json"])
     expect(await loginom(fixture, ["status", "--format", "json"])).toMatchObject({
       code: 0,
@@ -576,7 +587,7 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE") {
     process.on("message", m => {
       if (m.operation === "start") {
         const { url, username, password } = m.input.connection;
-        appendFileSync(${JSON.stringify(validations)}, JSON.stringify({ validation: m.input.validation, pid: process.pid, url, username, password }) + "\\n");
+        appendFileSync(${JSON.stringify(validations)}, JSON.stringify({ validation: m.input.validation, headless: m.input.headless, pid: process.pid, url, username, password }) + "\\n");
         process.send(${JSON.stringify(browser ?? "")}
           ? { id: m.id, error: ${JSON.stringify(browser ?? "")} }
           : { id: m.id, result: { protocol: 1, generation: m.input.generation, chat: m.input.chat, checked: true, ready: true } });
