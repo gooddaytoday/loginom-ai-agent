@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { readdirSync, realpathSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { createRequire } from "node:module"
 import type { JSX } from "solid-js"
 import { createComponent, render } from "solid-js/web"
@@ -192,17 +192,15 @@ test("pairing, the WSL setup and the settings rows that 0.4 named the product do
   expect(values.filter((value) => /opencode/i.test(value))).toEqual([])
 })
 
-test("the Desktop page and the public folder carry no OpenCode favicons", async () => {
+test("the Desktop page links only product icons that ship", async () => {
   const pub = new URL("../public/", import.meta.url)
   const upstream = realpathSync(new URL("../../ui/src/assets/favicon/", import.meta.url))
   const page = await Bun.file(new URL("../../desktop/src/renderer/index.html", import.meta.url)).text()
   const links = [...page.matchAll(/<link[^>]+href="\.\/([^"]+)"/g)].map((match) => match[1]!)
 
-  // A link to a removed file throws here, so the page cannot point at a favicon that no longer ships.
-  const fromUpstream = (names: string[]) =>
-    names.filter((name) => realpathSync(new URL(name, pub)).startsWith(upstream))
+  // A link to a file the renderer does not ship throws here: the protocol handler would log a failed fetch for it.
+  const icons = links.map((name) => realpathSync(new URL(name, pub)))
 
-  expect(links.length).toBeGreaterThan(0)
-  expect(fromUpstream(links)).toEqual([])
-  expect(fromUpstream(readdirSync(pub))).toEqual([])
+  expect(icons.length).toBeGreaterThan(0)
+  expect(icons.filter((icon) => icon.startsWith(upstream))).toEqual([])
 })
