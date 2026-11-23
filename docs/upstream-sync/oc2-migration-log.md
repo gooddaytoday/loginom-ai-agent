@@ -7722,3 +7722,283 @@ Found 558 warnings and 0 errors.                                  # у изме�
   автоматическом, — по коду (`SessionEvent.Compaction.Started` до сводки).
 - Хуки `compaction`/`generate` с каталогом сессии вне исполнения (после окончания исполнения каталог сессии забывается) —
   по коду.
+
+## B2.7c Профили CLI и `.writer`
+
+22.11.2026. Ветка `b27c-profiles` от `oc2-migration` (`a42582279c`), рабочее дерево `.claude/worktrees/b27c`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_`
+появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` (Node 24.19.0) в этом дереве и в дереве
+базы; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. База тестов — отдельное дерево
+`<scratchpad>/b27c-base` (`a42582279c`, detached). `packages/loginom-agent` и `loginom-host/src/task-scope` (B2.5d) не
+трогал. Основа — 0.4 на `a080f7725c`: `product/src/cli-profile.ts` (в v2 тот же), `opencode/src/cli/profile.ts`
+(`acquireProfile`, `profileEnvironment`), `cli/profile-windows.ts`, `cli/standalone.ts` (загрузчик профиля),
+`core/src/global.ts`, тесты `test/cli/profile{,-windows}.test.ts`. Файлов `packages/opencode/src/cli/cmd/profile*`,
+которые называет задание, на точке отсечения нет: код профиля лежал в перечисленных файлах.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `0240643d79` `feat(cli): product CLI profiles with their own service and writer latch (B2.7c)` | файлы форка `cli/src/{profile,loginom-cli}.ts`; правки upstream `util/src/global.ts` (+4 −1, CAT-13), `cli/src/server-process.ts` (+7 −1, CAT-07); `product/src/cli-profile.ts` (`cliProfileService`); зависимость `cli` от `@loginom-ai-agent/product` (`package.json`, `bun.lock` +1, CAT-01); тесты `cli/test/{cli-profile,cli-profile-service}.test.ts` (новые), случай профиля CLI 0.4 в `cli/test/legacy-profile.test.ts`, `product/test/cli-profile.test.ts` (+2) | `clean` |
+| `b78a51325a` `test(cli): type the B2.7c profile test helpers for tsc` | типы в `cli-profile-service.test.ts` и `legacy-profile.test.ts` для `tsc` | `clean` |
+| `db7868e59c` `docs(upstream-sync): record B2.7c CLI profiles and the writer latch` | этот раздел, строка G2 в `guarantees.md`, `catalog.md` (CAT-01, CAT-07, CAT-08, CAT-13) | `clean` |
+| `90c4fb902b` `fix(cli): find the default CLI profile in the environment being applied` | `apply(env)` ищет профиль по умолчанию в переданном окружении, а не в `process.env`; случай профиля CLI 0.4 в `legacy-profile.test.ts` — без `LOGINOM_AI_AGENT_CLI_PROFILE`, профиль по умолчанию находится сам | `clean` |
+| следующий | дополнения этого раздела после ревью | |
+
+### Как было в 0.4 и что стало
+
+В 0.4 автономный CLI сам был бэкендом: загрузчик (`cli/standalone.ts`) выбирал корень, `acquireProfile` открывал его под
+защёлкой `.writer` на всё время работы процесса, `profileEnvironment` задавал `LOGINOM_AI_AGENT_CLI_ROOT`, `_CONFIG_DIR`,
+`_DB` и `TMPDIR`, а `core/src/global.ts` по `CLI_ROOT` клал данные, конфиг, состояние и кэш в корень. На v2 бэкенд —
+служба: несколько клиентов (TUI, `run`) ходят в одну службу профиля, а пишет профиль процесс сервера.
+
+| Что | 0.4 | v2 (B2.7c) |
+|---|---|---|
+| Корень | `<appData>/com.loginom.aiagent[.beta\|.dev]/cli/profiles/default` или абсолютный `LOGINOM_AI_AGENT_CLI_PROFILE` | то же, `cliProfile()` не менялся |
+| Загрузчик | `cli/standalone.ts` во входе `standalone.ts` | `CliProfile.apply()` во входе форка `cli/src/loginom-cli.ts`, затем `import("./index")` |
+| Проверки корня | каталог `0700`, `realpath`, `PROFILE_DESKTOP_ROOT`, права (POSIX) или ACL (Windows), маркер `cli-profile.json` (формат, версия, канал), подкаталоги `0700` без ссылок | те же, кроме ACL Windows; маркер создаётся исключительно, проигравший читает чужой |
+| Каталоги | `core/src/global.ts`: `data`, `config`, `state`, `cache`, `cache/tmp` корня | `util/src/global.ts` (CAT-13): то же, `profilePaths` |
+| Окружение | `CLI_ROOT`, `CONFIG_DIR`, `DB`, `TMPDIR`; удаляет `AUTH_CONTENT`, `CONFIG`, `CONFIG_CONTENT` | `CLI_ROOT`, `CONFIG_DIR`, `DB`, `SERVICE_IDENTITY`, `SERVICE_PORT` — всегда заменяются; удаляет те же три; `TMPDIR` не задаётся |
+| Служба | не было | своя на профиль (U5): identity `cli-<8 hex sha256 корня>`, порт из диапазона профилей CLI |
+| Защёлка | `.writer` держит процесс CLI; брошенную не забирает никто | `.writer` держит сервер профиля; защёлку умершего процесса забирает следующий сервер |
+| Host | в процессе CLI, корень `<root>/loginom` | в службе (B2.3), корень `<root>/loginom` |
+
+**Вход продукта, а не `index.ts`.** Службу Desktop запускает тот же `index.ts` (`serve --service`), контракты B3 (`migrate`
+без аргумента — база канала, `legacy-profile.test.ts`) опираются на каталоги канала, а identity отличить Desktop от CLI не
+может: CLI из терминала Desktop её наследует (B1.3a). Поэтому профиль включает отдельный вход, как `standalone.ts` в 0.4:
+он применяет профиль до загрузки `@opencode/util/global` (тот фиксирует пути при импорте) и загружает CLI. Служба,
+которую запускает клиент, — `selfCommand()`, то есть тот же вход: она применяет тот же профиль по унаследованному
+`LOGINOM_AI_AGENT_CLI_PROFILE` и окружению. Собрать `loginom-ai-agent-cli` из этого входа — B2.7a: `script/build.ts` и
+вход Node (`src/node/index.ts` импортирует `../index`) не менялись.
+
+**Порт и identity.** `cliProfileService(root, channel)` в `product/src/cli-profile.ts`: порт
+`0x6000 + 0x400 × канал + (16 бит sha256(корень) & 0x3ff)`.
+
+| Канал | Порты профилей CLI |
+|---|---|
+| prod | 24576–25599 (`0x6000`–`0x63ff`) |
+| beta | 25600–26623 (`0x6400`–`0x67ff`) |
+| dev (и запуск из исходников) | 26624–27647 (`0x6800`–`0x6bff`) |
+
+Почему так:
+- ниже `0x7000`: в блок `0x7000`–`0x7fff` upstream сворачивает на Windows порты служб без identity (`0xc0de` → 28894,
+  `local` → 28895); ниже `0x8000` порт одинаков на Linux и Windows, вне динамических и зарезервированных Hyper-V и WSL
+  диапазонов (B1.3a);
+- вне 13420 — порта, который взяла бы без identity сборка канала `prod` (`ServiceConfig.defaultPort("prod")`) — и вне
+  `0xc0de`;
+- по 1024 на канал — профили по умолчанию prod, beta и dev одного пользователя никогда не делят порт; хеш корня разводит
+  явные профили и пользователей одной машины (сервер терминалов); совпадение двух явных профилей — 1/1024 на пару, тогда
+  служба второго не стартует с ошибкой upstream «port … is already in use», и порт задаётся `service set port` (поле
+  `port` конфига службы профиля главнее);
+- identity только называет файлы: регистрация и конфиг службы лежат в `<root>/state` и `<root>/config` профиля.
+
+**Desktop (B4.9):** свои постоянные порты по каналу — ниже 28672 и вне 24576–27647, то есть в 27648–28671 или ниже
+24576. Службе Desktop нельзя наследовать `LOGINOM_AI_AGENT_CLI_ROOT`: `util/src/global.ts` читает его в любом процессе,
+и служба Desktop, запущенная из инструмента службы профиля, ушла бы в каталоги профиля. B4.9 удаляет переменную из
+окружения службы.
+
+**Защёлка.** `CliProfile.hold` в `server-process.ts` (CAT-07) — после проверки действующей службы, до предохранителя базы
+(B3.1b) и запуска Host (B2.3), освобождение — в области сервера после закрытия Host. Это закрывает риск B2.3: второй
+сервер на профиле (параллельный `serve`, сервер `--standalone`, служба-соперник) не открывает ни базу, ни Host.
+- Формат 0.4: каталог `.writer`, созданный исключительно, с файлом `owner`. В `owner` — `{pid, nonce, service}`.
+- Второй сервер получает ошибку `PROFILE_BUSY: the CLI profile <root> is open in another process (pid N)`, код 1.
+- Служба-соперник, заставшая живую службу профиля (`service: true`), выходит с кодом 0, как при найденной действующей
+  службе: её клиент ждёт регистрации той службы. Иначе соперник с ненулевым кодом проваливал бы `Service.ensure`
+  клиента, у которого он единственный (`contenderPool.reap`).
+- Защёлку, чей владелец умер (`process.kill(pid, 0)` — `ESRCH`), сервер забирает: переносит `owner` в сторону, сверяет, что
+  перенёс именно мёртвого владельца (иначе возвращает файл и отвечает `PROFILE_BUSY`), удаляет каталог и создаёт заново.
+  В 0.4 брошенную защёлку не забирал никто (тест «an abandoned guard is never stolen»). На v2 так нельзя: служба живёт в
+  фоне, `Service.stop` после бюджета мягкой остановки шлёт SIGKILL, служба по сроку `ShutdownDeadline` выходит без
+  финализаторов (B2.3b), Windows при выключении её убивает — после этого профиль был бы закрыт до ручного удаления
+  `.writer`. Вопрос владельцу — ниже.
+- Защёлку 0.4 (в `owner` только nonce) и защёлку без `owner` сервер не забирает и не трогает. PID, доставшийся другому
+  процессу, только держит профиль занятым, дважды не открывает.
+- Писатель — сервер, а не клиент: второй TUI или `run` на том же профиле работает через ту же службу, как в v2.
+
+**Host профиля** — корень профиля передаётся в `ServiceHost.start({ data })`, поэтому Host работает в `<root>/loginom`,
+где 0.4 хранил подключение (`loginom/connection`, конверт `loginom-cli-secrets-v1`). `host.ts` не менялся.
+
+### Профиль CLI 0.4 после перехода
+
+На месте, без шага переноса: маркер `cli-profile.json`, `data/loginom-ai-agent.db`, `data/auth.json`,
+`config/loginom-ai-agent.json(c)`, `config/skill(s)`, `loginom/connection`. Первый старт службы профиля: предохранитель
+B3.1b переносит базу (`data/loginom-ai-agent.v1-backup.db` — копия оригинала) и ключи из `data/auth.json` (B3.2); конфиг
+и навыки служба читает из `config` профиля (`LOGINOM_AI_AGENT_CONFIG_DIR`); Host — в `loginom`. База профиля задана
+явно (`LOGINOM_AI_AGENT_DB=<root>/data/loginom-ai-agent.db`), как в 0.4: иначе запуск из исходников (канал `local`)
+открыл бы `loginom-ai-agent-local.db`, и предохранитель ничего бы не перенёс.
+
+### Тесты
+
+| Файл | Тестов | Что |
+|---|---|---|
+| `product/test/cli-profile.test.ts` | +2 | порты каждого канала в своей четверти `0x6000`–`0x6bff`, identity `cli-<8 hex>`; профили по умолчанию трёх каналов не делят порт; корень → та же служба |
+| `cli/test/cli-profile.test.ts` (новый, в процессе) | 7 | новый корень: маркер, каталоги `0700`, унаследованные от службы Desktop `CLI_ROOT`, identity, порт, `CONFIG_DIR`, `DB` заменены, `CONFIG`, `CONFIG_CONTENT`, `AUTH_CONTENT` удалены; ссылка-псевдоним — тот же профиль и служба; отказы `PROFILE_ROOT_INVALID`, `PROFILE_DESKTOP_ROOT`, `PROFILE_FORMAT_INVALID` (чужие данные, маркер prod), `PROFILE_PATH_INVALID`, `PROFILE_PERMISSIONS_INVALID`; защёлка — один писатель, другой профиль независим; защёлка умершего процесса забирается; живой владелец, защёлка 0.4 и без владельца — `PROFILE_BUSY`, чужой владелец не удаляется (`PROFILE_OWNER_CHANGED`) |
+| `cli/test/cli-profile-service.test.ts` (новый, процессы) | 2 | служба Desktop (`index.ts serve --service`, identity `desktop`) и два профиля из «терминала Desktop» живут одновременно на своих портах, регистрации — каждая в своём каталоге, в каталоге Desktop только `service-desktop.json`, каждая служба видит только свою сессию; два одновременных `service start` — одна служба, один URL; `serve --port 0` на том же профиле — код 1 и `PROFILE_BUSY`, защёлка прежняя; после SIGKILL службы защёлка остаётся, следующий `service start` поднимает новую службу и забирает защёлку; после `service stop` защёлки нет |
+| `cli/test/legacy-profile.test.ts` | +1 | профиль CLI 0.4 по умолчанию канала dev, как его раскладывал 0.4 (с `90c4fb902b` — без `LOGINOM_AI_AGENT_CLI_PROFILE`, только `XDG_CONFIG_HOME`, как у пользователя после обновления): `service start` входа продукта — 4 сессии 0.4 в списке, копия базы равна оригиналу, навык `sales-summary` из `config/skills`, ключ `auth.json` доходит до подставного провайдера, в `loginom` — `connection` и `leases` Host, в `data` нет `loginom`, защёлка у службы; после `service stop` конфиг, навык, `auth.json` и все файлы подключения побайтно и по правам те же, защёлки нет |
+
+Порты служб в процессных тестах закреплены в конфиге службы профиля: выведенный порт постоянен для корня, а его числа
+проверяет тест `product`.
+
+### Мутации
+
+Скрипт `<scratchpad>/b27c-runs/mutate.sh` меняет одну строку `sed`, гоняет тесты и возвращает файл из git; на
+`0240643d79`. Без мутаций: `cli-profile` 7/0, `cli-profile-service` 2/0, `legacy-profile` 2/0, `product`
+`cli-profile` 4/0. Числа — по набору файлов из второго столбца.
+
+| Мутация | Тесты (без мутации) | Итог |
+|---|---|---|
+| M1 `util/src/global.ts` не читает `CLI_ROOT` | `cli-profile-service` + `legacy-profile` (4/0) | **1/3**: оба теста служб (регистрация в профиле не появилась за 30 с) и профиль 0.4 |
+| M2 `apply` оставляет унаследованное («задать, если не задано»: `Object.assign(env, профиль, { ...env })`) | `cli-profile` + `cli-profile-service` (9/0) | **6/3**: новый корень (остались identity, порт, `CONFIG_DIR`, `DB` Desktop), Desktop и два профиля (база и конфиг Desktop общие), второй тест служб (конфиг службы профиля не прочитан) |
+| M3 не удаляются `CONFIG` и `CONFIG_CONTENT` | `cli-profile` (7/0) | **6/1** |
+| M4 защёлка не берётся (`if (false && … hold`) | `cli-profile-service` + `legacy-profile` (4/0) | **2/2**: второй сервер на профиле стартует; у службы профиля 0.4 нет защёлки |
+| M5 брошенная защёлка не забирается, как в 0.4 | `cli-profile` + `cli-profile-service` (9/0) | **7/2**: защёлка умершего процесса — `PROFILE_BUSY`; служба после SIGKILL не поднимается |
+| M6 соперник при защёлке живой службы выходит с ошибкой | `cli-profile-service` (2/0) | **1/1**: один из двух одновременных `service start` — код 1, `Server process exited with code 1` и `PROFILE_BUSY` |
+| M7 Host профиля в `<data>/loginom` | `legacy-profile` (2/0) | **1/1**: в `loginom` нет `leases` |
+| M8 база профиля не задаётся | `cli-profile` + `legacy-profile` (9/0) | **7/2**: окружение; профиль 0.4 — сервер открыл `loginom-ai-agent-local.db`, сессий 0.4 в списке нет |
+| M9 каталог Desktop принят как профиль | `cli-profile` (7/0) | **6/1** |
+| M10 маркер любого канала | `cli-profile` (7/0) | **6/1** |
+| M11 один блок портов на все каналы | `product` `cli-profile` (4/0) | **3/1** |
+
+После прогона `git status` — чистое дерево кода. После `90c4fb902b` (случай 0.4 без `LOGINOM_AI_AGENT_CLI_PROFILE`)
+M1, M4, M7 и M8 повторены на `legacy-profile.test.ts` (`<scratchpad>/b27c-runs/mutate2.sh`): 2/0 → **1/1** каждая,
+падает случай профиля CLI 0.4.
+
+### Приёмка
+
+Полные прогоны: база — `a42582279c` в дереве `<scratchpad>/b27c-base`, итог — `0240643d79` (после него только типы в
+двух тестах, `b78a51325a`, и документы); оба — одним скриптом по пакетам, `npm ci` клиента `loginom-runtime` в обоих
+деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан.
+
+| Пакет | Команда | `a42582279c` | `0240643d79` |
+|---|---|---|---|
+| `product` | `bun test` | 58 pass, 3 fail | 60 pass (+2 `cli-profile`), 3 fail — те же три `repo-paths` (В-95) |
+| `client` | `bun test` | 268 pass, 0 fail | 268 pass, 0 fail |
+| `cli` | `bun test --timeout 60000` | 420 pass, 9 skip, 0 fail | 430 pass (+7 `cli-profile`, +2 `cli-profile-service`, +1 `legacy-profile`), 9 skip, 0 fail |
+| `server` | `bun test` | 236 pass, 3 skip, 0 fail | 236 pass, 3 skip, 0 fail |
+| `desktop` | `bun test --timeout 30000` | 536 pass, 4 skip, 0 fail | 536 pass, 4 skip, 0 fail |
+
+Тесты B2.7c на `90c4fb902b` и устойчивость:
+
+```text
+$ cd packages/cli && bun test --timeout 90000 test/cli-profile-service.test.ts test/legacy-profile.test.ts test/cli-profile.test.ts
+ 11 pass
+ 0 fail
+ 78 expect() calls
+Ran 11 tests across 3 files. [24.81s]
+$ bun test --timeout 90000 --rerun-each 5 test/cli-profile-service.test.ts
+ 10 pass
+ 0 fail
+Ran 10 tests across 1 file. [74.83s]
+$ bun test --timeout 90000 --rerun-each 5 -t "a 0.4 CLI profile" test/legacy-profile.test.ts
+ 5 pass
+ 0 fail
+Ran 5 tests across 1 file. [26.09s]
+```
+
+Полный `cli` после `90c4fb902b` не повторялся: правка меняет только источник окружения для профиля по умолчанию в
+`apply` и один тест, их три файла выше зелёные.
+
+Ручная проба (корень — временный каталог, канал dev из исходников):
+
+```text
+$ LOGINOM_AI_AGENT_CLI_PROFILE=<root>/p1 bun src/loginom-cli.ts service start
+http://127.0.0.1:26866
+$ cat <root>/p1/.writer/owner
+{"pid":3752407,"nonce":"…","service":true}
+$ ls <root>/p1/state
+service-cli-f2afbcfd.json
+$ LOGINOM_AI_AGENT_CLI_PROFILE=<root>/p1 bun src/loginom-cli.ts serve --port 0     # код 1
+Error: PROFILE_BUSY: the CLI profile <root>/p1 is open in another process (pid 3752407)
+$ LOGINOM_AI_AGENT_CLI_PROFILE=<root>/p1 bun src/loginom-cli.ts service stop      # код 0
+$ ls -a <root>/p1; ls <root>/p1/loginom <root>/p1/data
+. .. cache cli-profile.json config data loginom state
+leases
+log loginom-ai-agent.db repos
+```
+
+`debug paths` входа продукта с унаследованными `LOGINOM_AI_AGENT_SERVICE_IDENTITY=desktop`, `_PORT=24000` и `_DB` Desktop
+показывает `data`, `config`, `state`, `cache`, `log`, `db` в `<XDG_CONFIG_HOME>/com.loginom.aiagent.dev/cli/profiles/default`.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 450 divergent upstream files                  # как на базе: правки в файлах, которые уже расходились
+  CAT-07: 6
+  CAT-08: 0 (pending: B2.7, B2.8)
+  CAT-13: 23
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ cd packages/cli && bun typecheck && bun run typecheck:tsc         # код 0, 2189 файлов
+$ cd packages/{product,util,desktop,loginom-host} && bun typecheck  # код 0
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                                     # код 0, на b78a51325a
+Found 558 warnings and 0 errors.                                    # как на базе; в изменённых файлах предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+Повтор на итоговом дереве (код `90c4fb902b`, с этим разделом в рабочем дереве): `catalog-check.py --summary` — код 0,
+450 файлов; `apply-identity --check` — `would change: 0 files`; `product` `bun test` — 60 pass, 3 fail (те же три
+`repo-paths`); `bun install --frozen-lockfile` — без изменений; `bun run check` — код 0, `Found 558 warnings and 0
+errors`, `Tasks: 39 successful, 39 total`.
+
+Первый `bun run check` (на `0240643d79`) упал на `typecheck` `cli`: в двух новых тестах `tsc` не принял типы
+(кортеж `Promise.all` и окружение `isolatedEnv`); `bun test` их не проверяет. Поправлено в `b78a51325a`.
+
+### Где решал сам
+
+- **Вход продукта** вместо профиля по умолчанию во всём CLI — выше. Цена: пока B2.7a не соберёт из него бинарник,
+  собранный CLI работает без профиля, в каталогах канала, как на базе.
+- **Писатель — сервер профиля**, клиенты не защёлкиваются.
+- **Защёлка умершего процесса забирается** (в 0.4 — нет) — выше, вопрос владельцу.
+- **Числа диапазона** — выше. Порт по хешу для профилей B1.3a отвергал для Desktop как «не явный»; у профилей корень
+  произвольный, явный порт есть (`service set port`).
+- **`TMPDIR` не задаётся.** В 0.4 он вёл временные файлы всех дочерних процессов в профиль, а на Linux — через короткую
+  ссылку `/tmp/loginom-cli-*`, потому что путь сокета Chromium ограничен 108 байтами. Служба живёт долго, ссылку пришлось
+  бы убирать при её выходе. `Global.tmp` службы — `<root>/cache/tmp`; Node host, Chromium и оболочки берут системный
+  каталог.
+- **Код выхода 1, а не 3, у `PROFILE_BUSY`**: ошибку печатает и код ставит общий путь CLI v2. Код 3 и другие коды выхода
+  автономного CLI 0.4 — B2.7a.
+- **`--help` и `--version` тоже открывают профиль** (0.4 их пропускал) — B2.7a, если нужно.
+- **`migrate` во входе продукта** работает с базой профиля и не берёт защёлку: перенос сам держит `Flock` (B3.1b).
+- **Частные серверы в профиле берут защёлку.** `run` без работающей службы (`ServerConnection.resolve({ autostart: false })`),
+  `acp`, флаг `--standalone` и служба с `disabled` поднимают частный сервер `serve --stdio`; второй такой сервер на
+  профиле (или при живой службе — `acp`) получает `PROFILE_BUSY`, а клиент видит только «Standalone server exited before
+  reporting readiness»: stderr частного сервера скрыт. В 0.4 второй процесс CLI тоже получал `PROFILE_BUSY`, но с кодом 3
+  и сообщением. Сообщение и код — B2.7a.
+- **ACL Windows профиля (`profile-windows.ts` 0.4) не перенесён**: на Windows проверка прав пропускается. Проверить его на
+  Linux нельзя, а PowerShell при каждом старте — секунды; перенос — с B2.7a или отдельной задачей.
+- **Гонка маркера**: второй клиент, открывающий новый профиль одновременно с первым, может прочитать недописанный
+  `cli-profile.json` и получить `PROFILE_FORMAT_INVALID`; окно — запись 52 байт, в 0.4 его закрывала защёлка.
+- **`product/src/cli-profile.ts` импортирует `./index.js`**: `util` проверяет типы с `NodeNext` и без расширения не
+  находил модуль; для `bundler` и Bun это тот же файл.
+- **Зависимость `cli` от `@loginom-ai-agent/product`**: подпуть `./cli-profile` без неё не находил `bun check`.
+- **В `guarantees.md` — только строка G2**, как велит задание; вводный абзац («на v2 мутации не перемерялись, кроме G1,
+  G6, G3, G4») не дополнен G2.
+
+### Вопрос владельцу
+
+**Брошенная защёлка `.writer`.** В 0.4 её не забирал никто: после убитого CLI профиль ждал ручного удаления каталога. На v2
+служба профиля живёт в фоне, клиент добивает её SIGKILL после бюджета остановки, она выходит по сроку без финализаторов,
+Windows убивает её при выключении. Сделано: защёлку забирает следующий сервер, если процесс-владелец умер; живой PID
+(в том числе доставшийся другому процессу) профиль не открывает. Вариант строго как в 0.4 — одна строка, но тогда после
+каждого такого выхода CLI отвечает `PROFILE_BUSY`, пока пользователь не удалит `<root>/.writer`.
+
+### Найдено, не чинил
+
+- Регистрация службы, вышедшей по сроку `ShutdownDeadline` (B2.3b), остаётся; теперь рядом остаётся и защёлка. Обе
+  снимает следующий запуск.
+- `debug paths` во входе продукта не показывает identity и порт службы профиля; их видно в имени файла регистрации.
+
+### Не проверено
+
+- Windows и macOS: всё запускалось на Linux; ACL Windows не перенесён; `process.kill(pid, 0)` на Windows — по коду (так
+  же проверяет B2.3).
+- Собранный CLI и сборка Node: вход продукта в сборку не включён (B2.7a).
+- Что Host профиля читает подключение 0.4 (поколение 1 конверта `plaintext`): проверено только, что Host работает в
+  `<root>/loginom` рядом с ним; чтение конверта — тесты 0.4 `loginom-host/test/cli-credentials.test.ts`, не менялись.
+  Живой Loginom и настоящий Node host в тесте профиля не запускались.
+- Служба Desktop с identity и портом B4.9 — в тесте её заменяет `index.ts serve --service` с теми же переменными.
+- Гонка двух серверов, забирающих одну брошенную защёлку, — по коду (сверка перенесённого `owner`), тестом не воспроизводилась.
+- Мутация «`apply` берёт профиль по умолчанию из `process.env`» не запускалась: тест в процессе тогда создал бы профиль в
+  настоящем `~/.config` стенда. Процесс CLI получает то же окружение как `process.env`, поэтому процессные тесты её бы не
+  поймали.

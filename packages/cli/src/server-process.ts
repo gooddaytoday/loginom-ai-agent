@@ -19,6 +19,7 @@ import { ServiceRegistration } from "./services/service-registration"
 import { RemoteTunnel } from "./services/remote-tunnel"
 import { WebUi } from "./services/web-ui"
 import { databasePath } from "./database-path"
+import { CliProfile } from "./profile"
 import { ShutdownDeadline } from "./shutdown-deadline"
 
 export type Mode = "default" | "service" | "stdio"
@@ -77,6 +78,10 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           ? Service.incumbent({ ...serviceOptions, url: serviceURL(hostname, port) })
           : undefined
       if (findIncumbent !== undefined && (yield* findIncumbent) !== undefined) return
+      // Loginom AI Agent (B2.7c): one server writes a CLI profile (`.writer`); a second one opens neither its database nor
+      // its Host.
+      const profile = CliProfile.current()
+      if (profile && (yield* CliProfile.hold(profile.root, options.mode === "service")) === "incumbent") return
       // Desktop can launch the service directly without injecting its saved environment.
       Object.assign(process.env, ServiceConfig.processEnv(config.env))
       // Keep a package-manager or curl install replaceable while the service runs; Desktop updates its own copy.
@@ -90,7 +95,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
       const host = yield* Effect.acquireRelease(
         Effect.promise(() =>
-          ServiceHost.start({ data: global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
+          // A CLI profile keeps its Host in `<root>/loginom`, next to the connection 0.4 saved there.
+          ServiceHost.start({ data: profile?.root ?? global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
         ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
       )

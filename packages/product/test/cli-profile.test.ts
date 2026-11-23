@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { cliProfile } from "../src/cli-profile"
+import { cliProfile, cliProfileService } from "../src/cli-profile"
 
 describe("standalone CLI paths", () => {
   test("native defaults and channels", () => {
@@ -21,5 +21,30 @@ describe("standalone CLI paths", () => {
     const result = cliProfile({ root: "/bench/a", platform: "linux", channel: "prod" })
     expect(result.tmp).toBe("/bench/a/cache/tmp")
     expect(result.loginom).toBe("/bench/a/loginom")
+  })
+})
+
+describe("CLI profile services", () => {
+  // Desktop takes constant ports below 0x7000 outside this range (decision В-97 п. 7, B4.9); services without an identity
+  // listen on 0xc0de, fold into 0x7000-0x7fff on Windows, or take 13420 in a `prod` build.
+  test("each channel's profiles get ports from its own quarter of 0x6000-0x6bff", () => {
+    const roots = ["/home/a/.config/com.loginom.aiagent/cli/profiles/default", "/bench/a", "/bench/b", "C:\\Roaming\\x"]
+    for (const [index, channel] of (["prod", "beta", "dev"] as const).entries())
+      for (const root of roots) {
+        const service = cliProfileService(root, channel)
+        expect(service.port).toBeGreaterThanOrEqual(0x6000 + 0x400 * index)
+        expect(service.port).toBeLessThan(0x6400 + 0x400 * index)
+        expect(service.identity).toMatch(/^cli-[0-9a-f]{8}$/)
+      }
+  })
+
+  test("the default profiles of the channels never share a port, and a root always gets the same service", () => {
+    const ports = (["prod", "beta", "dev"] as const).map(
+      (channel) =>
+        cliProfileService(cliProfile({ platform: "linux", home: "/home/user", env: {}, channel }).root, channel).port,
+    )
+    expect(new Set(ports).size).toBe(3)
+    expect(cliProfileService("/bench/a", "dev")).toEqual(cliProfileService("/bench/a", "dev"))
+    expect(cliProfileService("/bench/a", "dev").identity).not.toBe(cliProfileService("/bench/b", "dev").identity)
   })
 })

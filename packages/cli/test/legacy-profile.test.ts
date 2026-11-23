@@ -1,8 +1,10 @@
 import { afterAll, expect, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { legacyDirectories, restoreLegacy } from "../../server/test/fixture/legacy/restore"
+import { CliProfile } from "../src/profile"
 import { isolatedEnv } from "./fixture/environment"
 
 // A whole 0.4 profile of the channel in the directories a release build uses (B3.2): the database and auth.json in the
@@ -125,6 +127,133 @@ test("the server moves a 0.4 profile: the provider works with its key, skills an
   expect(await kept()).toEqual(before)
 }, 60_000)
 
+// The standalone CLI of 0.4 kept a whole profile in one root (`a080f7725c:packages/product/src/cli-profile.ts`): its
+// marker, the database and auth.json in `data`, the configuration and own skills in `config`, the Loginom connection in
+// `loginom`. The product CLI opens it in place (B2.7c): the profile's own service migrates the sessions and the key on
+// its first start (B3.1b, B3.2), reads the configuration and the skills, and keeps its Host next to the connection.
+test("a 0.4 CLI profile works in place: its service brings the sessions and the key, reads its skills, keeps the connection", async () => {
+  const authorizations: (string | null)[] = []
+  const provider = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: (request) => complete(request, authorizations) })
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "loginom-legacy-cli-profile-")))
+  roots.push(root)
+  // The default profile of the dev channel on Linux, as 0.4 laid it out: directories 0700, files 0600.
+  const profile = path.join(root, "config", "com.loginom.aiagent.dev", "cli", "profiles", "default")
+  const config = path.join(profile, "config")
+  const data = path.join(profile, "data")
+  const loginom = path.join(profile, "loginom")
+  const skill = path.join(config, "skills", "sales-summary", "SKILL.md")
+  await Promise.all(
+    ["config", "data", "state", "cache/tmp", "loginom"].map((name) =>
+      fs.mkdir(path.join(profile, name), { recursive: true, mode: 0o700 }),
+    ),
+  )
+  await fs.writeFile(
+    path.join(profile, "cli-profile.json"),
+    JSON.stringify({ format: "loginom-cli", version: 1, channel: "dev" }),
+    { mode: 0o600 },
+  )
+  await restoreLegacy("0.4", path.join(data, "loginom-ai-agent.db"), root)
+  const { project } = legacyDirectories(root)
+  const recorded = new Database(path.join(data, "loginom-ai-agent.db"), { readonly: true })
+  const sessions = recorded
+    .query<{ id: string }, []>("SELECT id FROM session ORDER BY id")
+    .all()
+    .map((row) => row.id)
+  recorded.close()
+  await fs.copyFile(path.join(fixtures, "0.4-auth.json"), path.join(data, "auth.json"))
+  await fs.chmod(path.join(data, "auth.json"), 0o600)
+  await Bun.write(
+    path.join(config, "loginom-ai-agent.jsonc"),
+    (await Bun.file(path.join(fixtures, "0.4-config.jsonc")).text()).replace(
+      "http://127.0.0.1:4010/v1",
+      `http://127.0.0.1:${provider.port}/v1`,
+    ),
+  )
+  await Bun.write(
+    skill,
+    "---\nname: sales-summary\ndescription: Summarize the monthly sales report.\n---\n\nGroup the rows by region.\n",
+  )
+  await connectionStore(path.join(loginom, "connection"))
+  // Nothing names the profile, as for a user who upgrades: the CLI finds the default one of its channel. The inherited
+  // config directory and database of isolatedEnv do not apply: the profile replaces them.
+  const env = isolatedEnv(root, { XDG_CONFIG_HOME: path.join(root, "config") })
+  // The profile's service port is pinned in its service config; the derived one is fixed per root.
+  const applied: NodeJS.ProcessEnv = { ...env }
+  CliProfile.apply(applied)
+  const service = `service-${applied.LOGINOM_AI_AGENT_SERVICE_IDENTITY}.json`
+  const free = Bun.serve({ port: 0, fetch: () => new Response() })
+  const port = free.port
+  await free.stop(true)
+  await fs.writeFile(path.join(config, service), JSON.stringify({ port }), { mode: 0o600 })
+  const kept = async () =>
+    snapshot([
+      path.join(config, "loginom-ai-agent.jsonc"),
+      skill,
+      path.join(data, "auth.json"),
+      ...(await files(path.join(loginom, "connection"))),
+    ])
+  const before = await kept()
+  const original = (await snapshot([path.join(data, "loginom-ai-agent.db")]))[path.join(data, "loginom-ai-agent.db")]
+
+  expect(await productCli(["service", "start"], env)).toEqual({
+    code: 0,
+    stdout: `http://127.0.0.1:${port}\n`,
+    stderr: "",
+  })
+  try {
+    const info = await Bun.file(path.join(profile, "state", service)).json()
+    const call = api(info.url, project, info.password)
+    const listed = (await call("GET", "/api/session")).data as { id: string }[]
+    expect(listed.map((item) => item.id).toSorted()).toEqual(sessions)
+    expect(sessions).toHaveLength(4)
+    const skills = await until(async () => {
+      const found = (await call("GET", `/api/skill?location[directory]=${encodeURIComponent(project)}`)).data as {
+        id: string
+        path: string
+      }[]
+      return found.some((item) => item.id === "sales-summary") ? found : undefined
+    })
+    expect(skills.find((item) => item.id === "sales-summary")?.path).toBe(skill)
+    const session = (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
+    await call("POST", `/api/session/${session}/prompt`, { text: "Say hello" })
+    await call("POST", `/api/experimental/session/${session}/wait`, {})
+    expect(authorizations.length).toBeGreaterThan(0)
+    expect(authorizations.every((authorization) => authorization === `Bearer ${key}`)).toBe(true)
+    // The Host works in the directory with the connection, not in a new one under `data`.
+    expect((await fs.readdir(loginom)).toSorted()).toEqual(["connection", "leases"])
+    expect(await fs.readdir(data)).not.toContain("loginom")
+    expect(
+      (await snapshot([path.join(data, "loginom-ai-agent.v1-backup.db")]))[
+        path.join(data, "loginom-ai-agent.v1-backup.db")
+      ],
+    ).toBe(original)
+    expect(JSON.parse(await fs.readFile(path.join(profile, ".writer", "owner"), "utf8"))).toMatchObject({
+      pid: info.pid,
+    })
+  } finally {
+    expect(await productCli(["service", "stop"], env)).toMatchObject({ code: 0 })
+    await provider.stop(true)
+  }
+  expect(await kept()).toEqual(before)
+  expect(await fs.readdir(profile)).not.toContain(".writer")
+}, 60_000)
+
+// Runs the product CLI entry, which applies the profile.
+async function productCli(args: string[], env: Record<string, string | undefined>) {
+  const child = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), ...args], {
+    cwd: cli,
+    env,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  return { code, stdout, stderr }
+}
+
 // A Loginom connection store as 0.4 wrote it on Linux: plaintext records, directories 0700, files 0600
 // (`a080f7725c:packages/loginom-host/src/connection/connection-store.ts`).
 async function connectionStore(directory: string) {
@@ -191,12 +320,12 @@ async function listening(child: Bun.Subprocess<"ignore", "pipe", "pipe">) {
   throw new Error(`server did not start: ${output.text}${await new Response(child.stderr).text()}`)
 }
 
-function api(base: string, directory: string) {
+function api(base: string, directory: string, secret = password) {
   return async (method: string, route: string, body?: unknown) => {
     const response = await fetch(new URL(route, base), {
       method,
       headers: {
-        authorization: `Basic ${btoa(`opencode:${password}`)}`,
+        authorization: `Basic ${btoa(`opencode:${secret}`)}`,
         "content-type": "application/json",
         "x-opencode-directory": encodeURIComponent(directory),
       },
