@@ -101,6 +101,8 @@ windows(
 
     try {
       await Bun.write(path.join(installer.dir, "app/runtime/icudtl.dat"), "runtime fixture")
+      // customInstall ends by running the installed app with --verify-resources; this stand-in accepts.
+      await copyFile(await installer.compile("app", "  SetErrorLevel 0"), path.join(installer.dir, "app/OpenCode.exe"))
       await Bun.write(path.join(installer.dir, "unrelated.txt"), "outside the installation")
       await succeed(["icacls.exe", path.join(installer.dir, "app"), "/grant", "*S-1-15-2-999-999-999:(OI)(CI)(F)"])
       const parent = await acl(".")

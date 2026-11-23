@@ -2,6 +2,7 @@
 import { $ } from "bun"
 import { cp, mkdir, readdir, rm } from "node:fs/promises"
 import path from "node:path"
+import { Product } from "@loginom-ai-agent/product"
 import { getConfig } from "../electron-builder.config"
 import { getCurrentCli, resolveChannel } from "./utils"
 
@@ -36,7 +37,7 @@ if (app) {
   // The installer uses the channel's icons; the rest of the app is already built and signed.
   await $`bun ./script/copy-icons.ts ${resolveChannel()}`
   await $`bunx electron-builder ${flags} --prepackaged ${app}`
-  await cp(`dist/opencode-desktop-win-${cli.cpu}.exe`, path.join(out, `opencode-desktop-win-${cli.cpu}.exe`))
+  await cp(`dist/${Product.slug}-win-${cli.cpu}.exe`, path.join(out, `${Product.slug}-win-${cli.cpu}.exe`))
 }
 
 if (!app && os === "linux") {
@@ -52,7 +53,7 @@ if (!app && os === "mac") {
 
   if (bundles.length !== 1) throw new Error(`Expected one .app bundle in ${parent}, found ${bundles.join(", ")}`)
   await writeUpdateConfig(path.join(parent, bundles[0], "Contents", "Resources"))
-  await $`tar -cf ${path.join(out, `opencode-desktop-mac-${cli.cpu}.app.tar`)} -C ${parent} ${bundles[0]}`
+  await $`tar -cf ${path.join(out, `${Product.slug}-mac-${cli.cpu}.app.tar`)} -C ${parent} ${bundles[0]}`
 }
 
 if (!app && os === "win") {
@@ -63,10 +64,12 @@ if (!app && os === "win") {
 }
 
 // electron-builder writes resources/app-update.yml only for dmg, zip and nsis targets, not for --dir builds.
-// electron-updater reads its feed from that file, so write the one those targets would.
+// electron-updater reads its feed from that file, so write the one those targets would. They name the updater
+// cache after the package name the config gives the app, not the workspace package's.
 async function writeUpdateConfig(resources: string) {
-  const publish = getConfig().publish
-  const name: string = (await Bun.file("package.json").json()).name
+  const config = getConfig()
+  const publish = config.publish
+  const name: string = config.extraMetadata.name
   await Bun.write(
     path.join(resources, "app-update.yml"),
     [

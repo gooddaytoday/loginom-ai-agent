@@ -3,18 +3,12 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Arch, type Configuration } from "electron-builder"
+import { Product, productName, productSlug } from "@loginom-ai-agent/product"
 import { NativeArch } from "../../script/native-arch"
 import { DESKTOP_NATIVE_ENGLISH } from "@opencode/app/i18n/desktop-native"
 import { CLI_BINARIES, getCurrentCli, nodePtyPackage } from "./script/utils"
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
-
-// The Electron 42 packaging update briefly installed Linux launchers/icons under
-// "opencode-desktop". Keep that hidden desktop entry around so existing GNOME/KDE
-// pins still resolve after the canonical app id changes back to ai.opencode.desktop.
-const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
-
-const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
 
 // rpmbuild adds /usr/lib/.build-id links for every ELF file. The bundled Electron
 // binaries are byte-identical across apps on the same Electron version, so those
@@ -40,44 +34,36 @@ function resolveChannel() {
   return "dev"
 }
 
-const APP_IDS = {
-  dev: "ai.opencode.desktop.dev",
-  beta: "ai.opencode.desktop.beta",
-  prod: "ai.opencode.desktop",
-} as const
-
-// libappimage (used by AppImageLauncher) resolves the .desktop entry inside an
-// AppImage by globbing `*.desktop` at the squashfs root. If the main
-// executable itself ends in `.desktop` (prod appId `ai.opencode.desktop`), the
-// ELF binary matches the glob and is parsed as a desktop entry, so
-// integration fails with `Malformed desktop entry: Unexpected char '\x7f' at 0`
-// (0x7F is the first byte of the ELF magic).
-// https://github.com/anomalyco/opencode/issues/51867
-// Strip a trailing `.desktop` so the executable can never collide with the
-// desktop-entry glob. Beta/dev appIds end in `.beta`/`.dev` and are unaffected.
-function linuxExecutableName(appId: string): string {
-  return appId.replace(/\.desktop$/, "")
-}
-
-const getBase = (appId: string): Configuration => {
+const getBase = (channel: keyof typeof Product.channels): Configuration => {
   const target = getCurrentCli()
+  const appId = Product.channels[channel]
   const desktopName = `${appId}.desktop`
 
   return {
-    artifactName: "opencode-desktop-${os}-${arch}.${ext}",
+    appId,
+    // electron-builder names the /opt directory after productName, so Linux takes the slug; the launcher and
+    // the packaged metadata keep the display name.
+    productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
+    artifactName: Product.artifactName,
     directories: {
       output: "dist",
       buildResources: "resources",
     },
     // Linux launchers are .desktop files, so this is the desktop file name,
-    // not just the app id. For prod, app id "ai.opencode.desktop" becomes
-    // "ai.opencode.desktop.desktop".
+    // not just the app id. For prod, app id "com.loginom.aiagent" becomes
+    // "com.loginom.aiagent.desktop".
     // https://developer.gnome.org/documentation/guidelines/maintainer/integrating.html
     // https://www.electron.build/docs/linux/
-    // Release builds take their version from LOGINOM_AI_AGENT_VERSION instead of rewriting package.json.
-    extraMetadata: process.env.LOGINOM_AI_AGENT_VERSION
-      ? { desktopName, version: process.env.LOGINOM_AI_AGENT_VERSION }
-      : { desktopName },
+    // The package name gives the per-user install directory and the updater cache their names; the 0.4
+    // installers published them as @loginom-ai-agentdesktop and @loginom-ai-agentdesktop-updater.
+    extraMetadata: {
+      name: `${Product.namespace}/desktop`,
+      productName: productName(channel),
+      desktopName,
+      // Release builds take their version from LOGINOM_AI_AGENT_VERSION instead of rewriting package.json;
+      // electron-builder skips an undefined value.
+      version: process.env.LOGINOM_AI_AGENT_VERSION || undefined,
+    },
     files: [
       "out/**/*",
       "resources/**/*",
@@ -172,12 +158,10 @@ const getBase = (appId: string): Configuration => {
       },
       target: ["dmg", "zip"],
     },
-    protocols: {
-      name: "OpenCode",
-      schemes: ["opencode"],
-    },
+    protocols: { name: Product.name, schemes: [Product.scheme] },
     win: {
       icon: `resources/icons/icon.ico`,
+      executableName: productSlug(channel),
       target: ["nsis"],
       verifyUpdateCodeSignature: false,
     },
@@ -187,17 +171,22 @@ const getBase = (appId: string): Configuration => {
       perMachine: false,
       installerIcon: `resources/icons/icon.ico`,
       installerHeaderIcon: `resources/icons/icon.ico`,
+      shortcutName: productName(channel),
     },
     linux: {
       icon: `resources/icons`,
       category: "Development",
-      executableName: linuxExecutableName(appId),
+      // libappimage finds the AppImage's desktop entry by globbing `*.desktop`, so the executable must never
+      // end in `.desktop` (anomalyco/opencode#51867). The slug does not.
+      executableName: productSlug(channel),
+      // deb and rpm otherwise need an email in the manifest's author.
+      maintainer: "Loginom",
       // Derive the installed `.desktop` filename from `desktopName`
-      // (`ai.opencode.desktop.desktop` for prod) instead of `executableName`,
-      // so window association is unaffected by the executable rename above.
+      // (`com.loginom.aiagent.desktop` for prod) instead of `executableName`.
       syncDesktopName: true,
       desktop: {
         entry: {
+          Name: productName(channel),
           // Match the installed .desktop file and hicolor icon basename so
           // Linux shells can associate the running Electron window with its launcher.
           StartupWMClass: appId,
@@ -210,23 +199,27 @@ const getBase = (appId: string): Configuration => {
 
 export function getConfig() {
   const channel = resolveChannel()
-  const appId = APP_IDS[channel]
-  const base = getBase(appId)
+  const appId = Product.channels[channel]
+  const packageName = productSlug(channel)
+
+  const base = {
+    ...getBase(channel),
+    // A generic target writes app-update.yml even with --publish never. Until the build supplies the product
+    // feed, the invalid placeholder only enables that file; no channel updates from an upstream feed.
+    publish: {
+      provider: "generic",
+      url: process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || "https://updates.invalid/",
+      channel: "latest",
+    },
+  }
 
   switch (channel) {
     case "dev": {
       return {
         ...base,
-        appId,
-        productName: "OpenCode Dev",
-        publish: {
-          provider: "generic",
-          url: "https://opencode.ai/update/api/dev/desktop/opencode/",
-          channel: "latest",
-        },
-        deb: { fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        deb: { packageName, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
-          packageName: "opencode-dev",
+          packageName,
           fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
         },
       }
@@ -235,17 +228,9 @@ export function getConfig() {
     case "beta": {
       return {
         ...base,
-        appId,
-        productName: "OpenCode Beta",
-        protocols: { name: "OpenCode Beta", schemes: ["opencode"] },
-        publish: {
-          provider: "generic",
-          url: "https://opencode.ai/update/api/beta/desktop/opencode/",
-          channel: "latest",
-        },
-        deb: { fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        deb: { packageName, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
-          packageName: "opencode-beta",
+          packageName,
           fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
         },
       }
@@ -254,21 +239,13 @@ export function getConfig() {
     case "prod": {
       return {
         ...base,
-        appId,
-        productName: "OpenCode",
-        protocols: { name: "OpenCode", schemes: ["opencode"] },
         // An Icon Composer package compiles to Assets.car, which macOS 26 and later draw the app icon from
         // (Dock, Finder, system dialogs and the system icon styles). Older macOS keeps using the ICNS.
         mac: { ...base.mac, icon: "resources/icons/icon.icon" },
         // The DMG volume icon would otherwise use the same actool-generated ICNS.
         dmg: { icon: "resources/icons/icon.icns" },
-        publish: {
-          provider: "generic",
-          url: "https://opencode.ai/update/api/latest/desktop/opencode/",
-          channel: "latest",
-        },
-        deb: { fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
-        rpm: { packageName: "opencode", fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId), legacyDesktopEntryFpm] },
+        deb: { packageName, fpm: [metainfoFpm(appId)] },
+        rpm: { packageName, fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId)] },
       }
     }
   }

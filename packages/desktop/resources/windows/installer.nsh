@@ -3,9 +3,45 @@
 ; directory and each channel's installer and uninstaller replaced or deleted the others' files.
 ; Each channel now installs into a directory named after its app ID, like its data directory.
 ; Only the installer moves, and NSIS rejects a variable that the uninstaller build never sets.
+; Loginom AI Agent 0.4 channels shared "@loginom-ai-agentdesktop" the same way, so the package name stays.
 !ifndef BUILD_UNINSTALLER
   Var /GLOBAL sharedInstallDir
 !endif
+
+LangString VerifyResourcesStatus 1033 "Verifying application resources. This may take a few minutes..."
+LangString VerifyResourcesError 1033 "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
+LangString VerifyResourcesStatus 1049 "Проверка ресурсов приложения. Это может занять несколько минут..."
+LangString VerifyResourcesError 1049 "Не удалось проверить ресурсы приложения или сохранить результат проверки. Установка не завершена. Запустите установщик повторно."
+
+; Preserve electron-builder's full language set with the English source fallback.
+!macro VerifyResourcesEnglish LANG
+  LangString VerifyResourcesStatus ${LANG} "Verifying application resources. This may take a few minutes..."
+  LangString VerifyResourcesError ${LANG} "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
+!macroend
+!insertmacro VerifyResourcesEnglish 1031
+!insertmacro VerifyResourcesEnglish 1036
+!insertmacro VerifyResourcesEnglish 3082
+!insertmacro VerifyResourcesEnglish 2052
+!insertmacro VerifyResourcesEnglish 1028
+!insertmacro VerifyResourcesEnglish 1041
+!insertmacro VerifyResourcesEnglish 1042
+!insertmacro VerifyResourcesEnglish 1040
+!insertmacro VerifyResourcesEnglish 1043
+!insertmacro VerifyResourcesEnglish 1030
+!insertmacro VerifyResourcesEnglish 1053
+!insertmacro VerifyResourcesEnglish 1044
+!insertmacro VerifyResourcesEnglish 1035
+!insertmacro VerifyResourcesEnglish 2070
+!insertmacro VerifyResourcesEnglish 1046
+!insertmacro VerifyResourcesEnglish 1045
+!insertmacro VerifyResourcesEnglish 1058
+!insertmacro VerifyResourcesEnglish 1029
+!insertmacro VerifyResourcesEnglish 1051
+!insertmacro VerifyResourcesEnglish 1038
+!insertmacro VerifyResourcesEnglish 1025
+!insertmacro VerifyResourcesEnglish 1055
+!insertmacro VerifyResourcesEnglish 1054
+!insertmacro VerifyResourcesEnglish 1066
 
 !macro customInit
   StrCpy $sharedInstallDir ""
@@ -31,6 +67,26 @@
   nsExec::ExecToLog '"$SYSDIR\icacls.exe" "$INSTDIR" /grant "*S-1-15-2-2:(OI)(CI)(RX)"'
   Pop $0
   !insertmacro leaveSharedInstall
+  ; Never skip updates: the final installed bytes and current user's profile
+  ; must be checked before NSIS can mark the installation successful or launch.
+  SetDetailsPrint textonly
+  DetailPrint "$(VerifyResourcesStatus)"
+  SetDetailsPrint both
+  ClearErrors
+  ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --verify-resources' $0
+  ${If} ${Errors}
+    StrCpy $0 1
+  ${EndIf}
+  ${If} $0 != 0
+    ${If} ${isUpdated}
+      ; Updates are silent; an integrity failure must still explain why the app did not relaunch.
+      MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)"
+    ${Else}
+      MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)" /SD IDOK
+    ${EndIf}
+    SetErrorLevel 1
+    Abort
+  ${EndIf}
 !macroend
 
 ; Removes this channel's files from the shared directory, and the directory with the files every
@@ -56,6 +112,54 @@
 !macro customUnInstall
   ${IfNot} ${isUpdated}
     !insertmacro removeStagedUpdates $INSTDIR
+    !insertmacro removeProtocolKey
+    ; The installer keeps a copy of itself here and the updater its downloads, a few hundred MB.
+    ${StdUtils.GetParentPath} $R0 "$LOCALAPPDATA\${APP_INSTALLER_STORE_FILE}"
+    RMDir /r $R0
+  ${EndIf}
+!macroend
+
+; The app registers the product scheme for the current user. Every channel registers the same scheme, so
+; the key goes only while its command still starts this installation's executable.
+!macro removeProtocolKey
+  ReadRegStr $0 HKCU "Software\Classes\loginom-ai-agent\shell\open\command" ""
+
+  ; Read the executable, not its arguments. Electron quotes paths with spaces.
+  StrCpy $1 $0 1
+  StrCpy $2 0
+  ${If} $1 == '$\"'
+    StrCpy $0 $0 "" 1
+    StrCpy $1 '$\"'
+  ${Else}
+    StrCpy $1 " "
+  ${EndIf}
+  ${Do}
+    StrCpy $3 $0 1 $2
+    ${If} $3 == ""
+    ${OrIf} $3 == $1
+      ${ExitDo}
+    ${EndIf}
+    ${If} $1 == " "
+    ${AndIf} $3 == "$\t"
+      ${ExitDo}
+    ${EndIf}
+    IntOp $2 $2 + 1
+  ${Loop}
+  StrCpy $0 $0 $2
+
+  ; Reject relative commands; normalize traversal before checking ownership.
+  StrCpy $1 $0 2
+  StrCpy $2 $0 2 1
+  ${If} $1 == "\\"
+  ${OrIf} $2 == ":\"
+  ${OrIf} $2 == ":/"
+    GetFullPathName $0 $0
+    StrCpy $1 "$INSTDIR\"
+    StrLen $2 $1
+    StrCpy $0 $0 $2
+    ${If} $0 == $1
+      DeleteRegKey HKCU "Software\Classes\loginom-ai-agent"
+    ${EndIf}
   ${EndIf}
 !macroend
 
