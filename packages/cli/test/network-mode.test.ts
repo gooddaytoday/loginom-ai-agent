@@ -41,30 +41,6 @@ describe("network mode in the global config", () => {
 })
 
 describe("product defaults of the server", () => {
-  test("never reads .claude skills, without the variable", async () => {
-    const root = await temporary("cli-network-claude-")
-    const project = path.join(root, "project")
-    const skill = (directory: string, name: string) =>
-      Bun.write(
-        path.join(directory, name, "SKILL.md"),
-        `---\nname: ${name}\ndescription: ${name} skill.\n---\n\n${name}\n`,
-      )
-    await skill(path.join(root, ".claude", "skills"), "home-claude")
-    await skill(path.join(project, ".claude", "skills"), "project-claude")
-    // `.agents` is read by the same plugin: its skill shows the roots were scanned.
-    await skill(path.join(root, ".agents", "skills"), "home-agents")
-    const result = await serve(root, async (call) => {
-      await active(call, project)
-      return (await call("GET", `/api/skill?location[directory]=${encodeURIComponent(project)}`)).data as {
-        id: string
-      }[]
-    })
-    const ids = result.value.map((item) => item.id)
-    expect(ids).toContain("home-agents")
-    expect(ids).not.toContain("home-claude")
-    expect(ids).not.toContain("project-claude")
-  }, 60_000)
-
   test("«Только этот компьютер» repeats S6 without a request off loopback", async () => {
     const root = await temporary("cli-network-device-")
     const project = path.join(root, "project")
@@ -87,16 +63,15 @@ describe("product defaults of the server", () => {
         const session = (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
         await call("POST", `/api/session/${session}/prompt`, { text: "Make a todo list" })
         await call("POST", `/api/experimental/session/${session}/wait`, {})
-        // The catalog refresh starts with the server; S6 idled through its next cycles.
-        await Bun.sleep(2_000)
         return models.map((item) => item.providerID)
       })
       expect(result.requests).toEqual([])
       expect(result.value).toContain("stub")
       expect(result.value).not.toContain("opencode")
-      // The turn ran: the tool's result came back to the model in the next request.
+      // The turn ran: the next request carries the `todowrite` call and its result.
       expect(model.requests.length).toBeGreaterThanOrEqual(2)
       expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain("todowrite")
+      expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain(`"role":"tool"`)
     } finally {
       await model.server.stop(true)
     }
@@ -106,6 +81,7 @@ describe("product defaults of the server", () => {
     const free = await freeModel()
     try {
       const result = await freeTurn(free, {})
+      expect(result.value.skills).toEqual(skills)
       expect(result.requests).toContain("CONNECT models.opencode.ai:443 HTTP/1.1")
       expect(result.value.models).toContain("big-pickle")
       // The free route signs in as `public`, not with a configured key.
@@ -121,6 +97,7 @@ describe("product defaults of the server", () => {
     const free = await freeModel()
     try {
       const result = await freeTurn(free, { network: "device" })
+      expect(result.value.skills).toEqual(skills)
       expect(result.requests).toEqual([])
       expect(result.value.models).not.toContain("big-pickle")
       expect(free.authorizations).toEqual([])
@@ -131,11 +108,23 @@ describe("product defaults of the server", () => {
   }, 60_000)
 })
 
-// A model-less turn in a project whose catalog file lists only OpenCode's free model at `free`.
+// `.claude` skills are never read, in either mode and without the variable; `.agents` is read by the same plugin, so its
+// skill shows the roots were scanned.
+const skills = { "home-agents": true, "home-claude": false, "project-claude": false }
+
+// A model-less turn in a project whose catalog file lists only OpenCode's free model at `free`, with a skill in each of
+// `~/.agents`, `~/.claude` and the project's `.claude`.
 async function freeTurn(free: Awaited<ReturnType<typeof freeModel>>, config: Record<string, unknown>) {
   const root = await temporary("cli-network-free-")
   const project = path.join(root, "project")
-  await fs.mkdir(project)
+  const skill = (directory: string, name: string) =>
+    Bun.write(
+      path.join(directory, name, "SKILL.md"),
+      `---\nname: ${name}\ndescription: ${name} skill.\n---\n\n${name}\n`,
+    )
+  await skill(path.join(root, ".agents", "skills"), "home-agents")
+  await skill(path.join(root, ".claude", "skills"), "home-claude")
+  await skill(path.join(project, ".claude", "skills"), "project-claude")
   await Bun.write(path.join(root, "config", "loginom-ai-agent.json"), JSON.stringify(config))
   const catalog = path.join(root, "catalog.json")
   await Bun.write(catalog, JSON.stringify(free.catalog))
@@ -143,14 +132,18 @@ async function freeTurn(free: Awaited<ReturnType<typeof freeModel>>, config: Rec
     root,
     async (call) => {
       await active(call, project)
-      const models = (await call("GET", `/api/model?location[directory]=${encodeURIComponent(project)}`)).data as {
-        id: string
-      }[]
+      const query = `location[directory]=${encodeURIComponent(project)}`
+      const listed = ((await call("GET", `/api/skill?${query}`)).data as { id: string }[]).map((item) => item.id)
+      const models = (await call("GET", `/api/model?${query}`)).data as { id: string }[]
       const session = (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
       await call("POST", `/api/session/${session}/prompt`, { text: "Say hello" })
       await call("POST", `/api/experimental/session/${session}/wait`, {})
       const messages = await call("GET", `/api/session/${session}/message`)
-      return { models: models.map((item) => item.id), messages: JSON.stringify(messages) }
+      return {
+        skills: Object.fromEntries(Object.keys(skills).map((name) => [name, listed.includes(name)])),
+        models: models.map((item) => item.id),
+        messages: JSON.stringify(messages),
+      }
     },
     { LOGINOM_AI_AGENT_MODELS_PATH: catalog },
   )
