@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 100,
+    "max_errors": 8,
+    "max_nodes": 9,
+    "forbid": [
+      "sqlite3",
+      "convert ",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Минимум узлов с итоговым экспортом: 7. После прогона вручную сверить GUID REST и граф с первым ходом (#1235).",
+  "base": "bh-b01",
+  "input_files": []
+}
