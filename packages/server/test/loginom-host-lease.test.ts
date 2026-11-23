@@ -79,12 +79,16 @@ const leased = (data: string) =>
     return sessions.flat()
   })
 
-// `sent`, when given, collects what the plugin sends the Host: the same Node host, launched by the test.
-const boot = (sent?: unknown[]) =>
+// `sent`, when given, collects what the plugin sends the Host: the same Node host, launched by the test. `handshake`,
+// when given, holds the Host in its handshake until it resolves; otherwise the case starts once the Host is connected,
+// so a prompt takes its lease when it is admitted (B2.5d), however long the Node host takes to start.
+const boot = (options: { sent?: unknown[]; handshake?: Promise<void> } = {}) =>
   Effect.gen(function* () {
+    const sent = options.sent
     const dir = (yield* tmpdirScoped("loginom-host-lease-")).path
     const data = path.join(dir, "data")
     const connect = async () => {
+      await options.handshake
       const host = await launchNodeHost({
         node: path.join(fixture.resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
         entry: path.join(fixture.resources, "host", "node-host.mjs"),
@@ -103,9 +107,16 @@ const boot = (sent?: unknown[]) =>
     }
     // As the server process: the Host starts before the routes and closes after them.
     yield* Effect.acquireRelease(
-      Effect.promise(() => ServiceHost.start({ data, resources: fixture.resources, connect: sent && connect })),
+      Effect.promise(() =>
+        ServiceHost.start({
+          data,
+          resources: fixture.resources,
+          connect: sent || options.handshake ? connect : undefined,
+        }),
+      ),
       () => Effect.promise(() => ServiceHost.close()),
     )
+    if (!options.handshake) yield* until(() => Effect.succeed(ServiceHost.connected() || undefined))
     const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
     const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
     // A `fail` step waits for the test before the provider rejects the request.
@@ -287,16 +298,20 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
   )
 
   // A prompt takes the lease when it is admitted (B2.5d); an execution that starts without one — a synthetic message, a
-  // resume after a restart — takes it when it starts.
+  // resume after a restart — takes it when it starts. Here it starts while the Location's plugins are still activating,
+  // so the plugin never sees its `session.execution.started`, and while the Host is still in its handshake (B2.6a2).
   it.live(
     "S2 synthetic wake: an execution without a prompt leases when it starts and releases the lease when it succeeds",
     () =>
       Effect.gen(function* () {
-        const test = yield* boot()
+        const handshake = Promise.withResolvers<void>()
+        const test = yield* boot({ handshake: handshake.promise })
         const id = yield* test.create("synthetic")
         yield* test.sessions.synthetic({ sessionID: id, text: script({ tool: "hold" }, { text: "end" }) })
         yield* until(() => Effect.succeed(test.holding.includes(id) || undefined))
-        // Taken on `session.execution.started` once the Host's handshake is done, which may come after the tool starts.
+        // A Host still in its handshake holds up no session; the execution's lease follows the handshake.
+        expect(yield* test.leased).toEqual([])
+        handshake.resolve()
         yield* until(() => test.leased.pipe(Effect.map((sessions) => (sessions.includes(id) ? true : undefined))))
         expect(yield* test.leased).toEqual([id])
         yield* test.release
@@ -418,7 +433,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     () =>
       Effect.gen(function* () {
         const sent: unknown[] = []
-        const test = yield* boot(sent)
+        const test = yield* boot({ sent })
         const id = yield* test.create("browser recovery")
         yield* test.wizard(
           id,

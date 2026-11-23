@@ -149,12 +149,13 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
-    const create = (title: string) =>
+    // A session allows everything unless `defaults` keeps the product's permission defaults (B2.6a).
+    const create = (title: string, defaults = false) =>
       sessions.create({ title, agent: Agent.ID.make("build"), model: model.ref, location }).pipe(
         Effect.tap((session) =>
           sessions.setPermissions({
             sessionID: session.id,
-            permissions: [{ action: "*", resource: "*", effect: "allow" }],
+            permissions: defaults ? [] : [{ action: "*", resource: "*", effect: "allow" }],
           }),
         ),
         Effect.map((session) => session.id),
@@ -637,6 +638,52 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
   )
 
   it.live(
+    "the full text of an oversized Dock reply is read without the «outside the project» question (B2.6a2)",
+    () =>
+      Effect.gen(function* () {
+        const large = {
+          operation_id: "large-table",
+          status: "SUCCEEDED",
+          state: "settled",
+          execution: { status: "completed", execution_id: "original-execution" },
+          output: { rows: [["Данные".repeat(12000)]] },
+        }
+        const host = scriptedHost({
+          catalog: () => [dockTool("dock_table")],
+          call: () => ({ content: [{ type: "text", text: JSON.stringify(large) }] }),
+        })
+        const asked: string[] = []
+        const test = yield* boot(host, (ctx) =>
+          ctx.permission.hook("evaluate", (event) =>
+            Effect.sync(() => {
+              asked.push(`${event.action} ${event.effect}`)
+            }),
+          ),
+        )
+        // The product's defaults: reading outside the project asks.
+        const id = yield* test.create("retained", true)
+        yield* test.wizard(
+          id,
+          script(
+            { tool: "loginom_dock_table", input: { path: "b" } },
+            { tool: "read", input: { path: "@retained" } },
+            { text: "end" },
+          ),
+        )
+        const [table, read] = yield* test.calls(id)
+        const retained = table.state.status === "completed" ? table.state.metadata?.outputPath : undefined
+        if (typeof retained !== "string") throw Error("expected the retained output")
+        yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(retained, { force: true })))
+        expect(read.state.status).toBe("completed")
+        expect(JSON.stringify(read.state.status === "completed" ? read.state.content : undefined)).toContain("Данные")
+        // The stand's hook runs before the product's: OpenCode's rules ask, the product answers without a question (one
+        // would hold the session, and nobody here answers it).
+        expect(asked).toContain("external_directory ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "a Dock call names what it acts on, so the product's permission kinds tell a save and an export apart (B2.6a)",
     () =>
       Effect.gen(function* () {
@@ -749,7 +796,10 @@ function respond(request: LLMRequest) {
   const step = steps[request.messages.slice(user + 1).filter((message) => message.role === "assistant").length]
   if (!step) return TestLLM.text("done", "text_done")
   if ("text" in step) return TestLLM.text(step.text, `text_${crypto.randomUUID()}`)
-  return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, step.input ?? {})
+  // `@retained` stands for the file an earlier oversized Dock reply was kept in, as the model reads it from that reply.
+  const retained = JSON.stringify(request.messages).match(/retained at (.+?)\. Do not/)?.[1]
+  const input = JSON.parse(JSON.stringify(step.input ?? {}).replaceAll('"@retained"', JSON.stringify(retained ?? "")))
+  return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, input)
 }
 
 function text(message: LLMRequest["messages"][number]) {

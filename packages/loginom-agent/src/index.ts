@@ -13,7 +13,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
-import { classify, grantable, settle, withDefaults, type Kind } from "./permissions"
+import { classify, grantable, ownRead, settle, withDefaults, type Kind } from "./permissions"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -92,10 +92,11 @@ export default Plugin.define({
     })
 
     // Host lease (B2.3, G3): one Host run per session execution, as 0.4 `turnLifecycle.acquireRun` held one per run. It
-    // is taken when the execution starts, or by the first tool that needs it if that comes first, and released when the
-    // execution succeeds, fails or is interrupted; a steer prompt joins the running execution and its lease. A plugin
-    // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`. A failed record write
-    // only loses that lease: the event loop below must keep running to release the others.
+    // is taken when the execution starts (at its first step boundary at the latest), or by the first tool that needs it
+    // if that comes first, and released when the execution succeeds, fails or is interrupted; a steer prompt joins the
+    // running execution and its lease. A plugin that is disposed releases what it still holds. Without a ready Host the
+    // lease is `undefined`. A failed record write only loses that lease: the event loop below must keep running to
+    // release the others.
     const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
     // Why the Host refused a session's lease; the model is told (B2.5d).
     const refused = new Map<string, string>()
@@ -166,6 +167,16 @@ export default Plugin.define({
     // asks again, and a subagent's or a fork's session holds none.
     const subagents = new Set<string>()
     const conversation = new Map<string, Set<Kind>>()
+    // The product's own directories outside the project, which the agent reads without the «outside the project»
+    // question (B2.6a2): the full text of a large tool result (`<data>/tool-output`, where OpenCode and `dock.ts` keep
+    // it), the bundled skills' files and the `plan` agent's plans (the directory of `core/src/plugin/plan.ts`).
+    const own = [
+      join(Global.Path.data, "tool-output"),
+      ...(resources ? [join(resources, "skills")] : []),
+      join(Global.Path.home, ".loginom-ai-agent", "plan"),
+    ]
+    // The tool behind a running call (`<message> <call>`), so the hook can tell a read from a write.
+    const calls = new Map<string, string>()
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
@@ -180,10 +191,12 @@ export default Plugin.define({
       })
     })
     await ctx.permission.hook("evaluate", (event) => {
+      const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
       const settled = settle(
         event,
         event.agent !== undefined && subagents.has(event.agent),
         conversation.get(event.sessionID) ?? new Set(),
+        ownRead(tool, event, own),
       )
       event.effect = settled.effect
       if (settled.message) event.message = settled.message
@@ -244,6 +257,10 @@ export default Plugin.define({
       dock.hide(event)
     }
     await ctx.session.hook("context", async (event) => {
+      // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
+      // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
+      // a resume) publishes it before this plugin's `setup` subscribes; its first step waits for the activation (B2.6a2).
+      void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
@@ -251,12 +268,14 @@ export default Plugin.define({
     await ctx.session.hook("compaction", hide)
     await ctx.session.hook("generate", hide)
     await ctx.tool.hook("execute.before", (event) => {
-      if (permits(profile(event.sessionID), event.tool)) return
-      throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      if (!permits(profile(event.sessionID), event.tool))
+        throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
     await ctx.tool.hook("execute.after", async (event) => {
+      calls.delete(`${event.messageID} ${event.id}`)
       if (event.status !== "completed") return
       if (event.tool === "skill") {
         const current = profile(event.sessionID)

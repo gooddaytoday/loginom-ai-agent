@@ -6,7 +6,8 @@
 //   rules, the config's `permissions` (the settings mechanism in ux-spec) and the session's rules still override them,
 //   and a configured deny still wins before any hook;
 // - the `permission.evaluate` hook (`settle`) handles what rules cannot express: the conversation grant, a terminal
-//   command of the agent that always asks (В-31), and subagents, whose own rules may not loosen the product's defaults.
+//   command of the agent that always asks (В-31), a schedule's `run` check that never runs, subagents, whose own rules
+//   may not loosen the product's defaults, and reading the product's own directories outside the project.
 import type { Permission } from "@opencode/schema/permission"
 
 export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
@@ -61,7 +62,8 @@ export const table: readonly Entry[] = [
   { action: "loginom_dock_node_apply", resource: "exports.*", kind: "export", effect: "ask" },
   { action: "webfetch", resource: "*", kind: "web", effect: "ask" },
   { action: "websearch", resource: "*", kind: "web", effect: "ask" },
-  // The terminal is off until the user turns it on (decision 12, В-68); on, it asks for every command (В-31).
+  // The terminal is off until the user turns it on (decision 12, В-68); on, it asks for every command (В-31), and a
+  // schedule's `run` check never runs (`settle`).
   { action: "shell", resource: "*", kind: "terminal", effect: "deny" },
 ]
 
@@ -99,16 +101,20 @@ type Request = {
 
 /**
  * The product's word on a request the rules did not deny (a configured deny never reaches a hook). `subagent` is true
- * for a subagent's request, `granted` holds the session's conversation grants.
+ * for a subagent's request, `granted` holds the session's conversation grants, `own` marks a read in the product's own
+ * directories (`ownRead`).
  */
-export function settle(request: Request, subagent: boolean, granted: ReadonlySet<Kind>) {
+export function settle(request: Request, subagent: boolean, granted: ReadonlySet<Kind>, own = false) {
+  if (own) return { effect: "allow" as const }
   const entry = classify(request.action, request.resources)
   if (!entry) return { effect: request.effect }
   if (entry.kind === "terminal") {
     if (subagent) return { effect: "deny" as const, message: terminalDenied }
-    // A command of the agent asks every time, whatever saved, configured or session rule allows it. A schedule's
-    // check has no source: it follows the rules.
-    return { effect: request.source !== undefined && request.effect === "allow" ? ("ask" as const) : request.effect }
+    // A schedule's check has no source. It never runs, the terminal on or off: nobody answers its question, and an
+    // approval given once would run the command unattended at every tick (В-31).
+    if (request.source === undefined) return { effect: "deny" as const, message: scheduleRunDenied }
+    // A command of the agent asks every time, whatever saved, configured or session rule allows it.
+    return { effect: request.effect === "allow" ? ("ask" as const) : request.effect }
   }
   // A subagent's own rules (`explore` allows sites and reading outside the project) do not loosen the defaults.
   const effect = subagent && entry.effect === "ask" && request.effect === "allow" ? "ask" : request.effect
@@ -117,6 +123,32 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
 }
 
 export const terminalDenied = "LOGINOM_TERMINAL_DENIED: subagents do not run terminal commands in Loginom AI Agent"
+export const scheduleRunDenied =
+  "LOGINOM_SCHEDULE_RUN_DENIED: schedule checks do not run terminal commands in Loginom AI Agent; use a code check"
+
+// The tools whose `external_directory` question is a read (`FileAccess.authorizeRead`, `glob`, `grep`).
+const readers = new Set(["read", "glob", "grep"])
+
+/**
+ * Whether a request is a read by `tool` in the product's own `directories` outside the project: the `external_directory`
+ * question of `read`, `glob` or `grep`, whose every resource (`<directory>/*`, as `FileAccess` names it) lies inside one
+ * of them. A write there asks as before.
+ */
+export function ownRead(
+  tool: string | undefined,
+  request: Pick<Request, "action" | "resources">,
+  directories: readonly string[],
+) {
+  if (request.action !== "external_directory" || tool === undefined || !readers.has(tool)) return false
+  if (request.resources.length === 0) return false
+  const roots = directories.map(slash)
+  return request.resources.every((resource) => {
+    const directory = slash(resource).replace(/\/\*$/, "")
+    return roots.some((root) => directory === root || directory.startsWith(root + "/"))
+  })
+}
+
+const slash = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "")
 
 // Entry resources are `*`, a literal or a `prefix*`.
 const within = (resource: string, pattern: string) =>
