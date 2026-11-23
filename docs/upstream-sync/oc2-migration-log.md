@@ -11132,7 +11132,7 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 | Коммит | Что |
 |---|---|
 | `deef83b359` `feat(app): product name in Desktop menus, updater and window titles (B4.11)` | словари `en` и `ru` Desktop и обновлятора; заголовки приложения, сессии и меню Windows; тест в `desktop-native.test.ts`; e2e `tabs.spec.ts` |
-| следующий | этот раздел; CAT-09, CAT-10, CAT-12 в `catalog.md` |
+| `199c4a5bfc` и следующий | этот раздел; CAT-09, CAT-10, CAT-12 в `catalog.md`; затем уточнения про About и места заголовка |
 
 Файлы кода — пять: `app.tsx`, `session/route.tsx`, `shell/titlebar/windows-menu.tsx`, `desktop-native.test.ts`,
 `e2e/regression/tabs.spec.ts`. Словари — четыре: `desktop-native.ts` (правятся только строки `DESKTOP_NATIVE_ENGLISH`),
@@ -11191,6 +11191,9 @@ desktop.cli.installed.message "CLI установлен в {{path}}\n\nПере�
 - **Следствие 2: одно имя на всех языках.** Заголовок окна и сессии, заголовок меню Windows — имя продукта и при языке
   не `en`/`ru`. Пункты меню, кнопка меню Windows (`desktop.menu.ariaLabel`), окна восстановления и обновлятор на 57
   других языках по-прежнему говорят `OpenCode` (ниже).
+- **Других мест нет.** `git grep -n '<Title' -- packages`: `<Title>` из `@solidjs/meta` в Desktop-приложении — только
+  `app.tsx` и `session/route.tsx`; в `ui` это `Title` Kobalte (диалоги, всплывающие окна), `packages/data` — отдельный
+  сайт. Присваиваний `document.title` в `app`, `ui`, `session-ui`, `gui-plugins` нет.
 
 ### Тесты
 
@@ -11330,10 +11333,13 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - **Страница «О программе» в настройках** (`settings/about/about.tsx`): ключи `settings.about.description`
   («OpenCode, the open source coding agent»), `settings.about.trademark` (торговая марка Anomaly Innovations),
   `settings.about.website` (`www.opencode.ai`), `settings.about.notices.description`, слово-знак OpenCode, ссылка на
-  `https://opencode.ai`. Это не ключи `desktop.*`, в B4.11 не входят. BRAND-01 в тестовом каталоге называет «About»;
-  встроенное окно About (роль `about` в меню macOS) берёт имя из `app.setName` (B4.2). Нужна ли страница настроек в
-  шлюзе B — вопрос владельцу.
-- **Ссылки меню «Справка»** (`shell/commands/desktop-menu.ts:275-282`): документация — `https://opencode.ai/docs`,
+  `https://opencode.ai`. Это не ключи `desktop.*`, в B4.11 не входят. В 0.4 такой страницы и строк About в словарях
+  не было: `git grep -n -i about a080f7725c -- packages/app/src/i18n/{en,ru,desktop-native}.ts` — пусто; About в 0.4 —
+  только роль `about` в меню macOS (`a080f7725c:packages/app/src/desktop-menu.ts:81`). В v2 так же: подпись пункта —
+  от имени приложения (B4.2), содержимое панели — из метаданных пакета (B4.5a); `setAboutPanelOptions` нет ни в 0.4,
+  ни в v2; панель не проверялась. BRAND-01 в тестовом каталоге называет «About». Нужна ли страница настроек в шлюзе B —
+  вопрос владельцу.
+- **Ссылки меню «Справка»** (`shell/commands/desktop-menu.ts:275-288`): документация — `https://opencode.ai/docs`,
   форум — Discord OpenCode, отзыв и ошибка — GitHub `anomalyco/opencode`. Подпись — имя продукта, ссылка — OpenCode.
 - **Веб-сборка `app`:** `app/index.html:10` — `<title data-sm>OpenCode</title>` до загрузки приложения. Desktop
   грузит свой `renderer/index.html` (B4.3), его это не касается.
@@ -11348,3 +11354,4 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   в scratchpad со ссылками `chromium_headless_shell-1223`, `chromium-1223`, `ffmpeg-1011` на установленные версии.
   `bun run check` e2e не запускает; в CI его гоняет `check-test.yml`, если он включён.
 - Словарь `ru` глазами в интерфейсе не смотрел; тексты сверены с 0.4.
+- Замер strobe для `session/route.tsx` (`packages/app/AGENTS.md`) не запускал: правка — замена литерала в заголовке.
