@@ -32,11 +32,9 @@ describe.skipIf(process.platform !== "linux")("CLI resources", () => {
     expect(env.LOGINOM_AI_AGENT_RESOURCES).toBe(complete.resources)
   })
 
-  test("an explicit value is used as is", async () => {
+  test("an explicit value is used as is, even next to a complete artifact", async () => {
     const env: NodeJS.ProcessEnv = { LOGINOM_AI_AGENT_RESOURCES: "/explicit/resources" }
-    await Effect.runPromise(
-      CliResources.apply(env, path.join(os.tmpdir(), "no-artifact", "bin", "loginom-ai-agent-cli")),
-    )
+    await Effect.runPromise(CliResources.apply(env, complete.executable))
     expect(env.LOGINOM_AI_AGENT_RESOURCES).toBe("/explicit/resources")
   })
 
@@ -49,16 +47,22 @@ describe.skipIf(process.platform !== "linux")("CLI resources", () => {
     ["a file was added", (root: string) => Bun.write(path.join(root, "resources/loginom/bin/extra"), "extra")],
     ["the manifest is missing", (root: string) => fs.rm(path.join(root, "cli-manifest.json"))],
   ])("an artifact where %s leaves the resources unset", async (_, damage) => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cli-resources-damaged-"))
-    roots.push(root)
-    await fs.cp(complete.root, root, { recursive: true, verbatimSymlinks: true })
+    const root = await copy()
     await damage(root)
-    const executable = path.join(root, "bin", "loginom-ai-agent-cli")
-    await expect(CliResources.locate(executable)).rejects.toThrow("LOGINOM_BUNDLE_INCOMPLETE")
-    const env: NodeJS.ProcessEnv = {}
-    await Effect.runPromise(CliResources.apply(env, executable))
-    expect(env.LOGINOM_AI_AGENT_RESOURCES).toBeUndefined()
+    await expectRefused(root)
   })
+
+  // What the server needs must be there even when the manifests describe the artifact accurately: Node and the Host
+  // entry (B2.3), the product skills (B2.4). Both manifests are written again without them.
+  test.each(["resources/loginom/bin/node", "resources/loginom/host/node-host.mjs", "resources/loginom/skills"])(
+    "an artifact staged without %s leaves the resources unset",
+    async (file) => {
+      const root = await copy()
+      await fs.rm(path.join(root, file), { recursive: true })
+      await manifests(root)
+      await expectRefused(root)
+    },
+  )
 
   test("a CLI run from source has no artifact", async () => {
     expect(await CliResources.locate(process.execPath)).toBeUndefined()
@@ -75,6 +79,13 @@ async function artifact() {
     ),
   )
   await copyProductSkillsFixture(resources)
+  await manifests(root)
+  return { root, resources, executable: path.join(root, "bin", "loginom-ai-agent-cli") }
+}
+
+// The resource inventory and the artifact manifest, as `build-cli.ts` writes them.
+async function manifests(root: string) {
+  const resources = path.join(root, "resources", "loginom")
   await Bun.write(
     path.join(resources, "resource-manifest.json"),
     JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
@@ -89,5 +100,19 @@ async function artifact() {
     sourceDirty: true,
     dependencies: {},
   })
-  return { root, resources, executable: path.join(root, "bin", "loginom-ai-agent-cli") }
+}
+
+async function copy() {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cli-resources-damaged-"))
+  roots.push(root)
+  await fs.cp(complete.root, root, { recursive: true, verbatimSymlinks: true })
+  return root
+}
+
+async function expectRefused(root: string) {
+  const executable = path.join(root, "bin", "loginom-ai-agent-cli")
+  await expect(CliResources.locate(executable)).rejects.toThrow("LOGINOM_BUNDLE_INCOMPLETE")
+  const env: NodeJS.ProcessEnv = {}
+  await Effect.runPromise(CliResources.apply(env, executable))
+  expect(env.LOGINOM_AI_AGENT_RESOURCES).toBeUndefined()
 }
