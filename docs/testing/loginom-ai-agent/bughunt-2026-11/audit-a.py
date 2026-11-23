@@ -54,13 +54,19 @@ def audit(journal, config):
             reply = result
         if not isinstance(reply, dict):
             reply = {}
-        error = reply.get('error') or {}
-        code = reply.get('code') or (error.get('code') if isinstance(error, dict) else None)
-        if state.get('status') == 'error' or reply.get('status') in ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS'):
-            errors.append(dict(evidence, code=code or reply.get('status') or 'TOOL_ERROR'))
-        output = reply.get('output') or {}
-        node_id = output.get('node_id') or reply.get('node_id')
-        if reply.get('status') == 'SUCCEEDED' and node_id:
+        bodies = [reply]
+        if isinstance(reply.get('result'), dict):
+            bodies.append(reply['result'])
+        bad = next((b for b in bodies if b.get('status') in
+                    ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS', 'REJECTED')), None)
+        if state.get('status') == 'error' or bad is not None:
+            error = (bad or reply).get('error') or {}
+            code = (bad or reply).get('code') or (error.get('code') if isinstance(error, dict) else None)
+            errors.append(dict(evidence, code=code or (bad or reply).get('status') or 'TOOL_ERROR'))
+        receipt = next((b for b in bodies if b.get('status') == 'SUCCEEDED'), {})
+        output, node = receipt.get('output') or {}, receipt.get('node') or {}
+        node_id = node.get('node_id') or output.get('node_id') or receipt.get('node_id')
+        if node_id:
             target = args.get('target') or {}
             if tool == 'loginom_dock_node_apply' and (target == 'create' or isinstance(target, dict) and target.get('kind') in ('new', 'create')):
                 created.add(node_id)
