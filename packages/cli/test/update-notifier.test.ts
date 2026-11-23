@@ -300,6 +300,24 @@ describe("signed CLI update notifier", () => {
     expect(await fs.readdir(f.input.data)).toEqual([])
   })
 
+  // Loginom AI Agent (B2.8): the network mode is the `network` key of the profile's global config.
+  test("«Только этот компьютер» checks for no updates", async () => {
+    await using f = await fixture()
+    await Bun.write(path.join(f.input.config, "loginom-ai-agent.json"), JSON.stringify({ network: "device" }))
+    await UpdateNotifier.notify(f.input)
+    expect(f.asked).toEqual([])
+    expect(f.output).toEqual([])
+    expect(await fs.readdir(f.input.data)).toEqual([])
+  })
+
+  test("«Интернет» asks the product feed", async () => {
+    await using f = await fixture()
+    await Bun.write(path.join(f.input.config, "loginom-ai-agent.json"), JSON.stringify({ network: "online" }))
+    await UpdateNotifier.notify(f.input)
+    expect(f.requests).toContain("/feed/stable/cli.json")
+    expect(f.output).toHaveLength(1)
+  })
+
   test("policy channel overrides CLI channel", async () => {
     await using f = await fixture()
     await Bun.write(f.input.policyFile, JSON.stringify({ channel: "unstable" }))
