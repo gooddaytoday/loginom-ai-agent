@@ -4,7 +4,7 @@ import net from "node:net"
 import os from "node:os"
 import path from "node:path"
 import { writeCliManifest } from "@loginom-ai-agent/loginom-host/cli-manifest"
-import { ripgrepPinForTarget, stageRipgrep } from "../../loginom-host/script/ripgrep-resource"
+import { ripgrepPinForTarget, ripgrepPins, stageRipgrep } from "../../loginom-host/script/ripgrep-resource"
 import { copyProductSkillsFixture } from "../../loginom-host/test/fixtures/product-skills"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { LOGINOM_AI_AGENT_VERSION } from "../src/version"
@@ -14,8 +14,10 @@ import { isolatedEnv } from "./fixture/environment"
 // product resources and never downloads it (LAB-1094). Each case starts `serve` without a system rg on PATH and with
 // every proxy variable pointing to a stub that records connections, so a runtime download is seen, not made. The file
 // search of the API goes through core's ripgrep only with fff off. The rg is the pinned release the build stages, from
-// the build cache (`LOGINOM_AI_AGENT_RIPGREP_CACHE`). Linux only, as `cli-resources.test.ts`.
+// the build cache (`LOGINOM_AI_AGENT_RIPGREP_CACHE`). Linux only, as `cli-resources.test.ts`, where the product pins rg.
 const cli = path.join(import.meta.dir, "..")
+const target = `${process.platform}-${process.arch}`
+const pinned = process.platform === "linux" && Object.hasOwn(ripgrepPins.archives, target)
 const password = "bundled-ripgrep-test"
 const roots: string[] = []
 const staged = { resources: "", artifact: "", executable: "" }
@@ -24,11 +26,11 @@ afterAll(async () => {
   await Promise.all(roots.map((root) => fs.rm(root, { recursive: true, force: true })))
 })
 
-describe.skipIf(process.platform !== "linux")("bundled ripgrep of the server", () => {
+describe.skipIf(!pinned)("bundled ripgrep of the server", () => {
   beforeAll(async () => {
     const root = await temporary("cli-bundled-rg-")
     staged.resources = path.join(root, "resources")
-    await stageRipgrep({ resources: staged.resources, pin: ripgrepPinForTarget(`${process.platform}-${process.arch}`) })
+    await stageRipgrep({ resources: staged.resources, pin: ripgrepPinForTarget(target) })
     Object.assign(staged, await artifact(staged.resources))
   }, 120_000)
 
