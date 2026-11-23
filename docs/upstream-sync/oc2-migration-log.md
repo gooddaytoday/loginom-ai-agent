@@ -7743,7 +7743,8 @@ Found 558 warnings and 0 errors.                                  # у изме�
 | `14bbb5351a` `test(core): sessions that run shell commands turn the product's terminal on` | тесты upstream `packages/core/test/shell-restart.test.ts` (+4) и `packages/server/test/schedule.test.ts` (+5 −1), оба — в CAT-07 (`catalog.json`) |
 | `8a00e486df` `docs(upstream-sync): record B2.6a permission kinds and defaults` | этот раздел (первая версия), CAT-05 и CAT-07 в `catalog.md`, уточнён комментарий к `external_directory` в `permissions.ts` |
 | `203bee96c9` `test(sdk): the lazy provisioning case turns the product's terminal on and answers it` | тест upstream `packages/sdk/test/embedded.test.ts` (+12 −1), в CAT-07 |
-| следующий | уточнения этого раздела и CAT-07 в `catalog.md` |
+| `49e645d482` `docs(upstream-sync): B2.6a sdk case, product directories outside the project, 0.4 profiles` | уточнения этого раздела и CAT-07 в `catalog.md` |
+| следующий | повтор `bun run check` в «Приёмке» |
 
 ### Виды действий и инструменты
 
@@ -7917,6 +7918,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 @loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 224 files
  Tasks:    39 successful, 39 total                        # 32 из кэша turbo
 ```
+
+Повтор `bun run check` на `203bee96c9` с уточнениями раздела: код 0, `Found 558 warnings and 0 errors`, 39/39 задач (38 из
+кэша turbo).
 
 ### Где решал сам
 
