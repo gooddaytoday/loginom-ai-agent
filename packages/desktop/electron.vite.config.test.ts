@@ -62,6 +62,32 @@ test("minifies only builds, previews onboarding only in development, and ships s
   expect(existsSync(path.resolve(import.meta.dirname, root, publicDir, "oc-theme-preload.js"))).toBe(true)
 })
 
+// Loginom AI Agent (B4.12): Product.updateFeed in main is the build's LOGINOM_AI_AGENT_UPDATE_FEED and nothing else, the
+// same input electron-builder writes into app-update.yml. Without it the updater is off; there is no fallback feed.
+test.each([
+  { build: "no feed", feed: undefined, define: "null" },
+  { build: "an empty feed", feed: "", define: "null" },
+  {
+    build: "a feed",
+    feed: "  https://updates.example.test/loginom/  ",
+    define: JSON.stringify("https://updates.example.test/loginom/"),
+  },
+])("a build with $build gives the main bundle the product update feed $define", async ({ feed, define }) => {
+  const previous = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+
+  try {
+    if (feed === undefined) delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    else process.env.LOGINOM_AI_AGENT_UPDATE_FEED = feed
+
+    for (const command of ["build", "serve"] as const)
+      expect((await load(command)).config.main?.define?.LOGINOM_AI_AGENT_UPDATE_FEED).toBe(define)
+  } finally {
+    delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+
+    if (previous !== undefined) process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previous
+  }
+})
+
 test("bundles one Effect runtime and Drizzle while keeping native dependencies external", async () => {
   for (const name of bundled) {
     expect(Object.keys(pkg.dependencies)).not.toContain(name)
@@ -78,12 +104,14 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
   ])
 
   const previousTarget = process.env.LOGINOM_AI_AGENT_TARGET
+  const previousFeed = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
   // Build against the opposite architecture to prove cross-packaging resolves the target's native package, not the host's.
   const crossTarget = process.arch === "arm64" ? "windows-x64" : "windows-arm64"
   const crossNodePty = nodePtyPackage(crossTarget)
 
   try {
     process.env.LOGINOM_AI_AGENT_TARGET = crossTarget
+    process.env.LOGINOM_AI_AGENT_UPDATE_FEED = "https://updates.example.test/loginom/"
     const result = await load("build")
 
     if (!result.config.main) throw new Error("Missing main-process build configuration")
@@ -123,9 +151,15 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
     expect(imports).not.toContain(`@lydell/node-pty-${process.platform}-${process.arch}`)
     expect(modules.some((id) => id.includes("/node_modules/msgpackr"))).toBe(false)
     expect(chunks.some((chunk) => chunk.code.includes("msgpackr"))).toBe(false)
+    // Loginom AI Agent (B4.12): the bundler folds the define into packages/product, so Product.updateFeed is the feed.
+    const productFeed = /updateFeed: "https:\/\/updates\.example\.test\/loginom\/"/
+    expect(chunks.some((chunk) => productFeed.test(chunk.code))).toBe(true)
   } finally {
     delete process.env.LOGINOM_AI_AGENT_TARGET
+    delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
 
     if (previousTarget !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = previousTarget
+
+    if (previousFeed !== undefined) process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previousFeed
   }
 }, 30_000)

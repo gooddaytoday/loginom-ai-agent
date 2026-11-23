@@ -3,9 +3,12 @@ import { Effect, Option, Predicate, Schema } from "effect"
 import { Button } from "@opencode/ui/button"
 import { Dialog } from "@opencode/ui/dialog"
 import { usePlugin, type DialogHandle, type SetupContext } from "@opencode/plugin/gui"
+import { Product } from "@loginom-ai-agent/product"
 import type definition from "./index"
 
-const CHANGELOG_URL = "https://opencode.ai/changelog.json"
+// Loginom AI Agent (B4.12): only the product changelog. The product has none yet, as in 0.4, so What's New requests
+// nothing and stays hidden.
+const CHANGELOG_URL = Product.changelogFeed
 
 export type Highlight = {
   title: string
@@ -57,6 +60,8 @@ export async function loadWhatsNewHighlights(input: {
   readonly current: string
   readonly signal: AbortSignal
 }): Promise<readonly Highlight[]> {
+  if (!CHANGELOG_URL) return []
+
   const response = await fetch(CHANGELOG_URL, { signal: input.signal, headers: { Accept: "application/json" } })
 
   if (!response.ok) throw new Error(`The changelog request failed with ${response.status}`)

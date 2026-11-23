@@ -23,6 +23,7 @@
     "@betteroffice/xlsx": "0.3.0",
     "@effect/platform-node": "catalog:",
     "@kobalte/core": "catalog:",
+    "@loginom-ai-agent/product": "workspace:*",
     "@opencode/client": "workspace:*",
     "@opencode/plugin": "workspace:*",
     "@opencode/plugin-browser": "workspace:*",

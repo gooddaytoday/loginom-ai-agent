@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import path from "node:path"
 import { createDesktopNotify } from "./notifications"
 
 const originalNotification = globalThis.Notification
@@ -112,6 +113,22 @@ describe("desktop notifications", () => {
       expect(notification?.onerror).toBeNull()
     },
   )
+
+  // Loginom AI Agent (B4.12): the icon is the product's own file the renderer serves from its publicDir (app/public),
+  // the same one the web notifications use since B4.6, so showing a notification requests nothing from opencode.ai.
+  test("shows the product icon the renderer serves, not a remote one", async () => {
+    globalThis.Notification = FakeNotification
+
+    await createDesktopNotify({
+      getWindowFocused: async () => false,
+      showWindow: async () => {},
+      setWindowFocus: async () => {},
+    })("Response ready")
+
+    const icon = created[0]?.icon ?? ""
+    expect(icon).toBe("/loginom-icon.png")
+    expect(await Bun.file(path.resolve(import.meta.dirname, "../../../../app/public", `.${icon}`)).exists()).toBe(true)
+  })
 
   test("suppresses desktop notifications while the window is already focused", async () => {
     globalThis.Notification = FakeNotification
