@@ -425,3 +425,9 @@ f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/br
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
 f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:55
+# The same #1231 fixtures in the first-parent diff of the v0.4.0 merge into loginom.
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
