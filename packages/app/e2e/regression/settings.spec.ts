@@ -1315,6 +1315,7 @@ test.describe("pages open before slow data", () => {
 
   test("about names the product and asks GitHub for nothing", async ({ page }) => {
     const { settings } = await open(page)
+
     // Upstream counted contributors from api.github.com when About opened; the product page sends no such request.
     const github = page
       .waitForRequest((request) => new URL(request.url()).hostname === "api.github.com", { timeout: 2_000 })
@@ -1322,6 +1323,7 @@ test.describe("pages open before slow data", () => {
         () => true,
         () => false,
       )
+
     await settings.getByRole("tab", { name: "About", exact: true }).click()
     const about = settings.locator(".settings-about-content")
     await expect(about.getByText("Loginom AI Agent", { exact: true })).toBeVisible()
