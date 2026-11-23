@@ -12892,3 +12892,255 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   `CLI_RUN_FAILED` после 60 с ожидания плагинов — не проверялись.
 - Windows и macOS: процессные тесты — только Linux (фикстура B2.7b); Ctrl+C-случай — вне Windows.
 - Сам `run-node-selection-attempt.ts` (docker, план, собранный CLI) — только его командная строка и флаги окружения.
+
+## B4.8a Ресурсы Loginom в Desktop
+
+23.11.2026. Ветка `b48a-desktop-resources` от `oc2-migration` (`67c74e23e9`), рабочее дерево `.claude/worktrees/b48a`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов —
+отдельное дерево `<scratchpad>/b48a-base` (`67c74e23e9`, detached, тот же `npm ci`; после прогонов удалено). `packages/cli` и
+`packages/loginom-agent` (B2.7a4b) не трогал. Эталон 0.4 — `v0.4.0`: `scripts/bundle-loginom.ts` с тестом,
+`extraResources` конфига, `src/main/loginom/desktop-service.ts` (`loginomResources`, `verifyDesktopResources`),
+`index.ts:185-193`, `proxy-env.ts` (`sidecarEnvironment` — то, что B4.1 называл `createSidecarEnv`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `79a7eddaa2` `feat(desktop): bundle the Loginom resources and verify them with --verify-resources (B4.8a)` | шесть файлов кода (ниже), `.gitignore` пакета, тесты `scripts/bundle-loginom.test.ts` (из 0.4) и `src/main/loginom/resources.test.ts` (новый) |
+| `cf110298b9` `test(desktop): ship the Loginom resources beside app.asar, never inside it (B4.8a)` | `electron-builder.config.test.ts`: тест upstream «shared packaging defaults» держал прежний список `extraResources` |
+| `dabdaac46a` `style(desktop): space the Loginom resource scripts and tests as the linter asks (B4.8a)` | пустые строки по `require-readable-spacing` и тип очистки в тесте: у изменённых файлов предупреждений `oxlint` нет |
+| следующий | этот раздел; CAT-02, CAT-09, CAT-13 в `catalog.md` |
+
+Файлы кода — шесть, как в задании: `scripts/bundle-loginom.ts` и `src/main/loginom/resources.ts` (новые файлы форка),
+`script/build.ts` (+4), `src/main/index.ts` (+12 −1), `electron-builder.config.ts` (+5),
+`src/main/service/background-service.ts` (+5 −1). Шестой — `background-service.ts`: строка задания называет
+`Service.ensure({ env })`, а он вызывается только там. Седьмой файл — `packages/desktop/.gitignore` (+7, не код): без него
+`resources/loginom` (949 МБ) и `updates-s3.json` видны git как неотслеживаемые; строки — из `.gitignore` 0.4.
+
+### Пункты задания
+
+| № | Было (`67c74e23e9`) | Стало |
+|---|---|---|
+| 1. Сборка | `script/build.ts` кладёт в `resources/` значки, metainfo и CLI; `extraResources` — только CLI; маска `files` `resources/**/*` унесла бы в `app.asar` всё из `resources/` | `script/build.ts` перед `electron-vite build` запускает `scripts/bundle-loginom.ts`: файл 0.4 плюс вызов `buildNodeHost(<resources>/loginom/host)` (и пустые строки для `oxlint`) после общего `stageResources({ flavor: "desktop" })`, как `build-cli.ts` (B2.7a2). Без `LOGINOM_AI_AGENT_NODE_SOURCE` и `LOGINOM_AI_AGENT_BROWSER_SOURCE` сборка падает в любом канале, как 0.4 (`prebuild.ts`). Конфиг: `{ from: "resources/loginom", to: "loginom" }` в `extraResources`, `!resources/loginom{,/**/*}` и `!resources/updates-s3.json` в `files` |
+| 2. `--verify-resources` | ключа нет; `customInstall` NSIS (B4.5a) открыл бы окно и ждал его закрытия | `index.ts`: сразу после `configureApplication()` (userData уже задан) и до `acquireApplicationLock()` — `LoginomResources.verify(...)`, затем `app.exit(0)` или ошибка в stderr и `app.exit(1)`; окна, блокировки, службы нет. `verify`: вход Host на месте, затем `verifyInstallationResources` (все файлы `resource-manifest.json` по хешу, кеш и фазы — в `<userData>/loginom`, как 0.4), на Windows — прогрев Chromium и повторная проверка с `forceHash: false`, код 0.4 |
+| 3. Переменная службы | службе ничего не передаётся; Host и навыки продукта есть только при унаследованной переменной | `prepare` в `background-service.ts` берёт `LoginomResources.serviceEnvironment(...)`, `Service.ensure` получает `env`. Упакованное приложение всегда отдаёт свои `<resources>/loginom`: клиент запускает службу с `{ ...process.env, ...env }`, унаследованное значение (из оболочки или окружения) не выигрывает — правило 0.4 (`sidecarEnvironment`, тест `system-proxy.test.ts` 0.4). Запуск из исходников `env` не задаёт: служба наследует явную переменную разработчика или работает без Host, как описали B2.3 и B2.4 |
+| 4. Неполный набор | — | упакованное приложение без `resource-manifest.json`, `bin/node[.exe]` или `host/node-host.mjs` службу не запускает: `LOGINOM_BUNDLE_INCOMPLETE: <resources> lacks <файлы>; reinstall the application`. Ошибка идёт путём любой ошибки запуска службы: `connect.failed` автомата, журнал главного процесса, отказ `awaitInitialization` окну (`renderer.log`) |
+
+Вход Host `host/node-host.mjs` в `resource-manifest.json` не входит: `stageResources` пишет инвентарь и публикует каталог,
+`buildNodeHost` собирает вход после, как у CLI (там его держит `cli-manifest.json`). `stage-resources.ts` не менял — его
+вывод общий с CLI. Поэтому `resources.ts` проверяет вход отдельно, только наличие и непустой файл; байты входа Host
+Desktop не хеширует.
+
+### Тесты
+
+`src/main/loginom/resources.test.ts` (11 случаев, таблицами). Фикстура разложена как у `bundle-loginom`: `bin/node`,
+`browsers/chrome`, навык, `resource-manifest.json` из настоящего `resourceInventory` (`loginom-runtime`), потом
+`host/node-host.mjs`. Node не запускается: проверка сравнивает только путь и хеш.
+
+| Случай | Ожидание |
+|---|---|
+| `--verify-resources`: полный набор / нет файла из манифеста / нет Node / нет входа Host / изменён навык | `verify` проходит / `ENOENT` / `LOGINOM_BUNDLE_INCOMPLETE` / `LOGINOM_BUNDLE_INCOMPLETE` / `LOGINOM_RESOURCE_HASH_MISMATCH` |
+| окружение службы: упакованное приложение / запуск из исходников (даже без входа Host) | `{ LOGINOM_AI_AGENT_RESOURCES: <resources> }` / `undefined` |
+| упакованное приложение без входа Host, Node, манифеста, без ресурсов вообще | `LOGINOM_BUNDLE_INCOMPLETE … lacks <ровно эти файлы>; reinstall the application` |
+
+`scripts/bundle-loginom.test.ts` — тест 0.4, изменены только пустые строки (ключ S3 только для чтения, устаревший
+ключ удаляется).
+`electron-builder.config.test.ts`, «shared packaging defaults»: второй элемент `extraResources`; через
+`FileMatcher` electron-builder (`trimFilter` теста), `resources/loginom`, файл в нём и `updates-s3.json` в
+`app.asar` не попадают, `resources/windows/installer.nsh` — попадает.
+
+`index.ts` и `background-service.ts` импортируют `electron`, и ни один тест пакета такие модули не загружает
+(`node_modules/electron/dist` здесь нет). `resources.ts` поэтому без `electron` во время выполнения (только
+`import type`): пути и признак упаковки ему передают вызывающие. Мутации мест вызова ловит собранное приложение (ниже), а
+не юнит-тест.
+
+### Мутации
+
+Юнит (`<scratchpad>/b48a-runs/mutate-unit.py`: одна замена в `resources.ts`, `bun test resources.test.ts`, возврат):
+
+```text
+=== M0 none: 11 pass / 0 fail
+=== MU1 the presence check skips the Host entry: 8 pass / 3 fail
+=== MU2 verify skips the manifest hashes: 9 pass / 2 fail          # нет файла из манифеста, изменён навык
+=== MU3 a packaged service starts without the presence check: 7 pass / 4 fail
+=== MU4 a run from source also overrides the inherited value: 10 pass / 1 fail
+=== MU5 the presence check never fails: 5 pass / 6 fail
+```
+
+Конфиг (`bun test electron-builder.config.test.ts`, строка убрана из `electron-builder.config.ts`): без
+`!resources/loginom{,/**/*}`, без `!resources/updates-s3.json`, без элемента `extraResources` — каждый раз 16/1 (база 17/0).
+
+Собранное приложение (`<scratchpad>/b48a-runs/mutate-built.sh`: правка, `electron-vite build` и `--linux dir`, возврат
+файла, сценарий ниже):
+
+```text
+=== MW --verify-resources falls through to the normal start      # условие ключа → if (false)
+exit=124 seconds=40.35 app_windows_max=1                          # timeout 40 с: окно открыто, процесс не вышел
+=== ME the service starts without the env                         # строка env: setup.env убрана
+service pid …: LOGINOM_AI_AGENT_RESOURCES=/inherited/from/the/shell
+node host:                                                        # дочернего Node host нет
+skills: … opencode report browser                                 # навыков продукта нет
+```
+
+После мутаций `git status` по коду чистый.
+
+### Сборка `--linux dir` и приёмка на ней
+
+Сборка (`<scratchpad>/b48a-runs/build.sh`, канал `dev`): встроенный CLI —
+`LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun script/build.ts --skip-install --skip-web-ui` в `packages/cli` (18,6 с;
+Desktop ищет `cli/dist/cli-linux-x64-baseline`); затем `bun run build` в `packages/desktop` с
+`LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node` и `LOGINOM_AI_AGENT_BROWSER_SOURCE=<каталог с
+chromium-1246>` (значения B2.7a2; 32,7 с, `Bundled Loginom linux-x64 runtime: 12378 verified resource files`); затем
+`bunx electron-builder --linux dir --x64 --publish never --config electron-builder.config.ts
+-c.directories.output=<scratchpad>/… -c.npmRebuild=false` (29 с). Все три — код 0.
+
+```text
+linux-unpacked/resources/: app-update.yml app.asar app.asar.unpacked loginom opencode-cli opencode-cli.version
+linux-unpacked/resources/loginom/: THIRD_PARTY_NOTICES.md bin browsers dashboard help host licenses resource-manifest.json ripgrep runtime skills
+resources/loginom/host/: build-inputs.json node-host.mjs       # 949 МБ всего; app.asar — 230 МБ
+app.asar: 12834 записей, из resources/loginom и updates-s3.json — 0
+```
+
+Главный бандл: `out/main/index.js` — 63 296 байт на базе, 64 515 с правкой; проверка `loginom-host` — отдельный чанк
+`host-*.js` (25 КБ), его подгружает только ветка `--verify-resources` (динамический `import`), статических импортов у
+`index.js` не прибавилось.
+
+Сценарий (`<scratchpad>/b48a-runs/accept.sh`): root, `xvfb-run -a`, `--no-sandbox`, свой
+`LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и `HOME` на каждый прогон, служба под identity `b48a-accept` и портом 27993,
+`LOGINOM_AI_AGENT_RESOURCES=/inherited/from/the/shell` в окружении. «Окно» — окно X больше 100×100 (служебные окна
+Chromium 10×10 не считаются), опрос каждые 0,2 с. После прогона все процессы сборки убиваются по пути, остаток — 0.
+
+```text
+== --verify-resources, целая сборка
+exit=0 seconds=4.966 app_windows_max=0
+phases: {"phase":"resources.verify","scope":"installation","status":"ready","duration_ms":4435,"mode":"full","hashedFiles":12378,"cachedFiles":0}
+== без host/node-host.mjs
+exit=1 seconds=.4195 app_windows_max=0
+stderr: LOGINOM_BUNDLE_INCOMPLETE: <B>/out/linux-unpacked/resources/loginom lacks host/node-host.mjs
+== один байт в skills/loginom-automation/SKILL.md
+exit=1 seconds=4.128 app_windows_max=0
+stderr: LOGINOM_RESOURCE_HASH_MISMATCH
+== без browsers/chromium-1246/chrome-linux64/chrome
+exit=1 seconds=.6190 app_windows_max=0
+phases: {…"status":"failed",…"error":{"name":"Error","code":"ENOENT",…
+== файлы возвращены
+exit=0 seconds=4.131 app_windows_max=0
+```
+
+Обычный запуск целой сборки — служба получает ресурсы приложения поверх унаследованного значения и запускает Node host
+из них; навыки продукта — из тех же ресурсов (`/api/skill` нового location, опрос до 40 с: каталог location
+заполняется через несколько секунд после старта):
+
+```text
+registration: <B>/run-l-intact/state/loginom-ai-agent-dev/service-b48a-accept.json after 2 s; app windows: 1
+service pid …: LOGINOM_AI_AGENT_RESOURCES=<B>/out/linux-unpacked/resources/loginom
+node host: <B>/out/linux-unpacked/resources/loginom/bin/node --use-system-ca <B>/out/linux-unpacked/resources/loginom/host/node-host.mjs
+skills: opencode report browser loginom-automation@resources/loginom/skills/… loginom-dashboard@… package-docs@…
+app alive: yes; app windows: 1
+```
+
+Обычный запуск без `host/node-host.mjs` — службы нет, окно живо, ошибка дошла до окна (по журналам; экран не смотрел):
+
+```text
+registration: none after 60 s; app windows: 1
+app alive: yes; app windows: 1
+# <test root>/desktop/logs/…/main.log
+[error] (main) v2 CLI background service failed { event: { type: 'connect.failed', attempt: 1,
+  error: 'Error: LOGINOM_BUNDLE_INCOMPLETE: <B>/out/linux-unpacked/resources/loginom lacks host/node-host.mjs; reinstall the application …' } }
+# renderer.log — та же ошибка в "message"; каталогов state и data службы нет
+```
+
+Сборка, прогоны, `out/`, `resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`,
+`packages/dashboard/dist` удалены; `git status --ignored` — только `.husky/_` и `node_modules`.
+
+### Приёмка
+
+База — `<scratchpad>/b48a-base` (`67c74e23e9`), итог — `79a7eddaa2` (`loginom-host`, его код задача не меняла) и
+`dabdaac46a` (`desktop`); `npm ci`
+клиента в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `loginom-host` — `xvfb-run -a`. Падения
+сравнивались по именам из JUnit.
+
+| Пакет | Команда | `67c74e23e9` | итог |
+|---|---|---|---|
+| `desktop` | `bun typecheck` | 3 505 файлов, ошибок нет | 3 519 файлов, ошибок нет (+ граф `loginom-host/host`) |
+| `desktop` | `bun run typecheck:tsc` | код 0 | код 0 |
+| `desktop` | `bun test --timeout 30000` | 546 pass, 4 skip, 0 fail (550 тестов, 69 файлов) | 558 pass, 4 skip, 0 fail (562, 71): +11 `resources`, +1 `bundle-loginom` |
+| `loginom-host` | `bun typecheck` | 174 файла, ошибок нет | то же |
+| `loginom-host` | `xvfb-run -a bun test` | 541 pass, 12 skip, 5 fail | 541 pass, 12 skip, 5 fail — те же: «umask», три `bundled-ripgrep`, `managed-work-entry` (B2.7a2) |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 483 divergent upstream files                    # база 481: + desktop/src/main/index.ts, + desktop/.gitignore
+  CAT-09: 35                                                          # база 33
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+$ bun run check                                                       # код 0, на dabdaac46a с этим разделом
+Found 558 warnings and 0 errors.                                      # как на базе (B4.5a); на cf110298b9 было 571 — +13 в новых файлах, убраны dabdaac46a
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` по изменённым и новым TS-файлам — чисто.
+
+### Каталог
+
+`catalog.json` не менялся: `script/build.ts` и `electron*.ts` — CAT-02, `background-service.ts` — CAT-13, `index.ts` и
+`.gitignore` пакета — CAT-09 (маска `packages/desktop/**`). В `catalog.md`: CAT-02 — сборка ресурсов и упаковка, в «не
+перенесено» вместо B4.8a — `updates-s3.json` в `extraResources` и его читатель (этап C); CAT-13 — переменная службы и
+отказ без ресурсов; CAT-09 — ключ `--verify-resources` и `.gitignore` пакета.
+
+### Где решал сам
+
+- **Тест 0.4 `bundle-loginom.test.ts` проверяет только ключ S3 обновлений.** Задание просит перенесённый тест, а
+  читатель `updates-s3.json` — источники обновлений этапа C (UPDATE-01, вопрос 5 B4.1). Файл 0.4 перенесён целиком, с
+  `writeUpdateS3Resource` и тестом; ключ пишется, только если сборке дали `LOGINOM_UPDATES_S3_READ_*`, в `app.asar` не
+  попадает (`files`), а `extraResources` для него не добавлен — его вернёт этап C вместе с читателем.
+- **Явная переменная: упакованное приложение — как 0.4, из исходников — без `env`.** В 0.4 унаследованное значение
+  никогда не заменяло ресурсы приложения (`AGENTS.md` Desktop 0.4, `sidecarEnvironment`). B2.3 и B2.4 переопределения для
+  Desktop не требуют; меньший вариант — упакованное приложение всегда своё, запуск из исходников ничего не задаёт и не
+  проверяет, так что явная переменная разработчика доходит до службы. Ресурсы `bundle-loginom` из исходников служба сама
+  не берёт; `--verify-resources` из исходников проверял бы `packages/desktop/resources/loginom` (по коду, не запускал).
+- **Отказ при старте — по наличию трёх файлов, а не полной проверкой.** Полная проверка — 4–5 с на 12 378 файлах
+  (холодный кеш — дольше) до старта службы, а при принятой пробе `prepare` выполняется дважды (проба и `ensure`). Наличие манифеста, Node и
+  входа Host ловит сборку без ресурсов и потерянный вход; содержимое проверяют установщик (`--verify-resources`) и сам
+  Host при старте (B2.3).
+- **Кеш проверки — `<userData>/loginom`, как 0.4.** Host службы v2 живёт в `<data>/loginom` профиля службы (B2.3) и
+  читает свой `resource-verification.json`, а версию кеша берёт из `cli-manifest.json`, которого у Desktop нет. Кеш
+  установщика им не используется: первый старт Host на Windows снова хеширует ресурсы. Согласовать корень и версию —
+  B4.9 или B4.14c (SMK `installer-resource-cache`).
+- **`--verify-resources` пишет причину отказа в stderr.** 0.4 молча выходил с 1; NSIS stderr не читает, а на Linux это
+  единственная видимая причина.
+- **Сборка требует источники Node и Chromium в любом канале**, как 0.4. `release.yml` upstream собирает Desktop без них и
+  теперь упадёт на `bundle-loginom.ts`; продукт им не выпускается (B5.1).
+- **`build-inputs.json` входа Host остаётся в ресурсах**, как у CLI; уведомления о npm-пакетах, вшитых в
+  `node-host.mjs`, CLI собирает в `licenses/bundled-npm` (`build-cli.ts`), Desktop — нет (ниже).
+- **Заметку 0.4 о `bundle-loginom.ts` из `packages/desktop/AGENTS.md`** не переносил: файла нет в списке задачи, как
+  решил B4.5a; перенос — B6.3.
+
+### Найдено, не чинил
+
+- **Уже работающая служба `env` не получает.** Если совместимая служба запущена раньше (прошлым запуском, другой версией
+  Desktop или CLI того же канала), окно её принимает (проба или `reuse` в `Service.ensure`): проверка наличия при этом
+  выполняется, а переменная у службы та, с которой её запустили. Своя служба Desktop — B4.9.
+- **Уведомления npm-пакетов `node-host.mjs` в Desktop не собираются** (у CLI — `licenses/bundled-npm`). Desktop 0.4 вшивал
+  Host в `app.asar` и тоже их не собирал. Лицензии выпуска — B5.
+- **`resources/ai.opencode.desktop.dev.metainfo.xml` попадает в `app.asar`** (`copy-metainfo.ts` до B4.6, B4.5a это
+  записал).
+
+### Не проверено
+
+- Windows: `--verify-resources` из NSIS, прогрев Chromium и повторная проверка, код выхода в `customInstall` — по коду
+  0.4 и компиляции B4.5a; `windows-installer.test.ts` на Linux пропускается. Установщик на Windows не собирался.
+- macOS, AppImage, deb, rpm не собирались; Linux — только `--linux dir`, от root, с `--no-sandbox`. Права
+  `chrome-sandbox` в ресурсах (4755 и владелец root) — B4.5b: здесь сборка шла под umask 077.
+- Настоящий Loginom и браузер: подключение Host `unconfigured`, Chromium не запускался.
+- Экран окна при отказе глазами не смотрел: что ошибка дошла до окна — по `renderer.log`. Текст
+  `LOGINOM_BUNDLE_INCOMPLETE … reinstall the application` английский и, вероятно, виден на странице ошибки локального
+  сервера в деталях; правило пакета о показываемых ошибках требует ключа i18n. Не правил: это словари `app` (этап C,
+  B4.11), за пределами шести файлов.
+- Отказ при старте ловит только отсутствие манифеста, Node и входа Host. Сборка Linux без Chromium или с изменённым
+  навыком службу запускает (установщика с `--verify-resources` на Linux нет): Host и навыки продукта тогда отказывают
+  сами и без сообщения пользователю (B2.3, B2.4). Проверять ли при старте все файлы манифеста (наличие или проверка с
+  кешем) — владельцу.

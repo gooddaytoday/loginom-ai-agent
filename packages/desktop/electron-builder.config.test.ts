@@ -212,7 +212,17 @@ test("shared packaging defaults", async () => {
   expect(config.files).toContain("!resources/opencode-cli*")
   expect(config.extraResources).toEqual([
     { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
+    { from: "resources/loginom", to: "loginom" },
   ])
+
+  // Loginom AI Agent (B4.8a): the Loginom resources and the 0.4 S3 read key stay out of app.asar.
+  const included = (file: string, stats = statSync(import.meta.filename)) =>
+    trimFilter(import.meta.dirname, config)(path.join(import.meta.dirname, file), stats)
+
+  expect(included("resources/loginom", statSync(import.meta.dirname))).toBe(false)
+  expect(included("resources/loginom/host/node-host.mjs")).toBe(false)
+  expect(included("resources/updates-s3.json")).toBe(false)
+  expect(included("resources/windows/installer.nsh")).toBe(true)
 })
 
 test("trims external dependencies without excluding runtime files", () => {

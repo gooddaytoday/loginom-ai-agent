@@ -68,6 +68,10 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       "out/**/*",
       "resources/**/*",
       "!resources/opencode-cli*",
+      // Loginom AI Agent (B4.8a): the Loginom resources ship next to app.asar. The 0.4 S3 read key for updates waits
+      // for the updater that reads it (stage C).
+      "!resources/loginom{,/**/*}",
+      "!resources/updates-s3.json",
       // Keep only the target platform's node-pty prebuild when cross-packaging with --cpu=*.
       ...CLI_BINARIES.filter((item) => item.os !== target.os || item.cpu !== target.cpu).map(
         (item) => `!**/node_modules/@lydell/node-pty-${item.os}-${item.cpu}{,/**/*}`,
@@ -93,6 +97,7 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
         to: "",
         filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
       },
+      { from: "resources/loginom", to: "loginom" },
     ],
     afterPack: async (context) => {
       const arch = Arch[context.arch]

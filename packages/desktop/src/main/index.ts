@@ -2,6 +2,7 @@
 import { marks } from "./lifecycle/marks"
 import { app } from "electron"
 import { acquireApplicationLock, configureApplication } from "./lifecycle/configure"
+import { LoginomResources } from "./loginom/resources"
 import { startSidecarProbe } from "./service/sidecar-probe"
 import { registerStorageSnapshotHandler } from "./storage/snapshot"
 import { createEarlyWindow, earlyWindowClosed } from "./windows/early"
@@ -14,7 +15,17 @@ import { registerRendererScheme } from "./windows/scheme"
 // precede ready; the window is created the moment ready fires; everything else is imported after.
 configureApplication()
 
-if (acquireApplicationLock()) {
+// Loginom AI Agent (B4.8a): the installer runs `--verify-resources` after it copies the app (0.4). Verify and exit with 0
+// or 1 before the single-instance lock, so neither a window nor the service starts.
+if (process.argv.includes("--verify-resources"))
+  void LoginomResources.verify(LoginomResources.installation(app)).then(
+    () => app.exit(0),
+    (error) => {
+      console.error(error)
+      app.exit(1)
+    },
+  )
+else if (acquireApplicationLock()) {
   registerRendererScheme()
   // Window first, then the bundle: starting the import before ready delays ready itself, because the
   // module graph evaluates on the same thread Chromium needs to finish initialising.
