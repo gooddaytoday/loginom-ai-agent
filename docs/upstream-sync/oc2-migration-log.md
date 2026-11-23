@@ -13485,3 +13485,223 @@ Found 558 warnings and 0 errors.
 
 Что меняет строка umask: на Linux загрузка конфига ставит umask `022` всему процессу — electron-builder, `pack.ts`
 (импортирует `getConfig`) и процессу `bun test` после импорта конфига; полный прогон `desktop` — без новых падений.
+
+## B4.9 Служба Desktop
+
+23.11.2026. Ветка `b49-desktop-service` от `oc2-migration` (`f3d9a5a92b`), рабочее дерево `.claude/worktrees/b49`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов —
+отдельное дерево `<scratchpad>/b49-base` (`f3d9a5a92b`, detached, тот же `npm ci`). `evals` (B2.7b2) не трогал. Эталон
+0.4 — `v0.4.0`: `desktop/src/main/loginom/desktop-service.ts` передавал Host `resourceVersion: app.getVersion()`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `7c9e1e3acd` `feat(desktop): run its own service with a constant identity and port per channel (B4.9)` | пять файлов кода, тесты |
+| `e0141b968f` `style(desktop): space the service identity module and test as the linter asks (B4.9)` | пустые строки по `require-readable-spacing` и `SAFETY:` у разбора в тесте: у изменённых файлов новых предупреждений `oxlint` нет, в тесте их стало на шесть меньше |
+| следующий | этот раздел; CAT-13 в `catalog.md` |
+
+Файлы кода — пять, предел задания: `desktop/src/main/service/service-identity.ts` (+24 −13),
+`desktop/src/main/service/background-service.ts` (+8 −2, CAT-13), `loginom-agent/src/host.ts` (+6),
+`loginom-host/src/node-client.ts` (+3), `loginom-host/src/node-entry.ts` (+3). Кроме `background-service.ts` — файлы
+форка, в `catalog.json` их нет. Тесты: `service-identity.test.ts` переписан (+153 −115), `loginom-host/test/node-host.test.ts`
+(+73).
+
+**Задание расходится с кодом в одном.** Оно предполагало, что для версии хватит правки `loginom-agent/src/host.ts`.
+Не хватает: Host службы — отдельный процесс Node (`launchNodeHost`), окружение ему режет список `runtimeEnvironment`, а
+`node-entry.ts` собирает параметры `createLoginomHost` только из handshake `start`. Выбрал путь `strictRecovery`
+(`loginom-host/AGENTS.md`: флаг идёт в handshake, окружение runtime его не видит) — необязательная строка
+`resourceVersion` в handshake, не строка — `LOGINOM_HANDSHAKE_INVALID`. Вместо одного файла три, всего пять.
+
+### Пункты задания
+
+| № | Было (`f3d9a5a92b`) | Стало |
+|---|---|---|
+| 1. Identity и порт | identity и порт никто не задаёт: окно ищет `service.json` канала, служба слушает `0xc0de` (на Windows — 28894), как у любой службы v2 без identity | `service-identity.ts`: identity `desktop`, порт — константа канала: prod 28288, beta 28289, dev 28290 (`0x6e80`–`0x6e82`; сборка из исходников, канал local, — dev). Ниже 28672, вне 24576–27647 профилей CLI. Порт занят чужой программой — служба не стартует, окно получает ошибку CLI `Managed service port 28290 on 127.0.0.1 is already in use by PID … (…). Configure another port with …` (ниже — собранное приложение) |
+| 2. Чужой файл | `serviceFile()`: `service.json` (prod, beta, dev), `service-local.json` сервера разработки, `service-<identity>.json` только из окружения главного процесса | всегда `<state>/<каталог канала>/service-desktop.json`. Ветка `service-local.json` убрана: сервер разработки под той же identity пишет тот же файл (тест, строка local) |
+| 3. Окружение службы | только `LOGINOM_AI_AGENT_RESOURCES` упакованного приложения (B4.8a) | `serviceEnvironment(version)` в `service-identity.ts`: `LOGINOM_AI_AGENT_SERVICE_IDENTITY=desktop`, `_SERVICE_PORT`, `LOGINOM_AI_AGENT_RESOURCE_VERSION` — всегда, поверх унаследованного, в любом запуске; `background-service.ts` добавляет к ним окружение B4.8a. Версия — `LoginomResources.installation(app).version`, то есть `app.getVersion()`, та же, с которой `--verify-resources` пишет кеш установщика. До `ensure` главный процесс удаляет из своего окружения `LOGINOM_AI_AGENT_CLI_ROOT` (обязательство B4.9 из раздела B2.7c): клиент запускает службу с `{ ...process.env, ...env }`, снять переменную через `env` нельзя, а пустая строка не равна отсутствию (`run/product.ts` и `loginom-agent/src/host.ts` проверяют `!== undefined`) |
+| 3. Версия в Host | Host службы Desktop берёт версию из `<resources>/../../cli-manifest.json`, которого у Desktop нет: кеш с версией `""` | `loginom-agent/src/host.ts` передаёт `LOGINOM_AI_AGENT_RESOURCE_VERSION` (пустое — как нет) в `launchNodeHost`, тот — в handshake, `node-entry.ts` — в `createLoginomHost`. Служба профиля CLI (`LOGINOM_AI_AGENT_CLI_ROOT` задан) значение не берёт: CLI из терминала Desktop его наследует, а у собранного CLI версия своя, из `cli-manifest.json` |
+| 3. Корень кеша установщика | — | не решается здесь, передано B4.14c (ниже) |
+
+### Порты: выбор и где проверял занятость
+
+Блок `0x6c00`–`0x6fff` (27648–28671) — между профилями CLI и блоком сворачивания Windows. Внутри выбрано окно, где никто
+ничего не регистрирует:
+
+```text
+$ ss -ltnH  (эта машина, 23.11.2026)            # слушают: 22 53 80 443 2019 2080 2222-2226 5180 7317 19514 35683 39075 43333 44383 46485
+$ cat /proc/sys/net/ipv4/ip_local_port_range   # 32768 60999 — исходящие порты Linux выше выбранных
+$ /etc/services, 27648–28671                   # пусто
+IANA service-names-port-numbers.csv (скачан 23.11.2026), TCP 27648–28671:
+  27782 ars-vista, 27876 astrolink, 27999 tw-auth-key, 28000 nxlmd, 28001 pqsp, 28010 gruber-cashreg,
+  28080 thor-engine, 28200 voxelstorm, 28240 siemensgsm, 28589 bosswave          # свободно 28241–28588
+Wikipedia «List of TCP and UDP port numbers» (wikitext, 23.11.2026), 27648–28671:
+  27500–27900, 27901–27910, 27960–27969 — игры id Software, только UDP; 27888, 27950, 28000, 28001, 28015, 28016,
+  28200; 28260 и 28443 — Palo Alto Panorama, TCP                                   # свободно 28261–28442
+Microsoft «Service overview and network port requirements for Windows» (learn.microsoft.com, ms.date 2026-02-12):
+  в 20000–32767 — только случайные диапазоны RPC «1024–65535» и «10000–65535»; динамический диапазон по умолчанию
+  с Windows Vista и Server 2008 — 49152–65535
+```
+
+28288–28290 — внутри пересечения свободных окон (28261–28442). Стенды `winstand` и macOS не трогал:
+`netsh int ipv4 show excludedportrange protocol=tcp` (резервы Hyper-V, WinNAT, WSL, Docker) не смотрел — B4.14c.
+
+### Тесты
+
+`service-identity.test.ts` (3 теста; модуль читает константу сборки, поэтому сторона Desktop — в отдельном процессе с
+`LOGINOM_AI_AGENT_CHANNEL`):
+
+| Тест | Что проверяет |
+|---|---|
+| каналы | таблица prod↔`latest`, beta↔beta, dev↔dev, local (окно `script/dev.ts`)↔CLI из исходников: окружение службы — identity `desktop`, порт канала числом, версия; настоящий `ServiceConfig` CLI с этим окружением даёт тот же файл `service-desktop.json` и тот же порт для `linux` и `win32`; порты ниже `0x7000` и выше `0x6bff` |
+| чужие файлы | в одном корне состояния живые службы той же версии: `opencode/service.json`, в каждом каталоге канала `service.json` и `service-cli-0123abcd.json`, и `service-desktop.json` всех трёх каналов. Окна prod, beta и dev через `Service.discover` берут каждое свою; без своих файлов — ничего |
+| занятый порт | окружение Desktop канала dev, порт заменён на тот, что держит чужой `Bun.serve`; настоящая служба из исходников (`serve --service`) через `Service.ensure`: отказ с `Managed service port <порт> on 127.0.0.1 is already in use`, регистрации нет. Постоянный порт тест не занимает: его может держать установленный Desktop. ~22 с (служба 15 с ждёт регистрацию владельца порта), тайм-аут 60 с |
+
+`node-host.test.ts` (+3): таблица — установщик (`verifyInstallationResources`) пишет кеш с версией `2.3.0-desktop`, затем
+Host в том же корне: с версией в handshake стартовая проверка `metadata`, 0 хешей, 2 из кеша; без версии — `full`, 2 хеша;
+версия не строкой — `LOGINOM_HANDSHAKE_INVALID`, очистка подтверждена.
+
+### Мутации
+
+`<scratchpad>/b49-runs/mutate.py`: одна замена в коде, тест своего пакета, возврат файла. Прогон до `prettier --write`
+тестов; форматирование меняло только переносы строк.
+
+```text
+=== M0 none: 3 pass / 0 fail
+=== MP1 the dev port moves to the next number: 2 pass / 1 fail                 # каналы
+=== MP2 beta shares the prod port: 2 pass / 1 fail                              # каналы
+=== MF1 the window looks at service.json: 1 pass / 2 fail                       # каналы, чужие файлы
+=== MF2 the window ignores its channel directory: 1 pass / 2 fail               # каналы, чужие файлы
+=== MI1 the service gets no identity: 1 pass / 2 fail                           # каналы, занятый порт
+=== MV1 the service gets no version: 2 pass / 1 fail                            # каналы
+=== H0 none: 3 pass / 0 fail
+=== MV2 the client leaves the version out of the handshake: 1 pass / 2 fail     # кеш с версией, не строка
+=== MV3 the entry drops the handshake version: 2 pass / 1 fail                  # кеш с версией
+=== MV4 the entry accepts any version type: 2 pass / 1 fail                     # не строка
+```
+
+`background-service.ts` (импортирует `electron`) и `loginom-agent/src/host.ts` юнит-тесты не загружают; места вызова
+проверены собранным приложением.
+
+### Собранное приложение
+
+`<scratchpad>/b49-runs/build.sh` (как у B4.8a: встроенный CLI канала dev, `bun run build` с источниками Node и Chromium,
+`electron-builder --linux dir`; 19 + 39 + 34 с) и `accept.sh`: root, `xvfb-run -a`, `--no-sandbox`, свой
+`LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и `HOME`. В окружении окна — то, что унаследовало бы окно из терминала профиля
+CLI: `LOGINOM_AI_AGENT_SERVICE_IDENTITY=cli-0123abcd`, `_SERVICE_PORT=24600`, `LOGINOM_AI_AGENT_CLI_ROOT=<root>/inherited-profile`,
+`LOGINOM_AI_AGENT_RESOURCE_VERSION=inherited`.
+
+```text
+== launch: --verify-resources, затем обычный запуск
+--verify-resources exit=0
+installer cache: <root>/desktop/loginom/resource-verification.json version=2.3.0
+registration: <root>/state/loginom-ai-agent-dev/service-desktop.json after 2 s
+state files: ./loginom-ai-agent-dev/service-desktop.json
+url: http://127.0.0.1:28290
+listening: 127.0.0.1:28290
+service pid 1108804 environment:
+  LOGINOM_AI_AGENT_RESOURCES=<build>/linux-unpacked/resources/loginom
+  LOGINOM_AI_AGENT_RESOURCE_VERSION=2.3.0
+  LOGINOM_AI_AGENT_SERVICE_IDENTITY=desktop
+  LOGINOM_AI_AGENT_SERVICE_PORT=28290
+  (no LOGINOM_AI_AGENT_CLI_ROOT)
+host phases: <root>/data/loginom-ai-agent-dev/loginom/startup-phases.jsonl
+  {…"phase":"resources.verify","status":"ready","duration_ms":5096,"files":12378,…,"mode":"full","hashedFiles":12378,"cachedFiles":0}
+host cache: <root>/data/loginom-ai-agent-dev/loginom/resource-verification.json version=2.3.0
+inherited profile root exists: no
+app alive: yes
+left: 0 processes
+== busy: чужой Bun.serve на 127.0.0.1:28290, затем запуск
+registration: none after 45 s
+log: Managed service port 28290 on 127.0.0.1 is already in use
+app alive: yes
+left: 0 processes
+# main.log: v2 CLI background service failed … type: 'connect.failed' … 'Error: Server process exited with code 1\n' +
+#   'Error: Managed service port 28290 on 127.0.0.1 is already in use by PID … (bun -e Bun.serve(…)). Configure another
+#   port with `opencode service set port <port>` and s…'; та же ошибка — в renderer.log
+```
+
+Версия дошла до кеша Host (`2.3.0`; на базе было бы `""`), но первый старт всё равно хеширует 12 378 файлов: кеш
+установщика лежит в `<userData>/loginom`, кеш Host — в `<data>/loginom` службы. Сборка, прогоны, `out/`,
+`resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`, `packages/dashboard/dist` удалены.
+
+### Приёмка
+
+База — `<scratchpad>/b49-base` (`f3d9a5a92b`), итог — `7c9e1e3acd` (после него — только пустые строки и комментарий: `service-identity.test.ts` снова 3 pass, `desktop` `bun typecheck` без ошибок); `npm ci` клиента в обоих деревьях,
+`LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `loginom-host` — `xvfb-run -a`. Падения сравнивались по именам из JUnit
+(`<scratchpad>/b49-runs/{suites.sh,compare.py}`). `server` — три файла, которые запускают Host через
+`loginom-agent/src/host.ts`.
+
+| Пакет | Команда | `f3d9a5a92b` | итог |
+|---|---|---|---|
+| `desktop` | `bun typecheck`; `bun run typecheck:tsc` | ошибок нет; код 0 | то же |
+| `desktop` | `bun test --timeout 30000` | 571 тест, 0 fail, 4 skip | 568, 0 fail, 4 skip: в `service-identity` 6 тестов стали 3 |
+| `loginom-agent` | `bun typecheck`; `bun test` | ошибок нет; 76, 0 fail | то же |
+| `loginom-host` | `bun typecheck` | ошибок нет | то же |
+| `loginom-host` | `xvfb-run -a bun test` | 558, 5 fail, 12 skip | 561, 5 fail, 12 skip — те же пять: «umask», три `bundled-ripgrep`, `managed-work-entry` (B2.7a2, B4.8a) |
+| `server` | `bun test test/loginom-{host-lease,local-file,dock-catalog}.test.ts` | 69, 0 fail, 1 skip | то же |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0, как на базе
+against a6b15d33daf6: 483 divergent upstream files              # база — 483; CAT-13: 23, CAT-09: 35, как на базе
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, на e0141b968f
+Found 552 warnings and 0 errors.                          # база — 558 (B4.8a); на 7c9e1e3acd — 568 (+10 в тесте); теперь в тесте одно, старое
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` изменённых файлов: чисто, кроме `loginom-host/src/node-client.ts` — он не проходил и на базе (строка
+`deadline` в `close`), файл целиком не переформатировал.
+
+### Каталог
+
+`catalog.json` не менялся: из пяти файлов только `background-service.ts` — upstream, CAT-13. В `catalog.md`, CAT-13:
+`serviceFile()` всегда называет `service-desktop.json`; к описанию `background-service.ts` добавлены identity, порты,
+версия, удаление `LOGINOM_AI_AGENT_CLI_ROOT` и путь версии до Host; «Проверка при обновлении» — тесты B4.9; в «Политике»
+вместо «identity и порты установленного Desktop — B4.9» — `desktop`, 28288–28290.
+
+### Где решал сам
+
+- **Версия через handshake, а не окружение Host** — выше. Пустое значение — как отсутствие: CLI без переменной
+  по-прежнему берёт `cli-manifest.json`.
+- **Служба профиля CLI версию из окружения не берёт.** Иначе CLI, запущенный из терминала Desktop, ключевал бы кеш
+  своих ресурсов версией Desktop. Признак — `LOGINOM_AI_AGENT_CLI_ROOT`; правка `cli/src/profile.ts` была бы шестым файлом.
+- **Версия и identity — в любом запуске, не только в упакованном.** Без ресурсов Host нет и версия ни на что не влияет;
+  с явной переменной разработчика Host получает версию окна, как в 0.4.
+- **`LOGINOM_AI_AGENT_CLI_ROOT` удаляется** из окружения главного процесса — обязательство B4.9 из раздела B2.7c. Его
+  читают `util/src/global.ts`, `product/src/dashboard-root.ts` и проверки «это CLI продукта»; окну он не нужен.
+- **Окно разработки (`script/dev.ts`, канал local) — порт dev, 28290.** В изолированном режиме (по умолчанию) `--port
+  0x0c0c` главнее; без него служба из исходников займёт порт dev-канала, как установленный Desktop Dev.
+- **Тест занятого порта подменяет только порт**, а не занимает 28290: на машине разработчика порт может держать
+  установленный Desktop Dev. Числа портов закреплены таблицей каналов.
+
+### Найдено, не чинил
+
+- **Корень кеша установщика (SMK `installer-resource-cache`) — B4.14c.** Версии теперь совпадают (`2.3.0` и у
+  `--verify-resources`, и у Host), корни — нет: установщик пишет `<userData>/loginom/resource-verification.json`
+  (B4.8a, как 0.4), Host службы — `<data>/loginom/…` (`~/.local/share/loginom-ai-agent[-канал]`, на Windows
+  `%USERPROFILE%\.local\share\…`). Первый старт Host после установки хеширует всё (Linux — 5 с, Windows — дольше).
+  Варианты: `--verify-resources` пишет в каталог данных службы (Desktop считает его, как `Global` CLI) или Host Desktop
+  получает корень `<userData>/loginom`. Без кеша Host на Windows не мерил.
+- **`LOGINOM_AI_AGENT_CONFIG_DIR` и `LOGINOM_AI_AGENT_DB`** из терминала профиля CLI доходят до службы Desktop и
+  уводят её конфиг и базу в профиль. Это и пользовательские переменные upstream, поэтому не удалял — решение владельцу.
+- **Текст ошибки занятого порта** предлагает `opencode service set port <port>`: имя upstream, и пользователь Desktop
+  команды не выполнит (нужна identity `desktop`). Порт в настройках — вариант В вопроса 7 B4.1, этап C; строка не
+  переведена (i18n — этап C).
+- **Один порт на канал.** Два пользователя одной машины (сервер терминалов) не запустят Desktop одного канала
+  одновременно: служба второго не стартует с той же ошибкой. Принято В-97 п. 7.
+- **`LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL`** в `script/dev.ts` теперь никто не читает. Не убирал: шестой файл.
+
+### Не проверено
+
+- Windows и macOS: занятость 28288–28290 на `winstand` (`excludedportrange`), запуск службы на них, путь
+  `%USERPROFILE%\.local\state\loginom-ai-agent[-канал]\service-desktop.json` — B4.14c.
+- Собранное приложение — только Linux `--linux dir`, канал dev, от root, `--no-sandbox`; prod и beta — юнит-тестом.
+- Экран окна при занятом порте глазами не смотрел: ошибка — в `main.log` и `renderer.log`.
+- Служба, уже запущенная прошлой версией Desktop под `service.json`, после обновления не подхватывается и не
+  останавливается: новое окно запустит свою под `service-desktop.json`, старая служба держит `0xc0de` до выхода. До B4.9
+  установленных сборок v2 не было — по коду, не проверял.
