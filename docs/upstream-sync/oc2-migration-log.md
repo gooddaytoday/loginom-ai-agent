@@ -14068,7 +14068,9 @@ B4.9; LIFE-01 в `docs/testing/loginom-ai-agent/README.md`; план этапа 
 | `f25a78f349` `feat(desktop): stop its own service when the app quits and keep windows from restarting it (B4.10)` | код, тесты, CAT-13 и CAT-09 |
 | `c43f7fcc9e` `docs(upstream-sync): record stopping Desktop's service with the app (B4.10)` | этот раздел |
 | `b05477c878` `test(desktop): wait for the own service's exit with a deadline in the quit test (B4.10)` | выход своей службы в тесте — ожидание со сроком 10 с, а не одно чтение `exitCode` (ниже) |
-| следующий | дополнения раздела |
+| `d633fb19d7` `docs(upstream-sync): note the quit test's exit wait and what B4.10 leaves unchecked (B4.10)` | дополнения раздела |
+| `fe272663c6` `fix(desktop): quit through the app lifecycle on SIGINT and SIGTERM (B4.10)` | доработка по решению оркестратора: сигналы (ниже); CAT-09 |
+| следующий | раздел «Доработка: сигналы» |
 
 Файлы кода — четыре: `desktop/src/main/service/background-service-machine.ts` (+71 −2, upstream),
 `service/background-service.ts` (+7 −1, upstream, CAT-13), `lifecycle/index.ts` (+4 −1, upstream, CAT-09),
@@ -14265,7 +14267,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Найдено, не чинил
 
-- **SIGTERM и SIGINT главному процессу Electron** (`kill`, Ctrl+C в терминале, менеджер сеанса Linux) — приложение
+- **(Исправлено доработкой `fe272663c6`.) SIGTERM и SIGINT главному процессу Electron** (`kill`, Ctrl+C в терминале, менеджер сеанса Linux) — приложение
   выходит за 0,1 с с кодом 130, участники `Shutdown` не останавливаются, служба и Host остаются. Причина —
   `NodeRuntime.runMain` в `desktop/src/main/desktop.ts` (upstream). Починка — свой `runMain` без обработки сигналов или
   `teardown`, который ждёт автомат; это пятый файл кода и поведение upstream, решать в B4 (LIFE-01 требует штатного
@@ -14283,7 +14285,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   переподключение пришло до остановки — прогоны доказывают ожидание попытки в полёте, не отказ. Отказ живому окну — это
   выход через меню «Выход», Cmd+Q на macOS (единственный путь там) и передача обновлению; его доказывает только тест
   драйвера.
-- Для B4.14b: проверка LIFE-01 должна закрывать приложение окном или `app.quit()`. Сигналом (так же, как выход из сеанса
+- (Снято доработкой.) Для B4.14b: проверка LIFE-01 должна закрывать приложение окном или `app.quit()`. Сигналом (так же, как выход из сеанса
   Linux) LIFE-01 красный, пока не исправлен `runMain` (раздел «Найдено»).
 - Новые автотесты запускались только на Linux.
 - Windows и macOS: мягкая остановка при выходе на `winstand` — B4.14c; установленный Linux (AppImage, deb) — B4.14b.
@@ -14291,3 +14293,94 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   собранном — закрытие последнего окна (3 раза) и SIGTERM (1 раз).
 - Host с запущенными рантаймами и Chromium (подключение к Loginom) при выходе: в прогонах Host только проверял ресурсы.
 - Срок 90 с на собранном приложении (зависшая служба) не мерил: он сложен из сроков B2.3b, проверенных там.
+
+### Доработка: сигналы
+
+Решение оркестратора: пятый файл кода допустим; при SIGTERM и SIGINT главному процессу приложение проходит тот же путь
+`Shutdown`, что при закрытии окна.
+
+**0.4 (`v0.4.0`, `desktop/src/main/index.ts`).** Главный эффект запускался `Effect.runFork`, без `runMain`; свой
+обработчик `process.on("SIGINT" | "SIGTERM")` ставил признак выхода, ждал `stopSidecars()` (sidecar, прокси, Host) и
+только потом звал `app.quit()`. Сигнал шёл тем же путём остановки, что и `before-quit`.
+
+**v2 до правки.** Обработчик того же вида в `lifecycle/index.ts` есть (`exit.requested`, режим `quit`), но
+`NodeRuntime.runMain` в `desktop.ts` ставит свой: прерывает главный fiber и зовёт `process.exit(130)`
+(`@effect/platform-node-shared/src/NodeRuntime.ts`), не дожидаясь автомата приложения.
+
+**Правка — `desktop/src/main/desktop.ts`** (+13 −3, upstream, CAT-09; пятый файл кода). Главный эффект запускает свой
+`runMain` из `Runtime.makeRunMain` — тот же, что `NodeRuntime.runMain` (отчёт об ошибке, `keepAlive`, `teardown`,
+`process.exit` при ненулевом коде), но без обработчика сигналов. Сигнал теперь получает только `lifecycle/index.ts`:
+`exit.requested` → остановка участников (служба — мягко, в бюджете 90 с) → `app.quit()` → `will-quit` → главный fiber
+заканчивается с кодом 0. Как в 0.4.
+
+**Тест.** Юнит-теста у правки нет: `desktop.ts` — вход Electron, при импорте сразу строит слои с `electron`, тесты
+`desktop` его не загружают, а шов для теста запрещён (`packages/desktop/AGENTS.md`); перенос раннера в модуль без
+`electron` — шестой файл. Звенья цепочки покрыты: сигнал → `exit.requested` → `stop-plugins` — существующий
+`lifecycle/machine.test.ts`; участник → остановка своей службы — тесты B4.10 выше. Сам раннер проверяет собранное
+приложение; мутация — сборка `f25a78f349`, где тот же код с `NodeRuntime.runMain` (отличается только `desktop.ts`).
+
+Сборка — тот же `<scratchpad>/b410/build.sh` (2 + 19 + 34 + 26 с, код 0), прогоны — `accept.sh <тег> sigterm`:
+`kill -TERM` главному процессу через 3 с после готовности окна.
+
+```text
+== sigterm1
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 1241116, http://127.0.0.1:28290
+host: pid 1241133, "status":"ready","duration_ms":3814
+service children: 1241133:MainThread
+SIGTERM to 1240982
+app exit: code 0 after .3910 s
+5 s later: service alive: [], host alive: [], children alive: []
+registration exists: no
+  [2026-11-23 05:31:45.230] [info]  (main)       stopping v2 CLI background service
+  [2026-11-23 05:31:45.511] [info]  (main)       v2 CLI background service stopped
+service log: message="shutdown started" reason="service stop"
+left (by this build or run path): []
+== sigterm2   app exit: code 0 after .3597 s; 5 s later: service, host, children — нет; registration exists: no;
+              stopping 05:32:00.479 → stopped .751; reason="service stop"; left: []
+== sigterm3   app exit: code 0 after .3104 s; 5 s later: service, host, children — нет; registration exists: no;
+              stopping 05:32:15.718 → stopped .941; reason="service stop"; left: []
+== мутация: сборка f25a78f349 (NodeRuntime.runMain), sigterm1 — раздел «Собранное приложение» выше
+SIGTERM to 1217038
+app exit: code 130 after .0921 s
+5 s later: service alive: [1217174 ], host alive: [1217190 ], children alive: [1217190 ]
+registration exists: yes
+```
+
+**3 из 3 `kill -TERM` чистые**: приложение выходит с кодом 0 за 0,31–0,39 с, через 5 с нет ни службы, ни Node Host,
+регистрации нет, служба остановлена запросом. На мутации — код 130 за 0,09 с, служба и Host живы, регистрация на месте.
+Закрытие окна с новым раннером (`accept.sh close4 close`) — как раньше: код 0 за 0,36 с, службы, Host и регистрации нет,
+`reason="service stop"`. В прогонах с сигналом окно было открыто во время остановки; новых `starting` после `stopping`
+в журнале нет, а попыток переподключения окна журналы не пишут (строк «Background service is stopped» нет ни в
+`main.log`, ни в `renderer.log`), поэтому отказ живому окну по-прежнему показан только тестом драйвера.
+
+Сборка, прогоны и артефакты удалены, как выше.
+
+Приёмка после доработки (`fe272663c6`):
+
+| Пакет | Команда | `3685e795a2` | `fe272663c6` |
+|---|---|---|---|
+| `desktop` | `bun typecheck`; `bun run typecheck:tsc` | ошибок нет; — | 3 519 файлов, ошибок нет; код 0 |
+| `desktop` | `bun test --timeout 30000` | 564 pass, 4 skip, 0 fail | 568 pass, 4 skip, 0 fail |
+
+`oxlint` `desktop.ts` — 0 предупреждений, `prettier` — чисто.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 486 divergent upstream files              # +desktop.ts (CAT-09): до доработки 485, база 483
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, 18 с; на fe272663c6 с этим разделом; turbo: 38 из 39 из кэша, desktop — заново
+Found 552 warnings and 0 errors.                                 # как на базе
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects [4.03s]
+ Tasks:    39 successful, 39 total
+```
+
+Каталог: CAT-09 — назначение (раннер без сигналов в `desktop.ts`, сигнал идёт путём закрытия окна), проверка при
+обновлении (только собранным приложением), политика (`fork-owned`; перейти на вариант upstream, если тот сам поведёт
+сигналы через автомат).
+
+Не проверено после доработки: SIGINT отдельно не посылал (тот же обработчик в `lifecycle/index.ts` и тот же раннер);
+сигнал до того, как слой `ApplicationLifecycle` поставил свой обработчик (первые доли секунды запуска), теперь
+никакой обработчик JS не ловит — что тогда делает Electron, не проверял (до правки `runMain` выходил с кодом 130); выход из сеанса Linux настоящим менеджером сеанса — нет, только
+`kill -TERM`; Windows сигналов этого вида не шлёт (`session-end` — B4.14c).
