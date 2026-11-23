@@ -56,104 +56,111 @@ type Row = {
   // safeStorage now; available when not given.
   protection?: ReturnType<typeof safeStorage>
   outcome: CredentialMigration.Outcome
+  // A runner whose platform lacks what the row relies on.
+  skip?: NodeJS.Platform
 }
 
 const linux = credentials("linux")
 
 describe("Desktop 0.4 connection for the service", () => {
-  test.each<Row>([
-    {
-      name: "linux: a connection to the user's own stand moves as the generation after 0.4's",
-      platform: "linux",
-      profile: (f) => desktop04(f, linux),
-      outcome: { state: "moved", generation: 3 },
-    },
-    {
-      name: "linux: a profile 0.4.0 never opened moves a connection to app.loginom.ai",
-      platform: "linux",
-      profile: (f) => desktop04(f, linux, { url: "https://app.loginom.ai/app/", marker: false }),
-      outcome: { state: "moved", generation: 3 },
-    },
-    {
-      name: "linux: a profile 0.4.0 never opened does not move a connection 0.4.0 would have removed",
-      platform: "linux",
-      profile: (f) => desktop04(f, linux, { marker: false }),
-      outcome: { state: "reset" },
-    },
-    {
-      name: "linux: without a 0.4 connection neither store is touched",
-      platform: "linux",
-      profile: async () => undefined,
-      outcome: { state: "none" },
-    },
-    {
-      name: "linux: a service that already has a connection keeps it",
-      platform: "linux",
-      profile: (f) => desktop04(f, linux),
-      service: (f) => save(connectionStore(f.target, cliCredentials("linux")), 1, true),
-      outcome: { state: "current" },
-    },
-    {
-      name: "linux: a move cut short before activation is finished with the next generation",
-      platform: "linux",
-      profile: (f) => desktop04(f, linux),
-      service: (f) => save(connectionStore(f.target, cliCredentials("linux")), 3, false),
-      outcome: { state: "moved", generation: 4 },
-    },
-    {
-      name: "linux: a record that is not one is not moved",
-      platform: "linux",
-      profile: async (f) => {
-        await desktop04(f, linux)
-        await fs.writeFile(path.join(f.source, "connection.json"), `{"generation":2,"password":"${stand.password}"`)
-      },
-      outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_INVALID" },
-    },
-    {
-      name: "linux: a store others can read is not moved",
-      platform: "linux",
-      profile: async (f) => {
-        await desktop04(f, linux)
-        await fs.chmod(f.source, 0o755)
-      },
-      outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_PERMISSIONS_INVALID" },
-    },
-    ...(["win32", "darwin"] as const).flatMap((platform): Row[] => [
+  test.each<Row>(
+    [
       {
-        name: `${platform}: safeStorage is unavailable, as it would be for 0.4`,
-        platform,
-        profile: (f) => desktop04(f, credentials(platform, safeStorage(true))),
-        protection: safeStorage(false),
-        outcome: { state: "failed", step: "read", reason: "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE" },
+        name: "linux: a connection to the user's own stand moves as the generation after 0.4's",
+        platform: "linux",
+        profile: (f) => desktop04(f, linux),
+        outcome: { state: "moved", generation: 3 },
       },
       {
-        name: `${platform}: safeStorage decrypts something other than the secrets`,
-        platform,
+        name: "linux: a profile 0.4.0 never opened moves a connection to app.loginom.ai",
+        platform: "linux",
+        profile: (f) => desktop04(f, linux, { url: "https://app.loginom.ai/app/", marker: false }),
+        outcome: { state: "moved", generation: 3 },
+      },
+      {
+        name: "linux: a profile 0.4.0 never opened does not move a connection 0.4.0 would have removed",
+        platform: "linux",
+        profile: (f) => desktop04(f, linux, { marker: false }),
+        outcome: { state: "reset" },
+      },
+      {
+        name: "linux: without a 0.4 connection neither store is touched",
+        platform: "linux",
+        profile: async () => undefined,
+        outcome: { state: "none" },
+      },
+      {
+        name: "linux: a service that already has a connection keeps it",
+        platform: "linux",
+        profile: (f) => desktop04(f, linux),
+        service: (f) => save(connectionStore(f.target, cliCredentials("linux")), 1, true),
+        outcome: { state: "current" },
+      },
+      {
+        name: "linux: a move cut short before activation is finished with the next generation",
+        platform: "linux",
+        profile: (f) => desktop04(f, linux),
+        service: (f) => save(connectionStore(f.target, cliCredentials("linux")), 3, false),
+        outcome: { state: "moved", generation: 4 },
+      },
+      {
+        name: "linux: a record that is not one is not moved",
+        platform: "linux",
         profile: async (f) => {
-          await desktop04(f, credentials(platform, safeStorage(true)))
-          const encrypted = safeStorage(true).encryptString(`${stand.password} is not JSON`).toString("base64")
-
-          const record = {
-            generation: 2,
-            revision: 2,
-            url: stand.url,
-            username: stand.username,
-            secrets: { encrypted },
-          }
-
-          await fs.writeFile(path.join(f.source, "connection.json"), JSON.stringify(record))
+          await desktop04(f, linux)
+          await fs.writeFile(path.join(f.source, "connection.json"), `{"generation":2,"password":"${stand.password}"`)
         },
-        outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_READ_FAILED" },
+        outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_INVALID" },
       },
       {
-        // This runner has neither DPAPI nor the Keychain helper of `cliCredentials`.
-        name: `${platform}: no protection for the service's record`,
-        platform,
-        profile: (f) => desktop04(f, credentials(platform, safeStorage(true))),
-        outcome: { state: "failed", step: "write", reason: "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE" },
+        name: "linux: a store others can read is not moved",
+        platform: "linux",
+        // The store checks POSIX modes; Windows has none.
+        skip: "win32",
+        profile: async (f) => {
+          await desktop04(f, linux)
+          await fs.chmod(f.source, 0o755)
+        },
+        outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_PERMISSIONS_INVALID" },
       },
-    ]),
-  ])("$name; a second start changes nothing", async (row) => {
+      ...(["win32", "darwin"] as const).flatMap((platform): Row[] => [
+        {
+          name: `${platform}: safeStorage is unavailable, as it would be for 0.4`,
+          platform,
+          profile: (f) => desktop04(f, credentials(platform, safeStorage(true))),
+          protection: safeStorage(false),
+          outcome: { state: "failed", step: "read", reason: "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE" },
+        },
+        {
+          name: `${platform}: safeStorage decrypts something other than the secrets`,
+          platform,
+          profile: async (f) => {
+            await desktop04(f, credentials(platform, safeStorage(true)))
+            const encrypted = safeStorage(true).encryptString(`${stand.password} is not JSON`).toString("base64")
+
+            const record = {
+              generation: 2,
+              revision: 2,
+              url: stand.url,
+              username: stand.username,
+              secrets: { encrypted },
+            }
+
+            await fs.writeFile(path.join(f.source, "connection.json"), JSON.stringify(record))
+          },
+          outcome: { state: "failed", step: "read", reason: "LOGINOM_STORE_READ_FAILED" },
+        },
+        {
+          // The fixture resources carry no Keychain helper, and DPAPI exists only on a Windows runner.
+          name: `${platform}: no protection for the service's record`,
+          platform,
+          skip: platform === "win32" ? "win32" : undefined,
+          profile: (f) => desktop04(f, credentials(platform, safeStorage(true))),
+          outcome: { state: "failed", step: "write", reason: "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE" },
+        },
+      ]),
+    ].filter((row) => row.skip !== process.platform),
+  )("$name; a second start changes nothing", async (row) => {
     const f = await fixture()
     await row.profile(f)
     await row.service?.(f)
