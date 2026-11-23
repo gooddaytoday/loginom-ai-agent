@@ -92,10 +92,11 @@ export default Plugin.define({
     })
 
     // Host lease (B2.3, G3): one Host run per session execution, as 0.4 `turnLifecycle.acquireRun` held one per run. It
-    // is taken when the execution starts, or by the first tool that needs it if that comes first, and released when the
-    // execution succeeds, fails or is interrupted; a steer prompt joins the running execution and its lease. A plugin
-    // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`. A failed record write
-    // only loses that lease: the event loop below must keep running to release the others.
+    // is taken when the execution starts (at its first step boundary at the latest), or by the first tool that needs it
+    // if that comes first, and released when the execution succeeds, fails or is interrupted; a steer prompt joins the
+    // running execution and its lease. A plugin that is disposed releases what it still holds. Without a ready Host the
+    // lease is `undefined`. A failed record write only loses that lease: the event loop below must keep running to
+    // release the others.
     const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
     // Why the Host refused a session's lease; the model is told (B2.5d).
     const refused = new Map<string, string>()
@@ -256,6 +257,10 @@ export default Plugin.define({
       dock.hide(event)
     }
     await ctx.session.hook("context", async (event) => {
+      // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
+      // relied on for it: the event subscription above becomes active only some time after `setup` returns, so an
+      // execution that starts as the Location activates (a synthetic wake, a resume) passes unseen (B2.6a2).
+      void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
