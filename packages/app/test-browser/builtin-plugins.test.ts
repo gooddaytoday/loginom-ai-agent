@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 
 // Loginom AI Agent (B4.11e): the product window loads no pairing, SSH or WSL, as in 0.4; SSH and WSL install upstream
-// OpenCode on the remote machine. Every other built-in stays. Desktop main still lists WSL: without its window entry it
-// has no UI, and its main entry alone bundles node-pty for the Desktop build.
+// OpenCode on the remote machine. Every other built-in stays. Desktop main still lists all three, as upstream does:
+// without a window entry they have no UI.
 const product = [
   "context",
   "btw",
@@ -22,9 +22,9 @@ const app = await import("@/runtime/plugin/builtins")
 
 const desktop = await import("@opencode/gui-plugins/main")
 
-test("the product window and Desktop main register every built-in but pairing and SSH, and WSL only in main", () => {
+test("the product window registers every built-in but pairing, SSH and WSL, which only Desktop main lists", () => {
   expect(app.builtins.map((plugin) => plugin.id)).toEqual(product)
-  expect(desktop.builtins.map((plugin) => plugin.id)).toEqual(
-    product.flatMap((id) => (id === "updater" ? [id, "wsl"] : [id])),
+  expect(desktop.builtins.map((plugin) => plugin.id).toSorted()).toEqual(
+    [...product, "pairing", "ssh", "wsl"].toSorted(),
   )
 })

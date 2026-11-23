@@ -7,7 +7,9 @@ import file from "./file"
 import review from "./review"
 import details from "./details"
 import browser from "./browser"
+import pairing from "./pairing"
 import updater from "./updater"
+import ssh from "./ssh"
 import wsl from "./wsl"
 import microsoftOffice from "./microsoft-office"
 import sources from "./sources"
@@ -23,9 +25,9 @@ export const builtins = compose({
   review,
   details,
   browser: { ...browser, mainEntry: () => import("./browser/main") },
-  // Loginom AI Agent (B4.11e): no pairing or ssh, as in 0.4. wsl stays here for now: the window does not load it, so
-  // it has no UI, and its main entry alone bundles node-pty (B4.11e in docs/upstream-sync/oc2-migration-log.md).
+  pairing: { ...pairing, mainEntry: () => import("./pairing/main") },
   updater: { ...updater, mainEntry: () => import("./updater/main") },
+  ssh: { ...ssh, mainEntry: () => import("./ssh/main") },
   wsl: { ...wsl, mainEntry: () => import("./wsl/main") },
   "microsoft-office": microsoftOffice,
   sources,

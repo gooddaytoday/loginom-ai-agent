@@ -39,8 +39,9 @@ export const builtins = compose({
   review: { ...review, windowEntry: eager(reviewRenderer) },
   details: { ...details, windowEntry: eager(detailsRenderer) },
   browser: { ...browser, windowEntry: eager(browserRenderer) },
-  // Loginom AI Agent (B4.11e): no pairing, ssh or wsl, as in 0.4. SSH and WSL install upstream OpenCode on the remote
-  // machine; pairing opens this computer's server to other devices. The folders stay, so upstream updates merge.
+  // Loginom AI Agent (B4.11e): the window loads no pairing, ssh or wsl, as in 0.4. SSH and WSL install upstream
+  // OpenCode on the remote machine; pairing opens this computer's server to other devices. main.ts still lists them:
+  // without a window entry they have no UI.
   updater: { ...updater, windowEntry: eager(updaterRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
