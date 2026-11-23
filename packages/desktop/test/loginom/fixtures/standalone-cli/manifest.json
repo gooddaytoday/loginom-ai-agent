@@ -1,0 +1,14 @@
+{
+  "A": {
+    "sha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5",
+    "rows": 3,
+    "expected": { "Alpha": 35, "Beta": 20 },
+    "total": 55
+  },
+  "B": {
+    "sha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c",
+    "rows": 3,
+    "expected": { "Alpha": 100, "Beta": 1 },
+    "total": 101
+  }
+}
