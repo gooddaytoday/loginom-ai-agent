@@ -705,6 +705,63 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     })
     expect(llm.hits.count).toBe(hits)
   }, 180_000)
+
+  // 0.4 `standalone-status`, phase `cancellation`. Ctrl+C while the Host still checks Help is a case of
+  // `run/product.test.ts`: from outside, the test cannot see that the run already waits for that answer.
+  test.if(process.platform !== "win32")(
+    "Ctrl+C ends run --command while the model answers",
+    async () => {
+      const fixture = await setupFixture(undefined, true)
+      const llm = model([{ hang: true }])
+      await productProfile(fixture.profile, llm.url)
+      expect(
+        await loginom(
+          fixture,
+          ["setup", "--stdin-json", "--format", "json"],
+          JSON.stringify({ url: login.url, username: login.username, password: login.password }),
+        ),
+      ).toMatchObject({ code: 0 })
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "src/loginom-cli.ts",
+          "run",
+          "--format",
+          "json",
+          "--model",
+          "test/test-model",
+          "--command",
+          "loginom-automation",
+          "--dir",
+          fixture.root,
+          "--",
+          "Построй сценарий.",
+        ],
+        {
+          cwd: cli,
+          env: { ...fixture.env, LOGINOM_AI_AGENT_CLI_ROOT: undefined, PWD: cli },
+          stdin: "ignore",
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+      const timer = setTimeout(() => child.kill("SIGKILL"), 60_000)
+      try {
+        await llm.requested
+        child.kill("SIGINT")
+        const code = await child.exited
+        const [stdout, stderr] = await output
+        expect({ code, cancelled: stdout.includes('"name":"CLI_CANCELLED"') }).toEqual({ code: 130, cancelled: true })
+        expect(stdout + stderr).not.toContain(login.password)
+        expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+      } finally {
+        clearTimeout(timer)
+        child.kill()
+      }
+    },
+    120_000,
+  )
 })
 
 function node() {
