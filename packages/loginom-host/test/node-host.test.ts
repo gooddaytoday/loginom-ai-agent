@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
+import { verifyInstallationResources } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
@@ -268,6 +269,78 @@ test("CLI setup writes the Host cache before saving; check and the next process 
     await restored.close()
   }
 }, 30_000)
+
+// Desktop's service forwards the application version (B4.9): the Host reuses a cache the installer wrote for that version
+// in the same root, and hashes again without it.
+test.each([
+  { forwarded: "2.3.0-desktop", verification: { mode: "metadata", hashedFiles: 0, cachedFiles: 2 } },
+  { forwarded: undefined, verification: { mode: "full", hashedFiles: 2, cachedFiles: 0 } },
+])(
+  "the Host keys its resource cache with the handshake version $forwarded",
+  async (input) => {
+    const resources = join(fixture.directory, "version-resources")
+    const root = join(fixture.directory, `version-profile-${input.forwarded ?? "none"}`)
+    const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+    await mkdir(join(resources, "bin"), { recursive: true })
+    await copyFile(fixture.node, join(resources, binary), constants.COPYFILE_FICLONE)
+    if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+    await writeFile(join(resources, "browser"), "controlled browser payload")
+    await writeFile(
+      join(resources, "resource-manifest.json"),
+      JSON.stringify({
+        protocol: 1,
+        nodeVersion: "24.19.0",
+        node: binary,
+        browser: "browser",
+        files: await Promise.all(
+          [binary, "browser"].map(async (path) => ({
+            path,
+            sha256: createHash("sha256")
+              .update(await readFile(join(resources, path)))
+              .digest("hex"),
+          })),
+        ),
+      }),
+    )
+    await verifyInstallationResources({ root, resources, resourceVersion: "2.3.0-desktop" })
+
+    const host = await launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root,
+      resources,
+      headless: true,
+      resourceVersion: input.forwarded,
+    })
+    try {
+      // Setup's check drains the startup verification first; closing would cancel it.
+      await host.request("connection.verify-resources", {})
+    } finally {
+      await host.close()
+    }
+
+    const startup = (await readFile(join(root, "startup-phases.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.phase === "resources.verify" && event.status === "ready" && event.scope === undefined)
+    expect(startup).toEqual([expect.objectContaining(input.verification)])
+  },
+  30_000,
+)
+
+test("a non-string resource version is rejected before the host starts", async () => {
+  await expect(
+    launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root: join(fixture.directory, "bad-version"),
+      resources: join(fixture.directory, "absent-runtime"),
+      headless: true,
+      resourceVersion: 2 as unknown as string,
+    }),
+  ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
+}, 15_000)
 
 test("a non-boolean recovery mode is rejected before the host starts", async () => {
   const failure = await launchNodeHost({
