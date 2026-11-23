@@ -7130,7 +7130,9 @@ Found 517 warnings and 0 errors.
 | `c81efbe42e` `feat(loginom-agent): attachment receipts and attachments carried through compaction (B2.5d)` | хуки `prompt` и `compaction` в `src/local-file.ts`; случаи `changed`/`stable` в `loginom-local-file.test.ts`; сжатие, откат и контракт хука `compaction` в `loginom-package-docs.test.ts` |
 | `ede9ca4dbc` `test(server): a failed catalog hides Dock tools another session registered` | случай отказа каталога ловит мутацию `hide` |
 | `869c527329` `test(server): port the profile snapshot case and check the registry keeps one generation` | случай 0.4 `profile-tools` для трёх профилей, проверка реестра Location при смене поколения; поиск перенесённых вложений без лишнего условия; ID сообщений ядра в тестах сжатия |
-| следующий | этот раздел, `guarantees.md`, `catalog.md` |
+| `2f8d30d6c3` `docs(upstream-sync): record B2.5d Dock catalog and attachments` | этот раздел (первая версия), `guarantees.md`, `catalog.md` |
+| `7a652f0075` `fix(loginom-agent): a Host still in its handshake holds up no session` | каталог читает аренду только после handshake Host (`ServiceHost.connected`); прогон старого поколения не заменяет реестр нового; тесты: исполнение без промпта, второе сжатие, Host в handshake, удаление сохранённого ответа |
+| следующий | уточнения этого раздела и строки G3 |
 
 ### Что сделано
 
@@ -7182,13 +7184,19 @@ B2.5, B2.6, B2.9: от B2.5 остались вложения, меняющие 
 
 - **Реестр поколения вместо инструментов хода** — см. п. 1. Имена, описания и схемы — из каталога Host, как в 0.4;
   `ProviderTransform.schema` 0.4 не нужен: схему под провайдера переводит ядро v2.
-- **Аренда берётся уже при приёме промпта.** Хук `prompt` читает каталог заранее, и для этого берёт аренду исполнения
-  (`hold`, B2.3): иначе первый шаг после смены поколения или в новом экземпляре плагина шёл бы без инструментов Dock (снимок
+- **Аренда берётся уже при приёме промпта** (если Host готов). Хук `prompt` читает каталог заранее, и для этого берёт
+  аренду исполнения (`hold`, B2.3): иначе первый шаг после смены поколения или в новом экземпляре плагина шёл бы без инструментов Dock (снимок
   раньше любого хука, событие `session.execution.started` асинхронно). Steer-промпт во время исполнения получает ту же
   аренду и прогон не перепривязывает: это сделает граница шага. Тест B2.3 «S2 interruption» ждёт теперь вызова модели, а не
   аренды (аренда появляется раньше начала исполнения).
 - **Отказ Host в привязке не снимает допуск плагина.** Допуски B2.2 от Host не зависят (`package_docs_run` работает без
   Host). Отказ `scope` скрывает инструменты Dock сессии и сообщает модели причину; 0.4 при отказе `bind` завершал ход ошибкой.
+- **Host в handshake никого не держит.** `ServiceHost.acquire` ждёт готовности Host (handshake до 180 с, B2.3). Хуки
+  `prompt` и `context` теперь на пути каждого запроса, поэтому до handshake (`ServiceHost.connected()`) каталог аренду не
+  берёт: у сессии нет инструментов Dock и подсказки, как в 0.4 без подключения. Первая версия (`98c53f9425`) ждала.
+- **Реестр не откатывается на старое поколение.** Настоящий Host отвечает поколением аренды прогона, поэтому прогон,
+  начатый до переподключения, видит старое поколение; его каталог задаёт только его собственный список, реестр остаётся
+  новому поколению.
 - **`ServiceHost.acquire` отклоняется с причиной Host** (раньше — `undefined`): подсказка 0.4 называет отказ
   (`acquire: LOGINOM_RECOVERY_REQUIRED`). Без Host (`start` не вызывался или Node host не поднялся) — по-прежнему `undefined`,
   без подсказки, как 0.4 без аренды.
@@ -7242,7 +7250,13 @@ Host по сценарию (`fixture/loginom-dock-host.ts`: порт `node-clien
 сохранённый оригинал, допуск вставленного вложения); контракт ядра: перезагрузка реестра в хуке `prompt` видна первому шагу,
 в `execute.after` — следующему, в `context` — только следующему; `context` пишет в системную часть.
 
-`loginom-package-docs.test.ts`: перевёрнутый случай сжатия; `a failed compaction carries nothing past a revert of the
+`loginom-dock-catalog.test.ts`, ещё: Host в handshake — первый промпт без инструментов Dock и подсказки, Host не спрошен;
+после handshake — инструменты есть. Случай большого ответа удаляет сохранённый оригинал: инструмент продукта пишет его в
+`tool-output` каталога данных машины (статический `Global.Path.data`, как профили B2.5b1), как и тест 0.4
+`loginom-truncation.test.ts`; файлы, оставленные прогонами до `7a652f0075` (35, все этого случая), удалены вручную.
+
+`loginom-package-docs.test.ts`: перевёрнутый случай сжатия (с `7a652f0075` — два сжатия подряд, второе переносит то, что
+перенесло первое; сценарная модель узнаёт и запрос обновления сводки); `a failed compaction carries nothing past a revert of the
 attachment` (сжатие, вложение, проваленное сжатие, откат сообщения с вложением — снова вопрос `read`); контракт хука
 `compaction`: при хуке сообщение сжатия открыто (`running`) и после завершения возглавляет контекст под тем же ID;
 проваленное сжатие сохраняет своё сообщение, контекст не возглавляет.
@@ -7251,7 +7265,9 @@ attachment` (сжатие, вложение, проваленное сжатие
 сценарию, чей каталог описывает действия Dock: без него файловые инструменты по условию 0.4 не предлагаются. Тест шлюза
 `loginom_file_admit` доходит до приёма файла в Host (`artifact-1`, вопросы `loginom_file_admit`, `read`).
 
-`loginom-host-lease.test.ts`: случай «`loginom_file_admit` доходит до Host…» заменён случаем привязки на настоящем Node host
+`loginom-host-lease.test.ts`: новый случай `S2 synthetic wake` — исполнение без промпта (синтетическое сообщение) берёт
+аренду при старте и освобождает её (без него мутация «аренда не берётся на `started`» ничего не краснила: аренду теперь
+берёт хук `prompt`); случай «`loginom_file_admit` доходит до Host…» заменён случаем привязки на настоящем Node host
 (без допуска — `loginom_dock_diagnostics`; под допуском мастера — плюс `loginom_dock_prepare`; вызов — `LOGINOM_CONFIG_REQUIRED`,
 не `LOGINOM_SCOPE_DENIED`): по `loginom_file_admit` её не проверить — без runtime Host отказывает в приёме и после `apply`.
 
@@ -7292,6 +7308,25 @@ D — `loginom-local-file.test.ts` и `loginom-package-docs.test.ts` без 60-�
 === D4  carry kept per session, not per compaction  package-docs 40/1: a failed compaction carries nothing…
 ```
 
+На `7a652f0075` (`loginom-dock-catalog.test.ts` 11/0, `loginom-host-lease.test.ts` 8/0; N5, N6 — случаи `compaction` в
+`loginom-package-docs.test.ts`, 3/0):
+
+```text
+=== N1  Host handshake awaited (ready всегда true)      dock-catalog 4/7: случай handshake (таймаут 30 с), остальные — каскадом
+                                                        (`LOGINOM_HOST_ALREADY_STARTED`: Host после таймаута не закрыт)
+=== N2  no lease on execution start                     host-lease 8/0 — не поймана
+=== N2' и N2 и каталог без аренды (ready всегда false)  host-lease 1/7: все случаи S2, привязка и G4
+=== N3  older generation replaces the registry          dock-catalog 11/0 — не поймана
+=== N4  generation change keeps old tools               dock-catalog 10/1: generations
+=== N5  compaction carries nothing                      package-docs 2/1: a completed compaction preserves…
+=== N6  carry without what the leading compaction carried  package-docs 2/1: то же (второе сжатие)
+```
+
+N2: аренду при старте исполнения берёт и хук `context` первого шага (чтение каталога), поэтому мутация B2.3 «аренда не
+берётся на `started`» (`guarantees.md`: 2/5) больше ничего не краснит; гарантию держат три пути, и без всех трёх S2 красный
+(N2'). Подписка на `started` осталась: она берёт аренду и тогда, когда каталог её не берёт (Host ещё в handshake). N3:
+Host по сценарию отвечает текущим поколением, прогон старого поколения не смоделирован.
+
 M19 до `869c527329` не ловилась: видимость держит `hide`, очистка реестра только убирает инструменты старого поколения из
 списка Location. Мутация «перенос считается без ведущего сжатия» на `c81efbe42e` (41/0, не поймана) показала лишнее
 условие: записи есть только под ID сообщений сжатия, и контекст начинается с последнего завершённого; условие убрано в
@@ -7300,36 +7335,37 @@ M19 до `869c527329` не ловилась: видимость держит `hi
 ### Приёмка
 
 Полные прогоны по одному пакету, `bun test` из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci`
-клиента сделан; `loginom-host` — под `xvfb-run -a`. База — числа задания для `39092e33a1`.
+клиента сделан; `loginom-host` — под `xvfb-run -a`. База — числа задания для `39092e33a1`. Итог — `7a652f0075`.
 
 | Пакет | База `39092e33a1` | Итог |
 |---|---|---|
-| `loginom-agent` | 53 pass, 0 fail | на `869c527329`: 58 pass (+5: `loginom-result.test.ts`), 0 fail |
-| `server` | 234 pass, 3 skip, 0 fail | на `869c527329`: 247 pass (+13: `loginom-dock-catalog` 10, `changed` в `loginom-local-file` 1, сжатие с откатом и контракт `compaction` в `loginom-package-docs` 2), 3 skip, 0 fail |
+| `loginom-agent` | 53 pass, 0 fail | 58 pass (+5: `loginom-result.test.ts`), 0 fail |
+| `server` | 234 pass, 3 skip, 0 fail | 249 pass (+15: `loginom-dock-catalog` 11, `changed` в `loginom-local-file` 1, сжатие с откатом и контракт `compaction` в `loginom-package-docs` 2, `S2 synthetic wake` в `loginom-host-lease` 1), 3 skip, 0 fail |
 | `loginom-host` | 538 pass, 13 skip, 5 fail | на `98c53f9425`: 539 pass, 12 skip, 5 fail — те же базовые (`cli-manifest` umask, три `bundled-ripgrep`, `managed-work-entry` под root); пакет не менялся (`git diff 39092e33a1 HEAD -- packages/loginom-host` пуст) и от `loginom-agent` не зависит, пропуск зависит от окружения, как в B2.2 |
-| `core` (`test/plugin/product.test.ts`, `test/location-layer.test.ts`) | — | 29 pass, 2 skip, 0 fail (без Host реестр Dock пуст, список инструментов location прежний) |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail (B2.3, B2.5c) | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
 | `cli` (`test/loginom-host.test.ts`, `ServiceHost.acquire` изменён) | 1 / 0 (B2.3) | 1 pass, 0 fail |
 
+После прогонов в `/root/.local/share/loginom-ai-agent-dev/tool-output` файлов нет (пустой каталог от случая большого
+ответа удалён вручную).
+
 ```text
-$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0; файлов upstream не менял
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # на 869c527329, код 0; файлов upstream не менял
 against a6b15d33daf6: 441 divergent upstream files
   CAT-05: 0 (pending: B2.5, B2.6, B2.9)
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                             # код 0
 $ bun install --frozen-lockfile
 Checked 1687 installs across 2060 packages (no changes)
-$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
-✓ No type errors in 222 files                                     # tsc --noEmit — код 0
-$ cd packages/server && bun run typecheck && bun run typecheck:tsc
-✓ No type errors in 1,633 files across 2 projects                 # tsc -b — код 0
-$ bun run check                                                   # на 869c527329, код 0
+$ cd packages/loginom-agent && bun run typecheck:tsc               # на 7a652f0075, код 0 (без конвейера)
+$ cd packages/server && bun run typecheck:tsc                      # tsc -b, код 0
+$ bun run check                                                   # на 7a652f0075, код 0
 Found 558 warnings and 0 errors.                                  # у изменённых файлов предупреждений oxlint нет
-sdk-docs: … 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total
 ```
 
-Сканер секретов на каждом коммите — `{"status":"clean",…}`. Паролей и ключей в тестах нет: Host по сценарию, подключение
-настоящего Node host — `unconfigured`.
+На `c81efbe42e` typecheck пакета `server` не проходил (ID сообщения плагина в `revert.stage`, `toBe` с `string | undefined`
+в новых случаях `loginom-package-docs.test.ts`); исправлено в `869c527329`. Сканер секретов на каждом коммите —
+`{"status":"clean",…}`. Паролей и ключей в тестах нет: Host по сценарию, подключение настоящего Node host — `unconfigured`.
 
 ### Где решал сам
 
@@ -7351,6 +7387,17 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - **Тесты шлюза B2.5a/b перенесены на Host по сценарию**, тест B2.3 про `loginom_file_admit` заменён случаем привязки: с
   условием 0.4 файловые инструменты без каталога Dock не предлагаются.
 
+### Согласовать с владельцем (общие контракты)
+
+- Аренда Host берётся уже при приёме промпта (если Host готов), а не только на `session.execution.started`; тест B2.3
+  «S2 interruption» ждёт вызова модели вместо аренды.
+- `ServiceHost.acquire` отклоняется с причиной отказа Host вместо `undefined`; новая функция `ServiceHost.connected()`.
+- Файловые инструменты B2.5a/b предлагаются только рядом с подготовленным Dock (условие 0.4); тесты шлюза B2.5a/b идут с
+  Host по сценарию, тест B2.3 про `loginom_file_admit` заменён случаем привязки.
+- Квитанции вложений — в хранилище плагина (ключ: сессия, сообщение, URI), а не в хранилище `loginom-host`
+  (`attachment-receipt.ts`) под `~/.local/state`.
+- При слиянии с B2.3b возможен конфликт в `packages/server/test/loginom-host-lease.test.ts` и `packages/loginom-agent/src/host.ts`.
+
 ### Найдено, не чинил
 
 - Квитанции и перенесённые сжатием вложения в хранилище плагина ничем не удаляются (как хранилище квитанций 0.4 и
@@ -7361,6 +7408,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   сжатия: при её подстановке вложения не переносятся, вызов снова спрашивает `read` (в безопасную сторону).
 - Реестр Dock — память экземпляра плагина: после перезапуска службы первый шаг первого исполнения получает инструменты
   через хук `prompt`; исполнение, возобновлённое `SessionRestart` без промпта, получает их со второго шага.
+- До handshake Host цикл событий аренды ждёт: `drop` ждёт обещание аренды, взятой на `started` (поведение B2.3).
+- Отказ реестра от старого поколения тестом не проверен: Host по сценарию отвечает текущим поколением.
 - Смена поколения посреди шага: запрос шага уже собран со старыми инструментами, вызов старого инструмента Host отклоняет
   сам (`run.catalog`).
 
@@ -7384,5 +7433,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Настоящий Loginom и браузерный runtime: инструменты браузера после `dock_prepare`, `dock_action_describe` от настоящего
   Host, смена поколения при переподключении — только Host по сценарию.
 - Скриншот для модели с изображениями, настоящая модель, Desktop, CLI, установленная сборка, Windows и macOS.
+- Автоматическое сжатие (по размеру контекста) — только ручное `compact`; что сообщение сжатия открыто в момент хука и при
+  автоматическом, — по коду (`SessionEvent.Compaction.Started` до сводки).
 - Хуки `compaction`/`generate` с каталогом сессии вне исполнения (после окончания исполнения каталог сессии забывается) —
   по коду.
