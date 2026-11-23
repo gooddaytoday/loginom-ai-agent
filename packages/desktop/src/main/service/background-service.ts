@@ -11,7 +11,7 @@ import { cleanStages } from "./cli-stages"
 import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
-import { serviceEnvironment, serviceFile } from "./service-identity"
+import { serviceEnvironment, serviceFile, stopService } from "./service-identity"
 import { takeSidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
@@ -40,6 +40,12 @@ export const layer = Layer.effect(
           const event = new SidecarChanged({ url: data.url })
           getMainWindows().forEach((win) => emitIpcEvent(win.webContents, event))
         },
+        // Loginom AI Agent (B4.10): the app's quit waits for this stop (`lifecycle/index.ts`).
+        stop: Effect.logInfo("stopping v2 CLI background service").pipe(
+          Effect.andThen(Effect.tryPromise(stopService)),
+          Effect.andThen(Effect.logInfo("v2 CLI background service stopped")),
+          Effect.catch((error) => Effect.logError("failed to stop v2 CLI background service", { error })),
+        ),
       }),
     )
   }),

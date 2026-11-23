@@ -41,6 +41,17 @@ export function serviceFile() {
 }
 
 /**
+ * Stops Desktop's own service, the one registered in `serviceFile()`, when the app quits (B4.10): the stop request of
+ * B2.3b first, which lets the service close its plugins and Loginom runtimes on Windows too, then SIGTERM and SIGKILL if
+ * it does not answer or exit in time. The service of OpenCode, of a CLI profile or of another channel is not touched.
+ */
+export async function stopService() {
+  const { Service } = await import("@opencode/client/service")
+
+  await Service.stop({ file: serviceFile() })
+}
+
+/**
  * What Desktop adds to the environment its service inherits. Both U5 variables always, never only when unset: a window
  * started from a CLI profile's terminal inherits the profile's. The service's Host keys its resource verification cache
  * with `version`, as 0.4's Desktop Host did with `app.getVersion()`.

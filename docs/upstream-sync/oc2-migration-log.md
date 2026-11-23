@@ -14485,3 +14485,338 @@ Found 554 warnings and 0 errors.                                      # в фа�
 - Значок окна на живом окне (Linux, Windows) и Dock установленного приложения на macOS: приложение не запускалось,
   macOS и Windows не собирались.
 - `Categories=Office` в ярлыке deb и AppImage — только тест конфига.
+
+## B4.10 Остановка службы с приложением
+
+23.11.2026. Ветка `b410-service-stop` от `oc2-migration` (`3685e795a2`), рабочее дерево `.claude/worktrees/b410`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, 1600 пакетов, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. Эталон
+0.4 — `v0.4.0`. Значки и `packages/desktop/script*` (B4.6) не трогал.
+
+Прочитано: решения В-87 и В-97 (п. 3 — сторож не здесь); этот журнал — B4.1 (п. 8 «Жизнь службы», строка B4.10), B2.3b,
+B4.9; LIFE-01 в `docs/testing/loginom-ai-agent/README.md`; план этапа B, B4; 0.4 — `desktop/src/main/{shutdown,index,server}.ts`
+и `test/loginom/shutdown-validation.mjs`; `.opencode/skills/unit-tests`, раздел Tests в `packages/{app,desktop}/AGENTS.md`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `f25a78f349` `feat(desktop): stop its own service when the app quits and keep windows from restarting it (B4.10)` | код, тесты, CAT-13 и CAT-09 |
+| `c43f7fcc9e` `docs(upstream-sync): record stopping Desktop's service with the app (B4.10)` | этот раздел |
+| `b05477c878` `test(desktop): wait for the own service's exit with a deadline in the quit test (B4.10)` | выход своей службы в тесте — ожидание со сроком 10 с, а не одно чтение `exitCode` (ниже) |
+| `d633fb19d7` `docs(upstream-sync): note the quit test's exit wait and what B4.10 leaves unchecked (B4.10)` | дополнения раздела |
+| `fe272663c6` `fix(desktop): quit through the app lifecycle on SIGINT and SIGTERM (B4.10)` | доработка по решению оркестратора: сигналы (ниже); CAT-09 |
+| следующий | раздел «Доработка: сигналы» |
+
+Файлы кода — четыре: `desktop/src/main/service/background-service-machine.ts` (+71 −2, upstream),
+`service/background-service.ts` (+7 −1, upstream, CAT-13), `lifecycle/index.ts` (+4 −1, upstream, CAT-09),
+`service/service-identity.ts` (+11, файл форка). Тесты: `background-service-machine.test.ts` (+144 −4),
+`service-identity.test.ts` (+65 −2).
+
+### Пункты задания
+
+| № | Было (`3685e795a2`) | Стало |
+|---|---|---|
+| 1. Остановка при выходе | участники `Shutdown` — только GUI-плагины; служба переживает выход (B0.4) | `BackgroundServiceMachine.make` — участник `Shutdown`, а не обработчик `before-quit`: так служба останавливается при любом выходе через автомат приложения — `before-quit`, выход из сеанса Windows (`session-end`), передача установщику обновления. `stop` участника: автомат — в `stopped`, ждёт попытки в полёте (`FiberSet.awaitEmpty`), затем `stopService()` из `service-identity.ts` — `Service.stop({ file: serviceFile() })` промис-клиента, мягкая остановка B2.3b. `resume` (неудачная передача обновлению) — новая попытка, окна переходят на новую службу. Бюджет — ниже |
+| 2. Переподключение во время выхода | закрытие окна обрывает поток событий, окно зовёт `AppReconnectService`, автомат запускает `Service.ensure("reconnect")` | состояние `stopped`: `connection.requested` и `reconnect.requested` отклоняются ошибкой «Background service is stopped» без команды `connect`, ожидающие в момент остановки — тоже; результат попытки в полёте отбрасывается (номер попытки). Окно на отказ ничего не ломает: поток событий повторяет `reconnect` раз в секунду (`client/src/solid/connection.ts`, `reconnectDelay`), пока окно не закрыто или автомат не возобновлён |
+| 3. Чужая служба | — | `stopService()` называет только `service-desktop.json` своего канала; клиент читает только этот файл, шлёт запрос и сигналы только pid из него и удаляет только его. Тест: живые процессы — служба OpenCode, `service.json` prod (`fallback()` клиента) и dev, служба профиля CLI, Desktop prod и beta — не тронуты |
+| 4. Windows | — | `Service.stop` промис-клиента (`client/src/promise/service.ts`, `terminate`) сначала шлёт `POST /api/experimental/service/stop` (B2.3b) и ждёт выхода; сигналы — только если служба не ответила за 2 с или не вышла за 70 с. Тест: своя служба получила запрос и вышла с кодом 0 без сигнала (на Windows сигнал — `TerminateProcess` с кодом 1). Стенд — B4.14c |
+
+**Попытка в полёте — главное место.** Закрытие окна в прогонах ниже каждый раз начинает переподключение (3 из 3, B0.4 —
+3 из 4), и оно ещё идёт, когда приходит `before-quit`. Промис `Service.ensure` не отменяется. Если остановить службу в
+это время, `ensure` увидит `stopping`, дождётся выхода и запустит новую службу — ровно то, что видел B0.4. Поэтому
+участник сначала закрывает автомат, потом ждёт попытки, и только затем останавливает службу. В журнале Desktop это
+видно: `starting v2 background service` (переподключение) → `ready` → `stopping` через 0–1 мс.
+
+### Бюджет
+
+| | 0.4 (`v0.4.0`) | B4.10 |
+|---|---|---|
+| Окна | `before-quit` сначала закрывает окна, до 2 с (`closeWindows`) | окна открыты, пока участники останавливаются (`before-quit` отложен автоматом v2), закрываются после |
+| Служба | sidecar получает `stop`; через 6 с — `child.kill()` (`SIDECAR_STOP_TIMEOUT`, `server.ts`) | `Service.stop`: запрос до 2 с, выход до 70 с, SIGTERM и 5 с, SIGKILL и 5 с — худший случай 82 с |
+| Host и Chromium | `loginomStarting.close()` в главном процессе со своими 30 с закрытия и 60 с на всё; внешнего срока у выхода нет | внутри службы: `dispose` плагина продукта (B2.3), срок службы 65 с (B2.3b) |
+| Срок выхода | нет; ручная проверка 0.4 ждала 12 с | `lifecycle/index.ts`: остановка участников — 90 с вместо 10 с (82 с и запас на службу, которую запускала попытка в полёте); возобновление — прежние 10 с |
+
+Выбран вариант «поднять бюджет» из раздела B2.3b, а не «отправить запрос и не ждать»: второму нужен публичный
+вариант `Service.stop` с другим ожиданием (правка `client`), и при нём Desktop уходил бы раньше, чем служба закроет
+Host. Ожидание до выхода службы — как в 0.4, где выход ждал закрытия Host.
+
+**Служба не отвечает в срок** — как в 0.4, её убивают: не ответила на запрос за 2 с — SIGTERM (на Windows
+`TerminateProcess`), через 5 с SIGKILL. Приняла запрос и зависла — выходит сама через 65 с (`SERVICE_STOP`), клиент ждёт до
+70 с и тоже переходит к сигналам. Если и 90 с не хватило (попытка в полёте съела бюджет) — `shutdown timed out, continuing
+anyway`, приложение выходит, служба может остаться до следующего запуска. В обычном случае остановка заняла 0,15–0,21 с.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `background-service-machine.test.ts` «a stop turns every caller away and drops the attempt in flight; a resume connects again» | из `reconnecting`: остановка отклоняет ждущего переподключения и открытое окно; новые `reconnect` и `connection` — отказ, без `connect`; поздний `connect.succeeded` — ничего; повторная остановка — ничего; `resume` — `connect` с новым номером в режиме `reconnect`, поздний результат старой попытки отброшен, результат новой — `publish`; без службы — первый `connect` |
+| там же «a quit stops the service once the attempt in flight settles, and no window starts it again» | настоящий `Shutdown.layer`: первое подключение висит на `Deferred`, `shutdown.stop`, затем окно просит переподключиться. До окончания попытки — только `ensure initial`, остановки нет; потом `settled initial`, `stop`; окно и переподключение — отказ, `publish` нет |
+| там же «a failed update handoff starts the service again and moves every window to it» | `connection` → A, `shutdown.stop`, `shutdown.resume`: `ensure reconnect`, `publish` B, следующее `connection` — B |
+| `service-identity.test.ts` «a quit stops only its own channel's service, by request and not by signal» | семь живых процессов фикстуры клиента (`client/test/fixture/service.ts`, режим `soft`: пишет `<файл>.soft-stop` на запрос и `<файл>.signal` на сигнал). Окно канала dev в отдельном процессе зовёт `stopService()`: своя служба — запрос, код 0, без сигнала, регистрации нет; `opencode/service.json`, `loginom-ai-agent/service.json`, `loginom-ai-agent-dev/{service,service-cli-0123abcd}.json`, `service-desktop.json` prod и beta — живы, без запроса и сигнала, файлы те же |
+
+Четыре прежних теста драйвера получили `Effect.provide(Shutdown.layer)`: автомат теперь берёт `Shutdown` из контекста.
+Время в тестах не выжидается: попытка держится `Deferred`, фикстура выходит через 50 мс после запроса; новый тест
+`service-identity` — 0,16 с. Устойчивость: `--rerun-each 20` — тест остановки 20/0, файл автомата 400/0. Подставные pid
+(`fakeService(1000 + …)`) в новом тесте не используются: клиент шлёт сигналы pid из файла, а прогоны — от root.
+
+`b05477c878`: тест читал `exitCode` своей службы один раз сразу после `stopService()`. На Linux pid пропадает только
+после того, как процесс теста его подберёт, поэтому `exitCode` к этому моменту уже есть (20 из 20). На Windows этой связи
+нет, и тест мог бы увидеть `running`. Теперь выход своей службы ждётся до 10 с, чужих — не ждётся. После правки:
+`--rerun-each 20` — 20/0; мутации MS3, MF1, MF2, MF3, MWin — снова по 1 fail, M0 — 24/0; весь `desktop` — 568 pass, 4 skip,
+0 fail.
+
+### Мутации
+
+`<scratchpad>/b410/mutate.py`: одна замена в коде, тесты обоих файлов, возврат исходного текста.
+
+```text
+=== M0 none: 24 pass / 0 fail
+=== MS1 the participant stop leaves the service running: 22 pass / 2 fail      # quit, handoff
+=== MS2 the machine is no Shutdown participant: 22 pass / 2 fail               # quit, handoff
+=== MS3 stopService stops nothing: 23 pass / 1 fail                            # only its own
+=== MR1 a reconnect during the stop starts the service again: 22 pass / 2 fail # stop turns away, quit
+=== MR2 the stop leaves the machine connected: 21 pass / 3 fail                # stop turns away, quit, handoff
+=== MW1 the stop does not wait for the attempt in flight: 23 pass / 1 fail     # quit
+=== MZ1 the resume starts nothing: 23 pass / 1 fail                            # handoff (по тайм-ауту 30 с)
+=== MF1 stopService names no file (the client fallback): 23 pass / 1 fail      # only its own
+=== MF2 stopService stops the beta channel's Desktop: 23 pass / 1 fail         # only its own
+=== MF3 stopService stops the channel's service.json: 23 pass / 1 fail         # only its own
+=== MWin stopService signals instead of the request: 23 pass / 1 fail          # only its own
+```
+
+Строку `stop: …stopService…` в `background-service.ts` (модуль импортирует `electron`) и бюджет в `lifecycle/index.ts`
+юнит-тесты не загружают; их проверяет собранное приложение ниже.
+
+### Собранное приложение
+
+`<scratchpad>/b410/build.sh` — как у B4.9: `npm ci --ignore-scripts` клиента `loginom-runtime/client`, встроенный CLI
+канала dev (`linux-x64-baseline`), `bun run build` Desktop с источниками Node 24.19.0 и Chromium
+`/root/.cache/loginom-wave2-browsers` (B4.8a), `electron-builder --linux dir`; 2 + 18 + 45 + 32 с, код 0.
+`<scratchpad>/b410/accept.sh`: root, `xvfb-run -a`, `--no-sandbox`, свой `LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и `HOME`;
+перед запуском порт 28290 свободен. Ждёт `service-desktop.json`, готовность Host (`startup-phases.jsonl`, его pid),
+`v2 CLI background service ready` в журнале окна и ещё 3 с, затем закрывает окно: `window.close()` в renderer через
+CDP (`--remote-debugging-port`, `<scratchpad>/b410/close.ts`) — как пользователь, который закрыл последнее окно (Linux:
+`window-all-closed` → `app.quit()`). Процессы — только по pid из файлов прогона и путям сборки и прогона, не по имени.
+
+```text
+== close1
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 1212513, http://127.0.0.1:28290
+host: pid 1212529, "status":"ready","duration_ms":4940
+service children: 1212529:MainThread
+closed 1 page(s): oc://renderer/index.html
+app exit: code 0 after .3250 s
+5 s later: service alive: [], host alive: [], children alive: []
+registration exists: no
+main.log: 72 lines; service and stop lines:
+  [2026-11-23 05:14:49.651] [info]  (main) starting v2 background service
+  [2026-11-23 05:14:50.120] [info]  (main)       v2 CLI background service starting { reason: 'missing' }
+  [2026-11-23 05:14:50.539] [info]  (main)       v2 CLI background service ready {
+  [2026-11-23 05:14:58.800] [info]  (main)       starting v2 background service
+  [2026-11-23 05:14:58.828] [info]  (main)       v2 CLI background service ready {
+  [2026-11-23 05:14:58.828] [info]  (main)       stopping v2 CLI background service
+  [2026-11-23 05:14:58.982] [info]  (main)       v2 CLI background service stopped
+service log: message="shutdown started" reason="service stop"
+left (by this build or run path): []
+== close2   app exit: code 0 after .3443 s; 5 s later: service, host, children — нет; registration exists: no;
+            starting (переподключение) 05:15:13.986 → ready .019 → stopping .019 → stopped .224; reason="service stop"; left: []
+== close3   app exit: code 0 after .3410 s; 5 s later: service, host, children — нет; registration exists: no;
+            starting 05:15:29.705 → ready .737 → stopping .738 → stopped .951; reason="service stop"; left: []
+```
+
+**3 из 3 закрытий чистые**: приложение выходит за 0,33–0,34 с от `window.close()`, через 5 с нет ни службы, ни Node Host
+(единственный потомок службы; Chromium в прогонах не запускался — подключения к Loginom не было), файла регистрации нет. Служба
+остановлена запросом (`reason="service stop"` в её журнале), а не сигналом. Переподключение, начатое закрытием окна,
+закончилось раньше остановки и службу не запустило: после `stopping` новых `starting` нет. Первый прогон до правки
+скрипта (таймер, путь журнала) дал то же: `starting` .516 → `ready` .543 → `stopping` .544 → `stopped` .748.
+
+**SIGTERM главному процессу — служба остаётся** (один прогон, `accept.sh sigterm1 sigterm`):
+
+```text
+SIGTERM to 1217038
+app exit: code 130 after .0921 s
+5 s later: service alive: [1217174 ], host alive: [1217190 ], children alive: [1217190 ]
+registration exists: yes
+```
+
+Причина — upstream, не B4.10: `NodeRuntime.runMain` (`desktop/src/main/desktop.ts`) сам слушает SIGINT и SIGTERM,
+прерывает главный fiber и зовёт `process.exit` (`@effect/platform-node-shared/src/NodeRuntime.ts`), не дожидаясь
+автомата приложения; обработчик SIGTERM в `lifecycle/index.ts` (`exit.requested`) не успевает. По коду на базе так же,
+и GUI-плагины тоже не останавливаются; базу не запускал. Остатки этого прогона убиты по pid (строка `left`). Ниже, в «Найдено».
+
+Сборка, прогоны, `out/`, `resources/{loginom,icons,opencode-cli,opencode-cli.version,*.metainfo.xml}`,
+`packages/cli/{dist,.cache}`, `packages/dashboard/dist` и `node_modules` клиента `loginom-runtime/client` удалены.
+
+### Приёмка
+
+База — те же файлы `packages/desktop` из `3685e795a2` в этом дереве (`git checkout 3685e795a2 -- packages/desktop`, после
+прогона — обратно на `f25a78f349`); падения сравнивались по JUnit.
+
+| Пакет | Команда | `3685e795a2` | `f25a78f349` |
+|---|---|---|---|
+| `desktop` | `bun typecheck` | 3 519 файлов, ошибок нет | то же |
+| `desktop` | `bun run typecheck:tsc` | — | код 0 |
+| `desktop` | `bun test --timeout 30000` | 564 pass, 4 skip, 0 fail | 568 pass (+4), 4 skip, 0 fail |
+
+`oxlint` изменённых файлов: одно предупреждение, то же, что на базе (`no-unknown-returns` у `cleanup` в
+`service-identity.test.ts`); `prettier --check` — чисто.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 485 divergent upstream files              # база — 483: +background-service-machine.ts и его тест; CAT-13: 25 (было 23), CAT-09: 35
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+```
+
+Итоговая проверка — на `f25a78f349` с этим разделом в рабочем дереве:
+
+```text
+$ bun run check                                                  # код 0, 18 с; turbo: 38 из 39 задач из кэша, desktop — заново
+Found 552 warnings and 0 errors.                                 # как на базе (B4.9); в изменённых файлах — только старое в тесте
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects [4.07s]
+ Tasks:    39 successful, 39 total
+```
+
+### Каталог
+
+`catalog.json`: в пути CAT-13 добавлены `desktop/src/main/service/background-service-machine.ts` и его тест (без этого их
+молча забирала маска CAT-09). `catalog.md`: CAT-13 — назначение (участник, `stopped`, ожидание попытки, `stopService`),
+почему не вынесено, компоненты, проверка при обновлении (тесты B4.10), политика; CAT-09 — бюджет 90 с в
+`lifecycle/index.ts` (`fork-owned`, не меньше худшего случая `Service.stop`), в «Не перенесено» — остановка при выходе
+сделана, сторож — B4.
+
+### Где решал сам
+
+- **Участник `Shutdown`, а не `before-quit`** — как рекомендовал B4.1: тот же путь у выхода из сеанса Windows и у
+  передачи установщику обновления, где `before-quit` нет или он не ждёт.
+- **Участника регистрирует автомат (`make`), а не `background-service.ts`.** Модуль с `electron` тесты не загружают;
+  в автомате мутации «нет участника» и «нет остановки» краснят тест. Автомат берёт `Shutdown.Service` из контекста.
+- **`stopService` — в файле форка `service-identity.ts`**, рядом с `serviceFile()`: выбор файла проверяется тестом с
+  настоящим клиентом. Это продуктовая функция, не шов для теста (её зовёт `background-service.ts`).
+- **Отказ, а не ожидание до `resume`.** Окно на отказ `reconnect` только повторяет его раз в секунду; ожидание до
+  `resume` пришлось бы снимать при `disposed` и при закрытии окна — больше кода ради того же итога.
+- **Бюджет 90 с на всех участников.** Отдельный срок только для службы — правка `shutdown.ts` или `plugin/index.ts`,
+  пятый и шестой файлы. Следствие — ниже.
+- **Сначала ждать попытку, потом останавливать**, а не останавливать сразу и повторять: повтор не закрывает гонку, если
+  `ensure` запустит службу после повторной проверки.
+
+### Найдено, не чинил
+
+- **(Исправлено доработкой `fe272663c6`.) SIGTERM и SIGINT главному процессу Electron** (`kill`, Ctrl+C в терминале, менеджер сеанса Linux) — приложение
+  выходит за 0,1 с с кодом 130, участники `Shutdown` не останавливаются, служба и Host остаются. Причина —
+  `NodeRuntime.runMain` в `desktop/src/main/desktop.ts` (upstream). Починка — свой `runMain` без обработки сигналов или
+  `teardown`, который ждёт автомат; это пятый файл кода и поведение upstream, решать в B4 (LIFE-01 требует штатного
+  закрытия, оно чистое).
+- **Окна видны, пока служба останавливается.** В v2 `before-quit` отложен до остановки участников, окна закрываются
+  после (в 0.4 — до). Обычно это 0,2 с; при зависшем Host — до 65–67 с открытого окна, которое показывает
+  переподключение.
+- **Зависший GUI-плагин** теперь держит выход до 90 с вместо 10 с.
+- **Окно, перезагруженное во время передачи обновлению**, получит ошибку запуска (отказ `connection.requested` в
+  `stopped`); окна, которые не перезагружались, после неудачной передачи переходят на новую службу.
+
+### Не проверено
+
+- Отказ **живому** окну в `stopped` на собранном приложении не наблюдался: во всех трёх прогонах окно уже закрыто, а его
+  переподключение пришло до остановки — прогоны доказывают ожидание попытки в полёте, не отказ. Отказ живому окну — это
+  выход через меню «Выход», Cmd+Q на macOS (единственный путь там) и передача обновлению; его доказывает только тест
+  драйвера.
+- (Снято доработкой.) Для B4.14b: проверка LIFE-01 должна закрывать приложение окном или `app.quit()`. Сигналом (так же, как выход из сеанса
+  Linux) LIFE-01 красный, пока не исправлен `runMain` (раздел «Найдено»).
+- Новые автотесты запускались только на Linux.
+- Windows и macOS: мягкая остановка при выходе на `winstand` — B4.14c; установленный Linux (AppImage, deb) — B4.14b.
+- Выход из сеанса Windows и передача установщику обновления на собранном приложении — только автомат и тесты; на
+  собранном — закрытие последнего окна (3 раза) и SIGTERM (1 раз).
+- Host с запущенными рантаймами и Chromium (подключение к Loginom) при выходе: в прогонах Host только проверял ресурсы.
+- Срок 90 с на собранном приложении (зависшая служба) не мерил: он сложен из сроков B2.3b, проверенных там.
+
+### Доработка: сигналы
+
+Решение оркестратора: пятый файл кода допустим; при SIGTERM и SIGINT главному процессу приложение проходит тот же путь
+`Shutdown`, что при закрытии окна.
+
+**0.4 (`v0.4.0`, `desktop/src/main/index.ts`).** Главный эффект запускался `Effect.runFork`, без `runMain`; свой
+обработчик `process.on("SIGINT" | "SIGTERM")` ставил признак выхода, ждал `stopSidecars()` (sidecar, прокси, Host) и
+только потом звал `app.quit()`. Сигнал шёл тем же путём остановки, что и `before-quit`.
+
+**v2 до правки.** Обработчик того же вида в `lifecycle/index.ts` есть (`exit.requested`, режим `quit`), но
+`NodeRuntime.runMain` в `desktop.ts` ставит свой: прерывает главный fiber и зовёт `process.exit(130)`
+(`@effect/platform-node-shared/src/NodeRuntime.ts`), не дожидаясь автомата приложения.
+
+**Правка — `desktop/src/main/desktop.ts`** (+13 −3, upstream, CAT-09; пятый файл кода). Главный эффект запускает свой
+`runMain` из `Runtime.makeRunMain` — тот же, что `NodeRuntime.runMain` (отчёт об ошибке, `keepAlive`, `teardown`,
+`process.exit` при ненулевом коде), но без обработчика сигналов. Сигнал теперь получает только `lifecycle/index.ts`:
+`exit.requested` → остановка участников (служба — мягко, в бюджете 90 с) → `app.quit()` → `will-quit` → главный fiber
+заканчивается с кодом 0. Как в 0.4.
+
+**Тест.** Юнит-теста у правки нет: `desktop.ts` — вход Electron, при импорте сразу строит слои с `electron`, тесты
+`desktop` его не загружают, а шов для теста запрещён (`packages/desktop/AGENTS.md`); перенос раннера в модуль без
+`electron` — шестой файл. Звенья цепочки покрыты: сигнал → `exit.requested` → `stop-plugins` — существующий
+`lifecycle/machine.test.ts`; участник → остановка своей службы — тесты B4.10 выше. Сам раннер проверяет собранное
+приложение; мутация — сборка `f25a78f349`, где тот же код с `NodeRuntime.runMain` (отличается только `desktop.ts`).
+
+Сборка — тот же `<scratchpad>/b410/build.sh` (2 + 19 + 34 + 26 с, код 0), прогоны — `accept.sh <тег> sigterm`:
+`kill -TERM` главному процессу через 3 с после готовности окна.
+
+```text
+== sigterm1
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 1241116, http://127.0.0.1:28290
+host: pid 1241133, "status":"ready","duration_ms":3814
+service children: 1241133:MainThread
+SIGTERM to 1240982
+app exit: code 0 after .3910 s
+5 s later: service alive: [], host alive: [], children alive: []
+registration exists: no
+  [2026-11-23 05:31:45.230] [info]  (main)       stopping v2 CLI background service
+  [2026-11-23 05:31:45.511] [info]  (main)       v2 CLI background service stopped
+service log: message="shutdown started" reason="service stop"
+left (by this build or run path): []
+== sigterm2   app exit: code 0 after .3597 s; 5 s later: service, host, children — нет; registration exists: no;
+              stopping 05:32:00.479 → stopped .751; reason="service stop"; left: []
+== sigterm3   app exit: code 0 after .3104 s; 5 s later: service, host, children — нет; registration exists: no;
+              stopping 05:32:15.718 → stopped .941; reason="service stop"; left: []
+== мутация: сборка f25a78f349 (NodeRuntime.runMain), sigterm1 — раздел «Собранное приложение» выше
+SIGTERM to 1217038
+app exit: code 130 after .0921 s
+5 s later: service alive: [1217174 ], host alive: [1217190 ], children alive: [1217190 ]
+registration exists: yes
+```
+
+**3 из 3 `kill -TERM` чистые**: приложение выходит с кодом 0 за 0,31–0,39 с, через 5 с нет ни службы, ни Node Host,
+регистрации нет, служба остановлена запросом. На мутации — код 130 за 0,09 с, служба и Host живы, регистрация на месте.
+Закрытие окна с новым раннером (`accept.sh close4 close`) — как раньше: код 0 за 0,36 с, службы, Host и регистрации нет,
+`reason="service stop"`. В прогонах с сигналом окно было открыто во время остановки; новых `starting` после `stopping`
+в журнале нет, а попыток переподключения окна журналы не пишут (строк «Background service is stopped» нет ни в
+`main.log`, ни в `renderer.log`), поэтому отказ живому окну по-прежнему показан только тестом драйвера.
+
+Сборка, прогоны и артефакты удалены, как выше.
+
+Приёмка после доработки (`fe272663c6`):
+
+| Пакет | Команда | `3685e795a2` | `fe272663c6` |
+|---|---|---|---|
+| `desktop` | `bun typecheck`; `bun run typecheck:tsc` | ошибок нет; — | 3 519 файлов, ошибок нет; код 0 |
+| `desktop` | `bun test --timeout 30000` | 564 pass, 4 skip, 0 fail | 568 pass, 4 skip, 0 fail |
+
+`oxlint` `desktop.ts` — 0 предупреждений, `prettier` — чисто.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 486 divergent upstream files              # +desktop.ts (CAT-09): до доработки 485, база 483
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, 18 с; на fe272663c6 с этим разделом; turbo: 38 из 39 из кэша, desktop — заново
+Found 552 warnings and 0 errors.                                 # как на базе
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects [4.03s]
+ Tasks:    39 successful, 39 total
+```
+
+Каталог: CAT-09 — назначение (раннер без сигналов в `desktop.ts`, сигнал идёт путём закрытия окна), проверка при
+обновлении (только собранным приложением), политика (`fork-owned`; перейти на вариант upstream, если тот сам поведёт
+сигналы через автомат).
+
+Не проверено после доработки: SIGINT отдельно не посылал (тот же обработчик в `lifecycle/index.ts` и тот же раннер);
+сигнал до того, как слой `ApplicationLifecycle` поставил свой обработчик (первые доли секунды запуска), теперь
+никакой обработчик JS не ловит — что тогда делает Electron, не проверял (до правки `runMain` выходил с кодом 130); выход из сеанса Linux настоящим менеджером сеанса — нет, только
+`kill -TERM`; Windows сигналов этого вида не шлёт (`session-end` — B4.14c).

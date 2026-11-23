@@ -48,12 +48,15 @@ const runtime = Layer.effect(
     const exits = new Set<NodeJS.Immediate>()
 
     // A hung step would otherwise leave every quit, or the app after a failed handoff, waiting on it forever.
+    // Loginom AI Agent (B4.10): the stop waits for the background service to close its Loginom runtimes (Host: up to
+    // 60 s) and exit. `Service.stop` gives it 2 s to accept the request and 70 s to exit, then SIGTERM and SIGKILL for
+    // 5 s each: 82 s, plus a service an attempt in flight was starting.
     const driver = createDriver({
       stop: () =>
         runPromise(
           shutdown.stop.pipe(
             Effect.timeoutOrElse({
-              duration: "10 seconds",
+              duration: "90 seconds",
               orElse: () => Effect.logError("shutdown timed out, continuing anyway"),
             }),
           ),

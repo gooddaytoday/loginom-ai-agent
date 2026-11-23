@@ -1,6 +1,7 @@
 export * as BackgroundServiceMachine from "./background-service-machine"
 
 import { Cause, Effect, Exit, FiberSet } from "effect"
+import { Shutdown } from "../lifecycle/shutdown"
 import type { SidecarCredentials } from "./sidecar-credentials"
 
 type Data = SidecarCredentials.Data
@@ -40,6 +41,12 @@ export type State =
    * service reached before it, if any.
    */
   | { readonly status: "failed"; readonly attempt: number; readonly error: Error; readonly last: Data | undefined }
+  /**
+   * Loginom AI Agent (B4.10): the app stops its service before it quits or hands off to an update. Every caller is
+   * turned away, so no window starts the service again, and a result of an attempt in flight is dropped. `last` is the
+   * service reached before, which `resume.requested` replaces.
+   */
+  | { readonly status: "stopped"; readonly attempt: number; readonly last: Data | undefined }
   | { readonly status: "disposed" }
 
 export type Event =
@@ -51,6 +58,8 @@ export type Event =
   | { readonly type: "connect.failed"; readonly attempt: number; readonly error: Error }
   | { readonly type: "verify.succeeded"; readonly attempt: number; readonly data: Data }
   | { readonly type: "verify.failed"; readonly attempt: number; readonly error: Error }
+  | { readonly type: "stop.requested" }
+  | { readonly type: "resume.requested" }
   | { readonly type: "disposed" }
 
 export type Command =
@@ -66,6 +75,8 @@ export type Transition = {
 }
 
 const DISPOSED_ERROR = new Error("Background service is disposed")
+
+const STOPPED_ERROR = new Error("Background service is stopped")
 
 export function initialTransition(): Transition {
   return {
@@ -86,6 +97,14 @@ export function transition(state: State, event: Event): Transition {
     return {
       state: { status: "disposed" },
       commands: reject(pending(state), DISPOSED_ERROR),
+    }
+
+  if (state.status === "stopped") return stopped(state, event)
+
+  if (event.type === "stop.requested")
+    return {
+      state: { status: "stopped", attempt: state.attempt, last: active(state) },
+      commands: reject(pending(state), STOPPED_ERROR),
     }
 
   if (state.status === "connecting") return connecting(state, event)
@@ -220,12 +239,42 @@ function ready(state: Extract<State, { status: "ready" }>, event: Event): Transi
   return unchanged(state)
 }
 
+function stopped(state: Extract<State, { status: "stopped" }>, event: Event): Transition {
+  if (event.type === "connection.requested" || event.type === "reconnect.requested")
+    return { state, commands: [{ type: "reject", replies: [event.reply], error: STOPPED_ERROR }] }
+
+  if (event.type !== "resume.requested") return unchanged(state)
+
+  const attempt = state.attempt + 1
+
+  // A failed handoff keeps the windows open: they move to the service this attempt starts.
+  if (state.last)
+    return {
+      state: { status: "reconnecting", attempt, data: state.last, waiters: [], joiners: [] },
+      commands: [{ type: "connect", attempt, mode: "reconnect" }],
+    }
+
+  return {
+    state: { status: "connecting", attempt, waiters: [] },
+    commands: [{ type: "connect", attempt, mode: "initial" }],
+  }
+}
+
 function resolve(replies: readonly Reply[], data: Data): Command[] {
   return replies.length > 0 ? [{ type: "resolve", replies, data }] : []
 }
 
 function reject(replies: readonly Reply[], error: Error): Command[] {
   return replies.length > 0 ? [{ type: "reject", replies, error }] : []
+}
+
+/** The service callers are using, if any. */
+function active(state: State) {
+  if (state.status === "ready" || state.status === "reconnecting") return state.data
+
+  if (state.status === "failed") return state.last
+
+  return undefined
 }
 
 /** Every caller still waiting on an attempt. */
@@ -251,7 +300,8 @@ function unchanged(state: State): Transition {
 
 /**
  * Runs the machine for the scope's lifetime. The initial connect starts at once, in the background: windows are
- * created as soon as the main process is up, and their renderers load while the CLI service is resolved.
+ * created as soon as the main process is up, and their renderers load while the CLI service is resolved. The service
+ * stops with the app, as a `Shutdown` participant.
  */
 export const make = Effect.fn("BackgroundServiceMachine.make")(function* (input: {
   /** The compatible service the entry module found, if any. */
@@ -259,7 +309,10 @@ export const make = Effect.fn("BackgroundServiceMachine.make")(function* (input:
   readonly ensure: (mode: ConnectMode) => Effect.Effect<Data, unknown>
   /** Called when the active service changes. */
   readonly publish: (data: Data) => void
+  /** Loginom AI Agent (B4.10): stops the service `ensure` starts. */
+  readonly stop: Effect.Effect<void>
 }) {
+  const shutdown = yield* Shutdown.Service
   const fibers = yield* FiberSet.make()
   const run = yield* FiberSet.runtime(fibers)()
   const initial = initialTransition()
@@ -341,7 +394,23 @@ export const make = Effect.fn("BackgroundServiceMachine.make")(function* (input:
       return Effect.sync(() => dispatch({ type: "waiter.cancelled", reply }))
     })
 
-  yield* Effect.addFinalizer(() => Effect.sync(() => dispatch({ type: "disposed" })))
+  // Loginom AI Agent (B4.10, decision В-87): the service stops with the app, as 0.4's sidecar did. Callers are turned
+  // away first, so a window whose event stream the stop breaks does not start the service again. An attempt in flight
+  // settles before the stop: `Service.ensure` cannot be cancelled, and it starts a new service once the old one is gone.
+  const remove = yield* shutdown.add({
+    stop: Effect.sync(() => dispatch({ type: "stop.requested" })).pipe(
+      Effect.andThen(FiberSet.awaitEmpty(fibers)),
+      Effect.andThen(input.stop),
+    ),
+    resume: Effect.sync(() => dispatch({ type: "resume.requested" })),
+  })
+
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      remove()
+      dispatch({ type: "disposed" })
+    }),
+  )
   initial.commands.forEach(perform)
 
   return {
