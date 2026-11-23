@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { it } from "../../core/test/lib/effect"
 import { ServerProcess } from "../src/process"
@@ -257,5 +257,49 @@ it.live("server info lists remote URLs alongside local addresses while they are 
     expect((yield* info()).urls).toEqual([base, "https://example.opentunnel.xyz"])
     remote.urls = []
     expect((yield* info()).urls).toEqual([base])
+  }),
+)
+
+// Loginom AI Agent (B2.3b): the soft stop of a managed service.
+it.live("a managed service shuts down on an authenticated stop request only", () =>
+  Effect.gen(function* () {
+    const server = yield* ServerProcess.start<never, never>(
+      { hostname: "127.0.0.1", port: 0, password: "secret", database: { path: ":memory:" } },
+      { onListen: () => Effect.succeed(Effect.void) },
+    )
+    const stop = (authorization?: string) =>
+      Effect.promise(() =>
+        fetch(new URL("/api/experimental/service/stop", HttpServer.formatAddress(server.address)), {
+          method: "POST",
+          headers: authorization ? { authorization } : undefined,
+        }),
+      )
+
+    expect((yield* stop()).status).toBe(401)
+    expect((yield* stop(`Basic ${btoa("opencode:wrong")}`)).status).toBe(401)
+    expect(yield* server.shutdown.pipe(Effect.timeoutOption("200 millis"))).toEqual(Option.none())
+
+    expect((yield* stop(`Basic ${btoa("opencode:secret")}`)).status).toBe(202)
+    yield* server.shutdown.pipe(Effect.timeout("5 seconds"))
+  }),
+)
+
+it.live("a server without a managed lifecycle has no stop request", () =>
+  Effect.gen(function* () {
+    const server = yield* ServerProcess.start<never, never>({
+      hostname: "127.0.0.1",
+      port: 0,
+      password: "secret",
+      database: { path: ":memory:" },
+    })
+    const response = yield* Effect.promise(() =>
+      fetch(new URL("/api/experimental/service/stop", HttpServer.formatAddress(server.address)), {
+        method: "POST",
+        headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+      }),
+    )
+
+    expect(response.status).toBe(404)
+    expect(yield* server.shutdown.pipe(Effect.timeoutOption("200 millis"))).toEqual(Option.none())
   }),
 )

@@ -211,6 +211,49 @@ test("signals an unresponsive registered service process", async () => {
   expect(await Bun.file(registration).exists()).toBe(false)
 })
 
+// Loginom AI Agent (B2.3b): the stop request comes first; signals only follow when it fails.
+test("stop asks the service to exit before signalling it", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const existing = fixture.spawn("soft")
+  await fixture.waitForFile()
+
+  await run(stop({ file: registration }))
+
+  expect(await existing.exited).toBe(0)
+  expect(await Bun.file(registration + ".soft-stop").exists()).toBe(true)
+  expect(await fixture.signal()).toBeUndefined()
+  expect(await Bun.file(registration).exists()).toBe(false)
+})
+
+test("stop signals a service that accepted the stop request but does not exit", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const existing = fixture.spawn("soft-hung")
+  await fixture.waitForFile()
+
+  await run(stop({ file: registration }))
+
+  expect(await existing.exited).toBe(stoppedExitCode)
+  expect(await Bun.file(registration + ".soft-stop").exists()).toBe(true)
+  expect(await fixture.signal()).toBe(stopSignal)
+  expect(await Bun.file(registration).exists()).toBe(false)
+})
+
+test("stop signals a service that does not answer the stop request", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const existing = fixture.spawn("stop-hanging")
+  await fixture.waitForFile()
+
+  await run(stop({ file: registration }))
+
+  expect(await existing.exited).toBe(stoppedExitCode)
+  expect(await Bun.file(registration + ".soft-stop").exists()).toBe(true)
+  expect(await fixture.signal()).toBe(stopSignal)
+  expect(await Bun.file(registration).exists()).toBe(false)
+})
+
 test("stop escalates when the registration disappears before the process exits", async () => {
   await using fixture = await serviceFixture()
   const registration = fixture.registration

@@ -25,5 +25,7 @@ const hung = LayerNode.make({
 Effect.gen(function* () {
   yield* ShutdownDeadline.install(Number(process.argv[2]))
   yield* Layer.build(LayerNode.compile(hung))
+  // Loginom AI Agent (B2.3b): `arm` stands for a service asked to stop without a signal; teardown starts at once.
+  if (process.argv[3] === "arm") return yield* ShutdownDeadline.arm(Number(process.argv[2]), "service stop")
   return yield* Effect.never
 }).pipe(Effect.scoped, NodeRuntime.runMain)

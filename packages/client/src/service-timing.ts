@@ -6,6 +6,7 @@ export type EnsureTiming = {
   readonly promiseTimeout: number
   readonly stopPollInterval: number
   readonly stopPollAttempts: number
+  readonly softStopTimeout: number
 }
 
 const timings = new WeakMap<object, EnsureTiming>()
@@ -21,6 +22,10 @@ export const defaultEnsureTiming: EnsureTiming = {
   promiseTimeout: 120_000,
   stopPollInterval: 50,
   stopPollAttempts: 100,
+  // Loginom AI Agent (B2.3b): how long a service that accepted the stop request may take to close its plugins before the
+  // signals. Host closes its runtimes within 60 s and the service bounds its own teardown at 65 s
+  // (`SERVICE_STOP` in cli/src/shutdown-deadline.ts), so a stuck service exits on its own before this runs out.
+  softStopTimeout: 70_000,
 }
 
 export function ensureTiming(options: object) {

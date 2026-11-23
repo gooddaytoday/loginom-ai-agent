@@ -47,10 +47,7 @@ export function same(left: Info, right: Info) {
 
 /** Ask a registered owner for its health and classify the answer. */
 export async function probeResult(info: Info, timeout = defaultEnsureTiming.requestTimeout) {
-  const endpoint = {
-    url: info.url,
-    auth: info.password === undefined ? undefined : { type: "basic", username: "opencode", password: info.password },
-  } satisfies Endpoint
+  const endpoint = endpointOf(info)
   const signal = AbortSignal.timeout(timeout)
   const result = await fetch(new URL("/api/info", info.url), { headers: headers(endpoint), signal })
     .then(async (response) => ({
@@ -87,6 +84,28 @@ export async function probeResult(info: Info, timeout = defaultEnsureTiming.requ
     } satisfies LocalService,
     timedOut: false,
   }
+}
+
+/**
+ * Ask a registered owner to close its plugins and exit (Loginom AI Agent, B2.3b). True only when it accepted; awaiting the
+ * exit is the caller's part. An older service without the request answers 404, a hung one not at all.
+ */
+export async function requestStop(info: Info, timeout = defaultEnsureTiming.requestTimeout) {
+  return fetch(new URL("/api/experimental/service/stop", info.url), {
+    method: "POST",
+    headers: headers(endpointOf(info)),
+    signal: AbortSignal.timeout(timeout),
+  }).then(
+    (response) => response.ok,
+    () => false,
+  )
+}
+
+function endpointOf(info: Info) {
+  return {
+    url: info.url,
+    auth: info.password === undefined ? undefined : { type: "basic", username: "opencode", password: info.password },
+  } satisfies Endpoint
 }
 
 /** Create HTTP authentication headers for a service endpoint. */

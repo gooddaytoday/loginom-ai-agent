@@ -4,7 +4,7 @@ import { contenderPool, spawnServiceContender } from "../service-contender.js"
 import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service-timing.js"
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
-import { decide, fallback, headers, probeResult, same } from "../service-probe.js"
+import { decide, fallback, headers, probeResult, requestStop, same } from "../service-probe.js"
 
 export * from "../service.js"
 export { headers }
@@ -165,8 +165,8 @@ const registered = Effect.fnUntraced(function* (file?: string, timeout?: number)
 
 // 50ms cadence bounded at ~5s, shared by stop escalation and each ensure
 // discovery window.
-const poll = (timing: EnsureTiming) =>
-  Schedule.max([Schedule.spaced(timing.stopPollInterval), Schedule.recurs(timing.stopPollAttempts)])
+const poll = (timing: EnsureTiming, attempts = timing.stopPollAttempts) =>
+  Schedule.max([Schedule.spaced(timing.stopPollInterval), Schedule.recurs(attempts)])
 
 const signal = (pid: number, name: NodeJS.Signals) =>
   Effect.try({ try: () => process.kill(pid, name), catch: (cause) => cause }).pipe(Effect.ignore)
@@ -182,8 +182,16 @@ const stopped = Effect.fnUntraced(function* (pid: number) {
 const terminate = Effect.fnUntraced(function* (info: Info, options: { readonly file?: string }, timing: EnsureTiming) {
   const current = yield* read(options.file)
   if (current === undefined || !same(current, info)) return
-  yield* signal(info.pid, "SIGTERM")
-  const done = yield* stopped(info.pid).pipe(Effect.retry(poll(timing)), Effect.option)
+  // Loginom AI Agent (B2.3b): ask the service to close its plugins and exit; signals are the fallback. On Windows
+  // SIGTERM ends the process at once, so only the request lets plugins clean up there.
+  const exited = (yield* Effect.promise(() => requestStop(info, timing.requestTimeout)))
+    ? yield* stopped(info.pid).pipe(
+        Effect.retry(poll(timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval))),
+        Effect.option,
+      )
+    : Option.none()
+  if (Option.isNone(exited)) yield* signal(info.pid, "SIGTERM")
+  const done = Option.isSome(exited) ? exited : yield* stopped(info.pid).pipe(Effect.retry(poll(timing)), Effect.option)
   // The registration can disappear or change hands before this process exits. Only the PID we
   // signalled can tell us whether it has stopped, so escalate based on that process.
   if (Option.isNone(done)) {

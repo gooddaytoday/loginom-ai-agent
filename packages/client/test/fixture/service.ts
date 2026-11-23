@@ -70,6 +70,19 @@ const server = Bun.serve({
     }
     if (pathname === "/api/experimental/persistent-pty/handoff" && mode === "handoff-broken")
       return new Response(null, { status: 500 })
+    // Loginom AI Agent (B2.3b): the stop request. `soft` exits once it answers, `soft-hung` answers and keeps running,
+    // `stop-hanging` never answers.
+    if (
+      pathname === "/api/experimental/service/stop" &&
+      (mode === "soft" || mode === "soft-hung" || mode === "stop-hanging")
+    ) {
+      if (request.method !== "POST" || request.headers.get("authorization") !== "Basic " + btoa("opencode:private"))
+        return new Response(null, { status: 401 })
+      await writeFile(registration + ".soft-stop", "")
+      if (mode === "stop-hanging") return new Promise<Response>(() => {})
+      if (mode === "soft") setTimeout(() => void shutdown(), 50)
+      return new Response(null, { status: 202 })
+    }
     if (pathname !== "/api/info") return new Response(null, { status: 404 })
     if (mode === "protocol" && (await Bun.file(registration + ".missing-health").exists()))
       return new Response(null, { status: 404 })
