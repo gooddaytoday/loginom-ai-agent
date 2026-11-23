@@ -665,8 +665,17 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       path.join(project, "input.csv"),
     ]
     const stdin = "Построй сценарий."
+    // The flags its environment sets for the CLI (lines 127-134); the explicit resources stand in for those of the built
+    // CLI, which a source run does not locate.
+    const env = {
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
+      LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT: "1",
+      LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS: "1",
+      LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS: "1",
+    }
     const refused = async (code: string, exit: number) => {
-      const result = await run(fixture, args, { stdin })
+      const result = await run(fixture, args, { stdin, env })
       expect({ code: result.code, stderr: result.stderr }).toEqual({ code: exit, stderr: code + "\n" })
       expect(result.events.at(-1)).toMatchObject({ type: "error", error: { name: code, data: { message: code } } })
       expect(llm.hits.count).toBe(0)
@@ -685,7 +694,7 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     await refused("LOGINOM_CONNECTION_NOT_READY", 1)
     await fs.rm(path.join(fixture.root, "fail-help"))
 
-    const ready = await run(fixture, args, { stdin })
+    const ready = await run(fixture, args, { stdin, env })
     expect({ code: ready.code, stderr: ready.stderr }).toEqual({ code: 0, stderr: "" })
     expect(ready.events.filter((event) => event.type === "text").at(-1)?.part.text).toBe("Сценарий готов.")
     const first = JSON.stringify(llm.requests[0]?.messages)
@@ -694,6 +703,16 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     // The checks never started the browser.
     expect((await records(fixture.validations)).length).toBe(logins)
     expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+    // The skill grants its task the `loginom-automation` profile, which offers no subagent (`loginom-agent/src/access.ts`);
+    // an ordinary run of the same profile offers one.
+    const tools = (index: number) =>
+      (llm.requests[index]?.tools as { function: { name: string } }[]).map((tool) => tool.function.name)
+    expect(tools(0)).not.toContain("subagent")
+    const offered = llm.requests.length
+    expect(
+      (await run(fixture, ["--format", "json", "--model", "test/test-model", "--dir", project, "--", "hi"])).code,
+    ).toBe(0)
+    expect(tools(offered)).toContain("subagent")
 
     // A skill the catalog lacks fails the run before the model, as an unknown command failed 0.4's.
     const hits = llm.hits.count
