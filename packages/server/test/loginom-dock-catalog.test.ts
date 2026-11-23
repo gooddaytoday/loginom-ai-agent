@@ -314,16 +314,19 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
     "a failed catalog request adds nothing and tells the model the failure; a refused lease too",
     () =>
       Effect.gen(function* () {
-        const failure = {
-          tools: "LOGINOM_KNOWLEDGE_UNAVAILABLE" as string | undefined,
-          acquire: undefined as string | undefined,
-        }
+        const failure = { tools: undefined as string | undefined, acquire: undefined as string | undefined }
         const host = scriptedHost({
           catalog: () => [dockTool("find"), dockTool("dock_prepare")],
           tools: () => failure.tools,
           acquire: () => failure.acquire,
         })
         const test = yield* boot(host)
+        // Another session's run already brought these tools into the Location's registry.
+        const other = yield* test.create("registered")
+        yield* test.wizard(other, script({ text: "end" }))
+        expect(loginom((yield* test.requests(other))[0])).toEqual(["loginom_dock_prepare", "loginom_find"])
+
+        failure.tools = "LOGINOM_KNOWLEDGE_UNAVAILABLE"
         const id = yield* test.create("failed catalog")
         yield* test.wizard(id, script({ text: "end" }))
         const [failed] = yield* test.requests(id)
