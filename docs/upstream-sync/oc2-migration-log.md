@@ -8323,7 +8323,8 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 | `82ebab48b8` `feat(loginom-host): build the CLI artifact from the product CLI of OpenCode 2 (B2.7a2)` | `loginom-host/script/build-cli.ts` (+8 −8, файл форка) | `clean` |
 | `d0cd88c5bd` `feat(cli): give a built product CLI's server the resources next to its binary (B2.7a2)` | файл форка `cli/src/resources.ts`; правка upstream `cli/src/server-process.ts` (+3, CAT-07); `cli/package.json` и `bun.lock` (+1 и +1, CAT-01); тест `cli/test/cli-resources.test.ts` | `clean` |
 | `b7c385f143` `test(cli): require Node, the Host entry and the product skills of a built CLI (B2.7a2, G5)` | случаи «артефакт без Node, входа Host, навыков продукта» и явное значение рядом с полным артефактом | `clean` |
-| следующий | этот раздел, строка G5 в `guarantees.md`, CAT-01, CAT-07, CAT-08 в `catalog.md` | |
+| `5c77f00dcc` `docs(upstream-sync): record the CLI artifact with Host resources (B2.7a2)` | этот раздел, строка G5 в `guarantees.md`, CAT-01, CAT-07, CAT-08 в `catalog.md` | `clean` |
+| следующий | холодный старт, сборка по умолчанию, распаковка не от root; `cli-resources.test.ts` в списке «`npm ci` клиента» `guarantees.md` | |
 
 ### B2.7a2: сборка
 
@@ -8396,6 +8397,11 @@ B2.7a10, комментарий в `cli/script/build.ts` — B2.7a1).
   манифеста) — `LOGINOM_BUNDLE_INCOMPLETE: …` в stderr и `WARN` в журнале, сервер работает без Host и навыков продукта.
 - Проверка — 3,4 с на каждом старте сервера (все 13 786 файлов артефакта): `serve` слушает через 0,45 с с явной
   переменной и через 3,8 с с поиском; `service start` — 5,1 с.
+- Проверка идёт до прослушивания порта. Холодный кеш страниц (только файлы артефакта сброшены `dd iflag=nocache count=0`,
+  `<scratchpad>/b27a2-runs/accept5.sh`): `service start` — 10,2 с (тёплый — 4,6 с), `run --standalone` — 12,5 с (тёплый —
+  10,2 с), оба код 0, модель ответила `OK`. Срок клиента — `promiseTimeout` 120 с (`client/src/service-timing.ts`); после
+  `spawnDelay` 5 с клиент запускает ещё одного соперника службы, тот видит защёлку `.writer` службы и выходит (B2.7c).
+  У частного сервера срока готовности нет.
 
 ### B2.7a2: Host и навыки в собранном CLI
 
@@ -8549,6 +8555,9 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   `Script.version` в `package.json` артефакта.
 - **Установщик 0.4 оставлен в артефакте** (`build-cli-installer`, строка 0.4 не менялась). Ставит ли CLI продукта он или
   `install` v2 — B2.7a8; здесь установщик не запускался.
+- **Сборка по умолчанию не изменилась.** `server-process.ts` общий с CLI Desktop: `build.ts --single --skip-install
+  --skip-web-ui` без `--standalone` (канал `beta`) — `cli-linux-x64/bin/opencode` за 18 с, `serve --port 0` с пустыми HOME
+  и XDG слушает, stderr пуст (профиля нет — поиска нет).
 - **Ранбук `standalone-cli.md` не правил** (задание: только свой раздел журнала); его команда сборки с Bun 1.3.14 —
   историческая, на v2 — команда выше.
 - **Не перенесено из 0.4** (вне задания): `withBundledRipgrep` (ripgrep из ресурсов в окружение — B2.7a10 и `core`),
@@ -8583,3 +8592,7 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   в собранном CLI не вызывались.
 - TUI собранного бинарника.
 - Сборка в канале `beta`/`prod` с ресурсами — собирался только `dev`.
+- Распаковка не от root. Приёмка шла от root с `tar --same-permissions`. Режимы файлов — в манифесте: обычный `tar -xzf`
+  под umask 077 срезает 0755, а без root `tar` не восстановит 4755 у `chrome-sandbox` — проверка, вероятно, не пройдёт, и
+  сервер тихо (для службы — только в журнале) останется без Host. В 0.4 так же без установщика; установщик (B2.7a8) режимы
+  восстанавливает — не проверял.
