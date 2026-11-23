@@ -7741,7 +7741,9 @@ Found 558 warnings and 0 errors.                                  # у изме�
 |---|---|
 | `e4091feac7` `feat(loginom-agent): product permission kinds, defaults and the conversation grant (B2.6a)` | `packages/loginom-agent/src/permissions.ts` (новый), правила, хук и RPC в `src/index.ts`, ресурс вызова Dock в `src/dock.ts`; тесты `packages/loginom-agent/test/permissions.test.ts`, `packages/server/test/loginom-permissions.test.ts` (новые), случай в `loginom-dock-catalog.test.ts`, правки `loginom-package-docs.test.ts` и `loginom-access.test.ts` |
 | `14bbb5351a` `test(core): sessions that run shell commands turn the product's terminal on` | тесты upstream `packages/core/test/shell-restart.test.ts` (+4) и `packages/server/test/schedule.test.ts` (+5 −1), оба — в CAT-07 (`catalog.json`) |
-| следующий | этот раздел, CAT-05 и CAT-07 в `catalog.md`, уточнён комментарий к `external_directory` в `permissions.ts` |
+| `8a00e486df` `docs(upstream-sync): record B2.6a permission kinds and defaults` | этот раздел (первая версия), CAT-05 и CAT-07 в `catalog.md`, уточнён комментарий к `external_directory` в `permissions.ts` |
+| `203bee96c9` `test(sdk): the lazy provisioning case turns the product's terminal on and answers it` | тест upstream `packages/sdk/test/embedded.test.ts` (+12 −1), в CAT-07 |
+| следующий | уточнения этого раздела и CAT-07 в `catalog.md` |
 
 ### Виды действий и инструменты
 
@@ -7840,6 +7842,9 @@ Found 558 warnings and 0 errors.                                  # у изме�
   проверяет срабатывание проверок `run`, остальные случаи файла уже включали терминал так же.
 - upstream `core/test/shell-restart.test.ts`: четыре случая создают сессию с правилом `shell * allow` (без него модель не
   получает `shell`, и случаи ждали 30 с).
+- upstream `sdk/test/embedded.test.ts`, «blocks the model-selected first tool on lazy provisioning»: конфиг включает терминал
+  (`shell ask`), тест отвечает `once` на вопрос команды до ожидания подготовки рабочего пространства — вопрос задаётся раньше,
+  чем команда доходит до него (без этого: «first tool did not provision»).
 
 ### Мутации
 
@@ -7882,6 +7887,7 @@ M9 — «терминал по умолчанию выключен». Случа
 | `server` (`bun test`) | задание: 249 / 3 / 0; прогон здесь: 250 pass, 3 skip, 1 fail из 254 | 259 pass (+9: `loginom-permissions` 8, случай Dock 1), 3 skip, 1 fail из 263 — тот же `S2 synthetic wake` |
 | `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail (задание) | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
 | `cli` (`bun test --timeout 60000`) | 420 pass, 9 skip, 0 fail | 420 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | на `14bbb5351a`: 39 / 1 (`lazy provisioning`, см. «Тесты»); на `203bee96c9`: 40 pass, 0 fail |
 
 `server`, `S2 synthetic wake` (`loginom-host-lease.test.ts`, B2.5d): падает и в базе, если в том же процессе раньше прошёл
 `loginom-dock-catalog.test.ts` (`bun test test/loginom-dock-catalog.test.ts test/loginom-host-lease.test.ts` в дереве базы
@@ -7893,9 +7899,9 @@ M9 — «терминал по умолчанию выключен». Случа
 
 ```text
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary
-against a6b15d33daf6: 451 divergent upstream files       # код 0; база 450: + core/test/shell-restart.test.ts
+against a6b15d33daf6: 452 divergent upstream files       # код 0, на 203bee96c9; база 450: + shell-restart, embedded (sdk)
   CAT-05: 0 (pending: B2.5, B2.6, B2.9)
-  CAT-07: 8                                               # было 6: + shell-restart, schedule
+  CAT-07: 9                                               # было 6: + shell-restart, schedule, embedded
   CAT-12: 181                                             # было 182: schedule.test.ts перешёл в CAT-07
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                     # код 0
@@ -7939,7 +7945,15 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   «Разрешать в этом разговоре» (этап C).
 - Ресурсы вопросов Dock: `local_package` и тип узла вместо `*` у `dock_prepare` и `dock_node_apply`.
 - Таблица видов (выше): `loginom_file_admit` — чтение, `dashboard_delete` — сохранение, `external_directory` — чтение.
-- Тесты upstream в CAT-07: `core/test/shell-restart.test.ts`, `server/test/schedule.test.ts`.
+- Тесты upstream в CAT-07: `core/test/shell-restart.test.ts`, `server/test/schedule.test.ts`, `sdk/test/embedded.test.ts`.
+- **Каталоги продукта вне проекта теперь спрашивают «вне проекта».** `FileAccess` исключений не делает (по коду; тест —
+  чтение файла вне проекта): полный текст большого ответа в `<data>/tool-output` (на него указывают урезание ядра и
+  `dock.ts`), файлы рядом со `SKILL.md` встроенных навыков под `LOGINOM_AI_AGENT_RESOURCES`, план режима `plan`. Модель,
+  которая читает их `read`, получит вопрос `external_directory`. Предложение: узкие правила `allow` для
+  `<resources>/skills/*` и `<data>/tool-output/*` (оценка S; `classify` тогда искать с конца, как правила).
+- **Профили 0.4 после переноса (B3.2).** `permission: "allow"` или `{"*": "allow"}` становится правилом `* * allow` конфига
+  позже умолчаний и снимает все вопросы, кроме команды терминала агента; `bash: allow` (→ `shell allow`) включает терминал.
+  Что писал Desktop 0.4 в профиль, не проверял.
 
 ### Найдено, не чинил
 
@@ -7954,10 +7968,16 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Режим `plan` пишет план в `~/.loginom-ai-agent/plan` — вне проекта: теперь каждый раз спрашивает `external_directory`.
 - RPC на запрос, которого уже нет, отвечает ошибкой `rpc.internal`, а не объявленной ошибкой.
 - Вопрос подагента приходит в его подсессии: разрешение «в этом разговоре» родителя его не покрывает.
+- `server`, `S2 synthetic wake`: падает после `loginom-dock-catalog.test.ts` в том же процессе, в базе тоже (см. «Приёмка»).
+- Команда пользователя (`!cmd`, `core/src/session/shell.ts`) разрешений не спрашивает: выключенный терминал её не трогает,
+  как велит В-69 (по коду).
 
 ### Не проверено
 
 - Кнопки и тексты в окне (этап C), Desktop, CLI с `--dangerously-skip-permissions`, установленная сборка, Windows и macOS.
 - Настоящая модель и настоящий Host: вызовы Dock — Host по сценарию, `dashboard_*` — только таблица и API (B2.9).
-- Инструменты MCP, `experimental_image_generate`, `fetch` в CodeMode — по коду, тестом не проверены.
+- Действия настоящих инструментов проверены тестом только у `read` (`external_directory`) и `shell`; `edit`, `write`,
+  `patch` → `edit`, `webfetch`, `websearch`, `glob`, `grep`, MCP, `experimental_image_generate`, `fetch` в CodeMode — по коду,
+  умолчания для их действий — через API.
+- `explore` проверен запросами API от его имени (`agent: "explore"`), не через инструмент `subagent`.
 - Тесты `tui`, `desktop`, `simulation`, `sdk`.
