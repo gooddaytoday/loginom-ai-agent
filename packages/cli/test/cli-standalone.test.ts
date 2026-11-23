@@ -106,8 +106,9 @@ test("auth and models work in the profile without a Loginom connection and see o
   expect(models.stdout.split("\n")).toContain("test/test-model")
   expect(models.stdout).not.toContain("desktop/")
   expect(models.stdout).not.toContain("inherited/")
+  // The private server released the profile and started no Loginom runtime.
   expect(await fs.readdir(profile.root)).not.toContain(".writer")
-  expect(await fs.readdir(profile.loginom)).not.toContain("connection")
+  expect(await fs.readdir(profile.loginom)).not.toContain("runtime")
 }, 60_000)
 
 test.each([false, true])(
@@ -144,8 +145,8 @@ test.each([false, true])(
       expect(offered.length).toBeGreaterThan(0)
       for (const body of offered) expect(names(body.tools)).toContain("skill")
       expect(await fs.readdir(profile.root)).not.toContain(".writer")
-      for (const name of ["connection", "runtime", "knowledge"])
-        expect(await fs.readdir(profile.loginom)).not.toContain(name)
+      // No Loginom runtime or knowledge service was started for an ordinary answer.
+      for (const name of ["runtime", "knowledge"]) expect(await fs.readdir(profile.loginom)).not.toContain(name)
     } finally {
       await llm.server.stop(true)
     }
