@@ -79,15 +79,19 @@ const commands = {
 
     if (info.pid !== service.pid) throw Error("SERVICE_PID_MISMATCH")
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-    // The product plugin loads with the Location, so the bundled skills appear a few seconds after the first request.
 
+    // `{ location, data }` of the workspace's Location. The product plugin loads with the Location, so the bundled
+    // skills appear a few seconds after the first request.
     const skills = await until("BUNDLED_SKILLS_MISSING", deadline, async () => {
-      const response = await fetch(new URL(`/api/skill?directory=${encodeURIComponent(workspace)}`, service.url), {
-        headers: auth,
-        signal: AbortSignal.timeout(10_000),
-      })
+      const response = await fetch(
+        new URL(`/api/skill?location[directory]=${encodeURIComponent(workspace)}`, service.url),
+        {
+          headers: auth,
+          signal: AbortSignal.timeout(10_000),
+        },
+      )
 
-      return response.ok && checkBundledSkills(manifest, await response.json(), resources)
+      return response.ok && checkBundledSkills(manifest, (await response.json()).data, resources)
     })
 
     return { pid: service.pid, port: Number(new URL(service.url).port), version: info.version, skills }

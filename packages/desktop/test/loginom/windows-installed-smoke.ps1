@@ -63,7 +63,7 @@ function Test-StartupLog([string]$Text, [string]$Version) {
 }
 function Test-CrashLog([string]$Text) {
     # Remove only complete startup records, including their path metadata and closing brace.
-    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) crash reporter started \{(?:\r?\n +path: ''[^''\r\n]+''\r?\n\}| path: ''[^''\r\n]+'' \})\r?(?:\n|\z)'
+    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) +crash reporter started \{(?:\r?\n +path: ''[^''\r\n]+''\r?\n\}| path: ''[^''\r\n]+'' \})\r?(?:\n|\z)'
     return (-not [regex]::Replace($Text, $startupRecord, '').Trim())
 }
 function Test-RetiredEndpoint([string]$Directory, [string]$Ripgrep) {
@@ -102,10 +102,62 @@ function Get-ProcessRole($Process, [int]$Service, [string]$Install) {
     if ($Install -and $path.StartsWith($Install + '\', [StringComparison]::OrdinalIgnoreCase)) { return 'electron' }
     return 'other'
 }
+# Every process with its parent, and for the account's own processes the image path and command line. Not WMI: an
+# ordinary account over SSH gets "access denied" from root\cimv2 (0x80041003).
+function Process-Table {
+    if (-not ('SmokeProcesses' -as [type])) {
+        Add-Type @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class SmokeProcesses {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct Entry32 { public uint dwSize, cntUsage, th32ProcessID; public IntPtr th32DefaultHeapID; public uint th32ModuleID, cntThreads, th32ParentProcessID; public int pcPriClassBase; public uint dwFlags; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szExeFile; }
+    [StructLayout(LayoutKind.Sequential)] struct UnicodeString { public ushort Length, MaximumLength; public IntPtr Buffer; }
+    [DllImport("kernel32.dll")] static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint pid);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32FirstW(IntPtr snapshot, ref Entry32 entry);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32NextW(IntPtr snapshot, ref Entry32 entry);
+    [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageNameW(IntPtr process, uint flags, StringBuilder name, ref uint size);
+    [DllImport("ntdll.dll")] static extern int NtQueryInformationProcess(IntPtr process, int type, IntPtr buffer, int length, out int needed);
+    public class Item { public int ProcessId, ParentProcessId; public string Name, ExecutablePath, CommandLine; }
+    public static List<Item> List() {
+        var list = new List<Item>();
+        var snapshot = CreateToolhelp32Snapshot(2, 0);
+        var entry = new Entry32 { dwSize = (uint)Marshal.SizeOf(typeof(Entry32)) };
+        for (var more = Process32FirstW(snapshot, ref entry); more; more = Process32NextW(snapshot, ref entry)) {
+            var item = new Item { ProcessId = (int)entry.th32ProcessID, ParentProcessId = (int)entry.th32ParentProcessID, Name = entry.szExeFile };
+            var process = OpenProcess(0x1000, false, entry.th32ProcessID);
+            if (process != IntPtr.Zero) {
+                var name = new StringBuilder(1024); uint size = 1024;
+                if (QueryFullProcessImageNameW(process, 0, name, ref size)) item.ExecutablePath = name.ToString();
+                int needed; NtQueryInformationProcess(process, 60, IntPtr.Zero, 0, out needed);
+                if (needed > 0) {
+                    var buffer = Marshal.AllocHGlobal(needed);
+                    if (NtQueryInformationProcess(process, 60, buffer, needed, out needed) == 0) {
+                        var line = (UnicodeString)Marshal.PtrToStructure(buffer, typeof(UnicodeString));
+                        item.CommandLine = Marshal.PtrToStringUni(line.Buffer, line.Length / 2);
+                    }
+                    Marshal.FreeHGlobal(buffer);
+                }
+                CloseHandle(process);
+            }
+            list.Add(item);
+        }
+        CloseHandle(snapshot);
+        return list;
+    }
+}
+'@
+    }
+    @([SmokeProcesses]::List())
+}
 # The run's processes: descendants of the application and of its service (detached, so it can outlive the app's tree),
 # and anything started from the installation or userData, such as the service's stage copy of the CLI.
 function Owned([int]$Main, [int]$Service) {
-    $table = @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine)
+    $table = @(Process-Table)
     $mine = [Collections.Generic.HashSet[int]]::new()
     foreach ($id in @($Main, $Service)) { if ($id) { [void]$mine.Add($id) } }
     foreach ($entry in $table) {
@@ -120,7 +172,7 @@ function Owned([int]$Main, [int]$Service) {
         }
     } while ($changed)
     @($table | Where-Object { $mine.Contains([int]$_.ProcessId) -and $_.ProcessId -ne $PID } | ForEach-Object {
-        [pscustomobject]@{ pid=[int]$_.ProcessId; parent=[int]$_.ParentProcessId; name=$_.Name; role=(Get-ProcessRole $_ $Service $install) }
+        [pscustomobject]@{ pid=[int]$_.ProcessId; parent=[int]$_.ParentProcessId; name=$_.Name; path=$_.ExecutablePath; role=(Get-ProcessRole $_ $Service $install) }
     })
 }
 function Roles($List) {
@@ -129,8 +181,8 @@ function Roles($List) {
     return $roles
 }
 function Listening([int[]]$Ports) {
-    @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $Ports -contains $_.LocalPort } |
-        ForEach-Object { [int]$_.LocalPort } | Sort-Object -Unique)
+    @([Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() |
+        Where-Object { $Ports -contains $_.Port } | ForEach-Object { [int]$_.Port } | Sort-Object -Unique)
 }
 function Wait-For([scriptblock]$Condition, [int]$Seconds = $TimeoutSeconds) {
     $deadline = (Get-Date).AddSeconds($Seconds)
@@ -158,11 +210,11 @@ function Probe([string[]]$Arguments) {
     $output = Join-Path $RunRoot ('probe-' + [guid]::NewGuid().ToString('N') + '.json')
     & $node (Join-Path $PSScriptRoot 'windows-sidecar-smoke.mjs') @($Arguments + $output) | Out-Null
     $code = $LASTEXITCODE
-    $value = if (Test-Path -LiteralPath $output) { Get-Content -LiteralPath $output -Raw | ConvertFrom-Json } else { $null }
+    $value = if (Test-Path -LiteralPath $output) { Get-Content -LiteralPath $output -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
     if ($code -ne 0 -or -not $value -or $value.failure) { throw "probe $($Arguments[0]): exit $code $(if ($value) { $value.failure })" }
     return $value
 }
-function Visible-Windows([int]$Process) {
+function App-Windows([int]$Process) {
     if (-not ('SmokeWindows' -as [type])) {
         Add-Type @'
 using System;
@@ -178,15 +230,18 @@ public static class SmokeWindows {
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out Rect rect);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
-    // Visible top-level windows of the process larger than 100x100: not Chromium's helper windows.
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr window, StringBuilder name, int count);
+    // Top-level BrowserWindows of the process (Chromium's Chrome_WidgetWin_1) larger than 100x100, not its helper windows.
     public static List<string> List(uint pid) {
         var found = new List<string>();
         EnumWindows((window, state) => {
             uint owner; GetWindowThreadProcessId(window, out owner);
             Rect rect;
-            if (owner == pid && IsWindowVisible(window) && GetWindowRect(window, out rect) && rect.Right - rect.Left > 100 && rect.Bottom - rect.Top > 100) {
+            var kind = new StringBuilder(64);
+            if (owner == pid && GetClassName(window, kind, 64) > 0 && kind.ToString() == "Chrome_WidgetWin_1" &&
+                GetWindowRect(window, out rect) && rect.Right - rect.Left > 100 && rect.Bottom - rect.Top > 100) {
                 var text = new StringBuilder(512); GetWindowText(window, text, 512);
-                found.Add(window.ToInt64() + "|" + text + "|" + (rect.Right - rect.Left) + "x" + (rect.Bottom - rect.Top));
+                found.Add(window.ToInt64() + "|" + text + "|" + (rect.Right - rect.Left) + "x" + (rect.Bottom - rect.Top) + "|" + IsWindowVisible(window));
             }
             return true;
         }, IntPtr.Zero);
@@ -201,7 +256,7 @@ public static class SmokeWindows {
 '@
     }
     @([SmokeWindows]::List([uint32]$Process) | ForEach-Object {
-        $parts = $_.Split('|'); [pscustomobject]@{ title=$parts[1]; size=$parts[2] } })
+        $parts = $_.Split('|'); [pscustomobject]@{ title=$parts[1]; size=$parts[2]; visible=($parts[3] -eq 'True') } })
 }
 function Free-Port {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -233,9 +288,12 @@ function Launch([int]$Run, [int]$Previous) {
     $script:app = $app
     $observation.main = $app.Id
     try {
-        $window = Wait-For { $app.Refresh(); if ($app.HasExited) { throw "Desktop exited before its window: $($app.ExitCode)" }; @(Visible-Windows $app.Id) | Select-Object -First 1 }
+        # In session 0 (an SSH logon) the window station is not interactive: the app shows its window, but Windows never
+        # makes it visible there. Visibility is required only in an interactive session.
+        $window = Wait-For { $app.Refresh(); if ($app.HasExited) { throw "Desktop exited before its window: $($app.ExitCode)" }
+            @(App-Windows $app.Id | Where-Object { $_.visible -or -not $interactive }) | Select-Object -First 1 }
         if (-not $window) { throw 'APP_WINDOW_NOT_SHOWN' }
-        $observation.window = [ordered]@{ title=$window.title; size=$window.size; seconds=[math]::Round(((Get-Date) - $started).TotalSeconds, 1) }
+        $observation.window = [ordered]@{ title=$window.title; size=$window.size; visible=$window.visible; session=$session; seconds=[math]::Round(((Get-Date) - $started).TotalSeconds, 1) }
         # A fresh registration of a new service, not the file of the previous launch.
         $service = Wait-For {
             $value = Get-Content -LiteralPath $registration -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
@@ -256,8 +314,12 @@ function Launch([int]$Run, [int]$Previous) {
         }
         if (-not $mainLog) { throw 'WINDOW_NOT_CONNECTED' }
         $observation.mainLog = $mainLog.FullName
+        # The app revealed its window itself (windows/index.ts), whether or not the window station can display it.
+        if ((Get-Content -LiteralPath $mainLog.FullName -Raw) -notmatch '\(main\)\s+main window visible') { throw 'APP_WINDOW_NOT_REVEALED' }
         $observation.renderer = Probe @('renderer', [string]$debug, [string]$TimeoutSeconds)
         if ($observation.renderer.wizard) { throw 'WIZARD_SHOWN' }
+        # The window takes the channel's name until the page sets its title (B4.3), so read it again once loaded.
+        $observation.window.titleLoaded = (@(App-Windows $app.Id) | Select-Object -First 1).title
         # The service starts its Node host at boot; with a connection the Host then starts Help for the active generation.
         if (-not (Wait-For { @(Owned $app.Id $service.pid | Where-Object role -eq 'node-host').Count })) { throw 'HOST_NOT_STARTED' }
         if ($Connection -and -not (Wait-For { @(Owned $app.Id $service.pid | Where-Object role -eq 'help').Count } ([math]::Max($TimeoutSeconds, 600)))) { throw 'HELP_NOT_STARTED' }
@@ -269,7 +331,7 @@ function Launch([int]$Run, [int]$Previous) {
         $closing = Get-Date
         if ($CloseMethod -eq 'Window') {
             # WM_CLOSE: the user closes the last window; Electron quits on Windows (window-all-closed).
-            if ([SmokeWindows]::Close([uint32]$app.Id) -eq 0) { throw 'WM_CLOSE found no visible Desktop window' }
+            if ([SmokeWindows]::Close([uint32]$app.Id) -eq 0) { throw 'WM_CLOSE found no Desktop window' }
         } else {
             Probe @('close', [string]$debug) | Out-Null
         }
@@ -301,17 +363,20 @@ try {
     $RunRoot = [IO.Path]::GetFullPath($RunRoot)
     $install = Join-Path $RunRoot 'installed'
     $workspace = Join-Path $RunRoot 'workspace'
+    $session = (Get-Process -Id $PID).SessionId
+    $interactive = $session -ne 0
     $exe = Join-Path $install "$slug.exe"
     $resources = Join-Path $install 'resources\loginom'
     $node = Join-Path $resources 'bin\node.exe'
     New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
     if ((Test-Path -LiteralPath $install) -or (Test-Path -LiteralPath $workspace)) { throw 'Use a fresh RunRoot' }
     if ((Entries).Count) { throw "Existing $name installation: uninstall it explicitly before this test" }
-    $os = Get-CimInstance Win32_OperatingSystem
-    $report.os = [ordered]@{ caption=$os.Caption; version=$os.Version; architecture=$os.OSArchitecture }
+    $os = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    $report.os = [ordered]@{ product=$os.ProductName; edition=$os.EditionID; installation=$os.InstallationType; build="$($os.CurrentBuild).$($os.UBR)"; display=$os.DisplayVersion }
     $report.user = [ordered]@{ administrator=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) }
-    $supported = [Environment]::Is64BitOperatingSystem -and (($os.ProductType -eq 1 -and [int]$os.BuildNumber -ge 22000) -or ($AllowServer -and $os.ProductType -ne 1))
-    Check 'windows-x64' $supported "$($os.Caption) $($os.Version); allowServer=$AllowServer"
+    # ProductName still says "Windows 10" on Windows 11; the build tells them apart.
+    $supported = [Environment]::Is64BitOperatingSystem -and (($os.InstallationType -eq 'Client' -and [int]$os.CurrentBuild -ge 22000) -or ($AllowServer -and $os.InstallationType -ne 'Client'))
+    Check 'windows-x64' $supported "$($os.EditionID) build $($report.os.build) $($os.DisplayVersion); allowServer=$AllowServer"
     if (-not $supported) { throw 'Windows 11 x64 or an explicitly allowed Windows Server is required' }
     Check 'ordinary-user' (-not $report.user.administrator) 'The installing account is not an elevated administrator'
     $Installer = (Resolve-Path -LiteralPath $Installer).Path
@@ -403,7 +468,7 @@ try {
         $observation = Launch $run $previous
         if ($observation.service) { $previous = $observation.service.pid }
         if ($run -eq 1) {
-            Check 'app-window' ([bool]$observation.window -and $observation.window.title -eq 'Loginom AI Agent') ($observation.window | ConvertTo-Json -Compress)
+            Check 'app-window' ([bool]$observation.window -and $observation.window.title -like 'Loginom AI Agent*' -and $observation.window.titleLoaded -like 'Loginom AI Agent*') ($observation.window | ConvertTo-Json -Compress)
             Check 'renderer-loaded' ([bool]$observation.renderer -and -not $observation.renderer.wizard) ($observation.renderer | ConvertTo-Json -Compress)
             Check 'service-ready' ($observation.service.port -eq $servicePort -and [bool]$observation.service.version) ($observation.service | ConvertTo-Json -Compress)
             Check 'bundled-skills' (@($observation.skills).Count -gt 0) (@($observation.skills) -join ', ')
@@ -418,12 +483,15 @@ try {
             $uriRegistered = Test-InstalledUriScheme ([string]$report.uriAfterLaunch) $install
             Check 'uri-scheme-registered' $uriRegistered ([string]$report.uriAfterLaunch)
             $images = @($firstLaunch.before | ForEach-Object {
-                $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($_.pid)" -ErrorAction SilentlyContinue
-                $description = if ($process -and $process.ExecutablePath) { (Get-Item -LiteralPath $process.ExecutablePath).VersionInfo.FileDescription }
+                $description = if ($_.path) { (Get-Item -LiteralPath $_.path).VersionInfo.FileDescription }
                 "$($_.role)=$($_.name)|$description" } | Sort-Object -Unique)
             $report.taskManager = $images
             Check 'process-names' (@($images | Where-Object { $_ -match 'opencode' }).Count -eq 0 -and @($images | Where-Object { $_ -like "electron=$slug.exe|*" }).Count -eq 1 -and
                 @($images | Where-Object { $_ -like 'service=loginom-ai-agent-cli.exe|*' }).Count -eq 1) ($images -join '; ')
+            # Task Manager's Processes tab shows the file description. Not blocking: the bundled CLI is a Bun executable
+            # whose description the build does not set (B4.14c).
+            $foreignDescriptions = @($images | Where-Object { $_ -match '^(electron|service)=' -and ($_ -split '\|', 2)[1] -notmatch '^(Loginom|loginom-ai-agent)' })
+            $checks.Add([pscustomobject]@{ id='process-descriptions'; status=$(if ($foreignDescriptions.Count) { 'WARN' } else { 'PASS' }); detail=($foreignDescriptions -join '; ') })
             if ($Connection) {
                 # B4.13: the 0.4 connection moved to the service's store once, with DPAPI; its Host started Help for it.
                 $store = Get-Content -LiteralPath (Join-Path $serviceData 'loginom\connection\connection.json') -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
@@ -476,8 +544,8 @@ try {
         $dumps = @(Get-ChildItem -LiteralPath $userData -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue)
         Check 'no-minidumps' ($dumps.Count -eq 0) (($dumps | Select-Object -ExpandProperty FullName) -join '; ')
         $errors = @(Get-ChildItem -LiteralPath $logs -Recurse -File -Filter '*.log' -ErrorAction SilentlyContinue |
-            Select-String -Pattern '\[(error|fatal)\]|uncaught|unhandled rejection|FATAL ERROR')
-        $report.errorLines = @($errors | Select-Object -First 40 | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" })
+            Select-String -Pattern '\[(error|fatal)\]|level=(ERROR|FATAL)|uncaught|unhandled rejection|FATAL ERROR')
+        Check 'no-error-lines' ((Test-Path -LiteralPath $logs) -and $errors.Count -eq 0) (($errors | Select-Object -First 20 | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n")
         foreach ($id in @('silent-install','installed-apps','install-path','verify-resources','resource-hashes','bundled-chromium','app-window','renderer-loaded','service-ready','uri-scheme-registered','process-names','silent-uninstall','uri-scheme-removed','updater-cache-removed','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }

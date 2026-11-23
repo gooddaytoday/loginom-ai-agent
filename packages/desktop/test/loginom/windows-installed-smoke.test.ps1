@@ -68,6 +68,9 @@ foreach ($case in @(
 Write-Output 'PASS process roles: service by registration and stage copy, Node host, Help, browser, runtime, Electron, foreign'
 $startup = "[2026-11-12 16:58:19.163] [info]  (crash) crash reporter started {`n  path: 'C:\\lab\\profile\\desktop\\Crashpad'`n}"
 Assert (Test-CrashLog $startup) 'Normal crash setup rejected'
+$v2 = "[2026-11-24 00:29:46.689] [info]  (crash)   crash reporter started {`r`n  path: 'C:\\Users\\user\\AppData\\Roaming\\com.loginom.aiagent.dev\\Crashpad'`r`n}"
+Assert (Test-CrashLog $v2) 'Desktop v2 crash setup (indented, CRLF) rejected'
+Assert (-not (Test-CrashLog ($v2 + "`r`n[2026-11-24 00:29:47.000] [warn]  (crash)   previous session did not exit cleanly"))) 'Unexpected v2 record accepted'
 Assert (Test-CrashLog '') 'Empty crash log rejected'
 Assert (-not (Test-CrashLog ($startup + "`nunexpected metadata"))) 'Unexpected crash-log content accepted'
 Assert (-not (Test-CrashLog '[error] (crash) previous session ended unexpectedly')) 'Crash accepted'
