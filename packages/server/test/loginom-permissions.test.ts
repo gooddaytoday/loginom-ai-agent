@@ -753,35 +753,59 @@ describe("loginom.product the administrator's deny (B2.6c, В-69)", () => {
   )
 
   it.live(
-    "a kind the policy touches is not allowed for the conversation; a grant does not lift the policy's deny",
+    "a kind the policy touches is not allowed for the conversation, for every kind the grant covers; a grant does not lift the policy's deny",
     () =>
       Effect.gen(function* () {
-        // The administrator denies fetching pages (one entry of «Открывать сайты») and one file. The project's own
-        // `policies` cannot allow back what the administrator denies.
+        // Every kind the conversation grant covers. The administrator denies a sibling entry of reading, saving and
+        // sites, and one resource of writing and of exports, whose rows have one entry each. The project's own
+        // `policies` load (their deny holds) and cannot allow back what the administrator denies.
         const test = yield* boot(
-          { policies: [{ action: "tool.use", resource: "webfetch:*", effect: "allow" }] },
+          {
+            policies: [
+              { action: "tool.use", resource: "webfetch:*", effect: "allow" },
+              { action: "tool.use", resource: "question:*", effect: "deny" },
+            ],
+          },
           undefined,
-          [deny("webfetch", "*"), deny("edit", "secret.md")],
+          [
+            deny("glob", "*"),
+            deny("dashboard_delete", "*"),
+            deny("webfetch", "*"),
+            deny("edit", "secret.md"),
+            deny("loginom_dock_node_apply", "exports.excel"),
+          ],
         )
         const id = yield* test.create("locked")
+        expect((yield* test.ask(id, { action: "question", resources: ["*"] })).effect).toBe("deny")
         expect((yield* test.ask(id, { action: "webfetch", resources: ["https://example.com"] })).effect).toBe("deny")
-        // A search is not denied, but its row is locked: the grant is refused, the question stays for «один раз».
-        const search = yield* test.ask(id, { action: "websearch", resources: ["loginom"] })
-        expect(search.effect).toBe("ask")
-        const refused = yield* test.conversation(id, search.id)
-        expect(refused.status).not.toBe(200)
-        expect(refused.body).toMatchObject({ type: "not_grantable", data: { action: "websearch" } })
-        expect((yield* test.open(id)).map((item) => item.id)).toEqual([search.id])
-        expect(yield* test.reply(id, search.id, "once")).toBe(204)
-        const again = yield* test.ask(id, { action: "websearch", resources: ["loginom"] })
-        expect(again.effect).toBe("ask")
-        expect(yield* test.reply(id, again.id, "reject")).toBe(204)
-        // A deny of one file does not lock its row: the grant answers, and that file stays denied.
-        const edit = yield* test.ask(id, { action: "edit", resources: ["report.md"] })
-        const granted = yield* test.conversation(id, edit.id)
-        expect([granted.status, granted.body]).toEqual([200, { output: { kind: "write" } }])
-        expect((yield* test.ask(id, { action: "edit", resources: ["other.md"] })).effect).toBe("allow")
-        expect((yield* test.ask(id, { action: "edit", resources: ["secret.md"] })).effect).toBe("deny")
+        // A request the policy leaves alone, of a locked row: the grant is refused, the question stays for «один раз».
+        for (const request of [
+          { action: "external_directory", resources: ["/elsewhere/*"] },
+          { action: "loginom_dock_action_run", resources: ["*"] },
+          { action: "websearch", resources: ["loginom"] },
+        ]) {
+          const pending = yield* test.ask(id, request)
+          expect([request.action, pending.effect]).toEqual([request.action, "ask"])
+          const refused = yield* test.conversation(id, pending.id)
+          expect([request.action, refused.status === 200]).toEqual([request.action, false])
+          expect(refused.body).toMatchObject({ type: "not_grantable", data: { action: request.action } })
+          expect((yield* test.open(id)).map((item) => item.id)).toEqual([pending.id])
+          expect(yield* test.reply(id, pending.id, "once")).toBe(204)
+          const again = yield* test.ask(id, request)
+          expect([request.action, again.effect]).toEqual([request.action, "ask"])
+          expect(yield* test.reply(id, again.id, "reject")).toBe(204)
+        }
+        // A deny of one resource does not lock its row: the grant answers, and that resource stays denied.
+        for (const [kind, action, asked, other, denied] of [
+          ["write", "edit", "report.md", "other.md", "secret.md"],
+          ["export", "loginom_dock_node_apply", "exports.text", "exports.lgd", "exports.excel"],
+        ] as const) {
+          const pending = yield* test.ask(id, { action, resources: [asked] })
+          const granted = yield* test.conversation(id, pending.id)
+          expect([kind, granted.status, granted.body]).toEqual([kind, 200, { output: { kind } }])
+          expect([kind, (yield* test.ask(id, { action, resources: [other] })).effect]).toEqual([kind, "allow"])
+          expect([kind, (yield* test.ask(id, { action, resources: [denied] })).effect]).toEqual([kind, "deny"])
+        }
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
