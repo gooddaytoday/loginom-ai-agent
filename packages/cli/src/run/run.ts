@@ -9,6 +9,7 @@ import { ServerConnection } from "../services/server-connection"
 import { createWorktreeLocation, parseSessionTargetModel, resolveSessionTarget } from "../session-target"
 import { toolInlineInfo } from "@opencode/tui/mini/tool"
 import { runNonInteractivePrompt } from "./noninteractive"
+import { RunProduct } from "./product"
 import { UI } from "./ui"
 import { Env } from "../env"
 import { errorMessage } from "../util/error"
@@ -191,7 +192,8 @@ async function prepareFile(input: string, directory: string): Promise<FilePart> 
           ? "text/plain"
           : detected
     const name = path.basename(file)
-    if (mime === "text/plain") return { text: `<file name="${name}">\n${text}\n</file>` }
+    // Loginom AI Agent (B2.7a4): the product CLI attaches every file, as 0.4 did, so a Dock run admits it (B2.5d).
+    if (mime === "text/plain" && !RunProduct.enabled()) return { text: `<file name="${name}">\n${text}\n</file>` }
     return { attachment: { uri: `data:${mime};base64,${bytes.toString("base64")}`, name } }
   } finally {
     await handle.close()
@@ -228,15 +230,18 @@ async function renderToolError(part: SessionMessageAssistantTool, directory: str
 export function reportRunError(input: Pick<RunCommandInput, "format">, message: string, sessionID?: string) {
   // Keep a failure code already reported, such as the private server's (`services/standalone.ts`).
   process.exitCode ||= 1
+  // Loginom AI Agent (B2.7a4): as 0.4's product CLI, the reason goes to stderr as well, with 0.4's fields in the event.
+  const product = RunProduct.enabled()
   if (input.format === "json") {
     process.stdout.write(
       JSON.stringify({
         type: "error",
         timestamp: Date.now(),
         sessionID: sessionID ?? "",
-        error: { type: "unknown", message },
+        error: product ? RunProduct.error({ type: "unknown", message }) : { type: "unknown", message },
       }) + "\n",
     )
+    if (product) process.stderr.write(message + "\n")
     return
   }
   UI.error(message)

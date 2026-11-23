@@ -16,6 +16,7 @@ import { SessionMessage } from "@opencode/schema/session-message"
 import { EOL } from "node:os"
 import { toolOutputText, type MiniToolPart } from "@opencode/tui/mini/tool"
 import { UI } from "./ui"
+import { RunProduct } from "./product"
 
 type Input = {
   client: OpenCodeClient
@@ -69,7 +70,9 @@ export async function runNonInteractivePrompt(input: Input) {
   if ((await stream.next()).done) throw new Error("Event stream disconnected before prompt admission")
 
   const messageID = SessionMessage.ID.create()
-  const render = renderer(input)
+  // Loginom AI Agent (B2.7a4): the product CLI's final state, JSON events and exit code (`product.ts`).
+  const product = RunProduct.enabled() ? RunProduct.outcome() : undefined
+  const render = renderer(input, product)
   const state = {
     phase: "running" as "running" | "settled" | "cancelling",
     promoted: false,
@@ -95,6 +98,7 @@ export async function runNonInteractivePrompt(input: Input) {
   }
 
   const replyPermission = async (request: PermissionRequest) => {
+    if (!input.auto) product?.reject()
     if (!input.auto)
       UI.println(
         UI.Style.TEXT_WARNING_BOLD + "!",
@@ -170,7 +174,10 @@ export async function runNonInteractivePrompt(input: Input) {
         }
       }
       if (sessionID !== input.sessionID) continue
-      if (event.type === "session.inbox.delivered" && event.data.inboxID === messageID) state.promoted = true
+      if (event.type === "session.inbox.delivered" && event.data.inboxID === messageID) {
+        state.promoted = true
+        if (product) render.status({ type: "busy" })
+      }
       // A busy period that ends before this prompt is delivered leaves the prompt queued for good.
       if (terminal && !state.promoted && terminal.error) state.failure ??= terminal.error
       if (terminal && state.promoted) state.outcomes.push(terminal)
@@ -292,11 +299,23 @@ export async function runNonInteractivePrompt(input: Input) {
     // Requests failing during or after cancellation (e.g. the private server shutting down) are ignored.
     if (!settled) {
       running.catch(() => {})
-      return await cancel().catch(() => {})
+      await cancel().catch(() => {})
+      if (!product) return
+      if (state.promoted) render.status({ type: "idle" })
+      product.cancelled().forEach(render.error)
+      process.exitCode = 130
+      return
     }
     state.phase = "settled"
     await render.reconcile(settled.messages)
     const error = finalError(settled, state)
+    if (product) {
+      if (state.promoted) render.status({ type: "idle" })
+      const verdict = product.verdict(error)
+      verdict.errors.forEach(render.error)
+      if (verdict.exit) process.exitCode = verdict.exit
+      return
+    }
     if (!error) return
     process.exitCode = 1
     render.error(error)
@@ -353,7 +372,7 @@ async function projectedMessages(client: OpenCodeClient, sessionID: string, mess
   }
 }
 
-function renderer(input: Input) {
+function renderer(input: Input, product?: ReturnType<typeof RunProduct.outcome>) {
   const starts = new Map<string, { id: string; timestamp: number }>()
   const tools = new Map<string, Tool>()
   const steps = new Map<string, "started" | "ended">()
@@ -417,6 +436,21 @@ function renderer(input: Input) {
     const id = key(messageID, item.id)
     if (printed.has(id)) return
     printed.set(id, "")
+    product?.observe({
+      id: item.id,
+      sessionID: input.sessionID,
+      tool: item.name,
+      state:
+        item.state.status === "completed"
+          ? { status: "completed", input: item.state.input, metadata: item.state.metadata }
+          : {
+              status: "error",
+              input: item.state.input,
+              error: item.state.error.message,
+              type: item.state.error.type,
+              metadata: item.state.metadata,
+            },
+    })
     const time = { start: item.time.ran ?? item.time.created, end: item.time.completed ?? timestamp }
     const state =
       item.state.status === "completed"
@@ -462,7 +496,11 @@ function renderer(input: Input) {
 
   return {
     error: (error: RunError) => {
-      if (!emit("error", Date.now(), { error })) UI.error(error.message)
+      if (!emit("error", Date.now(), { error: product ? RunProduct.error(error) : error })) UI.error(error.message)
+    },
+
+    status: (value: Parameters<typeof RunProduct.status>[0]) => {
+      emit("session.status", Date.now(), RunProduct.status(value))
     },
 
     waiting: (jobs: Job[]) => {
@@ -484,6 +522,12 @@ function renderer(input: Input) {
           nextRetryAt: event.data.at,
           error: event.data.error,
         }
+        if (product)
+          emit(
+            "session.status",
+            time,
+            RunProduct.status({ type: "retry", attempt: retry.attempt, at: retry.nextRetryAt, error: retry.error }),
+          )
         if (emit("retry", time, retry)) return
         UI.println(
           UI.Style.TEXT_WARNING_BOLD + "!",

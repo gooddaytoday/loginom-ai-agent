@@ -1,0 +1,4 @@
+{"type":"session.status","timestamp":1795414316875,"sessionID":"ses_df8f7ab6affemRvZFhqKVxtVzn","status":{"type":"busy"}}
+{"type":"step_start","timestamp":1795414316856,"sessionID":"ses_df8f7ab6affemRvZFhqKVxtVzn","part":{"id":"prt_207085738001CuVNnelBgS1bsL","sessionID":"ses_df8f7ab6affemRvZFhqKVxtVzn","messageID":"msg_20708570c001bm7p743tb3QU6t","type":"step-start"}}
+{"type":"session.status","timestamp":1795414316904,"sessionID":"ses_df8f7ab6affemRvZFhqKVxtVzn","status":{"type":"idle"}}
+{"type":"error","timestamp":1795414316905,"sessionID":"ses_df8f7ab6affemRvZFhqKVxtVzn","error":{"type":"provider.auth","message":"bad key","status":401,"response":{"body":"{\"error\":{\"message\":\"bad key\",\"type\":\"invalid_request_error\"}}"},"name":"ProviderAuthError","data":{"message":"bad key","statusCode":401}}}

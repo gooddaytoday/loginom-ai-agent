@@ -8,11 +8,15 @@ import { Standalone } from "./standalone"
 try {
   // Help, version and `diagnostics export` exit here, before the profile is opened (B2.7a3).
   await Standalone.early(process.argv.slice(2))
+  // The flags of the product's `run` that OpenCode 2 lacks (B2.7a4); `run` takes its directory from PWD.
+  const forwarded = Standalone.forward(process.argv.slice(2), process.env.PWD ?? process.cwd())
+  process.argv.splice(2, Infinity, ...forwarded.args)
+  if (forwarded.directory) process.env.PWD = forwarded.directory
   CliProfile.apply()
 } catch (error) {
-  if (!(error instanceof Error && /^PROFILE_[A-Z_]+$/.test(error.message))) throw error
+  if (!(error instanceof Error && /^(PROFILE_[A-Z_]+$|CLI_ARGUMENT_INVALID:)/.test(error.message))) throw error
   process.stderr.write(`${error.message}\n`)
-  process.exit(1)
+  process.exit(error.message.startsWith("CLI_ARGUMENT_INVALID") ? 2 : 1)
 }
 
 await import("./index")
