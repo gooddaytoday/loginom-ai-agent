@@ -9130,6 +9130,10 @@ Found 558 warnings and 0 errors.
 | auth and models work in the profile without a Loginom connection and see only its providers | `standalone` «provider management uses the CLI profile without Loginom configuration or bundle» | `auth list --standalone`, `models --standalone`: код 0, `test/test-model`; провайдеры конфига Desktop и унаследованного `LOGINOM_AI_AGENT_CONFIG_CONTENT` не видны; защёлка снята, рантайма Loginom нет |
 | an ordinary run without a Loginom connection gets its answer and releases the profile (auto=false/true) | `standalone-preflight` «ordinary standalone chat omits todowrite and releases its profile» | `run --format json --model test/test-model [--dangerously-skip-permissions]` без подключения: код 0, ответ модели, инструмент `skill` в каждом запросе с инструментами, защёлка снята, ни `runtime`, ни `knowledge` в `<профиль>/loginom`. **Без** «omits todowrite» — «Найдено» |
 
+Проверки «нет `runtime`/`knowledge`» из исходников упасть не могут: без ресурсов у сервера нет Host. Настоящее
+свидетельство — собранный CLI: после службы и `run` в `<профиль>/loginom` только `connection leases recovery
+resource-verification.json startup-phases.jsonl` (ниже).
+
 `auth list`: в 0.4 проверялось, что `LOGINOM_AI_AGENT_AUTH_CONTENT` не наследуется; v2 эту переменную не читает нигде
 (профиль её только удаляет), поэтому проверка заменена на унаследованный конфиг, который v2 читает.
 
@@ -9159,8 +9163,8 @@ Found 558 warnings and 0 errors.
 | M1 вход не зовёт `Standalone.early` (как на базе) | **5/2**: справка создаёт профиль; `diagnostics` идёт в CLI v2 с профилем, а такой команды там нет |
 | M2 справка и версия не узнаются | **6/1**: справка |
 | M3 `diagnostics` после `--headless` не узнаётся | **6/1**: выгрузка |
-| M4 выгрузка берёт профиль по умолчанию вместо `LOGINOM_AI_AGENT_CLI_PROFILE` | **6/1**: в архиве нет журнала профиля |
-| M5 `profile.ts` не удаляет унаследованный `LOGINOM_AI_AGENT_CONFIG_CONTENT` (B2.7c) | **6/1**: `models` видит унаследованного провайдера |
+| M4 выгрузка берёт профиль по умолчанию вместо `LOGINOM_AI_AGENT_CLI_PROFILE` | **6/1**: выгрузка |
+| M5 `profile.ts` не удаляет унаследованный `LOGINOM_AI_AGENT_CONFIG_CONTENT` (B2.7c) | **6/1**: `auth` и `models` |
 | M6 `profile.ts` не заменяет `LOGINOM_AI_AGENT_CONFIG_DIR` (B2.7c) | **3/4**: пути, `models`, оба `run` |
 
 На базе (`65feb14f9f`) `diagnostics export --no-chat --output …` — ошибка разбора `Unrecognized flag: --no-chat in
@@ -9215,7 +9219,8 @@ $ loginom-ai-agent-cli run --format json "Reply with the single word OK"   # Log
 step_start / text: OK / step_finish               # код 0, stderr пуст (свободная модель по умолчанию)
 $ loginom-ai-agent-cli diagnostics export --output <R>/d3.zip      # код 0; chat: unavailable (database-unreadable)
 $ loginom-ai-agent-cli run --command loginom-automation "Построй сценарий"
-# код 1: справка `run` и ошибка разбора флага --command (у run v2 его нет)
+# код 1: справка `run` (в выводе обрезано до 400 байт); из исходников конец вывода —
+# «ERROR Unrecognized flag: --command in command opencode run»
 $ loginom-ai-agent-cli service stop               # код 0
 $ pgrep -af <R>/x                                 # процессов нет
 $ find <R>/home <R>/p1 -iname '*opencode*'        # пусто
@@ -9300,6 +9305,10 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   (`auth login`), в список известных значений не попадает, а манифест всё равно пишет `knownSecrets: ok`. Остаются
   шаблоны редактора (`sk-…`, `Bearer …`, `…KEY=…` и т. п.). Чинить — в `loginom-host` (читать `credential` из базы только
   на чтение), отдельной задачей до выпуска.
+- **Журнал CLI в выгрузке несёт командные строки.** `index.ts` пишет в журнал профиля `cli starting … args=[…]` каждой
+  команды, а выгрузка кладёт журнал и с `--no-chat`. Проверено из исходников: в `cli/…log` архива — текст промпта `run`
+  и `auth login … --answer key=<значение>` как есть. Шаблоны редактора (по коду `redact.mjs`) ловят `apiKey=…`, `sk-…`,
+  `Bearer …`, но не `key=…` и не текст промпта. Было ли так в 0.4, не сверял. Решать вместе с известными секретами.
 - **Чат в выгрузке на v2 всегда `unavailable` (`database-unreadable`).** `diagnostics-cli.ts` читает таблицы v1; в свежей
   базе v2 и в перенесённом профиле 0.4 их нет (выше). Чинить — запросы к `session_v2`/`session_message`/`session_part` в
   `loginom-host/src/diagnostics-cli.ts`.
