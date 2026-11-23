@@ -2738,7 +2738,7 @@ for (const viewport of [
         await page.getByRole("menuitemradio", { name, exact: true }).click()
       }
 
-      if (name === "About") await expect(panel.getByText("Released under the MIT License")).toBeVisible()
+      if (name === "About") await expect(panel.getByText("Released under MIT AND AGPL-3.0-only")).toBeVisible()
 
       if (name !== "About")
         await expect(

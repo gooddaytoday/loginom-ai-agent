@@ -166,7 +166,7 @@ export const dict = {
   "provider.connect.status.waiting": "Ожидание авторизации…",
   "provider.connect.status.failed": "Ошибка авторизации: {{error}}",
   "provider.connect.apiKey.description":
-    "Введите ключ API {{provider}}, чтобы подключить аккаунт и использовать модели {{provider}} в OpenCode.",
+    "Введите ключ API {{provider}}, чтобы подключить аккаунт и использовать модели {{provider}} в Loginom AI Agent.",
   "provider.connect.apiKey.label": "Ключ API {{provider}}",
   "provider.connect.apiKey.placeholder": "Ключ API",
   "provider.connect.apiKey.required": "Требуется ключ API",
@@ -317,7 +317,7 @@ export const dict = {
   "error.chain.modelNotFound": "Модель не найдена: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Проверьте названия провайдера и модели в конфигурации (loginom-ai-agent.json)",
   "error.chain.mcpFailed":
-    'MCP-сервер "{{name}}" завершился с ошибкой. Обратите внимание: OpenCode пока не поддерживает MCP-авторизацию.',
+    'MCP-сервер "{{name}}" завершился с ошибкой. Обратите внимание: Loginom AI Agent пока не поддерживает MCP-авторизацию.',
   "error.chain.providerAuthFailed": "Ошибка аутентификации провайдера ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     'Не удалось инициализировать провайдера "{{provider}}". Проверьте учётные данные и конфигурацию.',
@@ -409,16 +409,17 @@ export const dict = {
   "settings.general.section.sounds": "Звуковые эффекты",
 
   "settings.general.row.language.title": "Язык",
-  "settings.general.row.language.description": "Изменить язык отображения OpenCode",
+  "settings.general.row.language.description": "Изменить язык отображения Loginom AI Agent",
   "settings.general.row.shell.title": "Оболочка терминала",
   "settings.general.row.shell.description":
     "Выберите оболочку для терминала. Совместимые оболочки также используются агентом при вызове инструментов.",
   "settings.general.row.shell.autoDefault": "Авто (по умолчанию)",
   "settings.general.row.shell.terminalOnly": "только терминал",
   "settings.general.row.colorScheme.title": "Цветовая схема",
-  "settings.general.row.colorScheme.description": "Выберите, следует ли OpenCode системной, светлой или тёмной теме",
+  "settings.general.row.colorScheme.description":
+    "Выберите, следует ли Loginom AI Agent системной, светлой или тёмной теме",
   "settings.general.row.theme.title": "Тема",
-  "settings.general.row.theme.description": "Настройте оформление OpenCode.",
+  "settings.general.row.theme.description": "Настройте оформление Loginom AI Agent.",
   "settings.general.row.font.title": "Шрифт кода",
   "settings.general.row.font.description": "Настройте шрифт, используемый в блоках кода",
   "settings.general.row.terminalFont.title": "Шрифт терминала",
@@ -744,7 +745,7 @@ export const dict = {
   "settings.tab.about": "О нас",
   "settings.about.version": "Версия {{version}}",
   "settings.about.devVersion": "разработка",
-  "settings.about.license": "Выпущен под индексом MIT License",
+  "settings.about.license": "Выпущен под лицензией MIT AND AGPL-3.0-only",
   "settings.about.otherContributor.one": "{{count}} другой",
   "settings.about.otherContributor.other": "{{count}} другого",
   "settings.about.firstPublished": "Впервые опубликовано в Миссури, США.",
