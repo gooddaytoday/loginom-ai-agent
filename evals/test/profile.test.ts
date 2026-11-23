@@ -805,15 +805,52 @@ test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой rese
   await expect(recoverIfNeeded(command, 1)).rejects.toThrow("LOGINOM_DOCK_API_KEY")
 })
 
-test("assertAuth: без auth.json — EvalFailure с командой providers login; с записью провайдера — ок", async () => {
+// OpenCode 2 keeps provider keys in the profile's database, which goes to the archive after every attempt; each
+// attempt's run creates a new database that imports data/auth.json. The check is what such a database lists (B2.7b2).
+test("assertAuth: ключ — то, что показывает auth list новой базы, а не запись в data/auth.json", async () => {
   const { config, command, profileDir } = await fakeProfile()
+  // Outside the profile: the archive takes everything in it but the settings files.
+  const scratch = await mkdtemp(path.join(os.tmpdir(), "evals-auth-list-"))
+  const args = path.join(scratch, "args.json"), integrations = path.join(scratch, "integrations.json")
+  const listed = { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args, EVAL_FAKE_INTEGRATIONS_FILE: integrations } }
   const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
-  await expect(assertAuth(openai, command)).rejects.toThrow("providers login")
-  await mkdir(path.join(profileDir, "data"), { recursive: true })
-  await writeFile(path.join(profileDir, "data", "auth.json"), JSON.stringify({ openai: { type: "oauth" } }))
-  await assertAuth(openai, command)
-  const viaProvider = { ...config, agent: { ...config.agent, model: "xiaomi/mimo", provider: { id: "xiaomi", baseUrl: "u", apiKey: "k", modelId: "mimo" } } }
-  await assertAuth(viaProvider, command)
+  try {
+    await mkdir(path.join(profileDir, "data"), { recursive: true })
+    // A record the new database does not import: the run would have no key.
+    await writeFile(path.join(profileDir, "data", "auth.json"), JSON.stringify({ openai: { type: "oauth" } }))
+    await writeFile(integrations, JSON.stringify([{ id: "anthropic", name: "Anthropic", connections: [{ type: "credential" }] }]))
+    const refusal = await assertAuth(openai, listed).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toContain("data/auth.json")
+    expect((refusal as EvalFailure).message).not.toContain("providers login")
+    expect(await Bun.file(args).json()).toEqual(["auth", "list", "--standalone", "--format", "json"])
+    await archiveProfileHistory(profileDir, "auth-check")
+    await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
+    await assertAuth(openai, listed)
+    await archiveProfileHistory(profileDir, "auth-check")
+    await rm(args)
+    const viaProvider = { ...config, agent: { ...config.agent, model: "xiaomi/mimo", provider: { id: "xiaomi", baseUrl: "u", apiKey: "k", modelId: "mimo" } } }
+    await assertAuth(viaProvider, listed)
+    expect(await Bun.file(args).exists()).toBe(false)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(`${profileDir}.history`, { recursive: true, force: true })
+    await rm(scratch, { recursive: true, force: true })
+  }
+})
+
+test("assertAuth: база, оставшаяся в профиле, — отказ до auth list", async () => {
+  const { config, command, profileDir } = await fakeProfile()
+  const args = path.join(profileDir, "args.json"), integrations = path.join(profileDir, "integrations.json")
+  const listed = { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args, EVAL_FAKE_INTEGRATIONS_FILE: integrations } }
+  const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
+  try {
+    // A key only in this database (`auth login`) would pass the check and go to the archive before the attempt.
+    await Bun.write(path.join(profileDir, "data", "loginom-ai-agent.db"), "database with its own keys")
+    await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
+    await expect(assertAuth(openai, listed)).rejects.toThrow("PROFILE_DATABASE_PRESENT")
+    expect(await Bun.file(args).exists()).toBe(false)
+  } finally { await rm(profileDir, { recursive: true, force: true }) }
 })
 
 test("recoverIfNeeded: непустые recoveries → acknowledge → ready", async () => {

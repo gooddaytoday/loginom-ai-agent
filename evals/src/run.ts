@@ -7,7 +7,7 @@ import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
 import { checkIsolatedLoginom, preflight, type SlotStorageContext } from "./preflight"
-import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
+import { archiveProfileHistory, assertAuth, ensureProfile, profileHistory, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
 import { redactKnownSecrets } from "./output-redaction"
@@ -426,9 +426,11 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand, runId: 
   if (config.resetProfile) await resetProfile(config)
   await releaseStaleWriter(config.profileDir, null)
   await ensureProfile(config, command)
-  await assertAuth(config, command)
   await recoverIfNeeded(command, 2)
   await archiveProfileHistory(config.profileDir, `${runId}-initial`)
+  // The check's `auth list` creates the database the first attempt's run would create (B2.7b2); it goes to the archive.
+  await assertAuth(config, command)
+  if ((await profileHistory(config.profileDir)).length) await archiveProfileHistory(config.profileDir, `${runId}-auth`)
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {

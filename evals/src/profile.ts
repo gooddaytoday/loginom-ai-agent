@@ -380,17 +380,24 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
     throw new EvalFailure("SHARED_AUTH_UNSUPPORTED: общий OAuth (auth.sharedDir) не поддерживается CLI продукта на OpenCode 2 — " +
       "уберите auth из файла слотов; ключ провайдера — в <профиль>/data/auth.json или EVAL_AGENT_PROVIDER_*", 2)
   if (config.agent.provider?.id === providerId) return
-  const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
-  const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
-  if (providerId in entries) return
-  const envLine = Object.entries(command.env)
-    .filter(([key]) => key.startsWith("LOGINOM_AI_AGENT_CLI_"))
-    .map(([key, value]) => `${key}=${value}`)
-    .join(" ")
+  // OpenCode 2 keeps provider keys in the profile's database, and the archive takes it after every attempt: each run
+  // creates a new one, which imports data/auth.json (B2.7b2). `auth list` creates and lists such a database here; a
+  // database left in the profile would answer instead, with keys that go to the archive before the run.
+  const data = await readdir(path.join(config.profileDir, "data")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  if (data.some((name) => name.endsWith(".db")))
+    throw new EvalFailure("PROFILE_DATABASE_PRESENT: ключ провайдера проверяется на новой базе профиля — перенесите историю профиля в архив", 2)
+  const listed = await management(command, ["auth", "list", "--standalone", "--format", "json"])
+  const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
+  if (listed.exitCode !== 0 || !Array.isArray(integrations))
+    throw new EvalFailure(`auth list завершился кодом ${listed.exitCode}:\n${listed.stderr.trim()}`, 2)
+  if (integrations.some((integration) => integration.id === providerId)) return
   throw new EvalFailure(
-    `Нет авторизации провайдера "${providerId}" в eval-профиле ${config.profileDir}.\n` +
-      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} providers login\n` +
-      "или задайте EVAL_AGENT_PROVIDER_* в evals/.env.",
+    `Нет ключа провайдера "${providerId}" для прогона в eval-профиле ${config.profileDir}: новая база его не получает.\n` +
+      `Запишите ключ в ${path.join(config.profileDir, "data", "auth.json")} (формат 0.4: каждая новая база берёт ключи оттуда) ` +
+      "или задайте EVAL_AGENT_PROVIDER_* в evals/.env; `auth login` хранит ключ только в базе, а она уходит в архив после попытки.",
     2,
   )
 }

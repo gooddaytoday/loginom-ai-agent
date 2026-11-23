@@ -350,6 +350,38 @@ test("main: failed cleanup пишет summary/result/report, сохраняет 
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 })
 
+// OpenCode 2 keeps provider keys in the profile's database: each attempt's run creates a new one after the archive, and
+// it imports data/auth.json (B2.7b2). The key is checked on such a database, after the history left in the profile.
+test("main: ключ провайдера проверяется на новой базе, после архива оставшейся истории", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-auth-database-"))
+  const profile = path.join(directory, "profile")
+  const tasks = path.join(directory, "tasks")
+  const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
+  try {
+    await cp(path.join(evalsRoot, "tasks/calc-data-double"), path.join(tasks, "key-check"), { recursive: true })
+    const file = path.join(tasks, "key-check", "task.json")
+    await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), id: "key-check" }))
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "leftover database")
+    await Bun.write(path.join(profile, "data/auth.json"), JSON.stringify({ fake: { type: "api", key: "fixture-provider-key" } }))
+    const env = { EVAL_CLI_MODE: "fake", EVAL_AGENT_MODEL: "fake/model", EVAL_PROFILE_DIR: profile,
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+      EVAL_ARTIFACT_SOURCE: `dir:${path.join(evalsRoot, "fixtures/storage")}`, LOGINOM_DOCK_API_KEY: "fixture-key",
+      LOGINOM_URL: `http://127.0.0.1:${server.port}`, LOGINOM_DOCK_BASE_URL: `http://127.0.0.1:${server.port}` }
+    const run = await main(["--skip-judge", "--tasks", tasks], env)
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    expect(summary.stopped_reason).toBeNull()
+    expect(summary.tasks[0]!.attempts).toHaveLength(1)
+    const archives = (await readdir(`${profile}.history`)).sort()
+    const databases = await Promise.all(archives.map((name) => Bun.file(path.join(`${profile}.history`, name, "data/loginom-ai-agent.db")).text()
+      .catch(() => null)))
+    const archived = (prefix: string) => databases[archives.findIndex((name) => name.startsWith(`${path.basename(run.runDir)}-${prefix}-`))]
+    expect(archived("initial")).toBe("leftover database")
+    expect(archived("auth")).toBe("fake auth list database")
+    expect(await Bun.file(path.join(profile, "data/auth.json")).json()).toEqual({ fake: { type: "api", key: "fixture-provider-key" } })
+    expect(await Bun.file(path.join(run.runDir, "summary.json")).text()).not.toContain("fixture-provider-key")
+  } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
+})
+
 test("main --dry-run --only: подмножество задач", async () => {
   const result = await main(["--dry-run", "--only", "group-sum-qty", "--repeat", "1"])
   try {
