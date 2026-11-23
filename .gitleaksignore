@@ -3,3 +3,22 @@ afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-repl
 afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:92
 afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:146
 afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:gcp-api-key:71
+
+# Redaction fixtures from #1231, carried into loginom by the v0.4.0 merge:
+# synthetic private paths that the tests prove are removed.
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+77d5c1f38052d44abef2fbdb55c4d350aa844a80:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
+f571165d16f6521dfd3bfa7ae2753e21cd2e245c:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:55
+fc33a9ce01da0e6f04c1b0bf31cf0f3f78bef34d:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/artifact-download.test.mjs:personal-windows-home-path:464
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:15
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:16
+5f79f57f8d11539fa7307f1e55ba39414c1afe6e:packages/loginom-runtime/client/test/browser-failure.test.mjs:personal-windows-home-path:34
