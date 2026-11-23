@@ -1,6 +1,6 @@
-import { NodeFileSystem, NodePath, NodeRuntime } from "@effect/platform-node"
+import { NodeFileSystem, NodePath } from "@effect/platform-node"
 import { app } from "electron"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Runtime } from "effect"
 import { Plugins } from "./plugin"
 import { Ipc } from "./ipc"
 import { DesktopInitialization } from "./lifecycle/desktop-initialization"
@@ -40,6 +40,17 @@ const runIpc = Effect.fn("Desktop.runIpc")(function* () {
   })
 })
 
+// Loginom AI Agent (B4.10): SIGINT and SIGTERM quit through the app lifecycle (`lifecycle/index.ts`), which stops the
+// plugins and the background service first, as 0.4's signal handler did. `NodeRuntime.runMain` is this runner plus its
+// own SIGINT and SIGTERM handler, which interrupts the main fiber and exits before any `Shutdown` participant stops.
+const runMain = Runtime.makeRunMain(({ fiber, teardown }) => {
+  fiber.addObserver((exit) =>
+    teardown(exit, (code) => {
+      if (code !== 0) process.exit(code)
+    }),
+  )
+})
+
 runIpc().pipe(
   Effect.provide(Ipc.layer),
   Effect.provide(BackgroundService.layer),
@@ -48,5 +59,5 @@ runIpc().pipe(
   Effect.provide(ApplicationLifecycle.layer),
   Effect.provide(Layer.merge(NodeFileSystem.layer, NodePath.layer)),
   Effect.scoped,
-  NodeRuntime.runMain,
+  runMain,
 )
