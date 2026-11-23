@@ -14820,3 +14820,182 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 сигнал до того, как слой `ApplicationLifecycle` поставил свой обработчик (первые доли секунды запуска), теперь
 никакой обработчик JS не ловит — что тогда делает Electron, не проверял (до правки `runMain` выходил с кодом 130); выход из сеанса Linux настоящим менеджером сеанса — нет, только
 `kill -TERM`; Windows сигналов этого вида не шлёт (`session-end` — B4.14c).
+
+## B2.7a11 Пользователь Basic-входа
+
+23.11.2026. Ветка `b27a11-basic-user` от `oc2-migration` (`9ef3c65f7c`), рабочее дерево `.claude/worktrees/b27a11`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите.
+База тестов — отдельное дерево `<scratchpad>/b27a11-base` (`9ef3c65f7c`, detached). Эталон 0.4 — `v0.4.0`. `app`, `ui`
+и словари GUI-плагинов (их параллельно правит B4.11d) не трогал.
+
+Прочитано: нарезка B2.7a (строка B2.7a11), раздел B2.7a1 («пользователь Basic-входа `opencode`»); 0.4 —
+`opencode/src/server/auth.ts`, `opencode/src/cli/cmd/run.ts`, `desktop/src/main/sidecar.ts`, `app/src/utils/server.ts`;
+правила зависимостей корневого `AGENTS.md`; `.opencode/skills/unit-tests`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `241d45cab9` `feat(server): use loginom-ai-agent as the Basic user of the server and its clients (B2.7a11)` | код, тесты, CAT-12, CAT-13, CAT-09, CAT-02 |
+| следующий | этот раздел; в CAT-12 — копия в `client` (ниже) |
+
+Файлы кода — восемь: `schema/src/server-username.ts` (+17, файл форка), по строке в upstream — `server/src/auth.ts`,
+`server/src/process.ts`, `client/src/service-probe.ts` (+ копия, 8 строк), `client/src/pty-handoff.ts`,
+`cli/src/services/server-connection.ts`, `cli/src/services/standalone.ts`, `desktop/src/main/service/sidecar-credentials.ts`.
+Тесты и скрипты проверки: три файла форка, 26 тестов upstream, `cli/script/service-smoke.ts`, `scripts/live-profiles/live.mjs`.
+
+### Было и стало
+
+| | 0.4 (`v0.4.0`) | `9ef3c65f7c` | B2.7a11 |
+|---|---|---|---|
+| Сервер | `server/auth.ts`: `Config.string("LOGINOM_AI_AGENT_SERVER_USERNAME")`, по умолчанию `loginom-ai-agent` | литерал `opencode` в `ServerAuth.Config.configLayer` (API) и в `dispatch` (допуск процесса: `/api/info` до готовности, остановка B2.3b, каждый запрос) | `ServerUsername.current()` в обоих местах |
+| Клиент CLI | `ServerAuth.header`: `LOGINOM_AI_AGENT_SERVER_USERNAME` или `loginom-ai-agent` (`run --attach`, `attach`) | `opencode` | `--server` (`server-connection.ts`) и частный сервер (`standalone.ts`) — `ServerUsername.current()` |
+| Служба | общей службы v2 в 0.4 нет | `opencode` | проба, остановка (`service-probe.ts`) и передача терминалов (`pty-handoff.ts`) — копия `username()` |
+| Desktop, своя служба | sidecar с `LOGINOM_AI_AGENT_SERVER_USERNAME: "loginom-ai-agent"` в окружении, свой заголовок `loginom-ai-agent` | `opencode` | `sidecar-credentials.ts` — `ServerUsername.current()`; служба наследует окружение окна (`Service.ensure` кладёт `env` поверх `process.env`) |
+| Веб-приложение, чужой сервер | `authTokenFromCredentials`: имя из токена или `loginom-ai-agent` | `opencode` | не менялось — ниже |
+
+`OPENCODE_SERVER_USERNAME`: v2.3.0 его не читает (комментарий `cli/test/flag-identity.test.ts`). Единственное
+упоминание — `cli/test/standalone.test.ts`: upstream давал владельцу частного сервера `OPENCODE_SERVER_USERNAME: "custom"`,
+`apply-identity` (B1.4a) уже превратил его в `LOGINOM_AI_AGENT_SERVER_USERNAME`. До B2.7a11 переменную не читал никто;
+теперь её читают и `serve`, и клиент частного сервера, и тест проверяет, что они согласны (мутация M8).
+
+### Где решал сам
+
+1. **Объём — восемь файлов, без входа в чужой сервер.** Нарезка называет около 14 файлов, задание — до восьми и
+   запрещает `app`. Сделано то, что задание перечисляет: сервер и клиенты, которые идут к своей службе или к серверу CLI,
+   плюс одно место значения. Не сделан вход паролем к серверу, который не служба своего окна: веб-приложение
+   (`app/src/runtime/server/api.ts:6`, `authTokenFromCredentials`), Desktop для таких серверов
+   (`desktop/src/main/plugin/host.ts:326`, ветка `endpoint.password`), проверка здоровья WSL и SSH
+   (`gui-plugins/src/wsl/sidecar.ts:131`, `gui-plugins/src/ssh/controller.ts:338`). Это одна группа: пароль приходит из
+   renderer, заголовок строят `app` или плагин. `host.ts` один не правил: главный процесс и renderer одного окна тогда
+   разошлись бы. Следствие до правки группы — 401 у сервера той же сборки в WSL и по SSH, у сервера, добавленного
+   пользователем с паролем, и у веб-интерфейса `serve`, если войти паролем (вход по ссылке `pair` — cookie, имени нет).
+   Своя служба Desktop этого пути не касается: renderer шлёт запросы к ней без заголовка, его добавляет главный процесс
+   из `SidecarCredentials.authorization` (`windows/security.ts`, `wireRendererHeaders`), и `ready()` отдаёт renderer
+   только адрес.
+2. **Одно место — `schema`, копия — в `client`.** Пакет, от которого уже зависят `server`, `cli` и `desktop`, — только
+   `schema`: Desktop не подключает `protocol`, `server` и `client` — `product`, а `server` от `client` во время работы не
+   зависит (только `devDependencies`). Promise-служба клиента (`@opencode/client/service`: проба, остановка, передача
+   терминалов) не может взять и `schema`: тест upstream `client/test/import-boundaries.test.ts` требует, чтобы эта
+   точка входа не тянула ни одного модуля `schema`, `protocol` и `effect` (первый прогон с импортом из `schema` упал на
+   нём). Поэтому в `service-probe.ts` — копия, функция `username()`, без новых экспортов пакета; `pty-handoff.ts` берёт
+   её оттуда же. Равенство копии и `ServerUsername.current()` при пустой, заданной и отсутствующей переменной держит
+   тест форка `client/test/server-username.test.ts`. Сделать единственным местом `client` — значит дать `server`
+   зависимость от `client` во время работы: это изменение общего контракта, не делал.
+3. **Переменная читается в момент вызова, внутри функции.** Не через `cli/src/env.ts` (`Env`) и поле `ServerOptions`:
+   это ещё около четырёх файлов (`env.ts`, `server-process.ts`, `options.ts`, `routes.ts`) и вход в публичные опции
+   сервера. Модуль `schema` при импорте `process` не трогает.
+4. **Desktop читает переменную, а не закрепляет её, как 0.4.** 0.4 ставил `LOGINOM_AI_AGENT_SERVER_USERNAME` в
+   окружение sidecar. Здесь служба Desktop наследует окружение окна, и обе стороны читают одно и то же значение;
+   закрепление потребовало бы девятого файла (`service-identity.ts`, `serviceEnvironment`).
+5. **Пустое значение — как не заданное** (`||`, не `??`): пустое имя бессмысленно; в 0.4 пустая переменная давала
+   пустое имя. Тест — `server/test/basic-user.test.ts`, мутация M12.
+6. **Тесты upstream — на настоящий пользователь, а не через переменную.** 26 файлов тестов upstream шлют настоящему
+   серверу или фикстуре `opencode:`; заменил на `loginom-ai-agent:` только в контексте учётных данных (`btoa(`,
+   `Buffer.from(`, `username:`). Подстановка `LOGINOM_AI_AGENT_SERVER_USERNAME=opencode` в preload пакетов оставила бы
+   upstream нетронутым, но тогда пропущенный клиент со старым литералом проходил бы все тесты. Не менялись:
+   `server/test/auth.test.ts` (конфиг с `username: "opencode"` задан в самом тесте), запросы с неверным паролем
+   `opencode:wrong` (401 в любом случае), `app`, `session-ui`, `gui-plugins`. Строки, ставшие длиннее 120 знаков
+   (9 строк в пяти файлах), не переформатировал — так меньше расхождение с upstream; `prettier` проверка не требует.
+7. **`cli/script/service-smoke.ts` и `scripts/live-profiles/live.mjs`** — скрипты проверки, а не код продукта: первый
+   запускает CI на собранном CLI (`check-test.yml`, `release.yml`), второй — живые профили B3.3. Оба шлют серверу этой
+   сборки Basic, поэтому заменил литерал; в счёт восьми файлов не входят.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `server/test/basic-user.test.ts` «accepts loginom-ai-agent and refuses OpenCode's opencode by default» | `ServerProcess.start` с паролем, запросы `/api/info` по HTTP: без переменной `loginom-ai-agent` — 200, `opencode` — 401; пустая переменная — 200 для `loginom-ai-agent`. Запрос проходит обе проверки: `dispatch` и `ServerAuth.Config` |
+| там же «takes the user from LOGINOM_AI_AGENT_SERVER_USERNAME» | `alice` — 200, `loginom-ai-agent` и `opencode` — 401 |
+| `cli/test/basic-user.test.ts` «serve and the CLI client use loginom-ai-agent; opencode is refused» | процессы: `src/index.ts serve --port 0` (`isolatedEnv`, пароль, без переменной), `/api/info` с `opencode` — 401, с `loginom-ai-agent` — 200; клиент CLI `session list --format json --server <url>` — код 0, stderr пуст, `[]` |
+| там же «LOGINOM_AI_AGENT_SERVER_USERNAME moves the server and the client that shares it» | `serve` и клиент с `alice`: `alice` — 200, `loginom-ai-agent` — 401, клиент — код 0, `[]` |
+| `client/test/server-username.test.ts` | копия `username()` равна `ServerUsername.current()` без переменной, с пустой и с `alice`; по умолчанию — `loginom-ai-agent` |
+
+Клиент процессного теста — `session list`: разрешает явный сервер (`ServerConnection`), проверяет здоровье и читает
+список; промпта нет, модель не вызывается. Службу и клиент CLI проверяют тесты upstream с новым пользователем:
+`cli/test/{debug-config,cli-profile-service,service-identity,service-lifecycle,service}.test.ts` (проба по
+регистрации, `endpointOf`), `client/test/{service,promise-service}.test.ts` (остановка и передача терминалов —
+фикстура `client/test/fixture/service.ts` принимает только `loginom-ai-agent:private`), `cli/test/standalone.test.ts`
+(частный сервер с переменной).
+
+### Мутации
+
+`<scratchpad>/b27a11-mutate.sh`: одна замена `perl` в файле кода, тесты пакета, возврат исходного текста из копии;
+после всех прогонов `git status` — только `catalog.md` (правка раздела). Все мутации краснят.
+
+```text
+M0  без мутации (контроль)                                        server basic-user: 2 pass / 0 fail
+M1  schema: fallback = "opencode"                                 server basic-user: 1 / 1; cli basic-user: 1 / 1
+M2  server/auth.ts configLayer: username "opencode"               server basic-user: 0 / 2   # dispatch пропустил, API отказал
+M3  server/process.ts dispatch: username "opencode"               server basic-user: 0 / 2
+M4  client service-probe endpointOf: "opencode"                   client: 266 / 6     # stop … (promise и effect, по 3)
+M5  client pty-handoff: "opencode"                                client: 271 / 1     # passes the prepared handoff to the replacement server
+M6  client копия: "opencode" по умолчанию                         client: 262 / 10    # server-username 3, handoff 1, stop 6
+M7  cli server-connection (--server): "opencode"                  cli basic-user: 0 / 2
+M8  cli standalone: "opencode"                                    cli standalone + cli-standalone: 4 / 5
+M9  desktop sidecar-credentials: "opencode"                       desktop sidecar-credentials.test: 1 / 1
+M10 schema: переменная не читается                                server basic-user: 1 / 1; cli basic-user + standalone: 2 / 1
+M11 client копия: переменная не читается                          client server-username: 3 / 1
+M12 schema: `??` вместо `||` (пустая переменная — пустое имя)     server basic-user: 1 / 1
+```
+
+M10 в `cli/test/standalone.test.ts` не краснеет и не должен: частный сервер и его владелец оба читают `schema`, и при
+мутации оба получают `loginom-ai-agent` — согласие сохраняется; переопределение ловит второй процессный тест.
+
+### Приёмка
+
+Тесты — `bun test` в каталоге пакета, с таймаутом скрипта пакета (`server` — по умолчанию 5 с, `client` — 5 с, `cli`
+и `desktop` — 30 с), отчёт JUnit; база — то же в `<scratchpad>/b27a11-base`. Список падений базы и ветки совпадает
+построчно.
+
+| Пакет | `9ef3c65f7c` | `241d45cab9` | Падения |
+|---|---|---|---|
+| `server` | 218 pass, 2 skip, 8 fail | 220 pass, 2 skip, 8 fail | те же 8: `loginom-access` 3, `loginom-permissions` 2, `loginom-dock-catalog`, `loginom-host-lease`, `loginom-package-docs` |
+| `client` | 268 pass, 0 fail | 272 pass, 0 fail | — |
+| `cli` | 499 pass, 9 skip, 2 fail | 501 pass, 9 skip, 2 fail | те же: `cli-loginom.test.ts` без `LOGINOM_AI_AGENT_TEST_NODE` |
+| `desktop` | 577 pass, 4 skip, 0 fail | 577 pass, 4 skip, 0 fail | — |
+| `cli/test/cli-loginom.test.ts` с `LOGINOM_AI_AGENT_TEST_NODE` (Node 24.19.0) и `npm ci --ignore-scripts` клиента `loginom-runtime/client` в обоих деревьях | 14 pass, 0 fail | 14 pass, 0 fail | — |
+
+`bun typecheck` в `schema`, `server`, `client`, `cli`, `desktop` — ошибок нет. `bun run generate` в `packages/client` —
+код 0, сгенерированные файлы не изменились (HttpApi не менялся).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 560 divergent upstream files               # CAT-12: 195, CAT-13: 25, CAT-09: 38, CAT-02: 56
+$ python3 -I scripts/upstream-sync/apply-identity.py --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, 52 с; на 241d45cab9 с правкой CAT-12 и этим разделом
+Found 554 warnings and 0 errors.                                 # oxlint на базе — тоже 554
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+Каталог: на базе 547 расходящихся файлов upstream, здесь 560 — CAT-12 +11 (`server/src/auth.ts`, `client/src/pty-handoff.ts`,
+`cli/src/services/server-connection.ts` и тесты), CAT-09 +2 (`sidecar-credentials.ts` и тест); `process.ts`,
+`service-probe.ts` (CAT-13) и `service-smoke.ts` (CAT-02) уже расходились. Описание — пункт «Пользователь Basic-входа
+(B2.7a11)» в CAT-12, ссылки на него — в «Компонентах» CAT-13 и CAT-09 и в назначении CAT-02.
+
+### Найдено, не чинил
+
+- **Вход паролем к серверу, который не служба своего окна, шлёт `opencode`** (пункт 1 «Где решал сам»):
+  `app/src/runtime/server/api.ts:6`, `desktop/src/main/plugin/host.ts:326`, `gui-plugins/src/wsl/sidecar.ts:131`,
+  `gui-plugins/src/ssh/controller.ts:338`. Сервер этой сборки ответит им 401: WSL и SSH не дождутся здоровья службы,
+  сервер, добавленный с паролем, и веб-интерфейс `serve` при входе паролем не откроются. Четыре файла кода, из них `app` —
+  зона B4.11d. Сделать одной задачей после B4.11d: `app` и `gui-plugins` уже зависят от `schema` и могут взять
+  `ServerUsername.fallback`; в 0.4 `authTokenFromCredentials` брал имя из токена или `loginom-ai-agent`. Тесты `app`
+  (`runtime/server/{api,client,image,health}.test.ts`, `e2e/utils/mock-server.ts`) ждут `opencode:` — их менять вместе.
+- `packages/loginom-host/script/skills-acceptance/desktop.mjs:155` строит заголовок из `backend.username`, которого
+  `awaitInitialization` на v2 не отдаёт (`SidecarCredentials.ready` — только адрес): прогон 0.4, на v2 не переносился.
+
+### Не проверено
+
+- `cli/script/service-smoke.ts` — только в CI на собранном CLI (`check-test.yml`, `release.yml`), локально не собирал;
+  `scripts/live-profiles/live.mjs` — только с установленными сборками (B3.3).
+- Собранный Desktop со своей службой: путь проверен по частям — проба и `Service.ensure` клиента (тесты `client`,
+  `cli`), заголовок главного процесса (`sidecar-credentials.test.ts`), — но приложение не собирал и не запускал.
+- Windows и macOS; WSL и SSH (там ожидается 401 до правки группы выше).
+- Выход в сеть из `serve` в процессном тесте не перехватывал: модель не вызывается (промпта нет), загрузка каталога
+  моделей выключена `isolatedEnv` (`LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH`); настоящую модель не вызывал.
+- Профиль CLI и служба Desktop между собой не соединяются (отдельные регистрации и порты, B4.9), поэтому их общего
+  прогона нет.
