@@ -18286,11 +18286,14 @@ CAT-07, «Компоненты»: `cli/src/server-process.ts` — ещё +4 (B2.
 23.11.2026. Ветка `b27a8-cli-installer` от `oc2-migration` (`f2be0f6268`), рабочее дерево `.claude/worktrees/b27a8`.
 Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
 --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
-`packages/loginom-runtime/client`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Модель не
+`packages/loginom-runtime/client`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите; первую попытку коммита журнала он
+остановил (`personal-home-path`: заполнитель временного HOME — `<R>`, косая черта, `home` — сканер принял за личный каталог),
+в разделе теперь `<HOME>`. Модель не
 вызывалась, к opencode.ai, репозиторию и пакетам npm OpenCode ни один прогон не обращался: установка, проверки
 установленного CLI, тесты и мутации шли под `unshare -n` (поднят только `lo`). С сетью — только `npm ci` клиента и
 сборка, как в B2.7a2 (закреплённый zip Bun 1.4.4 baseline с `github.com/oven-sh/bun`, хеш проверяется; ripgrep — из
-кэша). В настоящие `~/.local`, `/usr/local` ничего не ставилось:
+кэша; каталог моделей — закоммиченный снимок: `core/script/models-snapshot.ts` без `LOGINOM_AI_AGENT_MODELS_SNAPSHOT`
+ничего не качает). В настоящие `~/.local`, `/usr/local` ничего не ставилось:
 `/root/.local/bin/loginom-ai-agent-cli` и `/root/.local/share/loginom-ai-agent-cli` нет до и после прогона.
 `packages/desktop/test/loginom/*` (B4.14c) не трогал.
 
@@ -18307,7 +18310,8 @@ src/cli-install{,-entry,-windows}.ts,test/cli-install{,-windows}.test.ts,test/cl
 | Коммит | Что |
 |---|---|
 | `932af10cf0` `test(loginom-host): check that CLI uninstall removes the launcher and receipt (B2.7a8)` | +3 строки в тесте 0.4 `cli-install.test.ts` (ниже, «Тесты») |
-| следующий | этот раздел |
+| `b0ae614242` `docs(upstream-sync): record the product CLI installer on v2 (B2.7a8)` | этот раздел |
+| следующий | поправки раздела после ревью: `services/site`, пакет `services/loginom-ai/npm/cli`, сеть сборки, хук |
 
 Файлов кода — ноль. Установщик 0.4 уже в дереве и работает с артефактом v2 без правок.
 
@@ -18357,17 +18361,17 @@ building cli-linux-x64-baseline
 (справка — только разделы):
 
 ```text
-## env: HOME=<HOME> uid=0 umask=0077 net: lo:
-## unpack
+== env: HOME=<HOME> uid=0 umask=0077 net: lo:
+== unpack
 loginom-ai-agent-cli-0.0.0-dev-202611232121-linux-x64.tar.gz: OK                 # sha256sum -c
 tar exit 0                                                                       # tar --same-permissions -xzf
 -rwxr-xr-x install.sh  -rwxr-xr-x uninstall.sh  -rw------- install.mjs  -rw------- INSTALL.md
-## installer files naming opencode (case-insensitive)                            # grep -il по install.sh, uninstall.sh, INSTALL.md, install.mjs
+== installer files naming opencode (case-insensitive)                            # grep -il по install.sh, uninstall.sh, INSTALL.md, install.mjs
 (end)                                                                            # ни одного
-## profile sentinel (archive binary, before install)
+== profile sentinel (archive binary, before install)
 {"revision":0,"generation":0,"setupRequired":true,…,"state":"unconfigured",…}   # профиль создан, в нём data/keep
-## command -v before install: none
-## install.sh
+== command -v before install: none
+== install.sh
 {"destination":"<HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev","launcher":"<HOME>/.local/bin/loginom-ai-agent-cli"}
 exit 0
 launcher: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/bin/loginom-ai-agent-cli
@@ -18375,50 +18379,50 @@ current.json: {"format":"loginom-cli-install-v1","name":"0.0.0-dev-202611232121-
 4755 root:root …/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
 755 root:root …/bin/loginom-ai-agent-cli
 files in payload: 13113
-## HOME top level (installer does not edit shell profiles or PATH)
+== HOME top level (installer does not edit shell profiles or PATH)
 .local
-## command -v: <HOME>/.local/bin/loginom-ai-agent-cli
-## loginom-ai-agent-cli --version
+== command -v: <HOME>/.local/bin/loginom-ai-agent-cli
+== loginom-ai-agent-cli --version
 loginom-ai-agent-cli v0.0.0-dev-202611232121
 exit 0
-## loginom-ai-agent-cli --help
+== loginom-ai-agent-cli --help
 exit 0
 DESCRIPTION
   Loginom AI Agent command line interface
 USAGE
   loginom-ai-agent-cli <subcommand> [flags] [<directory>]
 … ARGUMENTS, FLAGS, GLOBAL FLAGS, SUBCOMMANDS (upgrade, uninstall, migrate, acp, api, …, serve)
-## loginom-ai-agent-cli loginom status --format json
+== loginom-ai-agent-cli loginom status --format json
 {…,"state":"unconfigured",…}
 exit 0
-## install.sh again (existing launcher is never overwritten)
+== install.sh again (existing launcher is never overwritten)
 CLI_INSTALL_PATH_EXISTS
 exit 1
-## serve --port 0 through the launcher                                           # без промпта: модель не вызывается
+== serve --port 0 through the launcher                                           # без промпта: модель не вызывается
 server listening on http://127.0.0.1:41369
 serve children: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/resources/loginom/bin/node --use-system-ca …/resources/loginom/host/node-host.mjs
 serve exe: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/bin/loginom-ai-agent-cli
-## uninstall.sh while serve runs
+== uninstall.sh while serve runs
 CLI_INSTALL_BUSY
 exit 1
 launcher still present
 serve exit 143                                                                   # SIGTERM; stderr пуст
 payload processes left:                                                          # нет
-## uninstall.sh
+== uninstall.sh
 {"uninstalled":true,"profilesPreserved":true}
 exit 0
-## after uninstall
+== after uninstall
 absent <HOME>/.local/bin/loginom-ai-agent-cli
 absent <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev
 absent <HOME>/.local/share/loginom-ai-agent-cli/current.json
 absent <HOME>/.local/share/loginom-ai-agent-cli/.install-lock
 find HOME/.local: .local, .local/share, .local/share/loginom-ai-agent-cli, .local/bin   # пустые каталоги, как в 0.4
 sentinel: existing CLI profile
-## command -v after uninstall: none
-## uninstall.sh again
+== command -v after uninstall: none
+== uninstall.sh again
 CLI_INSTALL_FAILED
 exit 1
-## real home after
+== real home after
 absent /root/.local/bin/loginom-ai-agent-cli
 absent /root/.local/share/loginom-ai-agent-cli
 ```
@@ -18434,7 +18438,9 @@ absent /root/.local/share/loginom-ai-agent-cli
 |---|---|---|
 | корневой `install` (`APP=opencode`, `https://opencode.ai/v2/install`, `registry.npmjs.org/@opencode-ai/cli-…`) | Desktop: `desktop-cli.ts:9` встраивает текст (`install?raw`) | исполняет его только `runInstaller` (`desktop-cli.ts:199`), до него ведёт одна цепочка: `DesktopCli.install` (только macOS) ← `createCliInstaller` (`native/install-cli.ts`) ← действие меню `app.installCli`. После B4.7b пункта нет в `DESKTOP_MENU`, а нативное меню строится только из `DESKTOP_MENU` и пунктов плагинов (у них свой `run`). RPC `MenuRunAction` (`ipc-handlers/menu.ts`) передаёт `runDesktopMenuAction` только `createWindow` и `relaunch`, так что `app.installCli` из окна — пустой вызов `handlers.installCli?.()`. Текст остаётся в `app.asar`, запуска нет. Запись B4.5a «Desktop запускает его только с `--binary`» верна до B4.7b. `installCli(bundled, version)` в `desktop-cli.ts:93,145` — другое: копия встроенного CLI в `userData` для службы, скрипт не трогает |
 | | сборки и CI продукта | ни один workflow и скрипт его не запускает. Путь `curl` в `cli/src/services/updater.ts:543` — `upstreamLayer`, CLI продукта его не берёт (B2.7d) |
-| `packages/cli/script/postinstall.mjs` | npm-пакеты CLI | копирует его только `cli/script/pack.ts:61`; `bun run pack` пакета `cli` — только в `release.yml`, где все задания зависят от `plan` с `if: github.repository == 'anomalyco/opencode'`. `check-test.yml` пакует только `codemode`. Продукт npm не публикует |
+| `packages/cli/script/postinstall.mjs` | npm-пакеты CLI | копирует его только `cli/script/pack.ts:61`; `bun run pack` пакета `cli` — только в `release.yml`, где все задания зависят от `plan` с `if: github.repository == 'anomalyco/opencode'`. `check-test.yml` пакует только `codemode`. CLI продукта в npm не публикуется |
+| upstream `install` по адресу | сайт `services/site` | сайт opencode.ai upstream (`middleware.ts:51,160` отдаёт `/v2/install`, беря его с `raw.githubusercontent.com/anomalyco/opencode/dev/install`; файл как в v2.3.0); `deploy-site.yml` — только `anomalyco/opencode`. Сайт продукта — `apps/loginom-site`, установщика OpenCode не отдаёт |
+| другой `postinstall` | `services/loginom-ai/npm/cli` | пакет `@openviking/cli` (бинарник `ov`) другого проекта; к CLI продукта и к OpenCode отношения не имеет |
 
 ### Тесты
 
