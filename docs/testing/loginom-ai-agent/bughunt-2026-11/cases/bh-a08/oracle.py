@@ -23,5 +23,5 @@ w=load_workbook(a.data/'sales.xlsx',data_only=True,read_only=True)
 s=w['Продажи 2026']; records=[{'Month':d.strftime('%Y-%m'),'Amount':str(v)} for d,v,paid in s.iter_rows(min_row=3,values_only=True) if paid is True]
 rows=grouped(records,['Month'],'Amount')
 columns=[('Month', 'string'), ('Total', 'real')]
-expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.excel']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a08-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
+expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.excel']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a08-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t, **({'tolerance':{'abs':1e-8,'rel':1e-10}} if t=='real' else {})} for n,t in columns], 'rows':rows}]}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

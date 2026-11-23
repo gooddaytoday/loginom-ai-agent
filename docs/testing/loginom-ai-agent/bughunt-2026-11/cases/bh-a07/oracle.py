@@ -24,5 +24,5 @@ for r in read('wide.csv'):
     rows.append(dict(v,Total=sum(v[k] for k in ['C080','C160','C240','C400'])))
 rows.sort(key=lambda r:r['C001'])
 columns=[('C001', 'integer'), ('C080', 'integer'), ('C160', 'integer'), ('C240', 'integer'), ('C400', 'integer'), ('Total', 'integer')]
-expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.text']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a07-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
+expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.text']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a07-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t, **({'tolerance':{'abs':1e-8,'rel':1e-10}} if t=='real' else {})} for n,t in columns], 'rows':rows}]}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

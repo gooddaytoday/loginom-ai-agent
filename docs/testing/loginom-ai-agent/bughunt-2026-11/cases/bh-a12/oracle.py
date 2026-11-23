@@ -22,5 +22,5 @@ with sqlite3.connect('file:'+str(a.data/'sales.db')+'?mode=ro',uri=True) as db:
     records=[{'Region':r,'Amount':str(v)} for r,v in db.execute('SELECT Region,Amount FROM sales WHERE Active=1 AND Amount>=10')]
 rows=grouped(records,['Region'],'Amount')
 columns=[('Region', 'string'), ('Total', 'real')]
-expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.database']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a12-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
+expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.database']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a12-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t, **({'tolerance':{'abs':1e-8,'rel':1e-10}} if t=='real' else {})} for n,t in columns], 'rows':rows}]}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

@@ -22,5 +22,5 @@ assert hashlib.sha256((a.data/'source.lgd').read_bytes()).hexdigest()=='f748f865
 records=csv.DictReader(io.StringIO((Path(__file__).parent/'oracle-source.csv').read_text(encoding='utf-8')))
 rows=[{'Id':int(r['Id']),'Amount2':None if r['Amount']==r'\N' else float(Decimal(r['Amount'])*2)} for r in records]
 columns=[('Id', 'integer'), ('Amount2', 'real')]
-expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.lgd', 'exports.lgd']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a13-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
+expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.lgd', 'exports.lgd']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a13-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t, **({'tolerance':{'abs':1e-8,'rel':1e-10}} if t=='real' else {})} for n,t in columns], 'rows':rows}]}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

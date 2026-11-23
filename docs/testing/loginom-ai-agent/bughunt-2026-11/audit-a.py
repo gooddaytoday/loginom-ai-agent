@@ -14,7 +14,7 @@ import re
 
 def audit(journal, config):
     calls, errors, repeats, recovery, foreign, forbidden = [], [], [], [], [], []
-    seen, ids, created, deleted = Counter(), set(), set(), set()
+    seen, ids, created, deleted, new_operations = Counter(), set(), set(), set(), set()
     budget = config['budget']
     for line, raw in enumerate(journal.read_text().splitlines(), 1):
         try:
@@ -31,6 +31,10 @@ def audit(journal, config):
         if identity:
             ids.add(identity)
         tool, args = part.get('tool', ''), state.get('input', {})
+        target = args.get('target') or {}
+        operation = args.get('operation_id')
+        if tool == 'loginom_dock_node_apply' and isinstance(target, dict) and target.get('kind') == 'new' and operation:
+            new_operations.add(operation)
         evidence = dict(line=line, tool=tool, input=args)
         calls.append(evidence)
         text = json.dumps(args, ensure_ascii=False, sort_keys=True)
@@ -61,6 +65,11 @@ def audit(journal, config):
             bodies.append(reply['result'])
         if isinstance(reply.get('structuredContent'), dict):
             bodies.append(reply['structuredContent'])
+        outcome = (reply.get('output') or {}).get('outcome') if isinstance(reply.get('output'), dict) else None
+        if isinstance(outcome, dict):
+            bodies.append(outcome)
+            if isinstance(outcome.get('output'), dict):
+                bodies.append(outcome['output'])
         for block in reply.get('content', []):
             if block.get('type') == 'text':
                 try:
@@ -80,6 +89,11 @@ def audit(journal, config):
         receipt = next((b for b in bodies if b.get('status') == 'SUCCEEDED'), {})
         output, node = receipt.get('output') or {}, receipt.get('node') or {}
         node_id = node.get('node_id') or output.get('node_id') or receipt.get('node_id')
+        if operation in new_operations:
+            for body in bodies:
+                current = body.get('node') or (body.get('progress') or {}).get('node') or {}
+                if current.get('node_id'):
+                    created.add(current['node_id'])
         if node_id:
             target = args.get('target') or {}
             if tool == 'loginom_dock_node_apply' and (target == 'create' or isinstance(target, dict) and target.get('kind') in ('new', 'create')):

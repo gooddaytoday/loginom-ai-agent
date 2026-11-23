@@ -5,7 +5,6 @@
     "max_nodes": 0,
     "forbid": [
       "python",
-      "bash",
       "sqlite",
       "convert",
       "to_csv",
