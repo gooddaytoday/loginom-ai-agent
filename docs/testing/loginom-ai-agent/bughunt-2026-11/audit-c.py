@@ -6,6 +6,7 @@ The output is diagnostic evidence, not a replacement for CSV/cold acceptance.
 Keep it outside Git: it contains runtime log locations and native node IDs.
 """
 import argparse
+import csv
 import json
 from collections import Counter
 from pathlib import Path
@@ -58,7 +59,13 @@ def audit(path, cases):
     creates = [call for call in loginom if call['tool'] == 'loginom_dock_node_apply'
                and call['input'].get('target', {}).get('kind') == 'new']
     deletes = [call for call in loginom if call['tool'] == 'loginom_dock_node_delete']
-    nodes = {item['node_id'] for call in creates for item in objects(call['reply']) if item.get('node_id')}
+    creation_operations = {item['operation_id'] for call in creates for item in objects(call['reply'])
+                           if item.get('operation_id')}
+    # An apply can return before the node exists. Correlate its later wait/inspect
+    # receipts, rather than counting attempted new-node requests as creations.
+    creation_receipts = [call for call in loginom if call in creates
+                         or call['input'].get('operation_id') in creation_operations]
+    nodes = {item['node_id'] for call in creation_receipts for item in objects(call['reply']) if item.get('node_id')}
     case = path.parent.name
     config = cases / case / 'case.json'
     budget = json.loads(config.read_text())['budget'] if config.is_file() else {}
@@ -70,12 +77,24 @@ def audit(path, cases):
     for name, count in [('max_tool_calls', len(loginom)), ('max_errors', len(errors)), ('max_nodes', len(nodes))]:
         if name in budget and count > budget[name]:
             breaches.append(dict(metric=name, actual=count, maximum=budget[name]))
+    header = None
+    expected_path, actual_path = path.parent / 'expected.json', path.parent / 'actual.csv'
+    if expected_path.is_file() and actual_path.is_file():
+        expected = json.loads(expected_path.read_text())
+        if len(expected.get('outputs', [])) == 1:
+            text = actual_path.read_text(encoding='utf-8-sig')
+            dialect = csv.Sniffer().sniff(text[:8192], delimiters=',;\t')
+            actual_header = next(csv.reader(text.splitlines(), dialect))
+            wanted_header = [column['name'] for column in expected['outputs'][0]['columns']]
+            header = dict(actual=actual_header, expected=wanted_header, exact=actual_header == wanted_header)
     return dict(case=case, log=str(path), loginom_calls=len(loginom), errors=len(errors),
                 first_error={key: errors[0][key] for key in ('line', 'tool', 'codes')} if errors else None,
                 error_codes=dict(Counter(code for call in errors for code in call['codes'])),
                 recoveries=[dict(line=call['line'], tool=call['tool']) for call in calls
                             if 'recover' in call['tool'] or 'browser_recovery' in json.dumps(call['input'])],
-                new_node_requests=len(creates), created_node_ids=sorted(nodes),
+                new_node_requests=len(creates), created_node_ids=sorted(nodes), csv_header=header,
+                creation_requests=[dict(line=call['line'], type=call['input']['target'].get('type'),
+                                        failed=call['failed']) for call in creates],
                 delete_requests=[dict(line=call['line'], failed=call['failed'], input=call['input']) for call in deletes],
                 identical_repeats=[dict(tool=tool, input=json.loads(request), count=count)
                                    for (tool, request), count in signatures.items() if count > 1],
