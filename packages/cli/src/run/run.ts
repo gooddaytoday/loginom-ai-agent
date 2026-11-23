@@ -65,11 +65,15 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
   const argument = input.message.join(" ") || undefined
   // With a message argument, stdin is extra context: a shell pipe is read in full, but the open, silent
   // stdin that spawn's default stdio gives a child must not hold the run.
+  // Loginom AI Agent (B2.7a4): Ctrl+C while the prompt is still read from stdin cancels the run, as 0.4's did; the read
+  // alone would hold the run, and with it the private server, until the shutdown deadline.
   const piped = process.stdin.isTTY
     ? undefined
-    : argument
-      ? await readStdinIfReady(PIPED_INPUT_GRACE_MS)
-      : await readStdin()
+    : await Promise.race([
+        argument ? readStdinIfReady(PIPED_INPUT_GRACE_MS) : readStdin(),
+        new Promise<undefined>((resolve) => signal.addEventListener("abort", () => resolve(undefined), { once: true })),
+      ])
+  if (signal.aborted) return
   const message = mergeInput(argument, piped)
   if (!message?.trim()) fail("You must provide a message")
   const files = await Promise.all(input.file.map((file) => prepareFile(file, root)))

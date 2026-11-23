@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { isolatedEnv } from "./fixture/environment"
 import { cli, finished, product, productRoot, receipt, scriptedModel, spawnProduct } from "./fixture/product-run"
 
 // Loginom AI Agent (B2.7a4): `run --headless --format json` of the product CLI on OpenCode 2, from source, with a model
@@ -181,6 +182,39 @@ test("Ctrl+C while the model answers cancels the run: exit code 130, CLI_CANCELL
   expect({ code: next.code, busy: next.stdout.includes("PROFILE_BUSY") }).toEqual({ code: 0, busy: false })
 }, 90_000)
 
+// 0.4 `standalone` «bootstrap carries an early signal into stdin admission…»: without a message, `run` reads its prompt
+// from stdin, and a pipe that never closes must not hold the run or its private server after Ctrl+C.
+test("Ctrl+C while run waits for its prompt on stdin exits with 130 and releases the profile", async () => {
+  const llm = model([])
+  const { project, profile } = await root(llm.url)
+  const child = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), ...run(project).slice(0, -2)], {
+    cwd: cli,
+    env: isolatedEnv(roots.at(-1)!, {
+      LOGINOM_AI_AGENT_CLI_ROOT: undefined,
+      LOGINOM_AI_AGENT_CLI_PROFILE: profile.root,
+    }),
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+  // The private server holds the latch, then reports ready, and the run turns to stdin; nothing it prints marks that turn.
+  await until(
+    () => fs.exists(path.join(profile.root, ".writer", "owner")),
+    () => child.exitCode !== null,
+  )
+  await Bun.sleep(2_000)
+  const signalled = Date.now()
+  child.kill("SIGINT")
+  expect(await child.exited).toBe(130)
+  // Well within the 10 s shutdown deadline that a run stuck on stdin runs into.
+  expect(Date.now() - signalled).toBeLessThan(8_000)
+  const [stdout, stderr] = await output
+  expect({ stdout, stderr }).toEqual({ stdout: "", stderr: "" })
+  expect(await fs.readdir(profile.root)).not.toContain(".writer")
+  expect(llm.requests).toEqual([])
+}, 60_000)
+
 // 0.4 `standalone-file-errors`: a file `run` cannot attach is refused before the model. OpenCode 2 refuses it with its
 // own text, not 0.4's `LOGINOM_FILE_*` codes; root reads a file without permissions, so `denied` needs another user.
 test.each(["missing", "directory", ...(process.getuid?.() === 0 ? [] : ["denied"])])(
@@ -213,6 +247,14 @@ test("--headless and --no-headless together are invalid arguments: exit code 2 b
   expect(result.stderr).toStartWith("CLI_ARGUMENT_INVALID")
   expect(await fs.readdir(profile.root)).not.toContain(".writer")
 })
+
+async function until(ready: () => Promise<boolean>, failed: () => boolean, timeout = 30_000) {
+  const deadline = Date.now() + timeout
+  while (!(await ready())) {
+    if (failed() || Date.now() >= deadline) throw new Error("Timed out waiting for condition")
+    await Bun.sleep(50)
+  }
+}
 
 function model(steps: Parameters<typeof scriptedModel>[0]) {
   const llm = scriptedModel(steps)
