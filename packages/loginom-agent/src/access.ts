@@ -10,7 +10,7 @@ export type Grant = Exclude<Profile, "default">
 export const grants: readonly Grant[] = ["package-docs", "loginom-automation"]
 
 // Loginom tools that read local help or diagnose the connection stay available without a grant (0.4 LOGINOM_LOCAL_TOOLS).
-const local = new Set(
+export const local: ReadonlySet<string> = new Set(
   ["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"].map((name) => `loginom_${name}`),
 )
 // OpenCode 2 names: 0.4 `apply_patch`, `bash` and `task` are `patch`, `shell` and `subagent`. `write` and `patch` keep

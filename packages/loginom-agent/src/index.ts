@@ -1,12 +1,14 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
-// (`./host`); this plugin leases it for its sessions (B2.3). The Loginom tools arrive in B2.5.
+// (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
+import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
@@ -72,30 +74,32 @@ export default Plugin.define({
     // that is disposed releases what it still holds. Without a ready Host the lease is `undefined`. A failed record write
     // only loses that lease: the event loop below must keep running to release the others.
     const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
+    // Why the Host refused a session's lease; the model is told (B2.5d).
+    const refused = new Map<string, string>()
     const hold = (sessionID: string) => {
-      const current = leases.get(sessionID) ?? ServiceHost.acquire(sessionID).catch(() => undefined)
+      const current =
+        leases.get(sessionID) ??
+        ServiceHost.acquire(sessionID).then(
+          (lease) => {
+            refused.delete(sessionID)
+            return lease
+          },
+          (error) => {
+            refused.set(sessionID, "acquire: " + hostErrorText(error))
+            return undefined
+          },
+        )
       leases.set(sessionID, current)
       return current
     }
     const drop = async (sessionID: string) => {
       const current = leases.get(sessionID)
       leases.delete(sessionID)
+      refused.delete(sessionID)
+      dock.forget(sessionID)
       const lease = await current
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
     }
-    const stop = new AbortController()
-    void (async () => {
-      const types = [
-        "session.execution.started",
-        "session.execution.succeeded",
-        "session.execution.failed",
-        "session.execution.interrupted",
-      ] as const
-      for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
-        if (event.type === "session.execution.started") void hold(event.data.sessionID)
-        else await drop(event.data.sessionID)
-      }
-    })().catch(() => undefined)
 
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
     // process has not seen a prompt for (resumed after a restart) uses its latest user message.
@@ -150,14 +154,46 @@ export default Plugin.define({
       editor.add(packageDocs(files, ctx.location.directory, resources))
     })
 
+    // The Dock catalog of the session's Host run (B2.5d): its tools come and go with the connection generation. The
+    // `context` hook binds the run to the task and reads the catalog at every step boundary, as 0.4 did every turn; an
+    // admitted prompt and a completed grant or Dock call read it ahead, so the next step's tool snapshot already has it.
+    const dock = await dockTools({
+      plugin: ctx,
+      files,
+      profiles,
+      lease: hold,
+      failure: (sessionID) => refused.get(sessionID),
+      task,
+    })
+
+    // The lease events start once the catalog that `drop` clears exists.
+    const stop = new AbortController()
+    void (async () => {
+      const types = [
+        "session.execution.started",
+        "session.execution.succeeded",
+        "session.execution.failed",
+        "session.execution.interrupted",
+      ] as const
+      for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
+        if (event.type === "session.execution.started") void hold(event.data.sessionID)
+        else await drop(event.data.sessionID)
+      }
+    })().catch(() => undefined)
+
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.
     const hide = (event: SessionContext) => {
       const current = profile(event.sessionID)
       Object.keys(event.tools)
         .filter((name) => !permits(current, name))
         .forEach((name) => delete event.tools[name])
+      dock.hide(event)
     }
-    await ctx.session.hook("context", hide)
+    await ctx.session.hook("context", async (event) => {
+      await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
+      hide(event)
+      dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
+    })
     await ctx.session.hook("compaction", hide)
     await ctx.session.hook("generate", hide)
     await ctx.tool.hook("execute.before", (event) => {
@@ -166,16 +202,21 @@ export default Plugin.define({
     })
 
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
-    await ctx.tool.hook("execute.after", (event) => {
-      if (event.tool !== "skill" || event.status !== "completed") return
-      const current = profile(event.sessionID)
-      const requested = next(current, (event.input as { id?: unknown } | undefined)?.id)
-      if (requested !== "default") granted.set(event.sessionID, requested)
+    await ctx.tool.hook("execute.after", async (event) => {
+      if (event.status !== "completed") return
+      if (event.tool === "skill") {
+        const current = profile(event.sessionID)
+        const requested = next(current, (event.input as { id?: unknown } | undefined)?.id)
+        if (requested === "default" || requested === current) return
+        granted.set(event.sessionID, requested)
+      }
+      if (event.tool === "skill" || dock.registered(event.tool))
+        await dock.refresh(event.sessionID, profile(event.sessionID), undefined, true)
     })
 
     // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
     // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
-    await ctx.session.hook("prompt", (event) => {
+    await ctx.session.hook("prompt", async (event) => {
       tasks.set(event.sessionID, event.messageID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
@@ -186,6 +227,7 @@ export default Plugin.define({
           : (event.prompt.skills ?? []).reduce<Profile>((current, skill) => next(current, skill.id), "default")
       if (requested === "default") granted.delete(event.sessionID)
       else granted.set(event.sessionID, requested)
+      await dock.refresh(event.sessionID, requested, undefined, true)
     })
     await ctx.session.hook("fork", (event) => {
       granted.delete(event.sessionID)

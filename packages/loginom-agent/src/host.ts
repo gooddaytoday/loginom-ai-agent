@@ -83,7 +83,10 @@ export function close() {
   return current.closing
 }
 
-/** A Host run for one execution of `session`, recorded until `release`; `undefined` without a ready Host. */
+/**
+ * A Host run for one execution of `session`, recorded until `release`; `undefined` without a ready Host. A Host that
+ * refuses the run rejects with its reason (for example `LOGINOM_RECOVERY_REQUIRED`), which the model is told (B2.5d).
+ */
 export async function acquire(session: string) {
   const current = state.current
   if (!current || current.closing) return undefined
@@ -92,7 +95,10 @@ export async function acquire(session: string) {
   const file = join(current.directory, randomUUID() + ".json")
   await writeFile(file + ".tmp", JSON.stringify({ session, pid: process.pid }), { mode: 0o600 })
   await rename(file + ".tmp", file)
-  const lease = await LoginomHost.acquire(session).catch(() => undefined)
+  const lease = await LoginomHost.acquire(session).catch(async (error) => {
+    await rm(file, { force: true })
+    throw error
+  })
   if (!lease) {
     await rm(file, { force: true })
     return undefined

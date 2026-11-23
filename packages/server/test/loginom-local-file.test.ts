@@ -28,8 +28,10 @@ import { it } from "../../core/test/lib/effect"
 import { fileReferences } from "../../loginom-host/src/file-reference"
 import { fileTools } from "../../loginom-agent/src/file-profile"
 import { profileFile, sampleFile } from "../../loginom-agent/src/file-profile-core"
+import { ServiceHost } from "../../loginom-agent/src/host"
 import { localFiles, type Lease } from "../../loginom-agent/src/local-file"
 import { createEmbeddedRoutes } from "../src/routes"
+import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
 import { pluginsLoaded } from "./fixture/routes"
 
 // Local file admission of the product plugin (B2.5a), ported from 0.4
@@ -238,6 +240,22 @@ const boot = Effect.gen(function* () {
     asked: (sessionID: string) => asked.filter((item) => item.sessionID === sessionID).map((item) => item.action),
   }
 })
+
+// 0.4 offered the product's file tools only beside a prepared Dock, whose catalog describes Dock actions (B2.5d): a
+// scripted Host with such a catalog, whose runs already have a browser runtime.
+const preparedDock = tmpdirScoped("loginom-local-file-host-").pipe(
+  Effect.flatMap((dir) =>
+    Effect.acquireRelease(
+      Effect.promise(() =>
+        ServiceHost.start({
+          data: dir.path,
+          connect: scriptedHost({ catalog: () => [dockTool("dock_action_describe")], prepared: true }).connect,
+        }),
+      ),
+      () => Effect.promise(() => ServiceHost.close()),
+    ),
+  ),
+)
 
 const truncate = (file: string, size: number) =>
   Effect.promise(async () => {
@@ -770,7 +788,9 @@ describe("loginom local file admission (B2.5a)", () => {
     "the product's loginom_file_admit is hidden and rejected without the loginom-automation grant (G1 gate)",
     () =>
       Effect.gen(function* () {
+        yield* preparedDock
         const test = yield* boot
+        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "input.csv"), "amount\n10\n"))
         const call = script({ tool: "loginom_file_admit", input: { path: "input.csv" } }, { text: "end" })
         // No grant: not offered, and a call is rejected by the gate before the tool runs.
         const plain = yield* test.create()
@@ -787,8 +807,8 @@ describe("loginom local file admission (B2.5a)", () => {
         expect(names(docsRequests[0])).not.toContain("loginom_file_admit")
         expect(JSON.stringify(docsRequests[1].messages)).toContain("LOGINOM_SCOPE_DENIED")
 
-        // loginom-automation: offered with 0.4's name, description and input, and the call reaches the tool. There is no
-        // Host lease before B2.3, so the tool answers LOGINOM_HOST_NOT_READY.
+        // loginom-automation: offered with 0.4's name, description and input beside the prepared Dock, and the call goes
+        // through the tool to the Host, which admits the file into the task's run.
         const granted = yield* test.create()
         yield* test.wizard(granted, "loginom-automation", call)
         const grantedRequests = yield* test.requests(granted)
@@ -801,9 +821,10 @@ describe("loginom local file admission (B2.5a)", () => {
             additionalProperties: false,
           },
         })
-        expect(JSON.stringify(grantedRequests[1].messages)).toContain("LOGINOM_HOST_NOT_READY")
+        expect(JSON.stringify(grantedRequests[1].messages)).toContain("artifact-1")
         expect(JSON.stringify(grantedRequests[1].messages)).not.toContain("LOGINOM_SCOPE_DENIED")
-        for (const sessionID of [plain, docs, granted]) expect(test.asked(sessionID)).toEqual([])
+        for (const sessionID of [plain, docs]) expect(test.asked(sessionID)).toEqual([])
+        expect(test.asked(granted)).toEqual(["loginom_file_admit", "read"])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -1033,6 +1054,7 @@ describe("loginom file profile tools (B2.5b1)", () => {
     "the product's file profile tools are hidden and rejected without the loginom-automation grant (G1 gate)",
     () =>
       Effect.gen(function* () {
+        yield* preparedDock
         const test = yield* boot
         const profileTools = ["loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
         // Each input fails inside its tool before a profile is written: the product's own tools keep profiles under
@@ -1057,7 +1079,8 @@ describe("loginom file profile tools (B2.5b1)", () => {
         yield* test.wizard(docs, "package-docs", calls)
         refused(yield* test.requests(docs))
 
-        // loginom-automation: 0.4's file tools, offered with the product's definitions, and each call reaches its tool.
+        // loginom-automation: 0.4's file tools, offered with the product's definitions beside the prepared Dock, and each
+        // call reaches its tool.
         const granted = yield* test.create()
         yield* test.wizard(granted, "loginom-automation", calls)
         const grantedRequests = yield* test.requests(granted)
