@@ -263,6 +263,13 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       code: 0,
       stdout: expect.stringContaining(`Подключение настроено: ${login.url}, пользователь ${login.username}.`),
     })
+    // Help of the command's own Host has not answered yet: status reports the saved connection, not that phase.
+    await fs.writeFile(path.join(fixture.root, "hold-help"), "")
+    expect(await loginom(fixture, ["status", "--format", "json"])).toMatchObject({
+      code: 0,
+      json: { generation: 2, state: "configured" },
+    })
+    await fs.rm(path.join(fixture.root, "hold-help"))
 
     // The profile's server starts its Host in the same directory (B2.3): it prepares Help for the saved generation.
     const before = (await records(fixture.starts)).length
@@ -568,14 +575,15 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE") {
   await fs.writeFile(path.join(resources, "browser"), "controlled browser payload")
   await fs.writeFile(
     path.join(resources, "runtime", "src", "knowledge-entry.mjs"),
-    `import { appendFileSync } from "node:fs";
+    `import { appendFileSync, existsSync } from "node:fs";
     process.on("disconnect", () => process.exit(0));
     process.on("message", m => {
       if (m.operation === "start") {
         appendFileSync(${JSON.stringify(starts)}, JSON.stringify({ generation: m.input.generation, pid: process.pid }) + "\\n");
         process.send({ id: m.id, result: { protocol: 1, generation: m.input.generation, started: true } });
       }
-      if (m.operation === "list") process.send({ id: m.id, result: { tools: [] } });
+      // While the test holds Help, its catalog stays pending: the Host reports the connection as starting.
+      if (m.operation === "list" && !existsSync(${JSON.stringify(path.join(root, "hold-help"))})) process.send({ id: m.id, result: { tools: [] } });
       if (m.operation === "interrupt") process.send({ id: m.id, result: { interrupted: true } });
       if (m.operation === "close") process.send({ id: m.id, result: { closed: true } }, () => process.disconnect());
     });`,
