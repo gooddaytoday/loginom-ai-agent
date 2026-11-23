@@ -62,6 +62,32 @@ test("minifies only builds, previews onboarding only in development, and ships s
   expect(existsSync(path.resolve(import.meta.dirname, root, publicDir, "oc-theme-preload.js"))).toBe(true)
 })
 
+// Loginom AI Agent (B4.12): Product.updateFeed in main is the build's LOGINOM_AI_AGENT_UPDATE_FEED and nothing else, the
+// same input electron-builder writes into app-update.yml. Without it the updater is off; there is no fallback feed.
+test.each([
+  { build: "no feed", feed: undefined, define: "null" },
+  { build: "an empty feed", feed: "", define: "null" },
+  {
+    build: "a feed",
+    feed: "  https://updates.example.test/loginom/  ",
+    define: JSON.stringify("https://updates.example.test/loginom/"),
+  },
+])("a build with $build gives the main bundle the product update feed $define", async ({ feed, define }) => {
+  const previous = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+
+  try {
+    if (feed === undefined) delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+    else process.env.LOGINOM_AI_AGENT_UPDATE_FEED = feed
+
+    for (const command of ["build", "serve"] as const)
+      expect((await load(command)).config.main?.define?.LOGINOM_AI_AGENT_UPDATE_FEED).toBe(define)
+  } finally {
+    delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
+
+    if (previous !== undefined) process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previous
+  }
+})
+
 test("bundles one Effect runtime and Drizzle while keeping native dependencies external", async () => {
   for (const name of bundled) {
     expect(Object.keys(pkg.dependencies)).not.toContain(name)

@@ -3,6 +3,8 @@ import { promisify } from "node:util"
 import { app, autoUpdater } from "electron"
 import pkg from "electron-updater"
 import { Effect } from "effect"
+import { Product } from "@loginom-ai-agent/product"
+import { isProductBuild } from "./feed"
 import type { Platform } from "./machine"
 
 const updateClient = pkg.autoUpdater
@@ -13,8 +15,8 @@ const restartTimeout = 10_000
 
 const unpackTimeout = 120_000
 
-export const make = Effect.fn("Updater.platform")(function* (channel: string) {
-  const userAgent = `opencode/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
+export const make = Effect.fn("Updater.platform")(function* (channel: string, feed: string) {
+  const userAgent = `${Product.slug}/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...args)),
@@ -22,6 +24,8 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string) {
     error: (...args) => runFork(Effect.logError(...args)),
     debug: (...args) => runFork(Effect.logDebug(...args)),
   }
+  // Loginom AI Agent (B4.12): the product feed the build set, whatever app-update.yml names.
+  updateClient.setFeedURL({ provider: "generic", url: feed, channel: "latest" })
   updateClient.channel = "latest"
   updateClient.requestHeaders = { "User-Agent": userAgent }
   updateClient.allowPrerelease = false
@@ -42,6 +46,10 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string) {
 
         if (!result?.isUpdateAvailable) return undefined
         const files = result.updateInfo.files
+
+        // Loginom AI Agent (UPDATE-01): the product never installs an OpenCode build, as in 0.4.
+        if (!isProductBuild(files, feed)) throw new Error("LOGINOM_UPDATE_TARGET_INVALID")
+
         // electron-updater picks the installer whose name contains process.arch, which emulation on Windows ARM64
         // reports as x64. downloadUpdate() reads this same list, so keeping only the ARM64 installer moves the install
         // to the native build. macOS needs nothing here: electron-updater already prefers arm64 under Rosetta.

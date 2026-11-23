@@ -1,5 +1,6 @@
 import { dialog } from "electron"
 import { Effect, Exit, Schema, Scope } from "effect"
+import { Product } from "@loginom-ai-agent/product"
 import { builtinMainContext } from "@opencode/plugin/gui/builtin"
 import { MenubarItem, type Plugin } from "@opencode/plugin/gui/main"
 import { Updater } from "@opencode/plugin/gui/updater"
@@ -10,7 +11,10 @@ const setup: Plugin.MainSetup = async (ctx) => {
   const builtin = builtinMainContext(ctx)
   const build = ctx.app
   const lifecycle = builtin.lifecycle
-  const enabled = build.packaged
+  // Loginom AI Agent (B4.12): updates come only from the product feed the build sets; without it the updater is off
+  // and requests nothing, as in 0.4.
+  const feed = build.packaged ? Product.updateFeed : null
+  const enabled = feed !== null
   // Holds no resources, so it needs no cleanup.
   const context = logContext(ctx.log.write)
   const runPromise = Effect.runPromiseWith(context)
@@ -25,7 +29,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
 
   // electron-updater loads only in packaged builds, after the first window is up.
   const platform = enabled
-    ? await import("./platform").then((module) => runPromise(module.make(build.channel)))
+    ? await import("./platform").then((module) => runPromise(module.make(build.channel, feed)))
     : undefined
 
   if (ctx.signal.aborted) return

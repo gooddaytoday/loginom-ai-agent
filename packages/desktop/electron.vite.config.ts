@@ -45,6 +45,8 @@ export default defineConfig(({ command }) => {
       define: {
         // Local renderer/server mode still uses the dev application identity and updater policy.
         "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
+        // Loginom AI Agent (B4.12): Product.updateFeed, the only feed the updater checks; without it the updater is off.
+        LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
       },
       build: {
         minify: command === "build",

@@ -15,7 +15,8 @@ export function createDesktopNotify(api: DesktopNotifyAPI): Platform["notify"] {
 
     const notification = new Notification(title, {
       body: description ?? "",
-      icon: "https://opencode.ai/favicon-96x96-v3.png",
+      // Loginom AI Agent (B4.12): the product icon the renderer serves from app/public, as web notifications (B4.6).
+      icon: "/loginom-icon.png",
       silent: true,
     })
 
