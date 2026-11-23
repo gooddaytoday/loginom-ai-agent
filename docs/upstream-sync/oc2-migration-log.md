@@ -14485,3 +14485,265 @@ Found 554 warnings and 0 errors.                                      # в фа�
 - Значок окна на живом окне (Linux, Windows) и Dock установленного приложения на macOS: приложение не запускалось,
   macOS и Windows не собирались.
 - `Categories=Office` в ярлыке deb и AppImage — только тест конфига.
+
+## B4.11d Остатки бренда
+
+23.11.2026. Ветка `b411d-brand-rest` от `oc2-migration` (`612aba774c`), рабочее дерево `.claude/worktrees/b411d`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите.
+`packages/desktop/src/main/service` и `lifecycle` (B4.10) не трогал. Окно Desktop не запускалось, настоящая модель не
+вызывалась. База для сравнения — отдельное дерево `<scratchpad>/b411d-base` на `612aba774c`.
+
+Прочитано: журнал B4.11, B4.11b, B4.11c, B4.5a, B4.6, B4.6b (списки «осталось»); BRAND-01; В-97 п. 8; эталон `v0.4.0`:
+`ui/src/components/logo.{tsx,css}`, `app/src/pages/error.tsx`, `app/src/pages/layout/helpers.ts`,
+`desktop/src/renderer/index.html`, `desktop/package.json`, `app/src/i18n/{en,ru}.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `a4d5eea4e9` `fix(app): product marks, error page name and license on Desktop (B4.11d)` | пп. 1–5, 7, тексты 0.4, тесты, файлы `app/public` |
+| следующий | этот раздел; CAT-03, CAT-09, CAT-10, CAT-12 в `catalog.md` |
+
+Файлов кода шесть — предел задания: `desktop/src/renderer/startup/splash.tsx`, `ui/src/components/logo.tsx`,
+`app/src/shell/errors/error.tsx`, `desktop/src/renderer/index.html`, `app/test-browser/product-brand.test.ts` (бывший
+`logo-splash.test.ts` B4.6b) и `app/e2e/regression/settings.spec.ts` (одна строка). Словари — `app/src/runtime/i18n/{en,ru}.ts`,
+`gui-plugins/src/pairing/i18n/en.ts`. Ассеты — 10 удалённых символьных ссылок и `favicon.svg` в `app/public`.
+
+### Нарезка: п. 6 не вошёл
+
+Полный список задания требует восьми файлов кода. Сверх шести:
+
+- **п. 4 тянет e2e.** `settings.spec.ts:2741` ждёт на «О программе» текст `Released under the MIT License`; без правки
+  строки e2e краснеет (мутация ниже). Это шестой файл.
+- **п. 6 — ещё два файла:** `ui/src/data-display/project-avatar/project-avatar.tsx:83` и его тест
+  `project-avatar.test.ts:17`, который держит адрес `https://opencode.ai/favicon.svg`.
+
+Взял пп. 1–5 и 7, п. 6 оставил второй нарезке: аватар срабатывает только для трёх id репозитория OpenCode (ниже), а
+пп. 1–4 требуют тестов. Вторая нарезка — два файла: `getProjectAvatarSource` отдаёт знак продукта (в 0.4 —
+`/loginom-icon.svg` для id `4b0ea68d…`, `pages/layout/helpers.ts:90`) и тест; адрес `/loginom-icon.svg` в v2 сейчас
+отдал бы 404 — в `app/public` есть только `loginom-icon.png` и `favicon.svg` (теперь знак продукта). Ещё одна задача по
+WSL, SSH и строкам `en`/`ru` — в «Что осталось».
+
+### Пункты
+
+| № | Было (`612aba774c`) | Стало | 0.4 (`v0.4.0`) |
+|---|---|---|---|
+| 1. Заставка свежей установки | `startup/splash.tsx`: `Wordmark` из `ui/wordmark` — «opencode» контуром, анимация `first-launch-wordmark-draw` | `Splash` (знак продукта, B4.6b), классы обычной заставки без `animate-pulse`; место на странице прежнее | такой заставки не было |
+| 1а. Предпросмотр знакомства | конец рисования — `onAnimationEnd` контуров или сразу при reduced motion | `props.onDrawEnd()` сразу после `onDrawStart()`: контура у знака нет, иначе `LOGINOM_AI_AGENT_TEST_ONBOARDING=1` ждал бы `drawing: "running"` вечно | — |
+| 2. `Mark` | знак OpenCode путями, `viewBox` 16×20 | `<image href={loginom-icon.svg}>`, `viewBox` 1024 — тело 0.4 | то же |
+| 3. Страница ошибки | `Logo` — слово-знак `opencode` (`error.tsx:409`) | `<p>{Product.name}</p>`, крупно и бледно, как был `Logo` (`opacity-12`); импорт `Logo` убран | `Logo` был текстом «Loginom AI Agent» в SVG |
+| 3б. «on Discord» | подпись «on Discord» / «в Discord» и значок Discord, ссылка `Product.support` (B4.11c) | без изменений | то же: `en:736`, `ru:825`, `pages/error.tsx:358-361` |
+| 4. Лицензия в «О программе» | `Released under the MIT License` / `Выпущен под индексом MIT License` | `Released under MIT AND AGPL-3.0-only` / `Выпущен под лицензией MIT AND AGPL-3.0-only` | `license` Desktop: `MIT AND AGPL-3.0-only`; строки About не было |
+| 5. `app/public` | 12 символьных ссылок на значки и картинки OpenCode в `ui/src/assets`; `renderer/index.html` ссылается на пять из них | 10 удалены, `favicon.svg` ведёт на знак продукта, `social-share.png` оставлен; страница Desktop — `./loginom-icon.png` | `loginom-favicon-32-v1.png`, `loginom-favicon-v1.svg` |
+| 6. Аватар проекта | `https://opencode.ai/favicon.svg` | не менялся — вторая нарезка | `/loginom-icon.svg` |
+| 7. Плагины | `en` сопряжения, WSL, SSH называют OpenCode | сопряжение `en` — имя продукта; WSL и SSH — без изменений, ниже | — |
+
+**3б — по 0.4 менять нечего.** В `v0.4.0` та же подпись, тот же значок и та же ссылка на `Product.support` (GitHub
+issues продукта). Несоответствие «Discord» и GitHub осталось, как в 0.4, — в «Что осталось».
+
+**`Logo` не тронут.** Его рисует слово-знак нового чата (`new-session/wordmark.tsx:259` кладёт `Logo` поверх своих букв
+234×42) — этап C. Замена `Logo` на текст, как в 0.4, сломала бы этот экран, поэтому правка — в `error.tsx`.
+
+**`Mark` и `logo.css`.** `[data-component="logo-mark"]` в v2 — `aspect-ratio: 4/5` (0.4 менял на `1`). Ширину задаёт
+класс вызова (`w-14`, слой utilities), квадратный знак встаёт по центру рамки 56×70. `logo.css` не правил — седьмой файл.
+
+### `app/public`
+
+Кто ссылается на 12 файлов (`grep` по `packages`, `services`, `apps`):
+
+| Файл | Ссылки на базе | Решение |
+|---|---|---|
+| `favicon-96x96-v3.png`, `favicon-v3.svg`, `favicon-v3.ico`, `apple-touch-icon-v3.png` | `desktop/src/renderer/index.html`; `ui/src/components/favicon.tsx` (импортёров нет, только история `UI/Favicon`) | удалены; страница Desktop — `./loginom-icon.png` |
+| `favicon.ico`, `favicon-96x96.png`, `apple-touch-icon.png`, `web-app-manifest-{192x192,512x512}.png`, `social-share-zen.png` | нет: веб-манифест и значки веб-версии — из `desktop/icons/<канал>` (`app/vite.icons.ts`) | удалены |
+| `favicon.svg` | `perf/composer.bench.ts:38` открывает `/favicon.svg` как статическую страницу до приложения | ссылка на `ui/src/assets/loginom/loginom-icon.svg` |
+| `social-share.png` | `og:image` и `twitter:image` веб-страницы `app/index.html` (её отдаёт и CLI) | оставлен: пользователь Desktop его не видит, картинки продукта нет |
+
+История `UI/Favicon` теперь ссылается на отсутствующие файлы — это только теги `<head>` в каталоге историй, сборку не
+ломает. `e2e/utils/serve.ts:57` отвечает на `/favicon.ico` 404 и без файла.
+
+Сборки — код 0, обе удалены после проверки:
+
+```text
+$ cd packages/desktop && bunx electron-vite build                     # exit=0
+$ ls out/renderer                                                      # файлы
+_headers  favicon.svg  index.html  loginom-icon.png  oc-theme-preload.js  social-share.png
+favicon.svg == loginom-icon.svg; social-share.png == upstream image    # cmp
+<link rel="icon" type="image/png" href="./loginom-icon.png" sizes="128x128" />   # out/renderer/index.html
+path знака Mark OpenCode "M12 4H4V16H12V4Z…": не найден в out/renderer
+path слова-знака Wordmark "M55.3846 36.4286…": только assets/screen-*.js (экран подключения к серверу, ниже)
+favicon-96x96: только main-*.js — `https://opencode.ai/favicon-96x96-v3.png` уведомлений Desktop (B4.12)
+$ cd packages/app && bun run build                                     # exit=0
+dist: _headers favicon.svg icons/ index.html loginom-icon.png oc-theme-preload.js site.webmanifest social-share.png sw.js …
+```
+
+### Плагины GUI (п. 7)
+
+Все три видны в Desktop: сопряжение — страница настроек при `ctx.desktop`; SSH — при `platform === "desktop"`; WSL —
+`os: ["windows"]`.
+
+- **Сопряжение** — сервер этой машины и есть служба продукта. `en` (`ru` у плагина нет, берётся `en`): `description`,
+  `dialog.description`, `remote.description`, `screenActive.description` называют `Loginom AI Agent`.
+- **WSL и SSH не переименованы.** Они ставят на удалённую машину OpenCode upstream: WSL —
+  `curl https://raw.githubusercontent.com/anomalyco/opencode/v2/install | bash` (`wsl/remote-cli.ts`), SSH — тот же
+  скрипт или `registry.npmjs.org/@opencode/cli-<target>` (`ssh/remote-cli.ts:79,91`). «Install OpenCode», «OpenCode not
+  installed», «the OpenCode server did not become ready» описывают то, что они ставят. Имя продукта здесь появится
+  вместе с заменой источника установки. К тому же `settings-wsl.spec.ts:30-33,121-123,151` держит эти тексты — ещё файл.
+- **Терминал, детали, браузер** — не в списке п. 7, но в области `grep`; разобраны ниже.
+
+### Тесты
+
+`app/test-browser/product-brand.test.ts` — 7 тестов. Компоненты компилирует `babel-preset-solid`, как Vite; фильтр
+расширен с `logo.tsx` на все `packages/*/src/**/*.tsx`. Стили заставки — пустой модуль. DOM — happy-dom `test:browser`.
+
+- `Splash` и `Mark` — нет `path`, `href` картинки — `loginom-icon.svg`, текст равен `apps/loginom-site/assets/loginom-icon.svg`.
+- `LoadingSplash` Desktop с `firstLaunch` и `drawingPaused` (окно видно и в фокусе, reduced motion нет) — знак продукта,
+  путей нет; вызовы `["start", "end"]`.
+- `ErrorPage` с `PlatformProvider` и `LanguageProvider` (`en`) — нет `path`, есть `Product.name`, нет `opencode`;
+  нажатие «on Discord» открывает `Product.support`.
+- `settings.about.license` в `en` и `ru` содержит `MIT AND AGPL-3.0-only`.
+- `en` сопряжения и пять ключей 0.4 в `en`/`ru` — без `opencode`.
+- Страница Desktop ссылается хотя бы на один файл, каждый существует в `app/public` и не ведёт в `ui/src/assets/favicon`;
+  в `app/public` нет ссылок туда же.
+
+Мутации (`<scratchpad>/b411d/mut/mutate.py`: одна правка или файл с базы, прогон теста, возврат байтов; `git status`
+после — как до):
+
+```text
+=== M0 none: 7 pass / 0 fail
+=== M1 first-launch splash draws the OpenCode wordmark (v2 splash.tsx): 6 pass / 1 fail; the first-launch splash draws the product mark and still finishes the onboarding preview
+=== M2 first-launch drawing ends only on reduced motion (v2 handshake): 6 pass / 1 fail; the first-launch splash …
+=== M3 Mark is the OpenCode mark (v2 logo.tsx): 6 pass / 1 fail; the empty side pane draws the product mark
+=== M4 error page shows the OpenCode wordmark (v2 error.tsx): 6 pass / 1 fail; the error page names the product and sends reports to the product
+=== M5 error page reports to opencode.ai: 6 pass / 1 fail; the error page …
+=== M6 en license MIT: 6 pass / 1 fail; About states the license of Desktop 0.4 in en and ru
+=== M7 ru license MIT: 6 pass / 1 fail; About states the license …
+=== M8 Desktop page links the OpenCode favicons (v2 index.html): 6 pass / 1 fail; the Desktop page and the public folder carry no OpenCode favicons
+=== M9 OpenCode favicon back in app/public: 6 pass / 1 fail; the Desktop page and the public folder …
+=== M10 favicon.svg is the OpenCode favicon again: 6 pass / 1 fail; the Desktop page and the public folder …
+=== M11 pairing en says OpenCode server: 6 pass / 1 fail; pairing and the settings rows that 0.4 named the product do not say OpenCode
+=== M12 ru theme row says OpenCode: 6 pass / 1 fail; pairing and the settings rows …
+```
+
+e2e на dev-сервере Vite (Chromium 1248 вместо 1223 — ссылки в `<scratchpad>/pw-browsers`, как в B4.11c):
+
+```text
+$ PLAYWRIGHT_BROWSERS_PATH=<scratch>/pw-browsers PLAYWRIGHT_PORT=3417 bunx playwright test \
+    e2e/regression/settings.spec.ts -g "about names the product|every page scrolls"
+  3 passed (54.1s)                                           # About; раскладка desktop и mobile
+=== en settings.about.license снова «Released under the MIT License», -g "settings layout \(desktop\)"
+Locator: … .getByText('Released under MIT AND AGPL-3.0-only')   Expected: visible
+  1 failed
+```
+
+### Приёмка
+
+База `612aba774c` (`<scratchpad>/b411d-base`), итог `a4d5eea4e9`; `<scratchpad>/b411d/suites.sh`.
+
+| Команда | `612aba774c` | `a4d5eea4e9` |
+|---|---|---|
+| `app`: `bun typecheck` | 2 391 файл, ошибок нет | то же |
+| `app`: `bun run test:unit` | 2 719 pass, 0 fail (275 файлов) | то же |
+| `app`: `bun run test:browser` | 361 pass, 0 fail (59 файлов) | 367 pass, 0 fail (59): +6 в `product-brand.test.ts` |
+| `ui`: `bun typecheck` | 264 файла, ошибок нет | то же |
+| `ui`: `bun test src` | 620 pass, 0 fail | то же |
+| `desktop`: `bun typecheck` | 3 519 файлов, ошибок нет | 3 518: заставка больше не тянет `wordmark.tsx` |
+| `desktop`: `bun test --timeout 30000` | 573 pass, 4 skip, 0 fail | то же |
+| `gui-plugins`: `bun typecheck` | 1 422 файла, ошибок нет | то же |
+| `gui-plugins`: `bun test` | 1 129 pass, 1 skip, 0 fail | то же |
+
+`test-browser` в `tsconfig` `app` не входит; временный `tsconfig` с тестом и `splash.tsx` (`bun check -p`, удалён) —
+ошибок нет, внесённая ошибка находится. `prettier --check` по шести файлам и словарям — мои строки чистые; в `ru.ts`
+остаются пустые строки 181, 242 и строки 858–859 от `apply-identity` (B4.11).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 557 divergent upstream files       # база 544: +13
+  CAT-03: 96                                              # база 85: 10 удалённых ссылок и favicon.svg
+  CAT-09: 36                                              # база 35: startup/splash.tsx
+  CAT-12: 185                                             # база 184: pairing/i18n/en.ts
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
+would change: 0 files
+```
+
+`bun run check` — ниже, после раздела.
+
+### Остатки в области `grep`
+
+Область приёмки: `packages/app/src`, `packages/ui/src`, `packages/app/public` и `gui-plugins/src/*/i18n/{en,ru}.ts`,
+`git grep -n -i opencode` — 3 653 строки (база — 3 667). Каждая строка отнесена к классу правилом по пути, ключу словаря
+или тексту (`<scratchpad>/b411d/classify.py`); неразобранных — 0.
+
+**Видит пользователь Desktop — нужна задача:**
+
+| Класс | Строк | Где | Причина, что делать |
+|---|---|---|---|
+| APP-NAME | 22 | `en`: `dialog.provider.description`, `voice.assistant`, `provider.connect.oauth.auto.paste.description`, `dialog.mcp.signIn.description`, `project.settings.name.description`, `project.settings.extensions.empty.{mcps,plugins,skills}.description`, `settings.workspaces.empty.description`; `ru` — пять из них; `gui-plugins` `details/en` (7: «Add a server with OpenCode», запросы к модели про «global OpenCode config»), `browser/en` `site.local.description` | OpenCode здесь — само приложение; текста 0.4 нет, перевод не придумывал. Задача словарей `en`/`ru` в шлюзе B (В-97 п. 8) |
+| PLUGIN-REMOTE | 29 | `wsl/{en,ru}` (24), `ssh/{en,ru}` `error.service` (2), `terminal/en` (3) | удалённый сервер — OpenCode upstream (выше); имя вместе с заменой источника установки. `settings-wsl.spec.ts`, `terminal.spec.ts:537` держат тексты |
+| THEME-NAME | 2 | `ui/src/theme/context.tsx:68` `"oc-2": "OpenCode"`, `themes/oc-2.json` | тема по умолчанию в «Оформлении» называется OpenCode; в 0.4 — `OC-2`. Код `ui` |
+| TIPS | 3 | `tips/model.ts:60,72`, `en` `tips.browse.description` | подсказки ведут на расширение браузера OpenCode и приложение Hex Anomaly (`anoma.ly/hex`, `utm_source=opencode-desktop`) |
+| VOICE-PROMPT | 2 | `voice/spec.ts:5,16` | инструкции голосовой модели: «You are OpenCode's voice assistant»; голос включён не в `prod` (`voice/composer.tsx:56`) |
+| CONNECT-SCREEN | 2 | `servers/connect/screen.tsx:21` (`Wordmark`, `aria-label="OpenCode"`), `:146` `opencode pair` | экран без серверов или после выхода (`routes.tsx:123`); у Desktop есть встроенный сервер, чаще — веб и сопряжённое устройство |
+| AVATAR | 1 | `project-avatar.tsx:83` | п. 6, вторая нарезка |
+
+**Не бренд продукта или другой этап:**
+
+| Класс | Строк | Причина |
+|---|---|---|
+| L57 | 1 827 | остальные 57 языков `app` и `ui` — этап C (В-97 п. 8) |
+| PKG | 1 041 | имена рабочих пакетов `@opencode/*` в импортах (B4.5a: не переименовывались) |
+| TEST | 444 | тесты, истории, лаборатория компонентов (`/components`, только dev и beta, `routes.tsx:28-33`) |
+| PROVIDER | 89 | провайдер OpenCode: Zen, Go, Console, Free — id, ссылки `opencode.ai/{console,go,auth}`, ключи `en`/`ru`/`ui`, `client_id=opencode-desktop`, подпись модели `OpenCode / …`; судьба провайдера — этап C (B4.11c) |
+| IDENT | 90 | ключи `localStorage`/IndexedDB/`BroadcastChannel`/Web Locks, имена типов клиента, `VITE_OPENCODE_*`, CSS-классы, id спрайта, имя пользователя Basic auth `opencode`, имя приложения в API плагинов; не видны |
+| THEME-SCHEMA | 39 | `$schema` тем и `desktop-theme.schema.json` — метаданные JSON |
+| COMMENT | 33 | комментарии и `README.md` |
+| CLI | 10 | команда `opencode` в текстах (`opencode pair`, `opencode service get password`, `desktop.cli.installed.message`) — B4.7 |
+| LEGAL | 9 | `settings.about.trademark` (не показывается, B4.11b), запись OpenCode в сведениях о лицензиях и `contributors.ts` без импортёров (B4.11c) |
+| REMOTE | 4 | `server.row.incompatible`, `session.error.incompatible.description` (`en`/`ru`): версия OpenCode сервера |
+| DOCS | 3 | документация тем и навыков opencode.ai — своей нет (B4.11c) |
+| UI-FAVICON | 3 | `ui/src/assets/favicon/site.webmanifest`, `ui/src/components/favicon.tsx` — без импортёров, в сборки не входят |
+
+### Каталог
+
+`catalog.json` не менялся: `app/public` — CAT-03, `desktop/src/renderer/**` — CAT-09, `app`/`ui` — CAT-10, словарь
+сопряжения — CAT-12. В `catalog.md`: CAT-03 — файлы `app/public`; CAT-09 — значок страницы и заставка первого запуска;
+CAT-10 — `Mark`, страница ошибки, лицензия, тексты 0.4, новое имя и проверки теста, строка e2e; CAT-12 — словарь
+сопряжения и ссылка на этот раздел про WSL, SSH, терминал, детали, браузер.
+
+### Где решал сам
+
+- **Шесть файлов кода — п. 6 во вторую нарезку** (выше).
+- **3б — без изменений:** «по 0.4» — это уже так.
+- **Лицензия — выражение SPDX дословно** в обоих языках; `ru` «под индексом» исправлено на «под лицензией».
+- **Пять ключей `en`/`ru` — дословно 0.4** (`provider.connect.apiKey.description`, `error.chain.mcpFailed`,
+  `settings.general.row.{language,colorScheme,theme}.description`): v2 вернул в них OpenCode. Только словари, тестов на
+  эти строки не было. Остальные строки APP-NAME без текста 0.4 не трогал.
+- **WSL и SSH — тексты upstream** (выше).
+- **`social-share.png` оставлен, `favicon.svg` перенаправлен** — не удалён: на них ссылаются веб-страница и замер.
+- **Страница Desktop — один PNG 128 px.** SVG продукта в `app/public` нет; 0.4 ссылался на PNG 32 и SVG, генератор v2
+  их не пишет (B4.6).
+- **Мёртвое в `splash.css` и `onAnimationEnd` оставлено** — правила и обработчик upstream без цели; удаление — лишний
+  файл и конфликт при обновлении.
+- **Тест страницы ошибки — монтаж настоящей `ErrorPage`.** Других тестов страницы нет; e2e на неё — ещё файл.
+- **Имя теста.** `logo-splash.test.ts` переименован в `product-brand.test.ts`: в нём теперь заставки, страница ошибки,
+  лицензия и `public/`. CAT-10 ссылается на новое имя.
+
+### Найдено, не чинил
+
+- **Установка удалённого сервера из инфраструктуры OpenCode.** WSL (Windows) и SSH скачивают OpenCode upstream с
+  GitHub `anomalyco/opencode` или npm `@opencode/cli-<target>` версии Desktop. Для версии продукта такой версии upstream
+  нет либо это чужая сборка. Нужно решение владельца: свой артефакт CLI для удалённых машин или скрыть WSL и SSH в B.
+- **Тема «OpenCode»** в «Оформлении», подсказки браузера OpenCode и Hex Anomaly, голосовые инструкции — таблица выше.
+- **Подпись «on Discord»** со значком Discord ведёт на GitHub issues продукта — как в 0.4.
+- **`desktop/package.json` `license` — `MIT`**, у 0.4 — `MIT AND AGPL-3.0-only`. Не менял: строка About теперь как 0.4,
+  поле пакета — не в задании (`copy-metainfo.ts` уже пишет `MIT AND AGPL-3.0-only`).
+- **Веб-страница `app/index.html`**: `<title>OpenCode</title>`, `og:image` `/social-share.png` (картинка OpenCode). Её
+  отдаёт и CLI (`cli/src/app-assets.ts`). Не Desktop.
+
+### Не проверено
+
+- Настоящее окно Desktop: заставка свежей установки, пустая боковая панель, страница ошибки, «О программе» — B4.14b;
+  проверены DOM happy-dom, e2e на dev-сервере Vite и сборка `electron-vite`.
+- Предпросмотр знакомства `LOGINOM_AI_AGENT_TEST_ONBOARDING=1` в окне — только тест `LoadingSplash`.
+- Вид `Mark` в рамке `aspect-ratio: 4/5` глазами не смотрел.
+- Строки `ru` и `en` сопряжения в интерфейсе не открывал — тест словаря.
