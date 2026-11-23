@@ -84,10 +84,11 @@ def audit(journal, config):
                     ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS', 'REJECTED')
                     or b.get('result_delivery') == 'refused'
                     or isinstance(b.get('error'), dict) and b['error'].get('code')), None)
-        if state.get('status') == 'error' or bad is not None:
+        if state.get('status') == 'error' or bad is not None or tool == 'invalid':
             error = (bad or reply).get('error') or {}
             code = (bad or reply).get('code') or (error.get('code') if isinstance(error, dict) else None)
-            errors.append(dict(evidence, code=code or (bad or reply).get('status') or 'TOOL_ERROR'))
+            errors.append(dict(evidence, code=code or (bad or reply).get('status')
+                               or ('INVALID_TOOL_INPUT' if tool == 'invalid' else 'TOOL_ERROR')))
         receipt = next((b for b in bodies if b.get('status') == 'SUCCEEDED'), {})
         output, node = receipt.get('output') or {}, receipt.get('node') or {}
         node_id = node.get('node_id') or output.get('node_id') or receipt.get('node_id')
