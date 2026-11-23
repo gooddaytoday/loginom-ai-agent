@@ -1,6 +1,7 @@
 export * as ServerProcess from "./server-process"
 
 import { NodeServices } from "@effect/platform-node"
+import { withBundledRipgrep } from "@loginom-ai-agent/loginom-host/bundled-ripgrep"
 import { Service } from "@opencode/client/effect/service"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
@@ -93,6 +94,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       yield* LegacyMigrate.guard(databasePath(global.data))
       // Loginom AI Agent (B2.7a2, B2.7a2b): a built product CLI takes the resources next to its binary, or stops here.
       if (profile) yield* CliResources.apply()
+      // Loginom AI Agent (B2.7a10b): as in 0.4, glob and grep find the resources' rg on PATH before core downloads one.
+      if (process.env.LOGINOM_AI_AGENT_RESOURCES)
+        withBundledRipgrep(process.env, process.env.LOGINOM_AI_AGENT_RESOURCES)
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
       const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
