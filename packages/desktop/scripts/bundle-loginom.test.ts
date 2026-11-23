@@ -7,6 +7,7 @@ import { writeUpdateS3Resource } from "./bundle-loginom"
 test("Desktop resource contains only the read key; disabled or partial builds cannot reuse a stale key", async () => {
   const dir = await mkdtemp(join(tmpdir(), "update-resource-"))
   const file = join(dir, "updates-s3.json")
+
   const env = {
     LOGINOM_UPDATES_S3_ENDPOINT: "https://s3.example.test",
     LOGINOM_UPDATES_S3_REGION: "ru-central-1",
@@ -16,6 +17,7 @@ test("Desktop resource contains only the read key; disabled or partial builds ca
     LOGINOM_UPDATES_S3_ACCESS_KEY: "tenant:write-key",
     LOGINOM_UPDATES_S3_SECRET_KEY: "write-test-secret",
   }
+
   try {
     expect(await writeUpdateS3Resource(file, env)).toBe(true)
     expect(await Bun.file(file).json()).toEqual({

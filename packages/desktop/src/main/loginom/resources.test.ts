@@ -11,7 +11,8 @@ import { LoginomResources } from "./resources"
 // start it, as a built CLI refuses to serve without its artifact (B2.7a2b). Fixtures are laid out as bundle-loginom
 // lays them out: the manifest lists the staged files, and the Host entry is built after it.
 const node = process.platform === "win32" ? "bin/node.exe" : "bin/node"
-const cleanup: Array<() => Promise<unknown>> = []
+
+const cleanup: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((run) => run()))
