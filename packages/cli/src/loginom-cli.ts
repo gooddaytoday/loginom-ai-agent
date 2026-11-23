@@ -3,8 +3,11 @@
 // the profile: the service runs this entry again and opens the same one. `index.ts` stays the entry of Desktop's service,
 // which keeps the channel directories. Building `loginom-ai-agent-cli` from this entry is B2.7a.
 import { CliProfile } from "./profile"
+import { Standalone } from "./standalone"
 
 try {
+  // Help, version and `diagnostics export` exit here, before the profile is opened (B2.7a3).
+  await Standalone.early(process.argv.slice(2))
   CliProfile.apply()
 } catch (error) {
   if (!(error instanceof Error && /^PROFILE_[A-Z_]+$/.test(error.message))) throw error

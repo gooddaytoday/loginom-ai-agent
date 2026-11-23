@@ -9368,3 +9368,295 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Windows (PowerShell): форма без программы у `pwsh` (например, `Set-Location x > out`) — только по коду, общая ветка.
 - Установленная сборка, Desktop, настоящая модель.
+
+## B2.7a3 standalone
+
+22.11.2026. Ветка `b27a3-standalone` от `oc2-migration` (`65feb14f9f`), рабочее дерево `.claude/worktrees/b27a3`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile`
+— код 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` в этом дереве и в дереве
+базы. База тестов — `<scratchpad>/b27a3-base` (`65feb14f9f`, detached). `packages/loginom-agent` и `server/test` (B2.6a2)
+не трогал. Основа — 0.4 на `a080f7725c`: `opencode/src/standalone.ts`, `opencode/src/cli/standalone{,-run,-models}.ts`,
+тесты `opencode/test/cli/standalone{,-startup,-preflight,-status,-file-errors}.test.ts`; дизайн
+`2026-09-17-loginom-cli-standalone-design.md` (§16, «Package docs isolation» 2026-10-06/07), ранбук `standalone-cli.md`.
+
+### B2.7a3: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `02495b270b` `feat(cli): answer help, version and diagnostics export without opening the CLI profile (B2.7a3)` | файл форка `cli/src/standalone.ts` (новый), вход `cli/src/loginom-cli.ts` (+3); `loginom-host/src/diagnostics-export.ts` (+1 −1, см. «Где решал сам»); тест `cli/test/cli-standalone.test.ts` (новый) | `clean` |
+| `b51582737d` `test(cli): check the Loginom runtime, not the connection directory, in the standalone cases (B2.7a3)` | поправка двух проверок теста после собранного CLI (ниже) | `clean` |
+| следующий | этот раздел | |
+
+Файлов кода — три (`loginom-cli.ts`, `standalone.ts`, `diagnostics-export.ts`); правок upstream нет, `catalog.json` не
+менялся.
+
+### B2.7a3: пункты задания
+
+| Пункт | Итог |
+|---|---|
+| 1. Предварительная проверка `run` | **Проверки не добавлял — противоречие задания с 0.4, выбран меньший вариант (ниже).** Обычный `run` без настроенного Loginom в 0.4 не отказывал и отвечал; перенесён тест, что и на v2 он отвечает и освобождает профиль |
+| 2. `diagnostics export` | как в 0.4: `diagnosticsCommand` из `loginom-host/diagnostics-cli` до открытия профиля, без защёлки; работает, пока службы или `run` держат профиль. **Не как в 0.4:** чат в выгрузке на v2 всегда `unavailable`, а ключи провайдеров v2 не попадают в список известных секретов («Найдено»; чинить в `loginom-host`) |
+| 3. `--help` и `--version` | как в 0.4: до открытия профиля, ничего не пишут — ни профиля, ни каталогов Desktop, ни журнала. Текст справки и версии — прежний v2 |
+| 4. `auth` и `models` | **хватает, не переношу** `standalone-models.ts` (ниже) |
+| 5. Тесты 0.4 | из 29 тестов и групп `test.each` пяти файлов 0.4 перенесены 6 (7 тестов `cli-standalone.test.ts`, все зелёные), 23 записаны с причиной (таблицы ниже) |
+
+**Пункт 1: почему проверки нет.** Задание: «`run` без настроенного Loginom падает до модели». Так было в ранней версии
+дизайна (этап 3, 17.09: «unconfigured → 2») и так до сих пор пишет ранбук `standalone-cli.md` («Без Loginom setup он
+возвращает 2»). Но 0.4 на `a080f7725c` — уже после «ленивого preflight» (дизайн, 2026-10-06/07): обычный `run` идёт без
+подключения и без готовности справки; до модели его останавливает только строгий журнал восстановления
+(`LOGINOM_AI_AGENT_STRICT_RECOVERY=1`, `LOGINOM_RECOVERY_REQUIRED`, код 4). `LOGINOM_CONFIG_REQUIRED` (код 2) и
+`LOGINOM_CONNECTION_NOT_READY` (код 1) до модели — только у явной `--command loginom-automation` (и у дашборда, B2.9);
+после ленивого отказа инструмента — по итогу сессии (коды §10, B2.7a4). Тест 0.4 «ordinary standalone chat…» прямо
+проверяет, что обычный `run` без подключения отвечает без `LOGINOM_CONFIG_REQUIRED`. На v2:
+
+- у `run` нет `--command` и нет способа приложить навык к промпту (`run/run.ts` шлёт текст и файлы); доступ
+  `loginom-automation` выдаётся лениво, когда модель загружает навык (`loginom-agent/src/index.ts`). Явного запроса
+  автоматизации, к которому 0.4 привязывал проверку, в `run` нет: `run --command loginom-automation` — ошибка разбора
+  флагов, код 1 (собранный CLI, ниже);
+- строгий журнал на v2 не подключён: `ServiceHost` не передаёт Host `strictRecovery`, `LOGINOM_AI_AGENT_STRICT_RECOVERY`
+  читает только `loginom-host/script/cli-owner-crash.ts`; снять замок нечем — `loginom recover` это B2.7b.
+
+Отказывать обычному `run` без подключения — против 0.4 и его теста; проверка для `--command` — новый флаг `run`, то есть
+новый контракт (решение владельца, файлы B2.7a4). Меньший вариант — проверки нет, обычный `run` без Loginom отвечает
+(тест ниже, собранный CLI — тоже). Вопрос владельцу — в «Согласовать».
+
+**Пункт 3: как.** `loginom-cli.ts` первым делом зовёт `Standalone.early(argv)`. Есть `--help`, `-h`, `--version` или `-v`
+до `--` — CLI отвечает из того же дерева команд (`Runtime.run(Commands, [], …)`), но без обработчиков и без слоёв
+`index.ts` (пути `Global`, конфиг, журнал, обновлятор): справку и версию `effect/cli` печатает сам и до обработчика не
+доходит. Поэтому справка любой команды (`run --help`, `auth login --help`) та же, что и с профилем; версия — прежняя
+строка v2 `loginom-ai-agent-cli v<версия>` (в 0.4 — голая версия; потребителей формата нет: `evals` проверяет только
+код). Затем процесс выходит, дождавшись конца stdout и stderr. Статический текст справки 0.4 не переносил: он называл
+команды 0.4 (`providers`, `loginom setup/check/status…`).
+
+**Пункт 2: как.** Первая команда (без `--headless`/`--no-headless`, как в 0.4) — `diagnostics`: профиль вычисляется
+`cliProfile` (тот же канал, что у `profile.ts`) без `apply` — каталоги не создаются, окружение не меняется, `.writer` не
+берётся. `diagnostics-cli.ts` 0.4 не менялся: журнал v2 лежит в `<data>/log` (`loginom-ai-agent[-<канал>].log`) и
+попадает в архив как `cli/…`; `cli-manifest.json` собранного CLI — в `cliManifest`. Ошибки — коды 0.4
+(`CLI_ARGUMENT_INVALID` 2, `DIAGNOSTICS_OUTPUT_EXISTS` 1), `PROFILE_ROOT_INVALID` (относительный путь) — код 1 через вход.
+
+**Пункт 4: почему хватает.** `standalone-models.ts` 0.4 — обёртка: в 0.4 команды моделей шли внутри процесса CLI, и ей
+нужно было запустить их без Host и без комплекта. На v2 `auth` (`list/login/logout/export/import/switch`) и `models` —
+обычные команды CLI профиля: идут через сервер профиля (по умолчанию его службу, с `--standalone` — частный), Loginom не
+нужен, учётные данные — в базе профиля, конфиг и унаследованное окружение Desktop профиль заменяет (B2.7c; тест ниже).
+Отличия, которые не переношу:
+
+| 0.4 | v2 | Куда |
+|---|---|---|
+| `providers` (алиас `auth`), `models [провайдер]` | только `auth`, `models` без фильтра | — (команды upstream) |
+| в процессе, без комплекта | через сервер; собранный CLI без полного артефакта сервер не поднимает (B2.7a2b) | — |
+| `LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH=1`, системный прокси | каталог моделей грузит сервер; прокси — после шлюза B (В-97, п. 6) | — |
+| коды `CLI_ARGUMENT_INVALID` 2, `CLI_MODEL_COMMAND_FAILED` 1, `CLI_CANCELLED` 130 | ошибки v2 — код 1, SIGINT — 130 (`runMain`) | B2.7a4 (коды §10, отмена) |
+| `evals`: `providers status --provider <id> --format json` (общий OAuth), подсказка `providers login` (`evals/src/profile.ts:376,401`) | команды нет | B2.7a4 (`evals` на v2) |
+
+### B2.7a3: тесты 0.4
+
+`cli/test/cli-standalone.test.ts` — вход продукта из исходников, свои HOME и XDG, окружение терминала Desktop
+(`isolatedEnv`: его база, конфиг, identity). Перенесено:
+
+| Тест v2 | Из 0.4 | Что проверяет |
+|---|---|---|
+| help and version create neither the profile nor Desktop storage | `standalone` «help and version never invoke backend…» | `--help`, `--version`, `-h`, `-v` и `run --help`: код 0, stdout не пуст, stderr пуст, каталог HOME/XDG/профиля пуст |
+| the profile selector alone does not move Desktop's paths | `standalone` «public CLI profile selector does not redirect…» | `Global.Path.data` при `LOGINOM_AI_AGENT_CLI_PROFILE` без входа продукта — каталог канала Desktop, профиль не создан |
+| a command that opens the profile uses its paths, never Desktop's | `standalone` «backend imports use isolated global paths…» | `debug paths`: data, config, tmp, база — в профиле при унаследованных базе и конфиге Desktop |
+| diagnostics export runs while a server holds the profile, with or without --headless | `standalone` «diagnostics export runs while a run holds the profile…» | защёлка `.writer` взята; `[--headless|--no-headless] diagnostics export --no-chat --output`: код 0, stdout — путь, без `PROFILE_BUSY`, в архиве `manifest.json` и журнал CLI профиля, защёлка на месте |
+| auth and models work in the profile without a Loginom connection and see only its providers | `standalone` «provider management uses the CLI profile without Loginom configuration or bundle» | `auth list --standalone`, `models --standalone`: код 0, `test/test-model`; провайдеры конфига Desktop и унаследованного `LOGINOM_AI_AGENT_CONFIG_CONTENT` не видны; защёлка снята, рантайма Loginom нет |
+| an ordinary run without a Loginom connection gets its answer and releases the profile (auto=false/true) | `standalone-preflight` «ordinary standalone chat omits todowrite and releases its profile» | `run --format json --model test/test-model [--dangerously-skip-permissions]` без подключения: код 0, ответ модели, инструмент `skill` в каждом запросе с инструментами, защёлка снята, ни `runtime`, ни `knowledge` в `<профиль>/loginom`. **Без** «omits todowrite» — «Найдено» |
+
+Проверки «нет `runtime`/`knowledge`» из исходников упасть не могут: без ресурсов у сервера нет Host. Настоящее
+свидетельство — собранный CLI: после службы и `run` в `<профиль>/loginom` только `connection leases recovery
+resource-verification.json startup-phases.jsonl` (ниже).
+
+`auth list`: в 0.4 проверялось, что `LOGINOM_AI_AGENT_AUTH_CONTENT` не наследуется; v2 эту переменную не читает нигде
+(профиль её только удаляет), поэтому проверка заменена на унаследованный конфиг, который v2 читает.
+
+Не перенесено, с причиной:
+
+| 0.4 | Случаи | Причина |
+|---|---|---|
+| `standalone` | failed cleanup leaves the guard; a host spawn failure releases the profile; forced startup cleanup keeps the guard; confirmed startup cleanup never removes a replaced writer nonce | в 0.4 защёлку и Host держал процесс CLI. На v2 защёлка — у сервера профиля (B2.7c: чужой владелец не удаляется, защёлка умершего процесса забирается — `cli-profile.test.ts`), Host запускает сервер, и сбой его старта сервер не останавливает (B2.3) |
+| `standalone` | короткий `TMPDIR` `/tmp/loginom-cli-*` (часть «backend imports…») | 0.4 сокращал путь сокета Chromium; на v2 Host получает окружение сервера (B2.3) — решать с запуском браузера в собранном CLI (не проверялся ни в одной задаче B2.7a) |
+| `standalone` | bootstrap carries an early signal; Ctrl+C during provider metadata fetch; provider cancellation waits for its credential command | отмена и код 130 с `CLI_CANCELLED` — `standalone-cancellation`, B2.7a4 |
+| `standalone-startup` | startup failure releases the profile only after confirmed cleanup (run/tui/management × 6); the writer stays held during startup cleanup; the compiled CLI recovers after a bundled host constructor fails | Host и его очистка — в процессе CLI 0.4; на v2 — в сервере (B2.3, тесты `loginom-host`), `loginom status` — B2.7b |
+| `standalone-preflight` | lazy scenario preparation preserves standalone connection exit (3); a real Help refusal does not turn an ordinary answer into a connection failure | код выхода по итогу инструментов Loginom — коды §10, B2.7a4 |
+| `standalone-preflight` | standalone Help preflight stays independent of the browser (ready, cancel, unavailable, ordinary-unavailable) | `--command=loginom-automation` — у `run` v2 нет (пункт 1); `ordinary-unavailable` по смыслу — перенесённый «ordinary run» |
+| `standalone-preflight` | strict recovery still blocks an ordinary request before the model | строгий журнал на v2 не подключён, `recover` нет (пункт 1) — B2.7b вместе с `loginom-agent` |
+| `standalone-preflight` | standalone management separates Help from browser validation (2) | `loginom setup/status/check` — B2.7b |
+| `standalone-status` | все 6 групп (help о `status`, тексты `status`, старт Host с тайм-аутом, выход после сбоя очистки, `status` с Node, management × 5) | `loginom-management` и Host в процессе CLI — B2.7b |
+| `standalone-file-errors` | `--file` missing/directory/denied; `--file` больше 10 МиБ — ссылка вместо снимка | `--file` — B2.7a4 по нарезке. Сейчас v2 отказывает до модели своими текстами (`File not found: …`, `Cannot attach a directory, special file, or file larger than 10 MiB: …`, `run/run.ts:172,176`), а не кодами `LOGINOM_FILE_*`, и большой файл не прикладывает ссылкой |
+
+### B2.7a3: мутации
+
+`<scratchpad>/b27a3-runs/mutate.sh`: одна правка `sed`, `cli-standalone.test.ts`, `git checkout` файла; на `02495b270b`.
+После — `git status` чистый.
+
+| Мутация | Итог |
+|---|---|
+| M0 нет | 7/0 |
+| M1 вход не зовёт `Standalone.early` (как на базе) | **5/2**: справка создаёт профиль; `diagnostics` идёт в CLI v2 с профилем, а такой команды там нет |
+| M2 справка и версия не узнаются | **6/1**: справка |
+| M3 `diagnostics` после `--headless` не узнаётся | **6/1**: выгрузка |
+| M4 выгрузка берёт профиль по умолчанию вместо `LOGINOM_AI_AGENT_CLI_PROFILE` | **6/1**: выгрузка |
+| M5 `profile.ts` не удаляет унаследованный `LOGINOM_AI_AGENT_CONFIG_CONTENT` (B2.7c) | **6/1**: `auth` и `models` |
+| M6 `profile.ts` не заменяет `LOGINOM_AI_AGENT_CONFIG_DIR` (B2.7c) | **3/4**: пути, `models`, оба `run` |
+
+На базе (`65feb14f9f`) `diagnostics export --no-chat --output …` — ошибка разбора `Unrecognized flag: --no-chat in
+command opencode`, код 1, и профиль уже создан; `--help` и `--version` создают профиль (`cli-profile.json`, `config`,
+`data/log`, `data/repos`, `state`, `cache/{tmp,bin}`, `loginom`).
+
+### B2.7a3: собранный CLI
+
+Архив — `packages/loginom-host/script/build-cli.ts`, как в B2.7a2 (`<scratchpad>/b27a3-runs/build.sh`:
+`LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node`, `LOGINOM_AI_AGENT_BROWSER_SOURCE=<кэш браузеров с
+chromium-1246>`), канал `dev`, на `02495b270b`:
+
+```text
+$ bun script/build-cli.ts <scratchpad>/b27a3-build/cli
+{"archive":"…/loginom-ai-agent-cli-0.0.0-dev-202611230425-linux-x64.tar.gz","sha256":"02785c31…",
+ "version":"0.0.0-dev-202611230425","sourceCommit":"02495b270b…","sourceDirty":false}
+# код 0; 2 мин 7 с, пик RSS 1,3 ГБ; архив 493 МБ
+```
+
+Распакованный архив (`tar --same-permissions -xzf`, root), пустые HOME и XDG, `PATH=/usr/bin:/bin`, без
+`LOGINOM_AI_AGENT_RESOURCES`, под `xvfb-run -a` (`<scratchpad>/b27a3-runs/accept.sh`):
+
+```text
+$ sha256sum -c …tar.gz.sha256                     # OK
+# профиль по умолчанию (LOGINOM_AI_AGENT_CLI_PROFILE не задана)
+$ loginom-ai-agent-cli --version                  # код 0: loginom-ai-agent-cli v0.0.0-dev-202611230425, stderr пуст
+$ loginom-ai-agent-cli -v                         # код 0: то же
+$ loginom-ai-agent-cli --help                     # код 0: 44 строки справки, stderr пуст
+$ loginom-ai-agent-cli -h                         # код 0: то же
+$ loginom-ai-agent-cli run --help                 # код 0: 32 строки, «USAGE loginom-ai-agent-cli run [flags] [<message...>]»
+$ loginom-ai-agent-cli diagnostics --help         # код 0: справка корня
+$ find <R>/home <R>/p1 -mindepth 1                 # пусто
+# явный профиль <R>/p1
+$ loginom-ai-agent-cli --version; loginom-ai-agent-cli --help   # код 0, код 0
+$ find <R>/home <R>/p1 -mindepth 1                 # пусто
+$ loginom-ai-agent-cli service start              # код 0: http://127.0.0.1:26990
+$ cat <R>/p1/.writer/owner                        # {"pid":2747,"nonce":"…","service":true}
+$ loginom-ai-agent-cli diagnostics export --output <R>/d1.zip
+<R>/d1.zip                                        # код 0
+included 1 files, omitted 0; session: recent attempts; chat: unavailable      # stderr
+$ loginom-ai-agent-cli --headless diagnostics export --no-chat --output <R>/d2.zip
+<R>/d2.zip                                        # код 0; chat: not-requested
+$ loginom-ai-agent-cli diagnostics export --output <R>/d2.zip      # DIAGNOSTICS_OUTPUT_EXISTS, код 1
+$ loginom-ai-agent-cli diagnostics export --bogus                  # CLI_ARGUMENT_INVALID, код 2
+$ cat <R>/p1/.writer/owner                        # та же защёлка службы (pid 2747)
+$ unzip -l <R>/d1.zip
+      356  cli/loginom-ai-agent.log
+     2182  manifest.json
+# manifest: product cli, version 0.0.0-dev-202611230425, channel dev, cliManifest {sourceCommit 02495b270b…,
+#           sourceDirty false, browserRecovery false}, knownSecrets ok, chat unavailable, chatReason database-unreadable
+$ loginom-ai-agent-cli run --format json "Reply with the single word OK"   # Loginom не настроен; через службу
+step_start / text: OK / step_finish               # код 0, stderr пуст (свободная модель по умолчанию)
+$ loginom-ai-agent-cli diagnostics export --output <R>/d3.zip      # код 0; chat: unavailable (database-unreadable)
+$ loginom-ai-agent-cli run --command loginom-automation "Построй сценарий"
+# код 1: справка `run` (в выводе обрезано до 400 байт); из исходников конец вывода —
+# «ERROR Unrecognized flag: --command in command opencode run»
+$ loginom-ai-agent-cli service stop               # код 0
+$ pgrep -af <R>/x                                 # процессов нет
+$ find <R>/home <R>/p1 -iname '*opencode*'        # пусто
+```
+
+Без настроенного Loginom собранный `run` отвечает, а не падает до модели — пункт 1. Каталог `<R>/p1/loginom` после
+службы: `connection leases recovery resource-verification.json startup-phases.jsonl` — Host создаёт каталог
+подключения и без подключения; поэтому в тесте проверка «нет `connection`» заменена на «нет `runtime`», как в 0.4
+(`b51582737d`). Чат в выгрузке: свежая база v2 — `no such table: session` (запрос `diagnostics-cli.ts` к таблицам v1
+`session`/`message`/`part`; в v2 — `session_v2`/`session_message`/`session_part`); профиль 0.4 после переноса сервером
+v2 (`restoreLegacy("0.4")`, `serve`, затем `diagnostics export`, `<scratchpad>/b27a3-runs/legacy-diagnostics.ts`) — то же:
+таблицы `session` нет, `session_v2` — 4 строки, `chat: unavailable`. Распакованный каталог и архив после проверки удалены.
+
+### B2.7a3: приёмка
+
+Полные прогоны по пакетам (`<scratchpad>/b27a3-runs/pkg-tests.sh`): база — `65feb14f9f` в `<scratchpad>/b27a3-base`, итог
+— `b51582737d`; `npm ci` клиента `loginom-runtime` в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан; `loginom-host` —
+`xvfb-run -a`. Падения сравнивались по именам — совпали во всех трёх пакетах.
+
+| Пакет | Команда | `65feb14f9f` | `b51582737d` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 443 pass, 9 skip, 0 fail | 450 pass, 9 skip, 0 fail (+7 `cli-standalone`) |
+| `loginom-host` | `xvfb-run -a bun test` | 539 pass, 12 skip, 5 fail | 539 pass, 12 skip, 5 fail — те же: «umask», 3 `bundled-ripgrep`, `managed-work-entry` |
+| `product` | `bun test` | 60 pass, 3 fail (`repo-paths`) | 60 pass, 3 fail — те же |
+
+```text
+$ cd packages/cli && bun test --timeout 90000 test/cli-standalone.test.ts
+ 7 pass
+ 0 fail                                            # 25 с
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,209 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc         # код 0
+$ cd packages/loginom-host && bun typecheck        # ✓ No type errors in 174 files; bun run typecheck:tsc — код 0
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 453 divergent upstream files                  # как на 65feb14f9f: правок upstream нет
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0, с этим разделом в дереве
+Found 558 warnings and 0 errors.                    # как на базе (B2.7a2b); у новых файлов предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+`redact.mjs` клиента `loginom-runtime` импортов не имеет, так что по коду выгрузке и `cli-standalone.test.ts` `npm ci`
+клиента не нужен (без него не запускал; полные прогоны выше шли с ним). `prettier`: новые файлы форматированы;
+`diagnostics-export.ts` и до правки не проходил `prettier --check`.
+
+### B2.7a3: где решал сам
+
+- **Пункт 1 — меньший вариант** (выше): обычный `run` без Loginom не отказывает, как в 0.4; проверки для явного запроса
+  автоматизации нет, потому что у `run` v2 нет такого запроса.
+- **Справка и версия — из дерева команд v2, а не текст 0.4.** «Как в 0.4» взято в смысле задания: без профиля и без
+  следов. Текст 0.4 перечислял команды 0.4; справка v2 верна для каждой подкоманды и та же, что с профилем. Формат версии
+  — прежний v2.
+- **`diagnostics` в справке v2 не виден** (0.4 перечислял его в своём тексте): дерево команд — `commands/commands.ts`,
+  он не в нарезке. `diagnostics --help` показывает справку корня.
+- **Третий файл кода вне списка нарезки — `loginom-host/src/diagnostics-export.ts`, одна строка.** Вход CLI теперь
+  импортирует выгрузку, и `noUnusedLocals` пакета `cli` (в `loginom-host` его нет) находит в ней неиспользуемую
+  переменную цикла: без правки `bun typecheck` и `typecheck:tsc` пакета `cli` падают. Поведение то же (`files.push` по
+  одной записи «omitted» на лишний источник); тесты `loginom-host` — без новых падений (ниже). Всего файлов кода три.
+- **Новый тестовый файл `cli-standalone.test.ts`:** `cli/test/standalone.test.ts` — тест upstream (частный сервер выходит
+  с владельцем).
+- **`guarantees.md`, ранбук, дизайн не правил** — задание: только свой раздел журнала. Строке G2 стоит добавить
+  `cli-standalone.test.ts` (справка без профиля); ранбук всё ещё говорит «Без Loginom setup он возвращает 2».
+
+### B2.7a3: согласовать с владельцем
+
+- **Явный запрос автоматизации в `run`.** В 0.4 — `run --command loginom-automation` с проверкой до модели
+  (`LOGINOM_CONFIG_REQUIRED` 2, `LOGINOM_CONNECTION_NOT_READY` 1). На v2 его нет: нужен ли `run` флаг, прикладывающий
+  навык продукта к промпту (как вложение навыка в TUI), и с ним проверка — новый контракт `run`, файлы B2.7a4.
+- **Строгий журнал восстановления на v2** (`LOGINOM_AI_AGENT_STRICT_RECOVERY=1`, код 4 до модели): включать ли и где —
+  `strictRecovery` в `ServiceHost` (`loginom-agent`) вместе с `loginom recover` (B2.7b).
+
+### B2.7a3: найдено, не чинил
+
+- **Известные секреты выгрузки не видят ключей v2.** `profileSecrets` (`loginom-host/src/diagnostics-export.ts`) учит
+  секреты из подключения Loginom и из `<data>/auth.json`, `mcp-auth.json` — хранилищ 0.4. v2 держит ключи провайдеров в
+  базе профиля (таблица `credential`), `mcp-auth.json` не читает и не пишет; `auth.json` 0.4 только импортирует при переносе
+  (`server/src/legacy-migrate.ts:280`, миграция `import_legacy_credentials`) и не пишет. Ключ, сохранённый в v2
+  (`auth login`), в список известных значений не попадает, а манифест всё равно пишет `knownSecrets: ok`. Остаются
+  шаблоны редактора (`sk-…`, `Bearer …`, `…KEY=…` и т. п.). Чинить — в `loginom-host` (читать `credential` из базы только
+  на чтение), отдельной задачей до выпуска.
+- **Журнал CLI в выгрузке несёт командные строки.** `index.ts` пишет в журнал профиля `cli starting … args=[…]` каждой
+  команды, а выгрузка кладёт журнал и с `--no-chat`. Проверено из исходников: в `cli/…log` архива — текст промпта `run`
+  и `auth login … --answer key=<значение>` как есть. Шаблоны редактора (по коду `redact.mjs`) ловят `apiKey=…`, `sk-…`,
+  `Bearer …`, но не `key=…` и не текст промпта. Было ли так в 0.4, не сверял. Решать вместе с известными секретами.
+- **Чат в выгрузке на v2 всегда `unavailable` (`database-unreadable`).** `diagnostics-cli.ts` читает таблицы v1; в свежей
+  базе v2 и в перенесённом профиле 0.4 их нет (выше). Чинить — запросы к `session_v2`/`session_message`/`session_part` в
+  `loginom-host/src/diagnostics-cli.ts`.
+- **`todowrite` в обычном `run` профиля.** 0.4 запрещал его в `run` профиля CLI (`cmd/run.ts:547`, при
+  `LOGINOM_AI_AGENT_CLI_ROOT`); v2 его предлагает модели (проба: `edit glob grep question read skill subagent todowrite
+  webfetch websearch write execute`) — B2.7a4 (`run`).
+- **`evals` вызывает `providers status --provider … --format json` и подсказывает `providers login`**
+  (`evals/src/profile.ts:376,401`); на v2 команды `providers` нет — B2.7a4.
+- **`auth` и `models` без `--standalone` поднимают службу профиля и оставляют её работать** (так устроен v2,
+  `ServerConnection.resolve`); 0.4 исполнял их в процессе. Для профиля это его собственная служба (B2.7c).
+
+### B2.7a3: не проверено
+
+- Windows и macOS: `cli-standalone.test.ts` не ограничен платформой, но запускался только на Linux; справка, версия и
+  выгрузка в собранном CLI — только linux-x64 (`dev`). Цели baseline-musl и arm64 не собирались.
+- Настоящий Loginom: подключение не настраивалось (`loginom setup` — B2.7b), поэтому выгрузка с секретами подключения и
+  с рантаймом `<профиль>/loginom/runtime` не проверялась.
+- Выгрузка из установленного CLI (`install.sh`) и не от root; TUI собранного бинарника.
+- Отмена (`SIGINT`) у `diagnostics` и у справки — не нужна по смыслу, не проверялась.
