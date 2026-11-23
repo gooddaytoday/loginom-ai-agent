@@ -137,6 +137,9 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
       await uninstallCli(home)
       expect(await readFile(join(profile, "keep"), "utf8")).toBe("profile")
       expect(await Bun.file(launcher).exists()).toBe(false)
+      // A launcher left behind would dangle once the payload is gone, so check the link itself; the receipt goes too.
+      await expect(readlink(launcher)).rejects.toThrow("ENOENT")
+      expect(await Bun.file(receipt).exists()).toBe(false)
       expect(await Bun.file(join(installed.destination, "cli-manifest.json")).exists()).toBe(false)
     } finally {
       await rm(root, { recursive: true, force: true })

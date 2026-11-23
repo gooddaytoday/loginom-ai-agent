@@ -18280,3 +18280,272 @@ CAT-07, «Компоненты»: `cli/src/server-process.ts` — ещё +4 (B2.
   (`stage-resources.test.ts`, нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`) — пропущена, как на базе.
 - Инструменты `glob` и `grep` с моделью — только общий `RipgrepBinary` через `fs.find`.
 - Только Linux; ключ `Path` Windows и `rg.exe` — чтением кода (`withBundledRipgrep` не менялся с 0.4).
+
+## B2.7a8 Установщик CLI продукта
+
+23.11.2026. Ветка `b27a8-cli-installer` от `oc2-migration` (`f2be0f6268`), рабочее дерево `.claude/worktrees/b27a8`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите; первую попытку коммита журнала он
+остановил (`personal-home-path`: заполнитель временного HOME — `<R>`, косая черта, `home` — сканер принял за личный каталог),
+в разделе теперь `<HOME>`. Модель не
+вызывалась, к opencode.ai, репозиторию и пакетам npm OpenCode ни один прогон не обращался: установка, проверки
+установленного CLI, тесты и мутации шли под `unshare -n` (поднят только `lo`). С сетью — только `npm ci` клиента и
+сборка, как в B2.7a2 (закреплённый zip Bun 1.4.4 baseline с `github.com/oven-sh/bun`, хеш проверяется; ripgrep — из
+кэша; каталог моделей — закоммиченный снимок: `core/script/models-snapshot.ts` без `LOGINOM_AI_AGENT_MODELS_SNAPSHOT`
+ничего не качает). В настоящие `~/.local`, `/usr/local` ничего не ставилось:
+`/root/.local/bin/loginom-ai-agent-cli` и `/root/.local/share/loginom-ai-agent-cli` нет до и после прогона.
+`packages/desktop/test/loginom/*` (B4.14c) не трогал.
+
+Прочитано: этот журнал — B2.7a (строка B2.7a8 нарезки), B2.7a2, B2.7a2b, B2.7d, B4.5a, B4.7b; ранбук
+`docs/testing/loginom-ai-agent/standalone-cli.md` («Linux user install», «Native regression gate»); дизайн
+`2026-09-17-loginom-cli-standalone-design.md` (дистрибутив, `PATH`, удаление: «Upstream install/update endpoints не
+используются»). 0.4 — `v0.4.0:packages/loginom-host/{script/build-cli-installer.ts,script/build-cli.ts,
+src/cli-install{,-entry,-windows}.ts,test/cli-install{,-windows}.test.ts,test/cli-install-native.mjs}`,
+`v0.4.0:packages/opencode/src/standalone.ts`. v2 — корневой `install`, `cli/script/postinstall.mjs`, `cli/script/pack.ts`,
+`desktop/src/main/{service/desktop-cli.ts,native/{menu,menu-actions,install-cli}.ts,ipc-handlers/menu.ts}`, workflows.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `932af10cf0` `test(loginom-host): check that CLI uninstall removes the launcher and receipt (B2.7a8)` | +3 строки в тесте 0.4 `cli-install.test.ts` (ниже, «Тесты») |
+| `b0ae614242` `docs(upstream-sync): record the product CLI installer on v2 (B2.7a8)` | этот раздел |
+| следующий | поправки раздела после ревью: `services/site`, пакет `services/loginom-ai/npm/cli`, сеть сборки, хук |
+
+Файлов кода — ноль. Установщик 0.4 уже в дереве и работает с артефактом v2 без правок.
+
+### Чем ставится CLI продукта
+
+Как в 0.4 — установщиком из `build-cli-installer.ts`. Корневой `install` и `postinstall.mjs` качают OpenCode с opencode.ai,
+GitHub и npm, это не путь продукта (ниже). В дереве v2 всё, что нужно установщику, совпадает с `v0.4.0` байт в байт:
+
+```text
+$ for f in script/build-cli-installer.ts src/cli-install-entry.ts src/cli-install.ts src/cli-install-windows.ts \
+    test/cli-install.test.ts test/cli-install-windows.test.ts; do git diff --quiet v0.4.0 f2be0f6268 -- packages/loginom-host/$f && echo "same $f"; done
+same script/build-cli-installer.ts            # и остальные пять — same
+```
+
+Отличаются только `test/cli-install-native.mjs` (переименована переменная, правило lint v2.3.0, `0962f217a0`),
+`src/cli-manifest.ts` (API `Schema` Effect 4.1) и `script/build-cli.ts` (вызов сборки бинарника v2, B2.7a2);
+`buildCliInstaller` `build-cli.ts` вызывает, как в 0.4.
+
+Что получает пользователь (Linux; Windows и macOS — тем же кодом, не запускались):
+
+| | |
+|---|---|
+| Формат | `loginom-ai-agent-cli-<версия>-linux-x64.tar.gz` и `.tar.gz.sha256`; в корне артефакта `install.sh`, `uninstall.sh` (запускают комплектный `resources/loginom/bin/node` с `install.mjs`), `INSTALL.md`. Windows — `install.cmd`, `uninstall.cmd` |
+| Установка | `tar --same-permissions -xzf` и `./install.sh`: проверка всего артефакта по `cli-manifest.json`, копия в `~/.local/share/loginom-ai-agent-cli/<версия>-<канал>`, повторная проверка копии, `chrome-sandbox` закреплённого Chromium — `root:root` и `4755` (не от root — через `sudo`), лаунчер — символьная ссылка `~/.local/bin/loginom-ai-agent-cli`, квитанция `current.json`. Ничего не скачивается. Существующий лаунчер или каталог версии — отказ `CLI_INSTALL_PATH_EXISTS` |
+| `PATH` | установщик его не меняет и профили оболочки не трогает; `INSTALL.md`: «ensure that directory is on your PATH». Windows — `%LOCALAPPDATA%\Programs\loginom-ai-agent-cli\bin`, `PATH` пользователь задаёт сам |
+| Удаление | `./uninstall.sh` из распакованного архива: квитанция, лаунчер и манифест установленной копии сверяются; живой процесс из каталога версии — отказ `CLI_INSTALL_BUSY`; удаляются лаунчер, каталог версии и `current.json`. Профили CLI, Desktop и `PATH` не трогаются; пустые `~/.local/share/loginom-ai-agent-cli` и `~/.local/bin` остаются. Обновление — удалить старую копию и поставить новую |
+
+### Прогон установщика linux-x64
+
+Сборка — как в B2.7a2: из `packages/loginom-host`, `LOGINOM_AI_AGENT_NODE_SOURCE` — Node 24.19.0,
+`LOGINOM_AI_AGENT_BROWSER_SOURCE` — каталог с `chromium-1246`, `chromium_headless_shell-1246`, `ffmpeg-1011`
+(`<scratchpad>/b27a8/runs/build.sh`), назначение — временный каталог:
+
+```text
+$ bun script/build-cli.ts <tmp>/out/cli
+building cli-linux-x64-baseline
+[build] … END cli-installer 54ms
+[build] … END cli-archive 60387ms
+[build] … END cli-roundtrip-verify 3791ms
+{"archive":"<tmp>/out/loginom-ai-agent-cli-0.0.0-dev-202611232121-linux-x64.tar.gz","sha256":"93090ff9…",
+ "version":"0.0.0-dev-202611232121","sourceCommit":"f2be0f6268dc…","sourceDirty":false}
+# код 0; 2 мин 4 с, пик RSS 1,4 ГБ; архив 494 МБ
+```
+
+Приёмка — `<scratchpad>/b27a8/runs/accept.sh`: root, umask 077, `env -i` (временные `HOME` — ниже `<HOME>`, `TMPDIR`, `XDG_*`,
+`LOGINOM_AI_AGENT_CLI_PROFILE`; `PATH=<HOME>/.local/bin:/usr/bin:/bin`), всё под `unshare -n`. Вывод сокращён
+(справка — только разделы):
+
+```text
+== env: HOME=<HOME> uid=0 umask=0077 net: lo:
+== unpack
+loginom-ai-agent-cli-0.0.0-dev-202611232121-linux-x64.tar.gz: OK                 # sha256sum -c
+tar exit 0                                                                       # tar --same-permissions -xzf
+-rwxr-xr-x install.sh  -rwxr-xr-x uninstall.sh  -rw------- install.mjs  -rw------- INSTALL.md
+== installer files naming opencode (case-insensitive)                            # grep -il по install.sh, uninstall.sh, INSTALL.md, install.mjs
+(end)                                                                            # ни одного
+== profile sentinel (archive binary, before install)
+{"revision":0,"generation":0,"setupRequired":true,…,"state":"unconfigured",…}   # профиль создан, в нём data/keep
+== command -v before install: none
+== install.sh
+{"destination":"<HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev","launcher":"<HOME>/.local/bin/loginom-ai-agent-cli"}
+exit 0
+launcher: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/bin/loginom-ai-agent-cli
+current.json: {"format":"loginom-cli-install-v1","name":"0.0.0-dev-202611232121-dev"}
+4755 root:root …/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
+755 root:root …/bin/loginom-ai-agent-cli
+files in payload: 13113
+== HOME top level (installer does not edit shell profiles or PATH)
+.local
+== command -v: <HOME>/.local/bin/loginom-ai-agent-cli
+== loginom-ai-agent-cli --version
+loginom-ai-agent-cli v0.0.0-dev-202611232121
+exit 0
+== loginom-ai-agent-cli --help
+exit 0
+DESCRIPTION
+  Loginom AI Agent command line interface
+USAGE
+  loginom-ai-agent-cli <subcommand> [flags] [<directory>]
+… ARGUMENTS, FLAGS, GLOBAL FLAGS, SUBCOMMANDS (upgrade, uninstall, migrate, acp, api, …, serve)
+== loginom-ai-agent-cli loginom status --format json
+{…,"state":"unconfigured",…}
+exit 0
+== install.sh again (existing launcher is never overwritten)
+CLI_INSTALL_PATH_EXISTS
+exit 1
+== serve --port 0 through the launcher                                           # без промпта: модель не вызывается
+server listening on http://127.0.0.1:41369
+serve children: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/resources/loginom/bin/node --use-system-ca …/resources/loginom/host/node-host.mjs
+serve exe: <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev/bin/loginom-ai-agent-cli
+== uninstall.sh while serve runs
+CLI_INSTALL_BUSY
+exit 1
+launcher still present
+serve exit 143                                                                   # SIGTERM; stderr пуст
+payload processes left:                                                          # нет
+== uninstall.sh
+{"uninstalled":true,"profilesPreserved":true}
+exit 0
+== after uninstall
+absent <HOME>/.local/bin/loginom-ai-agent-cli
+absent <HOME>/.local/share/loginom-ai-agent-cli/0.0.0-dev-202611232121-dev
+absent <HOME>/.local/share/loginom-ai-agent-cli/current.json
+absent <HOME>/.local/share/loginom-ai-agent-cli/.install-lock
+find HOME/.local: .local, .local/share, .local/share/loginom-ai-agent-cli, .local/bin   # пустые каталоги, как в 0.4
+sentinel: existing CLI profile
+== command -v after uninstall: none
+== uninstall.sh again
+CLI_INSTALL_FAILED
+exit 1
+== real home after
+absent /root/.local/bin/loginom-ai-agent-cli
+absent /root/.local/share/loginom-ai-agent-cli
+```
+
+Запуск через лаунчер-ссылку находит ресурсы рядом с настоящим бинарником: `serve` прошёл проверку манифеста (иначе
+`LOGINOM_BUNDLE_INCOMPLETE`, B2.7a2b) и поднял Host из установленной копии. Временные каталоги прогона и сборки удалены.
+
+### `install` и `postinstall.mjs`: кто вызывает
+
+Продукт их не вызывает — записал, файлы не менял.
+
+| Файл | Где мог бы вызываться | Что на деле |
+|---|---|---|
+| корневой `install` (`APP=opencode`, `https://opencode.ai/v2/install`, `registry.npmjs.org/@opencode-ai/cli-…`) | Desktop: `desktop-cli.ts:9` встраивает текст (`install?raw`) | исполняет его только `runInstaller` (`desktop-cli.ts:199`), до него ведёт одна цепочка: `DesktopCli.install` (только macOS) ← `createCliInstaller` (`native/install-cli.ts`) ← действие меню `app.installCli`. После B4.7b пункта нет в `DESKTOP_MENU`, а нативное меню строится только из `DESKTOP_MENU` и пунктов плагинов (у них свой `run`). RPC `MenuRunAction` (`ipc-handlers/menu.ts`) передаёт `runDesktopMenuAction` только `createWindow` и `relaunch`, так что `app.installCli` из окна — пустой вызов `handlers.installCli?.()`. Текст остаётся в `app.asar`, запуска нет. Запись B4.5a «Desktop запускает его только с `--binary`» верна до B4.7b. `installCli(bundled, version)` в `desktop-cli.ts:93,145` — другое: копия встроенного CLI в `userData` для службы, скрипт не трогает |
+| | сборки и CI продукта | ни один workflow и скрипт его не запускает. Путь `curl` в `cli/src/services/updater.ts:543` — `upstreamLayer`, CLI продукта его не берёт (B2.7d) |
+| `packages/cli/script/postinstall.mjs` | npm-пакеты CLI | копирует его только `cli/script/pack.ts:61`; `bun run pack` пакета `cli` — только в `release.yml`, где все задания зависят от `plan` с `if: github.repository == 'anomalyco/opencode'`. `check-test.yml` пакует только `codemode`. CLI продукта в npm не публикуется |
+| upstream `install` по адресу | сайт `services/site` | сайт opencode.ai upstream (`middleware.ts:51,160` отдаёт `/v2/install`, беря его с `raw.githubusercontent.com/anomalyco/opencode/dev/install`; файл как в v2.3.0); `deploy-site.yml` — только `anomalyco/opencode`. Сайт продукта — `apps/loginom-site`, установщика OpenCode не отдаёт |
+| другой `postinstall` | `services/loginom-ai/npm/cli` | пакет `@openviking/cli` (бинарник `ov`) другого проекта; к CLI продукта и к OpenCode отношения не имеет |
+
+### Тесты
+
+Переносить нечего: `cli-install.test.ts` и `cli-install-windows.test.ts` уже в дереве и совпадают с `v0.4.0`. Теста самого
+`build-cli-installer.ts` в 0.4 не было: его проверяли нативный прогон `cli-install-native.mjs` и прогон архива, как выше.
+
+`cli-install.test.ts` не ловил удаление, которое оставляет лаунчер или квитанцию (MI7, MI8 ниже): после удаления каталога
+версии ссылка-лаунчер висит, и `Bun.file(launcher).exists()` и так `false`. Добавил три строки: `readlink(launcher)`
+отказывает с `ENOENT`, `current.json` нет. Остальное в тесте — 0.4.
+
+Мутации — `<scratchpad>/b27a8/runs/mutate.py`: одна точная замена в `src/cli-install.ts`, `bun test
+test/cli-install.test.ts test/cli-install-windows.test.ts` под `unshare -n`, файл возвращается; после — `git status`
+чистый. На Linux из шести тестов три — Windows, пропуск.
+
+| Мутация | до `932af10cf0` | после |
+|---|---|---|
+| MI0 нет | 3 pass, 3 skip | 3 pass, 3 skip |
+| MI1 существующий лаунчер не проверяется перед установкой | **1 fail** | **1 fail** |
+| MI2 каталоги установки — `stat` вместо `lstat` (символьные ссылки принимаются) | **1 fail** | **1 fail** |
+| MI3 режим `chrome-sandbox` не проверяется | **1 fail** | **1 fail** |
+| MI4 удаление не видит живой процесс из каталога версии | **1 fail** | **1 fail** |
+| MI5 удаление оставляет каталог версии | **1 fail** | **1 fail** |
+| MI6 удаление принимает квитанцию-ссылку | **1 fail** | **1 fail** |
+| MI7 удаление оставляет квитанцию | 0 fail | **1 fail** |
+| MI8 удаление оставляет лаунчер | 0 fail | **1 fail** |
+
+`build-cli-installer.ts` и `cli-install-entry.ts` модульными тестами не покрыты ни в 0.4, ни здесь; их проверяет прогон
+архива выше (`install.sh` и `uninstall.sh` сборки, код выхода и JSON входа).
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b27a8/suites.sh`): `bun test --timeout 60000` по пакетам под `unshare -n`, свежие
+временные `HOME`/`TMPDIR`/`XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `npm ci` клиента `loginom-runtime`. Код
+`packages` и `scripts` против базы не менялся (`git diff --stat f2be0f6268 -- packages scripts` — только
+`cli-install.test.ts`, +3), поэтому отдельного дерева базы нет: прогон `cli` — это `f2be0f6268`, а `loginom-host` — он
+же плюс три строки теста. Сверка по именам — с итогом B2.7a10b (тот же код пакетов).
+
+| Пакет | B2.7a10b, итог (`a0ffe520ce`, код как в `f2be0f6268`) | эта ветка |
+|---|---|---|
+| `cli` (`f2be0f6268`) | 590 pass, 9 skip, 0 fail, 2434 expect | 590 pass, 9 skip, 0 fail, 2434 expect |
+| `loginom-host` (`932af10cf0`) | 546 pass, 13 skip, 2 fail, 3374 expect | 546 pass, 13 skip, 2 fail, 3376 expect (+2 — строки теста); падения те же: `archive verification preserves manifest modes under a private umask`, `actual managed entry reads live bridge work and dispatching over private IPC` |
+
+```text
+$ cd packages/loginom-host && bun typecheck
+✓ No type errors in 174 files
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 609 divergent upstream files                  # как на базе: файлов upstream не трогал
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile
+Checked 1694 installs across 2084 packages (no changes)
+$ bun run check                                                     # код 0, с этим разделом, под unshare -n
+Found 905 warnings and 0 errors.                                    # как в B2.7a10b; у cli-install.test.ts предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+Три новые строки теста — в форме `prettier`; файл целиком `prettier --check` не проходил и на базе (строки 0.4).
+
+### Где решал сам
+
+- **Прогон — от root.** `cli-install-native.mjs` (нативный прогон 0.4) требует uid не 0 и `sudo` для смены владельца
+  песочницы; у `labsync` sudo нет (B2.7a2b). От root распакованный `--same-permissions` `chrome-sandbox` уже `root:root`,
+  установщик `sudo` не вызывает. Ветку `sudo chown` и запуск Chromium из установленной копии не проверял (ниже).
+- **Три строки в тесте 0.4, а не новый тест.** Задание — перенести тесты 0.4; они на месте. Мутации MI7 и MI8 —
+  ровно «удаление чистит», которое просит задание, а тест 0.4 их пропускал.
+- **База наборов — один прогон.** Код `packages` и `scripts` не менялся (`git diff --stat f2be0f6268 -- packages scripts`
+  — только тест выше), поэтому прогон `cli` — это и есть `f2be0f6268`; `loginom-host` отличается от базы тремя
+  строками теста. Падения сверены по именам с итогом B2.7a10b (тот же код).
+- **Сборка под umask 077, как в B2.7a2.** Файлы артефакта 0600/0700, `install.sh`, `uninstall.sh` и бинарник — 0755
+  (`chmod` сборки). Установщик ставит для одного пользователя, этого достаточно.
+- **`install` и `postinstall.mjs` не тронуты** — по заданию, раз продукт их не вызывает. `postinstall.mjs` совпадает с
+  v2.3.0; у `install` с v2.3.0 расходится одна строка (`INSTALL_DIR`, CAT-02). Пометку CAT-02 «имя бинарника и метка
+  `# opencode` в профиле оболочки … — B2.7a» эта задача закрывает без правки; `catalog.md` не менял — только свой раздел
+  журнала.
+
+### Найдено, не чинил
+
+- **`loginom-ai-agent-cli uninstall` — команда upstream, об установщике не знает.** Она есть в `--help` («Uninstall
+  Loginom AI Agent, keeping session data, configuration, and state»). У установленного CLI:
+
+  ```text
+  $ loginom-ai-agent-cli uninstall --dry-run
+  ●  Installation method: unknown
+  ●    Cache: <R>/profile/cache
+  ▲  Could not detect the installation method. Remove the installation manually after cleanup.
+  ```
+
+  Удаляет только кэш профиля и на `uninstall.sh` не указывает. В 0.4 такой команды у CLI продукта не было: вход
+  `standalone.ts` отдавал всё, кроме `loginom`, `providers`, `auth`, `models`, в TUI или `run`. Вопрос — к набору команд
+  CLI продукта (B2.7a3), не к установщику.
+- **`gui-plugins/src/{wsl,ssh}/remote-cli.ts`** (`:46`, `:91`) ставят на удалённую машину upstream `install` с
+  `raw.githubusercontent.com/anomalyco/opencode/v2/install`. Это не корневой файл репозитория; окно продукта эти плагины
+  не загружает, главный процесс регистрирует (остаток B4.11e, ждёт решения владельца о WSL и SSH).
+- Мёртвый путь Install CLI в Desktop (`DesktopCli.install`, `runInstaller`, `native/install-cli*.ts`, `app.installCli`)
+  и текст `install` в `app.asar` с адресами opencode.ai — как записал B4.7b; удалять — не эта задача.
+- Повторный `uninstall.sh` без квитанции отвечает общим `CLI_INSTALL_FAILED` (`ENOENT`), а не «не установлено» — как
+  в 0.4.
+
+### Не проверено
+
+- Установка обычным пользователем: `sudo chown root:root` песочницы, восстановление `4755` и запуск Chromium из
+  установленной копии (`cli-install-native.mjs`) — нужен пользователь с sudo. Без sudo B2.7a2b получил отказ без
+  установки.
+- Windows (`install.cmd`, `cli-install-windows.ts`; три теста на Linux пропускаются) и macOS (`lsof` перед удалением,
+  `tar -xpf`, путь бинарника при запуске через ссылку-лаунчер) — только чтением кода.
+- Обновление двумя версиями подряд (удалить старую, поставить новую) — не запускалось; только отказ повторной
+  установки поверх.
+- TUI и `run` установленного CLI (модель не вызывалась), каналы `beta` и `prod` — собирался только `dev`.
