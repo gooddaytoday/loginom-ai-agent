@@ -11826,7 +11826,8 @@ e2e-теста и его проверки.
 |---|---|
 | `b09f0b093c` `chore(migration): merge v0.4.0 release (В-99)` | слияние, родители `2bfc9c6243` и `a63462dde1`; только правки 0.4.0 |
 | `cc390ebe3c` `fix(loginom-host): read the saved keys of CLI diagnostics through a query-only connection` | `databaseSecrets` тем же способом и тест «соединение не пишет» |
-| следующий | этот раздел; эталон 0.4 `a080f7725c` → `v0.4.0` в `guarantees.md` и `catalog.md` |
+| `c472cc67cd` `docs(upstream-sync): record the v0.4.0 merge, v0.4.0 as the 0.4 reference (B1.9)` | этот раздел; эталон 0.4 `a080f7725c` → `v0.4.0` в `guarantees.md` и `catalog.md` |
+| следующий | этот раздел: дословный вывод поиска чтений базы (и Desktop), проба контрольной точки, полное имя теста для B4.5b |
 
 ### Слияние
 
@@ -11865,12 +11866,25 @@ CONFLICT (modify/delete): packages/opencode/test/cli/standalone-status.test.ts d
   (B2.7a3b), открывалось `readonly`. Тот же способ — отдельным коммитом `cc390ebe3c`: `{ readwrite: true, create: false }`,
   `PRAGMA query_only = ON` первой строкой в `try`, чтобы при ошибке соединение закрылось в `finally`.
 
-Других чтений нет:
+Других чтений нет. Desktop открывает только свою базу (`node:sqlite`, `desktop/src/main/storage`: окна, черновики,
+плагины); `profileSecrets` и `buildDiagnosticsArchive` Desktop в v2 не вызывает:
 
 ```text
 $ grep -rln "bun:sqlite" packages/loginom-host/src packages/cli/src packages/product/src
-packages/loginom-host/src/diagnostics-cli.ts
 packages/loginom-host/src/diagnostics-export.ts
+packages/loginom-host/src/diagnostics-cli.ts
+$ grep -rlnE "bun:sqlite|node:sqlite|better-sqlite|readonly: true" packages/desktop/src packages/loginom-agent/src
+packages/desktop/src/main/plugin/storage.test.ts
+packages/desktop/src/main/plugin/enable-state.ts
+packages/desktop/src/main/storage/window-snapshot.ts
+packages/desktop/src/main/storage/database.test.ts
+packages/desktop/src/main/storage/database.ts
+packages/desktop/src/main/storage/migration.ts
+packages/desktop/src/main/storage/state.test.ts
+packages/desktop/src/main/storage/drafts.ts
+packages/desktop/src/main/storage/window-snapshot.test.ts
+$ grep -rn "profileSecrets\|buildDiagnosticsArchive\|diagnostics-export" packages/desktop/src --include=*.ts | grep -v test
+# пусто
 ```
 
 Причина правки 0.4.0 на Linux не воспроизводится: Bun здесь со своим SQLite, и `readonly` открывает базу WAL без `-wal`
@@ -11985,7 +11999,7 @@ $ git diff 2bfc9c6243 HEAD --stat -- . ':!docs/upstream-sync/oc2-migration-log.m
 
 `packages/desktop/electron-builder.config.ts`, `mac.signIgnore` — четвёртый путь `"/Contents/Resources/loginom/dashboard/"`
 с комментарием 0.4.0 `// The dashboard kit's npm packages ship signed esbuild and rollup binaries.`, и та же строка в
-ожидании теста «macOS test packages use explicit ad-hoc arm64 signing without rewriting ve…»
+ожидании теста «macOS test packages use explicit ad-hoc arm64 signing without rewriting vendor resources»
 (`electron-builder.config.test.ts`). Источник — `d24398a02c`. В v2 сейчас `signIgnore` нет.
 
 ### Для B2.7b
@@ -12008,8 +12022,18 @@ and permits a real status retry» (`5798d9f9e0`): после повтора `sta
 
 - Три скрипта приёмки `loginom-host/script/{tui-multichat-acceptance,resume-oracle,cli-permission-acceptance}.ts`
   открывают базу профиля `readonly: true`. Это не диагностика, на macOS после выхода CLI они упадут так же, как чат 0.3.9.
-- `query_only` запрещает менять данные, но не контрольную точку: если CLI вышел и оставил `-wal`, закрытие соединения
-  диагностики (последнего) перенесёт WAL в основной файл. Данные те же; `readonly` так не делал. Так и в 0.4.0.
+- **`query_only` не запрещает контрольную точку.** Если CLI оборвался и оставил `-wal` с кадрами, соединение
+  диагностики, закрываясь последним, переносит WAL в основной файл и удаляет `-wal`. Данные те же; `readonly` файл не
+  трогал. Так и в 0.4.0. Проба (`<scratchpad>/ckpt-tool/ckpt.ts`): писатель в WAL вставил две строки и не закрылся, копии
+  `db`, `-wal`, `-shm` открыты по-разному, sha256 основного файла до и после закрытия:
+
+  ```text
+  readonly {"n":2} main 97e8d54f8a725510 -> 97e8d54f8a725510 wal after close: true
+  query_only {"n":2} main 97e8d54f8a725510 -> cd5c318ecf54148f wal after close: false
+  query_only, writer open {"n":2} main 97e8d54f8a725510 -> 97e8d54f8a725510 wal after close: true
+  ```
+
+  Последняя строка — та же база при открытом писателе, как при работающем CLI: контрольной точки нет.
 
 ### Не проверено
 
