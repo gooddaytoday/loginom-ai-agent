@@ -11116,3 +11116,235 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   Electron); проверены typecheck и чтением. Мутация, возвращающая `startsWith("opencode://")` в `index.ts`, тесты не
   покраснит.
 - Настоящий вход в OpenCode Console и поведение страницы Console при чужом `client_id` — не запускались.
+
+## B4.11 Словарь Desktop
+
+23.11.2026. Ветка `b411-desktop-dictionary` от `oc2-migration` (`07da80a66a`), рабочее дерево `.claude/worktrees/b411`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0,
+1600 пакетов, `.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите.
+`packages/cli` и `packages/loginom-host` (B2.7b) не трогал. Окно Desktop не запускалось, упакованная сборка не собиралась.
+
+Прочитано: журнал B4.1 (п. 9 «Бренд», вопрос 8, строка B4.11) и B4.3–B4.4 (находка о заголовке); В-97 п. 8; словари
+0.4 на `a080f7725c`: `app/src/i18n/{desktop-native,en,ru}.ts`, `desktop/src/renderer/i18n/{en,ru}.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `deef83b359` `feat(app): product name in Desktop menus, updater and window titles (B4.11)` | словари `en` и `ru` Desktop и обновлятора; заголовки приложения, сессии и меню Windows; тест в `desktop-native.test.ts`; e2e `tabs.spec.ts` |
+| следующий | этот раздел; CAT-09, CAT-10, CAT-12 в `catalog.md` |
+
+Файлы кода — пять: `app.tsx`, `session/route.tsx`, `shell/titlebar/windows-menu.tsx`, `desktop-native.test.ts`,
+`e2e/regression/tabs.spec.ts`. Словари — четыре: `desktop-native.ts` (правятся только строки `DESKTOP_NATIVE_ENGLISH`),
+`ru.ts`, `gui-plugins/src/updater/i18n/{en,ru}.ts`. `en.ts` не менялся: ключи `desktop.*` в нём — это
+`...DESKTOP_NATIVE_ENGLISH`. Правка заголовка в `app/src` без словарей и тестов — 8 строк добавлено, 3 удалено.
+
+### Словари
+
+Строки с `OpenCode` → `Loginom AI Agent`. Где строка была в 0.4, текст — из 0.4 дословно.
+
+| Ключ | `en` | `ru` | Откуда текст |
+|---|---|---|---|
+| `desktop.menu.app` | `Loginom AI Agent` | `Loginom AI Agent` | 0.4 |
+| `desktop.menu.documentation` | `Loginom AI Agent Documentation` | `Документация Loginom AI Agent` | 0.4 |
+| `desktop.menu.ariaLabel` | `Loginom AI Agent menu` | `Меню Loginom AI Agent` | 0.4 |
+| `desktop.recovery.loadFailed` | `Loginom AI Agent failed to load` | `Не удалось загрузить Loginom AI Agent` | 0.4 |
+| `desktop.recovery.terminated` | `Loginom AI Agent window terminated unexpectedly` | `Окно Loginom AI Agent неожиданно завершило работу` | 0.4 |
+| `desktop.recovery.unresponsive` | `Loginom AI Agent is not responding` | `Loginom AI Agent не отвечает` | 0.4 |
+| `desktop.{microphone,documentsFolder,desktopFolder,downloadsFolder,networkVolumes,removableVolumes}Usage` (подсказки macOS, `Info.plist`) | `Loginom AI Agent uses …` | нет ключей, берётся `en` | в 0.4 ключей не было — замена имени |
+| обновлятор `toast.latest.description` | `You're running the latest version of Loginom AI Agent.` | `Вы используете последнюю версию Loginom AI Agent.` | 0.4 (`settings.updates.toast.latest.description`) |
+| обновлятор `action.download` | `Download Loginom AI Agent` | `Скачать Loginom AI Agent` | замена имени |
+| обновлятор `migration.description` | `For now, Loginom AI Agent Beta is moving to Loginom AI Agent Stable. …` | `Сейчас Loginom AI Agent Beta переходит на Loginom AI Agent Stable. …` | замена имени |
+| обновлятор `web.ready.message` | `A new version of Loginom AI Agent is ready. …` | нет ключа, берётся `en` | замена имени |
+
+- **Исключение — `desktop.cli.installed.message`.** `en`: «use the 'opencode' command», `ru`: «команду «opencode2»». Это
+  имя команды, а не продукта: Install CLI (только macOS) ставит `~/.loginom-ai-agent/bin/opencode`
+  (`desktop/src/main/service/desktop-cli.ts:51`). Переименование — со встроенным CLI, B4.7. Расхождение `opencode` и
+  `opencode2` между `en` и `ru` — от upstream, не чинил.
+- Другие тексты 0.4 без имени продукта не переносились: `desktop.menu.exportLogs` («Collect Diagnostics…» в 0.4),
+  `checkForUpdates`, многоточия `...`.
+
+```text
+$ cd packages/app && bun -e '<en и ru.dict: ключи desktop.* с /opencode/i>'
+desktop.cli.installed.message "CLI installed to {{path}}\n\nRestart your terminal to use the 'opencode' command."
+desktop.cli.installed.message "CLI установлен в {{path}}\n\nПерезапустите терминал, чтобы использовать команду «opencode2»."
+```
+
+### Заголовок окна
+
+Имя — `DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]`, то же место, где `desktop.menu.app`:
+
+| Место | Было | Стало |
+|---|---|---|
+| `app/src/app.tsx:61` | `<Title>OpenCode</Title>` | `<Title>{DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]}</Title>` |
+| `app/src/session/route.tsx:294` | `` `${value} · OpenCode` `` | `` `${value} · ${DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]}` `` |
+| `app/src/shell/titlebar/windows-menu.tsx:128` | `<Menu.GroupLabel …>OpenCode</Menu.GroupLabel>` | то же с `DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]` |
+
+- **Почему константа, а не `t("desktop.menu.app")`.** `<Title>` в `AppBaseProviders` стоит над `LanguageProvider`:
+  `useLanguage` там недоступен. Перенос внутрь провайдера требует нового компонента. Имя от платформы Desktop требует
+  поля в `Platform` (`runtime/platform/platform.tsx`) и правки рендерера Desktop — больше файлов. `desktop-native.ts`
+  уже в графе `app` (`en.ts`, `language.tsx`). Зависимостей `app` → `core`, `server`, `product` нет, новой копии имени в
+  коде нет.
+- **Следствие 1: имя без канала.** Главный процесс ставит `APP_NAME` (B4.3): `Loginom AI Agent Beta`, `… Dev`. После
+  загрузки `app` документ даёт заголовок `Loginom AI Agent` во всех каналах. В 0.4 было так же: литерал
+  `Loginom AI Agent`.
+- **Следствие 2: одно имя на всех языках.** Заголовок окна и сессии, заголовок меню Windows — имя продукта и при языке
+  не `en`/`ru`. Пункты меню, кнопка меню Windows (`desktop.menu.ariaLabel`), окна восстановления и обновлятор на 57
+  других языках по-прежнему говорят `OpenCode` (ниже).
+
+### Тесты
+
+`src/runtime/i18n/desktop-native.test.ts`, блок «desktop product name»:
+
+- «names the product in the en and ru desktop strings»: в `en` (с `DESKTOP_NATIVE_ENGLISH`) и `ru.dict` нет ключа
+  `desktop.*` с `/opencode/i`, кроме `desktop.cli.installed.message`; `desktop.menu.app` — `Loginom AI Agent`;
+- «names the product in the en and ru updater strings»: в `gui-plugins/src/updater/i18n/{en,ru}.ts` нет `/opencode/i`.
+  Словари обновлятора читаются динамическим импортом по шаблону пути, как `language.test.ts` читает словари `ui`:
+  статический импорт из соседнего пакета вне `include` составного проекта `app`.
+
+`e2e/regression/tabs.spec.ts` — проверка заголовков в браузере. Пять ожиданий upstream (`· OpenCode`, `OpenCode`,
+`OpenCode menu`) переведены на имя продукта, иначе они красные. Добавлено одно ожидание: группа меню Windows с именем
+`Loginom AI Agent`.
+
+```text
+$ cd packages/app && bun test --conditions=solid --isolate --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./src/runtime/i18n/desktop-native.test.ts
+ 20 pass                                   # база: 18
+ 0 fail
+$ PLAYWRIGHT_BROWSERS_PATH=<scratch> PLAYWRIGHT_PORT=3411 bunx playwright test e2e/regression/tabs.spec.ts \
+    -g "browser title names|Windows titlebar menu pastes|Windows menu shares"
+# база 07da80a66a (второй прогон; первый на холодном dev-сервере упал по таймауту 10 с: "OpenCode" вместо "Tab A session · OpenCode")
+  3 passed (22.7s)
+# итог deef83b359
+  3 passed (23.3s)
+```
+
+### Мутации
+
+Каждая мутация — одна замена скриптом в scratchpad (`mutate.py`: правка, прогон, возврат исходных байтов); после всех
+`git status` — только файлы задачи, в заголовках `OpenCode` нет.
+
+```text
+=== U1: en desktop.menu.app → "OpenCode"
+(fail) desktop product name > names the product in the en and ru desktop strings
+ 19 pass  1 fail
+=== U2: en подсказка macOS микрофона → "OpenCode uses your microphone…"
+(fail) desktop product name > names the product in the en and ru desktop strings
+ 19 pass  1 fail
+=== U3: ru desktop.recovery.unresponsive → "OpenCode не отвечает"
+(fail) desktop product name > names the product in the en and ru desktop strings
+ 19 pass  1 fail
+=== U4: обновлятор en action.download → "Download OpenCode"
+(fail) desktop product name > names the product in the en and ru updater strings
+ 19 pass  1 fail
+=== U5: обновлятор ru toast.latest.description → "… OpenCode."
+(fail) desktop product name > names the product in the en and ru updater strings
+ 19 pass  1 fail
+=== U6: тест без исключения desktop.cli.installed.message
+(fail) desktop product name > names the product in the en and ru desktop strings
+ 19 pass  1 fail
+=== E1: app.tsx <Title>OpenCode</Title>
+Expected: "Loginom AI Agent"
+Received: "OpenCode"
+  1 failed  2 passed
+=== E2: route.tsx `${value} · OpenCode`
+Expected: "Tab A session · Loginom AI Agent"
+Received: "Tab A session · OpenCode"
+  1 failed  2 passed
+=== E3: windows-menu.tsx заголовок группы OpenCode
+expect(locator).toBeVisible() failed   # the Windows titlebar menu pastes through the desktop edit action
+  1 failed  2 passed
+=== E4: en desktop.menu.ariaLabel → "OpenCode menu"
+  2 failed  1 passed                     # оба теста меню Windows: кнопка не найдена
+```
+
+### Приёмка
+
+```text
+# база 07da80a66a                                   # итог deef83b359
+$ cd packages/app && bun typecheck
+✓ No type errors in 2,390 files across 1 project   ✓ No type errors in 2,390 files across 1 project
+$ bun run test:unit
+ 2715 pass  0 fail  (275 files)                    2717 pass  0 fail  (275 files)
+$ bun run test:browser
+ 360 pass  0 fail  (58 files)                      360 pass  0 fail  (58 files)
+$ cd packages/desktop && bun typecheck
+✓ No type errors in 3,504 files across 2 projects  ✓ No type errors in 3,504 files across 2 projects
+$ bun test
+ 540 pass  4 skip  0 fail  (69 files)              540 pass  4 skip  0 fail  (69 files)
+$ cd packages/gui-plugins && bun typecheck
+✓ No type errors in 1,422 files across 1 project   ✓ No type errors in 1,422 files across 1 project
+$ bun test
+ 1129 pass  1 skip  0 fail  (112 files)            1129 pass  1 skip  0 fail  (112 files)
+```
+
+`desktop` проверялся потому, что `electron-builder.config.ts` берёт подсказки macOS из `DESKTOP_NATIVE_ENGLISH`.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 472 divergent upstream files       # база 464: +8, `ru.ts` уже расходился (B1.4a)
+  CAT-10: 81                                              # база 75
+  CAT-12: 184                                             # база 182
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
+would change: 0 files
+$ bun run check                                                        # код 0, на deef83b359
+Found 558 warnings and 0 errors.                          # у изменённых файлов предупреждений oxlint нет
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/app:typecheck: ✓ No type errors in 2,390 files across 1 project [5.56s]
+@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [7.25s]
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` на изменённых файлах: чисто, кроме `ru.ts`. Его предупреждения — пустые строки 181, 242 и строки
+858–859 от `apply-identity` (B1.4a), на `07da80a66a` те же; мои строки чистые.
+
+### Каталог
+
+`catalog.json` не менялся: файлы `app` попадают в CAT-10 (`packages/app/**`), словари обновлятора — в CAT-12
+(`packages/**`). В `catalog.md`:
+
+- CAT-10 — назначение (словарь `desktop.*` `en`/`ru`, исключение, заголовки из `desktop.menu.app`) и проверка при
+  обновлении (`desktop-native.test.ts`, `tabs.spec.ts`, новые `desktop.*` и `<Title>` от upstream);
+- CAT-12 — пункт «Словарь обновлятора Desktop (B4.11)»;
+- CAT-09 — строка «находка B4.3, задачи нет» заменена ссылкой на B4.11.
+
+### Где решал сам
+
+- **Константа вместо `t()` и вместо платформы** — меньший вариант (выше). Заголовок без канала и на всех языках.
+- **Подсказки macOS без текста 0.4.** В 0.4 этих ключей не было; заменено только имя. В `ru` ключей нет и не
+  добавлялись: `Info.plist` собирается из `en` (`electron-builder.config.ts:163-170`).
+- **`migration.*` обновлятора — замена имени, без переписывания.** Это поток upstream «бета → стабильная» на macOS
+  (`status: "download-required"`). Нужен ли он продукту, решает лента продукта, B4.12.
+- **`action.download` — «Download Loginom AI Agent»,** не «Download» 0.4: в 0.4 это была другая кнопка (доступна новая
+  версия), здесь — скачать установщик продукта.
+- **Исключение для `desktop.cli.installed.message`** — имя команды, B4.7. Тест держит исключение явным списком,
+  мутация U6 показывает, что оно не пустое.
+- **`tabs.spec.ts` — пятый файл кода.** Без него пять ожиданий e2e upstream красные. Он же — проверка заголовков в
+  браузере, отдельного рендер-теста нет: `bun test` не собирает Solid JSX без babel (проба с `AppBaseProviders`
+  упала на `jsx_… is not defined`).
+
+### Найдено, не чинил
+
+- **Другие 57 языков.** При языке системы не `en`/`ru` пользователь пока видит `OpenCode`: меню приложения (macOS),
+  «Документация OpenCode», кнопка меню Windows, окна восстановления, обновлятор. Заголовок окна и сессии — имя
+  продукта на всех языках. Перевод — этап C (В-97 п. 8).
+- **Страница «О программе» в настройках** (`settings/about/about.tsx`): ключи `settings.about.description`
+  («OpenCode, the open source coding agent»), `settings.about.trademark` (торговая марка Anomaly Innovations),
+  `settings.about.website` (`www.opencode.ai`), `settings.about.notices.description`, слово-знак OpenCode, ссылка на
+  `https://opencode.ai`. Это не ключи `desktop.*`, в B4.11 не входят. BRAND-01 в тестовом каталоге называет «About»;
+  встроенное окно About (роль `about` в меню macOS) берёт имя из `app.setName` (B4.2). Нужна ли страница настроек в
+  шлюзе B — вопрос владельцу.
+- **Ссылки меню «Справка»** (`shell/commands/desktop-menu.ts:275-282`): документация — `https://opencode.ai/docs`,
+  форум — Discord OpenCode, отзыв и ошибка — GitHub `anomalyco/opencode`. Подпись — имя продукта, ссылка — OpenCode.
+- **Веб-сборка `app`:** `app/index.html:10` — `<title data-sm>OpenCode</title>` до загрузки приложения. Desktop
+  грузит свой `renderer/index.html` (B4.3), его это не касается.
+- **Заголовок страницы OAuth** в `core/src/oauth/page.ts:103` — `… · OpenCode`. Пакет `core`, не задача B4.11.
+
+### Не проверено
+
+- Настоящее окно Desktop: заголовок в рамке, панели задач, меню macOS, окна восстановления — B4.14b; окно не
+  запускалось.
+- Подсказки macOS в собранном `Info.plist` — сборки macOS нет.
+- e2e шёл на dev-сервере Vite, не на сборке. Playwright проекта ждёт Chromium 1223, установлен 1248: каталог браузеров
+  в scratchpad со ссылками `chromium_headless_shell-1223`, `chromium-1223`, `ffmpeg-1011` на установленные версии.
+  `bun run check` e2e не запускает; в CI его гоняет `check-test.yml`, если он включён.
+- Словарь `ru` глазами в интерфейсе не смотрел; тексты сверены с 0.4.
