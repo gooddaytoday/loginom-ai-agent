@@ -462,8 +462,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
             // Full transient loading/geometry diagnostics are retained above.
-            // The model needs readiness, identities and the complete knowledge
-            // bundle; raw diagnostic DOM can push a local-package reply over
+            // The model needs readiness, identities and node discovery;
+            // raw diagnostic DOM can push a local-package reply over
             // the existing wire budget without adding preparation authority.
             const delivered=structuredClone(result);
             if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);

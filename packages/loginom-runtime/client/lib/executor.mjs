@@ -3059,7 +3059,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const inspect = async ({ operationId, signal } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
-    if(operationId&&!operation){
+    if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
       const receipt=getPreparationReceipt(operationId);
       if(receipt)return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:operationId,
         phase:'retained_preparation_receipt',effect_possible:false,output:{state:'resolved',receipt:structuredClone(receipt),
