@@ -33,7 +33,7 @@ impl Runtime {
             .write(true)
             .open(directory.join(LOCK_FILE))?;
         lock.try_lock_exclusive()
-            .context("another opencode-pty process already owns the service lock")?;
+            .context("another loginom-ai-agent-pty process already owns the service lock")?;
 
         let socket_path = socket_path(&directory)?;
         if socket_path.exists() {
