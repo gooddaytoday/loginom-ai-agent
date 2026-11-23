@@ -8872,7 +8872,8 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 |---|---|---|
 | `1d12d183d1` `fix(cli): refuse to serve from an incomplete product CLI artifact (B2.7a2b, G5)` | файл форка `cli/src/resources.ts` (отказ вместо предупреждения, причина в сообщении); комментарий в `cli/src/server-process.ts`; `cli/test/cli-resources.test.ts` (+3 теста `serve`) | `clean` |
 | `c5881e8a19` `fix(cli): build the product CLI without source maps in every channel (B2.7a2b)` | `cli/script/build.ts` (+3 −1, CAT-02) | `clean` |
-| следующий | этот раздел, строка G5 в `guarantees.md`, CAT-02 и CAT-07 в `catalog.md` | |
+| `6a04e9ac0b` `docs(upstream-sync): record the refusal of an incomplete CLI artifact (B2.7a2b)` | этот раздел, строка G5 в `guarantees.md`, CAT-02 и CAT-07 в `catalog.md` | `clean` |
+| следующий | lock-файлы рантайма с 0.4, `INSTALL.md`, сборка по умолчанию, явная переменная в «не проверено» | |
 
 ### B2.7a2b: отказ
 
@@ -8939,6 +8940,14 @@ latest exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
 файлы самих пакетов; 0.4 клал их так же — `stage-resources.ts` и lock-файлы рантайма с `a080f7725c` не менялись (пин
 `runtimeLockSha256`). Не трогал: вычищать их — менять содержимое закреплённых пакетов.
 
+```text
+$ git diff --stat a080f7725c HEAD -- packages/loginom-host/script/stage-resources.ts \
+    packages/loginom-runtime/client/package-lock.json packages/dashboard/template/package-lock.json
+                                                          # пусто, код 0
+$ LOGINOM_AI_AGENT_CHANNEL=dev bun run script/build.ts --single --skip-install --skip-web-ui --outdir=…   # без --standalone
+default dev build exit 0 bin: opencode  maps: 664         # сборка Desktop прежняя: карты — поведение upstream
+```
+
 ### B2.7a2b: распаковка не от root
 
 `labsync` (uid 1000, без sudo, umask входа 0077), каталог `/tmp/b27a2b-lab/<вариант>`, свой HOME, `install.sh` из
@@ -8949,7 +8958,8 @@ latest exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
 | `tar -xzf` | `chrome-sandbox` 0700 (setuid снят), бинарник 0700 | `LOGINOM_MANIFEST_PAYLOAD_MISMATCH`, код 1, ничего не поставлено | `serve`: `Error: LOGINOM_BUNDLE_INCOMPLETE: <V>/x does not match its cli-manifest.json (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI`, код 1; `service start` — то же у клиента, код 1; `--version` — код 0 |
 | `tar --same-permissions -xzf` | `chrome-sandbox` 4755 владельца `labsync`, бинарник 0755 | манифест сошёлся; смена владельца песочницы — `sudo: a password is required`, `CLI_INSTALL_FAILED`, код 1, лаунчер и каталог установки не созданы | `serve` слушает, Host — дочерний Node host из `resources/loginom`; `service start` — код 0 |
 
-Тихой работы без Host нет ни в одном варианте: либо понятный отказ, либо Host. Установщик без root или sudo продукт не
+`INSTALL.md` артефакта так и велит: `tar --same-permissions -xzf` и `./install.sh`, который через `sudo` делает
+`chrome-sandbox` владельца `root:root`. Тихой работы без Host нет ни в одном варианте: либо понятный отказ, либо Host. Установщик без root или sudo продукт не
 ставит (песочница Chromium должна принадлежать root, так и в 0.4). Браузер ни в одном варианте не запускался; песочница
 владельца `labsync` для Chromium не годится (B3.3) — не проверял.
 
@@ -9021,5 +9031,8 @@ Found 558 warnings and 0 errors.
 - Windows и macOS: отказ и сборка без карт — по коду; `cli-resources.test.ts` — только Linux.
 - Распаковка не от root с sudo (установщик меняет владельца песочницы через `sudo`) и запуск Chromium после такой
   установки — у `labsync` sudo нет.
+- Явная `LOGINOM_AI_AGENT_RESOURCES` у собранного CLI проверку пропускает, в том числе пустая или неверная: сервер тогда
+  работает без Host молча (сбой запуска Node host не сообщается, B2.3). 0.4 при переопределении ещё требовал Node и вход
+  Host. Не менял: задание оставляет явное значение как есть.
 - TUI собранного бинарника при отказе: TUI — клиент службы, путь `Service.ensure` тот же, что у `service start`; глазами
   не смотрел.
