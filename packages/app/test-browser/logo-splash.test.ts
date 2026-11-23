@@ -21,7 +21,7 @@ const { transformSync } = solid("@babel/core")
 Bun.plugin.clearAll()
 
 Bun.plugin({
-  name: "product-brand-solid",
+  name: "logo-solid",
   setup(build) {
     build.onLoad({ filter: /[\\/]packages[\\/][^\\/]+[\\/]src[\\/].+\.tsx$/ }, async (args) => ({
       contents: transformSync(await Bun.file(args.path).text(), {
@@ -52,7 +52,7 @@ const productIcon = await Bun.file(
 const desktop: Platform = {
   platform: "desktop",
   os: "linux",
-  windowID: "product-brand",
+  windowID: "logo-splash",
   openExternal: () => undefined,
   restart: async () => undefined,
   notify: async () => undefined,
@@ -164,8 +164,13 @@ test("About states the license of Desktop 0.4 in en and ru", () => {
   expect(dict["settings.about.license"]).toContain("MIT AND AGPL-3.0-only")
 })
 
-test("pairing and the settings rows that 0.4 named the product do not say OpenCode", async () => {
+test("pairing, the WSL setup and the settings rows that 0.4 named the product do not say OpenCode", async () => {
   const pairing = (await import("../../gui-plugins/src/pairing/i18n/en")).default
+
+  const wsl = [
+    (await import("../../gui-plugins/src/wsl/i18n/en")).default,
+    (await import("../../gui-plugins/src/wsl/i18n/ru")).default,
+  ]
 
   const keys = [
     "provider.connect.apiKey.description",
@@ -175,7 +180,14 @@ test("pairing and the settings rows that 0.4 named the product do not say OpenCo
     "settings.general.row.theme.description",
   ] as const
 
-  const values = [...Object.values(pairing), ...[en, dict].flatMap((messages) => keys.map((key) => messages[key]))]
+  // These WSL strings name the app; the ones about the CLI it installs in the distro stay OpenCode.
+  const setup = ["onboarding.wslNotInstalled.description", "onboarding.windowsRestartRequired"] as const
+
+  const values = [
+    ...Object.values(pairing),
+    ...wsl.flatMap((messages) => setup.map((key) => messages[key])),
+    ...[en, dict].flatMap((messages) => keys.map((key) => messages[key])),
+  ]
 
   expect(values.filter((value) => /opencode/i.test(value))).toEqual([])
 })
