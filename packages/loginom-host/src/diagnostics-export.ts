@@ -3,6 +3,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, rea
 import { isIPv6 } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { Product } from "@loginom-ai-agent/product"
 import { BlobReader, BlobWriter, ZipWriter } from "@zip.js/zip.js"
 import { createRedactor } from "../../loginom-runtime/client/lib/redact.mjs"
 import { connectionStore } from "./connection/connection-store"
@@ -316,6 +317,13 @@ export function maskHosts(text: string, allowed: readonly string[] = PUBLIC_HOST
   })
 }
 
+// The OpenCode 2 CLI logs each command line (`cli starting … args=[…]`, cli/src/index.ts): the prompt of `run` and the
+// values of flags such as `auth login --answer key=…`. The log of the 0.4 CLI had no command line, so neither does the
+// archive. A log line is `key=value`, with the value JSON-quoted when it has spaces or quotes.
+function withoutCommandLines(text: string) {
+  return text.replace(/(^|\s)args=(?:"(?:\\.|[^"\\])*"|\S*)/g, "$1args=[redacted]")
+}
+
 function readBounded(path: string, limit = DIAGNOSTICS_LIMITS.fileBytes) {
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
@@ -491,7 +499,7 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
         ? rows.map((row) => JSON.stringify(redactor.redact(row))).join("\n") + "\n"
         : json !== undefined
           ? JSON.stringify(redactor.redact(json))
-          : redactor.text(text)
+          : redactor.text(withoutCommandLines(text))
       cleaned = scrub(cleaned)
       if (hasExportSecret(cleaned)) {
         record.reason = "secret-after-redaction"
@@ -536,7 +544,7 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
 export async function profileSecrets(input: {
   /** `<root>` of the Loginom profile (contains `connection/`). */
   loginom?: string
-  /** opencode data directory (contains `auth.json`, `mcp-auth.json`). */
+  /** opencode data directory (contains the database, and `auth.json` and `mcp-auth.json` of 0.4). */
   data?: string
   codec?: CredentialCodec
   /** Dock home `${LOGINOM_DOCK_HOME:-~/.loginom-dock}` with `config.json` (client/bin/dispatch.mjs). */
@@ -593,6 +601,15 @@ export async function profileSecrets(input: {
         status = "unavailable"
       }
     }
+    // OpenCode 2 keeps provider and MCP credentials and account tokens in the profile database instead.
+    const database = join(input.data, Product.database)
+    if (lstatSync(database, { throwIfNoEntry: false })) {
+      try {
+        secrets.push(...(await databaseSecrets(database)))
+      } catch {
+        status = "unavailable"
+      }
+    }
   }
   if (input.dockHome) {
     // Dock client key `api_key` (loginom-runtime/client/lib/config.mjs).
@@ -610,14 +627,34 @@ export async function profileSecrets(input: {
   return { secrets: [...new Set(secrets.filter((value) => typeof value === "string" && value.length >= 4))], users, status }
 }
 
-// Credential fields of opencode `auth.json` (auth/index.ts) and `mcp-auth.json` (mcp/auth.ts).
-const credentialFields = new Set(["key", "access", "refresh", "token", "accessToken", "refreshToken", "clientSecret", "codeVerifier", "oauthState"])
+// Credential fields of opencode `auth.json` (auth/index.ts) and `mcp-auth.json` (mcp/auth.ts), and of an OpenCode 2
+// credential value with the OAuth client of an MCP server in its metadata (core/src/mcp/oauth.ts).
+const credentialFields = new Set(["key", "access", "refresh", "token", "accessToken", "refreshToken", "clientSecret", "client_secret", "codeVerifier", "oauthState"])
 function collectStrings(value: unknown, out: string[], depth = 0) {
   if (depth > 10 || !value || typeof value !== "object") return
   for (const [key, item] of Object.entries(value)) {
     if (typeof item === "string") {
       if (credentialFields.has(key)) out.push(item)
     } else collectStrings(item, out, depth + 1)
+  }
+}
+
+// The credential values (`credential`) and account tokens of an OpenCode 2 database (core/src/{credential,account}/sql.ts),
+// through a read-only connection: the running CLI keeps writing.
+async function databaseSecrets(file: string) {
+  const { Database } = await import("bun:sqlite")
+  const db = new Database(file, { readonly: true })
+  try {
+    db.run("PRAGMA busy_timeout = 5000")
+    const secrets: string[] = []
+    for (const row of db.query("SELECT value FROM credential").all() as { value: string }[])
+      collectStrings(JSON.parse(row.value), secrets)
+    for (const table of ["account", "control_account"])
+      for (const row of db.query(`SELECT access_token, refresh_token FROM ${table}`).all() as Record<string, string>[])
+        secrets.push(row.access_token, row.refresh_token)
+    return secrets
+  } finally {
+    db.close()
   }
 }
 

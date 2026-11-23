@@ -25,10 +25,16 @@ const planted = [
   "fixture-cli-loginom-key",
   "fixture-cli-oauth-refresh",
   "fixture-cli-dock-key",
+  "fixture-cli-saved-value",
+  "fixture-cli-mcp-refresh",
+  "fixture-cli-mcp-client",
+  "fixture-cli-account-access",
 ]
 
 // A CLI profile after one `run`: stores with planted values, the chat database
-// and runtime attempts of two sessions.
+// and runtime attempts of two sessions. The database has the OpenCode 2 tables the
+// export reads, with the columns of core/src/{session,credential,account}/sql.ts;
+// cli/test/cli-standalone.test.ts exports a database the server wrote itself.
 async function cliProfile() {
   const base = mkdtempSync(join(tmpdir(), "loginom-diagnostics-cli-"))
   roots.push(base)
@@ -50,17 +56,43 @@ async function cliProfile() {
   put(join(base, "dock", "config.json"), JSON.stringify({ api_key: "fixture-cli-dock-key" }))
   const echo = planted.map((value) => `echo ${value} ${Buffer.from(value).toString("base64")}`).join(" ")
   const db = new Database(join(paths.data, "loginom-ai-agent.db"), { create: true })
-  db.run("CREATE TABLE session (id TEXT PRIMARY KEY, parent_id TEXT, slug TEXT, title TEXT, version TEXT, agent TEXT, model TEXT, time_created INTEGER, time_updated INTEGER)")
-  db.run("CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT)")
-  db.run("CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT)")
+  db.run("CREATE TABLE session_v2 (id TEXT PRIMARY KEY, parent_id TEXT, slug TEXT NOT NULL, title TEXT, version TEXT NOT NULL, agent TEXT, model TEXT, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL)")
+  db.run("CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, type TEXT NOT NULL, seq INTEGER NOT NULL, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, data TEXT NOT NULL)")
+  db.run("CREATE TABLE session_part (message_id TEXT NOT NULL, session_id TEXT NOT NULL, ordinal INTEGER NOT NULL, type TEXT NOT NULL, call_id TEXT, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (message_id, ordinal))")
+  db.run("CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, connector_id TEXT, method_id TEXT, active INTEGER, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL)")
+  db.run("CREATE TABLE account (id TEXT PRIMARY KEY, email TEXT NOT NULL, url TEXT NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT NOT NULL, token_expiry INTEGER, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL)")
+  db.run("CREATE TABLE control_account (email TEXT NOT NULL, url TEXT NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT NOT NULL, token_expiry INTEGER, active INTEGER NOT NULL, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, PRIMARY KEY (email, url))")
+  // A provider key saved through `integration.connect.key`, the OAuth login of an MCP server with its client, and an account.
+  db.run("INSERT INTO credential VALUES ('cred_1', 'stub', 'default', ?, NULL, NULL, 1, 1, 1)", [
+    JSON.stringify({ type: "key", key: "fixture-cli-saved-value" }),
+  ])
+  db.run("INSERT INTO credential VALUES ('cred_2', 'mcp:docs', 'default', ?, NULL, 'oauth', 1, 1, 1)", [
+    JSON.stringify({
+      type: "oauth",
+      methodID: "oauth",
+      access: "a",
+      refresh: "fixture-cli-mcp-refresh",
+      expires: 1,
+      metadata: { client: { client_id: "public-id", client_secret: "fixture-cli-mcp-client" } },
+    }),
+  ])
+  db.run("INSERT INTO account VALUES ('acc_1', 'person@example.com', 'https://opencode.ai', 'fixture-cli-account-access', 'r', NULL, 1, 1)")
   for (const [id, updated] of [["ses_old", 1], ["ses_new", 2]] as const) {
-    db.run("INSERT INTO session VALUES (?, NULL, ?, ?, '1', 'build', '{}', 1, ?)", [id, id, `title ${id}`, updated])
-    db.run("INSERT INTO message VALUES (?, ?, 1, ?)", [`msg_${id}`, id, JSON.stringify({ role: "user" })])
-    db.run("INSERT INTO part VALUES (?, ?, ?, ?)", [
-      `prt_${id}`,
+    db.run("INSERT INTO session_v2 VALUES (?, NULL, ?, ?, '1', 'build', '{}', 1, ?)", [id, id, `title ${id}`, updated])
+    db.run("INSERT INTO session_message VALUES (?, ?, 'user', 1, 1, 1, ?)", [
       `msg_${id}`,
       id,
-      JSON.stringify({ type: "text", text: `request of ${id}; proxy http://10.4.4.4:3128/ next; ${echo}` }),
+      JSON.stringify({ text: `request of ${id}; proxy http://10.4.4.4:3128/ next; ${echo}`, files: [] }),
+    ])
+    db.run("INSERT INTO session_message VALUES (?, ?, 'assistant', 2, 2, 2, ?)", [
+      `msg_${id}_answer`,
+      id,
+      JSON.stringify({ agent: "build", model: { id: "m", providerID: "stub" } }),
+    ])
+    db.run("INSERT INTO session_part VALUES (?, ?, 0, 'text', NULL, 2, 2, ?)", [
+      `msg_${id}_answer`,
+      id,
+      JSON.stringify({ type: "text", text: `answer of ${id}; ${echo}` }),
     ])
     put(
       join(paths.loginom, "runtime", "generations", "1", "chats", sha(id), "attempts", "a1", "execution-events.jsonl"),
@@ -68,7 +100,18 @@ async function cliProfile() {
     )
   }
   db.close()
-  put(join(paths.data, "log", "loginom-ai-agent.log"), `server log ${echo}\n`)
+  // Command lines as the OpenCode 2 CLI logs them (cli/src/index.ts): a value with spaces or quotes is JSON-quoted.
+  const line = (args: string[]) =>
+    `timestamp=2026-11-13T10:00:00.000Z level=INFO run=r1 message="cli starting" args=${JSON.stringify(JSON.stringify(args))} role=cli`
+  put(
+    join(paths.data, "log", "loginom-ai-agent.log"),
+    [
+      `server log ${echo}`,
+      line(["auth", "login", "stub", "--answer", "key=fixture-cli-answer-value"]),
+      line(["run", "fixture-cli-prompt-text of the user"]),
+      "timestamp=2026-11-13T10:00:01.000Z level=INFO run=r2 message=\"cli starting\" args=[] role=cli",
+    ].join("\n") + "\n",
+  )
   return { base, paths, environment: { LOGINOM_DOCK_HOME: join(base, "dock") } }
 }
 
@@ -107,6 +150,7 @@ test("--session exports that session's attempts and chat to --output and prints 
   expect(manifest).toMatchObject({ selection: "session", chat: "included", product: "cli", knownSecrets: "ok" })
   expect(JSON.parse(files.get("chat/session.json")!).info.id).toBe("ses_old")
   expect(files.get("chat/session.json")).toContain("request of ses_old")
+  expect(files.get("chat/session.json")).toContain("answer of ses_old")
   expect([...files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_old")}/attempts/a1/execution-events.jsonl`)
   expect([...files.keys()].some((name) => name.includes(sha("ses_new")))).toBe(false)
   expect([...files.keys()]).toContain("cli/loginom-ai-agent.log")
@@ -160,7 +204,8 @@ test("an unreadable chat database leaves the chat unavailable and exports everyt
       expect(result.stderr).toContain("chat: unavailable")
       expect(result.stderr).not.toContain("SQLITE")
       const { files, manifest } = await unpack(output)
-      expect(manifest).toMatchObject({ chat: "unavailable", chatReason: "database-unreadable" })
+      // Nor can its saved keys be learned, so the archive does not claim it knows every secret.
+      expect(manifest).toMatchObject({ chat: "unavailable", chatReason: "database-unreadable", knownSecrets: "unavailable" })
       expect([...files.keys()].some((name) => name.startsWith("chat/"))).toBe(false)
       expect([...files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_new")}/attempts/a1/execution-events.jsonl`)
       expect([...files.keys()]).toContain("cli/loginom-ai-agent.log")
@@ -206,13 +251,13 @@ test("the chat is read as one snapshot: a message written meanwhile is not expor
   const query = Database.prototype.query
   Database.prototype.query = function (this: Database, sql: string) {
     const statement = query.call(this, sql)
-    if (this === writer || !sql.startsWith("SELECT id, message_id, data FROM part")) return statement
+    if (this === writer || !sql.startsWith("SELECT message_id, ordinal, data FROM session_part")) return statement
     const all = statement.all.bind(statement)
     return Object.assign(Object.create(statement), {
       all: (...args: unknown[]) => {
         const rows = all(...(args as []))
-        writer.run("INSERT INTO message VALUES ('msg_late', 'ses_new', 2, ?)", [JSON.stringify({ role: "assistant" })])
-        writer.run("INSERT INTO part VALUES ('prt_late', 'msg_late', 'ses_new', ?)", [JSON.stringify({ type: "text", text: "late" })])
+        writer.run("INSERT INTO session_message VALUES ('msg_late', 'ses_new', 'assistant', 3, 3, 3, ?)", [JSON.stringify({ agent: "build" })])
+        writer.run("INSERT INTO session_part VALUES ('msg_late', 'ses_new', 0, 'text', NULL, 3, 3, ?)", [JSON.stringify({ type: "text", text: "late" })])
         return rows
       },
     })
@@ -221,8 +266,11 @@ test("the chat is read as one snapshot: a message written meanwhile is not expor
     const output = join(profile.base, "snapshot.zip")
     expect((await run(["diagnostics", "export", "--output", output], profile)).code).toBe(0)
     const chat = JSON.parse((await unpack(output)).files.get("chat/session.json")!)
-    expect(writer.query("SELECT count(*) AS n FROM message WHERE id = 'msg_late'").get()).toEqual({ n: 1 })
-    expect(chat.messages.map((message: any) => [message.info.id, message.parts.length])).toEqual([["msg_ses_new", 1]])
+    expect(writer.query("SELECT count(*) AS n FROM session_message WHERE id = 'msg_late'").get()).toEqual({ n: 1 })
+    expect(chat.messages.map((message: any) => [message.info.id, message.parts.length])).toEqual([
+      ["msg_ses_new", 0],
+      ["msg_ses_new_answer", 1],
+    ])
   } finally {
     Database.prototype.query = query
     writer.close()
@@ -244,7 +292,7 @@ test("credentials of an earlier connection are masked in an older chat after swi
   await store.activate(2)
   // Plain text, no credential assignment: only known values can mask it.
   const db = new Database(join(profile.paths.data, "loginom-ai-agent.db"))
-  db.run("INSERT INTO part VALUES ('prt_plain', 'msg_ses_old', 'ses_old', ?)", [
+  db.run("INSERT INTO session_part VALUES ('msg_ses_old_answer', 'ses_old', 1, 'text', NULL, 2, 2, ?)", [
     JSON.stringify({ type: "text", text: "signed in as fixture-cli-person with fixture-cli-loginom-pass" }),
   ])
   db.close()
@@ -291,6 +339,16 @@ test("no planted value or internal address reaches the raw zip or any entry", as
     for (const variant of [value, Buffer.from(value).toString("base64")])
       expect({ variant, found: bytes.includes(Buffer.from(variant)) }).toEqual({ variant, found: false })
   expect(bytes.toString("utf8")).toContain("http://host-")
+})
+
+test("the CLI log keeps no command line: neither flag values nor the prompt", async () => {
+  const profile = await cliProfile()
+  const output = join(profile.base, "commands.zip")
+  expect((await run(["diagnostics", "export", "--output", output], profile)).code).toBe(0)
+  const log = (await unpack(output)).files.get("cli/loginom-ai-agent.log")!
+  expect(log).toContain("server log")
+  expect(log.match(/args=\[redacted\] role=cli/g)?.length).toBe(3)
+  for (const value of ["fixture-cli-answer-value", "fixture-cli-prompt-text", "--answer"]) expect(log).not.toContain(value)
 })
 
 test("invalid arguments exit 2 and write nothing", async () => {

@@ -168,8 +168,8 @@ function buildProvenance(installed: string) {
   }
 }
 
-// The chat in the `opencode export` shape `{ info, messages: [{ info, parts }] }`,
-// read through a separate read-only connection: the running CLI keeps writing.
+// The chat in the `opencode export` shape of 0.4 `{ info, messages: [{ info, parts }] }`, read from the session tables of
+// OpenCode 2 (core/src/session/sql.ts) through a separate read-only connection: the running CLI keeps writing.
 async function openSessions(file: string) {
   if (!lstatSync(file, { throwIfNoEntry: false })?.isFile()) return
   const { Database } = await import("bun:sqlite")
@@ -189,27 +189,27 @@ async function openSessions(file: string) {
   return {
     latest() {
       const row = db
-        .query("SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC, id DESC LIMIT 1")
+        .query("SELECT id FROM session_v2 WHERE parent_id IS NULL ORDER BY time_updated DESC, id DESC LIMIT 1")
         .get() as Row | null
       return typeof row?.id === "string" ? row.id : undefined
     },
     // One read transaction: messages and parts come from the same snapshot even
     // while the running CLI appends to the session.
     export: db.transaction((sessionID: string) => {
-      const session = db.query("SELECT * FROM session WHERE id = ?").get(sessionID) as Row | null
+      const session = db.query("SELECT * FROM session_v2 WHERE id = ?").get(sessionID) as Row | null
       if (!session) return
       const parts = new Map<string, Row[]>()
       for (const part of db
-        .query("SELECT id, message_id, data FROM part WHERE session_id = ? ORDER BY message_id, id")
+        .query("SELECT message_id, ordinal, data FROM session_part WHERE session_id = ? ORDER BY message_id, ordinal")
         .all(sessionID) as Row[]) {
         const list = parts.get(String(part.message_id)) ?? []
-        list.push({ ...json(part.data), id: part.id, sessionID, messageID: part.message_id })
+        list.push({ ...json(part.data), sessionID, messageID: part.message_id, ordinal: part.ordinal })
         parts.set(String(part.message_id), list)
       }
       const messages = (
-        db.query("SELECT id, data FROM message WHERE session_id = ? ORDER BY time_created, id").all(sessionID) as Row[]
+        db.query("SELECT id, type, time_created, data FROM session_message WHERE session_id = ? ORDER BY seq").all(sessionID) as Row[]
       ).map((message) => ({
-        info: { ...json(message.data), id: message.id, sessionID },
+        info: { time: { created: message.time_created }, ...json(message.data), id: message.id, type: message.type, sessionID },
         parts: parts.get(String(message.id)) ?? [],
       }))
       return {
