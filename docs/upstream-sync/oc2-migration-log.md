@@ -11355,3 +11355,224 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   `bun run check` e2e не запускает; в CI его гоняет `check-test.yml`, если он включён.
 - Словарь `ru` глазами в интерфейсе не смотрел; тексты сверены с 0.4.
 - Замер strobe для `session/route.tsx` (`packages/app/AGENTS.md`) не запускал: правка — замена литерала в заголовке.
+
+## B4.11b О программе и Справка
+
+23.11.2026. Ветка `b411b-about` от `oc2-migration` (`109d79b41b`), рабочее дерево `.claude/worktrees/b411b`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_`
+есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/cli` и `packages/loginom-host`
+не трогал. Окно Desktop не запускалось.
+
+Решение владельца (через координатора): BRAND-01 шлюза B включает About и меню; «сведения об исходных проектах в
+лицензиях допустимы»; настройки не перестраиваются (этап C).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `ab5295ccdb` `feat(app): product About page and Help links (B4.11b)` | страница «О программе», ссылки «Справки» и кнопки Help, зависимость `app` → `product`, тесты |
+| `3b2cd44ea2` `test(app): readable spacing in the About e2e test (B4.11b)` | две пустые строки в новом e2e-тесте: `anti-slop(require-readable-spacing)` в `bun run check` |
+| следующий | этот раздел; CAT-01, CAT-10 в `catalog.md` |
+
+Файлы кода — пять: `settings/about/about.tsx`, `shell/commands/desktop-menu.ts`, `shell/titlebar/titlebar.tsx`,
+`runtime/i18n/desktop-native.test.ts`, `e2e/regression/settings.spec.ts`. Словари — `en.ts`, `ru.ts`. Манифесты —
+`packages/app/package.json`, `bun.lock` (по строке).
+
+### Что было в 0.4
+
+- **About.** Страницы «О программе» в настройках 0.4 не было (B4.11). Описание продукта — `description` в
+  `a080f7725c:packages/desktop/package.json`: `Loginom AI Agent — desktop assistant for Loginom workflows`; сайт —
+  `homepage` там же: `https://loginom.ru/`. В `packages/product` полей сайта, торговой марки и правообладателя нет.
+- **Справка.** `a080f7725c:packages/app/src/desktop-menu.ts`: документация — `Product.documentation`, форум, отзыв и
+  ошибка — `Product.support`. Кнопка Help — `onOpenHelp={() => platform.openExternal(Product.support)}`
+  (`a080f7725c:packages/app/src/pages/layout.tsx:2238`). `app` 0.4 зависел от `@loginom-ai-agent/product`
+  (`a080f7725c:packages/app/package.json:54`). Пунктов без пары в 0.4 нет, убирать нечего.
+
+### Зависимость `app` → `product`
+
+Как в 0.4: `"@loginom-ai-agent/product": "workspace:*"` в `packages/app/package.json`. `bun install` дописал в
+`bun.lock` одну строку — это ребро; `--frozen-lockfile` после — код 0. Typecheck `app` видит на один файл больше
+(`product/src/index.ts`).
+
+```text
+$ git diff bun.lock
+@@ -63,6 +63,7 @@
+         "@kobalte/core": "catalog:",
++        "@loginom-ai-agent/product": "workspace:*",
+         "@opencode/client": "workspace:*",
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes) [124.00ms]
+```
+
+### Страница «О программе»
+
+| Элемент | Было | Стало |
+|---|---|---|
+| слово-знак | анимированный `opencode` (`AnimatedWordmark`) | строка `DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]` — `Loginom AI Agent`, стиль классами Tailwind в разметке |
+| авторы и иллюстраторы | 16 логинов команды OpenCode, 4 иллюстратора, «N others» из `api.github.com/repos/anomalyco/opencode/contributors` | блока нет, запроса нет |
+| сайт | `https://opencode.ai`, подпись `www.opencode.ai` | `https://loginom.ru/` (0.4), подпись `loginom.ru` в `en` и `ru` |
+| описание | `OpenCode, the open source coding agent` | `en`: `Loginom AI Agent — desktop assistant for Loginom workflows` (0.4); `ru`: `Loginom AI Agent — настольный помощник для сценариев Loginom` — мой перевод |
+| торговая марка | `OpenCode is a registered trademark of Anomaly Innovations, Inc.` | строки нет |
+| сведения о лицензиях | `OpenCode includes the following open source software.` | `en`: `Loginom AI Agent includes …`; в `ru` ключа нет, берётся `en`; список и тексты лицензий не менялись |
+
+Снимок страницы в `en` после правки (e2e, Chromium): версия, «Released under the MIT License», `Loginom AI Agent`,
+«First published in Missouri, USA», «First illustrated in London, England», `loginom.ru`, описание, «Typeset in Inter
+and IBM Plex Mono», «Third-party notices», слоган, значок MIT, «© Anomaly Innovations, Inc.» и логотип Anomaly.
+
+### Справка и кнопка Help
+
+| Место | Было | Стало |
+|---|---|---|
+| `desktop-menu.ts` «Документация» | `https://opencode.ai/docs` | `Product.documentation` |
+| «Форум поддержки» | `https://discord.com/invite/opencode` | `Product.support` |
+| «Отправить отзыв» | GitHub `anomalyco/opencode`, `feature_request.yml` | `Product.support` |
+| «Сообщить об ошибке» | GitHub `anomalyco/opencode`, `bug_report.yml` | `Product.support` |
+| `titlebar.tsx:716` Help мобильного меню | `https://opencode.ai/desktop-feedback` | `Product.support` |
+
+### Тесты
+
+- `src/runtime/i18n/desktop-native.test.ts`, блок «desktop product name», два новых теста:
+  - «names the product in the en and ru About strings»: в `en` и `ru` нет ключа `settings.about.*` с `/opencode/i`,
+    кроме `settings.about.trademark` — страница его больше не показывает;
+  - «leads the Help menu to the product, as 0.4 did»: ссылки «Справки» —
+    `[Product.documentation, Product.support, Product.support, Product.support]`.
+- `e2e/regression/settings.spec.ts`: два теста upstream о счётчике участников (они ждали запрос к GitHub и ссылку
+  `www.opencode.ai`) заменены одним — «about names the product and asks GitHub for nothing». Ожидание запроса к
+  `api.github.com` ставится до открытия вкладки и ждёт 2 с; на странице — имя, описание, ровно одна ссылка
+  `https://loginom.ru/`, нет текста `opencode` в любом регистре.
+- Проверка `grep` для кода (`titlebar.tsx` тестом не покрыт):
+
+```text
+$ cd packages/app && grep -n -i -E 'opencode\.ai|discord\.com|anomalyco|api\.github\.com' \
+    src/shell/commands/desktop-menu.ts src/shell/titlebar/titlebar.tsx src/settings/about/about.tsx
+# пусто, код 1
+```
+
+```text
+$ bun test … ./src/runtime/i18n/desktop-native.test.ts
+ 22 pass                                   # база 109d79b41b: 20
+ 0 fail
+$ PLAYWRIGHT_BROWSERS_PATH=<scratch> PLAYWRIGHT_PORT=3412 bunx playwright test e2e/regression/settings.spec.ts \
+    -g "<тесты About>|Copied tooltip closes|every page scrolls inside settings"
+# база 109d79b41b, тёплый dev-сервер (первый прогон на холодном упал на первом тесте: таймаут фокуса)
+  5 passed (33.8s)                         # 2 теста участников, Copied, раскладка desktop и mobile
+# итог ab5295ccdb (и 3b2cd44ea2), тёплый dev-сервер (первый прогон на холодном: `settings-screen` не найден за 30 с)
+  4 passed (33.4s)                         # новый тест About, Copied, раскладка desktop и mobile
+```
+
+### Мутации
+
+`mutate.py` из scratchpad: одна замена, прогон, возврат исходных байтов. После всех мутаций `git status` — только файлы
+задачи.
+
+```text
+=== U1: Документация → https://opencode.ai/docs
+(fail) desktop product name > leads the Help menu to the product, as 0.4 did      21 pass  1 fail
+=== U2: Форум поддержки → https://discord.com/invite/opencode
+(fail) desktop product name > leads the Help menu to the product, as 0.4 did      21 pass  1 fail
+=== U3: en settings.about.description → OpenCode, the open source coding agent
+(fail) desktop product name > names the product in the en and ru About strings   21 pass  1 fail
+=== U4: ru settings.about.website → www.opencode.ai
+(fail) desktop product name > names the product in the en and ru About strings   21 pass  1 fail
+=== U5: en settings.about.notices.description → OpenCode includes …
+(fail) desktop product name > names the product in the en and ru About strings   21 pass  1 fail
+=== U6: тест без исключения settings.about.trademark
+(fail) desktop product name > names the product in the en and ru About strings   21 pass  1 fail
+=== E1: About снова грузит contributors.ts при открытии
+Expected: false
+Received: true                                                                    1 failed
+=== E2: ссылка сайта → https://opencode.ai
+Expected: "https://loginom.ru/"
+Received: "https://opencode.ai"                                                   1 failed
+=== E3: строка имени → opencode
+expect(locator).toBeVisible() failed                                              1 failed
+=== E4: en описание → OpenCode, the open source coding agent
+expect(locator).toBeVisible() failed                                              1 failed
+=== G1: titlebar Help → https://opencode.ai/desktop-feedback
+src/shell/titlebar/titlebar.tsx:716:  platform.openExternal("https://opencode.ai/desktop-feedback")   # grep находит
+```
+
+### Приёмка
+
+```text
+# база 109d79b41b                                   # итог ab5295ccdb
+$ cd packages/app && bun typecheck
+✓ No type errors in 2,390 files across 1 project   ✓ No type errors in 2,391 files across 1 project
+$ bun run test:unit
+ 2717 pass  0 fail  (275 files)                    2719 pass  0 fail  (275 files)
+$ bun run test:browser
+ 360 pass  0 fail  (58 files)                      360 pass  0 fail  (58 files)
+$ cd packages/desktop && bun typecheck
+✓ No type errors in 3,504 files across 2 projects  ✓ No type errors in 3,505 files across 2 projects
+$ bun test
+ 540 pass  4 skip  0 fail  (69 files)              540 pass  4 skip  0 fail  (69 files)
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 476 divergent upstream files       # база 472: +4
+  CAT-01: 10                                              # база 9: packages/app/package.json; bun.lock уже расходился
+  CAT-10: 84                                              # база 81: about.tsx, desktop-menu.ts, titlebar.tsx
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
+would change: 0 files
+$ bun run check                                                        # код 0, на 3b2cd44ea2
+Found 558 warnings and 0 errors.                          # на ab5295ccdb было 560: два новых — пробелы в новом e2e-тесте, исправлены в 3b2cd44ea2
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/app:typecheck: ✓ No type errors in 2,391 files across 1 project [4.90s]
+@opencode/desktop:typecheck: ✓ No type errors in 3,505 files across 2 projects [6.56s]
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check`: мои строки чистые. Предупреждения у `about.tsx` (строка 55, `writeClipboardText`) и `titlebar.tsx`
+(строка 212) — строки upstream, на `109d79b41b` те же; `prettier --write` их переносил, перенос откатил.
+
+### Каталог
+
+`catalog.json` не менялся: `packages/app/package.json` и `bun.lock` — CAT-01, файлы `app` — CAT-10. В `catalog.md`:
+CAT-01 — зависимость `app` → `product` и `packages/app/package.json` в компонентах; CAT-10 — страница «О программе»,
+«Справка», кнопка Help и проверка при обновлении.
+
+### Где решал сам
+
+- **Зависимость `app` → `product` — как в 0.4.** Литералы ссылок в `app` дали бы вторую копию адресов `product`.
+  Связь пакетов B4.3 относил к решению владельца; задание прямо просит ссылки продукта «как в 0.4», а в 0.4 эта
+  зависимость была. Если владелец против — откат: три импорта `Product` и строка в манифесте.
+- **Торговая марка — строки нет.** В репозитории нет правообладателя и формулировки марки продукта; придумывать
+  юридический текст нельзя. Ключ `settings.about.trademark` в словарях остался, страница его не показывает, тест
+  держит его исключением.
+- **Сайт — `https://loginom.ru/`.** Это `homepage` Desktop 0.4. В `packages/product` поля сайта нет, поэтому адрес —
+  литерал в `about.tsx`.
+- **Описание `ru` — мой перевод:** в 0.4 русского описания не было.
+- **Слово-знак — текстом.** Анимированный знак рисует буквы `o p e n c d` символами SVG. Для имени продукта новый SVG
+  или правка `settings.css` дали бы шестой файл кода, поэтому имя — строка с классами Tailwind в разметке.
+- **`contributors.ts`, его тест и `animated-wordmark.tsx` не удалены.** Импортёров у них нет
+  (`grep -rn 'from "./contributors"\|from "./animated-wordmark"' src e2e test-browser` — только `contributors.test.ts`),
+  удаление — ещё три файла. Маршруты `page.route(contributors…)` в двух других e2e-тестах (Copied, раскладка) не
+  трогал: запроса больше нет, маршрут не срабатывает.
+- **Колофон upstream оставлен** — вне списка задания: «First published in Missouri, USA», «First illustrated in
+  London, England», слоган «AI can’t build great software, without you», «© Anomaly Innovations, Inc.» с логотипом
+  Anomaly. Имени OpenCode в них нет, но это сведения об OpenCode вне лицензий. Правообладатель продукта в репозитории
+  не записан.
+
+### Найдено, не чинил
+
+- **Ещё две ссылки `opencode.ai/desktop-feedback`:** кнопка Help на главной (`home/projects/controller.tsx:104`) и
+  страница ошибки (`shell/errors/error.tsx:500`, «сообщить в Discord»). В 0.4 Help на главной вёл на
+  `Product.support`. В пять файлов кода не помещаются.
+- **Лицензия.** Страница пишет «Released under the MIT License»; у Desktop 0.4 в `package.json` —
+  `MIT AND AGPL-3.0-only`. Не менял: это сведения о лицензии.
+- **Лицензия OpenCode в списке сведений о лицензиях отсутствует:** список — BetterOffice, шрифты, crates. Строка
+  «© Anomaly Innovations, Inc.» — единственное упоминание правообладателя upstream на странице; её снятие требует
+  решения о том, где показывать уведомление MIT OpenCode.
+- Другие ссылки на opencode.ai в `app`, не относящиеся к About и «Справке»: документация тем
+  (`settings/appearance/appearance.tsx:116`), навыков (`settings/providers/extensions.tsx:277`,
+  `settings/workspaces/project-extensions.tsx:513`), Console и OpenCode Go (`providers/connect/dialog.tsx:1179`,
+  `session/composer/*`, `settings/providers/console-extensions.ts`), значок уведомления (`runtime/platform/web.ts:31`).
+
+### Не проверено
+
+- Страница в `ru` в браузере не открывалась: e2e идёт на `en`; `ru` проверен тестом словаря.
+- Настоящее окно Desktop, нативное меню «Справка» и открытие ссылок в браузере ОС — B4.14b.
+- e2e — на dev-сервере Vite с Chromium 1248 вместо ожидаемого 1223 (ссылки в каталоге браузеров в scratchpad).
+  `bun run check` e2e не запускает.
+- Замер strobe не запускал: сессионный код не менялся.
