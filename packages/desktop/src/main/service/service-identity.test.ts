@@ -4,13 +4,14 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
-// Contract (U5, catalog CAT-13): Desktop finds the background service through the registration file the CLI of the same
-// product channel writes, `<state>/<productSlug(channel)>/service[-<identity>].json`, so the prod, beta and dev windows
-// never meet each other's services and, under an identity, never adopt another product's or profile's `service.json`
-// of the same version. serviceFile() reads its build constant and the environment, so each case runs in a fresh
-// process; without a build constant (never in a build) the channel is dev.
+// Contract (U5, catalog CAT-13, decision В-97 п. 7): Desktop's service has the identity `desktop` and a constant port for
+// each channel. Desktop finds it at `<state>/<productSlug(channel)>/service-desktop.json`, the file the CLI of the same
+// channel writes under that identity, and hands the service the identity, the port and the application version. The
+// module reads its build constant, so each case runs in a fresh process; without a build constant the channel is dev.
 const version = "2.3.0-test"
+
 const cli = path.resolve(import.meta.dir, "../../../../cli")
+
 const cleanup: Array<() => Promise<unknown>> = []
 
 afterEach(async () => {
@@ -18,130 +19,177 @@ afterEach(async () => {
 })
 
 describe("service-identity", () => {
-  test.each([
-    {
-      env: { LOGINOM_AI_AGENT_SERVICE_IDENTITY: "loginom-ai-agent/desktop", XDG_STATE_HOME: "/state" },
-      expected: path.join("/state", "loginom-ai-agent-dev", "service-loginom-ai-agent-desktop.json"),
-    },
-    {
-      // An empty XDG_STATE_HOME falls back to the home directory, as the CLI's global roots do.
-      env: { LOGINOM_AI_AGENT_SERVICE_IDENTITY: "loginom-ai-agent-desktop", XDG_STATE_HOME: "" },
-      expected: path.join("<home>", ".local", "state", "loginom-ai-agent-dev", "service-loginom-ai-agent-desktop.json"),
-    },
-    { env: { XDG_STATE_HOME: "/state" }, expected: path.join("/state", "loginom-ai-agent-dev", "service.json") },
-    {
-      env: { LOGINOM_AI_AGENT_SERVICE_IDENTITY: "", XDG_STATE_HOME: "/state" },
-      expected: path.join("/state", "loginom-ai-agent-dev", "service.json"),
-    },
-  ])("serviceFile() with $env", async (input) => {
-    expect(await serviceFile(input.env)).toBe(input.expected)
-  })
-
-  // The Desktop build sets its channel to prod, beta or dev and bundles the CLI built for the same release, whose
-  // stable channel is `latest`. The development window (dev) runs the CLI from source, whose channel is local.
-  test("the service and the window use one registration file for each channel", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "desktop-service-channel-"))
-    cleanup.push(() => fs.rm(root, { recursive: true, force: true }))
-    const identity = { LOGINOM_AI_AGENT_SERVICE_IDENTITY: "loginom-ai-agent-desktop" }
+  // The Desktop build sets its channel to prod, beta or dev and bundles the CLI built for the same release, whose stable
+  // channel is `latest`. The development window (`script/dev.ts`, channel local) runs the CLI from source.
+  test("each channel has its own port, and the CLI under Desktop's environment uses Desktop's file and port", async () => {
+    const root = await temporary("desktop-service-channel-")
 
     const channels = [
-      {
-        desktop: { LOGINOM_AI_AGENT_CHANNEL: "prod" },
-        cli: "latest",
-        file: path.join("loginom-ai-agent", "service.json"),
-      },
-      {
-        desktop: { LOGINOM_AI_AGENT_CHANNEL: "beta" },
-        cli: "beta",
-        file: path.join("loginom-ai-agent-beta", "service.json"),
-      },
-      {
-        desktop: { LOGINOM_AI_AGENT_CHANNEL: "dev" },
-        cli: "dev",
-        file: path.join("loginom-ai-agent-dev", "service.json"),
-      },
-      {
-        desktop: { LOGINOM_AI_AGENT_CHANNEL: "dev", LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL: "local" },
-        cli: undefined,
-        file: path.join("loginom-ai-agent-dev", "service-local.json"),
-      },
-      {
-        desktop: { LOGINOM_AI_AGENT_CHANNEL: "prod", ...identity },
-        cli: "latest",
-        env: identity,
-        file: path.join("loginom-ai-agent", "service-loginom-ai-agent-desktop.json"),
-      },
+      { desktop: "prod", cli: "latest", port: 28288, directory: "loginom-ai-agent" },
+      { desktop: "beta", cli: "beta", port: 28289, directory: "loginom-ai-agent-beta" },
+      { desktop: "dev", cli: "dev", port: 28290, directory: "loginom-ai-agent-dev" },
+      { desktop: "local", cli: undefined, port: 28290, directory: "loginom-ai-agent-dev" },
     ]
 
     const found = await Promise.all(
-      channels.map((channel) =>
-        Promise.all([
-          serviceFile({ ...channel.desktop, XDG_STATE_HOME: path.join(root, "state") }),
-          cliServiceFile(root, channel.cli, channel.env ?? {}),
-        ]),
+      channels.map(async (channel) => {
+        const own = await desktop({
+          LOGINOM_AI_AGENT_CHANNEL: channel.desktop,
+          XDG_STATE_HOME: path.join(root, "state"),
+        })
+
+        return { own, cli: await cliService(root, channel.cli, own.env) }
+      }),
+    )
+
+    expect(found).toEqual(
+      channels.map((channel) => {
+        const file = path.join(root, "state", channel.directory, "service-desktop.json")
+
+        return {
+          own: expect.objectContaining({
+            file,
+            env: {
+              LOGINOM_AI_AGENT_SERVICE_IDENTITY: "desktop",
+              LOGINOM_AI_AGENT_SERVICE_PORT: String(channel.port),
+              LOGINOM_AI_AGENT_RESOURCE_VERSION: version,
+            },
+          }),
+          // The stated port is used as given on every platform, without the Windows fold into 0x7000-0x7fff.
+          cli: expect.objectContaining({ file, port: channel.port, win32: channel.port }),
+        }
+      }),
+    )
+    // Below 0x7000 and outside the CLI profiles' 0x6000-0x6bff (B2.7c).
+    expect(channels.every((channel) => channel.port < 0x7000 && channel.port > 0x6bff)).toBe(true)
+  })
+
+  test("finds only its own channel's service, never another live registration with the same version", async () => {
+    const root = await temporary("desktop-service-foreign-")
+    const directories = ["loginom-ai-agent", "loginom-ai-agent-beta", "loginom-ai-agent-dev"]
+
+    const foreign = [
+      // OpenCode on the same machine, a product service without an identity, a CLI profile's service.
+      path.join("opencode", "service.json"),
+      ...directories.flatMap((directory) => [
+        path.join(directory, "service.json"),
+        path.join(directory, "service-cli-0123abcd.json"),
+      ]),
+    ]
+
+    const own = directories.map((directory) => path.join(directory, "service-desktop.json"))
+    const services = new Map([...foreign, ...own].map((file, index) => [file, fakeService(1000 + index)]))
+    await Promise.all(
+      [...services].map(async ([file, service]) => {
+        await fs.mkdir(path.join(root, path.dirname(file)), { recursive: true })
+        await fs.writeFile(path.join(root, file), JSON.stringify(service))
+      }),
+    )
+
+    const files = await Promise.all(
+      ["prod", "beta", "dev"].map(
+        async (channel) => (await desktop({ LOGINOM_AI_AGENT_CHANNEL: channel, XDG_STATE_HOME: root })).file,
       ),
     )
 
-    expect(found).toEqual(channels.map((channel) => Array(2).fill(path.join(root, "state", channel.file))))
+    const discover = () => Promise.all(files.map(async (file) => (await Service.discover({ version, file }))?.url))
+
+    // Every planted registration answers with a matching version: whatever file a channel looked at, it would adopt.
+    expect(await discover()).toEqual(own.map((file) => services.get(file)?.url))
+
+    await Promise.all(own.map((file) => fs.rm(path.join(root, file))))
+    expect(await discover()).toEqual([undefined, undefined, undefined])
   })
 
-  test("finds its own service and never the service.json of another service with the same version", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "desktop-service-identity-"))
-    cleanup.push(() => fs.rm(root, { recursive: true, force: true }))
-    const own = await serviceFile({
-      LOGINOM_AI_AGENT_SERVICE_IDENTITY: "loginom-ai-agent-desktop",
-      XDG_STATE_HOME: root,
+  // A window started from a CLI profile's terminal or tool inherits what the profile's entry set for its processes
+  // (`cli/src/profile.ts`, `cli/src/standalone.ts`). The client starts the service with `{ ...process.env, ...env }`.
+  test("a window started from a CLI profile gives its service Desktop's own directories and database", async () => {
+    const root = await temporary("desktop-service-profile-")
+    const profile = path.join(root, "profile")
+    const window = { LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: path.join(root, "state") }
+
+    const sides = await Promise.all([
+      desktop(window),
+      desktop({
+        ...window,
+        LOGINOM_AI_AGENT_CLI_ROOT: profile,
+        LOGINOM_AI_AGENT_CONFIG_DIR: path.join(profile, "config"),
+        LOGINOM_AI_AGENT_DB: path.join(profile, "data", "loginom-ai-agent.db"),
+        LOGINOM_AI_AGENT_SERVICE_IDENTITY: "cli-0123abcd",
+        LOGINOM_AI_AGENT_SERVICE_PORT: "24600",
+        LOGINOM_AI_AGENT_HEADLESS: "1",
+        LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation",
+      }),
+    ])
+
+    const services = sides.map((side) => ({ ...side.inherited, ...side.env }))
+    const [own, inherited] = await Promise.all(services.map((env) => cliService(root, "dev", env)))
+
+    expect(services[1]).toEqual(services[0])
+    expect(inherited).toEqual(own)
+    expect(own).toMatchObject({
+      file: path.join(root, "state", "loginom-ai-agent-dev", "service-desktop.json"),
+      data: path.join(root, "data", "loginom-ai-agent-dev"),
+      config: path.join(root, "config", "loginom-ai-agent-dev"),
+      database: path.join(root, "data", "loginom-ai-agent-dev", "loginom-ai-agent.db"),
     })
-    const other = fakeService(101)
-    const mine = fakeService(202)
-    const shared = path.join(root, "loginom-ai-agent-dev", "service.json")
-    await fs.mkdir(path.dirname(shared), { recursive: true })
-    await fs.writeFile(shared, JSON.stringify(other))
-
-    // The default registration answers with a matching version: a probe without the identity file would adopt it.
-    expect((await Service.discover({ version, file: shared }))?.url).toBe(other.url)
-    expect(own).toBe(path.join(root, "loginom-ai-agent-dev", "service-loginom-ai-agent-desktop.json"))
-    expect(await Service.discover({ version, file: own })).toBeUndefined()
-
-    await fs.writeFile(own, JSON.stringify(mine))
-    expect((await Service.discover({ version, file: own }))?.url).toBe(mine.url)
   })
 })
 
-async function serviceFile(env: Record<string, string>) {
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), "desktop-service-identity-home-"))
-  cleanup.push(() => fs.rm(home, { recursive: true, force: true }))
+async function temporary(prefix: string) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
+  cleanup.push(() => fs.rm(root, { recursive: true, force: true }))
 
-  return output(
-    [process.execPath, "-e", 'const { serviceFile } = await import("./service-identity"); console.log(serviceFile())'],
-    import.meta.dir,
-    {
-      PATH: process.env.PATH,
-      HOME: home,
-      USERPROFILE: home,
-      LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
-      XDG_STATE_HOME: undefined,
-      ...env,
-    },
-  ).then((stdout) => stdout.replace(home, "<home>"))
+  return root
 }
 
-// The registration file `ServiceConfig.options()` hands the client in a CLI built for `channel`: the channel is a
-// build-time constant there, undefined when the CLI runs from source.
-async function cliServiceFile(root: string, channel: string | undefined, env: Record<string, string>) {
+async function desktop(env: Record<string, string>) {
+  const home = await temporary("desktop-service-identity-home-")
+
+  // `inherited`: this product's variables the window keeps once the module is loaded, which the service inherits.
+  const script = `
+    const { serviceEnvironment, serviceFile } = await import("./service-identity")
+    const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("LOGINOM_AI_AGENT_")))
+    console.log(JSON.stringify({ file: serviceFile(), env: serviceEnvironment(${JSON.stringify(version)}), inherited }))
+  `
+
+  const stdout = await output([process.execPath, "-e", script], import.meta.dir, {
+    PATH: process.env.PATH,
+    HOME: home,
+    USERPROFILE: home,
+    ...env,
+  })
+
+  // SAFETY: the script above prints exactly this shape.
+  return JSON.parse(stdout) as { file: string; env: Record<string, string>; inherited: Record<string, string> }
+}
+
+// The registration file `ServiceConfig.options()` hands the client, the port `serve --service` listens on, and the
+// directories and database of the service, in a CLI built for `channel`: the channel is a build-time constant there,
+// undefined when the CLI runs from source. `config` is the service's configuration directory as `server-process.ts`
+// takes it.
+async function cliService(root: string, channel: string | undefined, env: Record<string, string>) {
   const script = `
     import { NodeFileSystem } from "@effect/platform-node"
     import { Effect } from "effect"
     import { Global } from "@opencode/util/global"
+    import { databasePath } from "./src/database-path"
     import { ServiceConfig } from "./src/services/service-config"
     const options = await Effect.runPromise(
       ServiceConfig.options().pipe(Effect.provide(Global.layerWith({})), Effect.provide(NodeFileSystem.layer)),
     )
-    console.log(options.file)
+    console.log(JSON.stringify({
+      file: options.file,
+      port: ServiceConfig.defaultPort(undefined, "linux"),
+      win32: ServiceConfig.defaultPort(undefined, "win32"),
+      data: Global.Path.data,
+      config: process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? Global.Path.config,
+      database: databasePath(Global.Path.data),
+    }))
   `
 
   // The trailing argument stands in for the CLI entrypoint that options() puts into the service command.
-  return output(
+  const stdout = await output(
     [
       process.execPath,
       ...(channel === undefined ? [] : ["--define", `LOGINOM_AI_AGENT_CHANNEL=${JSON.stringify(channel)}`]),
@@ -152,22 +200,31 @@ async function cliServiceFile(root: string, channel: string | undefined, env: Re
     cli,
     {
       ...process.env,
-      // The isolated XDG_CACHE_HOME would hold Bun's transpiler cache; share the CLI tests' cache instead.
-      BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(os.tmpdir(), "opencode-test-transpiler-cache"),
-      HOME: root,
-      USERPROFILE: root,
-      TMPDIR: path.join(root, "tmp"),
-      TEMP: path.join(root, "tmp"),
-      XDG_CACHE_HOME: path.join(root, "cache"),
-      XDG_CONFIG_HOME: path.join(root, "config"),
-      XDG_DATA_HOME: path.join(root, "data"),
-      XDG_STATE_HOME: path.join(root, "state"),
+      ...isolated(root),
+      LOGINOM_AI_AGENT_CLI_ROOT: undefined,
       LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
-      LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
-      LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
+      LOGINOM_AI_AGENT_DB: undefined,
       ...env,
     },
   )
+
+  return JSON.parse(stdout)
+}
+
+// A CLI process whose directories all live under `root`.
+function isolated(root: string) {
+  return {
+    // The isolated XDG_CACHE_HOME would hold Bun's transpiler cache; share the CLI tests' cache instead.
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(os.tmpdir(), "opencode-test-transpiler-cache"),
+    HOME: root,
+    USERPROFILE: root,
+    TMPDIR: path.join(root, "tmp"),
+    TEMP: path.join(root, "tmp"),
+    XDG_CACHE_HOME: path.join(root, "cache"),
+    XDG_CONFIG_HOME: path.join(root, "config"),
+    XDG_DATA_HOME: path.join(root, "data"),
+    XDG_STATE_HOME: path.join(root, "state"),
+  }
 }
 
 async function output(cmd: string[], cwd: string, env: Record<string, string | undefined>) {
@@ -193,6 +250,8 @@ function fakeService(pid: number) {
         ? Response.json({ version, pid })
         : new Response("not found", { status: 404 }),
   })
+
   cleanup.push(() => server.stop(true))
+
   return { id: `service-${pid}`, version, url: server.url.origin, pid, password: `secret-${pid}` }
 }

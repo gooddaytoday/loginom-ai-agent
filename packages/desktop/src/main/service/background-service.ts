@@ -11,7 +11,7 @@ import { cleanStages } from "./cli-stages"
 import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
-import { serviceFile } from "./service-identity"
+import { serviceEnvironment, serviceFile } from "./service-identity"
 import { takeSidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
@@ -111,8 +111,11 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
 
   const file = serviceFile()
+  const installation = LoginomResources.installation(app)
   // Loginom AI Agent (B4.8a): a packaged app's service takes its Loginom resources, or the app does not start it.
-  const env = yield* Effect.promise(() => LoginomResources.serviceEnvironment(LoginomResources.installation(app)))
+  const resources = yield* Effect.promise(() => LoginomResources.serviceEnvironment(installation))
+  // Loginom AI Agent (B4.9): its own identity and port, and the version the installer verified the resources with.
+  const env = { ...serviceEnvironment(installation.version), ...resources }
 
   return { cli, client, env, file, isolated, version }
 })

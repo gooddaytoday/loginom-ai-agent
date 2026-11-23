@@ -95,6 +95,7 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
+        ("resourceVersion" in input && typeof input.resourceVersion !== "string") ||
         ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
         ("closeSavedPackageOnShutdown" in input && typeof input.closeSavedPackageOnShutdown !== "boolean") ||
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
@@ -105,6 +106,8 @@ async function dispatch(message: unknown) {
         resources: input.resources,
         headless: input.headless,
         preflightHeadless: input.headless,
+        resourceVersion:
+          "resourceVersion" in input && typeof input.resourceVersion === "string" ? input.resourceVersion : undefined,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
         closeSavedPackageOnShutdown:
           "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
