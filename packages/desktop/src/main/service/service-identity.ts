@@ -18,6 +18,21 @@ const identity = "desktop"
 
 const port = { prod: 0x6e80, beta: 0x6e81, dev: 0x6e82 }[channel]
 
+// What the product CLI's entry sets for every process it starts (`cli/src/profile.ts`, `cli/src/standalone.ts`), besides
+// the identity and port `serviceEnvironment` replaces. A window started from a profile's terminal or tool inherits them,
+// and its service would open the profile's directories, config and database, or hide its browser. The client lays `env`
+// over this process's environment and cannot remove a variable, so they leave this process when the entry imports this
+// module: before `configureApplication`, whose onboarding test mode sets its own database.
+const profile = [
+  "LOGINOM_AI_AGENT_CLI_ROOT",
+  "LOGINOM_AI_AGENT_CONFIG_DIR",
+  "LOGINOM_AI_AGENT_DB",
+  "LOGINOM_AI_AGENT_HEADLESS",
+  "LOGINOM_AI_AGENT_RUN_COMMAND",
+]
+
+profile.forEach((name) => delete process.env[name])
+
 // Read at call time: the isolated development server moves XDG_STATE_HOME before it asks.
 export function serviceFile() {
   const state = process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state")

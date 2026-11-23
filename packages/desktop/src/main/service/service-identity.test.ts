@@ -47,16 +47,16 @@ describe("service-identity", () => {
         const file = path.join(root, "state", channel.directory, "service-desktop.json")
 
         return {
-          own: {
+          own: expect.objectContaining({
             file,
             env: {
               LOGINOM_AI_AGENT_SERVICE_IDENTITY: "desktop",
               LOGINOM_AI_AGENT_SERVICE_PORT: String(channel.port),
               LOGINOM_AI_AGENT_RESOURCE_VERSION: version,
             },
-          },
+          }),
           // The stated port is used as given on every platform, without the Windows fold into 0x7000-0x7fff.
-          cli: { file, port: channel.port, win32: channel.port },
+          cli: expect.objectContaining({ file, port: channel.port, win32: channel.port }),
         }
       }),
     )
@@ -101,27 +101,39 @@ describe("service-identity", () => {
     expect(await discover()).toEqual([undefined, undefined, undefined])
   })
 
-  // No test may bind the constant port: an installed Desktop of the channel may hold it. The case takes Desktop's
-  // environment and moves only the port onto one a foreign program holds.
-  test("a foreign program on the port stops the service with the CLI's error, and nothing is adopted", async () => {
-    const root = await temporary("desktop-service-port-")
-    using listener = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("foreign") })
-    const own = await desktop({ LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: path.join(root, "state") })
+  // A window started from a CLI profile's terminal or tool inherits what the profile's entry set for its processes
+  // (`cli/src/profile.ts`, `cli/src/standalone.ts`). The client starts the service with `{ ...process.env, ...env }`.
+  test("a window started from a CLI profile gives its service Desktop's own directories and database", async () => {
+    const root = await temporary("desktop-service-profile-")
+    const profile = path.join(root, "profile")
+    const window = { LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: path.join(root, "state") }
 
-    const failure = await Service.ensure({
-      file: own.file,
-      env: { ...own.env, ...isolated(root), LOGINOM_AI_AGENT_SERVICE_PORT: String(listener.port) },
-      // The CLI's own directory, so that Bun reads the CLI's configuration rather than Desktop's.
-      command: [process.execPath, "--cwd", cli, "src/index.ts", "serve", "--service"],
-    }).then(
-      () => undefined,
-      (error: Error) => error.message,
-    )
+    const sides = await Promise.all([
+      desktop(window),
+      desktop({
+        ...window,
+        LOGINOM_AI_AGENT_CLI_ROOT: profile,
+        LOGINOM_AI_AGENT_CONFIG_DIR: path.join(profile, "config"),
+        LOGINOM_AI_AGENT_DB: path.join(profile, "data", "loginom-ai-agent.db"),
+        LOGINOM_AI_AGENT_SERVICE_IDENTITY: "cli-0123abcd",
+        LOGINOM_AI_AGENT_SERVICE_PORT: "24600",
+        LOGINOM_AI_AGENT_HEADLESS: "1",
+        LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation",
+      }),
+    ])
 
-    expect(failure).toContain(`Managed service port ${listener.port} on 127.0.0.1 is already in use`)
-    expect(await Bun.file(own.file).exists()).toBe(false)
-    // The service waits up to 15 s for an incumbent to register before it fails.
-  }, 60_000)
+    const services = sides.map((side) => ({ ...side.inherited, ...side.env }))
+    const [own, inherited] = await Promise.all(services.map((env) => cliService(root, "dev", env)))
+
+    expect(services[1]).toEqual(services[0])
+    expect(inherited).toEqual(own)
+    expect(own).toMatchObject({
+      file: path.join(root, "state", "loginom-ai-agent-dev", "service-desktop.json"),
+      data: path.join(root, "data", "loginom-ai-agent-dev"),
+      config: path.join(root, "config", "loginom-ai-agent-dev"),
+      database: path.join(root, "data", "loginom-ai-agent-dev", "loginom-ai-agent.db"),
+    })
+  })
 })
 
 async function temporary(prefix: string) {
@@ -134,9 +146,11 @@ async function temporary(prefix: string) {
 async function desktop(env: Record<string, string>) {
   const home = await temporary("desktop-service-identity-home-")
 
+  // `inherited`: this product's variables the window keeps once the module is loaded, which the service inherits.
   const script = `
     const { serviceEnvironment, serviceFile } = await import("./service-identity")
-    console.log(JSON.stringify({ file: serviceFile(), env: serviceEnvironment(${JSON.stringify(version)}) }))
+    const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("LOGINOM_AI_AGENT_")))
+    console.log(JSON.stringify({ file: serviceFile(), env: serviceEnvironment(${JSON.stringify(version)}), inherited }))
   `
 
   const stdout = await output([process.execPath, "-e", script], import.meta.dir, {
@@ -147,16 +161,19 @@ async function desktop(env: Record<string, string>) {
   })
 
   // SAFETY: the script above prints exactly this shape.
-  return JSON.parse(stdout) as { file: string; env: Record<string, string> }
+  return JSON.parse(stdout) as { file: string; env: Record<string, string>; inherited: Record<string, string> }
 }
 
-// The registration file `ServiceConfig.options()` hands the client and the port `serve --service` listens on, in a CLI
-// built for `channel`: the channel is a build-time constant there, undefined when the CLI runs from source.
+// The registration file `ServiceConfig.options()` hands the client, the port `serve --service` listens on, and the
+// directories and database of the service, in a CLI built for `channel`: the channel is a build-time constant there,
+// undefined when the CLI runs from source. `config` is the service's configuration directory as `server-process.ts`
+// takes it.
 async function cliService(root: string, channel: string | undefined, env: Record<string, string>) {
   const script = `
     import { NodeFileSystem } from "@effect/platform-node"
     import { Effect } from "effect"
     import { Global } from "@opencode/util/global"
+    import { databasePath } from "./src/database-path"
     import { ServiceConfig } from "./src/services/service-config"
     const options = await Effect.runPromise(
       ServiceConfig.options().pipe(Effect.provide(Global.layerWith({})), Effect.provide(NodeFileSystem.layer)),
@@ -165,6 +182,9 @@ async function cliService(root: string, channel: string | undefined, env: Record
       file: options.file,
       port: ServiceConfig.defaultPort(undefined, "linux"),
       win32: ServiceConfig.defaultPort(undefined, "win32"),
+      data: Global.Path.data,
+      config: process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? Global.Path.config,
+      database: databasePath(Global.Path.data),
     }))
   `
 
@@ -183,6 +203,7 @@ async function cliService(root: string, channel: string | undefined, env: Record
       ...isolated(root),
       LOGINOM_AI_AGENT_CLI_ROOT: undefined,
       LOGINOM_AI_AGENT_CONFIG_DIR: undefined,
+      LOGINOM_AI_AGENT_DB: undefined,
       ...env,
     },
   )

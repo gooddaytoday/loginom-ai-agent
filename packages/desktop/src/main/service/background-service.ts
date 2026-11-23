@@ -108,9 +108,6 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   const version = serviceVersion({ channel: CHANNEL, isolated, mode, version: cli.version })
 
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
-  // Loginom AI Agent (B4.9, B2.7c): `util/src/global.ts` moves every directory of a process with this variable into a CLI
-  // profile; a window started from a profile's tool must not hand it to its service. `env` cannot remove a variable.
-  delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
 
   const file = serviceFile()
