@@ -18549,3 +18549,289 @@ Found 905 warnings and 0 errors.                                    # как в 
 - Обновление двумя версиями подряд (удалить старую, поставить новую) — не запускалось; только отказ повторной
   установки поверх.
 - TUI и `run` установленного CLI (модель не вызывалась), каналы `beta` и `prod` — собирался только `dev`.
+
+## B2.7a9 Свой pty и uninstall
+
+23.11.2026. Ветка `b27a9-own-pty` от `oc2-migration` (`69f56d03ca`), рабочее дерево `.claude/worktrees/b27a9`. Эталон
+0.4 — `v0.4.0`. Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun
+install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`. Rust — `rustup`, пин пакета 1.90.0 (`rust-toolchain.toml` берётся по рабочему каталогу
+`packages/process-daemon`), Zig 0.16.0 из scratchpad — в `PATH` только для `cargo` и сборки; `CARGO_TARGET_DIR` — в
+scratchpad. Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и пробы — под
+`unshare -n` (поднят только `lo`), с временными `HOME`, `TMPDIR`, `XDG_*` и профилем CLI. С сетью — только сборки:
+`cargo` (crates из кэша `~/.cargo`, Ghostty — `git fetch` с GitHub из `build.rs`) и `build-cli.ts` (закреплённый zip Bun
+1.4.4 baseline, как в B2.7a2). Модель не вызывалась: `serve` пробы — без промпта, тесты `cli` — с подставными моделями,
+как на базе. `packages/desktop/test/loginom/*` и стенд Windows (B4.14c) не трогал.
+
+Прочитано: этот журнал — B2.7a (строка B2.7a9 нарезки, BRAND-01 по путям), B1.3b, B1.4 группа B (Р-16, Р-17), B2.7a2,
+B2.7d, B2.7a8; `catalog.md` (CAT-02, CAT-08, CAT-12, CAT-13); `check-process-daemon.yml`, `release-process-daemon.yml`,
+`process-daemon/build.rs`, `script/release-bin/zig`. v2 — `cli/script/{build,opencode-pty,node-assets}.ts`,
+`core/src/persistent-pty/{pty-binding,binary.bun,daemon,index}.ts`, `cli/src/{loginom-cli,standalone}.ts`,
+`cli/src/commands/handlers/{uninstall,upgrade}.ts`, `loginom-host/script/{build-cli,build-cli-installer}.ts`.
+
+**В 0.4 своего pty не было.** Терминал 0.4 — библиотека `bun-pty` 0.4.8 в процессе сервера
+(`v0.4.0:packages/core/src/pty/pty.bun.ts`, в Node — `@lydell/node-pty`): ни отдельного бинарника, ни службы, ни сокетов.
+Служба терминалов с сокетами пришла с OpenCode 2 (`process-daemon`, npm `@opencode/pty`); имя `loginom-ai-agent-pty` —
+переименование B1.4 (Р-16 — пакет и исполняемый файл, Р-17 — кэш встроенной копии).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `83467be53f` `fix(process-daemon): name the terminal service after the product in its help and messages (B2.7a9)` | четыре `.rs` |
+| `d6c1cb7ed7` `feat(cli): embed loginom-ai-agent-pty built from process-daemon in the product CLI (B2.7a9)` | `cli/script/{build,opencode-pty}.ts`, тест `cli/test/product-pty.test.ts` |
+| `523313e3f7` `fix(cli): refuse uninstall in the product CLI and point to the archive's uninstaller (B2.7a9)` | `cli/src/commands/handlers/uninstall.ts`, тест в `cli/test/cli-standalone.test.ts` |
+| `177f803f19` `docs(upstream-sync): describe the product CLI's own terminal service and uninstall refusal in the catalog (B2.7a9)` | `catalog.md`: CAT-02, CAT-08, CAT-12, CAT-13 |
+| следующий | этот раздел |
+
+Файлы кода — три TS (предел — пять) и четыре `.rs` из нарезки:
+
+| Файл | Строк | Каталог |
+|---|---|---|
+| `cli/script/opencode-pty.ts` | +49 | CAT-12 по маске (описание — CAT-13) |
+| `cli/script/build.ts` | +3 −2 | CAT-12 по маске (описание — CAT-02) |
+| `cli/src/commands/handlers/uninstall.ts` | +10 | CAT-12 |
+| `process-daemon/src/client.rs` | +24 −20 | CAT-13 |
+| `process-daemon/src/daemon.rs`, `src/daemon/unix.rs` | +3 −3, +1 −1 | CAT-13 |
+| `process-daemon/src/daemon/windows.rs` | +3 −3 | CAT-12 |
+
+Все семь файлов расходились с upstream и до задачи, поэтому `catalog.json` не менялся: число расходящихся файлов прежнее
+(ниже). В `catalog.md` поправлены ставшие ложными фразы: «Продукт пока встраивает бинарник из npm» (CAT-13) и «Сообщения и
+справка бинарника не менялись» (CAT-12); добавлены `uninstall` (CAT-12, ссылка в CAT-08) и сборка standalone (CAT-02).
+
+### Часть 1: свой `process-daemon` в CLI продукта
+
+Было: `build.ts` для каждой цели звал `resolveOpencodePty` — бинарник npm `@opencode/pty-<платформа>` (upstream), свой
+только через `LOGINOM_AI_AGENT_PTY_BIN`, без проверки. Стало (`resolveProductPty` в `opencode-pty.ts`, вызов в
+`build.ts` только при `--standalone`):
+
+- без `LOGINOM_AI_AGENT_PTY_BIN` сборка запускает `cargo build --locked --release` с рабочим каталогом
+  `packages/process-daemon` (так `rustup` берёт пин 1.90.0) и `OPENCODE_ZIG_CPU=baseline`, как выпуск upstream
+  (`script/release-bin/zig`, `release-process-daemon.yml`): Ghostty — для переносимого CPU, потому что `build-cli.ts`
+  собирает цель `-baseline` для машин без AVX2. На Windows ещё `RUSTFLAGS=-C target-feature=+crt-static` — как
+  `release-process-daemon.yml` (не запускалось). Бинарник — `<CARGO_TARGET_DIR или target>/release/loginom-ai-agent-pty`;
+- готовый бинарник из `LOGINOM_AI_AGENT_PTY_BIN` берётся без сборки;
+- в обоих случаях сборка запускает `<бинарник> --version` и принимает только `loginom-ai-agent-pty <версия> (protocol N)`;
+  версия из ответа — каталог кэша встроенной копии `<bin>/loginom-ai-agent-pty/<версия>-<хеш>/`. Бинарник npm
+  (`opencode-pty 0.5.2 (protocol 8)`) отклоняется и через переменную;
+- нет cargo, Zig или сети, `cargo` упал, цель — другая платформа, архитектура или musl — сборка падает с ошибкой, на npm
+  не откатывается. Сборка по умолчанию (без `--standalone`, её берёт Desktop) и сборка Node (`node-assets.ts`) — прежние:
+  бинарник npm и его сокеты в `/tmp/opencode-pty-<uid>`.
+
+Сборка без cargo в `PATH` (только Bun, `/usr/bin`, `/bin`):
+
+```text
+$ bun run script/build.ts --standalone --single --skip-install --skip-web-ui --outdir=<scratchpad>/build-nocargo
+bun: command not found: cargo
+error: Could not build loginom-ai-agent-pty for the product CLI: `cargo build --locked --release` failed in
+packages/process-daemon. It needs Rust 1.90.0 (rustup), Zig 0.16.0 on PATH and network access to fetch Ghostty; or set
+LOGINOM_AI_AGENT_PTY_BIN to a loginom-ai-agent-pty built for this machine.
+      at buildProductPty (…/packages/cli/script/opencode-pty.ts:89:15)
+# код 1 за 1,3 с, каталог сборки не создан
+```
+
+Артефакт продукта, как в B2.7a2 и B2.7a8 (`<scratchpad>/b27a9/build.sh`: Node 24.19.0, Chromium из кэша, Zig и cargo в
+`PATH`, `umask 077`), на `177f803f19`:
+
+```text
+$ bun script/build-cli.ts <scratchpad>/out/cli --no-archive
+    Finished `release` profile [optimized] target(s) in 0.03s       # cargo из сборки; первая сборка release — 2 мин 34 с,
+building cli-linux-x64-baseline                                     # после правки .rs — 25 с
+[build] … END cli-manifest-verify 3123ms
+{"artifact":"<scratchpad>/out/cli","archive":null,…,"sourceCommit":"177f803f1911…","sourceDirty":false}
+# код 0, 38 с, пик RSS 1,3 ГБ
+$ sha256sum target/release/loginom-ai-agent-pty && target/release/loginom-ai-agent-pty --version
+78bcde171676bb25866c63f5c8c13a56a2a32370c8e9d69c3f32274cf14b09e6
+loginom-ai-agent-pty 0.5.2 (protocol 8)
+```
+
+Первая попытка той же сборки упала `LOGINOM_SOURCE_CHANGED_DURING_BUILD` — во время сборки правился `catalog.md`;
+защита `build-cli.ts` сработала как задумано, вторая — из чистого дерева.
+
+**Терминал в сессии собранного CLI** (`<scratchpad>/b27a9/probe-terminal.ts`): под `unshare -n`, `env` только с временными
+`HOME`, `TMPDIR`, `XDG_*`, `LOGINOM_AI_AGENT_CLI_PROFILE`, `LOGINOM_AI_AGENT_SERVER_PASSWORD`; `serve --port 0` без промпта,
+терминал — `POST /api/experimental/session/<id>/terminal`, как в тесте `server`:
+
+```text
+serve: http://127.0.0.1:35987
+terminal: pty_persistent_5188408629787575 status=running
+snapshot: "pty-probe:<root>/work"                                    # вывод оболочки терминала (строка обрезана экраном 80)
+service.json: runtime=<root>/profile/state/pty/f0ba14f0-… pid=2883054 protocol=8 socket=/tmp/loginom-ai-agent-pty-0/e3396373a33a006dce610f6ea3b562b5.sock
+socket exists: true
+daemon exe: <root>/profile/cache/bin/loginom-ai-agent-pty/0.5.2-78bcde171676bb25/loginom-ai-agent-pty
+daemon args: daemon --runtime-dir <root>/profile/state/pty --name f0ba14f0-…
+daemon --version: loginom-ai-agent-pty 0.5.2 (protocol 8)
+daemon sha256: 78bcde171676bb25866c63f5c8c13a56a2a32370c8e9d69c3f32274cf14b09e6    # = cargo build выше
+terminal deleted
+serve exit: 143                                                      # SIGTERM
+$ find <root> -iname '*opencode*'                                    # пусто
+$ ls -la /tmp/opencode-pty-0/                                        # до и после — пусто, mtime 12:46 (до задачи)
+$ ls -la /tmp/loginom-ai-agent-pty-0/                                # после — пусто: служба вышла со serve и убрала сокет
+$ pgrep -af loginom-ai-agent-pty                                     # процессов нет
+```
+
+Встроенная копия — байт в байт сборка `cargo` (`install()` в `binary.bun.ts` сверяет sha256 встроенного файла), каталоги —
+B1.3b: состояние `<профиль>/state/pty/<id>` (служба задаёт `--runtime-dir`), сокет — `/tmp/loginom-ai-agent-pty-<uid>`.
+Артефакт (1,2 ГБ) и пробные каталоги удалены.
+
+### Часть 2: справка и сообщения `process-daemon`
+
+`opencode-pty` → `loginom-ai-agent-pty` во всех строках справки и сообщениях четырёх файлов нарезки: `client.rs`
+(`--version`, `help`, `usage: …`, ошибки запуска, протокола, регистрации, `status`, `stop`, заголовок `play`; ожидание
+юнит-теста `discover_rejects_another_protocol_version`), `daemon.rs` (регистрация, платформа), `daemon/unix.rs` и
+`daemon/windows.rs` (защёлка службы, регистрация). Литералом, без `env!("CARGO_PKG_NAME")`: каждая строка правится всё
+равно, литерал видно `grep`. Имена временных каталогов в тестах (`opencode-pty-client-…`, `opencode-pty-root-test-…`) не
+трогал.
+
+```text
+$ target/release/loginom-ai-agent-pty --version
+loginom-ai-agent-pty 0.5.2 (protocol 8)                              # было: opencode-pty 0.5.2 (protocol 8)
+$ cargo fmt --check                                                  # код 0 (после cargo fmt: две строки client.rs перенесены)
+$ cargo clippy --locked --all-targets --all-features -- -D warnings  # код 0
+$ rustfmt --edition 2024 --check src/daemon/windows.rs               # код 0; на Linux файл не компилируется
+```
+
+Читателей этих строк в TS нет (`git grep` по `packages/*/src` и тестам: ни `--version`, ни текстов ошибок Rust не
+разбирают). Остались `opencode-pty` в `daemon/{server,control,sweep}.rs`, `transport/{unix,windows}.rs`, `service.rs`,
+`service/pipe.rs` (строки stderr и имена потоков), `musl.rs` (`/opencode-pty-missing`), README, SPEC, PLAN,
+`description` в `Cargo.toml` — вне нарезки.
+
+### `uninstall`
+
+Было (B2.7a8, «Найдено»): `loginom-ai-agent-cli uninstall` — команда upstream; способа установки она не знает, удаляет кэш
+профиля и советует остальное удалить вручную. Стало: в CLI продукта команда отказывает, как `upgrade` после B2.7d.
+
+Шов — в обработчике (`commands/handlers/uninstall.ts`), а не в `Standalone.early`: тот смотрит только первый аргумент, и
+`loginom-ai-agent-cli --print-logs uninstall --force` прошёл бы мимо. Признак CLI продукта — `LOGINOM_AI_AGENT_CLI_ROOT`:
+его задаёт только вход `loginom-cli.ts` (`CliProfile.apply()`), Desktop снимает её со своих процессов; тот же признак у
+`run/product.ts` (B2.7a4). Ошибка идёт через `handlePromptErrors` обработчика — тот же вид, что у `upgrade`, код 1.
+
+```text
+$ loginom-ai-agent-cli uninstall --force                             # из исходников, временный профиль, unshare -n
+┌  Uninstall Loginom AI Agent
+│
+■  loginom-ai-agent-cli is removed by the installer of its archive.
+│  Stop every loginom-ai-agent-cli process, then run ./uninstall.sh from the extracted archive it was installed from. CLI profiles and Desktop are kept.
+│
+└  Failed
+# код 1; `--print-logs uninstall --dry-run` — то же; профиль не тронут
+```
+
+На Windows в тексте `uninstall.cmd` (по `process.platform`; не запускалось). Откуда запускать — по `INSTALL.md` установщика
+(`build-cli-installer.ts`): `./uninstall.sh` из исходного распакованного архива, Windows — `uninstall.cmd` из исходного
+каталога распаковки.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `cli/test/product-pty.test.ts` (новый, 4 случая; на Windows пропуск — подставные бинарники на `sh`) | подставной `cargo` в `PATH`: сборка из `packages/process-daemon`, `OPENCODE_ZIG_CPU=baseline`, аргументы `build --locked --release`, бинарник из `CARGO_TARGET_DIR`, версия и sha256; готовый `LOGINOM_AI_AGENT_PTY_BIN` принимается, если отвечает `loginom-ai-agent-pty …`, и не собирается; бинарник с ответом npm (`opencode-pty 0.5.2 …`) отклоняется; `cargo` упал или его нет — ошибка сборки, не откат на npm; чужая архитектура и musl — ошибка |
+| `cli/test/cli-standalone.test.ts`, новый случай `uninstall refuses, names the archive's uninstaller and removes nothing` | вход продукта из исходников: `uninstall --force`, `--print-logs uninstall -f`, `uninstall --dry-run` — код 1, текст продукта и `./uninstall.sh`, нет «Installation method», файл в кэше профиля жив |
+
+Мутации — `<scratchpad>/b27a9/mutate.py`: одна точная замена, тесты файла под `unshare -n` с временными каталогами (мутация
+MU1 выполняет настоящий `uninstall --force` upstream — только во временном профиле), файл возвращается; после —
+`git diff --stat` тот же.
+
+```text
+=== M0 no mutation: 4 pass / 0 fail                                   # product-pty
+=== M0u no mutation: 1 pass / 0 fail                                  # uninstall
+=== PM1 the product build always embeds the upstream npm binary: 0 pass / 4 fail
+=== PM2 a failed cargo build falls back to the upstream npm binary: 3 pass / 1 fail
+=== PM3 any binary is embedded, its --version is not checked: 3 pass / 1 fail
+=== PM4 Ghostty is built for the build machine's CPU: 3 pass / 1 fail
+=== PM5 cargo without --locked: 3 pass / 1 fail
+=== PM6 cargo outside packages/process-daemon (rustup ignores the pinned toolchain): 3 pass / 1 fail
+=== PM7 another platform or libc is built on this machine: 3 pass / 1 fail
+=== MU1 the product CLI runs OpenCode's uninstall: 0 pass / 1 fail     # код 0 вместо 1, кэш профиля удалён
+=== MU2 the refusal does not name the archive's uninstaller: 0 pass / 1 fail
+=== MU3 the refusal exits 0: 0 pass / 1 fail
+```
+
+Тестом не ловится вызов в `build.ts` (`standalone ? resolveProductPty : resolveOpencodePty`): его проверяют сборка без cargo
+(падает, выше) и артефакт со своей копией (sha256 совпал).
+
+### Приёмка
+
+База — это же дерево на `69f56d03ca` до правок (код базы и итога различается только этой задачей); `npm ci` клиента
+`loginom-runtime` сделан до базового прогона; наборы — `<scratchpad>/b27a9/suite.sh`: `bun test --timeout 60000` под
+`unshare -n`, свежие временные `HOME`/`TMPDIR`/`XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0.
+
+| Набор | `69f56d03ca` | итог |
+|---|---|---|
+| `process-daemon` `cargo test --locked` | 147 passed, 0 failed, 1 ignored | 147 passed, 0 failed, 1 ignored |
+| `cli` `bun test` | 590 pass, 9 skip, 0 fail, 2434 expect (599 тестов, 76 файлов) | 595 pass, 9 skip, 0 fail, 2458 expect (604, 77): +4 `product-pty`, +1 `cli-standalone` |
+| `server` `test/persistent-pty.test.ts`, `LOGINOM_AI_AGENT_PTY_BIN` — своя сборка release | 7 pass, 0 fail, 103 expect | 7 pass, 0 fail, 103 expect |
+| `core` `test/shell-daemon.test.ts`, то же | 14 pass, 0 fail, 80 expect | 14 pass, 0 fail, 80 expect |
+
+`server` и `core` со своей сборкой — проверка, что служба из исходников форка говорит с клиентом TS (протокол 8) так же,
+как бинарник npm: создание, ввод-вывод, переименование, размер, передача при перезапуске.
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,228 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc                           # код 0
+$ oxlint <5 изменённых файлов cli>
+Found 0 warnings and 0 errors.
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 609 divergent upstream files                    # как на базе
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0; OPENCODE_ZIG_CPU — в UNPROCESSED_READERS
+$ bun install --frozen-lockfile
+Checked 1694 installs across 2084 packages (no changes)
+$ bun run check                                                       # код 0, на 177f803f19 (после него — только этот раздел)
+Found 905 warnings and 0 errors.                                      # как в B2.7a8; в изменённых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check`: мои строки форматированы; `opencode-pty.ts` не проходил и на базе (длинная строка после
+`apply-identity`, B1.4a).
+
+### Где решал сам
+
+- **«Канал продукта» — сборка `--standalone`, а не канал prod или beta.** Задание противопоставляет ей «сборку по
+  умолчанию, без продукта»; так меньше: в любом канале CLI продукта встраивает только своё, Desktop — прежнее.
+- **Собирает сам `build.ts`, а не `build-cli.ts`.** Нарезка называет только `cli/script/{build,opencode-pty}.ts`; так
+  любой путь к CLI продукта (`build-cli.ts`, ручной `build.ts --standalone`) встраивает своё, а CI может подать готовый
+  бинарник через `LOGINOM_AI_AGENT_PTY_BIN`.
+- **Только для машины сборки.** Кросс-сборка Rust с Ghostty требует своих целей и компоновщиков (выпуск upstream —
+  матрица машин и `cargo-zigbuild`); `build-cli.ts` и так собирает одну цель — свою.
+- **Проверка `--version`.** Не просили, но без неё `LOGINOM_AI_AGENT_PTY_BIN` с бинарником npm тихо вернул бы
+  `/tmp/opencode-pty-<uid>` — то, что задача убирает.
+- **`cargo` на каждую цель, без кэша в процессе.** `--single --baseline` даёт две цели; второй вызов `cargo` — пустой
+  (0,03 с).
+- **`OPENCODE_ZIG_CPU` по умолчанию `baseline`, заданное значение уважается;** `RUSTFLAGS` на Windows — так же.
+- **`uninstall` CLI Desktop не тронут.** Задание — про CLI продукта; Desktop своё удаление ведёт пакетом ОС, Install CLI
+  после B4.7b в меню нет.
+- **Отказ и для `--dry-run`.** Его вывод («Installation method: unknown», «remove manually») для установленного архивом
+  CLI тоже неверен.
+- **Строка `uninstall` в `--help` прежняя** («Uninstall Loginom AI Agent, keeping session data…»): описание — Spec
+  upstream, правка заняла бы ещё файл. Команда при вызове объясняет, куда идти.
+
+### Найдено, не чинил
+
+- **Порог glibc своей службы — от машины сборки.** Здесь (Ubuntu, glibc 2.39) бинарник требует `GLIBC_2.39`, бинарник
+  npm — `GLIBC_2.29` (`readelf --version-info`); выпуск upstream держит 2.30 через `cargo zigbuild …gnu.2.30`. CLI продукта,
+  собранный на новой системе, не запустит терминал на старой (в журналах стендов есть машины без `GLIBC_2.38`). Решать
+  при сборке выпуска (B5: машина сборки или `cargo-zigbuild`) — **вопрос владельцу**.
+- **Сборка CLI продукта теперь требует Rust 1.90.0 и Zig 0.16.0 (или готовый бинарник) и сеть для Ghostty.** Это касается
+  `script/build-windows.ps1` (стенд B4.14c) и `scripts/node-acceptance/run-check.py` (сборка `build-cli.ts` на стендах
+  приёмки узлов): без инструментов они упадут с ошибкой выше. Не менял.
+- **CLI Desktop (сборка по умолчанию) по-прежнему встраивает npm `@opencode/pty`**: его сокеты — в `/tmp/opencode-pty-<uid>`,
+  `uninstall` — upstream. Так же сборка Node (`node-assets.ts`).
+- **Поведение своей службы и npm 0.5.2 расходится в тесте `server` «boots fresh on restart when the handed-off
+  registration is gone»:** своя служба ждёт преемника `HANDOFF_TIMEOUT` (120 с, `ownership.rs`) и выходит через 121 с,
+  убрав сокет; npm выходит сразу, но оставляет в `/tmp/opencode-pty-0` устаревший сокет. Тест проходит с обеими; при
+  прогоне подряд своя служба переживает тест на две минуты.
+- `release-process-daemon.yml` сверяет `--version` с `opencode-pty $version` и ищет пакет `opencode-pty` — сломан ещё
+  переименованием Р-16, теперь и по тексту; публикует npm upstream, продукт его не запускает (B5.1).
+- `uninstall` есть в справке CLI продукта с описанием upstream (выше).
+
+### Не проверено
+
+- Windows и macOS: всё на Linux. `cargo build` на Windows (MSVC, Zig, `+crt-static`) и macOS, `daemon/windows.rs` (на Linux
+  не компилируется — только `rustfmt`), путь бинарника `.exe`, текст `uninstall.cmd` — по чтению кода.
+- Цели arm64 и musl: сборка для них отказывает по замыслу; собиралась только linux-x64 (`-baseline`).
+- Установленный архивом CLI (`install.sh`) со своей службой — проба шла из каталога артефакта; установщик не менялся
+  (B2.7a8).
+- TUI собранного CLI с терминалом и `run` — нет (модель не вызывалась).
