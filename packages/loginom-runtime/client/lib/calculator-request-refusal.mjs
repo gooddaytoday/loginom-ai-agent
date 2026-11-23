@@ -54,7 +54,7 @@ export function verifiedCalculatorRequestRefusal(refusal,node){
 export async function rejectUnchangedCalculatorDraft(channel,baseline,error,{close=closePreparedWizard,open=openPreparedWizard,
  syntax=false,graphBefore,readGraph,
  select=async channel=>{const s=await channel.observe({condition:'same calculator graph after rejected draft',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
-  await selectPreparedGraphNode(channel,s,'reselect retained calculator for rejection verification');}}={}){
+  await selectPreparedGraphNode(channel,s,'reselect retained calculator for rejection verification',{refreshReplacedBody:syntax});}}={}){
  const node=identity(baseline),before=configuration(baseline);
  need(Object.values(node).every(v=>typeof v==='string'&&v.length),'Exact calculator identity required');
  if(syntax){

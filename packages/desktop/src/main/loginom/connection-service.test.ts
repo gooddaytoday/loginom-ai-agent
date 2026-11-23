@@ -47,6 +47,26 @@ async function save(service: Awaited<ReturnType<typeof connectionService>>, inpu
   await service.settled()
 }
 
+test("launcher update gate retains active leases and unsettled recovery across release", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service)
+    expect(f.service.updateWorkState()).toEqual({ activeWork: false, unsettledWork: false })
+    const lease = f.service.acquire("update-gate")!
+    expect(f.service.updateWorkState()).toEqual({ activeWork: true, unsettledWork: false })
+    lease.holdRecovery()
+    expect(f.service.updateWorkState()).toEqual({ activeWork: true, unsettledWork: true })
+    lease.release()
+    expect(f.service.updateWorkState()).toEqual({ activeWork: false, unsettledWork: true })
+    lease.reconciled()
+    expect(f.service.updateWorkState()).toEqual({ activeWork: false, unsettledWork: false })
+    f.service.beginClose()
+    expect(f.service.acquire("new-work")).toBeUndefined()
+  } finally {
+    await f.close()
+  }
+})
+
 test("safe views expose defaults and presence flags only; a successful save survives restart", async () => {
   const f = await fixture()
   try {

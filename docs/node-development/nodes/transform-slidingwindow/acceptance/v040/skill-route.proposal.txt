@@ -1,0 +1,1 @@
+| Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |

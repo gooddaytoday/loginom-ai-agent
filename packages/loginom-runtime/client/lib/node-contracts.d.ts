@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'control.loop' | 'control.supernode' | 'control.supernode_output' | 'imports.database' | 'variables.replace' | 'variables.column_union' | 'variables.calculator' | 'variables.from_table' | 'variables.to_table' | 'variables.user' | 'research.quality' | 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'transform.ungroup_data' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript';
+  | 'transform.enrich_data' | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript' | 'programming.python';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -9,25 +9,39 @@ export type NodeTarget<T extends NodeType = NodeType> =
   | {kind: 'new'; type: T; label?: string; position: Position}
   | {kind: 'existing'; type: T; ref: NodeRef; label?: string; position?: Position};
 export interface InputLink { source: NodeRef; output: number; input: number }
+export interface VariableInputLink extends InputLink { kind: 'variables' | 'control' }
+export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
+export interface VariableBindingReadback extends VariableBinding {
+  mode: 'variable'; row_id: string;
+  variable: VariableBinding['variable'] & {id: number} & (
+    {type: 'integer' | 'string' | 'boolean'; is_null: false}
+    | {kind: 'control'; input: 0; type: 'real'; is_null: boolean}
+    | {kind: 'control'; input: 0; type: 'datetime'; is_null: false});
+  source: {ref: NodeRef; type: NodeType; output: number; variable_id: number};
+  input_port_guid: string; connected: true; verified: true;
+}
 export interface NodeTargetRequest<T extends NodeType = NodeType> {
-  document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[];
+  document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[]; variable_inputs?: VariableInputLink[];
 }
 export interface FieldRef { schema_id: string; field_id: string }
 /** Refers to this operation's fully configured source, resolved locally before mapping. */
 export interface ConfiguredFieldRef { kind: 'configured_field'; name: string }
 export interface PortMapping {
-  direction: 'input' | 'output'; port: number; autosync?: boolean;
+  direction: 'input' | 'output'; kind?: 'variables' | 'control'; port: number; autosync?: boolean;
   fields?: {source: FieldRef | ConfiguredFieldRef; name?: string; label?: string; excluded?: boolean}[];
+  changes?: PortMapping['fields'];
 }
 /** Each handler binds and validates P through its pinned local JSON schema. */
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
+  bindings?: VariableBinding[];
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
-  read: {ports: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
+  read: {ports: number[]; variable_ports?: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
   type?: T; revision: string; modes: readonly string[]; parameter_schema?: object;
+  binding_schema?: object;
   output_wizard?: 'embedded' | 'separate';
   /** Host-only JavaScript lifecycle: await materialization before output mapping. */
   materialize_output?: boolean;
@@ -37,7 +51,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): LoopForConfigurationReadback | LoopConfigurationReadback | VariablesCalculatorConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | AssnRulesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ExternalReplacementConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | PythonConfigurationReadback | FactorAnalysisApplyConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | ElimOutlierEditConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -54,7 +68,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | ClusteringConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; bindings?: VariableBindingReadback[]; variable_mappings?: VariableMappingReadback[]; readback?: LoopForConfigurationReadback | LoopConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ExternalReplacementConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | PythonConfigurationReadback | FactorAnalysisApplyConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | ElimOutlierEditConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -66,6 +80,9 @@ export interface TextImportConfigurationReadback {
   columns: Array<{index: number; name: string; label: string; type: string; data_kind: string; used: boolean}>;
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
+}
+export interface TextImportDetectionConfigurationReadback extends TextImportConfigurationReadback {
+  format: TextImportConfigurationReadback['format'] & {auto_detect_columns?: string; analysis_rows?: string};
 }
 export interface JavascriptConfigurationReadback {
   kind: 'javascript'; scope: 'observed_after_verified_finish'; node: NodeRef;
@@ -81,6 +98,10 @@ export interface JavascriptConfigurationReadback {
   output_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
     type: string; data_kind: string; source_name: string; excluded: boolean}>};
   package_persistence_verified: false;
+}
+export interface JavascriptUnconnectedConfigurationReadback extends JavascriptConfigurationReadback {
+  input_state: 'unconnected';
+  input_mapping?: {port: 0; autosync: boolean; fields: []; input_state: 'unconnected'; no_incoming_links_verified: true};
 }
 export interface CalculatorParameters {
   expressions: Array<{target: {kind: 'new'} | {kind: 'existing'; name: string};
@@ -105,17 +126,26 @@ export interface GroupingParameters {
   /** Full ordered lists, or both omitted to retain an existing configuration. */
   group_by?: Array<{kind: 'input_field'; name: string}>;
   measures?: Array<{field: {kind: 'input_field'; name: string};
-    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'unique_count'; name: string; label: string}>;
+    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'mode' | 'stddev' | 'null_count' | 'unique_count' | 'first' | 'last' | 'only' | 'concat'; name: string; label: string;
+    concat?: {separator: string; wrapper: '' | '"' | "'"; unique: boolean; order: 'none' | 'ASC' | 'DESC'}}>;
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
   mode: 'aggregate';
   group_by: Array<{name: string; label: string; type: string; order: number}>;
-  measures: Array<{name: string; label: string; type: string; order: number; functions: number}>;
+  measures: Array<{name: string; label: string; type: string; order: number; functions: number;
+    concat?: {separator: string; wrapper: string; unique: boolean; sort: boolean; direction: number}}>;
   options: {pedDimCache: {value: boolean; switch_pressed: boolean}; pedSortResult: {value: boolean; switch_pressed: boolean}};
   input_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
+  output_mapping: {port: 0; autosync: boolean;
+    fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string; excluded: boolean}>};
+}
+export interface VariablesToTableConfigurationReadback {
+  kind: 'variables_to_table'; scope: 'observed_before_verified_finish'; node: NodeRef;
+  receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false; mode: 'columns' | 'rows';
+  variable_input: {kind:'variables'; source:NodeRef; output:number; input:0; source_port_guid:string; target_port_guid:string};
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string; excluded: boolean}>};
 }
@@ -123,6 +153,7 @@ export interface SortingParameters {
   /** Full replacement, or omitted to preserve existing keys. */
   keys?: Array<{field: {kind: 'input_field'; name: string}; direction: 'ASC' | 'DESC'; case_sensitive?: boolean}>;
   compare_with_locale?: boolean;
+  max_threads?: 0 | 1 | 2 | 4 | 8 | 16 | 32;
 }
 export interface SortingConfigurationReadback {
   kind: 'sorting'; scope: 'observed_before_verified_finish'; node: NodeRef;
@@ -146,15 +177,34 @@ export interface RegexReplacementRule {
   pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
   other: {mode: 'keep' | 'null'};
 }
+export interface ExtendedReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string' | 'integer' | 'real';
+  result_type?: 'string' | 'integer' | 'real' | 'datetime' | 'boolean';
+  pairs: Array<{from: ReplacementValue; to: ReplacementValue | {type: 'datetime'; value: string | null} | {type: 'boolean'; value: boolean | null}}>;
+  regex_pairs?: RegexReplacementRule['pairs'];
+  other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue | {type: 'datetime'; value: string | null}};
+  case_sensitive?: boolean;
+  precision?: number;
+}
+export interface ExternalReplacementRule {
+ field: {kind: 'input_field'; name: string}; type: 'string'; case_sensitive: boolean; other: {mode: 'keep' | 'null'};
+ external: {port: 1; value: string; replacement: string; information: string[]; unused: string[]};
+}
+export interface ExternalReplacementConfigurationReadback extends Omit<ReplacementConfigurationReadback, 'kind' | 'mode' | 'rules'> {
+ kind: 'replacement_external'; mode: 'external'; rules: Array<ExternalReplacementRule | ExtendedReplacementRule>;
+ input_mappings: Array<Omit<GroupingConfigurationReadback['input_mapping'], 'port'> & {port: 0 | 1}>;
+ external_sources: Array<{field: string; source: string}>;
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: Array<ReplacementRule | RegexReplacementRule>;
+  rules?: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule | ExternalReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex' | 'mixed'; rules: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }
@@ -211,9 +261,15 @@ export interface NativeNodeOutputPort extends NodeOutputPortBase {
   cell_precision: {cells: 'exact_native'; temporal: 'native_serial_only'}; limitations: string[];
 }
 export type NodeOutputPort = LegacyNodeOutputPort | NativeNodeOutputPort | TreeNodeOutputPort;
+export interface NodeVariableOutput {
+ port:number; kind:'variables'; port_guid:string; fresh:true; read_id:string; execution_id:string|null;
+ source:'execution'|'snapshot'; native_source:'VariablesForm'|'VariablesEditValuesWizard'; complete:true; count:number;
+ variables:Array<{id:string|number;index:number;name:string;label:string;type:'integer'|'real'|'boolean'|'string'|'datetime';cell:TableCell}>;
+ completeness:{count:number;store_count:number;unique_ids:number;loaded:true};
+}
 export interface NodeOutput {
   status: 'not_refreshed' | 'partial' | 'complete'; evidence_ref: string | null;
-  execution_id?: string; ports?: NodeOutputPort[]; no_output_requested?: boolean;
+  execution_id?: string | null; ports?: NodeOutputPort[]; variable_ports?: NodeVariableOutput[]; no_output_requested?: boolean;
   verified?: boolean; cleanup_complete?: boolean; effect_possible?: boolean;
   /** Native format, read-setting and ownership evidence remains available. */
   [evidence: string]: unknown;
@@ -231,7 +287,7 @@ export interface NodeJobSnapshot {
   outcome: NodeApplyOutcome | null; error: NodeError | null;
 }
 export const NODE_CONTRACT_REVISION: string;
-export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Data_Mining' | 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт' | 'Программирование'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
+export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Переменные' | 'Data_Mining' | 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт' | 'Программирование'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
 export function validateNodeReference(ref: unknown): void;
 export function validateNodeTargetRequest(request: unknown): NodeTargetRequest;
 export function describeNodeTypes(types: NodeType[], pins?: object, actions?: Map<string, object>, candidateHandlers?: Map<NodeType, {revision: string}>, observedBuild?: string): object[];
@@ -270,6 +326,15 @@ export interface MissingValuesConfigurationReadback {
   options:Record<string,{value:boolean|number|string;switch_pressed:boolean}>;
   input_mapping:SortingConfigurationReadback['input_mapping'];
   output_mapping:SortingConfigurationReadback['output_mapping'];
+}
+
+export interface MissingValuesModesParameters {
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  max_nulls_percent:number; ordered:boolean;
+}
+export interface MissingValuesModesConfigurationReadback extends Omit<MissingValuesConfigurationReadback,'ordered'|'fields'> {
+  ordered:boolean;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear';value?:string}>;
 }
 
 export interface CollapseParameters {
@@ -312,14 +377,30 @@ export interface CrossTableConfigurationReadback {
 export interface ClusteringConfigurationReadback {
   kind: 'clustering'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'k_means'; features: string[];
-  clusters: number; seed: number; normalization: 'none' | 'standardize'; package_persistence_verified: false;
+  clusters: number; seed: number; normalization: 'none' | 'standardize' | 'scale_minus_one_one' | 'scale_zero_one' | 'absolute_scale'; package_persistence_verified: false;
   training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string;
     source: Array<{node: NodeRef; output: number; input: 0}>};
 }
 
+export interface ClusteringApplyConfigurationReadback extends Omit<ClusteringConfigurationReadback,'mode'|'normalization'|'training'> {
+ mode:'apply'; normalization:'none'; training:{status:'not_requested'};
+}
+
+export interface ClusteringGmeansConfigurationReadback extends Omit<ClusteringConfigurationReadback,'mode'|'clusters'> {
+ mode:'g_means'; min_clusters:number; max_clusters:number; threshold:number;
+}
+
+export interface AssnRulesConfigurationReadback {
+  kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; mode: 'fp_growth' | 'apply'; transaction_field: string; item_field: string;
+  min_support_pct: number; min_confidence_pct: number; max_items: 2 | 3;
+  min_lift: number; exclude_support_above_pct: number | null; singletons: true; consequence_limit: 1 | 2;
+  training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
+}
+
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply'; input_fields: string[]; target_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge' | 'lasso' | 'elastic'; regularization?: {setup:'manual';lambda_l2:number} | {setup:'manual';lambda_l1:number} | {setup:'manual';lambda_l1:number;lambda_l2:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10 | 1e-12; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
 }
@@ -332,7 +413,12 @@ export interface SamplingConfigurationReadback {
 }
 
 export interface SamplingModesConfigurationReadback extends Omit<SamplingConfigurationReadback,'mode'> {
- mode:'random'; seed:number; test_priority:false;
+ mode:'random' | 'stratified' | 'biased'; seed:number; strata_fields:string[];
+ bias_field:string | null; bias_factors:Array<{value:string;factor:number}>; test_priority:false;
+}
+
+export interface CorrAnalysisRanksConfigurationReadback extends Omit<CorrAnalysisConfigurationReadback,'mode'|'coefficients'> {
+ mode:'spearman' | 'kendall'; coefficients:['spearman'] | ['kendall'];
 }
 
 export interface CorrAnalysisConfigurationReadback {
@@ -348,11 +434,17 @@ export interface ElimOutlierConfigurationReadback {
  output_mappings:Array<{port:number;fields:Array<{index:number;name:string;label:string;type:string;data_kind:string;source_name:string}>}>;package_persistence_verified:false;
 }
 
+export interface ElimOutlierEditConfigurationReadback extends Omit<ElimOutlierConfigurationReadback,'mode'|'fields'> {
+ mode:'edit';
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';extreme_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';outlier_constant?:number;extreme_constant?:number}>;
+}
+
 export interface LogRegressionConfigurationReadback {
+ weight_field?:string;
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
- node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; input_fields:string[]; target_field:string;
+ node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'|'apply'|'ridge'|'lasso'|'elastic_net'; regularization?:{lambda_ridge:number}|{lambda_lasso:number}|{lambda_lasso:number;lambda_ridge:number}; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
- normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
+ normalization:'none'|'standardize'; train_percent:number; partition?:{method:'sequential';train_percent:number;test_percent:number;train_count?:number;test_count?:number;total_count?:number}; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;
 }
 
@@ -361,14 +453,14 @@ export interface TreeConfigurationReadback {
   scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
   json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
-  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.';
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: boolean; composite_labels?: boolean; label_separator?: '.' | '|' | ' ' | '-' | '_'; global_index_paths?: string[];
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
   freshness_basis: 'completed_execution_port_source'; sample_complete: true;
   tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
     schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
-    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string}>};
+    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string; timezone?: string}>};
 }
 export interface AutoCorrelationConfigurationReadback {
  kind: 'auto_correlation'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
@@ -382,5 +474,128 @@ export interface BinningConfigurationReadback {
  intervals: {number: number; lower: number; upper: number; label: string; lower_included: boolean; upper_included: boolean}[];
  training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: {state: 'materialized'; intervals: BinningConfigurationReadback['intervals']}};
  output_mappings: {port: number; fields: {index: number; name: string; label: string; type: string; data_kind: string; source_name: string}[]}[];
+ package_persistence_verified: false;
+}
+
+export interface QualityConfigurationReadback {
+ kind: 'quality'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; mode: 'profile';
+ fields: {name: string; label: string; type: 'integer'|'real'|'string'; data_kind: 'Непрерывный'|'Дискретный'}[];
+ hidden_settings: 'not_exposed_by_native_wizard'; output_schema_scope: 'verified_on_read'; package_persistence_verified: false;
+}
+export interface CoarseClassesConfigurationReadback {
+ kind: 'coarse_classes'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
+ mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic' | 'manual';
+ min_class_percent: number; max_classes: number; uniformity_percent: number;
+ roles: {name: string; role: 'unused' | 'input' | 'target'}[];
+ state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;
+ training: {status: 'not_requested'} | {status: 'trained'; node: NodeRef; execution_id: string; source: InputLink[]; model: Pick<CoarseClassesConfigurationReadback,'state'|'classes'|'total_iv'>};
+ output_mappings: BinningConfigurationReadback['output_mappings']; package_persistence_verified: false;
+}
+
+export interface CoarseClassesFrozenConfigurationReadback extends CoarseClassesConfigurationReadback { frozen: true; frozen_partition: {input_field: string; locked: true; edited: boolean; classes: {number: number; lower: number | null; upper: number | null}[]}; }
+export interface FactorAnalysisConfigurationReadback {
+  kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+  node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];
+  factors: number; rotation: 'none' | 'varimax' | 'quartimax'; training: ClusteringConfigurationReadback['training'];
+  output_mappings: Array<{port: number; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string}>}>;
+  package_persistence_verified: false;
+}
+
+export interface FactorAnalysisModesConfigurationReadback extends Omit<FactorAnalysisConfigurationReadback, 'mode'> {
+  mode: 'pca_fixed' | 'pca_eigenvalue' | 'pca_variance'; criterion: 'fixed' | 'eigenvalue' | 'variance';
+  eigenvalue?: number; variance_percent?: number; output_factors: number | false;
+}
+
+export interface FactorAnalysisApplyConfigurationReadback extends Omit<FactorAnalysisModesConfigurationReadback, 'mode' | 'training'> {
+  mode: 'apply'; training: {status: 'not_requested'};
+}
+
+export interface TreeConversionConfigurationReadback { kind: "table_to_tree" | "tree_to_json"; mode: "manual_structure" | "serialize"; scope: "observed_before_verified_finish"; values_are: "observed_ui_values"; node: NodeRef; receipt_ids: string[]; package_persistence_verified: false; input_port: 0; output_port: 0; nodes?: {path:string;name:string;label:string;type:"object"|"integer"|"real"|"string"|"boolean";is_array:boolean;source_field?:string}[]; exclude_root?: true; pretty?: false; keys?: "names"; multi_row?: false; datetime?: "iso8601" }
+
+export interface EnrichParameters {enrichment?: {tables:Array<{port:number;keys:Array<{main:string;lookup:string}>}>;
+  prefixes:{enabled:boolean;name:string;label:string}}}
+export interface EnrichConfigurationReadback {
+  kind:'enrich';scope:'observed_before_verified_finish';node:NodeRef;
+  receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
+  prefixes:{enabled:boolean;name:string;label:string};
+  tables:Array<{port:number;native_index:number;keys:Array<{main:string;lookup:string}>}>;
+  input_mappings:Array<{port:number;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
+    autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
+  output_mapping:GroupingConfigurationReadback['output_mapping'];
+}
+
+export interface UngroupParameters {
+ ungroup?: {keys:Array<{total:string;support:string}>;value_field:string;item_field:string;share_field:string;
+  rounding:{format:'none'}|{format:'precision'|'multiple';value:number};balance:'none'|'last'|'proportional'|'equal'};
+ seasonality?: {total_order_field:string;support_order_field:string;period:'year';multiplier:1;index_count:12;rare_density:0.25;absent_periods:1;novelty_periods:1;max_history_periods:0};
+}
+export interface UngroupConfigurationReadback extends Omit<JoinConfigurationReadback,'kind'|'mode'|'keys'|'case_sensitive'|'include_joined_keys'> {
+ kind:'ungroup';mode:'shares'|'computed'|'seasonal';ungroup:NonNullable<UngroupParameters['ungroup']>&{total_order_field?:string;support_order_field?:string};
+ seasonality?:{period:'year';multiplier:number;index_count:number;rare_density:number;absent_periods:number;novelty_periods:number;max_history_periods:number};
+}
+
+export interface UserVariablesParameters {
+ remove?:string[];
+ variables?:Array<{name:string;type:'integer';value:number|null}|{name:string;type:'boolean';value:boolean|null}|{name:string;type:'string';value:string|null}>;
+}
+
+export interface UserVariablesConfigurationReadback {
+ kind:'user_variables'; mode:'values'; scope:'observed_after_verified_finish'; values_are:'independent_owned_user_variables';
+ node:NodeRef; receipt_ids:string[]; variables:NodeVariableOutput['variables']; changed:string[]; removed?:string[]; package_persistence_verified:false;
+}
+
+export interface VariableMappingReadback {
+ kind:'variables'|'control'; direction:'input'; port:number; native_index:number; port_guid:string; node:NodeRef;
+ count:number; store_count:number; unique_ids:number; autosync:boolean; source_identity_verified:true; independent_readback:true;
+ fields:Array<{id:number;index:number;name:string;label:string;type:number;origin_type:number;usage:number;description:string;
+ value:string|number|boolean|null;is_null:boolean;source:{id:number;name:string;label:string;type:number}|null}>;
+}
+
+export interface VariablesCalculatorConfigurationReadback {
+ kind: 'variables_calculator'; scope: 'observed_before_verified_finish'; node: NodeRef;
+ receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
+ mode: 'expression'; syntax_validation: 'accepted_by_loginom_next';
+ expressions: Array<{index: number; name: string; label: string; type: 'integer' | 'real' | 'string' | 'boolean'; formula: string; description: string; intermediate: boolean}>;
+}
+
+export interface DataToVarParameters { fields?: Array<{field: {kind: 'input_field'; name: string}; aggregations: Array<'sum'|'count'|'min'|'max'|'avg'>}> }
+export interface DataToVarConfigurationReadback {
+ kind: 'variables_from_table'; mode: 'aggregate'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'|'string'|'boolean'|'datetime'; order: number; aggregations: string[]}>;
+ input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
+ output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
+}
+
+export interface SamplingUniformConfigurationReadback extends Omit<SamplingModesConfigurationReadback,'mode'|'test_priority'> {
+ mode:'uniform'; group_size_rows:number[]; test_priority:boolean; test_priority_position?:'beginning'|'end'|'algorithm'|null;
+}
+
+export interface PythonConfigurationReadback {
+ kind: 'python'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; mode: 'script'; execution_mode: 'external_process'; schema_mode: 'code' | 'declared';
+ columns?: {name: string; label: string; type: 'integer' | 'real' | 'string' | 'boolean' | 'datetime'}[];
+ source_sha256: string; source_utf8_bytes: number; source_lf_lines: number; separate_process: boolean; package_persistence_verified: false;
+}
+
+export interface LoopConfigurationReadback {
+ kind: 'loop'; mode: 'group_rows'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; body: {ref: NodeRef; label: string};
+ derived_component: {module: string; instance: number}; group_size: 1;
+ input_port: {direction: 'input'; index: 0; guid: string; label: string; kind: 'table'};
+ parallel: false; iteration_identifiers: false; ignore_errors: false; save_configuration: false;
+ ports: Array<{direction: 'input' | 'output'; index: 0; guid: string; label: string; kind: 'table'}>;
+ package_persistence_verified: false;
+}
+
+export interface LoopForConfigurationReadback {
+ kind: 'loop'; mode: 'for'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
+ node: NodeRef; receipt_ids: string[]; body: {ref: NodeRef; label: string};
+ derived_component: {module: string; instance: number}; count: number;
+ variable: {port_guid: string; definition_id: number; name: string; type: 'integer'; proxy: {module: string; instance: number}};
+ input_port: {direction: 'input'; index: 0; guid: string; label: string; kind: 'variables'};
+ parallel: false; iteration_identifiers: boolean; ignore_errors: false; save_configuration: false;
+ ports: Array<{direction: 'input' | 'output'; index: 0; guid: string; label: string; kind: 'table' | 'variables'}>;
  package_persistence_verified: false;
 }

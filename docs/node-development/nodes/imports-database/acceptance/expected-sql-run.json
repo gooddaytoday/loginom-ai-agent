@@ -1,0 +1,58 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.database",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Label",
+          "label": "Label",
+          "type": "string",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [
+        {
+          "Amount": 30.0,
+          "Id": 6,
+          "Label": "Б"
+        },
+        {
+          "Amount": -5.25,
+          "Id": 4,
+          "Label": ""
+        },
+        {
+          "Amount": 10.5,
+          "Id": 1,
+          "Label": "А"
+        }
+      ]
+    }
+  ]
+}

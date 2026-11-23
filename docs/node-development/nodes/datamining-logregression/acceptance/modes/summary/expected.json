@@ -1,0 +1,176 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "datamining.log_regression"
+        },
+        "port": 2,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "TotalSamples",
+            "type": "integer",
+            "value": 32
+          },
+          {
+            "name": "TotalSelectedSamples",
+            "type": "integer",
+            "value": 32
+          },
+          {
+            "name": "TrainSamples",
+            "type": "integer",
+            "value": 32
+          },
+          {
+            "name": "TrainRMSError",
+            "type": "real",
+            "value": 0.3665719574653795,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "TrainClsErrorPercentage",
+            "type": "real",
+            "value": 25.0,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "TrainAvgCE",
+            "type": "real",
+            "value": 0.620941777108084,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "TrainThreshold",
+            "type": "real",
+            "value": 0.8,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "NullMinusTwoLogL",
+            "type": "real",
+            "value": 44.3614195558365,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "MinusTwoLogL",
+            "type": "real",
+            "value": 27.545858694038426,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "R2",
+            "type": "real",
+            "value": 0.37905822289191604,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "AdjustedR2",
+            "type": "real",
+            "value": 0.2888897828363558,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "DFE",
+            "type": "integer",
+            "value": 30
+          },
+          {
+            "name": "ModelDF",
+            "type": "integer",
+            "value": 1
+          },
+          {
+            "name": "Chi2",
+            "type": "real",
+            "value": 16.815560861798073,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "AIC",
+            "type": "real",
+            "value": 0.9858080841887008,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "AICc",
+            "type": "real",
+            "value": 0.9987391186714595,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "BIC",
+            "type": "real",
+            "value": 1.0774165781136837,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "HQC",
+            "type": "real",
+            "value": 1.0161737081702553,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          },
+          {
+            "name": "ModelPValue",
+            "type": "real",
+            "value": 4.119412569170649e-05,
+            "tolerance": {
+              "abs": 1e-07,
+              "rel": 1e-08
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

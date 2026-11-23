@@ -1,0 +1,30 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #182b3e; background: #f3f6fa; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1040px; margin: auto; padding: 40px 32px 24px; }
+.eyebrow { color: #527286; font-size: 11px; font-weight: 750; letter-spacing: .16em; }
+h1 { margin: 12px 0 8px; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.035em; }
+header p { color: #65788a; margin: 0 0 28px; }
+.metrics { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; margin-bottom: 26px; }
+.metric { padding: 24px 28px; border-radius: 16px; background: #163e52; color: white; display: flex; flex-direction: column; gap: 8px; }
+.metric span { font-size: 14px; }
+.metric strong { font-size: 48px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.metric small { color: #c2d8e2; }
+.secondary { background: #e2ecef; color: #234758; }
+.secondary small { color: #56717d; }
+.table-panel { overflow: auto; background: white; border: 1px solid #e0e7ed; border-radius: 16px; }
+h2 { font-size: 18px; margin: 24px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+th, td { padding: 17px 24px; text-align: left; border-top: 1px solid #eaf0f4; }
+thead { color: #64788a; background: #f8fafc; font-size: 12px; }
+.number { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: #f7fbfc; }
+tfoot { background: #edf4f6; font-weight: 750; }
+.notice, .empty { padding: 16px 24px; color: #56717d; }
+.error { padding: 16px 24px; background: #fff0ed; color: #a23124; border-radius: 12px; margin-bottom: 20px; }
+button { border: 0; border-radius: 8px; padding: 12px 24px; color: white; background: #163e52; font: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible { outline: 3px solid #35a6cf; outline-offset: 3px; }
+footer { margin-top: 22px; color: #728596; font-size: 12px; }
+@media(max-width: 520px) { main { padding: 24px 16px; } .metrics { grid-template-columns: 1fr; gap: 12px; } .metric { padding: 20px; } .metric strong { font-size: 40px; } th, td { padding: 16px; } }

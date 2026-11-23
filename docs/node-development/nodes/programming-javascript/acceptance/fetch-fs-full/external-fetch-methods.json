@@ -1,0 +1,34 @@
+{
+  "http": [
+    {
+      "method": "PUT",
+      "suffix": "/draft",
+      "body_hex": "7b2276616c7565223a226472616674227d",
+      "content_type": "application/json"
+    },
+    {
+      "method": "PATCH",
+      "suffix": "/draft",
+      "body_hex": "7b2276616c7565223a2266696e616c227d",
+      "content_type": "application/json"
+    },
+    {
+      "method": "DELETE",
+      "suffix": "/draft",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "HEAD",
+      "suffix": "/text",
+      "body_hex": "",
+      "content_type": null
+    }
+  ],
+  "files": {},
+  "inventory": [],
+  "reserved_artifacts": [],
+  "required_artifacts": [],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

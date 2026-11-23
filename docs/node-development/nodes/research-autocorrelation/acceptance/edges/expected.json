@@ -1,0 +1,320 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "series": {
+    "count4": {
+      "output_node_type": "research.auto_correlation",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Lag",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "X_ACF",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_StdErr",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_Significant",
+          "label_any": true,
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        },
+        {
+          "Lag": 1,
+          "X_ACF": 0.47023809523809523,
+          "X_StdErr": 0.3535533905932738,
+          "X_Significant": true
+        },
+        {
+          "Lag": 2,
+          "X_ACF": 0.25,
+          "X_StdErr": 0.42459506185692736,
+          "X_Significant": false
+        },
+        {
+          "Lag": 3,
+          "X_ACF": -0.005952380952380952,
+          "X_StdErr": 0.4426126597300262,
+          "X_Significant": false
+        }
+      ]
+    },
+    "count8": {
+      "output_node_type": "research.auto_correlation",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Lag",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "X_ACF",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_StdErr",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_Significant",
+          "label_any": true,
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        },
+        {
+          "Lag": 1,
+          "X_ACF": 0.47023809523809523,
+          "X_StdErr": 0.3535533905932738,
+          "X_Significant": true
+        },
+        {
+          "Lag": 2,
+          "X_ACF": 0.25,
+          "X_StdErr": 0.42459506185692736,
+          "X_Significant": false
+        },
+        {
+          "Lag": 3,
+          "X_ACF": -0.005952380952380952,
+          "X_StdErr": 0.4426126597300262,
+          "X_Significant": false
+        },
+        {
+          "Lag": 4,
+          "X_ACF": -0.2857142857142857,
+          "X_StdErr": 0.4426226657809545,
+          "X_Significant": false
+        },
+        {
+          "Lag": 5,
+          "X_ACF": -0.27976190476190477,
+          "X_StdErr": 0.4651053509994748,
+          "X_Significant": false
+        },
+        {
+          "Lag": 6,
+          "X_ACF": -0.44047619047619047,
+          "X_StdErr": 0.485684741748541,
+          "X_Significant": false
+        },
+        {
+          "Lag": 7,
+          "X_ACF": -0.20833333333333334,
+          "X_StdErr": 0.5332864961364119,
+          "X_Significant": false
+        }
+      ]
+    },
+    "count12": {
+      "output_node_type": "research.auto_correlation",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Lag",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "X_ACF",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_StdErr",
+          "label_any": true,
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X_Significant",
+          "label_any": true,
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        },
+        {
+          "Lag": 1,
+          "X_ACF": 0.47023809523809523,
+          "X_StdErr": 0.3535533905932738,
+          "X_Significant": true
+        },
+        {
+          "Lag": 2,
+          "X_ACF": 0.25,
+          "X_StdErr": 0.42459506185692736,
+          "X_Significant": false
+        },
+        {
+          "Lag": 3,
+          "X_ACF": -0.005952380952380952,
+          "X_StdErr": 0.4426126597300262,
+          "X_Significant": false
+        },
+        {
+          "Lag": 4,
+          "X_ACF": -0.2857142857142857,
+          "X_StdErr": 0.4426226657809545,
+          "X_Significant": false
+        },
+        {
+          "Lag": 5,
+          "X_ACF": -0.27976190476190477,
+          "X_StdErr": 0.4651053509994748,
+          "X_Significant": false
+        },
+        {
+          "Lag": 6,
+          "X_ACF": -0.44047619047619047,
+          "X_StdErr": 0.485684741748541,
+          "X_Significant": false
+        },
+        {
+          "Lag": 7,
+          "X_ACF": -0.20833333333333334,
+          "X_StdErr": 0.5332864961364119,
+          "X_Significant": false
+        }
+      ]
+    }
+  },
+  "requested_lags": {
+    "range_2_6_step_2": [
+      {
+        "Lag": 2,
+        "X_ACF": 0.25,
+        "X_StdErr": 0.42459506185692736,
+        "X_Significant": false
+      },
+      {
+        "Lag": 4,
+        "X_ACF": -0.2857142857142857,
+        "X_StdErr": 0.4426226657809545,
+        "X_Significant": false
+      },
+      {
+        "Lag": 6,
+        "X_ACF": -0.44047619047619047,
+        "X_StdErr": 0.485684741748541,
+        "X_Significant": false
+      }
+    ],
+    "explicit_1_3_7": [
+      {
+        "Lag": 1,
+        "X_ACF": 0.47023809523809523,
+        "X_StdErr": 0.3535533905932738,
+        "X_Significant": true
+      },
+      {
+        "Lag": 3,
+        "X_ACF": -0.005952380952380952,
+        "X_StdErr": 0.4426126597300262,
+        "X_Significant": false
+      },
+      {
+        "Lag": 7,
+        "X_ACF": -0.20833333333333334,
+        "X_StdErr": 0.5332864961364119,
+        "X_Significant": false
+      }
+    ]
+  },
+  "degenerate_math": {
+    "empty": "undefined: no mean",
+    "one": "undefined: zero variance",
+    "null": "undefined without an explicit missing-data policy"
+  },
+  "observations_not_claimed": {
+    "one": {
+      "status": "observation_not_claimed",
+      "accepted_output": false,
+      "observed_rows": [
+        {
+          "Lag": 0,
+          "X_ACF": 1.0,
+          "X_StdErr": 0.0,
+          "X_Significant": true
+        }
+      ],
+      "reason": "One native run; mathematical coefficient undefined at N=1"
+    }
+  },
+  "native_conventions": {
+    "empty": {
+      "status": "platform_limitation",
+      "accepted_output": false,
+      "observed": "Access violation on empty input; inconsistent output cache is not a result"
+    },
+    "null": {
+      "status": "execution_refused",
+      "accepted_output": false,
+      "message": "Данные содержат пустые значения"
+    }
+  },
+  "unavailable": {
+    "start_lag": true,
+    "lag_step": true,
+    "explicit_lags": true,
+    "reason": "No corresponding controls in Loginom 7.4.2 AutoCorrelationWizard"
+  },
+  "model_delivery": "Only task and CSV; never oracle or expected."
+}

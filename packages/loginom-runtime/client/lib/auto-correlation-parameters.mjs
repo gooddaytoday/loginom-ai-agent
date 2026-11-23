@@ -3,7 +3,7 @@ export function validateAutoCorrelationParameters(p,mode,r){
  need(mode==='time_domain','use mode time_domain (PACF off)');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='autocorrelation'),'use parameters.autocorrelation only');
  const a=p.autocorrelation;
- need(a===undefined||a&&typeof a==='object'&&!Array.isArray(a)&&Object.keys(a).every(k=>['field','lag_count'].includes(k)),'only field and lag_count are supported');
+ need(a===undefined||a&&typeof a==='object'&&!Array.isArray(a)&&Object.keys(a).every(k=>['field','lag_count'].includes(k)),'only field and lag_count are supported; Loginom 7.4.2 has no lag range, step or list controls; lag_count selects 0..min(lag_count,N)-1');
  need(r.target.kind==='existing'||a?.field!==undefined&&a?.lag_count!==undefined,'new nodes require field and lag_count');
  if(a?.field!==undefined)need(typeof a.field==='string'&&a.field.length>0&&a.field.length<=128,'one exact technical field name required');
  if(a?.lag_count!==undefined)need(Number.isSafeInteger(a.lag_count)&&a.lag_count>=1,'lag_count must be an integer 1..9007199254740991 including lag 0');

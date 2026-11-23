@@ -1,0 +1,41 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "header": true,
+  "null_marker": "?",
+  "columns": [
+    {
+      "name": "Transaction",
+      "type": "string",
+      "data_kind": "Дискретный"
+    },
+    {
+      "name": "Item",
+      "type": "string",
+      "data_kind": "Дискретный"
+    }
+  ],
+  "dependencies": "Python 3 stdlib: csv, itertools, fractions, json, hashlib",
+  "files": {
+    "duplicates.csv": {
+      "bytes": 62,
+      "sha256": "8ae558d2684d5a4bfa80d80283b38d4d854b53e172341ec1ecf5ee1bbdebd1ee"
+    },
+    "empty.csv": {
+      "bytes": 17,
+      "sha256": "7680f6e9efb4ad38e7ad8a14eb43431677cd29f23c898a1b4b43d4dce6c0438f"
+    },
+    "length.csv": {
+      "bytes": 67,
+      "sha256": "c409bf987e5bdc49cdd4cd17144b52e72982623c83f46f56d92da1ee22a8f54e"
+    },
+    "null.csv": {
+      "bytes": 45,
+      "sha256": "a745c67804c31a8c4757ab9eff3c024b1ec9980ee3a7186fa04018048371a811"
+    },
+    "transactions.csv": {
+      "bytes": 57,
+      "sha256": "255f733a32fd0f512685b2a0ba346765364a336f9c35d1f0a27d67c918002be0"
+    }
+  }
+}

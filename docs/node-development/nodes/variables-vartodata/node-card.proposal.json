@@ -1,0 +1,39 @@
+{
+  "type": "variables.to_table",
+  "title": "Переменные в таблицу",
+  "palette_group": "Переменные",
+  "icon_class": "bg-vendor-icon-variablestodata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 0,
+  "variable_inputs": 1,
+  "input_kinds": ["variables"],
+  "tabular_outputs": 1,
+  "output_kinds": ["table"],
+  "additional_tabular_inputs": false,
+  "modes": ["columns"],
+  "semantics": "Convert one explicitly connected nonempty variable set to one typed table row on output 0. Mode columns preserves variable names, labels, types and source order. NULL, false, zero and empty string remain distinct. Datetime preserves civil milliseconds without adding a timezone; real values retain binary64 precision. Read the variable source through its issued typed port reference before connecting input 0. A table port, control-variable port or a same-numbered scenario service port is not a substitute. No training model or separate saved-model apply; execute computes the current source. Done commits settings without proving output. Existing parameters:{} preserves columns mode. Rows/Variant, empty sets, system/session/user variables and unsupported variable types are outside stage 1; reject before mutation. Save separately.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "sources": {
+    "e2e": ["bg/helpers/workflow/node.ts", "bg/helpers/workflow/ports.ts", "bg/helpers/workflow/links.ts"],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/variables/variables-to-table.html"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "configuration_handler": "variables-vartodata-v1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": ["columns"],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false,
+    "description": "Use parameters:{} and top-level mode:\"columns\". The native page only selects orientation; variable values and types belong to the upstream source. Use the approved W1 typed inputs contract for input 0. Do not pass variables, formulas, rows mode, local_variables or bindings here. Table output mappings use the existing mappings contract. New and existing nodes require an explicit verified nonempty variable source; omitted settings never silently switch orientation. Top-level finish remains required."
+  },
+  "session_manifest": {}
+}

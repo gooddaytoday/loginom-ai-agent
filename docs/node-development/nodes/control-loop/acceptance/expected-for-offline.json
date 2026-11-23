@@ -1,0 +1,61 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "control.supernode"
+    },
+    {
+      "type": "control.loop"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.loop",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Skip",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Page",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Limit",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IterationId",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Page": 0,
+          "Limit": 2,
+          "Skip": 0,
+          "IterationId": 0
+        },
+        {
+          "Page": 1,
+          "Limit": 2,
+          "Skip": 2,
+          "IterationId": 1
+        },
+        {
+          "Page": 2,
+          "Limit": 2,
+          "Skip": 4,
+          "IterationId": 2
+        }
+      ]
+    }
+  ]
+}

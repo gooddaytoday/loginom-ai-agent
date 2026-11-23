@@ -60,7 +60,10 @@ function correctedRead(failure: ToolPart, success: ToolPart) {
   const before = failure.state.input.filePath
   const after = success.state.input.filePath
   if (typeof before !== "string" || typeof after !== "string") return false
-  if (!failure.state.error.startsWith(`File not found: ${before}`) || failure.state.metadata?.permissionDenied) return false
+  if (failure.state.metadata?.permissionDenied) return false
+  if (before === after && /^Offset \d+ is out of range for this file \(\d+ lines\)$/.test(failure.state.error))
+    return true
+  if (!failure.state.error.startsWith(`File not found: ${before}`)) return false
   if (path.dirname(before) !== path.dirname(after) || path.extname(before) !== path.extname(after)) return false
   // A later successful read repairs only the latest missing-file error in this directory and
   // extension only when all other arguments match; filename similarity is irrelevant.

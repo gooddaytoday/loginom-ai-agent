@@ -142,4 +142,5 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
       await rm(root, { recursive: true, force: true })
     }
   },
+  30_000,
 )

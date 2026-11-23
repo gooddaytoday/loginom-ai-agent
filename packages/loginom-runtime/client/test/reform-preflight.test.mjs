@@ -16,3 +16,8 @@ test('reform input validation uses effective retained or newly mapped input name
 test('preview without data kind defers compatibility to the complete native configuration',()=>{
  assert.doesNotThrow(()=>preflightReformParameters({changes:[{field:{kind:'input_field',name:'Amount'},type:'string'}]},[{name:'Amount',label:'Amount',type:'integer'}]));
 });
+
+test('new reform field cache requires explicit selected_fields caching before target creation',()=>{
+ for(const caching of [undefined,'disabled','on_access'])assert.throws(()=>preflightReformParameters({changes:[change('Price',{cache:'on_activation'})],...(caching?{caching}:{})},fields),/selected_fields/);
+ assert.deepEqual(preflightReformParameters({changes:[change('Price',{cache:'on_activation'})],caching:'selected_fields'},fields).fields.map(f=>f.caching_method),[1,undefined]);
+});

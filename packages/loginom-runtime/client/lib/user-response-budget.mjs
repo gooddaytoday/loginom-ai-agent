@@ -24,7 +24,7 @@ export function boundedUserToolReply(reply,{tool,operationId}={}) {
    scope:cardTooLarge?'javascript_description':'whole_response'},
    ...(retained?{original_operation_id:retained}:{}),
    next_step:cardTooLarge?{instruction:'Report the JavaScript description delivery limitation. Do not guess missing schema or rules or repeat the same oversized single-card request.'}
-     :describe?{tool:'dock_action_describe',instruction:'Request one selected node type; request saving actions separately.'}
+     :describe?{tool:'dock_action_describe',instruction:'Request one selected node type and its modes; request saving actions separately.'}
      :retained?{tool:'dock_operation_inspect',arguments:{operation_id:retained},instruction:'Inspect the original operation. A local full receipt is not model delivery; obtain smaller analytical output only after effects are reconciled.'}
        :{instruction:'Request a smaller reply. This delivery refusal does not establish the state of any browser effect.'}};
  return {...textReply(refusal),isError:true};

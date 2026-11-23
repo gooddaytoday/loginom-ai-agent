@@ -110,7 +110,8 @@
     "prettier": "3.6.2",
     "semver": "^7.6.0",
     "sst": "catalog:",
-    "turbo": "2.10.2"
+    "turbo": "2.10.2",
+    "@smithy/fetch-http-handler": "5.3.6"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.933.0",
@@ -170,5 +171,5 @@
     "@ai-sdk/amazon-bedrock@4.0.166": "patches/@ai-sdk%2Famazon-bedrock@4.0.166.patch",
     "@ai-sdk/openai@3.0.88": "patches/@ai-sdk%2Fopenai@3.0.88.patch"
   },
-  "version": "0.3.10"
+  "version": "0.4.0"
 }

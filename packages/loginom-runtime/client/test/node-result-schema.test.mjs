@@ -6,18 +6,75 @@ const provider=new AjvJsonSchemaValidator(),validate=provider.getValidator(nodeA
 const result=()=>({operation_id:'op',status:'AMBIGUOUS',effect_possible:true,phases:[],node:null,
  execution:{status:'pending',execution_id:'process'},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
  package_saved:false,cleanup_complete:false,warnings:[],pending_phase:'execute',error:{code:'UNKNOWN',message:'Await original receipt'}});
+test('logistic results admit K-fold readback and native execution evidence additively',()=>{
+ const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const c={kind:'log_regression',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node,receipt_ids:['i','c','s','m','f'],mode:'enter',input_fields:['X'],target_field:'Target',classes:[{index:0,label:'no'},{index:1,label:'yes'}],event:'yes',threshold:0.8,intercept:true,epsilon:1e-10,normalization:'none',train_percent:100,validation:'none',calibration:'train',training:{status:'trained',node,execution_id:'teach',source:[{node,output:0,input:0}]},package_persistence_verified:false};
+ r.configuration={status:'applied',readback:c};assert.equal(validate(r).valid,true);
+ c.validation={method:'kfold',folds:3,sampling:'sequential'};
+ c.training.validation={status:'completed',source:'native_validation_summary',execution_id:'teach',read_id:'read',folds:3,samples_per_fold:32};
+ assert.equal(validate(r).valid,true);
+ c.training.validation.samples_per_fold=0;assert.equal(validate(r).valid,false);
+ c.training.validation.samples_per_fold=32;c.validation.sampling='random';assert.equal(validate(r).valid,false);
+});
+test('binding result admits real and civil datetime thresholds and real NULL additively',()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'};
+ for(const [type,is_null] of [['integer',false],['string',false],['boolean',false],['real',false],['real',true],['datetime',false]]){
+  const r=result();r.configuration={status:'applied',bindings:[{parameter:'/groups/0/0/value',mode:'variable',row_id:'row',
+   variable:{kind:'control',input:0,id:1,name:'Threshold',type,is_null},source:{ref:node,type:'variables.user',output:4,variable_id:1},
+   input_port_guid:'port',connected:true,verified:true}]};
+  assert.equal(validate(r).valid,true,type+' '+is_null);
+  if(type!=='real'){r.configuration.bindings[0].variable.is_null=true;assert.equal(validate(r).valid,false);}
+ }
+});
+test('uniform readback publishes observed group sizes and native test priority',()=>{
+ const r=result();r.configuration={status:'applied',readback:{kind:'data_partition',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'uniform',counts:[6,4],groups:[],seed:42,group_size_rows:[1,1],strata_fields:[],bias_field:null,bias_factors:[],test_priority:true,test_priority_position:'beginning',output_mappings:[],package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ for(const change of [v=>v.mode='unsupported',v=>delete v.group_size_rows,v=>v.test_priority='true',v=>v.test_priority_position='middle']){
+  const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
+ }
+});
+test('Grouping readback admits concat settings while retaining legacy measures',()=>{
+ const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const field={index:0,name:'Region',label:'Region',type:'string',data_kind:'Дискретный',source_name:'Region'};
+ const readback={kind:'grouping',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node,
+  receipt_ids:['i','c','s','m','f'],mode:'aggregate',group_by:[{name:'Region',label:'Region',type:'string',order:0}],
+  measures:[{name:'Amount',label:'Amount',type:'integer',order:0,functions:8192,concat:{separator:'|',wrapper:'',unique:true,sort:true,direction:1}}],
+  options:{pedDimCache:{value:true,switch_pressed:false},pedSortResult:{value:false,switch_pressed:false}},
+  input_mapping:{port:0,autosync:true,fields:[field]},output_mapping:{port:0,autosync:true,fields:[{...field,excluded:false}]},package_persistence_verified:false};
+ r.configuration={status:'applied',readback};assert.equal(validate(r).valid,true);
+ readback.measures[0].concat.unique=1;assert.equal(validate(r).valid,false);
+ delete readback.measures[0].concat;readback.measures[0].functions=1024;assert.equal(validate(r).valid,true);
+});
 test('REST readback admits optional observed response Content-Type without changing legacy results',()=>{
  const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
  const connection={name:'Status',base_url:'https://httpbin.org/status/200',method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:['RequestId'],reference_node_id:'connection'};
  r.configuration={status:'applied',readback:{kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:'GET',connection,
   query_parameters:[{name:'RequestId',field:'RequestId'}],receipt_ids:['op:configure','op:node_finish'],package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
- for(const response_content_type of ['application/json','text/html']){
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
   connection.response_content_type=response_content_type;assert.equal(validate(r).valid,true);
  }
- for(const response_content_type of [null,true,'text/plain']){
+ for(const response_content_type of [null,true,'application/xml','text/*']){
   connection.response_content_type=response_content_type;assert.equal(validate(r).valid,false);
  }
+ delete connection.response_content_type;
+ for(const method of ['POST','PUT','PATCH','DELETE']){
+  r.configuration.readback.method=method;connection.method=method;
+  if(method!=='DELETE'){
+   connection.request_content_type='application/json';r.configuration.readback.body_field='Body';
+  }else{delete connection.request_content_type;delete r.configuration.readback.body_field;}
+  assert.equal(validate(r).valid,true,method);
+ }
+});
+test('C4 result retains variable identity separately from a literal header value',()=>{
+ const r=result();
+ r.configuration={status:'applied',readback:{kind:'rest_request',scope:'observed_before_verified_finish',
+  node:{document_id:'d',workflow_id:'w',node_id:'n'},values_are:'observed_ui_values',method:'POST',body_field:'Body',connection:null,
+  query_parameters:[],headers:[{name:'X-Lab-Cycle',value:{variable:'Cycle'}},{name:'X-Literal',value:'fixed'}],
+  receipt_ids:['op:configure','op:node_finish'],package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ r.configuration.readback.headers[0].value={variable:'Cycle',value:'first'};
+ assert.equal(validate(r).valid,false);
 });
 test('result schema preserves uncertainty and forbids claiming node-level package persistence',()=>{
  assert.equal(validate(result()).valid,true);
@@ -64,9 +121,10 @@ test('calculator readback has its own public shape and cannot masquerade as text
  expressions:[{index:0,name:'R',label:'R',type:'real',formula:'A * 2',replace:false,intermediate:false,cached:false,description:''}],
  input_fields:[{name:'A',label:'A',type:'real'}],syntax_validation:'accepted_by_loginom_next',output_mapping:{port:0,autosync:true,fields:[{index:0,name:'R',label:'R',type:'real',data_kind:'Непрерывный',source_name:'R',excluded:false}]},package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
- for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula]){
+ for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula,v=>v.syntax='python']){
   const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
  }
+ for(const syntax of ['expression','javascript']){const ok=structuredClone(r);ok.configuration.readback.syntax=syntax;assert.equal(validate(ok).valid,true,syntax);}
 });
 
 test('reform readback has a registered shape with input identities and preservation evidence',()=>{
@@ -89,19 +147,24 @@ test('replacement public readback admits typed Null and exact Int64 without clai
  assert.equal(validate(r).valid,true);
  for(const precision of [0.07,0.25,0.29,1]){const nearest=structuredClone(r);nearest.configuration.readback.rules[0].precision=precision;assert.equal(validate(nearest).valid,true);}
  for(const patch of [{output_mode:'external'},{package_persistence_verified:true},{mode:'regex'}]){const bad=structuredClone(r);Object.assign(bad.configuration.readback,patch);assert.equal(validate(bad).valid,false);}
- for(const [result_type,value] of [['integer','12'],['real',1.25],['datetime','2026-11-01T00:00:00']]){
+ for(const [result_type,value] of [['integer','12'],['real',1.25],['datetime','2026-11-01T00:00:00'],['boolean',false],['boolean',true],['boolean',null]]){
   const converted=structuredClone(r),rule=converted.configuration.readback.rules[0];
   delete rule.precision;Object.assign(rule,{type:'string',result_type,case_sensitive:true,pairs:[{from:{type:'string',value:'12'},to:{type:result_type,value}}],other:{mode:'null'}});
   converted.configuration.readback.input_mapping.fields[0].type='string';
   converted.configuration.readback.output_mapping.fields[0].type=result_type;
   assert.equal(validate(converted).valid,true,result_type);
-  rule.result_type='boolean';assert.equal(validate(converted).valid,false);
+  rule.result_type='variant';assert.equal(validate(converted).valid,false);
  }
+ const kept=structuredClone(r),keptRule=kept.configuration.readback.rules[0];
+ delete keptRule.precision;Object.assign(keptRule,{type:'string',result_type:'boolean',case_sensitive:true,pairs:[{from:{type:'string',value:'yes'},to:{type:'boolean',value:true}}],other:{mode:'keep'}});
+ kept.configuration.readback.input_mapping.fields[0].type='string';kept.configuration.readback.output_mapping.fields[0].type='variant';
+ assert.equal(validate(kept).valid,true,'Boolean keep readback');
 });
 
 test('regex readback admits only string constants, ordered patterns and keep/null policy',()=>{
  const r=result(),field={index:0,name:'Code',label:'Code',type:'string',data_kind:'Дискретный',source_name:'Code'};
  r.configuration={status:'applied',readback:{kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'regex',output_mode:'add',rules:[{field:{kind:'input_field',name:'Code'},type:'string',pairs:[{from:{type:'string',value:'(?i)AB-([0-9]{2})'},to:{type:'string',value:'SKU-$1'}}],other:{mode:'keep'}}],input_mapping:{port:0,autosync:true,fields:[field]},output_mapping:{port:0,autosync:true,fields:[{...field,excluded:false}]},package_persistence_verified:false}};
+ const mixed=structuredClone(r);mixed.configuration.readback.mode='mixed';const mr=mixed.configuration.readback.rules[0];mr.regex_pairs=structuredClone(mr.pairs);mr.pairs=[{from:{type:'string',value:'AB-12'},to:{type:'string',value:'EXACT-FIRST'}}];mr.case_sensitive=true;assert.equal(validate(mixed).valid,true);
  assert.equal(validate(r).valid,true);
  for(const change of [v=>v.rules[0].case_sensitive=true,v=>v.rules[0].pairs[0].to.value=null,v=>v.rules[0].pairs=[],v=>v.rules[0].type='integer',v=>v.rules[0].other.mode='value']){const bad=structuredClone(r);change(bad.configuration.readback);assert.equal(validate(bad).valid,false);}
 });

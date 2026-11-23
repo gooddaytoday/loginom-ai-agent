@@ -1,0 +1,92 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.col_union_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "MainCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "AttachedID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ThirdID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ThirdCode",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "MainCode": "M1",
+          "Amount": 1.25,
+          "AttachedID": 10,
+          "AttachedCode": "A1",
+          "ThirdID": 100,
+          "ThirdCode": "T1"
+        },
+        {
+          "RowID": 2,
+          "MainCode": "M2",
+          "Amount": 0.0,
+          "AttachedID": 20,
+          "AttachedCode": "A2",
+          "ThirdID": 100,
+          "ThirdCode": "T1"
+        },
+        {
+          "RowID": 3,
+          "MainCode": "M3",
+          "Amount": -2.5,
+          "AttachedID": 10,
+          "AttachedCode": "A1",
+          "ThirdID": 100,
+          "ThirdCode": "T1"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+Region;CustomerId;Customer
+North;1;alpha
+North;1;alpha
+North;2;beta
+North;\N;\N
+North;;""
+North;;""
+South;7;omega
+South;7;omega
+South;7;""
+South;\N;\N
+NullOnly;\N;\N
+NullOnly;\N;\N
+EmptyOnly;;""
+EmptyOnly;;""

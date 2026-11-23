@@ -1,0 +1,28 @@
+{
+  "type": "variables.column_union",
+  "title": "Соединение (переменные)",
+  "candidate_modes": ["append_variables"],
+  "platform_availability": "requires_live_preflight",
+  "semantics": "Combine exactly two ordered scalar variable sets: variable input 0 left, input 1 right, variable output 0. Preserve all values, labels and types; left variables precede right variables. Native automatic mapping allocates unique names: a0/a0/a1 become a0/a1/a2; duplicate title becomes title_1. Read actual generated names. integer/real/string/boolean and typed NULL only, at most 128 output variables. NULL differs from empty string, false and zero. Execute recomputes current inputs without training. Use W1 variable_inputs with kind variables and read.variable_ports:[0], not table inputs/read. Existing parameters:{} preserves settings and links; reject custom mappings, type conversion and dynamic inputs before mutation.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "Settings for the two initial variable inputs. New nodes use native automatic output mapping. An empty existing patch preserves the supported mapping.",
+    "additionalProperties": false,
+    "properties": {
+      "column_union": {
+        "type": "object",
+        "description": "Optional declaration of the supported output mapping. Other wizard settings and additional ports are outside this slice.",
+        "additionalProperties": false,
+        "properties": {
+          "mapping": {
+            "type": "string",
+            "description": "automatic keeps every source variable in input order and uses native unique names. Existing custom mappings require refusal, not silent resetting.",
+            "enum": ["automatic"]
+          }
+        },
+        "required": ["mapping"]
+      }
+    }
+  },
+  "port_contract_dependency": "W1; proposal only, not registered"
+}

@@ -42,6 +42,7 @@ try {
     let view = initial
     let candidate
     let mode = "ready"
+    let browser = { state: "verified" }
     let failRead = false
     const calls = { checks: 0, saves: 0, keys: 0 }
     for (const name of ["loginom-read", "loginom-status", "loginom-check", "loginom-save"]) ipcMain.removeHandler(name)
@@ -57,13 +58,25 @@ try {
       if ("apiKey" in input) calls.keys++
       if (input.username === "rejected-key-user") throw Error("LOGINOM_KNOWLEDGE_AUTH_FAILED")
       candidate = input
-      return { validationId: "test-validated", expiresAt: Date.now() + 60000 }
+      browser =
+        mode === "login-rejected"
+          ? { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" }
+          : mode === "login-unavailable"
+            ? { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" }
+            : { state: "verified" }
+      return { validationId: "test-validated", expiresAt: Date.now() + 60000, browser }
     })
     ipcMain.handle("loginom-save", () => {
       calls.saves++
       if (mode === "rejected") throw Error("LOGINOM_STORE_WRITE_FAILED")
-      view = { ...view, revision: view.revision + 1, state: mode, failure: undefined, browser: { state: "verified" } }
-      if (mode === "starting" || mode === "ready") {
+      view = {
+        ...view,
+        revision: view.revision + 1,
+        state: mode === "login-rejected" || mode === "login-unavailable" ? "ready" : mode,
+        failure: undefined,
+        browser,
+      }
+      if (view.state === "starting" || view.state === "ready") {
         view = {
           ...view,
           generation: view.generation + 1,
@@ -73,8 +86,8 @@ try {
             candidate.password.operation === "preserve" ? view.hasPassword : candidate.password.operation === "replace",
         }
       }
-      if (mode === "starting") view.setupRequired = true
-      if (mode === "ready") delete view.setupRequired
+      if (view.state === "starting") view.setupRequired = true
+      if (view.state === "ready") delete view.setupRequired
       return view
     })
     ipcMain.on("loginom-settings-test-mode", (_event, value) => {
@@ -128,6 +141,20 @@ try {
   await form.getByRole("button", { name: checkName }).click()
   await expect(form.getByText(/Connection verified|Подключение проверено/)).toBeVisible()
   assert.deepEqual(await page.evaluate(() => window.api.loginom.read()), startup)
+
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "login-rejected"))
+  await form.locator('input[type="password"]').fill("incorrect-password")
+  await form.getByRole("button", { name: saveName }).click()
+  await expect(form.getByRole("alert")).toContainText(
+    /Check your username and password|Проверьте имя пользователя и пароль/,
+  )
+  await expect(form).toBeVisible()
+  await expect(otherForm).toBeVisible()
+  await expect(form.locator('input[type="password"]')).toHaveValue("incorrect-password")
+  await expect(form.getByRole("button", { name: saveName })).toBeEnabled()
+  assert.deepEqual(await page.evaluate(() => window.api.loginom.read()), startup)
+  await page.screenshot({ path: join(evidence, "wizard-login-rejected.png") })
+  await form.locator('input[type="password"]').fill("")
 
   await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "rejected"))
   await form.getByRole("button", { name: saveName }).click()
@@ -194,7 +221,7 @@ try {
   // Return to the default address and credentials before retrying the first save.
   await username().fill(startup.username)
   await password.fill("")
-  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "ready"))
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "login-unavailable"))
   await Promise.all([
     expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible({
       timeout: 60_000,
@@ -202,6 +229,12 @@ try {
     form.getByRole("button", { name: saveName }).click(),
   ])
   await expect(form).toHaveCount(0)
+  await expect(page.getByText(/Loginom sign-in is not verified|Вход в Loginom не подтверждён/)).toBeVisible()
+  assert.deepEqual((await page.evaluate(() => window.api.loginom.read())).browser, {
+    state: "failed",
+    failure: "LOGINOM_LOGIN_UNAVAILABLE",
+  })
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "ready"))
   await expect(otherForm).toHaveCount(0)
   await expect(other.getByRole("button", { name: "Loginom", exact: true })).toBeVisible({ timeout: 60000 })
   await expect(duringForm).toHaveCount(0)
@@ -256,9 +289,15 @@ try {
   await expect(checkResult).toHaveCount(0)
   await form.getByRole("button", { name: checkName }).click()
   await expect(checkResult).toContainText(/not been saved|ещё не сохранены/)
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "login-rejected"))
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
   await expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible()
+  assert.deepEqual((await page.evaluate(() => window.api.loginom.read())).browser, {
+    state: "failed",
+    failure: "LOGINOM_LOGIN_REJECTED",
+  })
+  await application.evaluate(({ ipcMain }) => ipcMain.emit("loginom-settings-test-mode", {}, "ready"))
   await open()
   await expect(username()).toHaveValue("checked-user")
   await username().fill("rejected-key-user")
@@ -304,6 +343,9 @@ try {
     status: "PASS",
     version: await application.evaluate(({ app }) => app.getVersion()),
     firstSaveRequired: true,
+    rejectedFirstLoginNotSaved: true,
+    unavailableFirstLoginSavedWithWarning: true,
+    configuredRejectedLoginStillSaved: true,
     defaultsSavedAfterRetry: true,
     loadFailureRetry: true,
     otherWindowUnblocked: true,

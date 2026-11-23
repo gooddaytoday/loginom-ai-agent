@@ -23,7 +23,7 @@ async function prepareRun(client: ReturnType<typeof transport>, run: string) {
   await client.request("tools", { run })
 }
 
-test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
+test.each(["finish", "reject", "release", "close", "uncertain", "disconnect", "kill"])(
   "async operation journal retains ownership through waits: %s",
   async (ending) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -56,6 +56,11 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
           process.disconnect(); return;
         }
         if (action === 'kill') { process.kill(process.pid, 'SIGKILL'); return; }
+        if (action === 'reject') {
+          const result = {structuredContent:{request_rejected:true,error:{code:'REQUEST_REJECTED'},
+            next_step:{tool:'dock_node_wait',arguments:{operation_id:'original'}}},content:[]};
+          process.send({id:m.id,result:{result,recoveryPending:true,activeWork:true}}); return;
+        }
         process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:action!=='uncertain'&&action!=='finish'}});
       });
     `,
@@ -99,9 +104,10 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
       await prepareRun(client, "one")
-      const exited = ending === "kill"
-        ? (await host.runtime(1, createHash("sha256").update("chat").digest("hex"))).exited
-        : undefined
+      const exited =
+        ending === "kill"
+          ? (await host.runtime(1, createHash("sha256").update("chat").digest("hex"))).exited
+          : undefined
       expect(await call("start")).toEqual({ action: "start" })
       expect(host.journal.pending()).toEqual([])
       expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(1)
@@ -111,11 +117,36 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       expect(await call("wait")).toEqual({ action: "wait" })
       expect(host.journal.pending()).toEqual([])
       expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending()).toHaveLength(2)
-      if (ending === "finish") {
+      if (ending === "reject") {
+        const runtime = await host.runtime(1, createHash("sha256").update("chat").digest("hex"))
+        expect(await call("reject")).toMatchObject({
+          structuredContent: { request_rejected: true, error: { code: "REQUEST_REJECTED" } },
+        })
+        expect(host.journal.pending()).toEqual([])
+        expect(await call("wait")).toEqual({ action: "wait" })
+        expect(await host.runtime(1, createHash("sha256").update("chat").digest("hex"))).toBe(runtime)
+      }
+      if (ending === "finish" || ending === "reject") {
         expect(await call("finish")).toEqual({ action: "finish" })
         expect(await readdir(join(root, "recovery"))).toEqual([])
         await client.request("release", { run: "one" })
         expect(await client.request("acquire", { run: "next", session: "chat" })).toEqual({ generation: 1 })
+        if (ending === "reject") {
+          await client.request("scope", {
+            run: "next",
+            mode: "bind",
+            scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+          })
+          await client.request("tools", { run: "next" })
+          expect(
+            await client.request("call", {
+              run: "next",
+              name: "dock_node_wait",
+              args: { action: "finish" },
+              userMessage: "original",
+            }),
+          ).toEqual({ action: "finish" })
+        }
         await client.request("release", { run: "next" })
         return
       }
@@ -149,7 +180,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
         expect(() => process.kill(pid, 0)).toThrow()
       }
       if (ending !== "disconnect") await host.close()
-      if (ending !== "finish") {
+      if (ending !== "finish" && ending !== "reject") {
         const calls = await readFile(join(directory, "calls.jsonl"), "utf8")
         expect(
           calls
@@ -961,6 +992,9 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
+    for (const method of ["dashboardRead", "dashboardPublish"])
+      await expect(client.request(method, { run: "one" })).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(await chatStarts()).toEqual([])
     await client.request("scope", {
       run: "one",
       mode: "bind",
@@ -991,3 +1025,49 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     await rm(directory, { recursive: true, force: true })
   }
 }, 15000)
+
+test.each([
+  ["publish", "disconnect", "DASHBOARD_WRITE_UNKNOWN"],
+  ["publish", "malformed", "DASHBOARD_WRITE_UNKNOWN"],
+  ["publish", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_ACCESS_DENIED"],
+  ["publish", "DASHBOARD_VERSION_EXISTS", "DASHBOARD_VERSION_EXISTS"],
+  ["publish", "LOGINOM_RUNTIME_CLEANUP_FAILED", "LOGINOM_RUNTIME_CLEANUP_FAILED"],
+  ["publish", "LOGINOM_HOST_CLEANUP_FAILED", "LOGINOM_HOST_CLEANUP_FAILED"],
+  ["delete", "disconnect", "DASHBOARD_DELETE_UNKNOWN"],
+  ["delete", "malformed", "DASHBOARD_DELETE_UNKNOWN"],
+  ["delete", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_ACCESS_DENIED"],
+])("acquired dashboard %s classifies %s without replay", async (operation, outcome, expected) => {
+  const replies = new EventEmitter()
+  const calls: string[] = []
+  const method = operation === "delete" ? "dashboardDelete" : "dashboardPublish"
+  const malformed = operation === "delete" ? { status: "empty", confirmedRemoved: 1 } : { status: "written" }
+  LoginomHost.connect({
+    postMessage(value) {
+      const message = value as { id: string; method: string }
+      calls.push(message.method)
+      if (message.method === method && outcome === "disconnect") {
+        replies.emit("close")
+        return
+      }
+      replies.emit("message", { data: {
+        id: message.id,
+        ...(message.method === "acquire" ? { result: { generation: 1 } } : outcome === "malformed" ? { result: malformed } : { error: outcome }),
+      } })
+    },
+    on: replies.on.bind(replies),
+    onClose: listener => { replies.on("close", listener) },
+    start() {},
+  })
+  try {
+    const run = await LoginomHost.acquire("dashboard-uncertain")
+    if (!run) throw Error("No run")
+    const input = { origin: "http://example.test", binding: { packagePath: "/user/example.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" } }
+    const request = (signal?: AbortSignal) => operation === "delete"
+      ? run.dashboardDelete({ ...input, generation: 1, expected: [] }, signal)
+      : run.dashboardPublish({ ...input, content: "{}", expected: null }, signal)
+    await expect(request(AbortSignal.abort())).rejects.toThrow("DASHBOARD_CANCELLED")
+    expect(calls).toEqual(["acquire"])
+    await expect(request()).rejects.toThrow(expected)
+    expect(calls).toEqual(["acquire", method])
+  } finally { LoginomHost.disconnect() }
+})

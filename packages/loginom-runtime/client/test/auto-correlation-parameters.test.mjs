@@ -5,6 +5,12 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0]}};
 const parameters={autocorrelation:{field:'X',lag_count:4}};
+test('native 7.4.2 rejects range, step and explicit lags with a platform reason before browser access',()=>{
+ const handler=createCandidateNodeSupport({}).nodeApplyHandlers.get('research.auto_correlation');
+ for(const extra of [{start:2},{step:2},{lags:[1,3,7]},{range:{start:2,end:6,step:2}}])
+  assert.throws(()=>handler.validate({autocorrelation:{field:'X',lag_count:12,...extra}},'time_domain',request),/Loginom 7\.4\.2.*range.*step.*list/);
+ assert.doesNotThrow(()=>handler.validate({autocorrelation:{field:'X',lag_count:12}},'time_domain',request));
+});
 test('time-domain ACF uses its native research node and installed driver',()=>{
  assert.equal(NODE_TYPES['research.auto_correlation'].palette_group,'Исследование');
  assert.equal(NODE_TYPES['research.auto_correlation'].icon_class,'bg-vendor-icon-autocorrelation');

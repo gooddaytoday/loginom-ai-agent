@@ -1,0 +1,1 @@
+`control.supernode` → `references/nodes/control.supernode.md`: один табличный вход/выход, внутренний граф, вход/выход из Подмодели.

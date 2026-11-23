@@ -1,3 +1,5 @@
+import {sameJsonValues,sameRestEchoValues} from './tree-conversion.mjs';
+import {isDeepStrictEqual} from 'node:util';
 const need=(v,m)=>{if(!v)throw Error(m);};
 // Read the first CSV record, including quoted separators/newlines and UTF-8 BOM.
 // The complete downloaded file is checked by the scenario's file oracle.
@@ -27,12 +29,14 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination'];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination','header'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
- need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
+ need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&(parseExpectedVariableInventory(expected)?.outputs.length>0
+  ||Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0)),'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
+   &&(!Object.hasOwn(output,'header')||typeof output.header==='boolean')
    &&(!Object.hasOwn(output,'column_order')||['exact','any'].includes(output.column_order))
    &&(!Object.hasOwn(output,'output_port')||Number.isSafeInteger(output.output_port)&&output.output_port>=0)
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
@@ -60,6 +64,11 @@ export function parseExpectedOutputs(expected){
   for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
    &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
     ||typeof r[c.name]==='number'&&Number.isFinite(r[c.name])),'EXPECTED_CATEGORIES_INVALID');
+  // v040-c8-filetime: present = typed non-NULL DateTime in every row; the value
+  // is never compared. Rows carry only the token true.
+  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&['json_ast','rest_echo'].includes(c.comparison)
+   ||c.comparison==='present'&&c.type==='datetime'&&!['types','tolerance','category_labels_any','name_any'].some(k=>Object.hasOwn(c,k))
+    &&output.rows.every(r=>r[c.name]===true),'EXPECTED_COMPARISON_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -67,6 +76,9 @@ export function parseExpectedOutputs(expected){
     'EXPECTED_TOLERANCE_INVALID');
   }
   need(output.rows.every(r=>r&&Object.keys(r).length===names.length&&names.every(n=>Object.hasOwn(r,n))), 'EXPECTED_ROWS_INVALID');
+  // v040-nan-exact: a Real value may be the exact non-finite marker only.
+  for(const row of output.rows)for(const c of output.columns)if(c.type==='real'&&row[c.name]&&typeof row[c.name]==='object')
+   need(Object.keys(row[c.name]).join()==='non_finite'&&['NaN','Infinity','-Infinity'].includes(row[c.name].non_finite),'EXPECTED_NON_FINITE_INVALID');
   for(const row of output.rows)for(const c of output.columns)if(c.type==='variant'&&row[c.name]!==null){
    const v=row[c.name];need(v&&typeof v==='object'&&['string','boolean','real','integer','datetime'].includes(v.cell_type)
     &&(Object.hasOwn(v,'value')||/^[a-f0-9]{16}$/.test(v.bytes_le??'')),'EXPECTED_VARIANT_SUBTYPE_REQUIRED');
@@ -90,7 +102,8 @@ export function selectColdOutputReads(graph,outputs,{exportInput,savedNode}={}){
  // can establish both presence and uniqueness. Read failures remain failures.
  const content=outputs.some(o=>o.output_node_type==='table_content');
  const types=new Set(outputs.filter(o=>o.output_node_type!=='table_content').map(o=>o.output_node_type));
- const nodes=graph.nodes.filter(n=>types.has(n.type)&&(!savedNode||n.ref.node_id===savedNode)
+ const labelled=n=>outputs.some(o=>o.output_node_type===n.type&&(o.output_node_label===undefined||o.output_node_label===n.label));
+ const nodes=graph.nodes.filter(n=>types.has(n.type)&&labelled(n)&&(!savedNode||n.ref.node_id===savedNode)
   ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id||content&&n.outputs.length>0);
  need(nodes.length>0&&(content||nodes.length<=outputs.length),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  return nodes.map(node=>{
@@ -108,7 +121,10 @@ export function resolveExportInput(graph,{destination,destinations,type='exports
  need(['exports.text','exports.excel'].includes(type),error);
  let exports=graph.nodes.filter(n=>n.type===type);
  if(destination!==undefined){
-  need(Array.isArray(destinations)&&destinations.length===exports.length
+  need(Array.isArray(destinations),error);
+  // Destination observations include every export type in the package.
+  destinations=destinations.filter(d=>exports.some(n=>n.ref.node_id===d.node_id));
+  need(destinations.length===exports.length
    &&new Set(destinations.map(d=>d.node_id)).size===exports.length
    &&exports.every(n=>destinations.some(d=>d.node_id===n.ref.node_id&&typeof d.destination==='string')),error);
   exports=exports.filter(n=>destinations.some(d=>d.node_id===n.ref.node_id&&d.destination===destination));
@@ -138,7 +154,7 @@ export function matchesExpectedOutput(data,expected){
  const indices=columnIndices(data,expected);if(!indices)return false;
  const categories=expected.columns.flatMap((c,i)=>c.category_labels_any?[i]:[]);
  const matchesRow=(row,want)=>expected.columns.every((c,i)=>row[indices[i]]?.type===data.schema[indices[i]].type
-  &&(c.category_labels_any?categoryKey(row[indices[i]],c)!==undefined:matchesCell(row[indices[i]],c,want[c.name])));
+  &&(c.category_labels_any?categoryKey(row[indices[i]],c)!==undefined:matchesCell(row[indices[i]],c,want[c.name],expected.output_node_type==='preprocessing.coarse_classes'&&expected.output_port===1&&['LowerBound','UpperBound'].includes(c.name))));
  if(categories.length){
   const pairs=expected.ordered?expected.rows.map((want,i)=>matchesRow(data.sample[i],want)?i:-1)
    :matchIndices(expected.rows.map(want=>data.sample.flatMap((row,i)=>matchesRow(row,want)?[i]:[])),true);
@@ -166,12 +182,23 @@ export function matchesExpectedOutput(data,expected){
  };
  return expected.rows.every((_,i)=>assign(i,new Set()));
 }
-function matchesCell(cell,column,want){
+function matchesCell(cell,column,want,coarseBound=false){
+ // The new discrete coarse-class report has typed Variant NULL bounds. Its
+ // ordinary production reader proves exact NULL without native byte claims.
+ // Keep native provenance mandatory for every other Variant value/path.
+
  if(!cell||!allowsType(column,cell.type))return false;
+ if(column.comparison==='present')return presentDateTime(cell);
+ // Exact non-finite Real: never NULL, never a finite value or display text.
+ if(column.type==='real'&&want&&typeof want==='object'&&Object.hasOwn(want,'non_finite'))
+  return cell.type==='real'&&cell.is_null===false&&cell.value===null&&cell.precision==='exact_non_finite'&&cell.non_finite===want.non_finite;
+ if(column.type==='real'&&cell.precision==='exact_non_finite')return false;
+ if(coarseBound&&column.type==='variant'&&want===null&&cell.precision==='exact_null')
+  return cell.is_null===true&&cell.value===null&&cell.cell_type===undefined&&cell.native===undefined;
  const nativeRequired=column.type==='variant'||want&&typeof want==='object';
  if(nativeRequired&&cell.type!==column.type)return false;
  if(nativeRequired){
-  const tags={null:1,real:5,datetime:7,string:8,boolean:11,integer:20};
+  const tags={null:1,real:5,datetime:7,string:8,boolean:11,integer:column.native_variable===true&&cell.native?.tag===3?3:20};
   if(cell.precision!=='exact_native'||cell.native?.tag!==tags[cell.cell_type])return false;
  }
  if(want===null)return cell.is_null===true&&cell.value===null&&(!nativeRequired||cell.cell_type==='null');
@@ -181,7 +208,18 @@ function matchesCell(cell,column,want){
  if(nativeRequired){
   if(cell.cell_type!==type)return false;
   if(want.bytes_le!==undefined&&cell.native.bytes_le!==want.bytes_le)return false;
-  if(type==='datetime'&&(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate'||cell.native.semantic_scope!=='native_serial_only'))return false;
+  if(type==='datetime'){
+   if(cell.native.temporal_profile!=='loginom-7.4.2-native-oadate')return false;
+   if(cell.native.semantic_scope==='browser_civil_time'){
+    if(cell.native.civil_time_verified!==true||cell.native.epoch_verified!==true||cell.representation!=='local_datetime'
+     ||typeof cell.timezone!=='string'||!cell.timezone||cell.timezone.length>128
+     ||typeof cell.value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(cell.value)
+     ||!Number.isFinite(Number(cell.decimal))||typeof cell.decimal!=='string'
+     ||!(/^[a-f0-9]{16}$/.test(cell.native.bytes_le)))return false;
+    const serial=new DataView(Uint8Array.from(cell.native.bytes_le.match(/../g),s=>parseInt(s,16)).buffer).getFloat64(0,true);
+    if(!Number.isFinite(serial)||String(serial)!==cell.decimal)return false;
+   }else if(cell.native.semantic_scope!=='native_serial_only')return false;
+  }
   if(!Object.hasOwn(want,'value'))return typeof want.bytes_le==='string';
   want=want.value;
  }
@@ -207,6 +245,11 @@ function matchesCell(cell,column,want){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof cell.decimal!=='string'
    ||!Number.isFinite(Number(cell.decimal))||Number(cell.decimal)!==value)return false;
   value=Number(cell.decimal);
+ }else if(cell.type==='real'&&cell.precision==='17_significant_digits'
+  &&cell.representation===undefined&&cell.value===undefined){
+  // Compact user-v1 receipts retain the exact decimal instead of binary64/value.
+  if(typeof cell.decimal!=='string'||!cell.decimal.trim()||!Number.isFinite(Number(cell.decimal)))return false;
+  value=Number(cell.decimal);
  }
  if(column.type==='real'&&column.tolerance){
   if(typeof value!=='number'||!Number.isFinite(value)||typeof want!=='number'||!Number.isFinite(want))return false;
@@ -215,10 +258,39 @@ function matchesCell(cell,column,want){
   return Number.isFinite(difference)?difference<=Math.max(abs,rel*Math.abs(want))
    :Math.abs(value/2-want/2)<=Math.max(abs/2,rel*(Math.abs(want)/2));
  }
+ if(column.comparison==='json_ast')return type==='string'&&sameJsonValues(value,want);
+ if(column.comparison==='rest_echo')return type==='string'&&sameRestEchoValues(value,want);
  if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
 }
-export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv}={}){
+// Any civil or native DateTime value; precision and timezone are not promised.
+function presentDateTime(cell){
+ if(cell.type!=='datetime'||cell.is_null!==false)return false;
+ if(cell.precision==='exact_native')return cell.native?.tag===7&&/^[a-f0-9]{16}$/.test(cell.native.bytes_le??'');
+ return typeof cell.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(cell.value)
+  &&Number.isFinite(Date.parse(cell.value+'Z'));
+}
+export function alignFactorSigns(actual,outputs,rule){
+ if(rule===undefined)return outputs;
+ need(rule&&Object.keys(rule).every(k=>['columns','ports'].includes(k))&&Array.isArray(rule.columns)&&rule.columns.length>0&&rule.columns.length<=128
+  &&new Set(rule.columns).size===rule.columns.length&&rule.columns.every(n=>typeof n==='string')
+  &&JSON.stringify(rule.ports)==='[0,1]','EXPECTED_FACTOR_SIGNS_INVALID');
+ need(outputs.length===2&&rule.ports.every(port=>outputs.some(o=>o.output_node_type==='research.factor_analysis'&&o.output_port===port&&o.ordered===true&&o.column_order==='exact'
+  &&rule.columns.every(name=>o.columns.some(c=>c.name===name&&c.type==='real'&&c.tolerance)))),'EXPECTED_FACTOR_SIGNS_INVALID');
+ const anchor=outputs.find(o=>o.output_port===1),tables=actual.filter(a=>a.type==='research.factor_analysis'&&a.output_port===1);
+ need(tables.length===1,'FACTOR_SIGN_ANCHOR_MISSING');
+ const data=tables[0].data,signs={};
+ for(const name of rule.columns){
+  const index=data.schema?.findIndex(c=>c.name===name),row=anchor.rows.findIndex(r=>typeof r[name]==='number'&&r[name]!==0);
+  need(index>=0&&row>=0,'FACTOR_SIGN_ANCHOR_INVALID');
+  const cell=data.sample?.[row]?.[index],value=Number(cell?.decimal??cell?.value);
+  need(cell?.type==='real'&&cell.is_null===false&&Number.isFinite(value)&&value!==0,'FACTOR_SIGN_ANCHOR_INVALID');
+  signs[name]=Math.sign(value)===Math.sign(anchor.rows[row][name])?1:-1;
+ }
+ return outputs.map(o=>({...o,rows:o.rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,signs[k]&&v!==null?v*signs[k]:v])))}));
+}
+export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv,factorSigns}={}){
+ outputs=alignFactorSigns(actual,outputs,factorSigns);
  need(allowExtraPortReads?actual.length>=outputs.length:actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
  const used=new Set(),matches=[];
@@ -305,4 +377,203 @@ function matchIndices(options,unique=false){
  };
  const result=run();
  return result&&(!unique||!result.some((column,row)=>run(row,column)!==null))?result:null;
+}
+
+// run-check uses the same typed matcher before its existing CSV checks.
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='factor-signs'){
+ const {readFileSync,writeFileSync}=await import('node:fs');
+ const expected=JSON.parse(readFileSync(process.argv[3],'utf8')),actual=JSON.parse(readFileSync(process.argv[4],'utf8'));
+ const {outputs}=parseExpectedOutputs(expected);
+ const aligned=alignFactorSigns(actual,outputs,expected.factor_signs);
+ matchExpectedOutputs(actual,aligned);
+ writeFileSync(process.argv[5],JSON.stringify({...expected,outputs:aligned}));
+}
+
+// Optional variable evidence is independent of the legacy table matcher.
+export function parseExpectedVariableInventory(expected){
+ if(expected.variable_inventory===undefined)return null;
+ const v=expected.variable_inventory;
+ const tableLinkOnly=v?.outputs?.length===0&&Array.isArray(v.links)&&v.links.length>0
+  &&Array.isArray(expected.outputs)&&expected.outputs.some(o=>o.output_node_type==='variables.to_table'&&o.output_port===0)
+  &&v.links.every(l=>l?.target?.type==='variables.to_table'&&l.kind==='variables');
+ need(v&&Object.keys(v).every(k=>['outputs','links'].includes(k))&&Array.isArray(v.outputs)&&(v.outputs.length>0||tableLinkOnly)&&v.outputs.length<=16
+  &&(v.links===undefined||Array.isArray(v.links)&&v.links.length<=100),'EXPECTED_VARIABLE_INVENTORY_INVALID');
+ const selector=s=>s&&Object.keys(s).every(k=>['type','label'].includes(k))&&typeof s.type==='string'&&s.type.length>0
+  &&(s.label===undefined||typeof s.label==='string'&&s.label.length>0);
+ const ordinal=p=>Number.isInteger(p)&&p>=0&&p<100;
+ for(const o of v.outputs){
+  need(o&&Object.keys(o).every(k=>['node','port','ordered','column_order','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
+   &&(o.column_order===undefined||['exact','any'].includes(o.column_order))&&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
+  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','label_any','type','value','tolerance','native_tag'].includes(k))
+   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime','variant'].includes(x.type)
+   &&Object.hasOwn(x,'value')&&(x.label_any===undefined||typeof x.label_any==='boolean')
+   &&(x.type!=='variant'||[1,3,5,7,8,11,20].includes(x.native_tag))
+   &&(x.value===null||x.type==='variant'&&x.value&&typeof x.value==='object'&&['integer','real','boolean','string','datetime'].includes(x.value.cell_type)&&Object.hasOwn(x.value,'value')||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
+  for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
+   &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
+  for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
+   &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
+  need(new Set(o.variables.map(x=>x.name)).size===o.variables.length,'EXPECTED_VARIABLE_DUPLICATE');
+ }
+ for(const l of v.links??[])need(l&&Object.keys(l).every(k=>['source','output','target','input','kind'].includes(k))&&selector(l.source)&&selector(l.target)
+  &&ordinal(l.output)&&ordinal(l.input)&&['variables','control'].includes(l.kind)&&(l.kind!=='control'||l.input===0),'EXPECTED_VARIABLE_LINK_INVALID');
+ return v;
+}
+export function selectVariableInventoryNode(graph,selector){
+ const nodes=graph.nodes.filter(n=>n.type===selector.type&&(selector.label===undefined||n.label===selector.label));
+ need(nodes.length===1,'COLD_VARIABLE_NODE_AMBIGUOUS');return nodes[0];
+}
+export function matchVariableInventoryOutput(output,want){
+ const snapshot=want.node.type==='variables.user',c=output?.completeness;
+ need(output?.kind==='variables'&&output.port===want.port&&output.complete===true&&output.fresh===true&&typeof output.read_id==='string'&&output.read_id.length>0
+  &&output.source===(snapshot?'snapshot':'execution')&&output.native_source===(snapshot?'VariablesEditValuesWizard':'VariablesForm')
+  &&(snapshot?output.execution_id===null&&output.package_modified===false:typeof output.execution_id==='string'&&output.execution_id.length>0)
+  &&Array.isArray(output.variables)&&output.count===output.variables.length&&output.count===want.variables.length
+  &&c?.loaded===true&&[c.count,c.store_count,c.unique_ids].every(n=>n===output.count)
+  &&new Set(output.variables.map(v=>JSON.stringify(v.id))).size===output.count&&new Set(output.variables.map(v=>v.name)).size===output.count,'COLD_VARIABLE_INCOMPLETE');
+ if(want.column_order!=='any'&&['variables.replace','variables.calculator','variables.column_union'].includes(want.node.type))need(JSON.stringify(output.variables.map(v=>v.name))===JSON.stringify(want.variables.map(v=>v.name)),'COLD_VARIABLE_ORDER_MISMATCH');
+ if(want.column_order!=='any'&&want.ordered===true)need(output.variables.every((v,i)=>v.index===i&&v.name===want.variables[i].name),'COLD_VARIABLE_ORDER_MISMATCH');
+ for(const x of want.variables){
+  const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
+  if(x.type==='variant'){
+   need(a&&a.type==='variant'&&cell?.type==='variant'&&(x.label_any||x.label===undefined||a.label===x.label)
+    &&cell.native?.tag===x.native_tag&&matchesCell(cell,{type:'variant',native_variable:true},x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);continue;
+  }
+  need(a&&a.type===x.type&&(x.label_any||x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
+   &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(x.tolerance?matchesCell(cell,x,x.value):(want.node.type==='variables.column_union'?Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value))):x.type==='datetime'?matchesCell(cell,x,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
+ }
+ return true;
+}
+export function matchVariableInventoryLinks(graph,inventory){
+ return (inventory.links??[]).map(want=>{
+  const source=selectVariableInventoryNode(graph,want.source),target=selectVariableInventoryNode(graph,want.target);
+  const matches=(graph.variable_links??[]).filter(l=>l.source===source.ref.node_id&&l.target===target.ref.node_id&&l.output===want.output&&l.input===want.input&&l.kind===want.kind);
+  need(matches.length===1&&typeof matches[0].source_port_guid==='string'&&typeof matches[0].target_port_guid==='string','COLD_VARIABLE_LINK_MISMATCH');return matches[0];
+ });
+}
+
+// C8 reuses the cold variable matcher for the model's own production read.
+// A displayed or reconstructed summary is not evidence of a fresh port read.
+export function auditLinregSummaryHistory(events,expected){
+ const want=parseExpectedVariableInventory(expected)?.outputs[0];
+ need(want?.node.type==='datamining.lin_regression'&&want.port===0&&want.ordered===true&&want.variables.length===15,'LINREG_SUMMARY_ORACLE');
+ const same=(a,b)=>a&&b&&['document_id','workflow_id','node_id'].every(k=>typeof a[k]==='string'&&a[k]===b[k]);
+ const checkpoints=events.filter(e=>e.phase==='node_checkpoint'&&e.result?.status==='SUCCEEDED'&&e.result.cleanup_complete===true).map(e=>e.result);
+ const configured=checkpoints.filter(r=>r.configuration?.readback?.kind==='lin_regression'&&same(r.node,r.configuration.readback.node));
+ need(configured.length>0&&configured.every(r=>same(r.node,configured[0].node)),'LINREG_SUMMARY_NODE');
+ const match=checkpoints.find(r=>same(r.node,configured[0].node)&&r.execution?.status==='completed'&&r.output?.variable_ports?.some(output=>{
+  if(output.execution_id!==r.execution.execution_id)return false;
+  try{return matchVariableInventoryOutput(output,want);}catch{return false;}
+ }));
+ need(match,'LINREG_SUMMARY_READ_MISSING');
+ return {status:'PASS',node:match.node,execution_id:match.execution.execution_id,port:0,count:15};
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='linreg-summary'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditLinregSummaryHistory(JSON.parse(readFileSync(process.argv[4],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')))));
+}
+
+export function auditUserVariableHistory(events,initial,final){
+ const before=parseExpectedVariableInventory(initial)?.outputs,after=parseExpectedVariableInventory(final)?.outputs;
+ need(before?.length===1&&after?.length===1&&before[0].node.type==='variables.user'&&after[0].node.type==='variables.user','USER_VARIABLE_ORACLE_INVALID');
+ const requests=events.flatMap((e,index)=>e.phase==='node_apply_prepared'?[{index,request:e.request,operation_id:e.operation_id}]:[]);
+ need(requests.every(e=>e.request?.target?.type==='variables.user'),'UNEXPECTED_VARIABLE_SCENARIO_NODE');
+ const snapshots=events.flatMap((e,index)=>{
+  const r=e.result;
+  return e.phase==='node_checkpoint'&&r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.node&&r.execution?.status==='not_requested'&&r.execution.execution_id===null
+   ?(r.output?.variable_ports??[]).map(output=>({index,result:r,output})):[];
+ });
+ const matches=(s,want)=>{try{return matchVariableInventoryOutput(s.output,want);}catch{return false;}};
+ const first=snapshots.find(s=>matches(s,before[0]));need(first,'USER_INITIAL_SNAPSHOT_MISSING');
+ const updated=snapshots.filter(s=>s.index>first.index&&matches(s,after[0]));
+ need(updated.length>=2&&new Set(updated.map(s=>s.output.read_id)).size>=2&&new Set(updated.map(s=>s.result.operation_id)).size>=2,'USER_INDEPENDENT_REREADS_MISSING');
+ const reread=updated.find(s=>s.output.read_id!==updated[0].output.read_id&&s.result.operation_id!==updated[0].result.operation_id);
+ const sameOwner=s=>['document_id','workflow_id','node_id'].every(k=>s.result.node[k]===first.result.node[k]);
+ need(updated.every(s=>sameOwner(s)&&s.output.variables.every(v=>{const old=first.output.variables.find(x=>x.name===v.name);return old&&JSON.stringify(old.id)===JSON.stringify(v.id)&&old.type===v.type;})),'USER_IDS_TYPES_OR_OWNER_CHANGED');
+ const patches=requests.filter(e=>e.index>first.index&&e.index<updated[0].index&&e.request.mode==='values');
+ const changed=new Set();
+ for(const {request,operation_id} of patches){
+  need(request.target.kind==='existing'&&request.target.ref.node_id===first.result.node.node_id
+   &&events.some(e=>e.phase==='node_checkpoint'&&e.result?.operation_id===operation_id&&e.result.status==='SUCCEEDED'
+    &&e.result.configuration?.readback?.values_are==='independent_owned_user_variables'),'USER_PATCH_NOT_VERIFIED');
+  for(const v of request.parameters.variables){need(v.type==='integer'&&v.value===({limit:5,skip:10})[v.name],'USER_PATCH_CHANGED_UNREQUESTED_VALUE');changed.add(v.name);}
+ }
+ need(changed.size===2,'USER_VALUES_ONLY_PATCH_MISSING');
+ need(!requests.some(e=>e.index>updated[0].index&&e.index<reread.index&&e.request.mode==='values'),'USER_REREAD_RECONFIGURED');
+ return {status:'PASS',snapshots:updated.length+1,node:first.result.node,initial_read_id:first.output.read_id,updated_read_ids:updated.map(s=>s.output.read_id)};
+}
+export function auditRestQueryVariables(events,initial,final){
+ const checkpoints=events.flatMap((e,index)=>e.phase==='node_checkpoint'&&e.result?.status==='SUCCEEDED'&&e.result.cleanup_complete===true?[{index,result:e.result}]:[]);
+ const requests=events.flatMap((e,index)=>e.phase==='node_apply_prepared'?[{index,request:e.request,operation_id:e.operation_id}]:[]);
+ const same=(a,b)=>['document_id','workflow_id','node_id'].every(k=>a?.[k]===b?.[k]);
+ const echo=(c,want)=>{
+  const r=c.result,p=r.output?.ports?.find(p=>p.port===0),column=p?.schema?.findIndex(f=>f.name==='Response');
+  if(r.execution?.status!=='completed'||p?.fresh!==true||p.sample_complete!==true||p.row_count!==1||!Number.isInteger(column)||column<0)return false;
+  try{const response=JSON.parse(p.sample[0][column].value),w=want.outputs[0].rows[0];return response.args.limit===w.limit&&response.args.skip===w.skip&&response.url===w.url;}catch{return false;}
+ };
+ const configured=checkpoints.filter(c=>c.result.configuration?.readback?.kind==='rest_request');
+ const first=checkpoints.find(c=>configured.some(v=>v.index<=c.index&&same(v.result.node,c.result.node))&&echo(c,initial));need(first,'REST_QUERY_INITIAL_RESPONSE');
+ const snapshot=(c,want)=>c.result.output?.variable_ports?.some(p=>{try{return matchVariableInventoryOutput(p,want);}catch{return false;}});
+ const before=checkpoints.filter(c=>c.index<first.index&&snapshot(c,parseExpectedVariableInventory(initial).outputs[0])).at(-1);
+ need(before,'REST_QUERY_INITIAL_INTEGER_VARIABLES');
+ const patches=requests.filter(e=>e.index>first.index&&e.request.target?.type==='variables.user'&&e.request.mode==='values');
+ need(patches.length>0,'REST_QUERY_SOURCE_UPDATE');
+ const values=Object.fromEntries(final.variable_inventory.outputs[0].variables.map(v=>[v.name,v.value])),changed=new Set();
+ for(const {request} of patches){
+  need(request.target.kind==='existing'&&same(request.target.ref,before.result.node),'REST_QUERY_SOURCE_CHANGED');
+  for(const v of request.parameters.variables){need(v.type==='integer'&&Object.hasOwn(values,v.name)&&v.value===values[v.name],'REST_QUERY_VALUES_ONLY_UPDATE');changed.add(v.name);}
+ }
+ need(changed.size===2,'REST_QUERY_BOTH_VARIABLES_UPDATED');
+ const after=checkpoints.find(c=>c.index>patches[0].index&&same(c.result.node,before.result.node)&&snapshot(c,final.variable_inventory.outputs[0]));
+ need(after,'REST_QUERY_UPDATED_INTEGER_VARIABLES');
+ const ids=c=>c.result.output.variable_ports.find(p=>p.port===4).variables.map(v=>[v.id,v.index,v.name,v.type]);
+ need(JSON.stringify(ids(before))===JSON.stringify(ids(after)),'REST_QUERY_VARIABLE_IDENTITIES_CHANGED');
+ const second=checkpoints.find(c=>c.index>after.index&&same(c.result.node,first.result.node)&&echo(c,final)&&c.result.execution.execution_id!==first.result.execution.execution_id);
+ need(second,'REST_QUERY_UPDATED_SAME_REST');
+ const a=configured.find(c=>c.index<=first.index&&same(c.result.node,first.result.node)&&c.result.configuration.readback.connection)?.result.configuration.readback,b=second.result.configuration?.readback;
+ need(a,'REST_QUERY_INITIAL_CONNECTION_READBACK');
+ need(a.method==='GET'&&(!b||b.method==='GET')&&a.connection?.base_url==='https://httpbin.org/anything','REST_QUERY_CONNECTION');
+ need(!b?.connection||JSON.stringify(a.connection)===JSON.stringify(b.connection),'REST_QUERY_CONNECTION');
+ need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
+ for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
+  const r=e.request;if(r.target.type!=='integration.rest_request'&&!same(r.target.ref,first.result.node))continue;
+  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'
+   &&(['source_operation_id','schemas'].includes(k)||k==='execution_policy'&&r.parameters[k]==='execute'&&r.finish==='execute')),'REST_QUERY_RECONFIGURED');
+  if(Object.hasOwn(r.parameters??{},'schemas')){
+   const source=checkpoints.findLast(c=>c.index<e.index&&c.result.operation_id===r.parameters.source_operation_id&&same(c.result.node,r.target.ref));
+   const schemas=r.parameters.schemas,ports=r.read?.ports,outputs=source?.result.output?.ports;
+   need(r.finish==='execute'&&!r.bindings?.length&&source?.result.execution?.status==='completed'
+    &&Array.isArray(outputs)&&Array.isArray(schemas)&&schemas.length>0&&Array.isArray(ports)
+    &&ports.length===schemas.length&&new Set(ports).size===ports.length
+    &&schemas.every(s=>s&&Object.keys(s).sort().join(',')==='port,schema'&&Number.isInteger(s.port)
+      &&ports.includes(s.port)&&Array.isArray(s.schema)&&s.schema.length>0)
+    &&new Set(schemas.map(s=>s.port)).size===schemas.length
+    &&schemas.every(s=>{const matches=outputs.filter(p=>p.port===s.port);
+      return matches.length===1&&isDeepStrictEqual(s.schema,matches[0].schema);}),
+    'REST_QUERY_RECONFIGURED');
+  }
+  need(r.target.type==='integration.rest_request'&&same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
+ }
+ const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node,output:c.result.output}]:[];});
+ const tables=completed.filter(q=>q.request.target.type==='variables.to_table'&&q.request.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0&&i.output===4&&same(i.source,before.result.node)));
+ const edges=completed.flatMap(q=>(q.request.inputs??[]).map(i=>({source:i.source.node_id,target:q.node.node_id})));
+ const path=(id,target,seen=new Set())=>id===target?[id]:seen.has(id)?null:(seen.add(id),edges.filter(e=>e.source===id).map(e=>path(e.target,target,new Set(seen))).find(Boolean)?.toSpliced(0,0,id));
+ need(tables.some(q=>{
+  if(path(q.node.node_id,first.result.node.node_id)?.some(id=>completed.some(c=>c.node.node_id===id&&c.request.target.type==='transform.calculator')))return true;
+  // Columns preserves the verified integer variable types even when no table read was requested.
+  const fields=q.output?.ports?.find(p=>p.port===0)?.schema??(!q.request.mappings?.length?before.result.output.variable_ports.find(p=>p.port===4).variables:[]);
+  return q.request.mode==='columns'&&q.index<first.index
+   &&a.query_parameters.every(p=>fields.some(f=>f.name===p.field&&f.type==='integer'))
+   &&completed.some(c=>c.index<first.index&&same(c.node,first.result.node)
+    &&c.request.inputs?.length===1&&c.request.inputs[0].input===0&&c.request.inputs[0].output===0&&same(c.request.inputs[0].source,q.node));
+ }),'REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION');
+ return {status:'PASS',source:before.result.node,rest:first.result.node,initial_execution_id:first.result.execution.execution_id,updated_execution_id:second.result.execution.execution_id};
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='rest-query-variables'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditRestQueryVariables(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='variables-user'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditUserVariableHistory(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
 }

@@ -1,0 +1,19 @@
+{
+  "columns": [
+    {"name": "N", "type": "integer"},
+    {"name": "K", "type": "integer"},
+    {"name": "S", "type": "string"},
+    {"name": "B", "type": "boolean"},
+    {"name": "D", "type": "datetime"},
+    {"name": "V", "type": "variant"}
+  ],
+  "rows": [
+    [2, 7, "b", false, "2026-01-02T03:04:05.123", 2],
+    [4, 7, "a", true, "2026-01-01T00:00:00.456", "x"],
+    [4, 7, "a", true, "2026-01-01T00:00:00.456", false],
+    [null, 7, null, null, null, null],
+    [8, 7, "", false, "2026-01-03T00:00:00.000", 2]
+  ],
+  "datetime": "civil time, no timezone; milliseconds are significant",
+  "variant": "authored scalar values only; native numeric subtype is not established by this JSON or by ValueVariant"
+}

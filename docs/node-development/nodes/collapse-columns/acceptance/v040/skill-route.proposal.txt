@@ -1,0 +1,1 @@
+| Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |

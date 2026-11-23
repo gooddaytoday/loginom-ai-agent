@@ -1299,6 +1299,9 @@ export function toolStructuredFinal(commit: StreamCommit): boolean {
 
 export function toolInlineInfo(part: ToolPart): ToolInline {
   const ctx = frame(part)
+  if (ctx.name === "dashboard_delete" && ctx.status === "completed") {
+    return { ...fallbackInline(ctx), mode: "block", body: text(ctx.state.output) }
+  }
   const draw = rule(ctx.name)?.run
   try {
     if (draw) {

@@ -1,0 +1,108 @@
+name: Loginom full client tests
+
+on:
+  workflow_dispatch:
+  # Owner decision client-full-pr-info: informational check on pull requests, not a required check.
+  pull_request:
+    paths:
+      - "packages/loginom-runtime/client/**"
+      - "scripts/node-acceptance/**"
+      - ".github/workflows/loginom-client-full.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  client-full:
+    name: client-full (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Prepare runtime Chromium dependencies
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Run full client shard
+        id: tests
+        working-directory: packages/loginom-runtime/client
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          export LOGINOM_DOCK_TEST_BROWSER
+          LOGINOM_DOCK_TEST_BROWSER=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'process.stdout.write(require("playwright").chromium.executablePath())')
+          if [ ! -x "$LOGINOM_DOCK_TEST_BROWSER" ]; then
+            echo "::error::Pinned Chromium executable is missing: $LOGINOM_DOCK_TEST_BROWSER"
+            exit 1
+          fi
+          # One-based file numbers, assigned round-robin after a stable sort.
+          mapfile -t files < <(printf '%s\n' test/*.test.mjs | LC_ALL=C sort | awk -v shard="$SHARD" '(NR - 1) % 4 == shard - 1')
+          test "${#files[@]}" -gt 0
+          printf '%s\n' "${files[@]}" | tee "$RUNNER_TEMP/client-full-files.txt"
+          echo "files=${#files[@]}" >> "$GITHUB_OUTPUT"
+          "$LOGINOM_AI_AGENT_TEST_NODE" --version
+          "$LOGINOM_DOCK_TEST_BROWSER" --version
+          started=$(date +%s)
+          set +e
+          nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=2 --test-reporter=tap "${files[@]}" \
+            2>&1 | tee "$RUNNER_TEMP/client-full.tap"
+          status=$?
+          set -e
+          echo "seconds=$(($(date +%s) - started))" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Summarize shard measurement
+        if: always()
+        env:
+          SHARD: ${{ matrix.shard }}
+          FILES: ${{ steps.tests.outputs.files }}
+          SECONDS_ELAPSED: ${{ steps.tests.outputs.seconds }}
+        run: |
+          {
+            echo "### Client shard $SHARD/4"
+            echo "Commit: $GITHUB_SHA"
+            echo "Files: ${FILES:-unavailable}; test wall time: ${SECONDS_ELAPSED:-unavailable} s"
+            echo '```text'
+            if [ -f "$RUNNER_TEMP/client-full.tap" ]; then
+              tail -n 12 "$RUNNER_TEMP/client-full.tap"
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: client-full-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/client-full*
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,3 @@
+RequestId,Key,Body
+r-a,a b&я,"{""amount"":10,""note"":""Привет & + /""}"
+r-b,x/y?,"{""amount"":20,""note"":""second""}"

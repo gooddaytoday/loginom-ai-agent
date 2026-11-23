@@ -25,6 +25,9 @@ concurrency:
 
 jobs:
   macos:
+    # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration
+    # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)
     runs-on: macos-15
     timeout-minutes: 120
     env:

@@ -1,0 +1,189 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.collapse_columns"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.collapse_columns",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Field",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FieldLabel",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Cell",
+          "type": "variant",
+          "label_any": false,
+          "label": "Значение"
+        },
+        {
+          "name": "Kind",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "integer",
+            "value": 10
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 1,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "real",
+            "value": 1.25
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 1,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "string",
+            "value": "alpha"
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 1,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 1,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "datetime",
+            "value": "2026-11-07T12:00:00.000"
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 2,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "integer",
+            "value": 0
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 2,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "real",
+            "value": -2.5
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 2,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "string",
+            "value": ""
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 2,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "boolean",
+            "value": false
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 2,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": {
+            "cell_type": "datetime",
+            "value": "2026-11-08T00:00:00.000"
+          },
+          "Kind": 6
+        },
+        {
+          "RowID": 3,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": null,
+          "Kind": 6
+        },
+        {
+          "RowID": 3,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": null,
+          "Kind": 6
+        },
+        {
+          "RowID": 3,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": null,
+          "Kind": 6
+        },
+        {
+          "RowID": 3,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": null,
+          "Kind": 6
+        },
+        {
+          "RowID": 3,
+          "Field": "Cell",
+          "FieldLabel": "Значение",
+          "Cell": null,
+          "Kind": 6
+        }
+      ],
+      "output_node_label": "Повторная свёртка"
+    }
+  ]
+}

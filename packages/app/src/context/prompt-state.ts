@@ -1,4 +1,5 @@
 import { checksum } from "@opencode-ai/core/util/encode"
+import type { DashboardContextItem } from "@opencode-ai/session-ui/v2/prompt-input/types"
 import type { FilePartSource } from "@opencode-ai/sdk/v2/client"
 import { batch, createMemo, type Accessor } from "solid-js"
 import { createStore, type SetStoreFunction } from "solid-js/store"
@@ -62,7 +63,7 @@ export type FileContextItem = {
   preview?: string
 }
 
-export type ContextItem = FileContextItem
+export type ContextItem = FileContextItem | DashboardContextItem
 export type PromptScope = { draftID: string } | { dir: string; id?: string }
 
 export const DEFAULT_PROMPT: Prompt = [{ type: "text", content: "", start: 0, end: 0 }]
@@ -201,11 +202,15 @@ function createPromptStateValue(store: PromptStore, setStore: SetStoreFunction<P
       set: (model: PromptModel | undefined) => setStore("model", model),
     },
     context: {
-      items: createMemo(() => store.context.items),
+      items: () => store.context.items,
       add(item: ContextItem) {
         const key = contextItemKey(item)
+        if (item.type === "dashboard") {
+          setStore("context", "items", (items) => [...items.filter((x) => x.type !== "dashboard"), { ...item, key }])
+          return
+        }
         if (store.context.items.find((x) => x.key === key)) return
-        setStore("context", "items", (items) => [...items, { key, ...item }])
+        setStore("context", "items", (items) => [...items, { ...item, key }])
       },
       remove(key: string) {
         setStore("context", "items", (items) => items.filter((x) => x.key !== key))

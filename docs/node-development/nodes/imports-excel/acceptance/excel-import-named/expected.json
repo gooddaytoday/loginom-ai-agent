@@ -1,0 +1,52 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Amount": 10
+        },
+        {
+          "Id": 2,
+          "Amount": 20
+        },
+        {
+          "Id": 3,
+          "Amount": 30
+        }
+      ]
+    }
+  ],
+  "excel_named_range": {
+    "name": "SalesRange",
+    "extend_range": true,
+    "header_rows": 1
+  }
+}

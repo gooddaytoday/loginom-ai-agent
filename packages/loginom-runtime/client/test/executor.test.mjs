@@ -3,6 +3,166 @@ import assert from 'node:assert/strict';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
+import { compactActionResult } from '../lib/user-results.mjs';
+import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
+import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
+import {makeCapabilityCode} from '../lib/executor.mjs';
+import {activatePreparedWorkflow} from '../lib/node-workflow-activation.mjs';
+import {withStorageIdentity} from '../lib/storage-policy.mjs';
+import {readPreparedNodeContext} from '../lib/node-context.mjs';
+import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
+import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+
+for(const action of ['package.save_checkpoint','package.save_as'])
+for(const fault of ['none','retry-restore','recover-owner','recover-awaiting','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
+test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
+ const page=await restSavePage([fault==='dirty'],false),binding={...page.storageBinding,loginom_build:build};
+ page.staleSavedNavigation=fault==='stale-navigation';
+ const prepared=page.context.__loginomDockPreparationV1.receipts.get('prepared'),nativePort={};
+ const portIdentity={tid:'MF;TF-1;Graph;Vars;Output_Var-4'};
+ prepared.nodeTargetPortIdentities=new WeakMap([[nativePort,portIdentity]]);
+ const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
+ connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
+ if(fault==='retry-restore')page.context.Ext.Msg={cfg:{}};
+ const engine=runtime(page,{getStorageBinding:()=>binding,
+  execute:(code,options)=>page.execute(withStorageIdentity(code,binding,options?.storageSession))});
+ const path='/user/data/packages/lost-save.lgp',click=page.click.bind(page),initialPath=page.packagePath;
+ let restoring=fault.startsWith('recover-');
+ page.click=async item=>{
+  await click(item);
+  if(item.symbol==='file_dialog.confirm'&&page.saveWrites===1){
+   // The native application has committed Save As; its response is lost and
+   // the connection prompt replaces the file dialog before the action reads it.
+   page.conflict=true;page.conflictText='Обнаружен разрыв связи. Восстановить сессию?';
+   connection.Connected=false;form.FReconnecting=true;
+  }
+ };
+ const press=page.keyboard.press.bind(page.keyboard);let cancelledRecovery=0,restores=0;
+ page.keyboard.press=async key=>{
+  if(key==='Escape'&&form.FReconnecting){cancelledRecovery++;connection.UserName='';}
+  return press(key);
+ };
+ const locator=page.locator.bind(page);
+ page.locator=query=>{
+  if(query==='[data-tid="msgbox;p.h;p.t"]')return {count:async()=>form.FReconnecting?1:0,isVisible:async()=>form.FReconnecting,
+   innerText:async()=>form.FReconnecting?'Восстановление сессии':'',waitFor:async()=>{}};
+  if(query==='[data-tid="msgbox;cnt"]')return {innerText:async()=>page.conflictText};
+  if(query==='[data-tid="msgbox;tlb;yes"]'&&form.FReconnecting)return {count:async()=>1,isVisible:async()=>true,
+   innerText:async()=>'Восстановить',click:async()=>{
+    restores++;
+    if(restoring)return;
+    if(fault==='retry-restore'&&restores===1){
+     page.context.Ext.Msg.cfg={};page.conflictText='Ошибка при попытке восстановить сессию\nВосстановить сессию?';return;
+    }
+    connection.Connected=true;form.FReconnecting=false;page.conflict=false;
+   }};
+  return locator(query);
+ };
+ page.waitForFunction=async fn=>assert.equal(await page.evaluate(fn),true);
+ const stopped=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+ assert.equal(stopped.status,'AMBIGUOUS',JSON.stringify(stopped));
+ assert.equal(cancelledRecovery,0,'cleanup must not cancel the native recovery prompt and log out');
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared'),oldPackage=original.packageNode;
+ if(fault==='reopened'){
+  page.prefix='MF;TF-2';page.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';page.onReopen();
+ }
+ if(fault==='path')page.packagePath='/user/data/packages/other.lgp';
+ if(fault==='graph')page.nodes.pop();
+ if(fault==='guid')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign-guid';
+ if(fault==='type')page.model.FDiagram.FNodes.FCollection[0].FIconCls='foreign-type';
+ if(fault==='account')connection.UserName='foreign-account';
+ if(fault==='document')page.context.__loginomDockPreparationV1.id='foreign-document';
+ if(fault==='native-session')connection.FSession={};
+ if(fault==='retry-restore'){
+  const waiting=await engine.inspect({operationId:'lost-save'});
+  assert.equal(waiting.output.state,'pending');assert.equal(page.saveWrites,1);
+ }
+ if(restoring){
+  // The same native Save can update its displayed path before reconnect,
+  // or leave the old path until reconnect completes (LAB-1921 r35b/r35c).
+  if(fault==='recover-awaiting')page.packagePath=initialPath;
+  const waiting=await engine.inspect({operationId:'lost-save'});
+  assert.equal(waiting.output.state,'pending');
+  assert.deepEqual(waiting.output.next_steps.map(s=>s.tool),['dock_operation_inspect']);
+  assert.match(waiting.output.next_steps[0].instruction,/SAME operation_id.*10 seconds/);
+  const recovery=await engine.recover('lost-save',{strategy:'restore_control',recoveryOperationId:'restore-lost-save'});
+  assert.equal(recovery.status,'AMBIGUOUS');assert.equal(recovery.effect_possible,true);
+  assert.equal(cancelledRecovery,0);assert.equal(page.saveWrites,1);
+  restoring=false;connection.Connected=true;form.FReconnecting=false;page.conflict=false;page.packagePath=path;
+  const settled=await engine.inspect({operationId:'lost-save'});
+  assert.equal(settled.output.state,'resolved',JSON.stringify({recovery,settled}));
+  assert.equal(settled.output.outcome.status,'SUCCEEDED');
+  assert.equal(settled.output.outcome.effect_possible,true);assert.equal(page.saveWrites,1);
+  return;
+ }
+ const inspected=await engine.inspect({operationId:'lost-save'});
+ assert.equal(inspected.output.outcome.effect_possible,true,'Inspection must retain the original possible Save effect');
+ const mismatch=['path','graph','guid','type'].includes(fault);
+ const protectedIdentity=['account','document','native-session','dirty'].includes(fault);
+ if(mismatch||protectedIdentity){
+  assert.equal(inspected.output.state,protectedIdentity?'pending':'resolved',JSON.stringify(inspected));
+  assert.equal(inspected.output.outcome.status,protectedIdentity?'AMBIGUOUS':'NOT_APPLIED');
+  if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
+  assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
+  if(mismatch){
+   const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+   assert.equal(repeated.status,'NOT_APPLIED');assert.equal(repeated.effect_possible,true);assert.equal(page.saveWrites,1);
+  }
+  if(fault==='dirty'){
+   connection.Session.IsPackageModified=async()=>false;
+   const settled=await engine.inspect({operationId:'lost-save'});
+   assert.equal(settled.output.state,'resolved',JSON.stringify(settled));
+   assert.equal(settled.output.outcome.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+   assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
+  }
+  return;
+ }
+ assert.equal(inspected.output.state,'resolved',JSON.stringify(inspected));
+ assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+ assert.equal(inspected.output.outcome.output.package_ref.path,path);
+ assert.equal(page.saveWrites,1);assert.equal(restores,fault==='retry-restore'?2:1);
+ assert.equal(page.context.__loginomDockPreparationV1.receipts.get('prepared').packageNode,
+  form.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode);
+ if(fault==='none')assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
+ if(fault==='reopened')assert.equal(prepared.nodeTargetPortIdentities,undefined);
+ const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
+ assert.equal(repeated.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+ if(fault==='stale-navigation'){
+  const continuation=inspected.output.outcome.trace.find(e=>e.event==='save_continuations_observed').continuations[0];
+  const nodeBinding={document_id:'doc',workflow_ref:continuation.workflow_ref,node:{document_id:'doc',workflow_id:'workflow',node_id:'reference'}};
+  const dom=page.element(page.prefix+';Graph;Vars'),diagram=page.model.FDiagram;
+  diagram.FmxGraph.view.getState=()=>({shape:{node:dom}});
+  const query=page.context.document.querySelectorAll;
+  page.context.document.querySelectorAll=s=>s==='[data-tid='+JSON.stringify(dom.tid)+']'?[dom]:query(s);
+  const evaluate=page.evaluate.bind(page),locate=page.locator.bind(page);
+  page.evaluate=async(fn,arg)=>{
+   if(arg?.mode==='dirty')return false;
+   if(arg?.mode==='inventory')return {port_guid:'user-port',variables:[],count:0,complete:true};
+   diagram.FmxGraph.container.contains=e=>e===dom;
+   return evaluate(fn,arg);
+  };
+  page.locator=s=>s.includes(';btnClose"')?{click:async()=>{page.canonicalSavedNavigation=true;page.userWizardOpen=false;}}
+   :s.includes(';WizrdMCF"')?{count:async()=>0}:locate(s);
+  page.waitForFunction=async()=>{};
+  const snapshot=await page.execute(`async page=>(${readUserVariablesSnapshot.toString()})(page,${JSON.stringify({binding:nodeBinding,operation_id:'next-user-snapshot',deadline:10000})},${readPreparedNodeContext.toString()},async page=>{page.userWizardOpen=true;return {status:'SUCCEEDED',effect_possible:true}},()=>{},()=>{})`);
+  assert.equal(snapshot.status,'SUCCEEDED',JSON.stringify(snapshot));
+  assert.equal(snapshot.cleanup_complete,true);assert.equal(page.userWizardOpen,false);
+  assert.equal(engine.hasUnsettledWork(),false);assert.equal(page.saveWrites,1);
+  assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
+  // Finish with the same production close/logout used by ordinary shutdown.
+  page.app.Version='7.4.2';const map=form.FMapTree;let closed=0,loggedOut=false;
+  page.context.document.contains=tab=>page.active&&tab.getAttribute('data-tid')===page.tabTid;
+  map.HasRunningNodes=()=>false;map.FServerConnection.Session.IsPackageModified=async()=>false;
+  map.ClosePackage=async node=>{assert.equal(node,map.PackageNodes.Items(0));closed++;map.PackageNodes.Count=0;page.active=false;return true;};
+  page.waitForFunction=async fn=>{for(let i=0;i<8;i++){if(fn())return;await Promise.resolve();}throw Error('Native close did not settle');};
+  page.locator=s=>({locator(){return this;},async waitFor(){},async click(){if(s.includes('btnLogOut'))loggedOut=true;},
+   async innerText(){return 'save-user';},async isVisible(){return !loggedOut;}});
+  const cleanup=await page.execute(makePackageCleanupCode({sessionId:'save-session',documentId:'doc',account:'save-user',packagePath:path,
+   loginomUrl:'https://loginom.invalid/app',loginomBuild:'7.4.2',tabTid:continuation.workflow_ref.tab_tid}));
+  assert.equal(cleanup.status,'SUCCEEDED',JSON.stringify(cleanup));assert.equal(closed,1);assert.equal(loggedOut,true);assert.equal(page.saveWrites,1);
+ }
+});
+
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -74,12 +234,16 @@ test('both saves reuse an already open Packages menu without a closing toggle', 
   }
 });
 
-test('a cleanup failure keeps the original Save exception in its existing trace', async () => {
+test('a cleanup failure reports the original Save exception separately from cleanup', async () => {
   const page = linkPage(), click = page.click.bind(page);
   page.click = async item => { if (item.symbol === 'packages.save_as') throw Error('Primary Save refusal'); return click(item); };
   page.keyboard.press = async () => {};
   const outcome = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/refused.lgp', conflict_policy: 'fail' });
-  assert.equal(outcome.error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.error.code, 'CAPABILITY_ERROR');
+  assert.equal(outcome.error.message, 'Primary Save refusal');
+  assert.equal(outcome.output.cleanup_error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.output.cleanup_error.resource, 'transient_dialog');
+  assert.equal(outcome.status, 'AMBIGUOUS');
   assert.equal(outcome.cleanup_complete, false);
   assert.equal(outcome.trace.find(item => item.event === 'action_failed').message, 'Primary Save refusal');
 });
@@ -148,8 +312,8 @@ test('an opened package or missing creation receipt never authorizes layout', as
   }
 });
 
-test('native layout refusal, disabled control, wizard and running package do not fail saving', async () => {
-  for (const mode of ['refused','disabled','wizard','running','missing-button']) {
+test('native layout refusal, disabled control and wizard do not fail saving', async () => {
+  for (const mode of ['refused','disabled','wizard','missing-button']) {
     const page = await arrangePage({ wizard: mode === 'wizard', running: mode === 'running' });
     page.failArrange = mode === 'refused';
     const elements = page.elements.bind(page);
@@ -162,6 +326,78 @@ test('native layout refusal, disabled control, wizard and running package do not
     assert.equal(writes, 1);
     assert.equal(result.trace.find(item => item.event === 'package_arrangement').warning, true);
     assert.equal(page.arrangements, mode === 'refused' ? 1 : 0);
+  }
+});
+
+test('both saves refuse a confirmed running package before any gesture regardless of layout ownership', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const intent of ['new_draft','open_package']) {
+    const page = await arrangePage({ intent, running: true });
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => { clicked.push(item.symbol); return click(item); };
+    const outcome = await run(page, action, { path: '/user/data/packages/running.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'FAILED', JSON.stringify(outcome));
+    assert.equal(outcome.effect_possible, false);
+    assert.equal(outcome.cleanup_complete, true);
+    assert.match(outcome.error.message, /running|locked/i);
+    assert.deepEqual(clicked, []);
+    assert.equal(page.storage.size, 0);
+  }
+});
+
+test('both saves recheck running state after staging the dialog before sending Save', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(), click = page.click.bind(page);
+    const packageNode = page.context.__loginomDockPreparationV1.receipts.get('prepare').packageNode;
+    page.click = async item => {
+      if (item.tag === 'input') packageNode.HasRunningNodes = () => true;
+      return click(item);
+    };
+    const outcome = await run(page, action, { path: '/user/data/packages/running-race.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'AMBIGUOUS', JSON.stringify(outcome));
+    assert.equal(outcome.cleanup_complete, true);
+    assert.equal(page.storage.size, 0);
+    assert.equal(outcome.trace.some(item => item.event === 'save_requested'), false);
+  }
+});
+
+test('a sent Save refusal survives cleanup timeout, inspect and restore without another write', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const lostResponse of [false,true]) {
+    const page = linkPage(), click = page.click.bind(page);
+    let responses = 0;
+    const engine = runtime(page, { execute: async code => {
+      const result = await page.execute(code);
+      if (++responses === 2 && lostResponse) throw new Error('Save response lost after cleanup timeout');
+      return result;
+    } });
+    let writes = 0;
+    page.click = async item => {
+      if (item.symbol !== 'file_dialog.confirm') return click(item);
+      writes++;
+      page.error = 'Сценарий содержит 1 заблокированных узлов';
+    };
+    page.keyboard.press = async () => {};
+    const params = { path: '/user/data/packages/refused-running.lgp', conflict_policy: 'fail' };
+    const refused = await engine.run(action, params, { operationId: 'refused-save' });
+    assert.equal(refused.status, 'AMBIGUOUS', JSON.stringify(refused));
+    if (lostResponse) assert.equal(refused.error.code, 'BROWSER_CALL_UNCERTAIN');
+    else {
+      assert.equal(refused.error.message, page.error);
+      assert.equal(refused.output.cleanup_error.code, 'CLEANUP_FAILED');
+    }
+    assert.notEqual(refused.cleanup_complete, true);
+    const inspected = await engine.inspect({ operationId: 'refused-save' });
+    assert.equal(inspected.output.outcome.error.message, page.error);
+    assert.equal(inspected.output.outcome.output.cleanup_error.code, 'CLEANUP_FAILED');
+    assert.equal(compactActionResult(inspected).output.outcome.error.message, page.error);
+    const repeated = await engine.run(action, params, { operationId: 'refused-save' });
+    assert.equal(compactActionResult(repeated).output.cleanup_error.code, 'CLEANUP_FAILED');
+    page.keyboard.press = async () => { page.error = null; page.dialog = null; page.menu = false; };
+    await engine.recover('refused-save', { strategy: 'restore_control', recoveryOperationId: 'restore-refused-save' });
+    assert.equal(writes, 1);
+    assert.equal(page.storage.size, 0);
+    const restored = await engine.inspect({ operationId: 'refused-save' });
+    assert.equal(restored.output.outcome.error.message, 'Сценарий содержит 1 заблокированных узлов');
+    assert.notEqual(restored.output.outcome.status, 'SUCCEEDED');
   }
 });
 
@@ -484,6 +720,37 @@ test('save graph fingerprint preserves port ordinal across numeric reindex, with
   const observed = await runtime(page).observe();
   assert.equal(observed.output.package_identity.path, '/user/data/packages/reindexed.lgp');
 });
+for(const action of ['package.save_checkpoint','package.save_as']){
+  test(action+' preserves a linked ordinary scenario variable input',async()=>{
+    const page=linkPage();
+    page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+    page.nodes[1].ports.push('Input_Var-1');
+    page.edges=['Источник|Output_Data-0|Приёмник|Input_Data-0',
+      'Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+    const result=await run(page,action,{path:'/user/data/packages/variables.lgp',conflict_policy:'fail'});
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+    assert.ok(page.storage.has('/user/data/packages/variables.lgp'));
+  });
+  test(action+' keeps an unlinked builtin outside the legacy graph fingerprint',async()=>{
+    const page=linkPage();
+    page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+    const result=await run(page,action,{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+    if(action==='package.save_as'){
+      const reopened=result.trace.find(t=>t.event==='reopened_package_observed');
+      assert.ok(reopened);assert.equal(reopened.graph.nodes.includes('Переменные_сценария'),false);
+    }
+  });
+}
+test('saved variable links still reject a changed input ordinal after reopen',async()=>{
+  const page=linkPage();
+  page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+  page.nodes[1].ports.push('Input_Var-1','Input_Var-2');
+  page.edges=['Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+  page.onReopen=item=>{item.edges[0]='Переменные_сценария|Output_Var-4|Приёмник|Input_Var-2';};
+  const result=await run(page,'package.save_as',{path:'/user/data/packages/changed-variable.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.graph_matches,false);
+});
 
 test('save fingerprint rejects changed port ordinal, direction, missing port and extra port', async () => {
   for (const mutate of [
@@ -552,6 +819,11 @@ test('native graph accepts decorative duplicate vertices but stops bounded scan 
     assert.equal(result.status,mode==='vertices'?'SUCCEEDED':'FAILED',mode+JSON.stringify(result.error));
     assert.equal(page.drops,mode==='vertices'?1:0);
     if(mode==='oversized'){assert.match(result.error.message,/scan element budget/);assert.ok(visits<=6001);}
+    if(mode==='duplicate_port'){
+      const message=result.error.message;
+      assert.ok(message.includes('Duplicate actionable graph identifiers: '+page.prefix+';Graph;Источник;Output_Data-0 x3 {'),message);
+      assert.match(message,/@10,10,20x20 block\/visible\//,message);assert.ok(message.length<=1700,message);
+    }
   }
 });
 
@@ -632,8 +904,8 @@ test('save conflict cleanup is not complete while its native dialog remains open
 async function continuationPage() {
  const page=linkPage();await page.execute('async page=>true');
  class WorkFlowTreeNode{};page.app.WorkFlowTreeNode=WorkFlowTreeNode;
- const pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
- const tab={classList:{contains:name=>name==='x-tab-active'}};
+ let pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+ let tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
  const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
  let parentLength=0;const components=new Map();
@@ -643,24 +915,318 @@ async function continuationPage() {
  const crumbs=()=>{
   const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
   return labels.slice(0,parentLength||labels.length).map((label,i)=>{
-   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
+   // Save can update captions before the native NavigationBar rebuilds its keys.
+   const keys=[...labels];if(page.staleSavedNavigation&&!page.canonicalSavedNavigation)keys[2]='Draft';
+   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+keys.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:(!page.hiddenAncestors||i>=3)&&!(page.hiddenSaveParent&&page.packagePath&&i===3)});
    components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
   });
  };
  const elements=page.elements.bind(page),click=page.click.bind(page);
  page.elements=()=>[...elements(),...crumbs(),...(page.missingSaveUp?[]:[up]),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
- page.click=async item=>{if(item.kind==='save_up'){parentLength=4;return;}if(item.kind==='save_nav_parent'){parentLength=item.navigationLength;return;}return click(item);};
+ page.click=async item=>{if(item.kind==='save_up'){page.canonicalSavedNavigation=true;parentLength=4;return;}if(item.kind==='save_nav_parent'){page.canonicalSavedNavigation=true;parentLength=item.navigationLength;return;}return click(item);};
  page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
  const document={querySelectorAll:selector=>{
    if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
    if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
-   if(selector.includes('tb-1'))return [tab];return [];
+   if(selector==='[data-tid='+JSON.stringify(page.tabTid)+']'&&page.active)return [tab];return [];
  }};
  page.context.Ext={getCmp:id=>components.get(id)};
  page.context.document=document;
  page.context.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow}]])};
- return {page,flow,card};
+ return {page,flow,card,reopenNative(){
+  pkg=new page.app.PackageTreeNode();flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+  card.Controller.Node.data.node=flow;
+  tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
+  return pkg;
+ }};
 }
+
+async function restSavePage(modified, restReference = true) {
+ const {page,flow,card,reopenNative}=await continuationPage(),pkg=flow.ParentNode;
+ page.storageBinding={session_id:'save-session',document_id:'doc',loginom_account:'save-user',origin:'https://loginom.invalid'};
+ pkg.Package={};pkg.HasRunningNodes=()=>false;Object.defineProperty(pkg,'ReadOnly',{value:false});
+ page.model.FDiagram.FNodes={FCollection:[{FGuid:'reference',FIconCls:restReference?'bg-vendor-icon-restclientconnection':'bg-vendor-icon-restclient'},
+  {FGuid:'rest',FIconCls:'bg-vendor-icon-restclient'},{FGuid:'source',FIconCls:'source'}]};
+ page.onReopen=()=>{const fresh=reopenNative();fresh.Package={};fresh.HasRunningNodes=()=>false;fresh.ReadOnly=false;};
+ page.app.Application.FInstance.FMainForm.FMapTree={PackageNodes:{Count:1,Items:()=>card.Controller.Node.data.node.ParentNode},
+  FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
+   page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
+  }}}};
+ page.context.location={origin:'https://loginom.invalid'};
+ page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
+ await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
+ page.saveWrites=0;page.modifiedReads=0;
+ const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
+ page.save=()=>{page.saveWrites++;save();};
+ page.elements=()=>[...elements(),...(page.menu?[page.element('MF;MainMenuForm;btnSavePackage',{symbol:'native-save'})]:[])];
+ page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
+ return page;
+}
+
+test('ordinary Save As rebinds preparation before the next workflow activation',async()=>{
+ const page=await restSavePage([false],false);
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const oldTab=original.tab,oldPackage=original.packageNode;
+ original.nodeTargetPortIdentities={stale:true};
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ const continuation=saved.trace.find(e=>e.event==='save_continuations_observed')?.continuations[0];
+ assert.ok(continuation,'the verified reopen must issue a current workflow continuation');
+ assert.equal(continuation.workflow_ref.workflow_id,'workflow');
+ assert.notEqual(original.tab,oldTab);assert.notEqual(original.packageNode,oldPackage);
+ assert.equal(original.nodeTargetPortIdentities,undefined);
+ original.tab.isConnected=true;original.tab.getBoundingClientRect=()=>({width:100,height:25});original.tab.visible=true;
+ const task={request:{document_id:'doc',workflow_ref:continuation.workflow_ref},origin:'https://loginom.invalid',build,deadline:Date.now()+10000};
+ const activate=()=>page.execute(`async page=>(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task)})`);
+ assert.equal((await activate()).verified,true);
+ const currentTab=original.tab;original.tab=oldTab;
+ assert.match((await activate()).error,/Prepared workflow tab changed/);
+ original.tab=currentTab;original.packageNode=null;
+ assert.match((await activate()).error,/Prepared workflow receipt changed/);
+ assert.equal(page.modifiedReads,0);assert.equal(page.saveWrites,1);
+ assert.equal(saved.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const fault of ['native-node','package-path'])test('ordinary Save As refuses a foreign reopened identity: '+fault,async()=>{
+ const page=await restSavePage([false],false),reopen=page.onReopen;
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared'),oldTab=original.tab;
+ page.onReopen=()=>{reopen();if(fault==='native-node')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign';
+  else page.packagePath='/user/data/packages/foreign.lgp';};
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'AMBIGUOUS',JSON.stringify(saved));
+ assert.equal(saved.trace.some(e=>e.event==='save_continuations_observed'),false);
+ assert.equal(original.tab,oldTab);
+});
+
+test('ordinary Save As without a storage binding preserves its legacy completed receipt',async()=>{
+ const page=await restSavePage([false],false);delete page.storageBinding;
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ assert.equal(saved.output.reopened,true);assert.equal(saved.cleanup_complete,true);
+ assert.equal(saved.trace.some(e=>e.event==='save_continuations_observed'),false);
+});
+
+for(const fault of ['none','reopen-graph','guid','type','session','session-id','document','account','origin','path','package','tab','receipt','new-receipt','workflow','missing-proof','no-save'])
+test('ambiguous REST reopen then overwrite and native cleanup: '+fault,async()=>{
+ const page=await restSavePage([true,true]);
+ const prep=page.context.__loginomDockPreparationV1,original=prep.receipts.get('prepared'),oldTab=original.tab;
+ // Cached nested REST disappears from the reference probe after Open, while
+ // the root GUID/type inventory stays identical.
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-modelgeneric';
+ original.packageNode.FSubNodes={FItems:[{FCustomForm:{FDiagram:{FNodes:{FCollection:[{FIconCls:'bg-vendor-icon-restclientconnection'}]}}}}]};
+ const path='/user/data/packages/ambiguous-rest.lgp';
+ const accepted=['none','reopen-graph'].includes(fault);
+ if(fault==='reopen-graph'){
+  const reopen=page.onReopen;
+  page.onReopen=()=>{reopen();page.nodes[0].label='Normalized';};
+ }
+ const first=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(first.status,'AMBIGUOUS',JSON.stringify(first));
+ if(fault==='reopen-graph')assert.equal(first.output.graph_matches,false);
+ else assert.match(first.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.equal(original.tab,oldTab,'an ambiguous Save must not transfer ownership');
+ assert.ok(prep.savedPackageReopen,JSON.stringify(first));
+ const m=page.app.Application.FInstance.FMainForm.FMapTree;
+ if(fault==='guid')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign';
+ if(fault==='type')page.model.FDiagram.FNodes.FCollection[0].FIconCls='foreign';
+ if(fault==='session')m.FServerConnection.Session={...m.FServerConnection.Session};
+ if(fault==='session-id')page.storageBinding.session_id='foreign-session';
+ if(fault==='document')prep.id='foreign-doc';
+ if(fault==='account')m.FServerConnection.UserName='foreign';
+ if(fault==='origin')page.storageBinding.origin='https://foreign.invalid';
+ if(fault==='package'){
+  const flow=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
+  flow.ParentNode=Object.assign(Object.create(Object.getPrototypeOf(flow.ParentNode)),flow.ParentNode);
+ }
+ if(fault==='tab'){
+  const query=page.context.document.querySelectorAll;
+  const replacement={getAttribute:()=>page.tabTid,classList:{contains:()=>true}};
+  page.context.document.querySelectorAll=selector=>selector==='[data-tid='+JSON.stringify(page.tabTid)+']'?[replacement]:query(selector);
+ }
+ if(fault==='receipt')original.request=JSON.stringify({session:'save-session',operation:'changed'});
+ if(fault==='new-receipt')prep.receipts.set('foreign',{...original,packageNode:{}});
+ if(fault==='workflow')original.nodeTargetWorkflowNode={};
+ if(fault==='missing-proof')delete prep.savedPackageReopen;
+ let second;
+ if(fault!=='no-save'){
+  second=await run(page,'package.save_checkpoint',{path:fault==='path'?'/user/data/packages/other.lgp':path,conflict_policy:'replace'});
+  assert.equal(second.status,'SUCCEEDED',JSON.stringify(second));
+  assert.equal(second.output.reopened,false);
+  assert.equal(second.trace.some(e=>e.event==='rest_package_normalization'),false);
+ }
+ if(accepted){
+  assert.ok(second.trace.some(e=>e.event==='overwrite_confirmed'));
+  assert.equal(second.output.workflow_continuations[0]?.workflow_ref.workflow_id,'workflow',JSON.stringify(second));
+  assert.notEqual(original.tab,oldTab);
+  assert.equal(original.tab.getAttribute('data-tid'),page.tabTid);
+  assert.equal(original.packageNode,m.PackageNodes.Items(0));
+  assert.ok(second.trace.some(e=>e.event==='save_continuations_observed'&&e.recovered_reopen===true&&e.native_identity_verified===true));
+  assert.equal(prep.savedPackageReopen,undefined);
+ }else{
+  assert.equal(original.tab,oldTab,'unproved ownership must remain refused');
+  if(second)assert.deepEqual(second.output.workflow_continuations,[]);
+ }
+ // Run the production native close/logout body against the same external
+ // Loginom objects used by both serialized Save actions.
+ page.app.Version='7.4.2';
+ page.context.document.contains=tab=>page.active&&tab.getAttribute('data-tid')===page.tabTid;
+ let closed=0,loggedOut=false;
+ m.HasRunningNodes=()=>false;
+ m.FServerConnection.Session.IsPackageModified=async()=>false;
+ m.ClosePackage=async(node,suppress,after)=>{
+  assert.equal(node,m.PackageNodes.Items(0));assert.equal(suppress,false);assert.equal(after,true);
+  closed++;m.PackageNodes.Count=0;page.active=false;return true;
+ };
+ page.waitForFunction=async fn=>{
+  for(let i=0;i<8;i++){if(fn())return;await Promise.resolve();}
+  throw Error('External native close did not settle');
+ };
+ page.locator=selector=>({locator(){return this;},async waitFor(){},
+  async click(){if(selector.includes('btnLogOut'))loggedOut=true;},async innerText(){return 'save-user';},async isVisible(){return !loggedOut;}});
+ const cleanup=await page.execute(makePackageCleanupCode({sessionId:'save-session',documentId:'doc',account:'save-user',
+  packagePath:path,loginomUrl:'https://loginom.invalid/app',loginomBuild:'7.4.2',
+  tabTid:second?.output.workflow_continuations[0]?.workflow_ref.tab_tid??oldTab.getAttribute('data-tid')}));
+ assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
+ assert.equal(cleanup.package_closed,accepted);assert.equal(cleanup.logged_out,accepted);
+ assert.equal(closed,accepted?1:0);assert.equal(loggedOut,accepted);
+});
+
+for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
+test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
+ const page=await restSavePage([true,true]);
+ const action=structuredClone(actions.get('package.save_checkpoint'));
+ action.selector_symbols=action.selector_symbols.filter(symbol=>!missing.includes(symbol));
+ const outcome=await page.execute(makeCapabilityCode(action,selectors,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},
+  {expected_build:build,storage_binding:page.storageBinding}));
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(outcome.output.reopened,false);assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.some(e=>e==='package_closed'||e==='package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])
+test('REST Save refuses an empty continuation before writing: '+action,async()=>{
+ const page=await restSavePage([true,false]);
+ page.context.__loginomDockPreparationV1.receipts.clear();
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'FAILED',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/continuation unavailable/i);
+ assert.equal(outcome.effect_possible,false);assert.equal(page.saveWrites,0);
+ assert.equal(page.events.includes('package_closed'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false]])
+test('REST reference Save normalizes once after reopen: '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified);
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,false);
+ assert.ok(event.duration_ms>=0);assert.equal(outcome.output.reopened,true);
+ validateActionParameters(actions.get(action).output_schema,outcome.output);
+});
+
+test('REST normalization refuses a second dirty result without another Save or reopen',async()=>{
+ const page=await restSavePage([true,true]);
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.equal(page.saveWrites,2);assert.equal(page.modifiedReads,2);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+});
+
+test('normalized REST keeps logical ownership and its same-source edit, while a changed source still refuses',async()=>{
+ const page=await restSavePage([true,false]);
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const oldTab=original.tab,oldPackage=original.packageNode,oldWorkflow=original.nodeTargetWorkflowNode;
+ const saved=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ const continuation=saved.output.workflow_continuations?.[0];
+ assert.equal(continuation?.workflow_ref.workflow_id,'workflow');
+ assert.equal(continuation.workflow_ref.tab_tid,page.tabTid);assert.notEqual(page.tabTid,oldTab.getAttribute('data-tid'));
+ assert.notEqual(original.packageNode,oldPackage);assert.notEqual(original.nodeTargetWorkflowNode,oldWorkflow);
+ const bindings=createUserWorkflowBindings();bindings.remember(continuation);
+ for(const source of ['source','changed-source']){
+  const r=bindings.expandNode({operation_id:'edit-'+source,document_id:'doc',workflow_ref:{workflow_id:'workflow'},
+   target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'workflow',node_id:'rest'}},
+   inputs:[{source:{document_id:'doc',workflow_id:'workflow',node_id:source},output:0,input:0}],
+   mode:'request',parameters:{connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'limit',field:'limit'}]},
+   finish:'execute',budgets:{total_ms:600000}});
+  const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,
+   nodes:[{ref:r.target.ref,type:'integration.rest_request'}],links:[{source:'source',output:0,target:'rest',input:0}]};
+  const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>graph}};
+  const support=createRestRequestNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:build});
+  const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+   execute:async()=>{throw Error('connection validation reached');}});
+  await assert.rejects(drivers.beforeTarget({deadline:Date.now()+60000}),source==='source'?/connection validation reached/:/different raw source/);
+  assert.equal(operation.restQueryEncoder,undefined);
+ }
+});
+
+test('normalization cannot rebind a replaced native node with the same rendered graph',async()=>{
+ const page=await restSavePage([true,false]),reopen=page.onReopen;
+ page.onReopen=()=>{reopen();page.model.FDiagram.FNodes.FCollection.find(n=>n.FGuid==='source').FGuid='replacement';};
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(result.trace.find(e=>e.event==='reopened_package_observed').graph_matches,false);
+ assert.equal(result.trace.some(e=>e.event==='save_continuations_observed'),false);
+});
+
+for(const icon of ['bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'])for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
+test('Save normalizes an observed dirty node type exactly once: '+icon+' '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified,false);
+ page.model.FDiagram.FNodes.FCollection.forEach((node,i)=>{node.FIconCls=['bg-vendor-icon-importtextfile','bg-vendor-icon-sorting','bg-vendor-icon-exporttextfile'][i];});
+ page.model.FDiagram.FNodes.FCollection[1].FIconCls=icon;
+ const outcome=await run(page,action,{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,modified.at(-1));
+ assert.equal(event.additional_save,modified[0]);
+ if(modified.at(-1))assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ else {
+  assert.equal(outcome.output.reopened,true);
+  validateActionParameters(actions.get(action).output_schema,outcome.output);
+  if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
+ }
+});
+
+for(const icon of ['bg-vendor-icon-restclient','bg-vendor-icon-importtextfile','bg-vendor-icon-calcdata','bg-vendor-icon-sorting'])
+test('ordinary checkpoint avoids reopening without an observed dirty node type: '+icon,async()=>{
+ const page=await restSavePage([true,true],false);
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls=icon;
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.includes('package_closed'),false);assert.equal(outcome.output.reopened,false);
+ assert.equal(page.events.includes('package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
+test('grouping uses the existing guarded normalization only after dirty reopen: '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified,false);
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-groupdata';
+ const outcome=await run(page,action,{path:'/user/data/packages/grouping.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,modified.at(-1));
+ if(modified.at(-1))assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ else {
+  assert.equal(outcome.output.reopened,true);
+  validateActionParameters(actions.get(action).output_schema,outcome.output);
+  if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
+ }
+});
 
 test('saved continuation returns current navigation with the same native workflow and original binding',async()=>{
  const {page}=await continuationPage();
@@ -891,4 +1457,19 @@ test('unread prepared Save-copy rejects a changed initial binding: '+fault,async
  assert.notEqual(result.status,'SUCCEEDED');
  assert.equal(page.storage.size,0,'reject before Save');
  assert.equal(receipt.nodeTargetWorkflowNode,undefined);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])test(action+' accepts the observed builtin without a Label;Label',async()=>{
+  const page=linkPage();
+  page.addNode('Переменные_сценария',0,0,['Output_Var-4']);
+  page.nodes[1].ports.push('Input_Var-1');
+  page.edges=['Переменные_сценария|Output_Var-4|Приёмник|Input_Var-1'];
+  const elements=page.elements.bind(page);
+  page.elements=()=>{
+    const result=elements();
+    for(const e of result)if(e.tid===(page.graphPrefix??page.prefix)+';Graph;Переменные_сценария;Label;Label')e.visible=false;
+    return result;
+  };
+  const result=await run(page,action,{path:'/user/data/packages/unlabelled-variables.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
 });

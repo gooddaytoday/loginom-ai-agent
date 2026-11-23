@@ -1,0 +1,18 @@
+{
+  "proposal": true,
+  "nodes": [{"type": "exports.excel", "label_any": true}],
+  "output_node_type": "exports.excel",
+  "output_port": null,
+  "ordered": true,
+  "formats": ["xls", "xlsx"],
+  "input_columns": [{"name": "Code", "type": "string"}, {"name": "Amount", "type": "real"}],
+  "input_rows": [["А", 1234.56789], ["Б", -2.5], ["В", 0]],
+  "cases": {
+    "new": {"sheet": "Данные", "data_rows": 3, "headers": 1},
+    "numeric": {"sheet": "Данные", "data_rows": 3, "headers": 1, "number_format": "#,##0.00", "stored_values_rounded": false},
+    "replace-workbook": {"sheet": "Данные", "data_rows": 3, "headers": 1, "old_sheets_absent": true},
+    "append": {"availability": "blocked: no native append control observed", "sheet": "Данные", "data_rows": 4, "headers": 1, "old_row": ["OLD", 99.25], "preserve_sheet": "Контроль"},
+    "replace-sheet": {"availability": "blocked: no native sheet replacement control observed", "sheet": "Данные", "data_rows": 3, "headers": 1, "preserve_sheet": "Контроль", "old_row_absent": true},
+    "seed": {"sheets": ["Данные", "Контроль"], "data_rows": 1}
+  }
+}

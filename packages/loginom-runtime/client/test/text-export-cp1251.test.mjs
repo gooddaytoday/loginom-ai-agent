@@ -9,15 +9,15 @@ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-
 const values=(encoding,bom=false)=>Object.fromEntries(Object.entries({encoding,delimiter:';',header:2,line_ending:1,bom}).map(([k,value])=>[k,{value,...(k==='encoding'?{tid}:{})}]));
 
 test('Windows-1251 request, inventory schema and retained native code page agree',()=>{
- assert.deepEqual(textExportParametersSchema.properties.encoding.enum,['UTF-8','Windows-1251']);
+ assert.deepEqual(textExportParametersSchema.properties.encoding.enum,['UTF-8','Windows-1251','Windows-1252','UTF-16 LE','UTF-16 BE']);
  const request={target:{kind:'existing'},read:{ports:[]},inputs:[],mappings:[]};
  for(const [encoding,code] of [['UTF-8',65001],['Windows-1251',1251]]){
   assert.doesNotThrow(()=>validateTextExportParameters({encoding},'delimited',request));
   assert.equal(nativeExportValue('encoding',encoding),code);
   for(const bom of [false,true])assert.doesNotThrow(()=>validateNativeExportFormat(values(code,bom)));
  }
- for(const encoding of ['CP1251','ANSI','Windows-1252',1251])assert.throws(()=>validateTextExportParameters({encoding},'delimited',request));
- for(const code of [1252,1200,'1251'])assert.throws(()=>validateNativeExportFormat(values(code)));
+ for(const encoding of ['CP1251','ANSI','Windows-1250',1251])assert.throws(()=>validateTextExportParameters({encoding},'delimited',request));
+ for(const code of [1250,12000,'1251'])assert.throws(()=>validateNativeExportFormat(values(code)));
 });
 
 function fixture(initial,encoding,{wrong=false,unrelated=false}={}){

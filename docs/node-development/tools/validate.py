@@ -36,7 +36,7 @@ def render(data):
     counts=Counter(n['queue_class'] for n in data['nodes'])
     out=['# Реестр узлов — обзор','',
          'Сформирован из [registry.json](registry.json). Не редактировать сводные числа вручную.', '',
-         f"Исторический каталог: **{len(data['nodes'])}** компонентов. Обработчики: **{counts['implemented']}**; обычный остаток: **{counts['backlog']}**; условный резерв: **{counts['conditional_reserve']}**.", '',
+         f"Исторический каталог: **{len(data['nodes'])}** компонентов. Реализовано компонентов: **{counts['implemented']}**; встроенных вне каталога: **{len(data.get('builtin_handlers',[]))}**; всего обработчиков: **{counts['implemented']+len(data.get('builtin_handlers',[]))}**; обычный остаток: **{counts['backlog']}**; условный резерв: **{counts['conditional_reserve']}**.", '',
          'Реализация и историческая приёмка не равны повторной аналитической приёмке текущего CLI. Старые номера 01/02 — инфраструктура, а не дополнительные типы узлов.', '',
          f"Снимок регистрации: `{data['source_snapshot']['branch']}@{data['source_snapshot']['commit']}`. Режимы — значения runtime; операции и ограничения перечислены ниже. Приёмка относится только к указанному в источнике SHA, не переносится на этот снимок.", '',
          '## Реализованные обработчики','',
@@ -66,6 +66,10 @@ def render(data):
         note=acceptance.get('note','')
         cells=[f"`{h['type']}`",details,limits,f"{status}: {note} {'; '.join(refs)}"]
         out.append('| '+' | '.join(c.replace('|','/').replace('\n',' ') for c in cells)+' |')
+    out+=['','## Встроенные узлы вне исторического каталога','',
+          '| Runtime type / режимы | Ограничения и источник |','| --- | --- |']
+    for h in data.get('builtin_handlers',[]):
+        out.append(f"| `{h['type']}` / {', '.join(h['modes'])} | {h['scope']} [Справочник]({h['reference']}) |")
     out+=['','## Компоненты без полного обработчика','',
           'Список не является разрешённой очередью. У каждого компонента есть карточка и подплан; наличие подплана не подтверждает поддержку runtime и не назначает реализацию. Перед назначением подплан приводится к [шаблону](templates/node-plan.md) по [порядку создания](workflow/new-node-plan.md).', '',
           '| Component ID | Узел | Подплан | Категория | Следующее действие |','| --- | --- | --- | --- | --- |']
@@ -92,9 +96,14 @@ def check(render_view=False, source_archive=None, registry_only=False):
     runtime=(REPO/'packages/loginom-runtime/client/lib/node-contracts.mjs').read_text()
     # Read declarative registration, not dispatch syntax (which also has grouped branches).
     registered=registered_modes(runtime)
-    declared={n['handler']['type'] for n in nodes if n.get('handler')}
+    builtins=data.get('builtin_handlers',[])
+    declared={n['handler']['type'] for n in nodes if n.get('handler')}|{h['type'] for h in builtins}
     if set(registered)!=declared:errors.append('runtime handlers differ: '+str(sorted(set(registered)^declared)))
-    if len(declared)!=sum(bool(n.get('handler')) for n in nodes):errors.append('duplicate runtime type')
+    if len(declared)!=sum(bool(n.get('handler')) for n in nodes)+len(builtins):errors.append('duplicate runtime type')
+    for h in builtins:
+        if h['modes']!=registered.get(h['type']):errors.append('runtime modes differ: '+h['type'])
+        for p in [h['source'],h['reference']]:
+            if not (ROOT/p).is_file():errors.append('missing builtin source '+p)
     historical=json.loads((ROOT/data['evidence_catalog']['historical-catalog']['path']).read_text())
     historical_ids=set(re.findall(r'component\.[A-Za-z0-9_.]+',json.dumps(historical)))
     if historical_ids!=set(ids):errors.append('historical catalog IDs differ: '+str(sorted(historical_ids^set(ids))))

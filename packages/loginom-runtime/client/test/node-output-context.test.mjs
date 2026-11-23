@@ -1,7 +1,9 @@
+import {decodePortCell,makeNodeVariableOutputCode} from '../lib/node-port-output.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readOutputContext,makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
+import {chromium} from 'playwright-core';
+import {readVariableRecords,readOutputContext,makeNodeOutputContextCode} from '../lib/node-output-context.mjs';
 const portGuid='11111111-1111-1111-1111-111111111111',viewGuid='22222222-2222-2222-2222-222222222222';
 function fixture(surface='graph') {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;TF-1',navigation_path:[]},node:{node_id:'node'}};
@@ -83,4 +85,71 @@ for(const inside of [false,true])test('graph output inventory '+(inside?'rejects
  f.d.FmxGraph.container.contains=e=>e===f.port||(inside&&e===copy);
  const r=await readOutputContext(f.page,f.binding,f.readNode);
  assert.equal(r.verified,!inside);if(inside)assert.equal(r.reason,'port_identity');else assert.equal(r.ports.length,1);
+});
+
+function variableStore(){
+ const values=[[1,false],[4,0],[5,''],[5,null]];
+ const items=values.map(([DataType,ValueVariant],Index)=>({isModel:true,data:{ID:Index,Index,Name:'v'+Index,DisplayName:'V'+Index,DataType,ValueVariant,DisplayValue:ValueVariant,ValueIsNull:ValueVariant===null,OriginType:1}}));
+ return {items,complete:true,loadCount:1,getTotalCount:()=>items.length,isLoading:()=>false,getCount:()=>items.length,getData:()=>({items})};
+}
+test('W1 Variant requires native cells for the full inventory and never falls back to the JS number',()=>{
+ const s=variableStore();s.items[1].data.DataType=6;s.items[1].data.ValueVariant=2;
+ assert.throws(()=>readVariableRecords(s,'preview',decodePortCell),/metadata/);
+ const metadata=readVariableRecords(s,'preview',decodePortCell,false,{metadataOnly:true});
+ assert.equal(metadata.variables[1].type,'variant');assert.equal(metadata.variables[1].cell,undefined);
+ const cell={type:'variant',cell_type:'integer',value:'2',precision:'exact_native',is_null:false,native:{tag:3,encoding:'signed-int32-le',bytes_le:'02000000',bits:32}};
+ const cells=Array(s.items.length);cells[1]=cell;
+ assert.equal(readVariableRecords(s,'preview',decodePortCell,false,{variantCells:cells}).variables[1].cell,cell);
+ for(const bad of [[],[cell],Array(s.items.length).fill({...cell,precision:'unverified'}),Array(s.items.length).fill({...cell,cell_type:undefined})])
+  assert.throws(()=>readVariableRecords(s,'preview',decodePortCell,false,{variantCells:bad}),/native Variant/);
+ assert.throws(()=>readVariableRecords(s,'values',decodePortCell,false,{variantCells:cells}),/metadata/);
+ s.items[1].data.ValueVariant=undefined;
+ assert.throws(()=>readVariableRecords(s,'preview',decodePortCell,false,{variantCells:cells}),/not loaded/);
+});
+for(const mode of ['preview','values'])test('W1 complete native variable inventory distinguishes NULL, false, zero and empty string: '+mode,()=>{
+ const s=variableStore(),r=readVariableRecords(s,mode,decodePortCell);
+ assert.deepEqual(r.variables.map(v=>v.cell.value),[false,'0','',null]);assert.deepEqual(r.variables.map(v=>v.cell.is_null),[false,false,false,true]);
+ assert.deepEqual(r.completeness,{count:4,store_count:4,unique_ids:4,loaded:true});
+});
+for(const fault of ['loading','truncated','duplicate-id','duplicate-name','unsupported','unloaded','unsafe-integer','foreign-origin'])test('W1 refuses unproved variable inventory: '+fault,()=>{
+ const s=variableStore();
+ if(fault==='loading')s.isLoading=()=>true;if(fault==='truncated')s.getCount=()=>5;
+ if(fault==='duplicate-id')s.items[1].data.ID=0;if(fault==='duplicate-name')s.items[1].data.Name='v0';
+ if(fault==='unsupported')s.items[0].data.DataType=6;if(fault==='unloaded')s.items[1].data.ValueVariant=undefined;
+ if(fault==='unsafe-integer')s.items[1].data.ValueVariant=Number.MAX_SAFE_INTEGER+1;if(fault==='foreign-origin')s.items[0].data.OriginType=0;
+ assert.throws(()=>readVariableRecords(s,fault==='foreign-origin'?'values':'preview',decodePortCell));
+});
+test('W1 executable variable reader refuses a fabricated execution before any browser call',()=>{
+ assert.throws(()=>makeNodeVariableOutputCode({document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[]},node:{document_id:'doc',workflow_id:'wf',node_id:'n'}},{port:0,execution:{execution_id:'fake'}}));
+});
+
+test('W1 real values and preview use the existing finite binary64 decoder',()=>{
+ const s=variableStore();s.items[1].data.DataType=3;s.items[1].data.ValueVariant=3.5;
+ assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.value,3.5);
+ s.items[1].data.DisplayValue=3.5;assert.equal(readVariableRecords(s,'values',decodePortCell).variables[1].cell.value,3.5);
+ s.items[1].data.ValueVariant=Infinity;assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.non_finite,'Infinity');
+ for(const patch of [{complete:false},{loadCount:0},{getTotalCount:()=>8}])assert.throws(()=>readVariableRecords({...variableStore(),...patch},'preview',decodePortCell));
+});
+test('W1 local datetime values retain civil milliseconds and typed NULL through W2 decoder',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:30000,
+},async t=>{
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
+ for(const timezoneId of ['UTC','Europe/Moscow']){
+  const context=await browser.newContext({timezoneId});t.after(()=>context.close());const page=await context.newPage();
+  const results=await page.evaluate(({storeCode,readCode,decodeCode})=>{
+   const store=eval('('+storeCode+')')(),read=eval('('+readCode+')'),decode=eval('('+decodeCode+')');
+   store.items[1].data.DataType=2;store.items[1].data.DisplayValue=new Date(2026,10,5,5,47,52,160);
+   const value=read(store,'values',decode).variables[1];store.items[1].data.ValueIsNull=true;
+   return [value,read(store,'values',decode).variables[1]];
+  },{storeCode:variableStore.toString(),readCode:readVariableRecords.toString(),decodeCode:decodePortCell.toString()});
+  assert.equal(results[0].type,'datetime');assert.equal(results[0].cell.value,'2026-11-05T05:47:52.160');assert.equal(results[0].cell.precision,'millisecond');assert.equal(results[1].cell.is_null,true);
+ }
+});
+
+test('native delete leaves old Index values: tolerated only with the explicit option and only in increasing order',()=>{
+ const s=variableStore();s.items.splice(1,1);
+ assert.throws(()=>readVariableRecords(s,'values',decodePortCell),/record metadata/);
+ const r=readVariableRecords(s,'values',decodePortCell,true);
+ assert.deepEqual(r.variables.map(v=>[v.name,v.index]),[['v0',0],['v2',1],['v3',2]]);
+ s.items.reverse();assert.throws(()=>readVariableRecords(s,'values',decodePortCell,true),/record metadata/);
 });

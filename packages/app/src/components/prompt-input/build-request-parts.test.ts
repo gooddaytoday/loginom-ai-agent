@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Prompt } from "@/context/prompt"
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import { buildRequestParts } from "./build-request-parts"
 
 describe("buildRequestParts", () => {
@@ -479,4 +480,48 @@ test("large native references retain escaped paths and receipts without inline b
   expect(part.source?.type === "file" && part.source.text.value).toBe("loginom-attachment:" + reference.receipt)
   expect(JSON.stringify(result)).not.toMatch(/data:|base64/)
   expect(result.optimisticParts[0]).toMatchObject({ url: part.url, source: part.source })
+})
+
+test("a dashboard request keeps the user's words and adds the local folder instruction", () => {
+  const { requestParts } = buildRequestParts({
+    prompt: [],
+    text: "Change the title",
+    images: [],
+    sessionDirectory: "/repo",
+    sessionID: "s",
+    messageID: "m",
+    context: [
+      {
+        type: "dashboard",
+        key: "dashboard",
+        id: "5f85dea9-7be3-4709-9525-e11736087e19",
+        nodeName: "Node",
+        action: "create",
+      },
+    ],
+  })
+  expect(requestParts).toEqual([
+    expect.objectContaining({ type: "text", text: "Change the title" }),
+    expect.objectContaining({
+      type: "text",
+      synthetic: true,
+      text: dashboardPrompt("create"),
+    }),
+  ])
+})
+
+test("an edit preserves the prompt without claiming sources are a template", () => {
+  const { requestParts } = buildRequestParts({
+    prompt: [],
+    text: "Edit chart",
+    images: [],
+    sessionDirectory: "/repo",
+    sessionID: "s",
+    messageID: "m",
+    context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "Node", action: "edit" }],
+  })
+  expect(requestParts[1]).toMatchObject({ type: "text", synthetic: true, text: dashboardPrompt("edit") })
+  const note = requestParts[1]
+  expect(note?.type === "text" ? note.text : "").not.toContain("заготовка шаблона")
+  expect(JSON.stringify(requestParts)).not.toMatch(/127\.0\.0\.1:32768|\/dashboard\//)
 })

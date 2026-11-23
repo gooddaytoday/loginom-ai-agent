@@ -28,7 +28,12 @@ Oracle использует только CSV и рациональную ари�
 python3 acceptance/oracle.py > acceptance/expected.json
 python3 acceptance/oracle.py --case iqr > acceptance/iqr/expected.json
 python3 acceptance/oracle.py --case null --package-path /own-account/new.lgp
+python3 -I acceptance/oracle.py --check
+python3 -I acceptance/oracle-policies.py --check
 ```
+
+`--check` пересчитывает все закоммиченные expected в памяти и падает на
+расхождении (`oracle.py` — 3 файла, `oracle-policies.py` — 11).
 
 Пути приведены относительно каталога узла. В рабочей копии expected перед cold
 заменяется только `{{PACKAGE_PATH}}` на личный путь текущей попытки. Oracle,
@@ -87,3 +92,9 @@ matcher или механизм происхождения не требуетс
 `openai/gpt-6.1-sol`, medium, 1800 с. Старт — через `run-check start`, затем
 foreground `wait` одной shell-командой. Требуются штатные Save, закрытие пакета
 и logout; неизвестный исход не засчитывается. Общие лимиты не меняются.
+
+## LAB-1018: новые режимы, этап 0
+
+[Предложение и незавершённые проверки](modes-proposal.md). Старые expected выше
+сохраняются; новые файлы LAB-1018 не утверждают native/runtime поддержку.
+После двух разрывов связи исследование остановлено по карточке.

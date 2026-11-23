@@ -413,6 +413,23 @@ test('foreign prepared package or tab refuses before native close', async () => 
   assert.deepEqual(f.events,[]);
 });
 
+// LAB-1331: Save As reopened the package as a new node in TF-5. The original
+// preparation receipt (tb-1) no longer owns it; only a rebind receipt does.
+test('reopened package closes only through its rebind receipt', async () => {
+  const reopenedTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';
+  const rebind=f=>vm.runInContext(`__loginomDockPreparationV1.receipts.set('cleanup-rebind',{request:JSON.stringify({session:'owned-session',intent:'open_package'}),
+    packageNode:bg.app.Application.FInstance.FMainForm.FMapTree.PackageNodes.Items(0),tab:ownedTab})`,f.context);
+  const original=fixture({foreignPreparedPackage:true,tabTid:reopenedTab});rebind(original);
+  const stale=await original.run({tabTid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1'});
+  assert.equal(stale.reason,'TAB_IDENTITY_CHANGED');assert.deepEqual(original.events,[]);
+  const unbound=fixture({foreignPreparedPackage:true,tabTid:reopenedTab}),refused=await unbound.run({tabTid:reopenedTab});
+  assert.equal(refused.reason,'TAB_IDENTITY_CHANGED');assert.deepEqual(unbound.events,[]);
+  const bound=fixture({foreignPreparedPackage:true,tabTid:reopenedTab});rebind(bound);
+  const result=await bound.run({tabTid:reopenedTab});
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);
+  assert.deepEqual(bound.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
+});
+
 for (const [change,reason] of [
   [{modified:true},'UNSAVED_CHANGES'], [{running:true},'RUNNING_NODES'],
   [{account:'another-user'},'ACCOUNT_CHANGED'], [{path:'/other/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
@@ -936,16 +953,21 @@ test('D81 diagnostic retains fixed safe control IDs',async()=>{
   assert.equal(r.logout_menu_readback.avatar[0].hit_tid,tid);
 });
 
-for(const mode of ['clean','dirty','foreign-intent','persisted','foreign-tab','running'])
+for(const mode of ['clean','navigated','foreign-navigation','dirty','foreign-intent','persisted','foreign-tab','running'])
  test('unsaved prepared draft cleanup retains native guards: '+mode,async()=>{
   const f=fixture({path:mode==='persisted'?options.packagePath:null,modified:mode==='dirty',running:mode==='running'});
   const r=f.context.__loginomDockPreparationV1.receipts.get('prepare');
   r.request=JSON.stringify({session:options.sessionId,intent:mode==='foreign-intent'?'existing_workflow':'new_draft'});
   r.phase='verified';r.packageInventoryBefore=0;
+  if(mode==='navigated'||mode==='foreign-navigation'){
+   r.phase='superseded';
+   f.context.__loginomDockPreparationV1.receipts.set('enter',{request:JSON.stringify({session:options.sessionId}),
+    phase:'verified',packageNode:r.packageNode,tab:r.tab,navigationSource:mode==='navigated'?r:{},navigationResult:{}});
+  }
   if(mode==='foreign-tab')f.state.tab=false;
   const result=await f.run({packagePath:null,unsavedDraft:true});
-  assert.equal(result.status,mode==='clean'?'SUCCEEDED':'BLOCKED');
-  assert.equal(f.events.includes('close'),mode==='clean');
+  assert.equal(result.status,['clean','navigated'].includes(mode)?'SUCCEEDED':'BLOCKED');
+  assert.equal(f.events.includes('close'),['clean','navigated'].includes(mode));
   assert.equal(result.unsaved_changes_discarded,false);
   if(mode==='clean'){
    assert.equal(result.package_path,null);assert.equal(result.logged_out,true);

@@ -1,9 +1,38 @@
 const need=(value,message)=>{if(!value)throw Error('Linear regression: '+message);};
 export function validateLinRegressionParameters(p,mode,r){
- need(['enter','apply'].includes(mode),'only Enter (enter) and apply with an intercept and no normalization are supported');
- need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field'].includes(k)),'use input_fields and target_field');
+ need(['enter','apply','forward','backward','stepwise','ridge','lasso','elastic'].includes(mode),'only Enter (enter), Forward (forward), Backward (backward), Stepwise (stepwise), manual Ridge (ridge), LASSO (lasso), Elastic Net (elastic) and apply with an intercept and no normalization are supported');
+ need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','linear_regression'].includes(k)),'use input_fields and target_field');
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(n=>typeof n==='string'&&n.length>0&&n.length<=128),'input_fields must list continuous numeric predictors by their technical names');
  need(typeof p.target_field==='string'&&p.target_field.length>0&&p.target_field.length<=128,'target_field must name one continuous numeric response');
+ if(p.linear_regression?.statistics!==undefined)need(mode==='enter','linear_regression.statistics is supported only in mode enter; '+mode+' has no full coefficient statistics. Refused before any Loginom change');
+ if(p.linear_regression?.partition!==undefined)need(mode==='enter','linear_regression.partition is supported only in mode enter. Refused before any Loginom change');
+ if(p.linear_regression?.normalization!==undefined){
+  const norms=p.linear_regression.normalization;
+  need(mode==='enter'&&p.linear_regression.statistics==='full','indicator normalization requires enter with statistics:"full"; other modes are refused before effects');
+  need(Array.isArray(norms)&&norms.length>0&&norms.length<=128&&norms.every(n=>n&&typeof n==='object'&&!Array.isArray(n)&&Object.keys(n).length===3&&Object.keys(n).every(k=>['field','method','reference'].includes(k))&&p.input_fields.includes(n.field)&&n.method==='indicator'&&n.reference==='first')&&new Set(norms.map(n=>n.field)).size===norms.length,'normalization requires unique predictor fields, method:"indicator", reference:"first"');
+ }
+ if(mode==='ridge')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===1&&Number.isFinite(p.linear_regression.lambda_l2)&&p.linear_regression.lambda_l2>=0,'ridge requires linear_regression:{lambda_l2:nonnegative finite number}; no automatic setup, selection or bindings');
+ if(mode==='lasso')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===1&&Number.isFinite(p.linear_regression.lambda_l1)&&p.linear_regression.lambda_l1>=0,'lasso requires linear_regression:{lambda_l1:nonnegative finite number}; no automatic setup, selection or bindings');
+ if(mode==='elastic')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===2&&['lambda_l1','lambda_l2'].every(k=>Number.isFinite(p.linear_regression[k])&&p.linear_regression[k]>=0)&&Number.isFinite(p.linear_regression.lambda_l1+p.linear_regression.lambda_l2)&&p.linear_regression.lambda_l1+p.linear_regression.lambda_l2>0,'elastic requires linear_regression:{lambda_l1:nonnegative finite number,lambda_l2:nonnegative finite number}, with positive sum; no automatic setup, bindings or solver parameters');
+ if(p.linear_regression!==undefined&&mode==='enter'){
+  const settings=p.linear_regression;
+  need(settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).length>0&&Object.keys(settings).every(k=>['statistics','partition','normalization'].includes(k))&&(settings.statistics===undefined||['coefficients','full'].includes(settings.statistics)),'enter accepts only linear_regression statistics, partition and indicator normalization; linear_regression.selection is supported only in forward/backward/stepwise');
+  if(settings.partition!==undefined){
+   const split=settings.partition;
+   need(split&&typeof split==='object'&&!Array.isArray(split)&&Object.keys(split).length===3&&Object.keys(split).every(k=>['method','train_count','test_count'].includes(k))&&split.method==='sequential'&&Number.isSafeInteger(split.train_count)&&split.train_count>0&&Number.isSafeInteger(split.test_count)&&split.test_count>=0&&Number.isSafeInteger(split.train_count+split.test_count),'partition requires method:"sequential", positive train_count and nonnegative test_count in rows');
+  }
+ }else if(p.linear_regression!==undefined&&mode!=='ridge'&&mode!=='lasso'&&mode!=='elastic'){
+  const settings=p.linear_regression;
+  need(['forward','backward','stepwise'].includes(mode)&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward/backward/stepwise');
+  const selection=settings.selection;
+  if(selection!==undefined){
+   need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','add_significance','remove_significance'].includes(k)),'invalid selection settings');
+   need(selection.criterion!=='r2','R² пока недоступен: критерий не прошёл native-приёмку. Запрос отклонён до изменений Loginom.');
+   need(['f','r2','adjusted_r2','aic','aicc','bic','hqc'].includes(selection.criterion),'unknown selection criterion');
+   for(const key of ['add_significance','remove_significance'])if(selection[key]!==undefined)need(selection.criterion==='f'&&Number.isFinite(selection[key])&&selection[key]>0&&selection[key]<1,'invalid or inapplicable '+key);
+   if(mode==='stepwise'&&selection.criterion==='f')need((selection.add_significance??0.05)<(selection.remove_significance??0.1),'addition cutoff must be below removal cutoff for Stepwise');
+  }
+ }
  const names=[...p.input_fields,p.target_field];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors must be distinct from each other and from the target');
  if(r){
   if(mode==='apply')need(r.target.kind==='existing'&&r.inputs.length===0&&r.finish==='execute','apply requires an existing trained model, unchanged connections and finish execute');
@@ -13,11 +42,12 @@ export function validateLinRegressionParameters(p,mode,r){
  }
 }
 export function resolveLinRegressionRoles(p,fields){
- validateLinRegressionParameters(p,'enter');
+ const {linear_regression,...roles}=p;validateLinRegressionParameters(roles,'enter');
  need(Array.isArray(fields)&&fields.length>0&&new Set(fields.map(f=>f.name?.toLowerCase())).size===fields.length,'complete unique input schema required');
  for(const name of [...p.input_fields,p.target_field]){
   const field=fields.find(f=>f.name===name);
-  need(field&&['integer','real'].includes(field.type)&&field.data_kind==='Непрерывный','predictor and target must be observed continuous numeric fields: '+name);
+  const indicator=linear_regression?.normalization?.some(n=>n.field===name);
+  need(field&&(indicator?p.input_fields.includes(name)&&field.type==='string'&&field.data_kind==='Дискретный':['integer','real'].includes(field.type)&&field.data_kind==='Непрерывный'),'predictor and target must be observed continuous numeric fields, or explicitly declared discrete string indicators: '+name);
  }
  return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:0}));
 }

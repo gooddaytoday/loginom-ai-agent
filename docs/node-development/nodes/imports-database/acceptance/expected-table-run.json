@@ -1,0 +1,97 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.database",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer",
+          "data_kind": "continuous"
+        },
+        {
+          "name": "Label",
+          "label": "Label",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Active",
+          "label": "Active",
+          "type": "boolean",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "continuous"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Label": "А",
+          "Amount": 10.5,
+          "Active": true,
+          "Occurred": "2024-02-29T12:30:01.000"
+        },
+        {
+          "Id": 2,
+          "Label": "А",
+          "Amount": 20.0,
+          "Active": false,
+          "Occurred": "2024-03-01T00:00:00.000"
+        },
+        {
+          "Id": 3,
+          "Label": null,
+          "Amount": null,
+          "Active": null,
+          "Occurred": null
+        },
+        {
+          "Id": 4,
+          "Label": "",
+          "Amount": -5.25,
+          "Active": true,
+          "Occurred": "2023-12-31T23:59:59.000"
+        },
+        {
+          "Id": 5,
+          "Label": "Кириллица",
+          "Amount": 0.0,
+          "Active": false,
+          "Occurred": "2024-01-15T08:05:09.000"
+        },
+        {
+          "Id": 6,
+          "Label": "Б",
+          "Amount": 30.0,
+          "Active": true,
+          "Occurred": "2024-02-29T12:30:01.000"
+        }
+      ]
+    }
+  ]
+}

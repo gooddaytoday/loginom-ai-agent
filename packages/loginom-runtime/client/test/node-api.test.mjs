@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nodeApiTools,deliveryApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
+import {nodeApiTools,deliveryApiTools,dispatchNodeApi,clusteringParametersSchema} from '../lib/node-api.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
-test('model schema inventory pins merged v0.3.9 registrations and excludes private cold windows',()=>{
+test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,95063,'0a5656ddb1f78dd49be37b11d4cef8b2350671b6481ba465efec47b432f048e6'],
-  [nodeApiTools.map(userNodeTool),17361,'a9cdeea2ffe3ef38960f1a475674e60a269be89e1bf10debf5bf1a82a6544c45'],
+  [nodeApiTools,203205,'355b0205ac7db43c5846673ad23b567a28625bd6022186c145e9c945bdfdc0aa'],
+  [nodeApiTools.map(userNodeTool),14386,'601a58589ac28eee3a9423a07a1328e0fcd93ec8a3df064a10792009c1d491eb'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -31,6 +31,17 @@ const fixture=()=>{
   runtime[name]=(...args)=>{calls.push({name,args});return {operation_id:'op',state:'running'};};
  return {runtime,calls};
 };
+test('W1 variable_inputs is optional and dispatched independently from table inputs',async()=>{
+ const f=fixture(),request={operation_id:'w1',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'wf',navigation_path:[{tid:'crumb',label:'Scenario'}]},
+  target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'wf',node_id:'target'}},inputs:[],mode:'request',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:5,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',request);
+ const link={source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:4,input:0,kind:'variables'};
+ await dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[link]});
+ assert.deepEqual(f.calls[1].args[0].variable_inputs,[link]);
+ await assert.rejects(dispatchNodeApi(f.runtime,'dock_node_apply',{...request,variable_inputs:[{...link,kind:'data'}]}));
+ assert.equal(f.calls.length,2);
+});
 
 test('public apply mode reaches only the existing LinRegression handler',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
@@ -44,6 +55,22 @@ test('public apply mode reaches only the existing LinRegression handler',async()
  const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
  await dispatchNodeApi(runtime,'dock_node_apply',request);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'},parameters:{expressions:[]}}),/Unsupported node configuration mode/);
+});
+test('g-means public schema reaches the production handler with bounded automatic parameters',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'gmeans',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'datamining.clustering',position:{x:320,y:280}},inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:0,input:0}],mode:'g_means',parameters:{features:[{kind:'input_field',name:'X'},{kind:'input_field',name:'Y'}],min_clusters:2,max_clusters:4,threshold:1,seed:42,normalization:'none'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ assert.equal(clusteringParametersSchema.properties.threshold.minimum,0.1);
+ assert.equal(clusteringParametersSchema.properties.threshold.maximum,5);
+ for(const threshold of [0.099,5.001])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,threshold}}),/threshold|Invalid/);
+ const apply={...request,mode:'apply',target:{kind:'existing',type:'datamining.clustering',ref:{document_id:'doc',workflow_id:'wf',node_id:'saved'}},parameters:{},inputs:[]};
+ await dispatchNodeApi(runtime,'dock_node_apply',apply);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...apply,parameters:{seed:42}}),/apply/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,clusters:3}}),/unsupported parameter/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'}}),/Unsupported node configuration mode/);
 });
 test('lifecycle dispatch retains ID, local cancellation and independent server stop',async()=>{
  const {runtime,calls}=fixture(),signal=new AbortController().signal;
@@ -93,6 +120,12 @@ test('complete import and existing patch pass the public schema and installed ha
  await dispatchNodeApi(runtime,'dock_node_apply',short);
  await dispatchNodeApi(runtime,'dock_node_resume',short);
  assert.equal(calls.length,5);
+ for(const node_title of [{mode:'automatic'},{mode:'custom',label:'Ежедневные продажи'}]){
+  await dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,settings:{...request.parameters.settings,node_title}}});
+  await dispatchNodeApi(runtime,'dock_node_apply',{...patch,parameters:{...patch.parameters,settings:{node_title}}});
+ }
+ for(const node_title of [{mode:'custom'},{mode:'automatic',label:'Wrong'}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...patch,parameters:{...patch.parameters,settings:{node_title}}}));
 });
 
 test('published JavaScript full UI request requires the bounded exact read window',async()=>{
@@ -166,7 +199,7 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
  const {runtime,calls}=fixture();
  const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
  const cross={operation_id:'cross',contract_revision:'1.0.0',document_id:'doc',
-  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'MF;TF',navigation_path:[{tid:'path',label:'Scenario'}]},
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
   target:{kind:'new',type:'transform.cross_table'},inputs:[{source,output:0,input:0}],mode:'pivot',
   parameters:{row_keys:[],columns:[{kind:'input_field',name:'Category'}],
    facts:[{field:{kind:'input_field',name:'Amount'},functions:['sum']}],category_mode:'sliding'},
@@ -198,4 +231,46 @@ test('CrossTable and JavaScript keep distinct columns in the published schema an
  const incomplete=structuredClone(cross);delete incomplete.parameters.facts;
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',incomplete),/typed facts required/);
  assert.equal(calls.length,3);
+});
+
+test('W1 variable reread selection is additive and distinct from table ports',async()=>{
+ let received;const runtime={tools:nodeApiTools,startNodeRead:args=>{received=args;return {status:'pending'};}};
+ const args={operation_id:'fresh',source_operation_id:'executed',read:{ports:[],variable_ports:[0]}};
+ await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(received,args);
+ await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_read',{...args,read:{...args.read,variable_ports:[100]}}));
+});
+
+test('Forward scoped selection passes the public schema and real registered handler together',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'forward',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'datamining.lin_regression',ref:{document_id:'doc',workflow_id:'wf',node_id:'regression'}},inputs:[],mode:'forward',
+  parameters:{input_fields:['X'],target_field:'Y',linear_regression:{selection:{criterion:'f',add_significance:0.05,remove_significance:0.1}}},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:100,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
+});
+
+test('replacement Boolean, mixed and external registrations reach the production parameter validator',async()=>{
+ const {NODE_TYPES}=await import('../lib/node-contracts.mjs');
+ assert.equal(NODE_TYPES['transform.replace_columns'].additional_tabular_inputs,true);
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'replacement',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'transform.replace_columns',ref:{document_id:'doc',workflow_id:'wf',node_id:'replacement'}},inputs:[],mode:'exact',
+  parameters:{rules:[{field:{kind:'input_field',name:'Status'},type:'string',result_type:'boolean',case_sensitive:true,pairs:[{from:{type:'string',value:'no'},to:{type:'boolean',value:false}}],other:{mode:'null'}}]},mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ const mixed=structuredClone(request);mixed.mode='mixed';const rule=mixed.parameters.rules[0];delete rule.result_type;rule.pairs[0].to={type:'string',value:'EXACT-FIRST'};rule.regex_pairs=[{from:{type:'string',value:'AB-([0-9]{2})'},to:{type:'string',value:'REGEX'}}];rule.other={mode:'keep'};
+ await dispatchNodeApi(runtime,'dock_node_apply',mixed);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...mixed,mode:'exact'}),/mixed/);
+ const external=structuredClone(request);external.mode='external';external.parameters.rules=[{field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,other:{mode:'keep'},external:{port:1,value:'Value',replacement:'Replacement',information:['Info'],unused:['Ignored']}}];
+ await dispatchNodeApi(runtime,'dock_node_apply',external);
+ external.parameters.rules[0].pairs=[];await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',external),/external replacement/);
 });

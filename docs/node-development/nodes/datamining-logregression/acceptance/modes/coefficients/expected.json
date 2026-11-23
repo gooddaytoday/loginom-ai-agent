@@ -1,0 +1,128 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.log_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.log_regression",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "DisplayName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "UniqueValues",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Target_coefficients",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_stdError",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_wald",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_waldPValue",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_oddsRatio",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_lowerBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Target_upperBound",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-07,
+            "rel": 1e-08
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "DisplayName": null,
+          "UniqueValues": null,
+          "Target_coefficients": 0,
+          "Target_stdError": 0.48224282217041203,
+          "Target_wald": 0,
+          "Target_waldPValue": 1,
+          "Target_oddsRatio": null,
+          "Target_lowerBound": null,
+          "Target_upperBound": null
+        },
+        {
+          "Name": "X",
+          "DisplayName": "X",
+          "UniqueValues": null,
+          "Target_coefficients": 1.0986122886681098,
+          "Target_stdError": 0.3390317518104051,
+          "Target_wald": 10.500455959069468,
+          "Target_waldPValue": 0.00119345090708038,
+          "Target_oddsRatio": 3.0000000000000004,
+          "Target_lowerBound": 1.5436075865392207,
+          "Target_upperBound": 5.830497387084023
+        }
+      ]
+    }
+  ]
+}

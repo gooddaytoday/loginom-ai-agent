@@ -136,7 +136,29 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
   while(cursor){need(++pages<=32,'storage page bound');const n=await runtime.observe({cursor});need(n.status==='SUCCEEDED'&&n.output.observation_id===s.observation_id,'storage observation changed');for(const k of ['elements','dialogs','masks'])s.ui[k].push(...n.output.ui[k]);cursor=n.output.page?.next_cursor;}
   return s;
  };
- const act=async(s,e,verb='click',extra={})=>{const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');};
+ const act=async(s,e,verb='click',extra={})=>{
+  const ownFolder=verb==='double_click'&&s.file_storage?.directory==='/'&&e.label===account
+   &&e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+account&&e.storage_entry?.kind==='folder';
+  for(let attempt=0;attempt<2;attempt++){
+   const r=await runtime.uiAct({verb,ref:e.ref,...extra},{operationId:'cold-source-nav-'+randomId(),observationId:s.observation_id});
+   if(attempt===0&&ownFolder&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
+    &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'){
+    // Only the assigned folder can be retried, after rediscovering its row.
+    // A fresh epoch is expected; a different window, directory or dialog is not.
+    const found=await read({scope:'roots',storageName:account});
+    const fresh=await detail(found,one(found.ui.elements.filter(x=>x.tid===e.tid),'storage navigation uncertain'));
+    const matches=fresh.ui.elements.filter(x=>x.tid===e.tid&&x.label===account
+     &&x.storage_entry?.kind==='folder'&&x.allowed_actions.includes(verb)&&x.interaction?.state==='point_observed');
+    need(fresh.dom_epoch.document===s.dom_epoch.document&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(s.workflow_ref)
+     &&fresh.file_storage?.status==='observed'&&fresh.file_storage.directory==='/'
+     &&JSON.stringify(fresh.package_identity)===JSON.stringify(s.package_identity)
+     &&[s,fresh].every(x=>x.authenticated&&x.origin===s.origin&&x.loginom_build===s.loginom_build&&!x.ui.dialogs.length&&!x.ui.masks.length)
+     &&matches.length===1,'storage navigation uncertain');
+    s=fresh;e=matches[0];continue;
+   }
+   need(r.status==='SUCCEEDED'&&r.cleanup_complete,'storage navigation uncertain');return;
+  }
+ };
  const ready=async(fn,predicate)=>{const deadline=Date.now()+15000;for(;;){const s=await fn();if(s&&predicate(s))return s;need(Date.now()<deadline,'storage readiness timeout');await new Promise(r=>setTimeout(r,100));}};
  const roots=async()=>{
   // Storage navigation may finish while observation pages are being read.
@@ -145,7 +167,7 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
   catch(error){if(!String(error.message).startsWith('Workspace changed between observation pages;')||attempt===2)throw error;}
  };
  const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
- const directory=()=>ready(async()=>{const s=await roots(),bar=s.ui.elements.find(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');return bar?detail(s,bar):null;},s=>s.file_storage?.status==='observed');
+ const directory=expected=>ready(async()=>{const s=await roots(),bar=s.ui.elements.find(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');return bar?detail(s,bar):null;},s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
  const row=async(name,parent)=>{
   let last;const observed=async options=>{const s=await read(options.root_ref?{rootRef:options.root_ref,observationId:last?.observation_id}:{scope:'roots',...(options.storage_name?{storageName:options.storage_name}:{})});need(s.dom_epoch.document===parent.dom_epoch.document&&JSON.stringify(s.workflow_ref)===JSON.stringify(parent.workflow_ref),'storage owner changed');last=s;return s;};
   return findNativeStorageRow({name,roots:()=>observed({discover_roots:true}),read:observed,ready,act,guard:()=>{}});
@@ -155,8 +177,8 @@ export async function verifyStaticSourceBytes({load,runtime,execute,sources,allo
  s=await directory();
  const own='/'+account;
  if(s.file_storage.directory!==own){
-  if(s.file_storage.directory!=='/'){await act(s,one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'&&e.allowed_actions.includes('click')),'storage root'));s=await directory();need(s.file_storage.directory==='/','storage root changed');}
-  const r=await row(account,s);await act(r,one(r.ui.elements.filter(e=>e.label===account&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'own source folder'),'double_click');s=await directory();
+  if(s.file_storage.directory!=='/'){await act(s,one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'&&e.allowed_actions.includes('click')),'storage root'));s=await directory('/');need(s.file_storage.directory==='/','storage root changed');}
+  const r=await row(account,s);await act(r,one(r.ui.elements.filter(e=>e.label===account&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'own source folder'),'double_click');s=await directory(own);
  }
  need(s.file_storage.directory===own,'own storage required');
  const proofs=new Map();
@@ -204,8 +226,8 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {makeTextExportContextCode}=await load('client/lib/text-export-context.mjs');
  const destinations=[];
- for(const target of graph.nodes.filter(n=>['exports.text','exports.excel'].includes(n.type))){
-  const excel=target.type==='exports.excel',stage=excel?'excel_export':'text_export_params';
+ for(const target of graph.nodes.filter(n=>['exports.text','exports.excel','exports.lgd'].includes(n.type))){
+  const lgd=target.type==='exports.lgd',excel=target.type==='exports.excel',stage=lgd?'lgd_export':excel?'excel_export':'text_export_params';
   const channel=channelFor(target.ref,(includeInputFields?'export-input-':'export-destination-')+target.ref.node_id);
   const owned=s=>s.prepared_node_context?.verified===true
    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===target.ref[k]);
@@ -241,6 +263,16 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
     &&s.workflow_navigation?.status==='observed'&&s.active_identity===s.workflow_navigation.path.at(-1)?.label,
    confirmIdentity:s=>({owner:s.prepared_node_context,epoch:s.dom_epoch,setting:settings(s)[0]})});
   try{
+   let lgdVariables=null;
+   if((lgd||excel||target.type==='exports.text')&&!includeInputFields&&(graph.variable_links??[]).some(e=>e.target===target.ref.node_id&&e.kind==='variables'&&e.input===0)){
+    const {makeVariablePortMappingCode}=await load('client/lib/variable-port-mapping.mjs');
+    const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
+    const origin=await execute('async page=>new URL(page.url()).origin');
+    const code=makeVariablePortMappingCode(binding,{mapping:{direction:'input',kind:'variables',port:0},read_only:true,origin,build:'7.4.2',operation_id:'cold-lgd-variables-'+target.ref.node_id,deadline:Date.now()+30000});
+    const readback=await execute(code);
+    need(readback.verified===true&&readback.cleanup_complete===true&&readback.independent_readback===true&&readback.source_identity_verified===true,'saved LGD variables unavailable');
+    lgdVariables=readback.mapping;
+   }
    if(includeInputFields)await channel.openInputPort(0);else await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold saved export destination page',ready:s=>['input_mapping',stage].includes(s.wizard?.stage)});
    let input_fields;
@@ -264,13 +296,13 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
     resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step')),'export Next').ref,expected_stage:stage})});
    s=await channel.observe({condition:'cold export destination rendered',ready:s=>s.wizard?.stage===stage});
    const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
-   const reader=excel?(await load('client/lib/exports-excel-context.mjs')).makeExcelExportContextCode:makeTextExportContextCode;
-   const observed=await execute(reader(binding));
+   const reader=lgd?(await load('client/lib/lgd-export-context.mjs')).makeLgdExportContextCode:excel?(await load('client/lib/exports-excel-context.mjs')).makeExcelExportContextCode:makeTextExportContextCode;
+   const observed=await execute(lgd||excel||lgdVariables?reader(binding,lgdVariables):reader(binding));
    need(observed.verified===true&&observed.stage===stage&&observed.settings_applied===false
     &&observed.node_context?.verified===true&&observed.node_context.surface==='wizard'
     &&['document_id','workflow_id','node_id'].every(k=>observed.node_context?.[k]===target.ref[k])
     &&typeof observed.values?.destination?.value==='string','export destination unavailable');
-   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value]))}:{}),...(input_fields?{input_fields}:{})});
+   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(lgd?{lgd_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value])),lgd_binding:observed.values.destination.variable?observed.values.destination.variable_name:null}:{}),...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value])),excel_bindings:Object.fromEntries(Object.entries(observed.values).filter(([,v])=>v.variable===true).map(([key,v])=>[key,{variable:v.variable_name}]))}:{}),...(!lgd&&!excel&&observed.values.destination.variable?{text_binding:observed.values.destination.variable_name}:{}),...(input_fields?{input_fields}:{})});
   }finally{
    const current=await channel.observe({condition:'cold export inspection cancellation surface',ready:()=>true});
    if(current.wizard?.status==='observed'){

@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `preprocessing.data_recovery` / `impute`. impute: mean для непрерывных integer/real; zero для integer/real непрерывного и дискретного вида без value; constant для дискретных string, включая пустую строку. Для zero фиксированная замена применяется независимо от доли NULL, включая полностью пустое числовое поле; порог max_nulls_percent продолжает действовать для mean.
+
+Ограничения: Только явно неупорядоченный вход (ordered=false); произвольная числовая constant не поддержана, для нуля используется method=zero без value. Автоматической смены типа/вида данных нет; строковая constant требует string, mean требует непрерывный integer/real.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [missing-values-node.mjs](../../../../packages/loginom-runtime/client/lib/missing-values-node.mjs):1–22; [missing-values-parameters.mjs](../../../../packages/loginom-runtime/client/lib/missing-values-parameters.mjs):1–51; [preprocessing.data_recovery.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.data_recovery.md):1–27. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `preprocessing.data_recovery` / `impute` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи V02. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 

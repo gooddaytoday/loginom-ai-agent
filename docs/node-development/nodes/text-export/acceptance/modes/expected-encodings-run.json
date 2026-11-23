@@ -1,0 +1,36 @@
+{
+  "package_path": "/own/text.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "output_node_type": "export_input",
+  "column_order": "exact",
+  "ordered": true,
+  "columns": [
+    {
+      "name": "Code",
+      "label_any": true,
+      "type": "string"
+    },
+    {
+      "name": "Text",
+      "label_any": true,
+      "type": "string"
+    }
+  ],
+  "rows": [
+    {
+      "Code": "1",
+      "Text": "café €"
+    },
+    {
+      "Code": "2",
+      "Text": "Ångström"
+    }
+  ]
+}

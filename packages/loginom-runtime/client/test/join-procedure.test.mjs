@@ -10,6 +10,18 @@ function fixture(fault){
 test('Join waits for each complete key-set observation before creating the next pair',async()=>{const f=fixture();const r=await configureJoin(f.channel,p,{request:{mode:'inner',finish:'execute'}});assert.deepEqual(r.keys,p.keys);assert.equal(f.actions.length,2);});
 test('Join never retries a lost link response or proceeds to the next pair',async()=>{const f=fixture('lost response');await assert.rejects(configureJoin(f.channel,p,{request:{mode:'inner',finish:'execute'}}),/lost response/);assert.equal(f.actions.length,1);assert.deepEqual(f.c.keys,[p.keys[0]]);});
 test('Close does not mutate any Join setting',async()=>{const f=fixture();const r=await configureJoin(f.channel,p,{request:{mode:'inner',finish:'close'}});assert.equal(r.effect_possible,false);assert.equal(f.actions.length,0);assert.equal(r.draft_edits_skipped,true);});
+test('full preserves saved empty keys and explicitly configures an empty key set without gestures',async()=>{
+ const f=fixture();f.c.mode='full';
+ for(const parameters of [{},{...p,keys:[]}]){
+  const r=await configureJoin(f.channel,parameters,{request:{mode:'full',finish:'execute'}});
+  assert.deepEqual(r.keys,[]);assert.equal(r.effect_possible,false);
+ }
+ assert.equal(f.actions.length,0);
+ for(const mode of ['inner','left','right','difference']){
+  f.c.mode=mode;
+  await assert.rejects(configureJoin(f.channel,{}, {request:{mode,finish:'execute'}}),/no keys/);
+ }
+});
 for(const [mode,label] of [['inner','Внутреннее_соединение'],['left','Левое_соединение'],['right','Правое_соединение'],['full','Полное_соединение'],['difference','Разность']]){
  test('Join selects observed data-tid for '+mode+' and preserves keys and options',async()=>{
   const c={verified:true,input_fields:[['A','C'],['B','D']].map(ns=>ns.map(name=>({name,type:'string'}))),keys:structuredClone(p.keys),

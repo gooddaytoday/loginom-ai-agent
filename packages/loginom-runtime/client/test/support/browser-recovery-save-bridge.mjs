@@ -45,15 +45,20 @@ mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{
 mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>({
-  tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
-  run:async(key,parameters,{operationId})=>({status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}}),
+  tools:executor.executorTools,describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+  run:async(key,parameters,{operationId})=>{
+    f.saved={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+    return f.lost?{...f.saved,status:'AMBIGUOUS',output:{}}:f.saved;
+  },
+  inspect:async({operationId})=>({status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
+    output:{state:'resolved',cleanup_confirmed:true,outcome:f.saved}}),
   browserRecoveryBasis(){throw Error('No browser recovery trigger for this operation');},
 })}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
 for(const modified of [false,true])
 test('a confirmed Save with an unreadable package state is recovered by a runtime reread: modified='+modified,async t=>{
-  f.stateReads=0;f.modified=modified;
+  f.stateReads=0;f.modified=modified;f.lost=false;
   const directory=await mkdtemp(join(tmpdir(),'recovery-save-bridge-'));
   const resources=await createBundledSkillFixture(t);f.catalog=await createActionCatalogFixture(target);
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
@@ -87,5 +92,29 @@ test('a confirmed Save with an unreadable package state is recovered by a runtim
     assert.ok(journal.some(e=>e.phase==='browser_recovery_receipt'&&e.receipt.id==='own-save:br-save'));
     const again=await client.callTool({name:'dock_browser_recovery',arguments:{action:'start',operation_id:'own-save'}});
     assert.equal(again.isError,true);
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('inspection of an ambiguous Save delivers the original saved-package follow-up',async t=>{
+  f.stateReads=1;f.modified=false;f.lost=true;
+  const directory=await mkdtemp(join(tmpdir(),'reconciled-save-bridge-'));
+  const resources=await createBundledSkillFixture(t);f.catalog=await createActionCatalogFixture(target);
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:f.catalog.manifestUri,actionManifestSha256:f.catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true},session,{browserTransport:new ExternalTransport()});
+  const client=new AgentClient({name:'reconciled-save',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    await client.callTool({name:'dock_prepare',arguments:{}});
+    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
+    const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
+    const blocks=inspected.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
+    assert.equal(blocks[0].action_key,'operation.inspect');
+    const state=blocks.find(v=>v.kind==='dock_saved_package_state');
+    assert.equal(state?.save_operation_id,'own-save',JSON.stringify(inspected));
+    assert.equal(state.package_path,path);assert.equal(state.modified,false);assert.equal(f.stateReads,2);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });

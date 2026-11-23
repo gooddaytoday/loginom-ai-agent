@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { windowsPowerShellArguments } from "../windows-powershell"
+import { WINDOWS_POWERSHELL_TIMEOUT_MS, windowsPowerShellArguments } from "../windows-powershell"
 
 export type CommandResult = {
   code: number | null
@@ -103,7 +103,7 @@ export async function readSystemProxy(input: {
   const platform = input.platform ?? process.platform
   const environment = input.environment ?? process.env
   const runner = input.runner ?? spawnCommand
-  const timeoutMs = input.timeoutMs ?? 8000
+  const timeoutMs = input.timeoutMs ?? (platform === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000)
   try {
     if (platform === "win32") return readWindows(environment, runner, timeoutMs, input.signal)
     if (platform === "darwin") return readMacos(runner, timeoutMs, input.signal)
@@ -232,33 +232,34 @@ function windowsScript() {
 $ErrorActionPreference = 'Stop'
 try {
   [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
-  Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class LoginomProxy {
-  [StructLayout(LayoutKind.Sequential)] public struct Config {
-    [MarshalAs(UnmanagedType.Bool)] public bool AutoDetect;
-    public IntPtr AutoConfigUrl, Proxy, Bypass;
-  }
-  [DllImport("winhttp.dll", SetLastError=true)]
-  [return: MarshalAs(UnmanagedType.Bool)]
-  public static extern bool WinHttpGetIEProxyConfigForCurrentUser(out Config config);
-  [DllImport("kernel32.dll")] public static extern IntPtr GlobalFree(IntPtr value);
-}
-'@
-  $config = New-Object LoginomProxy+Config
-  if (-not [LoginomProxy]::WinHttpGetIEProxyConfigForCurrentUser([ref]$config)) { exit 1 }
+  # Emit just the native signatures in memory; do not start the C# compiler.
+  # Keep WinHTTP authoritative for per-user, policy and connection settings.
+  $assembly = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object Reflection.AssemblyName('LoginomProxy')), 'Run')
+  $module = $assembly.DefineDynamicModule('LoginomProxy')
+  $type = $module.DefineType('LoginomProxy', 'Public, Abstract, Sealed')
+  $read = $type.DefinePInvokeMethod('WinHttpGetIEProxyConfigForCurrentUser', [IO.Path]::Combine($env:SystemRoot, 'System32', 'winhttp.dll'), 'Public, Static, PinvokeImpl', 'Standard', [int], [Type[]]@([IntPtr]), 'Winapi', 'Unicode')
+  $free = $type.DefinePInvokeMethod('GlobalFree', [IO.Path]::Combine($env:SystemRoot, 'System32', 'kernel32.dll'), 'Public, Static, PinvokeImpl', 'Standard', [IntPtr], [Type[]]@([IntPtr]), 'Winapi', 'Unicode')
+  $read.SetImplementationFlags('PreserveSig')
+  $free.SetImplementationFlags('PreserveSig')
+  $native = $type.CreateType()
+  # BOOL followed by three pointer-aligned LPWSTR fields (x86 and x64).
+  $size = [IntPtr]::Size
+  $config = [Runtime.InteropServices.Marshal]::AllocHGlobal(4 * $size)
   try {
+    for ($i = 0; $i -lt 4; $i++) { [Runtime.InteropServices.Marshal]::WriteIntPtr($config, $i * $size, [IntPtr]::Zero) }
+    if ($native::WinHttpGetIEProxyConfigForCurrentUser($config) -eq 0) { throw 'WinHTTP read failed' }
     [ordered]@{
-      autoDetect = $config.AutoDetect
-      autoConfigUrl = [string][Runtime.InteropServices.Marshal]::PtrToStringUni($config.AutoConfigUrl)
-      proxy = [string][Runtime.InteropServices.Marshal]::PtrToStringUni($config.Proxy)
-      bypass = [string][Runtime.InteropServices.Marshal]::PtrToStringUni($config.Bypass)
+      autoDetect = [Runtime.InteropServices.Marshal]::ReadInt32($config) -ne 0
+      autoConfigUrl = [string][Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::ReadIntPtr($config, $size))
+      proxy = [string][Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::ReadIntPtr($config, 2 * $size))
+      bypass = [string][Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::ReadIntPtr($config, 3 * $size))
     } | ConvertTo-Json -Compress
   } finally {
-    foreach ($value in @($config.AutoConfigUrl, $config.Proxy, $config.Bypass)) {
-      if ($value -ne [IntPtr]::Zero) { [void][LoginomProxy]::GlobalFree($value) }
+    for ($i = 1; $i -lt 4; $i++) {
+      $value = [Runtime.InteropServices.Marshal]::ReadIntPtr($config, $i * $size)
+      if ($value -ne [IntPtr]::Zero) { [void]$native::GlobalFree($value) }
     }
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($config)
   }
 } catch { exit 1 }
 `

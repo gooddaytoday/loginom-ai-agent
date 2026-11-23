@@ -10,23 +10,33 @@ import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {excelExportNext,configureExcelExport} from '../lib/exports-excel-procedure.mjs';
+import {excelExportReadback} from '../lib/exports-excel-node.mjs';
+
+test('Excel readback distinguishes both saved variable bindings from resolved values',()=>{
+ const values={destination:{value:'/test-2/b.xlsx',variable:true,variable_name:'ExcelPath'},sheet_name:{value:'Февраль',variable:true,variable_name:'SheetName'}};
+ const phases=[{phase:'configure',value:{configuration:{destination:'/test-2/b.xlsx',configured:{excel_export:{values}}}}},
+  {phase:'input_mapping',value:{source_identity_verified:true,native_mapping:{autosync:true,target_fields:[]}}},{phase:'finish',status:'verified'}];
+ const result=excelExportReadback({node:{node_id:'sink'},phases});
+ assert.deepEqual(result.bindings,{destination:{variable:'ExcelPath'},sheet_name:{variable:'SheetName'}});
+ assert.equal(result.settings.sheet_name,'Февраль');
+});
 
 const directories={packages:'/operator/packages',inputs:'/operator/inputs',exports:'/operator/exports'};
 test('XLSX native exports retain the selected directory and extension guards',()=>{
- for(const extension of ['csv','tsv','xlsx']){
+ for(const extension of ['csv','tsv','xlsx','xls']){
   const destination=directories.exports+'/result.'+extension;
   assert.equal(requireExportDestination(destination,directories),destination);
   assert.equal(requireExportDestination('/test-2/result.'+extension),'/test-2/result.'+extension);
  }
  for(const path of ['/operator/inputs/result.xlsx','/operator/exports-other/result.xlsx','/operator/exports/../result.xlsx',
-  '/operator/exports/result.xls','/operator/exports/result.xlsm','/operator/exports/result.exe','/operator/exports/result.xlsx?x'])
+  '/operator/exports/result.xlsm','/operator/exports/result.exe','/operator/exports/result.xlsx?x'])
   assert.throws(()=>requireExportDestination(path,directories),path);
- for(const path of ['/test-1/result.xlsx','/test-2/../result.xlsx','/test-2/result.xls','/test-2/result.xlsm'])
+ for(const path of ['/test-1/result.xlsx','/test-2/../result.xlsx','/test-2/result.xlsm'])
   assert.throws(()=>requireExportDestination(path),path);
 });
 test('Excel export registers one input and no table output',()=>{
  const handler=createCandidateNodeSupport({}).nodeApplyHandlers.get('exports.excel');
- assert.equal(handler.fileOutput,true);assert.deepEqual(handler.modes,['xlsx']);
+ assert.equal(handler.fileOutput,true);assert.deepEqual(handler.modes,['xlsx','xls']);
  assert.equal(NODE_TYPES['exports.excel'].palette_group,'Экспорт');
  assert.equal(NODE_TYPES['exports.excel'].tabular_outputs,0);
  assert.ok(nodeApplyInputSchema.properties.target.properties.type.enum.includes('exports.excel'));
@@ -72,13 +82,13 @@ test('Excel export validates new settings and existing patches before mutation',
  const r={target:{kind:'new'},read:{ports:[]},inputs:[{}],mappings:[]};
  assert.doesNotThrow(()=>validateExcelExportParameters(p,'xlsx',r));
  assert.doesNotThrow(()=>validateExcelExportParameters({},'xlsx',{...r,target:{kind:'existing'},inputs:[]}));
- for(const change of [v=>delete v.excel_export.header,v=>v.excel_export.overwrite='replace',v=>v.excel_export.sheet_name='bad/name',v=>v.excel_export.sheet_name="'edge",v=>v.excel_export.destination='/test-2/cells.csv',v=>v.excel_export.extra=true]){
+ for(const change of [v=>delete v.excel_export.header,v=>v.excel_export.overwrite='append',v=>v.excel_export.sheet_name='bad/name',v=>v.excel_export.sheet_name="'edge",v=>v.excel_export.destination='/test-2/cells.csv',v=>v.excel_export.extra=true]){
   const v=structuredClone(p);change(v);assert.throws(()=>validateExcelExportParameters(v,'xlsx',r));
  }
  for(const patch of [{read:{ports:[0]}},{read:{ports:[],sample_rows:1}},{inputs:[]},{mappings:[{}]}])assert.throws(()=>validateExcelExportParameters(p,'xlsx',{...r,...patch}));
  const values=Object.fromEntries(Object.entries({destination:p.excel_export.destination,sheet_name:'Данные',header:2,file_type:1,number_format:0,divide_thousands:false}).map(([k,value])=>[k,{value}]));
  assert.doesNotThrow(()=>validateNativeExcelExport(values));
- for(const [key,value]of Object.entries({file_type:0,number_format:1,divide_thousands:true,header:3}))assert.throws(()=>validateNativeExcelExport({...values,[key]:{value}}));
+ for(const [key,value]of Object.entries({file_type:0,number_format:2,header:3}))assert.throws(()=>validateNativeExcelExport({...values,[key]:{value}}));
 });
 test('Excel wizard exposes only owned literal destination/sheet fields and header options',async()=>{
  for(const variable of [false,true]){
@@ -93,4 +103,48 @@ test('Excel wizard exposes only owned literal destination/sheet fields and heade
   const fields=s.ui.elements.filter(e=>e.allowed_actions.includes('set_wizard_field'));
   assert.deepEqual(fields.map(e=>e.wizard_field.name).sort(),variable?[]:['destination','sheet_name']);
  }
+});
+
+test('Excel bindings require distinct string settings and a connected variables input',()=>{
+ const r={target:{kind:'new'},read:{ports:[]},inputs:[{}],mappings:[],variable_inputs:[{kind:'variables',input:0}]};
+ const p={excel_export:{header:'names',overwrite:'reject',bindings:{destination:{variable:'ExcelPath'},sheet_name:{variable:'SheetName'}}}};
+ assert.doesNotThrow(()=>validateExcelExportParameters(p,'xlsx',r));
+ for(const change of [v=>v.excel_export.destination='/test-2/a.xlsx',v=>v.excel_export.sheet_name='literal',v=>v.excel_export.bindings.sheet_name.variable=null,v=>v.excel_export.bindings.other={variable:'Other'},v=>v.excel_export.bindings={},v=>v.excel_export.bindings.destination.extra=true]){
+  const bad=structuredClone(p);change(bad);assert.throws(()=>validateExcelExportParameters(bad,'xlsx',r));
+ }
+ for(const variable_inputs of [[],[{kind:'control',input:0}],[{kind:'variables',input:1}]])assert.throws(()=>validateExcelExportParameters(p,'xlsx',{...r,variable_inputs}));
+ assert.doesNotThrow(()=>validateExcelExportParameters({},'xlsx',{...r,target:{kind:'existing'},variable_inputs:[]}));
+ // Close never maps the variables input, so a bound Close is refused before the UI.
+ for(const target of [{kind:'new'},{kind:'existing'}]){
+  const req={...r,target,inputs:target.kind==='new'?[{}]:[],variable_inputs:target.kind==='new'?r.variable_inputs:[]};
+  assert.throws(()=>validateExcelExportParameters(p,'xlsx',{...req,finish:'close'}),/finish=close/,target.kind);
+  for(const finish of ['done','execute'])assert.doesNotThrow(()=>validateExcelExportParameters(p,'xlsx',{...req,finish}),target.kind+' '+finish);
+ }
+ assert.doesNotThrow(()=>validateExcelExportParameters({},'xlsx',{...r,target:{kind:'existing'},inputs:[],variable_inputs:[],finish:'close'}));
+});
+
+test('Excel variable read uses mapped names and labels without dereferencing native references',async()=>{
+ const {runInNewContext}=await import('node:vm');
+ const {readExcelExportBrowser}=await import('../lib/exports-excel-context.mjs');
+ const {EXCEL_EXPORT_FIELDS}=await import('../lib/exports-excel-parameters.mjs');
+ const base='own;WizrdMCF;',elements=new Map(),components=new Map();
+ const add=(tid,c)=>{const e={id:tid,checkVisibility:()=>true};elements.set(tid,e);components.set(tid,{...c,el:{dom:e}});return e;};
+ const root=add(base+'ExportExcelFilePreviewWizard',{});root.contains=()=>true;
+ const variables=[{name:'ExcelPath',label:'Путь',type:5,value:'/test-2/current.xlsx',is_null:false,source:{name:'ExcelPath'}},
+  {name:'SheetName',label:'Лист',type:5,value:'Февраль',is_null:false,source:{name:'SheetName'}}];
+ const mapping={kind:'variables',direction:'input',port:0,fields:variables};
+ for(const [key,[card,id]]of Object.entries(EXCEL_EXPORT_FIELDS)){
+  const tid=base+card+';'+id,index=['destination','sheet_name'].indexOf(key);
+  add(tid+';SwitchButton',{pressed:index>=0});add(tid+';ValueControl',{getValue:()=>({destination:'stale.xlsx',sheet_name:'stale',file_type:1,header:1,number_format:0,decimal_count:2,divide_thousands:false})[key]});
+  if(index>=0){
+   const reference=new Proxy({},{get(){assert.fail('native reference dereferenced');}}),v=variables[index];
+   add(tid+';VariableControl',{getValue:()=>reference,getStore:()=>({isLoading:()=>false,getData:()=>({items:[{data:{field1:reference,field2:v.label+' ( '+v.value+' )'}}]})})});
+  }
+ }
+ add(base+'ExportExcelFilePreviewWizard;edtConnection',{getValue:()=>'Локальное'});
+ const read=variableMapping=>runInNewContext('('+readExcelExportBrowser.toString()+')(args)',{args:{prefix:'own',fields:EXCEL_EXPORT_FIELDS,variableMapping},
+  document:{querySelectorAll:selector=>{const tid=JSON.parse(selector.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}},Ext:{getCmp:id=>components.get(id)}});
+ const result=read(mapping);assert.equal(result.verified,true);assert.equal(result.values.destination.variable_name,'ExcelPath');assert.equal(result.values.sheet_name.value,'Февраль');
+ for(const change of [null,{...mapping,kind:'control'},{...mapping,fields:[]},{...mapping,fields:[...variables,variables[0]]},
+  {...mapping,fields:variables.map(v=>({...v,is_null:true}))},{...mapping,fields:variables.map(v=>({...v,type:1}))}])assert.equal(read(change).verified,false);
 });

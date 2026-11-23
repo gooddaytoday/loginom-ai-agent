@@ -1,0 +1,69 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.calculator"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "limit",
+            "label": "Лимит",
+            "type": "integer",
+            "value": 120
+          },
+          {
+            "name": "skip",
+            "label": "Пропуск",
+            "type": "integer",
+            "value": 0
+          },
+          {
+            "name": "remaining",
+            "label": "Осталось",
+            "type": "integer",
+            "value": 120
+          },
+          {
+            "name": "title",
+            "label": "Заголовок",
+            "type": "string",
+            "value": "Страница"
+          },
+          {
+            "name": "enabled",
+            "label": "Включено",
+            "type": "boolean",
+            "value": true
+          },
+          {
+            "name": "ratio",
+            "label": "Доля",
+            "type": "real",
+            "value": 0.125
+          },
+          {
+            "name": "empty",
+            "label": "Пустая строка",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "missing",
+            "label": "Нет значения",
+            "type": "integer",
+            "value": null
+          }
+        ]
+      }
+    ]
+  }
+}

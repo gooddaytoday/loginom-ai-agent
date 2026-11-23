@@ -4,7 +4,24 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+C10: `produce_error_descriptions` управляет native-флагом выдачи описаний кодов
+в дополнительных параметрах REST. `false` удаляет поле ErrorDesc: порт 1 содержит
+RequestID/ErrorCode/HttpStatusCode (integer); `true` возвращает четыре поля,
+пропуск сохраняет настройку. Readback читает флаг мастера, чтение выхода проверяет
+фактическую трёх- или четырёхполевую схему. Приёмка `rest-error-descriptions`
+использует неизменённые task/response.json/expected и штатные CSV/Save/cold/cleanup.
+
+Зарегистрирован `integration.rest_request` / `request`. request: GET полного URL с REST-подключением; запрос без входа/query либо с параметрами строки запроса из входной таблицы.
+
+Ограничения: POST/PUT/PATCH с телом и DELETE — #808, свои заголовки — #1030; retry и auth/TLS вне среза; независимый plain GET подтверждён LAB-690.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [rest-request-node.mjs](../../../../packages/loginom-runtime/client/lib/rest-request-node.mjs):1–198; [rest-request-parameters.mjs](../../../../packages/loginom-runtime/client/lib/rest-request-parameters.mjs):1–36; [integration.rest_request.md](../../../../packages/product/skills/loginom-automation/references/nodes/integration.rest_request.md):1–15. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 На базе этапа 0 обработчика REST нет, статус реестра `discovery_required`. Discovery LAB-86 принят владельцем; приёмочный комплект скорректирован по ревью PR #95. Готовность обработчика этим docs PR не заявляется.
 

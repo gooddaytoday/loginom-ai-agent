@@ -1,0 +1,83 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "control.condition"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.condition",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Paid",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 101,
+          "Region": "North",
+          "Amount": 12.5,
+          "Paid": true,
+          "Note": "first"
+        },
+        {
+          "OrderID": 102,
+          "Region": "South",
+          "Amount": null,
+          "Paid": false,
+          "Note": ""
+        },
+        {
+          "OrderID": 103,
+          "Region": "North",
+          "Amount": -3.25,
+          "Paid": null,
+          "Note": null
+        },
+        {
+          "OrderID": 104,
+          "Region": null,
+          "Amount": 0.0,
+          "Paid": true,
+          "Note": "last"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRedactor} from '../lib/redact.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {rejectUnchangedCalculatorDraft,verifiedCalculatorRequestRefusal,verifiedCalculatorSyntaxFailure} from '../lib/calculator-request-refusal.mjs';
 const node={document_id:'d',workflow_id:'w',node_id:'n'};
 const state=()=>({prepared_node_context:{verified:true,...node},wizard:{stage:'calculator'},node_calculator:{verified:true,inventory_complete:true,mode:'expression',input_fields:[{name:'X',label:'X',type:'integer'}],expressions:[{name:'E',label:'E',formula:'X*2',type:'real',replace:false,intermediate:false,cached:false,description:''}]}});
@@ -62,10 +63,10 @@ test('native preview console refusal closes the owned modal before restoring the
  assert.equal(f.calls[0],'preview_close');
 });
 
-test('preview parse-error dialog requires its confirmed OK before draft rollback',async()=>{
+test('journal C parse-error dialog requires its confirmed OK before draft rollback',async()=>{
  const f=syntaxFixture(),v=f.error.receipt.output.wizard.calculator_validation;
- v.source='loginom_calculator_preview_error_dialog';v.field_name='E';
- v.message='Ошибка разбора выражения "E". Неправильное выражение: "X+"';
+ v.source='loginom_calculator_preview_error_dialog';v.field_name='id';
+ v.message='Loginom 7.4.2 Настройка прервана 1. Ошибка разбора выражения "id" 1.1. Некорректный символ';
  f.error.receipt.error.message=v.message;f.error.receipt.trace[0].message=v.message;
  f.error.receipt.trace.push({event:'wizard_calculator_preview_error_dismissed',root_ref:'wizard',message:v.message});
  const read=f.channel.observe;f.channel.observe=async()=>{const s=await read();s.wizard.calculator_preview={status:'absent'};s.ui={dialogs:[]};return s;};
@@ -93,4 +94,56 @@ for(const mode of ['lost_reply','cleanup','foreign','wrong_error','changed_valid
  if(mode==='changed_validation')f.channel.observe=async()=>state();
  if(mode==='graph_drift')f.ops.readGraph=async()=>({nodes:['n','source'],links:[]});
  await assert.rejects(rejectUnchangedCalculatorDraft(f.channel,f.baseline,f.error,f.ops));assert.equal(f.error.nodePhaseRefusal,undefined);
+});
+
+// d1:615→617: after native error dismissal/cancellation, SVG body 1855 is
+// replaced by 1857 before selection, while the prepared native GUID is unchanged.
+for(const fault of ['none','repeat','foreign_node','foreign_document','foreign_workflow','signature','effect','gesture','changed_after_refresh'])
+test('calculator rollback reobserves a replaced graph body: '+fault,async()=>{
+ const f=syntaxFixture(),records=[],actions=[];
+ const graph={origin:'https://app.loginom.ai/',loginom_build:'7.4.2',workflow_ref:{prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'w',navigation_path:[{tid:'path',label:'Workflow'}]},
+  prepared_node_context:{verified:true,...node,surface:'graph',tid:'MF;TF-1;Graph;Calculator',locked:false},
+  graph_identity:{status:'observed',container_ref:'diagram',native_prefix:'MF;TF-1;Graph;'},dom_epoch:{document:'dom',revision:50860},
+  scan:{complete:true},wizard:{status:'absent'},ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},elements:[
+   {tid:'MF;TF-1;Graph;Calculator',ref:'ui-body-1855',scope:'graph',kind:'graph',graph_node:{part:'body'},
+    identity:{anchor_tid:'MF;TF-1;Graph;Calculator',path:[]},signature:{tag:'g',native_graph:{node_id:'n',identity:['native-cell']}},
+    allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
+ let stage='validation',attempts=0,clicks=0;
+ const channel=createNodeProcedure({operation:{id:'rollback',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:{document_id:'d',workflow_ref:graph.workflow_ref,node},targetOrigin:graph.origin,targetBuild:graph.loginom_build,
+  now:()=>1,wait:async()=>{},record:async e=>{records.push(e);return structuredClone(e);},
+  wrapMutation:(code,reference)=>({reference}),execute:async code=>{
+   if(typeof code==='string'){
+    const s=structuredClone(graph);
+    if(attempts&&fault==='changed_after_refresh')s.prepared_node_context.node_id='foreign';
+    return {status:'SUCCEEDED',output:s};
+   }
+   const action=records.findLast(e=>e.phase==='node_step_prepared').action;actions.push(action);attempts++;
+   if(attempts===1||fault==='repeat'){
+    graph.ui.elements[0].ref=attempts===1?'ui-body-1857':'ui-body-1859';graph.dom_epoch.revision++;
+    if(fault==='foreign_node')graph.prepared_node_context.node_id='foreign';
+    if(fault==='foreign_document')graph.prepared_node_context.document_id='foreign';
+    if(fault==='foreign_workflow')graph.prepared_node_context.workflow_id='foreign';
+    if(fault==='signature')graph.ui.elements[0].signature.native_graph.identity=['foreign-cell'];
+    return {action_key:'ui.act',operation_id:code.reference.id,status:'NOT_APPLIED',phase:'preconditions',
+     effect_possible:fault==='effect',cleanup_complete:true,error:{code:'UI_REFERENCE_STALE',message:'Observed control is detached, hidden, disabled, or replaced'},
+     trace:fault==='gesture'?[{event:'ui_gesture_applied'}]:[{event:'ui_action_failed',code:'UI_REFERENCE_STALE'}],output:structuredClone(graph)};
+   }
+   assert.equal(action.ref,'ui-body-1857');clicks++;
+   return {action_key:'ui.act',operation_id:code.reference.id,status:'SUCCEEDED',phase:'completed',effect_possible:true,cleanup_complete:true,output:structuredClone(graph)};
+  }});
+ const close=f.ops.close,open=f.ops.open;
+ f.ops.close=async()=>{const r=await close();stage='graph';return r;};
+ f.ops.open=async()=>{await open();stage='reopened';};
+ delete f.ops.select;
+ f.channel={perform:channel.perform,observe:async options=>stage==='graph'?channel.observe(options)
+  :stage==='reopened'?state():{...state(),wizard:structuredClone(f.error.receipt.output.wizard)}};
+ await assert.rejects(rejectUnchangedCalculatorDraft(f.channel,f.baseline,f.error,f.ops),e=>fault==='none'?e===f.error:e!==f.error);
+ assert.equal(clicks,fault==='none'?1:0);
+ assert.equal(attempts,fault==='none'||fault==='repeat'?2:1);
+ if(fault==='none'){
+  assert.deepEqual(actions.map(a=>a.ref),['ui-body-1855','ui-body-1857']);
+  assert.equal(records.filter(e=>e.phase==='node_step_refresh_authorized'&&e.reason==='prepared_graph_body_replaced').length,1);
+  assert.equal(verifiedCalculatorRequestRefusal(f.error.nodePhaseRefusal,node),true);
+ }else assert.equal(f.error.nodePhaseRefusal,undefined);
 });

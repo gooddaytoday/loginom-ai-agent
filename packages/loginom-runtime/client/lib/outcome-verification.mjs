@@ -18,7 +18,15 @@ export function outcomeVerification(outcome, action) {
       // A permissive server schema cannot weaken this local save contract.
       const saveReady = entry.actionKey !== 'package.save_as' || (outcome.output.reopened === true
           && events.includes('reopened_package_observed'));
+      const normalizedRest = outcome.output.reopened === true && outcome.output.workflow_preserved === false
+        && events.includes('saved_package_closed') && events.includes('reopened_package_observed')
+        && outcome.trace.filter(e => e.event === 'rest_package_normalization').length === 1
+        && outcome.trace.some(e => e.event === 'rest_package_normalization' && e.modified_after === false
+          && typeof e.modified_before === 'boolean' && e.additional_save === e.modified_before)
+        && outcome.trace.some(e => e.event === 'postcondition_verified' && e.proof === 'rest_package_normalized');
       const checkpointReady = entry.actionKey !== 'package.save_checkpoint' || (
+        normalizedRest && outcome.output.save_completed === true && outcome.output.persisted_content_verified === false
+        && events.filter(e => e === 'save_flow_completed').length === 1) || (
         outcome.output.reopened === false && outcome.output.workflow_preserved === true
         && outcome.output.save_completed === true && outcome.output.persisted_content_verified === false
         && events.filter(e => e === 'save_flow_completed').length === 1

@@ -1,0 +1,71 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.data_recovery"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.data_recovery",
+      "output_node_label": "Линейное восстановление",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 10,
+          "R": 0.0,
+          "Keep": null
+        },
+        {
+          "RowID": 1,
+          "R": 2.0,
+          "Keep": ""
+        },
+        {
+          "RowID": 8,
+          "R": 4.0,
+          "Keep": "null"
+        },
+        {
+          "RowID": 2,
+          "R": 6.0,
+          "Keep": "0"
+        },
+        {
+          "RowID": 3,
+          "R": 8.0,
+          "Keep": "last"
+        }
+      ]
+    }
+  ]
+}

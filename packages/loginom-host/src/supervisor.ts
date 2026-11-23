@@ -13,11 +13,12 @@ export type Launch = {
   stateDir: string
   generation: number
   chat: string
-  endpoint: string
   connection: { apiKey: string; password: string; url: string; username: string }
   actionManifestUri?: string
   actionManifestSha256?: string
   validation?: boolean
+  // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
+  validationHttpCache?: boolean
   headless?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
@@ -28,10 +29,13 @@ export type Launch = {
   // Private launcher capability for temporary browser recovery tools.
   browserRecovery?: boolean
   startupDeadline?: number
+  resourceManifestHash?: string
+  resourceCachePath?: string
+  resourceCacheVersion?: string
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
-export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+export type KnowledgeLaunch = ProcessLaunch & { helpRoot: string }
 
 export class RuntimeStartupError extends Error {
   constructor(
@@ -72,6 +76,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "all_proxy",
     "no_proxy",
     "NODE_USE_ENV_PROXY",
+    "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
   ]
   if (platform === "linux")
     keys.push(
@@ -106,13 +111,15 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 // Both use the same private transport and acknowledged cleanup contract.
 export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
-  // Browser validation follows the separate key-only Help check in Host.
+  // Browser validation follows the separate local Help check in Host.
   const runtime = await superviseProcess(
     { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
     { ...input, environment: undefined, protocol: 1 },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
-    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,
+    // Windows browser/resource teardown can outlast 5s even after native Close/logout.
+    // Leave headroom for the exit grace inside the outer Host's 30s close budget.
+    input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
   )
   const ready = runtime.ready
   if (
@@ -130,13 +137,13 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
 }
 
 export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  if (!isAbsolute(input.helpRoot)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.apiKey] },
+    input,
     {
       protocol: 1,
       generation: input.generation,
-      endpoint: input.endpoint,
-      apiKey: input.apiKey,
+      helpRoot: input.helpRoot,
     },
     120_000,
     signal,
@@ -285,6 +292,7 @@ async function superviseProcess(
     void close().catch(() => undefined)
   }
   signal?.addEventListener("abort", cancel, { once: true })
+  const started = performance.now()
   try {
     const ready = await request("start", start, timeout)
     signal?.throwIfAborted()
@@ -300,6 +308,10 @@ async function superviseProcess(
     }
     return { ready, request, close, exited }
   } catch (cause) {
+    await appendFile(join(input.stateDir, "startup-failures.jsonl"), JSON.stringify({ version: 1,
+      recorded_at: new Date().toISOString(), phase: "runtime.start", generation: input.generation, pid: child.pid,
+      elapsed_ms: Math.round(performance.now() - started), error: startupDiagnostic(cause, input.diagnosticSecrets),
+    }) + "\n", { mode: 0o600 }).catch(() => undefined)
     const cleanupConfirmed = await close().then(
       () => true,
       () => false,

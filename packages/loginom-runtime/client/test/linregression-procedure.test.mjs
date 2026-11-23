@@ -1,8 +1,58 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureLinRegression,configureLinRegressionRoles} from '../lib/linregression-procedure.mjs';
+import {configureLinRegression,configureLinRegressionRoles,configureLinRegressionPartition} from '../lib/linregression-procedure.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
 import {createLinRegressionNodeSupport} from '../lib/linregression-node.mjs';
+
+function partitionReplay(fault){
+ const base='W;LearnPartitionWizard;',sizes=[0,1].map(index=>({index,unit:'percent',count:100,icon_ref:'ui-unit-'+index,absolute_control_tid:base+'SizeGridForm;colAbsoluteSize;FloatPropEdit'+(index?'-1':'')+';PropContainer;ValueContainer;ValueControl'}));
+ let sampling=0,sequence=[1,0,2],picker=false;const actions=[];
+ const state=()=>({wizard:{stage:'learn_partition',root_tid:'W'},prepared_node_context:{node_id:'same-node'},
+  node_linregression:{verified:true,kind:'partition',values:{sampling,validation:fault==='validation'?1:0,train:100,test:0},sizes:structuredClone(sizes),sequence},
+  ui:{elements:[...['pedSamplingMethod;ValueControl;trg_picker','SequenceMethodForm;btnGroupPositionReset',...(picker?['pedSamplingMethod;ValueControl;boundlist;Последовательный']:[])].map(key=>({tid:base+key,ref:'ui-'+key,allowed_actions:['click']})),
+   ...sizes.flatMap(s=>[{ref:s.icon_ref,signature:{tag:'img'},allowed_actions:['click']},{tid:s.absolute_control_tid,ref:'ui-count-'+s.index,allowed_actions:['fill','press']}])]}});
+ const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform({ready,resolve}){
+  const s=state();assert.equal(ready(s),true);const a=resolve(s);actions.push(a);
+  if(a.ref.endsWith('trg_picker'))picker=true;
+  else if(a.ref.endsWith('Последовательный')){sampling=1;picker=false;}
+  else if(a.ref.endsWith('btnGroupPositionReset')){if(fault!=='order')sequence=[0,1,2];}
+  else if(a.ref.startsWith('ui-unit-')){if(fault!=='unit')sizes[Number(a.ref.at(-1))].unit='rows';}
+  else if(a.verb==='fill'&&fault!=='count')sizes[Number(a.ref.at(-1))].count=Number(a.text);
+ }};
+ return {channel,actions,sizes,run:wanted=>configureLinRegressionPartition(channel,wanted)};
+}
+test('sequential partition uses row units, commits 16/2 and resets the native allocation order',async()=>{
+ const f=partitionReplay(),wanted={method:'sequential',train_count:16,test_count:2};
+ assert.deepEqual(await f.run(wanted),wanted);
+ assert.equal(f.actions.filter(a=>a.verb==='press'&&a.key==='Tab').length,2);
+ assert.equal(f.actions.some(a=>a.ref.endsWith('btnGroupPositionReset')),true);
+ f.actions.length=0;assert.deepEqual(await f.run(wanted),wanted);assert.deepEqual(f.actions,[]);
+});
+for(const fault of ['validation','order','unit','count'])test('partition refuses '+fault+' readback without silently training all rows',async()=>{
+ const f=partitionReplay(fault);await assert.rejects(f.run({method:'sequential',train_count:16,test_count:2}));
+ assert.equal(f.actions.some(a=>a.verb==='wizard_step'),false);
+});
+test('ordinary training remains 100 percent; a saved row split requires explicit counts',async()=>{
+ const f=partitionReplay();assert.deepEqual(await f.run(),{sampling:0,validation:0,train:100,test:0});assert.deepEqual(f.actions,[]);
+ f.sizes[0].unit='rows';await assert.rejects(f.run(),/explicit sequential/);
+});
+
+test('apply explicitly refuses a saved sequential partition without changing settings or training',async()=>{
+ const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'regression'};
+ const fields=['X','Y'].map((name,index)=>({name,label:name,type:'real',data_kind:'Непрерывный',index,usage_type:index===0?3:4}));
+ let stage='input_mapping';const actions=[];
+ const state=()=>({prepared_node_context:node,wizard:{stage,root_tid:'W'},
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]},
+  node_linregression:{verified:true,...(stage==='input_mapping'?{fields}:stage==='normalization'?
+   {kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:
+   {kind:'partition',values:{sampling:1,validation:0,train:16,test:2},sequence:[0,1,2],sizes:[{unit:'rows',count:16},{unit:'rows',count:2}]})}});
+ const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},
+  async perform({ready,resolve}){const s=state();assert.equal(ready(s),true);const action=resolve(s);actions.push(action);stage=action.expected_stage;}};
+ await assert.rejects(configureLinRegression(channel,{input_fields:['X'],target_field:'Y'},{request:{mode:'apply'}}),
+  /apply on a node with sequential partition is unsupported/);
+ assert.deepEqual(actions.map(a=>[a.verb,a.expected_stage]),[['wizard_step','normalization'],['wizard_step','learn_partition']]);
+ assert.equal(stage,'learn_partition');
+});
 
 // LAB-436 r3 journals: samples 387/375 still contain the old SVG body after
 // confirmed draft Close; steps 390/378 refuse selection after its replacement.
@@ -80,7 +130,7 @@ test('regression normalizer matches role identities rather than source order: '+
  if(mode==='normalized')normalizers[0].norm_type=1;
  let stage='input_mapping';const destinations=[];
  const state=()=>({prepared_node_context:node,wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']}]},node_linregression:{verified:true,node_context:node,
-  ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:normalizers,source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values:{pedAutoMethod:false,pedRegressionMethod:0,pedDenormalize:true,pedUseDetailedSettings:true},switches:{}}:{kind:'details',values:{pedIntercept:true},switches:{}})}});
+  ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:normalizers,source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0},sizes:[{unit:'percent'},{unit:'percent'}]}:stage==='lin_regression'?{kind:'parameters',values:{pedAutoMethod:false,pedRegressionMethod:0,pedDenormalize:true,pedUseDetailedSettings:true},switches:{}}:{kind:'details',values:{pedIntercept:true},switches:{}})}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform({ready,resolve}){const s=state();assert.equal(ready(s),true);const a=resolve(s);validateUiAction(a,s);destinations.push(a.expected_stage);stage=a.expected_stage;return {verified:true};}};
  const run=()=>configureLinRegression(channel,{input_fields:['X'],target_field:'Net'},{request:{target:{kind:'new'}},inputMapping});
  if(mode!=='native_order'){await assert.rejects(run,/only unnormalized continuous/);assert.deepEqual(destinations,['normalization']);return;}
@@ -96,7 +146,7 @@ test('Enter configuration advances from native details straight to Done under th
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,input_port:{port:0}},source_fields,target_fields:fields.map((f,index)=>({...f,source:source_fields[index]}))};
  let stage='input_mapping';const destinations=[];
  const state=()=>({prepared_node_context:node,wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']}]},node_linregression:{verified:true,node_context:node,
-  ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values:{pedAutoMethod:false,pedRegressionMethod:0,pedDenormalize:true,pedUseDetailedSettings:true},switches:{}}:{kind:'details',values:{pedIntercept:true},switches:{}})}});
+  ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0},sizes:[{unit:'percent'},{unit:'percent'}]}:stage==='lin_regression'?{kind:'parameters',values:{pedAutoMethod:false,pedRegressionMethod:0,pedDenormalize:true,pedUseDetailedSettings:true},switches:{}}:{kind:'details',values:{pedIntercept:true},switches:{}})}});
  const channel={
   async observe({ready}){const s=state();assert.equal(ready(s),true,'the expected native configuration must be ready');return s;},
   async perform({ready,resolve}){const s=state();assert.equal(ready(s),true);const action=resolve(s);validateUiAction(action,s);destinations.push(action.expected_stage);stage=action.expected_stage;return {verified:true};}

@@ -1,5 +1,5 @@
 import {nodeOutputPortSchema} from './node-result-schema.mjs';
-import {budgetUserPreview,previewWireSize} from './user-preview-budget.mjs';
+import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
 export const userResultSchema = {
@@ -63,13 +63,18 @@ export function compactNodeRequestFailure(outcome,request={}) {
 
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
-  const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile']) : {};
+  const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile','full_import_verification']) : {};
+  if(data?.variable_ports){
+    output.variable_ports=data.variable_ports.map(port=>({...pick(port,['port','kind','port_guid','fresh','source','native_source','read_id','execution_id','complete','count','completeness','package_modified']),
+      variables:port.variables.map(variable=>({...pick(variable,['id','index','name','label','type']),
+        cell:pick(variable.cell,['type','value','decimal','representation','precision','is_null','non_finite'])}))}));
+  }
   if (data?.ports) output.ports = data.ports.map(port => {
     if(port.port_kind==='tree')return pick(port,['port','port_guid','port_kind','fresh','execution_id','freshness_basis','tree','sample_complete']);
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'freshness_basis', 'read_limit', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations','full_import_verification']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
     value.sample = value.sample.map(row => row.map(cell => {
-      const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native']);
+      const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native', 'non_finite']);
       if (compact.value === compact.display_text) delete compact.display_text;
       return compact;
     }));
@@ -81,6 +86,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if (data?.format_restoration) output.format_restoration = pick(data.format_restoration, ['restored', 'table']);
   if (data?.workflow_return) output.workflow_returned = data.workflow_return.verified === true;
   const limitations=[...(node?.warnings??[])];
+  for(const proof of data?.full_import_verification??[])if(proof.status!=='verified')
+    limitations.push('N не сверено: '+proof.reason+'. В итоговом ответе явно укажи «N не сверено» и эту причину; N scan и число строк группировки не подтверждают полный импорт.');
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));
   // Delivery jobs carry their byte-verified destination in outcome directly.
   if (!node && outcome) Object.assign(output, outcome);
@@ -92,7 +99,10 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
       ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:inactiveSorting
         ?'No sorting node was created. First execute/read the SAME upstream node referenced by the rejected inputs[].source and output. Use dock_node_read with a successful local source_operation_id from this preparation; if none exists, use dock_node_apply with its exact existing ref, original type/mode, inputs:[], an empty settings patch from its parameter_schema and finish:"execute". Wait for confirmed success and the needed output, then submit the original sorting request with a NEW operation_id. Do not recreate the source, guess its identity or automatically run REST/JavaScript/export side effects outside the user request. No browser recovery is required.'
         :'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
-      :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
+      :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:
+        outcome.error?.code==='NODE_APPLY_STOPPED'&&outcome.error.message.startsWith('Node procedure readiness timeout: calculator done available;')
+          ?'The input mapping or node wizard did not expose an authorized Done action. The timeout authorized no new gesture; earlier node/link/mapping effects may remain. Inspect this original operation and follow its offered recovery: abandon_operation with a NEW recovery_operation_id, or dock_browser_recovery when offered after refused release. Do not submit another node operation, recreate the target, or save through this pending operation.'
+          :'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
   const reply={
     ...(result.upload_operation_id&&result.status?{upload_status:result.status,progress:pick(result,['bytes','total_bytes','percent','elapsed_ms','deadline_at','poll_after_ms'])}:{}),
@@ -104,10 +114,11 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
     limitations,
     ...(next?{next_step:next}:{}),
   };
-  // JS readback carries the complete observed mappings and schema. Refuse an
-  // oversized final reply instead of converting these facts into a summary.
-  if(node?.configuration?.readback?.kind!=='javascript'&&data?.javascript_source?.policy!=='javascript-module-v1')budgetUserPreview(reply,
-    {wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
+  // JS configuration/source bindings remain complete; only ordinary analytical
+  // rows may be omitted. Native full-table evidence keeps its strict contract.
+  if(node?.configuration?.readback?.kind!=='user_variables'&&!node?.configuration?.variable_mappings?.length)budgetUserPreview(reply,
+    {preserveConfiguration:node?.configuration?.readback?.kind==='javascript'||node?.configuration?.bindings!==undefined||data?.javascript_source?.policy==='javascript-module-v1',
+      wireSize:value=>wireSize({...value,limitations:[...value.limitations,...previewLimitations(value.output)]})});
   limitations.push(...previewLimitations(output));
   return reply;
 }
@@ -129,11 +140,20 @@ function previewLimitations(output) {
   return limitations;
 }
 
-export function compactActionResult(result) {
+export function compactActionResult(result,{wireSize=previewWireSize}={}) {
   // Keep continuation references and observed UI controls: removing these would
   // force another observation, or tempt clients to reuse stale references.
   const copy = structuredClone(result);
   delete copy.trace;
+  // Inspection must reconcile the same retained operation even when its table
+  // could not be delivered. Preserve every effect/phase/configuration receipt.
+  const node=copy.action_key==='operation.inspect'&&copy.output?.outcome?.action_key==='node.apply'
+    ?copy.output.outcome.output:null;
+  if(node?.output?.ports&&wireSize({...copy,result_version:'user-v1'})>USER_PREVIEW_WIRE_BUDGET){
+    const preview={output:node.output,limitations:node.warnings??[]};
+    node.warnings=preview.limitations;
+    budgetUserPreview(preview,{preserveConfiguration:true,wireSize:()=>wireSize({...copy,result_version:'user-v1'})});
+  }
   if (copy.status === 'SUCCEEDED' && ['package.save_as', 'package.save_checkpoint'].includes(copy.action_key)) {
     copy.output = pick(copy.output, ['package_ref', 'reopened', 'workflow_preserved', 'save_completed', 'persisted_content_verified', 'workflow_continuations']);
     const arrangement = result.trace?.findLast(item => item.event === 'package_arrangement');
@@ -145,10 +165,13 @@ export function compactActionResult(result) {
 }
 
 export function compactKnowledgeBundle(description) {
+  // Per-type cache keys, contract revisions, apply tool and handler revisions
+  // remain on dock_action_describe. They are identical in every type or
+  // handler-internal, and repeating them spends ~6 KB of the first reply.
   return {
     version: 'user-v1', session_manifest: description.session_manifest,
     actions: description.actions.map(action => pick(action, ['action_key', 'revision', 'description', 'input_schema', 'effect'])),
-    node_types: description.node_types.map(node => pick(node, ['type', 'contract_revision', 'cache_key', 'candidate_node_apply_available',
-      'candidate_apply_tool', 'configuration_handler', 'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
+    node_types: description.node_types.map(node => pick(node, ['type', 'candidate_node_apply_available',
+      'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
   };
 }

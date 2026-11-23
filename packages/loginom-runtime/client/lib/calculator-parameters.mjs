@@ -2,19 +2,21 @@ const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const types=['integer','real','string','boolean','datetime'];
 const properties=['name','label','type','formula','replace'];
+const flags=['intermediate','cached'];
 
 export function validateCalculatorParameters(parameters,mode,request) {
   requireValue(mode==='expression','Only Loginom expression syntax is supported');
   requireValue(parameters&&typeof parameters==='object'&&!Array.isArray(parameters)
-    &&Object.keys(parameters).every(k=>['expressions','order'].includes(k))&&Array.isArray(parameters.expressions)
+    &&Object.keys(parameters).every(k=>['expressions','order','syntax'].includes(k))&&Array.isArray(parameters.expressions)
     &&parameters.expressions.length<=128,'Bounded calculator expressions required');
+  requireValue(parameters.syntax===undefined||['expression','javascript'].includes(parameters.syntax),'Invalid parameters.parameters.syntax: expression or javascript');
   requireValue(request.target.kind==='existing'||parameters.expressions.length>0,'A new calculator requires expressions');
   requireValue(request.target.kind==='existing'||request.inputs.length===1&&request.inputs[0].input===0,
     'Invalid parameters.inputs: a new calculator requires exactly one explicit table connection to input 0');
   const targets=new Set(),names=new Set();
   for(const [index,e] of parameters.expressions.entries()) {
     const path='parameters.parameters.expressions['+index+']';
-    requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties].includes(k)),'Invalid expression parameters');
+    requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties,...flags].includes(k)),'Invalid expression parameters');
     const t=e.target;
     requireValue(t&&typeof t==='object'&&!Array.isArray(t)&&['new','existing'].includes(t.kind),
       'Invalid '+path+'.target: choose {kind:new} or {kind:existing,name:saved_name}');
@@ -35,6 +37,7 @@ export function validateCalculatorParameters(parameters,mode,request) {
     if(e.formula!==undefined)requireValue(typeof e.formula==='string'&&e.formula.trim().length>0&&e.formula.length<=2048
       &&!/[\r\0]/.test(e.formula)&&e.formula.split('\n').length<=128,'Bounded nonempty LF expression required');
     if(e.replace!==undefined)requireValue(typeof e.replace==='boolean','Expression replacement must be boolean');
+    for(const k of flags)if(e[k]!==undefined)requireValue(typeof e[k]==='boolean','Expression '+k+' must be boolean');
   }
   if(parameters.order!==undefined)requireValue(Array.isArray(parameters.order)&&parameters.order.length>0&&parameters.order.length<=128
     &&parameters.order.every(name)&&new Set(parameters.order.map(n=>n.toLowerCase())).size===parameters.order.length,'Explicit unique expression order required');
@@ -43,14 +46,19 @@ export function validateCalculatorParameters(parameters,mode,request) {
     'Invalid parameters.parameters.order: list every calculated expression name exactly once; inherited input fields do not belong in expression order');
   requireValue(request.inputs.length<=1&&request.inputs.every(i=>i.input===0),'Calculator accepts one table input');
   requireValue(request.read.ports.every(p=>p===0),'Calculator has one table output');
-  requireValue(request.mappings.length<=2&&request.mappings.every(m=>m.port===0),'Calculator has one input and output mapping');
+  const variableMappings=request.mappings.filter(m=>m.kind!==undefined),tableMappings=request.mappings.filter(m=>m.kind===undefined);
+  requireValue(tableMappings.length<=2&&tableMappings.every(m=>m.port===0),'Calculator has one input and output mapping');
+  requireValue(variableMappings.length<=1&&variableMappings.every(m=>m.kind==='variables'&&m.direction==='input'&&m.port===0),
+    'Calculator accepts one ordinary variable input mapping at port 0');
+  requireValue((request.variable_inputs??[]).length<=1&&(request.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),
+    'Calculator accepts one ordinary variable input at port 0');
   requireValue(request.finish!=='close'||request.mappings.every(m=>m.direction!=='input'),
     'Close cannot combine a calculator draft with input mappings: Loginom commits the input in a separate wizard; use Done/Execute or omit input mappings');
 }
 
 // Resolve a patch against observed identities, preserving every unrequested
 // property and expression. This plans only one calculator, never a scenario.
-export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=false}={}) {
+export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=false,removeDefault=false}={}) {
   requireValue(observed?.verified===true&&observed.inventory_complete===true&&observed.mode==='expression','Complete observed calculator required');
   requireValue(Array.isArray(inputFields)&&new Set(inputFields.map(f=>f.name.toLowerCase())).size===inputFields.length,'Unique observed input field names required');
   let baseline=structuredClone(observed.expressions);
@@ -60,19 +68,27 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     'New calculator default expression changed');
   }
   const original=baseline;
-  const resolved=newNode?[]:structuredClone(baseline),changes=[];
+  // An explicitly requested Expr1 uses the existing rename planner: the
+  // template becomes a requested expression instead of being deleted. Reuse
+  // it at the 128-record reader bound too: add-before-delete needs one slot.
+  const discardTemplate=newNode&&removeDefault&&parameters.expressions.length<128&&!parameters.expressions.some(e=>e.name.toLowerCase()==='expr1');
+  const resolved=newNode?[]:structuredClone(baseline),changes=[],rewritten=new Set();
   for(const [index,patch] of parameters.expressions.entries()) {
     const existing=patch.target.kind==='existing';
     const matches=existing?original.filter(e=>e.name===patch.target.name):[];
     requireValue(!existing||matches.length===1,'Existing expression name is missing or ambiguous');
-    const before=existing?matches[0]:newNode&&index===0?baseline[0]:null;
+    const before=existing?matches[0]:newNode&&index===0&&!discardTemplate?baseline[0]:null;
     const after=before?structuredClone(before):{intermediate:false,cached:false,description:'',replace:false};
-    for(const key of properties)if(patch[key]!==undefined)after[key]=patch[key];
+    for(const key of [...properties,...flags])if(patch[key]!==undefined)after[key]=patch[key];
+    if(patch.formula!==undefined)rewritten.add(after);
     // A new expression inherits no stale formula/options from another row.
     if(existing)resolved[resolved.findIndex(e=>e.record_id===before.record_id)]=after;else resolved.push(after);
-    changes.push({before,after,reuse_default:newNode&&index===0});
+    changes.push({before,after,reuse_default:newNode&&index===0&&!!before});
   }
   requireValue(resolved.length>0&&resolved.length<=128,'Calculator expression count outside supported bounds');
+  // Loginom keeps formula text when the language changes and never translates it.
+  if(!newNode&&parameters.syntax!==undefined&&parameters.syntax!==(observed.syntax??'expression'))
+    requireValue(resolved.every(e=>rewritten.has(e)),'Language change does not translate formulas: give every retained expression a new formula');
   const finalNames=resolved.map(e=>e.name.toLowerCase());
   requireValue(new Set(finalNames).size===finalNames.length,'Invalid parameters.parameters.expressions: Expression name collides with an unrequested expression; new adds, existing targets a retained name');
   for(const e of resolved) {
@@ -85,7 +101,8 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
       'Explicit order must include every resulting expression exactly once');
     resolved.sort((a,b)=>parameters.order.indexOf(a.name)-parameters.order.indexOf(b.name));
   }
-  return {baseline,changes,expressions:resolved.map((e,index)=>({...e,index})),order:resolved.map(e=>e.name)};
+  return {baseline,changes,expressions:resolved.map((e,index)=>({...e,index})),order:resolved.map(e=>e.name),
+    discard_default:discardTemplate?baseline[0]:null};
 }
 
 // Loginom checks names on each Apply, not just the final inventory. Free a

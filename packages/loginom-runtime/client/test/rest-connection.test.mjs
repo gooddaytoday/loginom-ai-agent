@@ -16,9 +16,13 @@ Object.assign(cases,{placement_before_drag:'REST checkpoints its unchanged graph
 Object.assign(cases,{plain_label:'plain GET waits for buffered native URL and label changes before saving without parameter edits'});
 for(const stage of ['placement_still_full','placement_before_drag'])for(const fault of ['changed','incomplete','busy','owner'])
  cases[stage+':'+fault]='REST refuses '+stage+' checkpoint with '+fault+' graph or owner';
+for(const method of ['POST','PUT','PATCH','DELETE'])cases['c1_'+method]='C1 saves and independently rereads native '+method+' and request Content-Type';
+for(const mime of ['text/plain','application/xml'])cases['c5_request_'+mime]='C5 persists request MIME '+mime;
+for(const mime of ['text/plain','*/*'])cases['c5_response_'+mime]='C5 persists response MIME '+mime;
 for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  const [stage,fault]=scenario.split(':');
- const reusing=stage.startsWith('reuse');
+ const reusing=stage.startsWith('reuse'),c1=stage.startsWith('c1_');
+ let method='GET',requestType='text/plain';
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
@@ -72,7 +76,8 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   inputValue:async()=>{
    if(selector.includes('fldLabel'))return label;
    if(selector.includes('pedURL'))return url;
-   if(selector.includes('pedVerb'))return 'GET';
+   if(selector.includes('pedVerb'))return method;
+   if(selector.includes('pedRequestContentType'))return requestType;
    if(selector.includes('pedResponseContentType'))return stage==='mime_stale'&&wizardCloses>0?'application/json':responseType;
    if(selector.includes('pedFieldType'))return 'Строка запроса';
    if(selector.includes('txtAuth'))return 'Не требуется';
@@ -118,6 +123,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    return fn(element);
   },
   fill:async value=>{
+   if(selector.includes('pedRequestContentType')){requestType=value;return;}
    if(selector.includes('pedResponseContentType')){responseFills++;responseType=value;return;}
    if(selector.includes('pedURL')){assert.equal(urlPoints,4);url=value;pendingUrl=stage==='plain_label';fills++;if(stage==='input')throw Error('fixture stopped after the sole reachable fill');return;}
    if(selector.includes('fldLabel')){label=value;pendingLabel=stage==='plain_label';return;}
@@ -125,7 +131,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   },
   press:async()=>{},
  });
- const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone')){if(stage==='plain_label')settleFields();wizardCloses++;}if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
+ const page={locator,mouse:{click:async()=>{if(lastSelector.includes('pedVerb;ValueControl;boundlist;'))method=stage.startsWith('c5_request_')?'POST':stage.slice(3);if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone')){if(stage==='plain_label')settleFields();wizardCloses++;}if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
   move:async()=>{if(!held&&reusing)referenceMoves++;if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
   up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='plain_label')settleFields();if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
@@ -149,7 +155,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  try{
   const task={deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:workflow,...(reusing?{existing_target:{document_id:'doc',workflow_id:'flow',node_id:'rest'}}:{}),
-   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:stage==='plain_label'?[]:[{name:'Key',field:'Key'}]};
+   connection:{...(stage.startsWith('c5_request_')?{method:'POST',request_content_type:stage.slice(11)}:{}),...(stage.startsWith('c5_response_')?{response_content_type:stage.slice(12)}:{}),name:'Echo',base_url:'https://httpbin.org/anything',...(c1?{method:stage.slice(3),...(stage==='c1_DELETE'?{}:{request_content_type:'application/json'})}:{}),...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:stage==='plain_label'?[]:[{name:'Key',field:'Key'}]};
   const result=['placement_native','placement_reselect'].includes(stage)?await vm.runInNewContext('('+makeRestConnectionCode(task)+')',{get document(){return globalThis.document;},innerWidth:1280,innerHeight:800})(page):await restConnectionCapability(page,task,async()=>{
    const graph=structuredClone(placementGraph);
    if(reusing&&++serviceGraphReads===2&&stage==='reuse_changed')graph.rest_connection_links=[];
@@ -168,6 +174,8 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_changed')placementGraph.nodes[0].position.x++;
    await args.guard();return {fully_visible:!['placement_hidden','placement_reselect'].includes(stage),zoom_steps:3,navigation_steps:[]};
   },nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,samePlacementGraph,{});
+  if(stage.startsWith('c5_')){assert.equal(result.verified,true,result.error);assert.equal(wizardCloses,2);if(stage.startsWith('c5_request_'))assert.equal(result.connection.request_content_type,stage.slice(11));else assert.equal(result.connection.response_content_type,stage.slice(12));return;}
+  if(c1){assert.equal(result.verified,true,result.error);assert.equal(result.connection.method,stage.slice(3));if(stage!=='c1_DELETE')assert.equal(result.connection.request_content_type,'application/json');return;}
   if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(['reuse','reuse_hidden_controls'].includes(stage)){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
   if(stage==='placement_dense'){assert.equal(result.verified,true,result.error);assert.equal(navigationCalls,0);assert.equal(downCount,1);assert.equal(upCount,1);return;}
   if(stage==='placement_reselect'){
@@ -260,3 +268,37 @@ async function verifyPublicRelease(connection,graph,task){
  assert.match(release.output.original_outcome.output.warnings[0],/saved REST connection.*Echo.*remains/);
  assert.equal(runtime.hasUnsettledWork(),false);runtime.assertPreparationAllowed();assert.equal(calls,1);
 }
+
+// LAB-1611: a saved REST connection is labelled by its name or URL. A long
+// label renders a palette TreeText wider than the clipping panel (x=108…715.81,
+// panel ends at x=318); its full-element centre lies over the graph SVG and
+// only the visible part hits, so the drag source must come from that part.
+const wideLabel=async({visible=true}={})=>{
+ const tid='module',root={},svg={},panel={},wrap={},calls=[];
+ const el={getBoundingClientRect:()=>({x:108,y:226,left:108,top:226,right:715.81,bottom:244,width:607.81,height:18}),parentElement:wrap,
+  closest:s=>s==='[data-tid]'?el:null,getAttribute:()=>tid,contains:n=>n===el};
+ wrap.parentElement=panel;panel.parentElement=svg.parentElement=root;
+ panel.getBoundingClientRect=()=>({x:0,y:100,left:0,top:100,right:318,bottom:700,width:318,height:600});
+ const styles=new Map([[wrap,{overflowX:'visible',overflowY:'visible'}],[panel,{overflowX:'hidden',overflowY:'auto'}]]);
+ const saved={document:globalThis.document,innerWidth:globalThis.innerWidth,innerHeight:globalThis.innerHeight,getComputedStyle:globalThis.getComputedStyle};
+ Object.assign(globalThis,{document:{documentElement:root,elementFromPoint:(x,y)=>visible&&x>=108&&x<318&&y>=226&&y<244?el:svg},innerWidth:1280,innerHeight:800,getComputedStyle:a=>styles.get(a)});
+ const locator=sel=>({count:async()=>sel.includes('x-mask')?0:1,evaluate:async fn=>fn(el),evaluateAll:async()=>[],isVisible:async()=>false,locator});
+ const page={evaluateHandle:async()=>({dispose(){}}),evaluate:async()=>true,locator,waitForTimeout:ms=>new Promise(r=>setTimeout(r,Math.min(ms,5))),
+  mouse:{click:async(x,y)=>{calls.push({x,y});throw Error('stop after first click');}}};
+ const flow={workflow_id:'flow',tab_tid:'tab',prefix:'MF;TF-1',navigation_path:[{tid,label:'Module'},{tid:'flow',label:'Flow'}]};
+ try{return {calls,result:await restConnectionCapability(page,{deadline:Date.now()+300,document_id:'doc',workflow_ref:flow,connection:{name:'https://example.test/a/very/long/rest/service/name',base_url:'https://example.test/'}})};}
+ finally{for(const [key,value]of Object.entries(saved))if(value===undefined)delete globalThis[key];else globalThis[key]=value;}
+};
+test('REST clicks a control wider than its clipping panel inside its visible part',async()=>{
+ const {calls,result}=await wideLabel();
+ assert.equal(calls.length,1,JSON.stringify(result));
+ assert.ok(calls[0].x>=108&&calls[0].x<318&&calls[0].y===235,JSON.stringify(calls[0]));
+ assert.match(result.error,/stop after first click/);
+});
+
+test('REST times out on an unreachable control naming the wait it was in, without a click',async()=>{
+ const {calls,result}=await wideLabel({visible:false});
+ assert.deepEqual(calls,[]);
+ assert.equal(result.verified,false);
+ assert.match(result.error,/^REST connection: operation deadline exceeded while waiting for reachable module$/);
+});

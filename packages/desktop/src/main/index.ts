@@ -1,4 +1,5 @@
-import { desktopLoginom } from "./loginom/desktop-service"
+import { credentials } from "./loginom/credentials"
+import { desktopLoginom, loginomResources, verifyDesktopResources } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
@@ -8,7 +9,8 @@ import { homedir, tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
-import { app, BrowserWindow, dialog, session } from "electron"
+import { app, BrowserWindow, dialog, safeStorage, session } from "electron"
+import { dashboardDataRoot, isDashboardWorkDirectoryAsync } from "@loginom-ai-agent/product/dashboard-root"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -17,9 +19,22 @@ import contextMenu from "electron-context-menu"
 import type { ServerReadyData } from "../preload/types"
 import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
-import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
+import { getDashboardTarget, checkDashboardTarget } from "./dashboard-target"
+import { createDeepLinkQueue, protocolUrls } from "./deep-links"
+import { registerIpcHandlers, notifyDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
-import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, startSession, write as writeLog } from "./logging"
+import {
+  configureDiagnosticsExport,
+  exportDebugLogs,
+  initCrashReporter,
+  prepareDiagnostics,
+  previewDiagnosticsFile,
+  saveDiagnostics,
+  initLogging,
+  startNetLog,
+  startSession,
+  write as writeLog,
+} from "./logging"
 import { createMenu } from "./menu"
 import {
   finishFirstLaunchOnboarding,
@@ -35,8 +50,10 @@ import {
   type SidecarListener,
 } from "./server"
 import { configuredProxy, startWithProxyFallback } from "./proxy-env"
+import { shouldUseProxyRelay, startProxyRelay } from "./proxy-relay"
 import {
   formatSystemProxyLog,
+  currentSystemProxyStatus,
   loopbackNoProxy,
   publishSystemProxyStatus,
   startSystemProxyDetection,
@@ -64,8 +81,11 @@ import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
-import { createQuitHandler } from "./shutdown"
+import { closeWindows, createQuitHandler } from "./shutdown"
 
+declare const LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: string | null
+const UPDATE_TEST_FIXTURE =
+  typeof LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY !== "undefined" && Boolean(LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY)
 const TEST_ONBOARDING = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
 const SIDECAR_VERSION = process.env.LOGINOM_AI_AGENT_SIDECAR_V2 === "1" ? "v2" : "v1"
 const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
@@ -73,7 +93,14 @@ const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 let logger: ReturnType<typeof initLogging>
 let server: SidecarListener | null = null
 
-const pendingDeepLinks: string[] = []
+const deepLinks = createDeepLinkQueue(process.platform === "linux" ? process.argv : [])
+
+function restoreWithDeepLinks() {
+  const windows = restoreMainWindows()
+  const win = windows.at(-1)
+  if (win) deepLinks.restore(win.webContents)
+  return windows
+}
 
 function useEnvProxy() {
   try {
@@ -86,9 +113,9 @@ function useEnvProxy() {
 
 function emitDeepLinks(urls: string[]) {
   if (urls.length === 0) return
-  pendingDeepLinks.push(...urls)
-  const win = getLastFocusedWindow()
-  if (win) sendDeepLinks(win, urls)
+  const win = getLastFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1)
+  deepLinks.add(win?.webContents, urls)
+  if (win) notifyDeepLinks(win)
 }
 
 async function killSidecar() {
@@ -125,6 +152,13 @@ const main = Effect.gen(function* () {
 
   const appId = app.isPackaged ? Product.channels[CHANNEL] : Product.channels.dev
   const onboardingTestRoot = ((): string | undefined => {
+    if (
+      UPDATE_TEST_FIXTURE &&
+      (!TEST_ONBOARDING ||
+        !process.env.LOGINOM_AI_AGENT_TEST_ROOT ||
+        !isAbsolute(process.env.LOGINOM_AI_AGENT_TEST_ROOT))
+    )
+      throw Error("LOGINOM_UPDATE_TEST_PROFILE_REQUIRED")
     if (!TEST_ONBOARDING) return
 
     const root = process.env.LOGINOM_AI_AGENT_TEST_ROOT ?? join(tmpdir(), `loginom-ai-agent-onboarding-${randomUUID()}`)
@@ -132,7 +166,7 @@ const main = Effect.gen(function* () {
     ;["data", "config", "cache", "state", "desktop", "session"].forEach((dir) =>
       mkdirSync(join(root, dir), { recursive: true }),
     )
-    process.env.LOGINOM_AI_AGENT_DB = ":memory:"
+    process.env.LOGINOM_AI_AGENT_DB = UPDATE_TEST_FIXTURE ? join(root, "data", Product.database) : ":memory:"
     process.env.XDG_DATA_HOME = join(root, "data")
     process.env.XDG_CONFIG_HOME = join(root, "config")
     process.env.XDG_CACHE_HOME = join(root, "cache")
@@ -146,6 +180,18 @@ const main = Effect.gen(function* () {
     onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),
   )
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
+  // NSIS runs this synchronously after copying the final payload, including
+  // --updated. Exit before single-instance forwarding, UI or any sidecars.
+  if (process.argv.includes("--verify-resources")) {
+    const code = yield* Effect.promise(() =>
+      verifyDesktopResources().then(
+        () => 0,
+        () => 1,
+      ),
+    )
+    app.exit(code)
+    return
+  }
   initializeOldLayoutEligibility(app.getPath("userData"))
   logger = initLogging()
   initCrashReporter()
@@ -169,14 +215,21 @@ const main = Effect.gen(function* () {
   let serverStarting: ReturnType<typeof spawnLocalServer> | undefined
   let stopping: Promise<void> | undefined
   let systemProxy: SystemProxyDetection | undefined
+  let proxyRelay: Awaited<ReturnType<typeof startProxyRelay>> | undefined
+  const dashboardLifecycle = new AbortController()
   const stopSidecars = () => {
+    dashboardLifecycle.abort()
     systemProxy?.stop()
     stopping ??= (async () => {
       try {
         // Startup can still be admitting the backend when Cmd+Q arrives.
-        await serverStarting?.then((started) => started.listener.stop(), () => undefined)
+        await serverStarting?.then(
+          (started) => started.listener.stop(),
+          () => undefined,
+        )
         await killSidecar()
       } finally {
+        await proxyRelay?.stop()
         wslServers.stopAll()
         await (await loginomStarting)?.close()
       }
@@ -217,10 +270,15 @@ const main = Effect.gen(function* () {
   startSession()
   // Явный прокси из login shell должен быть известен до запуска читателей ОС.
   const shellEnv = preferAppEnv(app.getPath("userData"))
-  systemProxy = startSystemProxyDetection({
-    environment: process.env,
-    enabled: systemProxyEnabled(),
-  })
+  // The v2 background CLI daemon outlives Desktop and keeps its environment, so it
+  // would keep a dead relay address; it stays on the detected system proxy.
+  const useSystemProxyRelay = SIDECAR_VERSION !== "v2" && shouldUseProxyRelay(systemProxyEnabled(), process.env)
+  if (!useSystemProxyRelay) {
+    systemProxy = startSystemProxyDetection({
+      environment: process.env,
+      enabled: systemProxyEnabled(),
+    })
+  }
   subscribeSystemProxyStatus((status) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.isDestroyed()) continue
@@ -228,7 +286,7 @@ const main = Effect.gen(function* () {
     }
   })
   app.on("second-instance", (_event: Event, argv: string[]) => {
-    const urls = argv.filter((arg: string) => arg.startsWith("loginom-ai-agent://"))
+    const urls = protocolUrls(argv)
     if (urls.length) {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
@@ -246,11 +304,20 @@ const main = Effect.gen(function* () {
     emitDeepLinks([url])
   })
 
+  let updater: ReturnType<typeof setupAutoUpdater> | undefined
   app.on(
     "before-quit",
     createQuitHandler({
       markQuitting: setAppQuitting,
-      stop: stopSidecars,
+      closeWindows: () => closeWindows(BrowserWindow.getAllWindows()),
+      stop: async () => {
+        // Inspect Host work before shutdown cancels it. A busy/unknown Host skips
+        // this close; autoInstallOnAppQuit stays false, including after download.
+        // Restart/signal paths may already have stopped the Host. Its cleared work
+        // state must never be treated as evidence that this close began idle.
+        if (!stopping && updater?.getState().status === "ready") await updater.install()
+        await stopSidecars()
+      },
       quit: () => app.quit(),
       onError: (error) => logger.error("application shutdown failed", error),
     }),
@@ -279,10 +346,22 @@ const main = Effect.gen(function* () {
   const serverReady = Deferred.makeUnsafe<ServerReadyData, unknown>()
 
   yield* Effect.promise(() => app.whenReady())
-  try {
-    systemProxy?.useChromium((url) => session.defaultSession.resolveProxy(url))
-  } catch (error) {
-    logger.warn("system proxy browser probe unavailable", error)
+  if (stopping) return
+  if (useSystemProxyRelay) {
+    proxyRelay = yield* Effect.promise(() =>
+      startProxyRelay({
+        resolveProxy: (url) => session.defaultSession.resolveProxy(url),
+        onNotice: (notice) => logger.warn(`system proxy: ${notice.code}`, { address: notice.detail }),
+        onStatus: (status) => publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() }),
+      }),
+    )
+    logger.log("system proxy: relay", { address: proxyRelay.url })
+    if (stopping) {
+      yield* Effect.promise(() => proxyRelay!.stop())
+      return
+    }
+    // Status resolution must not delay backend/window startup on a slow PAC.
+    void proxyRelay.status().then((status) => publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() }))
   }
 
   if (!TEST_ONBOARDING) migrate()
@@ -302,16 +381,37 @@ const main = Effect.gen(function* () {
   app.setAsDefaultProtocolClient(Product.scheme)
   registerRendererProtocol()
   setDockIcon()
-  const updater = setupAutoUpdater(stopSidecars)
+  updater = setupAutoUpdater({
+    stop: stopSidecars,
+    workState: async () => {
+      const host = await loginomStarting
+      if (!host) throw Error("LOGINOM_HOST_UNAVAILABLE")
+      return host.updateWorkState()
+    },
+    stopAdmission: () => {
+      void loginomStarting?.then((host) => host.beginClose())
+    },
+    proxy: async () => {
+      const result = await systemProxy?.result
+      return {
+        ...process.env,
+        ...(systemProxyEnabled() ? (proxyRelay?.environment ?? result?.environment) : undefined),
+      }
+    },
+    systemProxyEnabled,
+  })
+  const desktopUpdater = updater
   const menuDeps = {
     trigger: (id: string) => {
       const win = getLastFocusedWindow()
       if (win) sendMenuCommand(win, id)
     },
-    checkForUpdates: () => void showUpdaterDialog(updater, true),
+    checkForUpdates: () => void showUpdaterDialog(desktopUpdater, true),
+    updaterEnabled: () => desktopUpdater.getState().status !== "disabled",
     relaunch,
   }
   if (stopping) return
+  configureDiagnosticsExport({ codec: credentials(process.platform, safeStorage) })
   loginomStarting = desktopLoginom()
   const loginom = yield* Effect.promise(() => loginomStarting!)
   if (stopping) return
@@ -328,7 +428,19 @@ const main = Effect.gen(function* () {
       },
       (e) => Effect.runPromise(e),
     ),
-    consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
+    getDashboardTarget: (id) =>
+      getDashboardTarget(id, {
+        status: () => loginom.api.status(),
+        settled: () => loginom.settled(),
+        catalog: generation => loginom.catalog(generation),
+        readPublication: (input, signal) => loginom.readDashboard(input, signal),
+        signal: dashboardLifecycle.signal,
+        dashboards: () => dashboardDataRoot(process.env),
+        template: join(loginomResources(), "dashboard", "template"),
+      }),
+    checkDashboardTarget: (id) => checkDashboardTarget(id, dashboardDataRoot(process.env)),
+    isDashboardWork: (directory) => isDashboardWorkDirectoryAsync(directory, dashboardDataRoot(process.env)),
+    consumeDeepLinks: deepLinks.take,
     getDefaultServerUrl: () => getDefaultServerUrl(),
     setDefaultServerUrl: (url) => setDefaultServerUrl(url),
     isFirstLaunchOnboardingPending,
@@ -338,21 +450,31 @@ const main = Effect.gen(function* () {
     setDisplayBackend: async () => undefined,
     checkAppExists: (appName) => checkAppExists(appName),
     resolveAppPath: async (appName) => resolveAppPath(appName),
-    updater,
-    showUpdater: () => showUpdaterDialog(updater, true),
+    updater: desktopUpdater,
+    showUpdater: () => showUpdaterDialog(desktopUpdater, true),
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
+    diagnostics: { prepare: prepareDiagnostics, preview: previewDiagnosticsFile, save: saveDiagnostics },
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     setNativeTranslations: (bundle) => {
       if (setNativeTranslations(bundle)) createMenu(menuDeps)
     },
     systemProxyEnabled,
+    systemProxyStatus: async () => {
+      const status = proxyRelay ? await proxyRelay.status() : currentSystemProxyStatus()
+      publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() })
+      return { ...status, enabled: systemProxyEnabled() }
+    },
   })
   registerWslIpcHandlers(wslServers)
-  void updater.start()
-  const updateTimer = setInterval(() => void updater.check(), 10 * 60 * 1000)
+  const updateStartupTimer = setTimeout(() => void desktopUpdater.start(), 45_000)
+  updateStartupTimer.unref()
+  const updateTimer = setInterval(() => void desktopUpdater.check(), 4 * 60 * 60 * 1000)
   updateTimer.unref()
-  app.once("will-quit", () => clearInterval(updateTimer))
+  app.once("will-quit", () => {
+    clearTimeout(updateStartupTimer)
+    clearInterval(updateTimer)
+  })
   yield* Effect.promise(() => startNetLog()).pipe(
     Effect.catch((error) =>
       Effect.sync(() => {
@@ -375,7 +497,7 @@ const main = Effect.gen(function* () {
     if (SIDECAR_VERSION === "v2") {
       logger.log("spawning v2 sidecar")
       const sidecar = yield* Effect.promise(() =>
-        startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME, proxyResult?.environment),
+        startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME, proxyRelay?.environment ?? proxyResult?.environment),
       )
       yield* Deferred.succeed(serverReady, {
         url: sidecar.url,
@@ -417,6 +539,7 @@ const main = Effect.gen(function* () {
     const hostname = "127.0.0.1"
     const url = `http://${hostname}:${port}`
     const password = randomUUID()
+    configureDiagnosticsExport({ value: password })
 
     if (stopping) return
     let attempt = 0
@@ -424,14 +547,17 @@ const main = Effect.gen(function* () {
     logger.log("spawning sidecar", { url })
     const started = yield* Effect.promise(() =>
       startWithProxyFallback({
+        // The relay owns PAC fallback; a backend restart must not bypass it.
         proxy: testSidecarProxy
           ? { HTTPS_PROXY: testSidecarProxy, https_proxy: testSidecarProxy, NODE_USE_ENV_PROXY: "1" }
-          : (proxyResult?.environment ?? configuredProxy(process.env)),
+          : proxyRelay
+            ? undefined
+            : (proxyResult?.environment ?? configuredProxy(process.env)),
         start: (proxy) => {
           attempt += 1
           const starting = spawnLocalServer(hostname, port, password, {
             userDataPath: app.getPath("userData"),
-            proxyEnvironment: proxy,
+            proxyEnvironment: testSidecarProxy ? proxy : (proxyRelay?.environment ?? proxy),
             withoutProxy: attempt > 1,
             loginom,
             onStdout: (message) => writeLog("server", message),
@@ -495,10 +621,10 @@ const main = Effect.gen(function* () {
   })
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length > 0) return
-    restoreMainWindows()
+    restoreWithDeepLinks()
   })
 
-  const windows = restoreMainWindows()
+  const windows = restoreWithDeepLinks()
   if (windows.length) createMenu(menuDeps)
 })
 

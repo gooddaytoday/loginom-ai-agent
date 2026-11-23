@@ -1,22 +1,34 @@
+import {validateBooleanBinding} from './variable-binding-parameters.mjs';
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
-export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'}});
+export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},mode:{bit:64,suffix:'Mode',label:'Мода'},stddev:{bit:128,suffix:'Std',label:'Стандартное откл.'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'},null_count:{bit:512,suffix:'Null',label:'Кол-во пропусков'},first:{bit:1024,suffix:'First',label:'Первый'},last:{bit:2048,suffix:'Last',label:'Последний'},only:{bit:4096,suffix:'Only',label:'Единственный'},concat:{bit:8192,suffix:'Concat',label:'Список'}});
 const supportedMask=Object.values(GROUPING_FUNCTIONS).reduce((mask,f)=>mask|f.bit,0);
+// Input types observed for the functions that are not available on every field.
+const inputTypes={sum:['integer','real'],avg:['integer','real'],unique_count:['integer','string','real','boolean','datetime','variant'],median:['integer','real'],mode:['integer','string','real','boolean','datetime','variant'],stddev:['integer','real'],null_count:['integer','string','real','boolean','datetime','variant'],first:['integer','string','real','boolean','datetime','variant'],last:['integer','string','real','boolean','datetime','variant'],only:['integer','string','real','boolean','datetime','variant'],concat:['integer','string']};
+const typeFits=(fn,type)=>!inputTypes[fn]||inputTypes[fn].includes(type);
 export const supportedGroupingMeasure=f=>Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=supportedMask&&(f.functions&~supportedMask)===0
- &&(!(f.functions&GROUPING_FUNCTIONS.unique_count.bit)||['integer','string'].includes(f.type));
+ &&Object.keys(inputTypes).every(fn=>!(f.functions&GROUPING_FUNCTIONS[fn].bit)||typeFits(fn,f.type));
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const field=v=>v&&Object.keys(v).sort().join(',')==='kind,name'&&v.kind==='input_field'&&name(v.name);
 export function validateGroupingParameters(p,mode,r) {
  requireValue(mode==='aggregate','Grouping supports aggregate mode');
- requireValue(p&&Object.keys(p).every(k=>['group_by','measures'].includes(k)),'Invalid grouping parameters');
+ validateBooleanBinding(p,r);
+ requireValue(p&&Object.keys(p).every(k=>['group_by','measures','cache_groups','sort_result'].includes(k)),'Invalid grouping parameters');
+ for(const k of ['cache_groups','sort_result'])requireValue(p[k]===undefined||typeof p[k]==='boolean','Grouping '+k+' requires a literal boolean');
  const preserved=p.group_by===undefined&&p.measures===undefined;
  requireValue(!preserved||r.target.kind==='existing','New grouping requires complete keys and measures');
  if(!preserved){
   requireValue(Array.isArray(p.group_by)&&p.group_by.length>0&&p.group_by.length<=128&&p.group_by.every(field),'Ordered nonempty grouping keys required');
   requireValue(new Set(p.group_by.map(f=>f.name.toLowerCase())).size===p.group_by.length,'Duplicate grouping key');
-  requireValue(Array.isArray(p.measures)&&p.measures.length>0&&p.measures.length<=256,'Nonempty grouping measures required');
+  requireValue(Array.isArray(p.measures)&&p.measures.length<=256,'Grouping measures array required; use [] for unique key combinations');
   const pairs=new Set(),names=new Set(p.group_by.map(f=>f.name.toLowerCase()));
   for(const m of p.measures){
-   requireValue(m&&Object.keys(m).sort().join(',')==='field,function,label,name'&&field(m.field)&&Object.hasOwn(GROUPING_FUNCTIONS,m.function),'Invalid grouping measure');
+   requireValue(m&&Object.keys(m).sort().join(',')===(m.function==='concat'?'concat,field,function,label,name':'field,function,label,name')&&field(m.field)&&Object.hasOwn(GROUPING_FUNCTIONS,m.function),'Invalid grouping measure');
+   if(m.function==='concat'){
+    const c=m.concat;
+    requireValue(c&&Object.keys(c).sort().join(',')==='order,separator,unique,wrapper'
+     &&typeof c.separator==='string'&&c.separator.length>=1&&c.separator.length<=16&&!/[\x00-\x1f]/.test(c.separator)
+     &&['', '"', "'"].includes(c.wrapper)&&typeof c.unique==='boolean'&&['none','ASC','DESC'].includes(c.order),'Complete concat separator/wrapper/unique/order required');
+   }
    requireValue(name(m.name)&&!names.has(m.name.toLowerCase()),'Invalid or duplicate grouping output name');names.add(m.name.toLowerCase());
    requireValue(typeof m.label==='string'&&m.label.length>0&&m.label.length<=120&&!/[\x00-\x1f]/.test(m.label),'Invalid grouping output label');
    const key=m.field.name.toLowerCase()+':'+m.function;requireValue(!pairs.has(key),'Duplicate field/function pair');pairs.add(key);
@@ -48,8 +60,8 @@ export function resolveGroupingParameters(p,fields) {
  requireValue(Array.isArray(fields)&&fields.length<=1000&&new Set(fields.map(f=>f.name)).size===fields.length,'Complete unique input schema required');
  const get=f=>{const matches=fields.filter(x=>x.name===f.name);requireValue(matches.length===1,'Grouping input field is missing: '+f.name);return matches[0];};
  const keys=p.group_by.map(get),measures=p.measures.map(m=>{
-  const input=get(m.field);requireValue(!['sum','avg'].includes(m.function)||['integer','real'].includes(input.type),'Grouping function is incompatible with input type: '+m.field.name+'/'+m.function);
-  requireValue(m.function!=='unique_count'||['integer','string'].includes(input.type),'Grouping function is incompatible with input type: '+m.field.name+'/'+m.function);
+  const input=get(m.field);
+  requireValue(typeFits(m.function,input.type),'Grouping function is incompatible with input type: '+m.field.name+'/'+m.function);
   return {...m,input};
  });
  const fieldOrder=[...new Set(measures.map(m=>m.input.name))];

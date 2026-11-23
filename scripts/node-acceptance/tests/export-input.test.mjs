@@ -27,9 +27,9 @@ test('cold inspects saved export mapping after execution restores the complete d
  data.schema.push({name:'Status',label:'Status',type:'integer'});
  data.sample[0].push({type:'integer',is_null:false,value:'200'});
  const want={...output,column_order:'exact',columns:fields.map(({name,type})=>({name,type})),rows:[{Code:'A',Status:200}]};
- for(const completeAfterExecution of [true,false])for(const csvProvided of [true,false]){
+ for(const header of [true,false])for(const completeAfterExecution of [true,false])for(const csvProvided of [true,false]){
   let restored=false;const calls=[];
-  const result=run({expectedOutputs:[want],expected:{nodes:[]},graph:graph(),load:async()=>({}),
+  const result=run({expectedOutputs:[{...want,header}],expected:{nodes:[]},graph:graph(),load:async()=>({}),
    channelFor:()=>({}),execute:async()=>({}),record:async()=>{},saved:{path:'/own/export.lgp'},
    prepared:{document_id:'doc',workflow_ref:{}},origin:'https://app.loginom.ai',multiple:false,createNodeProcedure:()=>({}),withBrowserReceipt:()=>'',session:'cold',
    createNodeExecutionProcedure:()=>({}),performColdNodeAction:async()=>{},staticSources:undefined,
@@ -38,9 +38,9 @@ test('cold inspects saved export mapping after execution restores the complete d
    prepareTableRead:async()=>({}),readTableOutputPages:async()=>structuredClone(data),decodeTableOutput:raw=>raw,
    returnFromOutputTable:async()=>{},writeFile:async()=>{},join:()=>'',args:{output:''},config:{},loginPassword:'',
    matchExpectedOutputs,resolveExportInput,selectColdOutputReads,coldProcessObservation,openColdOutputViews:async()=>{},openColdTableFilter:async()=>{},
-   exportCsv:csvProvided?{columns:['Code','Status'],header:'names'}:undefined,state:{},
+   exportCsv:header&&csvProvided?{columns:['Code','Status'],header:'names'}:undefined,state:{},
    observeExportDestinations:async()=>{calls.push('mapping');return [{node_id:'export',input_fields:restored?fields:fields.slice(1)}];}});
-  if(!csvProvided)await assert.rejects(result,/COLD_EXPORT_CSV_REQUIRED/);
+  if(header&&!csvProvided)await assert.rejects(result,/COLD_EXPORT_CSV_REQUIRED/);
   else if(completeAfterExecution)assert.equal((await result).length,1);
   else await assert.rejects(result,/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
   assert.deepEqual(calls,['execute','mapping']);
@@ -99,7 +99,7 @@ test('CSV header reader respects BOM, quoting, escaped quotes, separators and em
 test('cold CSV header decodes only the explicitly selected encoding, defaulting to UTF-8',async()=>{
  const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
  const declaration=source.slice(source.indexOf('const exportCsv='),source.indexOf('\n\nconst saved ='));
- const decode=new (Object.getPrototypeOf(async function(){}).constructor)('args','readFile','resolve','parseExportCsvHeader',
+ const decode=new (Object.getPrototypeOf(async function(){}).constructor)('args','readFile','resolve','parseExportCsvHeader','expectedOutputs=[]',
   declaration+';return exportCsv;');
  const cp=Buffer.from([0xca,0xee,0xe4,0x3b,0xd2,0xe5,0xea,0xf1,0xf2,0x0d,0x0a]);
  const args={csv:'download.csv','csv-delimiter':';','csv-header':'labels','csv-encoding':'Windows-1251'};
@@ -111,6 +111,24 @@ test('cold CSV header decodes only the explicitly selected encoding, defaulting 
  assert.deepEqual((await decode(args,utfRead,x=>x,parseExportCsvHeader)).columns,['Код','Текст']);
  args['csv-encoding']='unsupported-encoding';
  await assert.rejects(decode(args,read,x=>x,parseExportCsvHeader));
+ // Headerless CSV positions were checked by the file oracle. Its first JSON
+ // cell must never be interpreted as a schema name during cold readback.
+ assert.equal(await decode(args,async()=>{throw Error('header read');},x=>x,parseExportCsvHeader,[{...output,header:false}]),undefined);
+});
+
+test('headerless expected outputs preserve cold native values and mapped column positions',()=>{
+ const want={...output,header:false,column_order:'exact'};
+ for(const multiple of [true,false]){
+  const expected={package_path:'/test/headerless.lgp',nodes:[],...(multiple?{outputs:[want]}:want)};
+  assert.equal(parseExpectedOutputs(expected).outputs[0].header,false);
+ }
+ for(const header of ['false',0,null])
+  assert.throws(()=>parseExpectedOutputs({package_path:'/test/x.lgp',nodes:[],outputs:[{...want,header}]}),/EXPECTED_SHAPE_INVALID/);
+ const a=actual('rename',1),exportInput=resolveExportInput(graph());
+ exportInput.input_fields=[{name:'Code',source_name:'Code',type:'string'}];
+ assert.equal(matchExpectedOutputs([a],[want],{exportInput}).length,1);
+ a.data.sample[0][0].value='wrong';
+ assert.throws(()=>matchExpectedOutputs([a],[want],{exportInput}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
 });
 
 test('label headers require an explicit mode and unambiguous observed labels',()=>{
@@ -214,6 +232,33 @@ test('exact destination selects renamed report while the earlier s1 export remai
   const a=actual('rename',1);mutate(a.data);
   assert.throws(()=>matchExpectedOutputs([a],[{...output,export_destination:destination}],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
  }
+});
+
+test('exact destination selects CSV or Excel among mixed export types',()=>{
+ for(const type of ['exports.text','exports.excel']){
+  const g=graph();g.nodes.find(n=>n.ref.node_id==='export').type=type;
+  g.nodes.push(node('input-lgd','exports.lgd',[]),node('result-lgd','exports.lgd',[]),
+   node('other-export',type==='exports.text'?'exports.excel':'exports.text',[]));
+  const destination='/own/report.csv',input_fields=[{name:'Code',source_name:'Code',type:'string'}];
+  const destinations=[{node_id:'input-lgd',destination:'/own/input.lgd'},
+   {node_id:'export',destination,input_fields},{node_id:'result-lgd',destination:'/own/result.lgd'},
+   {node_id:'other-export',destination}];
+  const binding=resolveExportInput(g,{type,destination,destinations});
+  assert.equal(binding.export_node_id,'export');assert.equal(binding.node.ref.node_id,'rename');
+  assert.equal(binding.output_port,1);assert.deepEqual(binding.input_fields,input_fields);
+  assert.equal(matchExpectedOutputs([actual('rename',1)],[output],{exportInput:binding}).length,1);
+  assert.throws(()=>resolveExportInput(g,{type,destination,destinations:[...destinations,destinations[1]]}),
+   /COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+ }
+});
+
+test('two CSV exports still refuse a single observed destination beside LGD',()=>{
+ const g=graph();g.nodes.push(node('second-export','exports.text',[]),node('lgd','exports.lgd',[]));
+ const destination='/own/report.csv';
+ for(const destinations of [
+  [{node_id:'export',destination},{node_id:'lgd',destination:'/own/report.lgd'}],
+  [{node_id:'export',destination},{node_id:'second-export',destination},{node_id:'lgd',destination:'/own/report.lgd'}],
+ ])assert.throws(()=>resolveExportInput(g,{destination,destinations}),/COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
 });
 
 test('cold reveals only an unavailable owned body, preserving clipped-label selection guards',async()=>{

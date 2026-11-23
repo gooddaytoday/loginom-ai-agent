@@ -20,12 +20,13 @@ export function restRequestReadback({node,phases,operation_id}){
  const c=configured?.value?.configuration;
  need(configured?.status==='verified'&&c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration readback owner differs');
  need(saved?.status==='verified'&&saved.value?.settings_applied===true&&saved.value.mode==='done'&&['document_id','workflow_id','node_id'].every(k=>saved.value.node_context?.[k]===node[k]),'node settings were not committed to this node');
- return {kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:'GET',
-  connection:c.connection??null,query_parameters:c.query_parameters,receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'readback phase differs');return p.receipt_id;}),package_persistence_verified:false};
+ return {kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:c.method??'GET',
+  ...(c.produce_error_descriptions!==undefined?{produce_error_descriptions:c.produce_error_descriptions}:{}),
+  ...(c.body_field!==undefined?{body_field:c.body_field}:{}),...(c.headers!==undefined?{headers:c.headers}:{}),...(c.simulation!==undefined?{simulation:c.simulation}:{}),connection:c.connection??null,query_parameters:c.query_parameters,receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'readback phase differs');return p.receipt_id;}),package_persistence_verified:false};
 }
 
 export function restQueryEncoderRequest(request,deadline,now=Date.now()){
- const fields=[...new Set(request.parameters.query_parameters.map(q=>q.field))];
+ const fields=[...new Set([...request.parameters.query_parameters.map(q=>q.field),...(request.parameters.body_field?[request.parameters.body_field]:[])])];
  need(request.inputs.length===1,'raw query values require one explicit table input');
  const budget=Math.min(request.budgets.total_ms,deadline-now);
  need(budget>0,'query encoding deadline elapsed');
@@ -37,7 +38,7 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
   mode:'script',parameters:{schema_mode:'declared',columns:fields.map(name=>({name,label:name,type:'string',data_kind:'Дискретный',usage:'Не задано'})),
    source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n'
     +'for(let row=0;row<InputTable.RowCount;row++){\n OutputTable.Append();\n for(const name of '+JSON.stringify(fields)+'){\n'
-    +'  const value=InputTable.Get(row,name);\n  if(value!=null&&typeof value!=="string")throw Error("REST query values require raw string fields");\n  OutputTable.Set(name,value==null?null:encodeURIComponent(value));\n }\n}\n'},
+    +'  const value=InputTable.Get(row,name);\n  const integer=name!=='+JSON.stringify(request.parameters.body_field??null)+'&&Number.isSafeInteger(value);\n  if(value!=null&&typeof value!=="string"&&!integer)throw Error("REST query values require raw strings or safe integers; body values require raw string fields");\n  OutputTable.Set(name,value==null?null:name==='+JSON.stringify(request.parameters.body_field??null)+'?value:encodeURIComponent(String(value)));\n }\n}\n'},
   mappings:[],finish:'execute',read:{ports:[],sample_rows:0,require_exact_numbers:false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
@@ -71,20 +72,60 @@ async function prepareQueryEncoder(options,ctx,config){
  return {source:result.node,output:0,input:0};
 }
 async function readRestOutputs(channel,read,ctx){
- const ports=[];
- for(const port of read.ports){
+ const ports=[],observed=new Map();
+ const readPort=async port=>{
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
-  need(output.schema.every((field,index)=>field.name===outputs[port][index]?.name),'output field order differs from the native REST schema');
-  const aligned=alignReadSchema(output.schema,outputs[port]);
+  const expected=port===1&&output.schema.length===3?outputs[1].filter(field=>field.name!=='ErrorDesc'):outputs[port];
+  need(output.schema.length===expected.length&&output.schema.every((field,index)=>field.name===expected[index].name),'output field order differs from the native REST schema');
+  const aligned=alignReadSchema(output.schema,expected);
   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
-  ports.push(output);
+  observed.set(port,output);return output;
+ };
+ for(const port of read.ports)ports.push(await readPort(port));
+ const scalar=cell=>cell?.is_null===false?(cell.decimal??cell.value):null;
+ const failed=port=>(port?.sample??[]).filter(row=>{const code=scalar(row[1]);return code!==null&&/^-?[0-9]+$/.test(String(code))&&Number(code)!==0;});
+ let body=observed.get(0),status=observed.get(1);
+ // Extra reads diagnose only a failed request or an empty body, under the same
+ // completed execution and existing preview limits. Returned ports stay requested.
+ if(body?.row_count===0&&!status)status=await readPort(1);
+ if(failed(status).length&&!body)body=await readPort(0);
+ const missing=failed(status).filter(row=>{
+  const id=scalar(row[0]);if(id===null||!body)return false;
+  const response=body.sample.find(r=>scalar(r[0])!==null&&String(scalar(r[0]))===String(id));
+  return response?response[1]?.is_null===true||scalar(response[1])==='':body.sample_complete===true;
+ });
+ if(missing.length){
+  const codes=[...new Set(missing.map(row=>String(scalar(row[1]))))].slice(0,10).join(',');
+  const message='REST_RESPONSE_BODY_MISSING: ErrorCode='+codes+'; тело ответа не получено: повтори запрос или уменьши ответ (select, limit/skip)';
+  for(const port of ports)port.limitations=[...(port.limitations??[]),message];
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'outputs must have distinct native ports');
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }
 
+// LAB-1904 r5/model.stdout:65→80: "create a NEW REST" alone left the old REST,
+// union, Calculator and Export as a second chain. Name the replacement steps
+// with the observed refs: the old REST, its generated encoder and consumers.
+export function restReplacementStep(graph,restId,input){
+ const node=id=>graph.nodes.find(n=>n.ref.node_id===id);
+ const encoder=input&&node(input.source);
+ const generated=!!encoder&&encoder.type==='programming.javascript'&&/^URL[ _]query[ _]encoding[ _][0-9a-f]{32}$/.test(encoder.label??'')
+  &&graph.links.filter(e=>e.source===input.source).length===1&&!(graph.variable_links??[]).some(e=>e.source===input.source||e.target===input.source);
+ // The saved connection's graph reference is removed only when this REST alone uses it.
+ const services=graph.rest_connection_links??[],own=services.filter(e=>e.target===restId&&e.input==='connection:0');
+ const reference=own.length===1&&services.filter(e=>e.source===own[0].source).length===1&&node(own[0].source)?own[0].source:null;
+ const consumers=[...new Set(graph.links.filter(e=>e.source===restId).map(e=>e.target))].map(id=>node(id)?.type+' '+id+' inputs:['
+  +graph.links.filter(e=>e.source===restId&&e.target===id).sort((a,b)=>a.input-b.input).map(e=>'{output:'+e.output+',input:'+e.input+'}').join(',')+']');
+ return 'This REST keeps its saved connection: a new URL or query list needs a replacement REST, not a second chain. next_step: '
+  +'1) dock_node_apply with a NEW operation_id and a NEW integration.rest_request target with a NEW unique target.label, the requested raw inputs and query_parameters and finish:"execute". '
+  +'If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. '
+  +'2) After it succeeds, dock_node_delete the replaced REST '+restId+(generated?' and then its generated URL encoder '+input.source:'')
+  +(reference?', then its connection reference '+reference+' that no other REST uses':'')+' (NodeRef only, no label). '
+  +(consumers.length?'3) Reconnect each former consumer to the new REST with dock_node_apply on the SAME existing target, the new REST as source of these inputs, parameters:{} and finish:"execute": '+consumers.join('; ')+'. '
+   +'Keep the existing parsing and Export; change only what the task asks. Do not duplicate the union, Calculator or Export.':'');
+}
 export function createRestRequestNodeSupport(config){
- const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-get-v2',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
+ const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-methods-v1',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
   configurationObservation:{condition:'owned REST wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
   configureAllOutputs:async()=>({verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true,native_output_definitions_preserved:true}),readOutputs:readRestOutputs};
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
@@ -109,7 +150,7 @@ export function createRestRequestNodeSupport(config){
      need(links.length<=1,'input 0 is ambiguous');
      existingInput=links[0]??null;
      if(existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
-      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs and query_parameters and finish:"execute". If the URL or ordered query parameter names changed, supply a NEW unique connection name and base_url; reuse the saved connection name only when both are unchanged. The existing REST and its input are preserved.');
+      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. '+restReplacementStep(graph,request.target.ref.node_id,existingInput));
       error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
       throw error;
      }
@@ -119,13 +160,33 @@ export function createRestRequestNodeSupport(config){
     // the model to author a codec or changing the caller's source table.
     // Preserve the already confirmed data edge on reconfiguration.
     const target_inputs=request.inputs.length?(existingInput||!request.parameters.query_parameters.length?request.inputs:[await prepareQueryEncoder(options,ctx,config)]):null;
-    const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
+    let result;
+    try{result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);}
+    catch(error){
+     // LAB-1904: an existing REST keeps its saved connection (rest-connection.mjs:148).
+     // Name the same replacement steps from a read-only graph, never a bare new REST.
+     if(request.target.kind!=='existing'||!/requested connection differs from the existing REST reference/.test(error?.message??''))throw error;
+     let graph=null;
+     try{graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);}catch{throw error;}
+     if(graph?.complete!==true||graph.document_id!==request.document_id||JSON.stringify(graph.workflow_ref)!==JSON.stringify(request.workflow_ref))throw error;
+     const input=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
+     error.message=error.message+'. '+restReplacementStep(graph,request.target.ref.node_id,input.length===1?input[0]:null);
+     throw error;
+    }
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
-   beforeInput:(_,ctx)=>linkConnection(ctx),
+   beforeInput:async(_,ctx,{channel})=>{
+    await linkConnection(ctx);
+    if(request.parameters.headers?.some(h=>typeof h.value==='object')){
+     const explicit=request.mappings.some(m=>m.kind==='variables');
+     const mapped=await channel[explicit||request.target.kind==='existing'?'readVariablePortMapping':'mapVariablePort']({direction:'input',kind:'variables',port:0});
+     need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'header variable mapping was not verified');
+     options.operation.restHeaderVariables=mapped.mapping;
+    }
+   },
    configure:async(channel,p,{request})=>{
     const ctx={document_id:request.document_id,workflow_ref:request.workflow_ref,node:options.operation.nodeApply.node,deadline:options.operation.deadline};
-    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,p,config);
+    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,{...p,new_node:request.target.kind==='new',...(options.operation.restHeaderVariables?{header_variables:options.operation.restHeaderVariables}:{})},config);
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);

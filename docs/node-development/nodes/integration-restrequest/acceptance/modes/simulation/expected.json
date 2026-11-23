@@ -1,0 +1,42 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "simulation.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "message",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ok",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "message": "REST offline fixture",
+          "amount": 17,
+          "ok": true
+        }
+      ]
+    }
+  ]
+}

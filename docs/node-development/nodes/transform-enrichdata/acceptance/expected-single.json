@@ -1,0 +1,109 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.enrich_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.enrich_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Key",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RefName",
+          "type": "string",
+          "label": "LookupName"
+        },
+        {
+          "name": "RefRate",
+          "type": "real",
+          "label": "LookupRate",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Key": 1,
+          "Amount": 1.25,
+          "Note": "first",
+          "RefName": "b1",
+          "RefRate": 0.5
+        },
+        {
+          "RowID": 2,
+          "Key": 2,
+          "Amount": 2.5,
+          "Note": "",
+          "RefName": "b2",
+          "RefRate": 1.25
+        },
+        {
+          "RowID": 3,
+          "Key": 3,
+          "Amount": -0.125,
+          "Note": null,
+          "RefName": null,
+          "RefRate": null
+        },
+        {
+          "RowID": 4,
+          "Key": null,
+          "Amount": 0.0,
+          "Note": "missing-key",
+          "RefName": "b-null",
+          "RefRate": 2.5
+        },
+        {
+          "RowID": 5,
+          "Key": 1,
+          "Amount": 4.75,
+          "Note": "repeat-main",
+          "RefName": "b1",
+          "RefRate": 0.5
+        },
+        {
+          "RowID": 6,
+          "Key": 4,
+          "Amount": 8.0,
+          "Note": "unmatched",
+          "RefName": null,
+          "RefRate": null
+        }
+      ]
+    }
+  ]
+}

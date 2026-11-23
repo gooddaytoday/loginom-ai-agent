@@ -47,3 +47,12 @@ test('unknown Filter materialization launch stops after one gesture',async()=>{
  assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
  assert.equal(f.actions.some(a=>a.verb==='show_process_node'),false);
 });
+
+test('new variable Filter materializes its connected control input through W1 before table settings',async()=>{
+ const calls=[],request={target:{kind:'new'},finish:'execute',inputs:[{input:0}],variable_inputs:[{kind:'control',input:0}],parameters:{groups:[[{value:{kind:'variable',name:'limit'}}]]},mappings:[]};
+ const options={operation:{nodeApply:{request}}};
+ const channel={mapVariablePort:async mapping=>{calls.push(mapping);return {verified:true,cleanup_complete:true,independent_readback:true};},observe:async()=>{throw Error('New Filter must not execute its unconfigured definition');}};
+ await prepareFilterInput(options,{node},{channel});
+ assert.deepEqual(calls,[{direction:'input',kind:'control',port:0}]);
+ calls.length=0;request.mappings=[{direction:'input',kind:'control',port:0}];await prepareFilterInput(options,{node},{channel});assert.deepEqual(calls,[]);
+});

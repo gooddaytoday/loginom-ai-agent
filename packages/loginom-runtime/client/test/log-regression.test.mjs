@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {validateLogRegressionParameters,resolveLogRegressionRoles} from '../lib/log-regression-parameters.mjs';
 import {configureLogRegression} from '../lib/log-regression-procedure.mjs';
 import {logRegressionOutputColumns,readLogRegressionOutputs} from '../lib/log-regression-output.mjs';
-import {logRegressionConfigurationReadback} from '../lib/log-regression-readback.mjs';
+import {logRegressionConfigurationReadback,readLogRegressionValidation} from '../lib/log-regression-readback.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
@@ -11,18 +11,29 @@ import {validateUiAction} from '../lib/workspace-ui.mjs';
 
 const logistic={input_fields:['X'],target_field:'Target',event:'yes',threshold:0.8};
 const parameters={logistic};
+test('column partition accepts a distinct Boolean test flag and rejects numeric flags before effects',()=>{
+ const partition={method:'column',field:'Split'},p={logistic:{...logistic,partition}};
+ assert.doesNotThrow(()=>validateLogRegressionParameters(p,'enter'));
+ const flag={name:'Split',label:'Split',type:'boolean',data_kind:'Дискретный',usage_type:0};
+ assert.equal(resolveLogRegressionRoles(p,[...fields,flag]).at(-1).usage_type,0);
+ for(const type of ['integer','real','string'])assert.throws(()=>resolveLogRegressionRoles(p,[...fields,{...flag,type}]),/Boolean/);
+ for(const field of ['X','Target','x','missing'])assert.throws(()=>resolveLogRegressionRoles({logistic:{...logistic,partition:{...partition,field}}},[...fields,flag]));
+ for(const bad of [{method:'column'},{...partition,train_percent:50},{...partition,field:''}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,partition:bad}},'enter'));
+ for(const mode of ['forward','ridge','lasso'])assert.throws(()=>validateLogRegressionParameters(p,mode));
+});
 const fields=[['RowID','integer','Непрерывный',0],['X','real','Непрерывный',3],['Target','string','Дискретный',4],['Note','string','Дискретный',0]]
  .map(([name,type,data_kind,usage_type],index)=>({name,label:name,type,data_kind,usage_type,index,field_id:String(index),record_id:'role-'+index}));
 const node={document_id:'doc',workflow_id:'flow',node_id:'logistic'};
 const request={operation_id:'logistic',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]},target:{kind:'new',type:'datamining.log_regression'},inputs:[{source:{...node,node_id:'import'},output:0,input:0}],mode:'enter',parameters,mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
 
-test('logistic registration and handler accept only binary Enter and its prediction port',()=>{
+test('logistic registration and handler accept prediction and full coefficient outputs',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
  const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
- assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise']);
+ assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','ridge','apply','lasso','elastic_net']);
  assert.equal(card.tabular_outputs,2);assert.ok(card.parameter_schema.properties.logistic.properties.event.description);
  assert.ok(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler);
- for(const patch of [{mode:'apply'},{read:{...request.read,ports:[1]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
+ for(const ports of [[1],[0,1]])assert.ok(validateNodeApplyRequest({...request,read:{...request.read,ports}},support.nodeApplyHandlers).handler);
+ for(const patch of [{read:{...request.read,ports:[2]}},{mappings:[{direction:'output',port:0,fields:[]}]},{parameters:{...parameters,weights:'W'}}])
   assert.throws(()=>validateNodeApplyRequest({...request,...patch},support.nodeApplyHandlers));
 });
 
@@ -35,31 +46,101 @@ test('logistic roles keep identifiers and comments and require a discrete string
  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,target_field:'x'}},'enter'));
 });
 
-function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',nativeSelection,needsScroll=false}={}){
+const globalFields=fields;
+function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,regularization,needsScroll=false,initialCriterion=1,validation,corruptValidation=false,partition,initialPartition,corruptPartition=false,partitionUnactivated=false,inputUnactivated=false,sequence=[0,1,2],normalization,initialNorm=0,existing=false,corruptTarget=false,weightType}={}){
+ const fields=[...(weightType?[...globalFields,{name:"Weight",label:"Weight",type:weightType,data_kind:"Непрерывный",usage_type:7,index:4,field_id:"4",record_id:"role-4"}]:globalFields),...(partition?.method==='column'?[{...globalFields[0],name:'Split',label:'Split',type:'boolean',data_kind:'Дискретный',usage_type:0,index:4,field_id:'4',record_id:'flag'}]:[])];
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
- const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:1,pedAddSignificance:0.05,pedRemoveSignificance:0.1,...nativeSelection};
- let stage='input_mapping',picker=null,scrollTop=0;const actions=[];
- const rawState=()=>({prepared_node_context:{...node,verified:true},wizard:{status:'observed',stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{elements:[{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
+ const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:initialCriterion,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
+ if(['ridge','elastic_net'].includes(mode))Object.assign(details,{pedRidgeSetupMethod:1,pedLambdaRidge:2});
+ if(['lasso','elastic_net'].includes(mode))Object.assign(details,{pedLassoSetupMethod:1,pedLambdaLasso:2});
+ if(mode==='apply'){Object.assign(values,{pedAutoMethod:false,pedRegressionMethod:0,pedUseDetailedSettings:true,pedEventType:4,pedEventId:2});Object.assign(details,{pedEpsilon:1e-10,pedThreshold:0.8});}
+ const partitionValues={train:100,test:0,sampling:0,validation:0,folds:5,fold_sampling:0,...initialPartition};
+ let inputActive=!inputUnactivated,partitionActive=!partitionUnactivated&&!inputUnactivated;
+ let stage='input_mapping',picker=null,scrollTop=0,normType=initialNorm,normSelected=false,normEditor=false,editorNorm=initialNorm;const actions=[];
+ const rawState=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',owner_context:{status:'observed'},stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']},{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
-  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?'Deviance':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
-  node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:details.pedRegSelQuality!==0||mode==='forward'}})}});
- const state=()=>{const s=rawState();if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
+  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)',ridge:'Ridge (Гребневая регрессия)',lasso:'LASSO (L1-регуляризация)',elastic_net:'Elastic-net (Регрессия эластичная сеть)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?'Задать вручную':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
+  node_logregression:{verified:true,...(['lasso','elastic_net'].includes(mode)?{method_choices:[{value:5,label:'LASSO (L1-регуляризация)'},{value:6,label:'Elastic-net (Регрессия эластичная сеть)'}]}:{}),node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>[3,4].includes(f.usage_type)).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:inputActive?'Вход активирован':'Не активировано'}:stage==='learn_partition'?{kind:'partition',values:Object.fromEntries(Object.entries(partitionValues).filter(([k])=>!['folds','fold_sampling'].includes(k)||partitionValues.validation===1)),source_status:(inputUnactivated?inputActive:partitionActive)?'Вход активирован':'Не активировано',sequence,switches:{},disabled:{train:partitionValues.sampling===2,test:partitionValues.sampling===2,field:false,validation:false,folds:false,fold_sampling:false},...(partitionValues.sampling===2?{column_choices:[{name:'Split',label:'Split'}]}:{}),...(partition&&partitionActive?{train_count:Math.floor(64*partitionValues.train/100),test_count:Math.floor(64*partitionValues.test/100),total_count:64}:{})}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:['ridge','lasso','elastic_net'].includes(mode),pedAddSignificance:['ridge','lasso','elastic_net'].includes(mode)||details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:['ridge','lasso','elastic_net'].includes(mode)||details.pedRegSelQuality!==0||mode==='forward',...(['ridge','elastic_net'].includes(mode)?{pedRidgeSetupMethod:false,pedLambdaRidge:false}:{}),...(['lasso','elastic_net'].includes(mode)?{pedLassoSetupMethod:false,pedLambdaLasso:false}:{})}})}});
+ const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();
+  if(stage==='learn_partition'){
+   s.ui.elements.push({ref:'partition-activate',tid:s.wizard.root_tid+';LearnPartitionWizard;btnActivationPort',allowed_actions:inputUnactivated&&inputActive?[]:['click']});
+   for(const [key,tid] of [['train','SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl'],['test','SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl'],['field','ByColumnMethodForm;pedPartitionColumn;ValueControl;trg_picker'],['sampling','pedSamplingMethod;ValueControl;trg_picker'],['validation','ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker'],['folds','ValidationSettings;pedFolds;ValueControl'],['fold_sampling','ValidationSettings;pedKFoldsSamplingMethod;ValueControl;trg_picker']])s.ui.elements.push({ref:'partition-'+key,tid:s.wizard.root_tid+';LearnPartitionWizard;'+tid,allowed_actions:['click','fill','press']});
+   if(picker==='validation')s.ui.elements.push({ref:'kfold-option',label:'K-fold кросс-валидация',tid:s.wizard.root_tid+';LearnPartitionWizard;ValidationSettings;pedLearnValidationMethod;ValueControl;boundlist;K-fold_кросс-валидация',allowed_actions:['click']});
+   if(picker==='fold_sampling')s.ui.elements.push({ref:'fold-sequential',label:'Последовательный',tid:s.wizard.root_tid+';LearnPartitionWizard;ValidationSettings;pedKFoldsSamplingMethod;ValueControl;boundlist;Последовательный',allowed_actions:['click']});
+   if(picker==='field')s.ui.elements.push({ref:'split-option',label:'Split',tid:s.wizard.root_tid+';LearnPartitionWizard;ByColumnMethodForm;pedPartitionColumn;ValueControl;boundlist;Split',allowed_actions:['click']});
+   if(picker==='sampling')s.ui.elements.push({ref:'column-option',label:'По столбцу',tid:s.wizard.root_tid+';LearnPartitionWizard;pedSamplingMethod;ValueControl;boundlist;По_столбцу',allowed_actions:['click']});
+   if(picker==='sampling')s.ui.elements.push({ref:'sequential',label:'Последовательный',tid:s.wizard.root_tid+';LearnPartitionWizard;pedSamplingMethod;ValueControl;boundlist;Последовательный',allowed_actions:['click']});
+  }
+  if(stage==='normalization'){
+   s.ui.elements.push({ref:'norm-activate',tid:s.wizard.root_tid+';NormTuneWizard;btnActivationPort',allowed_actions:inputActive?[]:['click']});
+   s.node_logregression.fields[0].norm_type=normType;
+   if(corruptTarget&&normType!==initialNorm)s.node_logregression.fields[1].norm_type=8;
+   s.node_logregression.selected=normSelected?['role-1']:[];
+   s.node_logregression.editor=normEditor?{root_tid:s.wizard.root_tid+';ColumnsEditForm',record_ids:['role-1'],norm_type:editorNorm}:null;
+   for(const [key,tid] of [['norm-row','NormTuneWizard;colDisplayName_X'],['norm-edit','NormTuneWizard;btnEdit'],['norm-picker','ColumnsEditForm;cbxNormType;trg_picker'],['norm-apply','ColumnsEditForm;btnApply']])s.ui.elements.push({ref:key,tid:s.wizard.root_tid+';'+tid,allowed_actions:['click']});
+   if(picker==='norm')for(const [value,label] of [[0,'Нет'],[5,'Стандартизация']])s.ui.elements.push({ref:'norm-option-'+value,tid:s.wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist;'+label,label,role:'option',allowed_actions:['click']});
+  }
+  if(needsScroll&&stage==='lin_regression_details')for(const e of s.ui.elements){if(e.ref.startsWith('ped')){e.scroll={ref:'details-scroll',top:scrollTop,max_top:43};e.interaction={state:'point_observed'};e.enabled=true;e.allowed_actions.push('scroll');}}if(stage==='lin_regression_details')for(const e of s.ui.elements)if(/;ped(?:Epsilon|Threshold);ValueControl$/.test(e.tid??'')){e.identity={anchor_tid:e.tid,path:[1,0,0,0]};e.signature={tag:'input'};e.tid=null;}return s;};
  const channel={async observe({ready,condition}){const s=state();assert.ok(ready(s),condition);return s;},async perform({ready,resolve,initialObservation}){
   const s=initialObservation??state();assert.ok(ready(s));const a=resolve(s);actions.push(a);
+  if(a.ref==='close'){stage='closed';return;}
   if(a.verb==='wizard_step'){validateUiAction(a,s);stage=a.expected_stage;return;}
+  if(a.ref==='norm-activate'){inputActive=true;return;}
+  if(a.ref==='partition-activate'){partitionActive=true;inputActive=true;return;}
+  if(a.ref==='kfold-option'){partitionValues.validation=1;picker=null;return;}
+  if(a.ref==='fold-sequential'){partitionValues.fold_sampling=corruptValidation?0:1;picker=null;return;}
+  if(a.ref==='column-option'){partitionValues.sampling=2;partitionValues.field=null;picker=null;return;}
+  if(a.ref==='split-option'){partitionValues.field=corruptPartition?'Other':'Split';picker=null;return;}
+  if(a.ref==='sequential'){partitionValues.sampling=1;picker=null;return;}
+  if(a.ref.startsWith('partition-')){const key=a.ref.slice(10);if(a.verb==='click')picker=key;else if(a.verb==='fill')partitionValues[key]=corruptPartition?99:Number(a.text);return;}
+  if(a.ref==='norm-row'){normSelected=true;return;}
+  if(a.ref==='norm-edit'){normEditor=true;editorNorm=normType;return;}
+  if(a.ref==='norm-picker'){picker='norm';return;}
+  if(a.ref.startsWith('norm-option-')){editorNorm=Number(a.ref.slice(12));picker=null;return;}
+  if(a.ref==='norm-apply'){normType=editorNorm;normEditor=false;return;}
   const key=a.ref.split(':')[0],target=stage==='lin_regression_details'?details:values;
   if(a.verb==='scroll'){scrollTop=43;return;}
   if(a.verb==='fill'&&key==='pedRemoveSignificance'&&needsScroll&&scrollTop===0)throw Error('UI_REFERENCE_OBSCURED');
   if(a.verb==='set_checked')target[key]=a.checked;
   else if(a.verb==='fill')target[key]=Number(a.text);
   else if(a.ref.startsWith('event-')){target.pedEventId=classes[Number(a.ref.slice(6))].index;picker=null;}
-  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise'].indexOf(mode):picker==='pedRegSelQuality'?0:picker==='pedEventType'?4:2;picker=null;}
+  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise','ridge','lasso','elastic_net'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?0:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
- return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,parameters,{request:{...request,mode},inputMapping})};
+ return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(partition?{partition}:{}),...(validation?{validation}:{}),...(weightType?{weight_field:"Weight"}:{}),...(normalization!==undefined?{normalization}:{}),...(selection?{selection}:{}),...(regularization?{regularization}:{})}},{request:{...request,mode,target:existing?{kind:'existing',ref:node}:request.target},inputMapping})};
 }
+
+test('normalization validates the native none/standardize choices before mutation',()=>{
+ for(const normalization of ['none','standardize'])assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,normalization}},'enter'));
+ for(const normalization of [null,5,'minmax',{},''])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,normalization}},'enter'));
+});
+
+test('standardize edits only predictors and preserves target encoding and denormalized coefficients',async()=>{
+ const f=fixture({normalization:'standardize'}),result=await f.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.equal(result.configuration.normalization[1].norm_type,1);
+ assert.equal(f.values.pedDenormalize,true);
+ assert.equal(f.actions.filter(a=>a.ref==='norm-apply').length,1);
+ assert.deepEqual(result.configuration.fields.map(f=>f.usage_type),[0,3,4,0]);
+ await assert.rejects(fixture({normalization:'standardize',corruptTarget:true}).run(),/other|unrelated/);
+});
+
+test('existing omitted normalization persists; explicit none reverses standardize',async()=>{
+ const kept=fixture({existing:true,initialNorm:5}),result=await kept.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.ok(!kept.actions.some(a=>a.ref==='norm-apply'));
+ const reset=await fixture({existing:true,initialNorm:5,normalization:'none'}).run();
+ assert.equal(reset.configuration.normalization[0].norm_type,0);
+});
+
+test('apply inspects saved standardize without edits and rejects an explicit mismatch',async()=>{
+ const f=fixture({mode:'apply',initialNorm:5,normalization:'standardize'}),result=await f.run();
+ assert.equal(result.configuration.normalization[0].norm_type,5);
+ assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+ await assert.rejects(fixture({mode:'apply',initialNorm:5,normalization:'none'}).run(),/saved.*normalization/);
+});
 
 test('Enter resolves event from observed classes, sets explicit threshold/epsilon and advances to Done',async()=>{
  const f=fixture(),result=await f.run();
@@ -92,35 +173,299 @@ test('readback binds training, event and cutoff to committed settings and separa
  const entries={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute',training:{status:'trained',node,execution_id:'teach',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
  const candidate={node,operation_id:'logistic',phases:Object.entries(entries).map(([phase,value])=>({phase,status:'verified',receipt_id:'logistic:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};
  const result=logRegressionConfigurationReadback(candidate);assert.equal(result.threshold,0.8);assert.equal(result.event,'yes');assert.equal(result.training.execution_id,'teach');assert.equal(result.package_persistence_verified,false);
+ c.normalization=[{name:'X',norm_type:5},{name:'Target',norm_type:9}];
+ assert.equal(logRegressionConfigurationReadback(candidate).normalization,'standardize');
+ c.fields=[...fields,{name:'Weight',type:'real',usage_type:7}];
+ assert.equal(logRegressionConfigurationReadback(candidate).weight_field,'Weight');
+ c.fields=fields;
+ c.partition={sampling:1,train:50,test:50,train_count:32,test_count:32,total_count:64};
+ const split=logRegressionConfigurationReadback(candidate);assert.equal(split.train_percent,50);assert.deepEqual(split.partition,{method:'sequential',train_percent:50,test_percent:50,train_count:32,test_count:32,total_count:64});
+ c.partition={sampling:2,field:'Split',train:100,test:0,validation:0};
+ const column=logRegressionConfigurationReadback(candidate);assert.deepEqual(column.partition,{method:'column',field:'Split'});assert.equal(column.train_percent,undefined);
+ delete c.partition;
+ c.mode='ridge';c.regularization={lambda_ridge:1};
+ for(const normType of [0,5]){
+  c.normalization[0].norm_type=normType;
+  const ridge=logRegressionConfigurationReadback(candidate);
+  assert.equal(ridge.mode,'ridge');assert.deepEqual(ridge.regularization,{lambda_ridge:1});
+  assert.equal(ridge.normalization,normType===5?'standardize':'none');
+ }
+ c.mode='lasso';c.regularization={lambda_lasso:0.75};
+ const lasso=logRegressionConfigurationReadback(candidate);assert.equal(lasso.mode,'lasso');assert.deepEqual(lasso.regularization,{lambda_lasso:0.75});
  entries.finish.training.execution_id='execute';assert.throws(()=>logRegressionConfigurationReadback(candidate),/training/);
 });
 
-for(const mode of ['forward','backward','stepwise'])test(mode+' uses native selection defaults without public selection parameters',async()=>{
- assert.doesNotThrow(()=>validateLogRegressionParameters(parameters,mode));
- const f=fixture({mode,nativeSelection:{pedAddSignificance:0.95,pedRemoveSignificance:0.99}}),r=await f.run();
- assert.equal(r.configuration.mode,mode);assert.equal(Object.hasOwn(r.configuration,'selection'),false);
- assert.equal(f.details.pedRegSelQuality,0);
- if(mode!=='backward')assert.equal(f.details.pedAddSignificance,0.05);
- if(mode!=='forward')assert.equal(f.details.pedRemoveSignificance,0.1);
+for(const mode of ['forward','backward','stepwise'])for(const criterion of ['deviance','aic','aicc','bic','hqic'])test(mode+' / '+criterion+' selects observed controls and reports applicable cutoffs',async()=>{
+ const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:1e-7}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
+ assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,selection}},mode));
+ const f=fixture({mode,selection,initialCriterion:criterion==='aic'?0:1}),r=await f.run();
+ assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise','ridge','lasso','elastic_net'].indexOf(mode));
+ assert.equal(r.configuration.mode,mode);assert.deepEqual(r.configuration.selection,selection);
+ assert.equal(f.details.pedRegSelQuality,['deviance','aic','aicc','bic','hqic'].indexOf(criterion));
  const edited=f.actions.filter(a=>a.verb==='fill').map(a=>a.ref.split(':')[0]);
- assert.equal(edited.includes('pedAddSignificance'),mode!=='backward');
- assert.equal(edited.includes('pedRemoveSignificance'),mode!=='forward');
+ assert.equal(edited.includes('pedAddSignificance'),criterion==='deviance'&&mode!=='backward');
+ assert.equal(edited.includes('pedRemoveSignificance'),criterion==='deviance'&&mode!=='forward');
+ if(criterion==='deviance'&&mode!=='backward')assert.equal(f.actions.find(a=>a.verb==='fill'&&a.ref.startsWith('pedAddSignificance')).text,'0.0000001');
 });
 
-test('custom selection criteria and significance cutoffs refuse before UI for every method',()=>{
+test('selection rejects missing, inapplicable, unknown and unordered cutoffs before UI',()=>{
+ for(const [mode,selection] of [['enter',{criterion:'aic'}],['forward',{criterion:'deviance',entry_significance:0}],['stepwise',{}],['forward',{criterion:'unknown'}],['forward',{criterion:'deviance',entry_significance:-1e-9}],['backward',{criterion:'deviance',removal_significance:0}],['backward',{criterion:'deviance',removal_significance:1}],['forward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['backward',{criterion:'deviance',entry_significance:0.01,removal_significance:0.2}],['stepwise',{criterion:'deviance',entry_significance:0.2,removal_significance:0.1}],['stepwise',{criterion:'aic',entry_significance:0.01}],['stepwise',{criterion:'aic',unexpected:true}]])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,...(selection?{selection}:{})}},mode));
+});
+
+ test('Backward reveals its own clipped removal cutoff using a visible anchor in the same scroll region',async()=>{
+  const f=fixture({mode:'backward',selection:{criterion:'deviance',removal_significance:0.2},needsScroll:true});
+  const result=await f.run();
+  assert.equal(result.configuration.selection.removal_significance,0.2);
+  assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
+  assert.ok(f.actions.findIndex(a=>a.verb==='scroll')<f.actions.findIndex(a=>a.verb==='fill'&&a.ref.startsWith('pedRemoveSignificance')));
+ });
+
+for(const mode of ['forward','backward','stepwise'])test(mode+' preserves native defaults when selection is omitted',async()=>{
+ assert.doesNotThrow(()=>validateLogRegressionParameters(parameters,mode));
+ const f=fixture({mode}),r=await f.run();
+ assert.deepEqual(r.configuration.selection,{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})});
+});
+
+test('apply accepts only an existing connected model and forbids rewiring or configuration',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
- const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
- assert.equal(Object.hasOwn(card.parameter_schema.properties.logistic.properties,'selection'),false);
- for(const mode of ['enter','forward','backward','stepwise'])for(const selection of [{},...['deviance','aic','aicc','bic','hqic'].map(criterion=>({criterion})),{criterion:'deviance',entry_significance:0,removal_significance:0.2}]){
-  const p={logistic:{...logistic,selection}};
-  assert.throws(()=>validateLogRegressionParameters(p,mode),/not supported/);
-  assert.throws(()=>validateNodeApplyRequest({...request,mode,parameters:p},support.nodeApplyHandlers));
+ const applying={...request,mode:'apply',target:{kind:'existing',type:'datamining.log_regression',ref:node},inputs:[]};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(applying,support.nodeApplyHandlers));
+ for(const patch of [{target:request.target},{inputs:request.inputs},{finish:'done',read:{...request.read,ports:[]}},{parameters:{logistic:{...logistic,selection:{criterion:'aic'}}}}])
+  assert.throws(()=>validateNodeApplyRequest({...applying,...patch},support.nodeApplyHandlers));
+});
+
+test('apply inspects the saved logistic model without editing settings or activating training data',async()=>{
+ const f=fixture({mode:'apply'}),result=await f.run();
+ assert.equal(result.configuration.mode,'apply');
+ assert.equal(result.settings_applied,false);
+ assert.equal(result.configuration.event,'yes');
+ assert.equal(result.configuration.threshold,0.8);
+ assert.ok(f.actions.length>0&&f.actions.every(a=>a.verb==='wizard_step'));
+});
+
+test('apply rejects changed saved event, threshold or training method before any edit',async()=>{
+ for(const change of [f=>f.values.pedEventId=7,f=>f.details.pedThreshold=0.5,f=>f.values.pedRegressionMethod=1]){
+  const f=fixture({mode:'apply'});change(f);
+  await assert.rejects(f.run(),/saved|apply/);
+  assert.ok(f.actions.every(a=>a.verb==='wizard_step'||a.ref==='close'));
  }
 });
 
-test('Backward reveals its clipped default removal cutoff using a visible anchor in the same scroll region',async()=>{
- const f=fixture({mode:'backward',nativeSelection:{pedRemoveSignificance:0.2},needsScroll:true});
- await f.run();assert.equal(f.details.pedRemoveSignificance,0.1);
- assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
- assert.ok(f.actions.findIndex(a=>a.verb==='scroll')<f.actions.findIndex(a=>a.verb==='fill'&&a.ref.startsWith('pedRemoveSignificance')));
+test('apply readback requires discarded draft and no training receipt',()=>{
+ const c={verified:true,node_context:node,mode:'apply',fields,target_field:'Target',classes:[{index:7,label:'no'},{index:2,label:'yes'}],event:'yes',threshold:0.8,intercept:true,epsilon:1e-10};
+ const entries={input_mapping:{},configure:{configuration:c,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:false,draft_discarded:true},output_mapping:{},finish:{settings_applied:false,mode:'execute',execution_id:'fresh'}};
+ const candidate=()=>({node,operation_id:'logistic',phases:Object.entries(entries).map(([phase,value])=>({phase,status:'verified',receipt_id:'logistic:'+phase,value:{verified:true,cleanup_complete:true,...value}}))});
+ assert.equal(logRegressionConfigurationReadback(candidate()).training.status,'not_requested');
+ entries.finish.training={status:'trained'};
+ assert.throws(()=>logRegressionConfigurationReadback(candidate()),/train/);
+ delete entries.finish.training;entries.node_finish.settings_applied=true;
+ assert.throws(()=>logRegressionConfigurationReadback(candidate()),/preserv|commit/);
+});
+
+
+test('manual Ridge configures lambda, preserves intercept and reports observed regularization',async()=>{
+ const regularization={lambda_ridge:1};
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,mode:'ridge',parameters:{logistic:{...logistic,regularization}}},support.nodeApplyHandlers).handler);
+ const f=fixture({mode:'ridge',regularization}),r=await f.run();
+ assert.equal(f.values.pedRegressionMethod,4);
+ assert.equal(f.details.pedRidgeSetupMethod,0);assert.equal(f.details.pedLambdaRidge,1);
+ assert.equal(r.configuration.mode,'ridge');assert.deepEqual(r.configuration.regularization,regularization);
+ assert.ok(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('pedLambdaRidge')));
+ assert.equal(f.actions.at(-1).expected_stage,'done');
+});
+
+test('Ridge preserves manual lambda with either native predictor normalization',async()=>{
+ for(const normalization of ['none','standardize']){
+  const regularization={lambda_ridge:1};
+  const f=fixture({mode:'ridge',regularization,normalization}),r=await f.run();
+  assert.deepEqual(r.configuration.regularization,regularization);
+  assert.equal(r.configuration.normalization[0].norm_type,normalization==='standardize'?5:0);
+  assert.equal(r.configuration.normalization[1].norm_type,1);
+  assert.equal(f.details.pedLambdaRidge,1);assert.equal(f.values.pedDenormalize,true);
+ }
+});
+
+test('Ridge requires one explicit finite positive lambda and rejects selection or other modes before UI',()=>{
+ for(const regularization of [undefined,{},null,{lambda_ridge:0},{lambda_ridge:-1},{lambda_ridge:Infinity},{lambda_ridge:NaN},{lambda_ridge:'1'},{lambda_ridge:1,lambda_lasso:1}])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'ridge'));
+ assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_ridge:1},selection:{criterion:'aic'}}},'ridge'));
+ for(const mode of ['enter','forward','backward','stepwise','apply'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_ridge:1}}},mode));
+});
+
+
+test('Real frequency weight is distinct from factors and Integer refuses before role edits',async()=>{
+ const f=fixture({weightType:'real'}),result=await f.run();
+ assert.deepEqual(result.configuration.fields.map(f=>f.usage_type),[0,3,4,0,7]);
+ assert.deepEqual(result.configuration.normalization.map(f=>f.name),['X','Target']);
+ const applied=await fixture({mode:'apply',weightType:'real'}).run();
+ assert.equal(applied.configuration.fields.at(-1).usage_type,7);
+ const weighted={logistic:{...logistic,weight_field:'Weight'}};
+ const schema=[...fields,{name:'Weight',type:'real',data_kind:'Непрерывный',usage_type:0}];
+ assert.equal(resolveLogRegressionRoles(weighted,schema).at(-1).usage_type,7);
+ for(const type of ['integer','string','boolean','variant']){
+  assert.throws(()=>resolveLogRegressionRoles(weighted,[...fields,{name:'Weight',type,data_kind:'Непрерывный'}]),/Real|real/);
+ }
+ const integer=fixture({weightType:'integer'});
+ await assert.rejects(integer.run(),/Real|real/);assert.deepEqual(integer.actions,[]);
+ for(const weight_field of [null,'',' ','X','x','Target','target',3])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,weight_field}},'enter'));
+ for(const mode of ['forward','backward','stepwise','ridge'])assert.throws(()=>validateLogRegressionParameters(weighted,mode));
+ assert.doesNotThrow(()=>validateLogRegressionParameters(weighted,'apply'));
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,parameters:weighted},support.nodeApplyHandlers).handler);
+});
+
+
+test('manual LASSO configures observed L1 on the same node and rejects stale lambda',async()=>{
+ const regularization={lambda_lasso:0.75};
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,mode:'lasso',parameters:{logistic:{...logistic,regularization}}},support.nodeApplyHandlers).handler);
+ for(const existing of [false,true]){
+  const f=fixture({mode:'lasso',regularization,existing}),r=await f.run();
+  assert.equal(f.values.pedRegressionMethod,5);assert.equal(f.details.pedLassoSetupMethod,0);
+  assert.equal(f.details.pedLambdaLasso,0.75);assert.equal(f.details.pedIntercept,true);
+  assert.equal(r.configuration.mode,'lasso');assert.deepEqual(r.configuration.regularization,regularization);
+  assert.ok(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('pedLambdaLasso')));
+  assert.equal(f.actions.at(-1).expected_stage,'done');
+ }
+ const stale=fixture({mode:'lasso',regularization}),perform=stale.channel.perform;
+ stale.channel.perform=async options=>{const action=options.initialObservation&&options.resolve(options.initialObservation);if(action?.verb==='fill'&&action.ref.startsWith('pedLambdaLasso'))return;return perform(options);};
+ await assert.rejects(stale.run(),/setting differs/);
+ assert.ok(!stale.actions.some(a=>a.expected_stage==='done'));
+});
+
+test('LASSO rejects invalid L1, L2, selection and weights before effects',()=>{
+ for(const regularization of [undefined,{},null,{lambda_lasso:0},{lambda_lasso:-1},{lambda_lasso:Infinity},{lambda_lasso:NaN},{lambda_lasso:'1'},{lambda_ridge:1},{lambda_lasso:1,lambda_ridge:1}])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'lasso'));
+ for(const patch of [{selection:{criterion:'aic'}},{weight_field:'Weight'}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_lasso:1},...patch}},'lasso'));
+ for(const mode of ['enter','ridge','forward','backward','stepwise','apply'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_lasso:1}}},mode));
+});
+
+
+test('manual Elastic Net configures both independent penalties for new and existing nodes',async()=>{
+ const regularization={lambda_lasso:0.75,lambda_ridge:1.25};
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,mode:'elastic_net',parameters:{logistic:{...logistic,regularization}}},support.nodeApplyHandlers).handler);
+ for(const existing of [false,true]){
+  const f=fixture({mode:'elastic_net',regularization,existing}),r=await f.run();
+  assert.equal(f.values.pedRegressionMethod,6);assert.equal(f.details.pedIntercept,true);
+  for(const [suffix,value] of [['Lasso',0.75],['Ridge',1.25]]){
+   assert.equal(f.details['ped'+suffix+'SetupMethod'],0);
+   assert.equal(f.details['pedLambda'+suffix],value);
+   assert.ok(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('pedLambda'+suffix)));
+  }
+  assert.equal(r.configuration.mode,'elastic_net');assert.deepEqual(r.configuration.regularization,regularization);
+  assert.equal(f.actions.at(-1).expected_stage,'done');
+ }
+ for(const suffix of ['Lasso','Ridge']){
+  const f=fixture({mode:'elastic_net',regularization}),perform=f.channel.perform;
+  f.channel.perform=async options=>{const a=options.initialObservation&&options.resolve(options.initialObservation);if(a?.verb==='fill'&&a.ref.startsWith('pedLambda'+suffix))return;return perform(options);};
+  await assert.rejects(f.run(),/setting differs/);
+  assert.ok(!f.actions.some(a=>a.expected_stage==='done'));
+ }
+});
+
+test('Elastic Net refuses incomplete, invalid or extra penalties, selection and weights before effects',()=>{
+ const valid={lambda_lasso:1,lambda_ridge:1};
+ for(const regularization of [undefined,null,{},[],{lambda_lasso:1},{lambda_ridge:1},{...valid,alpha:0.5},
+  ...['lambda_lasso','lambda_ridge'].flatMap(key=>[0,-1,NaN,Infinity,'1',null].map(value=>({...valid,[key]:value})))])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'elastic_net'));
+ for(const patch of [{selection:{criterion:'aic'}},{weight_field:'Weight'}])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:valid,...patch}},'elastic_net'));
+ for(const mode of ['enter','ridge','lasso','forward','backward','stepwise','apply'])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:valid}},mode));
+});
+
+const sequential={method:'sequential',train_percent:50,test_percent:50};
+test('column partition configures native Boolean test flag without writing percentages',async()=>{
+ const partition={method:'column',field:'Split'},f=fixture({partition,partitionUnactivated:true}),r=await f.run();
+ assert.equal(r.configuration.partition.sampling,2);assert.equal(r.configuration.partition.field,'Split');
+ assert.equal(r.configuration.fields.at(-1).usage_type,0);
+ assert.equal(f.actions.filter(a=>a.ref==='partition-activate').length,1);
+ assert.ok(!f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('partition-')));
+ await assert.rejects(fixture({partition,corruptPartition:true}).run(),/partition readback/);
+ const saved=fixture({mode:'apply',partition,initialPartition:{sampling:2,field:'Split'}});
+ assert.equal((await saved.run()).configuration.partition.field,'Split');
+ assert.ok(saved.actions.every(a=>a.verb==='wizard_step'));
+ await assert.rejects(fixture({mode:'apply',partition,initialPartition:{sampling:2,field:'Other'}}).run(),/saved partition/);
+ await assert.rejects(fixture({mode:'apply',initialPartition:{sampling:2,field:'Split'}}).run(),/saved partition/);
+ await assert.rejects(fixture({initialPartition:{sampling:2,field:'Split'}}).run(),/partition omitted/);
+});
+test('sequential partition validates before effects and keeps Split/Fold out of roles',()=>{
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...request,parameters:{logistic:{...logistic,partition:sequential}}},createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'}).nodeApplyHandlers));
+ for(const partition of [null,{}, {...sequential,method:'random'},{...sequential,train_percent:0},{...sequential,test_percent:0},{...sequential,test_percent:49},{...sequential,seed:1},{...sequential,train_percent:NaN}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,partition}},'enter'));
+ for(const mode of ['ridge','forward','lasso','elastic_net'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,partition:sequential}},mode));
+ const extra=['Split','Fold'].map((name,i)=>({...fields[0],name,index:4+i,record_id:name,field_id:String(4+i)}));
+ assert.deepEqual(resolveLogRegressionRoles({logistic:{...logistic,partition:sequential}},[...fields,...extra]).slice(-2).map(f=>f.usage_type),[0,0]);
+});
+test('sequential partition commits both percentages and confirms independent readback',async()=>{
+ const f=fixture({partition:sequential}),r=await f.run();
+ assert.deepEqual(r.configuration.partition,{train:50,test:50,sampling:1,validation:0,train_count:32,test_count:32,total_count:64});
+ assert.deepEqual(f.actions.filter(a=>a.verb==='fill'&&a.ref.startsWith('partition-')).map(a=>[a.ref,a.text]),[['partition-train','50'],['partition-test','50']]);
+ await assert.rejects(fixture({partition:sequential,corruptPartition:true}).run(),/partition|percentage/);
+ await assert.rejects(fixture({partition:sequential,sequence:[1,0,2]}).run(),/order/);
+});
+test('saved sequential apply verifies the split without editing it',async()=>{
+ const f=fixture({mode:'apply',partition:sequential,initialPartition:{train:50,test:50,sampling:1}}),r=await f.run();
+ assert.equal(r.configuration.mode,'apply');assert.equal(r.configuration.partition.sampling,1);
+ assert.ok(!f.actions.some(a=>a.ref.startsWith('partition-')));
+ await assert.rejects(fixture({mode:'apply',partition:sequential,initialPartition:{train:60,test:40,sampling:1}}).run(),/saved partition differs/);
+});
+
+test('sequential partition activates its own page before trusting row counts (live A/B:807)',async()=>{
+ const f=fixture({partition:sequential,partitionUnactivated:true}),r=await f.run();
+ assert.equal(f.actions.filter(a=>a.ref==='partition-activate').length,1);
+ assert.ok(f.actions.findIndex(a=>a.ref==='partition-activate')<f.actions.findIndex(a=>a.ref==='partition-train'));
+ assert.equal(r.configuration.partition.train_count,32);assert.equal(r.configuration.partition.test_count,32);assert.equal(r.configuration.partition.total_count,64);
+});
+
+test('live C:810,836,837: explicit partition defers input activation to its own page',async()=>{
+ const f=fixture({partition:sequential,inputUnactivated:true}),r=await f.run();
+ assert.equal(f.actions.filter(a=>a.ref==='norm-activate').length,0);
+ assert.equal(f.actions.filter(a=>a.ref==='partition-activate').length,1);
+ assert.equal(r.configuration.partition.train_count,32);assert.equal(r.configuration.partition.test_count,32);
+});
+for(const mode of ['enter','forward','backward','stepwise','ridge','lasso','elastic_net','apply'])test(mode+' without partition preserves its activation order',async()=>{
+ const regularization=mode==='ridge'?{lambda_ridge:1}:mode==='lasso'?{lambda_lasso:1}:mode==='elastic_net'?{lambda_lasso:1,lambda_ridge:1}:undefined;
+ const f=fixture({mode,regularization,inputUnactivated:true});await f.run();
+ assert.equal(f.actions.filter(a=>a.ref==='partition-activate').length,0);
+ if(mode==='apply'){assert.ok(!f.actions.some(a=>a.ref==='norm-activate'));return;}
+ const activation=f.actions.findIndex(a=>a.ref==='norm-activate');
+ assert.ok(activation>=0&&activation<f.actions.findIndex(a=>a.expected_stage==='learn_partition'));
+});
+
+const kfold={method:'kfold',folds:3,sampling:'sequential'};
+test('K-fold preflight admits only explicit sequential folds on Enter/apply without partition or weights',()=>{
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...request,parameters:{logistic:{...logistic,validation:kfold}}},createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'}).nodeApplyHandlers));
+ for(const validation of [null,{}, {...kfold,method:'monte_carlo'},{...kfold,folds:1},{...kfold,folds:2.5},{...kfold,folds:Infinity},{...kfold,sampling:'random'},{...kfold,seed:1}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,validation}},'enter'));
+ for(const mode of ['ridge','lasso','elastic_net','forward','backward','stepwise'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,validation:kfold}},mode));
+ for(const patch of [{partition:sequential},{weight_field:'Weight'}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,validation:kfold,...patch}},'enter'));
+});
+test('K-fold selects the native method and independent fold sampling, commits folds and verifies readback',async()=>{
+ const f=fixture({validation:kfold}),r=await f.run();
+ assert.equal(r.configuration.partition.validation,1);assert.equal(r.configuration.partition.folds,3);assert.equal(r.configuration.partition.fold_sampling,1);
+ assert.deepEqual(f.actions.filter(a=>a.ref==='partition-folds'&&a.verb==='fill').map(a=>a.text),['3']);
+ await assert.rejects(fixture({validation:kfold,corruptValidation:true}).run(),/sampling|differs/);
+ await assert.rejects(fixture({initialPartition:{validation:1}}).run(),/validation/);
+});
+test('saved K-fold apply verifies folds and sampling without editing or retraining',async()=>{
+ const options={mode:'apply',validation:kfold,initialPartition:{validation:1,folds:3,fold_sampling:1}};
+ const f=fixture(options),r=await f.run();assert.equal(r.configuration.partition.folds,3);
+ assert.ok(!f.actions.some(a=>a.ref.startsWith('partition-')||a.ref==='kfold-option'||a.ref==='fold-sequential'));
+ for(const initialPartition of [{validation:0},{validation:1,folds:5,fold_sampling:1},{validation:1,folds:3,fold_sampling:0}])await assert.rejects(fixture({...options,initialPartition}).run(),/saved partition differs/);
+});
+
+test('validation execution proof rejects missing counts, stale training, wrong folds and incomplete native reads',async()=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'logistic'},id='doc:root:1';
+ const progress_state={verified:true,source:'native_progress_record',state:'completed'};
+ const snapshot={verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},native_state:{active:true,running:false,locked:false},
+  processes:[{process_id:'1',parent_id:null,record_id:'group',progress_state,error:false,children_loaded:true},{process_id:'1.1',parent_id:'1',record_id:'child',progress_state,error:false,owner:{verified:true,node_id:node.node_id,source:'native_process_model_identity'}}]};
+ const summary={verified:true,cleanup_complete:true,output:{complete:true,fresh:true,execution_id:id,native_source:'VariablesForm',read_id:'read',variables:[['ValidationPartitions','3'],['ValidationSamples','32']].map(([name,value])=>({name,type:'integer',cell:{type:'integer',is_null:false,precision:'exact_integer',value}}))}};
+ const run=async(value=summary,training=id)=>readLogRegressionValidation({readExistingProcesses:async()=>structuredClone(snapshot),readVariablePort:async({port,execution})=>{assert.equal(port,0);assert.equal(execution.execution_id,id);return value;}},node,{execution_id:training},3);
+ assert.deepEqual(await run(),{status:'completed',source:'native_validation_summary',execution_id:id,read_id:'read',folds:3,samples_per_fold:32});
+ await assert.rejects(run(summary,'stale'),/differs/);
+ for(const change of [s=>s.output.variables.pop(),s=>s.output.variables[0].cell.value='5',s=>s.output.variables[0].type='real',s=>s.output.variables[1].cell.is_null=true,s=>s.output.variables[1].cell.value='0',s=>s.output.variables.push(s.output.variables[0]),s=>s.output.execution_id='stale',s=>s.output.complete=false,s=>s.cleanup_complete=false]){
+  const value=structuredClone(summary);change(value);await assert.rejects(run(value));
+ }
 });

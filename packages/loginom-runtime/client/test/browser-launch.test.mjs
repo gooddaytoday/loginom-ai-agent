@@ -2,13 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {browserLaunch} from '../lib/browser-launch.mjs';
 
+test('acceptance viewport is explicit, bounded and headless only',()=>{
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1024x633'}).viewport,{width:1024,height:633});
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1366x633'}).viewport,{width:1366,height:633});
+ assert.equal(browserLaunch(false,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1366x633'}).viewport,null);
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1920x945'}).viewport,{width:1920,height:945});
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1280x800'}).viewport,{width:1280,height:800});
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1280x665'}).viewport,{width:1280,height:665});
+ assert.equal(browserLaunch(false,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1920x945'}).viewport,null);
+ assert.throws(()=>browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'4000x4000'}),/acceptance viewport/);
+});
+
 test('browser launch normalizes headed DPI without incompatible viewport emulation', () => {
-  assert.deepEqual(browserLaunch(false), {
+  assert.deepEqual(browserLaunch(false, 'linux', {}), {
     args:['--start-maximized','--window-size=1280,800','--force-device-scale-factor=1'], viewport:null, windowMode:'maximized',
   });
+  // A fixed size overrides maximization, so desktops must not get it (0.3.8–0.3.9 opened 1280×800).
+  for (const [platform, env] of [['darwin',{}],['win32',{}],['linux',{XDG_CURRENT_DESKTOP:'GNOME'}],['linux',{DESKTOP_SESSION:'plasma'}],['linux',{WAYLAND_DISPLAY:'wayland-0'}]])
+    assert.deepEqual(browserLaunch(false, platform, env), {
+      args:['--start-maximized','--force-device-scale-factor=1'], viewport:null, windowMode:'maximized',
+    }, platform + ' ' + JSON.stringify(env));
   assert.deepEqual(browserLaunch(true), {args:[],viewport:{width:1280,height:800},windowMode:'headless'});
-  browserLaunch(false).args.push('--invalid');
-  assert.equal(browserLaunch(false).args.length,3);
+  browserLaunch(false, 'linux', {}).args.push('--invalid');
+  assert.equal(browserLaunch(false, 'linux', {}).args.length,3);
 });
 
 test('headed launch keeps the Files refresh control visible without a window manager', {
@@ -16,7 +32,7 @@ test('headed launch keeps the Files refresh control visible without a window man
   timeout: 30000,
 }, async () => {
   const {chromium} = await import('playwright-core');
-  const launch = browserLaunch(false);
+  const launch = browserLaunch(false, 'linux', {});
   const browser = await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,
     headless:false, chromiumSandbox:true, args:launch.args});
   try {

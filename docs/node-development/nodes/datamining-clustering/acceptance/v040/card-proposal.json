@@ -1,0 +1,139 @@
+{
+  "type": "datamining.clustering",
+  "title": "Кластеризация",
+  "palette_group": "Data_Mining",
+  "icon_class": "bg-vendor-icon-clusterization",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "k_means",
+    "g_means",
+    "apply"
+  ],
+  "semantics": "DESIGN ONLY: fixed k-means, g-means and existing saved-model apply. Outputs are assignments and source-unit centers. Apply must not retrain. Range-control settings need a separate completed UI contract.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "clustering-v1-internal-1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/datamining/clustering.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "k_means",
+    "g_means",
+    "apply"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "features": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "input_field"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+              "description": "ASCII name; title=label."
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 128,
+        "minItems": 1,
+        "description": "All continuous numeric features; retain/ignore unlisted fields/IDs."
+      },
+      "clusters": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 1000,
+        "description": "Fixed cluster count; no auto."
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647,
+        "description": "New default=42; existing omitted=preserve."
+      },
+      "normalization": {
+        "type": "string",
+        "enum": [
+          "none",
+          "standardize",
+          "scale_minus_one_one",
+          "scale_zero_one",
+          "absolute_scale"
+        ],
+        "description": "Existing native numeric normalizations; centers use source units, distances use normalized units."
+      },
+      "min_clusters": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "max_clusters": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "threshold": {
+        "type": "number",
+        "minimum": 0.1,
+        "maximum": 5
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}

@@ -1,0 +1,245 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "output_port": 0,
+  "same_node_and_links": true,
+  "initial_columns": {
+    "columns": [
+      {
+        "name": "amount",
+        "label": "amount",
+        "type": "integer"
+      },
+      {
+        "name": "empty",
+        "label": "empty",
+        "type": "string"
+      },
+      {
+        "name": "enabled",
+        "label": "enabled",
+        "type": "boolean"
+      },
+      {
+        "name": "missing",
+        "label": "missing",
+        "type": "integer"
+      }
+    ],
+    "rows": [
+      {
+        "amount": 7,
+        "empty": "",
+        "enabled": false,
+        "missing": null
+      }
+    ]
+  },
+  "switch_rows": {
+    "columns": [
+      {
+        "name": "Name",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "Name": "amount",
+        "DisplayName": "amount",
+        "Value": {
+          "cell_type": "integer",
+          "is_null": false,
+          "value": 7
+        }
+      },
+      {
+        "Name": "empty",
+        "DisplayName": "empty",
+        "Value": {
+          "cell_type": "string",
+          "is_null": false,
+          "value": ""
+        }
+      },
+      {
+        "Name": "enabled",
+        "DisplayName": "enabled",
+        "Value": {
+          "cell_type": "boolean",
+          "is_null": false,
+          "value": false
+        }
+      },
+      {
+        "Name": "missing",
+        "DisplayName": "missing",
+        "Value": {
+          "cell_type": "integer",
+          "is_null": true,
+          "value": null
+        }
+      }
+    ]
+  },
+  "changed_rows": {
+    "columns": [
+      {
+        "name": "Name",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "Name": "amount",
+        "DisplayName": "amount",
+        "Value": {
+          "cell_type": "integer",
+          "is_null": false,
+          "value": 11
+        }
+      },
+      {
+        "Name": "enabled",
+        "DisplayName": "enabled",
+        "Value": {
+          "cell_type": "boolean",
+          "is_null": false,
+          "value": false
+        }
+      },
+      {
+        "Name": "missing",
+        "DisplayName": "missing",
+        "Value": {
+          "cell_type": "integer",
+          "is_null": true,
+          "value": null
+        }
+      },
+      {
+        "Name": "rate",
+        "DisplayName": "rate",
+        "Value": {
+          "cell_type": "real",
+          "is_null": false,
+          "value": 0.125
+        }
+      }
+    ]
+  },
+  "switch_back_columns": {
+    "columns": [
+      {
+        "name": "amount",
+        "label": "amount",
+        "type": "integer"
+      },
+      {
+        "name": "enabled",
+        "label": "enabled",
+        "type": "boolean"
+      },
+      {
+        "name": "missing",
+        "label": "missing",
+        "type": "integer"
+      },
+      {
+        "name": "rate",
+        "label": "rate",
+        "type": "real"
+      }
+    ],
+    "rows": [
+      {
+        "amount": 11,
+        "enabled": false,
+        "missing": null,
+        "rate": 0.125
+      }
+    ]
+  },
+  "variant_columns": {
+    "columns": [
+      {
+        "name": "mixed",
+        "label": "mixed",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "mixed": {
+          "cell_type": "string",
+          "is_null": false,
+          "value": "19"
+        }
+      }
+    ]
+  },
+  "variant_rows": {
+    "columns": [
+      {
+        "name": "Name",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "Name": "mixed",
+        "DisplayName": "mixed",
+        "Value": {
+          "cell_type": "string",
+          "is_null": false,
+          "value": "19"
+        }
+      }
+    ]
+  },
+  "empty_rows": {
+    "columns": [
+      {
+        "name": "Name",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "type": "variant"
+      }
+    ],
+    "rows": []
+  },
+  "empty_columns": {
+    "status": "unresolved_native_zero_column_cardinality"
+  },
+  "disconnected_input": {
+    "status": "not_equivalent_to_connected_empty_source"
+  }
+}

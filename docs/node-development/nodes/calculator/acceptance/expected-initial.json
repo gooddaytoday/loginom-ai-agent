@@ -1,0 +1,67 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.calculator",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Shifted",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ScenarioAmount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Amount": 10,
+          "Shifted": 17,
+          "ScenarioAmount": 7
+        },
+        {
+          "RowID": 2,
+          "Amount": 0,
+          "Shifted": 7,
+          "ScenarioAmount": 7
+        },
+        {
+          "RowID": 3,
+          "Amount": -4,
+          "Shifted": 3,
+          "ScenarioAmount": 7
+        },
+        {
+          "RowID": 4,
+          "Amount": null,
+          "Shifted": null,
+          "ScenarioAmount": 7
+        }
+      ]
+    }
+  ]
+}

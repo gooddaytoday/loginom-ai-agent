@@ -20,7 +20,7 @@ export async function configureSampling(channel,p,{request,inputMapping}){
  let s=await observe('complete sequential selection settings'),before=s.node_sampling;
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,draft_edits_skipped:true};
  need(inputMapping?.verified&&inputMapping.inventory_complete,'complete input mapping required');
- const mode=request.mode??'sequential',method={sequential:'Последовательный',random:'Случайный',stratified:'Стратифицированный',biased:'Отбор со смещением'}[mode];
+ const mode=request.mode??'sequential',method={sequential:'Последовательный',random:'Случайный',stratified:'Стратифицированный',biased:'Отбор со смещением',uniform:'Равномерный случайный'}[mode];
  need(method,'unsupported sampling method');
  const partition=before.kind==='data_partition',base=before.base,sizesBase=(before.sizes_base??base+'SizeGridForm')+';';
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
@@ -53,6 +53,38 @@ export async function configureSampling(channel,p,{request,inputMapping}){
   await act('commit sampling row count',e=>editor(e)&&e.allowed_actions.includes('press'),{verb:'press',key:'Tab'});
   s=await observe('sampling row count committed');need(sequentialSizes(s.node_sampling)[index]===count,'row count differs');
  }
+ if(mode==='uniform'){
+  const groups=partition?[p.train_group_size_rows,p.test_group_size_rows]:[p.group_size_rows];
+  for(const [index,count] of groups.entries()){
+   if(count===undefined)continue;
+   s=await observe('uniform group row size');
+   const unit=s.node_sampling.group_units?.[index];need(unit,'observed uniform group size required');
+   if(unit.unit==='percent')await act('switch uniform group size to rows',e=>e.ref===unit.icon_ref&&e.allowed_actions.includes('click'),{verb:'click'});
+   s=await observe('uniform group absolute editor');
+   const current=s.node_sampling.group_units[index],key=current.absolute_control_tid;
+   need(current.unit==='rows'&&key.startsWith(s.node_sampling.groups_base+';colAbsoluteSize;'),'owned uniform group editor required');
+   const editor=e=>(e.tid===key||e.identity?.anchor_tid===key)&&e.allowed_actions.includes('fill');
+   await act('fill uniform group rows',editor,{verb:'fill',text:String(count)});
+   await act('commit uniform group rows',e=>editor(e)&&e.allowed_actions.includes('press'),{verb:'press',key:'Tab'});
+   s=await observe('uniform group rows committed');need(s.node_sampling.group_units[index].absolute_size===count,'uniform group size differs');
+  }
+  if(partition){
+   s=await observe('uniform test priority');need(typeof s.node_sampling.test_priority==='boolean','native test priority required');
+   if(p.test_priority!==undefined&&s.node_sampling.test_priority!==p.test_priority)await act('toggle test priority',tid('cntTestPriority;cnt;chb;InputEl','click'),{verb:'click'});
+   s=await observe('test priority readback');
+   if(p.test_priority!==undefined)need(s.node_sampling.test_priority===p.test_priority,'test priority differs');
+   if(p.test_priority_position!==undefined){
+    need(s.node_sampling.test_priority===true,'enable test priority before choosing position');
+    if(s.node_sampling.test_priority_position!==p.test_priority_position){
+     const label={beginning:'В начале набора',end:'В конце набора'}[p.test_priority_position];
+     await act('open test priority position',tid('pedTestPriorityPosition;ValueControl;trg_picker','click'),{verb:'click'});
+     await act('select test priority position',tid('pedTestPriorityPosition;ValueControl;boundlist;'+label.replaceAll(' ','_'),'click'),{verb:'click'});
+     s=await observe('test priority position committed');
+    }
+    need(s.node_sampling.test_priority_position===p.test_priority_position,'test priority position differs');
+   }
+  }
+ }
  if(mode!=='sequential')await configureSamplingMode(channel,p,{request,inputMapping,base,partition,observe,act});
  s=await observe('sequential groups before reordering');
  const original=s.node_sampling.sequence.map(r=>sequentialGroup(r,partition));
@@ -75,6 +107,10 @@ export async function configureSampling(channel,p,{request,inputMapping}){
  if(order)need(same(c.sequence.map(r=>sequentialGroup(r,partition)),order),'allocation order differs');
  need(c.units.every(u=>u.unit==='rows'),'sequential sizes must use rows');
  const sizes=sequentialSizes(c);for(const [i,count] of counts.entries())if(count!==undefined)need(sizes[i]===count,'final size differs');
+ if(mode==='uniform'){
+  const wanted=partition?[p.train_group_size_rows,p.test_group_size_rows]:[p.group_size_rows];
+  need(c.group_units?.length===wanted.length&&c.group_units.every((u,i)=>u.unit==='rows'&&Number.isSafeInteger(u.absolute_size)&&u.absolute_size>0&&(wanted[i]===undefined||wanted[i]===u.absolute_size)),'final uniform groups differ');
+ }
  const configuration={...c,mode,new_node:request.target.kind==='new',input_fields:inputMapping.target_fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),counts:sizes,groups:c.sequence.map(r=>sequentialGroup(r,partition))};
  await channel.perform({condition:'validate sequential selection',initialObservation:s,ready,identity:s=>s.prepared_node_context,resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:['output_mapping','done']})});
  let destination=await channel.observe({condition:'sequential selection destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
@@ -93,12 +129,31 @@ async function configureSamplingMode(channel,p,{request,inputMapping,base,partit
  };
  let c=(await observe('sampling method settings')).node_sampling;
  if(p.seed!==undefined){
-  await fill(base+'RandSeedEdit;edtRandSeed;ValueControl',p.seed);
+  const key=base+'RandSeedEdit;edtRandSeed;ValueControl';
+  let state=await observe('sampling seed visibility');
+  const control=s=>{const fields=s.ui.elements.filter(at(key,'fill'));need(fields.length===1,'unique seed control required');return fields[0];};
+  const target=control(state);
+  if(target.interaction?.state==='point_not_observed'){
+   // At 1280x800 the stratified form puts seed under rgpBottom.
+   // Scroll through a visible control in the same owned pane before typing.
+   const scroll=target.scroll;
+   need(scroll&&scroll.top<scroll.max_top,'seed cannot be revealed in its pane');
+   await channel.perform({condition:'reveal sampling seed in its own pane',initialObservation:state,
+    ready:s=>s.wizard?.stage===state.wizard.stage&&s.node_sampling?.verified===true&&s.node_sampling.base===base&&s.node_sampling.method===c.method,
+    identity:s=>({node:s.prepared_node_context,scroll:control(s).scroll.ref}),
+    resolve:s=>{const field=control(s),anchor=s.ui.elements.find(e=>e.scroll?.ref===field.scroll?.ref&&e.enabled===true&&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('scroll')
+     &&(e.tid?.startsWith(base)||e.identity?.anchor_tid?.startsWith(base)));
+     need(anchor,'visible sampling scroll anchor unavailable');return {verb:'scroll',ref:anchor.ref,delta_y:field.scroll.max_top-field.scroll.top};}});
+   state=await observe('sampling seed revealed');
+   const revealed=control(state);
+   need(revealed.scroll?.ref===scroll.ref&&revealed.scroll.top>scroll.top&&revealed.interaction?.state==='point_observed','seed pane did not reveal its control');
+  }
+  await fill(key,p.seed);
   c=(await observe('sampling seed readback')).node_sampling;
   need(c.seed===p.seed,'seed differs');
  }
  need(Number.isInteger(c.seed)&&c.seed>=0,'explicit retained seed required');
- if(partition)need(c.test_priority===false,'only disabled test priority is supported');
+ if(partition&&request.mode!=='uniform')need(c.test_priority===false,'only disabled test priority is supported');
  const field=name=>{
   const fs=inputMapping.target_fields.filter(f=>f.name===name&&!f.excluded);
   need(fs.length===1&&fs[0].data_kind==='Дискретный','observed discrete input field required: '+name);

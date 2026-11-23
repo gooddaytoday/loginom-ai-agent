@@ -1,0 +1,5 @@
+AccountID,CustomerID,Balance,Status,OpenYear
+ACC-001,C-001,15400.5,active,2019
+ACC-002,C-002,320.75,active,2021
+ACC-003,C-003,0.5,frozen,2023
+ACC-004,C-005,98000.25,active,2017

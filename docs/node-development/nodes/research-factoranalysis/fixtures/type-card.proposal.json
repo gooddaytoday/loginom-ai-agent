@@ -1,0 +1,73 @@
+{
+  "type": "research.factor_analysis",
+  "title": "Факторный анализ",
+  "palette_group": "Исследование",
+  "icon_class": "bg-vendor-icon-factoranalysis",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "pca_fixed"
+  ],
+  "semantics": "Correlation-matrix PCA of complete finite continuous Integer/Real features. parameters.factor_analysis supplies the full features set, fixed factors and rotation none. New nodes require all three; existing omitted settings persist. Execute trains/retrains current input, then executes; ordinary native activation applies the saved model. Read ports 0 (scores and original fields) and 1 (ColumnName, ColumnDisplayName, loadings). P feature columns Factor1..FactorP exist even with K<P: unused scores NULL, unused loadings zero. Scores use population-SD normalization. Preserve original values and rows; explicit output mappings with autosync=false are needed for stable field order after reopen. Constants, missing training features, rank-deficient inputs, automatic selection, rotations and saved-model apply are outside this slice.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "factor-analysis-v1-internal-1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "help_path": "data/processors/scrutiny/factor-analysis.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "pca_fixed"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "description": "Parameters for research.factor_analysis / pca_fixed. Do not pass fields belonging to another node type.",
+    "properties": {
+      "factor_analysis": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "PCA of complete finite continuous numeric features, fixed count, no rotation. New nodes require features, factors and rotation; existing omission preserves supported settings. Execute trains/retrains current input, then executes and reads both ports. NULL training, constants and rank-deficient inputs are outside this slice.",
+        "properties": {
+          "features": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Exact technical name of a continuous Integer/Real input field; never its display label."
+            },
+            "description": "Complete selected feature set in input-field order. Row identifiers and pass-through text must not be selected. On existing nodes the supplied list replaces all feature roles."
+          },
+          "factors": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128,
+            "description": "Fixed number of factors, at most the selected feature count and observed rank. Automatic significance selection and a separate output-factor cap are unsupported."
+          },
+          "rotation": {
+            "type": "string",
+            "enum": [
+              "none"
+            ],
+            "description": "Explicitly select no rotation. Native default is Varimax; do not preserve it on a new node. Varimax and Quartimax are outside this proposed first slice."
+          }
+        },
+        "required": []
+      }
+    },
+    "required": []
+  },
+  "session_manifest": {}
+}

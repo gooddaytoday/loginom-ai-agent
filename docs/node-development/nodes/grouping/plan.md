@@ -92,12 +92,129 @@ Count в принятой семантике Loginom считает строки
 
 ### Этап 1 и далее — непокрытые режимы Help 7.4 (отдельные карточки владельца)
 
+#### Предложение LAB-998: оставшиеся агрегаты и параметры, этап 0
+
+База `v040@bc63453453e22e1369809a7d36d2fee7719b7c7d`, mas2, 07.11.2026.
+[Живые наблюдения и оценка](modes-discovery.md), [комплект предложения](acceptance/modes/README.md),
+[карточка типа](modes-card.proposal.json), [дополнение навыка](modes-skill.proposal.json).
+Это отдельный docs-срез до утверждения владельцем, не изменение готовности
+или критериев прежнего принятого объёма. Переменные исключены.
+
+Предложено десять циклов: median, mode, stddev, null_count, first, last,
+only, concat, cache_groups, sort_result. Каждый имеет свой task и независимые
+ожидания. unique_count уже реализован и повторно не предлагается.
+Runtime mode остаётся aggregate, вход 0 / выход 0; обучение не появляется.
+Сначала решение владельца по предложению, затем отдельные адресные правки.
+
 - Медиана, мода, стандартное отклонение, distinct/missing count, first/last/single.
 - Список: integer/string, разделитель/ограничитель, уникальность и ASC/DESC/без сортировки.
 - Кэш значений групп и сортировка результата; редактор всех функций, имён и меток.
 - Матрица type×aggregate, включая variable там, где разрешает Help.
 
 Перечень будущей полноты сохраняет прежний подплан: частично принятые действия перепроверяются на этапе 0, дополнительные controls/типы/режимы назначаются отдельно; совпавшее название режима не расширяет scope.
+
+#### Предложение LAB-1558: типы агрегатов, ничья моды, пустой вход
+
+**Цикл Real LAB-1581 (13.11.2026):** native-проба всех вопросов 1–9 выполнена
+до кода на `eb92f4f467ef05cc5c2205a0239891e14f3e553b`, 7.4.2 / mas.
+Ответы — [discovery](discovery.md) и [README комплекта](acceptance/types/README.md).
+`cases.real` подтверждён без изменения oracle; `expected-real.json` выделяет
+его для `group-real`. Real открыт для всех функций, кроме native-недоступного
+concat. Остальные типы runtime остаются последующими циклами. Variant Min
+пропускает NULL (в отличие от гипотезы ниже), unique_count(1, 1.0, "1") = 2;
+оба наблюдения вне oracle текущего цикла. Далее сохранено исходное предложение.
+
+**Цикл Boolean LAB-1616:** `group-boolean` использует неизменённые
+`cases.boolean.stages` через отдельный `expected-boolean.json`: min/max/mode,
+unique_count/null_count, ничья False и all-NULL. Runtime разрешает Boolean
+для count/min/max/mode/unique_count/null_count/first/last/only по матрице Q1;
+sum/avg/median/stddev/concat для DateTime/Boolean/Variant запрещены также
+в сохранённых масках. DateTime/Variant не расширяются в этом цикле.
+
+**Цикл DateTime LAB-1659:** `group-date` использует неизменённые
+`cases.date.stages` через `expected-date.json`: min/max/last по Day и
+integer null_count, включая крайний NULL. По native-матрице Q1 разрешены
+count/min/max/mode/unique_count/null_count/first/last/only; тип даты сохраняется,
+счётчики дают integer. Sum/avg/median/stddev/concat запрещены до мутации и
+в сохранённых масках. Значения mode для DateTime описаны в discovery;
+бизнес-приёмка этого цикла проверяет min/max/last/null_count, CSV, Save и cold.
+
+**Цикл ничьи моды и пустого входа LAB-1663:** `group-mode-tie` и `group-empty`
+используют исходные `task-mode-tie.md` / `task-empty.md` и соответствующие CSV.
+`expected-mode-tie.json` / `expected-empty.json` без изменений выделяют
+`cases.mode_tie.stages` / `cases.empty.stages`. Native Q2/Q7 подтверждают
+минимум integer/string при ничьей и пустой результат с точными пятью типами.
+CSV пустого результата содержит только заголовок; Save, cold Execute без
+настройки и cleanup проверяются штатно. Валидатор runtime не изменён.
+
+База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
+run-check не менялись, native-пробы не было (её делает разработчик первым
+шагом цикла). Решение владельца `v040-open-scope`. Комплект —
+[acceptance/types](acceptance/types/README.md), fixtures — `fixtures/types/`
+(SHA в `fixtures/manifest.json`), `oracle.py --check` проходит.
+
+**Что 7.4.2 даёт штатно (справка, не наблюдение).** Таблица «Агрегация
+показателей и возможные типы данных» в `processors/transformation/grouping.md`
+потеряла иконки-заголовки шести типов. По строкам «Сумма» (integer+real) и
+«Список» (string+integer, сказано текстом) вероятный порядок: строка, целое,
+вещественное, затем дата, логический, Variant. Тогда median/stddev/avg/sum —
+только integer/real, а count/min/max/mode/unique/null/first/last/only — все
+шесть типов. Это вывод, первый вопрос пробы. Ничья моды — наименьшее значение
+(`processors/func/aggregation-functions.md`, «Мода»). Пустой вход справка
+не описывает. Кросс-таблица 7.4.2 на тех же типах (`transform-crosstable/discovery.md:55-62`)
+даёт min/max/first/last с типом входа, у Variant — native subtype; Variant Min
+считает NULL нижним значением.
+
+**Огр. 7.4.2 (по справке, сверить вопросом пробы 1).** «Список» (concat) —
+только строковый и целый тип: это сказано текстом в `aggregation-functions.md`,
+поэтому concat для real/date/Boolean/Variant не планируется. Сумма, среднее,
+медиана и СКО вне integer/real — тоже огр. 7.4.2. Этот вывод опирается на
+восстановленный порядок столбцов, проба его подтверждает.
+
+**Что мешает в коде.** `grouping-parameters.mjs:6` (`inputTypes`) пускает
+median/stddev только для integer, mode/null_count/first/last/only/unique_count/concat —
+для integer/string. Min/max/count не ограничены, но real/date/Boolean ни разу
+не принимались. Variant-выход Группировки читается без точного подтипа:
+`transform.group_data` нет в `typedVariants` (`node-procedure.mjs:269`).
+
+**Предложенный срез, по циклу на случай.** Real и Boolean идут первыми,
+потому что дают ничью моды на новых типах. Date — после них. Variant — после
+`typedVariants`. mode_tie и empty не требуют production-кода, если проба
+подтвердит правила: там только тест, строка навыка и регистрация.
+
+| Цикл | Случай | Production-изменение (ориентир) |
+|---|---|---|
+| 1 | real | `inputTypes`: real для median/stddev/mode (+ остальных по матрице пробы); тип выхода — `grouping-output.mjs:13` уже real/тип входа |
+| 2 | boolean | `inputTypes`: boolean для mode/unique_count/null_count/first/last/only |
+| 3 | date | `inputTypes`: datetime для last/null_count (+ mode/unique по пробе); min/max уже пропускаются |
+| 4 | variant | `inputTypes`: variant; `transform.group_data` в `typedVariants` (одна строка общего кода, как у Сортировки) |
+| 5 | mode_tie + empty | без кода или минимальная правка по пробе; две строки в `transform.group_data.md` |
+
+Оценка этапа 1 — **5 циклов** (+1 резерв, если проба покажет отличие
+Variant или пустого входа). Ориентир 20–60 строк production и адресные
+тесты `grouping-*.test.mjs`. Навык: `transform.group_data.md` 4865/6000 Б,
+нужна одна строка «real/date/Boolean/Variant: какие функции» (~250 Б) и
+правило ничьей (~120 Б). Карточка типа и маршрутизация не растут: режим тот же.
+
+**Вопросы native-пробы** (FactorEditDialog по `data-tid`, свой пакет):
+
+1. Какие `chb-N` включены у полей real, DateTime, Boolean и Variant? Это
+   ответ на матрицу справки без заголовков.
+2. Ничья моды integer/string/real/Boolean: выбирается наименьшее? Отдельно —
+   строки, где порядок кодовых точек и локали расходится (`Beta`/`alpha`).
+3. Ничья моды DateTime и Variant разных подтипов: что выбирается?
+4. Mode all-NULL у real и Boolean: 0.0 и False, как 0 и пустая строка у
+   integer/string, или NULL?
+5. Min/Max у Boolean выдают Boolean (False < True)? Тип выхода median/stddev
+   у real — real?
+6. Variant: Min считает NULL нижним, как в Кросс-таблице? Каков подтип у
+   First/Last после Свёртки? Порядок строк Свёртки — RowID × столбцы?
+7. Пустой вход (только заголовок): Execute успешен, результат — 0 строк с
+   объявленными типами? Или ошибка/предупреждение?
+8. DateTime-ключ и DateTime-мера: нет ли неоднозначности часового пояса
+   стенда (нужен ли полдень вместо полуночи)?
+9. Unique_count у Variant: 1, 1.0 и "1" — одно значение или три? (В срез
+   не входит, только наблюдение.)
 
 ## 3. Данные и независимые проверки
 

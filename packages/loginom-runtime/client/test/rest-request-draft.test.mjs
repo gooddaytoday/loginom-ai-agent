@@ -4,9 +4,37 @@ import vm from 'node:vm';
 import {restRequestCapability} from '../lib/rest-request.mjs';
 
 function fixture(foreign=null,manual=false,duplicate=null,options={}){
- const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
+ const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;'+(options.nestedParam?'MessageBody;':'')+'ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
- const names=options.empty?[]:['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
+ const advanced=root+';AdditionalParamsWizard',values={pedProduceErrorDescs:options.savedErrorDescriptions??true,pedTimeout:options.timeout??-1,pedFailedRequestRepeat:options.retries??0,pedUseResponseStub:options.savedSimulation?.enabled??false,pedResponseStub:options.savedSimulation?.file_path??''},writes=[];
+ const headerBase=root+';RESTCustomHeadersWizard',headerRows=[],headerFields={},variableElements={};let headerId=0;
+ const addHeader=(name='header'+headerId,value='')=>{
+  const id=headerId++,row={id,name,value};
+  for(const [key,column] of [['name','colName'],['value','colHeaderValue']]){
+   const input={disabled:false,readOnly:false},tid=headerBase+';'+column+';StringPropEdit-'+id+';PropContainer;ValueContainer;ValueControl';
+   const element={id:tid,querySelector:()=>input,getAttribute:()=>tid,getBoundingClientRect:()=>({width:100})};
+   row[key+'Element']=element;headerFields[tid]={el:{dom:element},inputEl:{dom:input},getValue:()=>row[key]};
+  }
+  const base=row.valueElement.id.split(';PropContainer;')[0],tid=base+';PropContainer;VariableContainer;VariableControl';
+  // Ext hides inactive containers by offset: geometry can remain nonzero.
+  const variableElement={id:tid,getAttribute:()=>tid,getBoundingClientRect:()=>({width:100})};
+  variableElements[tid]=variableElement;
+  const switchTid=base+';SwitchButton',switchElement={id:switchTid};
+  variableElements[switchTid]=switchElement;
+  headerFields[switchTid]={el:{dom:switchElement},get pressed(){return row.variableMode===true;}};
+  const v={DisplayName:'Cycle',Index:7,DataType:options.variableType??5,IsNull:options.variableNull??false,Value:options.variableValue??'first'};
+  const record={data:{field1:'cycle-id'},getFields:()=>[null,null,{getName:()=>"variable"}],get:()=>v};
+  headerFields[tid]={el:{dom:variableElement},getStore:()=>({getData:()=>({items:[record]})}),getValue:()=>row.selected,
+   getPicker:()=>({getNode:()=>row.picker?{getAttribute:()=>tid+';boundlist;Cycle_(_first_)'}:null})};
+  row.variableTid=tid;row.base=base;
+  row.deleteElement={getAttribute:()=>headerBase+';colDelete_header'+(options.reindexDeletes?headerRows.indexOf(row):id)};headerRows.push(row);
+ };
+ for(const h of options.savedHeaders??[])addHeader(h.name,h.value);
+ const headerTable={querySelectorAll:s=>s.includes('colName;')?headerRows.map(r=>r.nameElement):s.includes('colHeaderValue;')?headerRows.map(r=>r.valueElement):headerRows.map(r=>r.deleteElement)};
+ const inputs=Object.fromEntries(Object.keys(values).map(k=>[k,{id:k,value:String(values[k]),readOnly:false,disabled:false}]));
+ const advancedElement={contains:e=>Object.values(inputs).includes(e)};
+ const fields=Object.fromEntries(Object.keys(values).map(k=>[k,{el:{dom:inputs[k]},inputEl:{dom:inputs[k]},getXType:()=>['pedUseResponseStub','pedProduceErrorDescs'].includes(k)?'checkboxfield':k==='pedResponseStub'?'pickerfield':'numberfield',getValue:()=>values[k]}]));
+ const names=options.empty?[]:['RequestId','Key'],columnRows=[...names,...(options.method?['Body']:[])].map((Name,i)=>({id:Name,data:{Index:[17,0,3][i],Name,DataType:options.bodyType??5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=options.inputPage?-1:0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
  const store=rows=>({loading:false,getRange:()=>rows});
@@ -16,22 +44,32 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const owner={id:'columnheader-1032',getAttribute:()=>columnTid};
  const mask={parentElement:owner,matches:s=>s==='.x-mask',getBoundingClientRect:()=>({x:1214,y:168,width:30,height:27})};
  const loading={matches:()=>false};
- const rootElement={contains:e=>e===owner},paramElement={},card={contains:e=>e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
+ const rootElement={contains:e=>e===owner||Object.values(variableElements).includes(e)},paramElement={getAttribute:()=>base},card={contains:e=>e===headerTable||e===paramElement||(stage===-1&&e===owner&&options.mask!=='foreign-card')};
  const component={disabled:options.mask!=='enabled',getXType:()=>options.mask==='wrong-type'?'gridcolumn':'actioncolumn',el:{dom:options.mask==='foreign-dom'?{}:owner}};
  const grid={},draw={FOwner:grid,FLinks:{}};grid.FLinkDrawContainer=draw;
  const p={FView:{el:{dom:paramElement}},FColumnsStore:columns,FParamStore:parameters,FGrdParamStore:parameters,FRequestParamLinks:saved,
   FItems:{grdFields:{getStore:()=>columns},grdParams:{getStore:()=>parameters},pnlLinkGrid:grid}};
- class RESTRequestWizard{constructor(){this.FRequestConfig=p;this.FVerb=0;}}
- const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:card}})}};
+ const sourceColumns={Store:columns};
+ class RESTRequestWizard{constructor(){this.FColumns=sourceColumns;this.FVerb=['GET','POST','PUT','DELETE','PATCH'].indexOf(options.method??'GET');
+  this.FRequestConfig=[1,2,4].includes(this.FVerb)?{FColumns:sourceColumns,FParamLinks:p}:p;}}
+ const controller={FView:{el:{dom:rootElement}},FWizardItems:[{FWizard:new RESTRequestWizard()}],FCardLayout:{getActiveItem:()=>({id:'card-'+stage,el:{dom:captions[stage]==='Дополнительные параметры'?advancedElement:card}})}};
  const element={getBoundingClientRect:()=>({x:10,y:10,width:100,height:20}),contains:()=>false,closest:()=>null};
- const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
+ const document={querySelectorAll:s=>s==='[data-tid='+JSON.stringify(headerBase+';grdCustomHeaders;tbl')+']'?[headerTable]:s==='[data-tid='+JSON.stringify(advanced)+']'?[advancedElement]:Object.keys(values).some(k=>s==='[data-tid='+JSON.stringify(advanced+';'+k+';ValueControl')+']')?[inputs[Object.keys(values).find(k=>s.includes(k))]]:s==='[data-tid='+JSON.stringify(root)+']'?[rootElement]:s==='[data-tid='+JSON.stringify(base)+']'?[paramElement]:s==='[data-tid='+JSON.stringify(columnTid)+']'?(options.mask==='duplicate'?[owner,{}]:[owner]):[],elementFromPoint:()=>options.mask==='covered-next'?mask:element};
  const Workspace={getActiveTab:()=>({Controller:{FController:controller}})};
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
- const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},Ext:{getCmp:()=>component}});
+ const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app,TBGHTTPVerb:{httpGET:0,httpPOST:1,httpPUT:2,httpDELETE:3,httpPATCH:4}},Ext:{getCmp:id=>headerFields[id]??fields[id]??component}});
+ const query=document.querySelectorAll;document.querySelectorAll=s=>Object.entries(variableElements).filter(([tid])=>s==='[data-tid='+JSON.stringify(tid)+']').map(([,e])=>e).concat(query(s));
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
- const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
+ const captions=['Настройка запроса',...(options.skipHeaders?[]:['Настройка пользовательских заголовков']),'Дополнительные параметры','Описание узла'];
+ let body='',bodyPickerOpen=false;
  const page={evaluate,waitForTimeout:async ms=>options.tick?.(ms),locator:selector=>({
+  locator:()=>({inputValue:async()=>body,fill:async value=>{
+   const row=headerRows.find(r=>['name','value'].some(k=>selector==='[data-tid='+JSON.stringify(r[k+'Element'].id)+']'));
+   if(row){const key=selector.includes(';colName;')?'name':'value';row[key]=value;writes.push([key,value]);return;}
+   const k=Object.keys(values).find(k=>selector.includes(k));assert.ok(k);values[k]=k==='pedResponseStub'?value:Number(value);inputs[k].value=value;writes.push([k,values[k]]);
+  },press:async()=>{}}),
   count:async()=>{
+   if(selector.includes(';edtMessageBodyColumn;boundlist;Body'))return bodyPickerOpen?1:0;
    if(selector.startsWith('.x-mask'))return options.stall==='loading'||stage===-1?1:0;
    if(selector.includes(';btnError'))return 0;
    if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']')?(duplicate==='column'?2:1):0;
@@ -39,20 +77,106 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
    return 1;
   },
   evaluateAll:async(fn,arg)=>vm.runInContext('('+fn.toString()+')',scope)(options.stall==='loading'?[loading]:stage===-1?(options.mask==='real-loading'?[mask,loading]:[mask]):[],arg),
-  isVisible:async()=>stage>=0,innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
-  evaluate:async fn=>{lastSelector=selector;points.push(selector);return evaluate(fn,element);},
+  isVisible:async()=>stage>=0&&!(options.hiddenQuery&&selector.includes(';ParamLinks')),innerText:async()=>stage===-1?'Настройка входных столбцов':captions[stage],
+  evaluate:async(fn,arg)=>{lastSelector=selector;points.push(selector);const variable=Object.entries(variableElements).find(([tid])=>selector==='[data-tid='+JSON.stringify(tid)+']')?.[1];return arg&&(selector.includes(';grdCustomHeaders;tbl')||variable)?structuredClone(vm.runInContext('('+fn.toString()+')',scope)(variable??headerTable,arg)):evaluate(fn,element);},
  }),mouse:{click:async()=>{
-  if(lastSelector.includes(';btnAutoLink')){
+  if(lastSelector.includes(';pedProduceErrorDescs;ValueControl;DisplayEl')){values.pedProduceErrorDescs=!values.pedProduceErrorDescs;writes.push(['pedProduceErrorDescs',values.pedProduceErrorDescs]);}
+  else if(lastSelector.includes(';pedUseResponseStub;ValueControl;DisplayEl')){values.pedUseResponseStub=!values.pedUseResponseStub;writes.push(['pedUseResponseStub',values.pedUseResponseStub]);}
+  else if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;if(options.stall!=='bindings')draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
-  }else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
+  }else if(lastSelector.includes(';SwitchButton')){const row=headerRows.find(r=>lastSelector==='[data-tid='+JSON.stringify(r.base+';SwitchButton')+']');row.variableMode=!row.variableMode;}
+  else if(lastSelector.includes(';VariableControl;trg_picker')){const row=headerRows.find(r=>lastSelector.includes(r.variableTid));assert.ok(row.variableMode,'inactive picker is offset and unreachable');row.picker=true;}
+  else if(lastSelector.includes(';boundlist;Cycle_')){const row=headerRows.find(r=>lastSelector.includes(r.variableTid));row.selected='cycle-id';row.picker=false;}
+  else if(lastSelector.includes(';btnAddHeader')){addHeader();}
+  else if(lastSelector.includes(';colDelete_header')){const index=headerRows.findIndex(r=>lastSelector==='[data-tid='+JSON.stringify(r.deleteElement.getAttribute('data-tid'))+']');if(index>=0)headerRows.splice(index,1);}
+  else if(lastSelector.includes(';edtMessageBodyColumn;trg_picker')){bodyPickerOpen=true;}
+  else if(lastSelector.includes(';boundlist;Body')){body='Body';bodyPickerOpen=false;}
+  else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
  },move:async()=>{},down:async()=>{drags++;},up:async()=>{
   const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
   assert.ok(column&&parameter,'the drag must use the owned native records');
   draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
- return {saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
-  query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
+ return {values,writes,saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:(headers=options.headers,produceErrorDescriptions)=>{stage=options.inputPage?-1:0;return restRequestCapability(page,{deadline:Date.now()+600000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,...(headers!==undefined?{headers}:{}),
+  header_variables:{kind:'variables',port:0,fields:[{name:'Cycle',index:7,id:17,type:5,source:{id:27,type:5}}]},
+  ...(produceErrorDescriptions!==undefined?{produce_error_descriptions:produceErrorDescriptions}:{}),new_node:options.new_node===true,...(options.simulation?{simulation:options.simulation}:{}),...(options.method?{connection:{method:options.method},...(['POST','PUT','PATCH'].includes(options.method)?{body_field:'Body'}:{})}:{}),query_parameters:options.query??names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}));}};
 }
+
+test('C10 disables, preserves and reenables native error descriptions on the same wizard',async()=>{
+ const f=fixture(null,false,null,{empty:true});
+ for(const flag of [false,undefined,true]){
+  const r=await f.run(undefined,flag);
+  assert.equal(r.verified,true,r.error);
+  assert.equal(r.configuration.produce_error_descriptions,flag??false);
+ }
+ assert.deepEqual(f.writes.filter(([key])=>key==='pedProduceErrorDescs'),[['pedProduceErrorDescs',false],['pedProduceErrorDescs',true]]);
+ const saved=await fixture(null,false,null,{empty:true,savedErrorDescriptions:false}).run();
+ assert.equal(saved.verified,true,saved.error);
+ assert.equal(saved.configuration.produce_error_descriptions,false);
+});
+
+test('C4 selects and retains a native string binding, then can return to a literal',async()=>{
+ const f=fixture(null,false,null,{empty:true}),headers=[{name:'X-Lab-Cycle',value:{variable:'Cycle'}}];
+ for(let i=0;i<2;i++){const r=await f.run(headers);assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,headers);}
+ assert.equal(f.writes.filter(([key])=>key==='value').length,0);
+ const r=await f.run([{name:'X-Lab-Cycle',value:'literal'}]);assert.equal(r.verified,true,r.error);
+ assert.deepEqual(r.configuration.headers,[{name:'X-Lab-Cycle',value:'literal'}]);
+});
+for(const options of [{variableType:4},{variableNull:true},{variableValue:'bad\r\nvalue'}])test('C4 refuses unsafe native variable '+JSON.stringify(options),async()=>{
+ const r=await fixture(null,false,null,{empty:true,...options}).run([{name:'X-Lab-Cycle',value:{variable:'Cycle'}}]);
+ assert.equal(r.verified,false);assert.match(r.error,/non-NULL string/);
+});
+
+test('C2 writes first then second on the same REST, preserves omitted headers and clears explicitly',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true});
+ for(const value of ['first','second']){
+  const headers=[{name:'X-Lab-Cycle',value}],r=await f.run(headers);
+  assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,headers);assert.equal(r.configuration.body_field,'Body');
+ }
+ assert.equal(f.writes.filter(([key])=>key==='name').length,1,'same header is edited in place');
+ const before=f.writes.length,r=await f.run();assert.equal(r.verified,true,r.error);assert.equal(f.writes.length,before);assert.equal(r.configuration.headers,undefined);
+ const cleared=await f.run([]);assert.equal(cleared.verified,true,cleared.error);assert.deepEqual(cleared.configuration.headers,[]);
+});
+test('C2 replaces multiple saved headers and preserves empty literal values',async()=>{
+ const headers=[{name:'X-One',value:''},{name:'X-Two',value:'Привет & + /'}];
+ const f=fixture(null,false,null,{empty:true,savedHeaders:[{name:'X-Old',value:'old'}]}),r=await f.run(headers);
+ assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,headers);
+});
+for(const reversed of [false,true])test('C2 header readback ignores object key order: '+reversed,async()=>{
+ const headers=[reversed?{value:'first',name:'X-Lab-Cycle'}:{name:'X-Lab-Cycle',value:'first'}];
+ const r=await fixture(null,false,null,{empty:true}).run(headers);
+ assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,[{name:'X-Lab-Cycle',value:'first'}]);
+});
+test('C2 deletes multiple saved headers when native delete tids are reindexed',async()=>{
+ const f=fixture(null,false,null,{empty:true,reindexDeletes:true,savedHeaders:[{name:'X-One',value:'one'},{name:'X-Two',value:'two'}]});
+ const r=await f.run([{name:'X-Remaining',value:'kept'}]);
+ assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,[{name:'X-Remaining',value:'kept'}]);
+});
+test('C2 refuses success if the custom headers page was skipped',async()=>{
+ const r=await fixture(null,false,null,{empty:true,skipHeaders:true}).run([]);
+ assert.equal(r.verified,false);assert.match(r.error,/custom headers page was not reached/);
+});
+
+for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 configures native '+method+' and reads body binding',async()=>{
+ const f=fixture(null,false,null,{method,empty:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);
+ assert.equal(r.configuration.method,method);
+ assert.equal(r.configuration.body_field,method==='DELETE'?undefined:'Body');
+});
+test('C1 recognizes the owned request page when the empty query panel is hidden',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true,hiddenQuery:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(r.configuration.body_field,'Body');
+});
+test('C1 uses the owned nested MessageBody query data-tid for manual bindings',async()=>{
+ const f=fixture(null,true,null,{method:'POST',nestedParam:true}),r=await f.run();
+ assert.equal(r.verified,true,r.error);assert.equal(f.drags(),2);
+ assert.deepEqual(r.configuration.query_parameters,[{name:'requestid',field:'RequestId'},{name:'key',field:'Key'}]);
+});
+test('C1 rejects a non-string body column before a body gesture',async()=>{
+ const f=fixture(null,false,null,{method:'POST',empty:true,bodyType:1}),r=await f.run();
+ assert.equal(r.verified,false);assert.equal(r.effect_possible,false);
+ assert.match(r.error,/string input field/);
+});
 
 test('plain GET commits an empty parameter inventory without AutoLink or a data table',async()=>{
  const f=fixture(null,false,null,{empty:true}),result=await f.run();
@@ -132,4 +256,28 @@ for(const duplicate of ['column','parameter'])test('REST refuses duplicate '+dup
  assert.equal(result.cleanup_complete,true);
  assert.equal(f.drags(),0);
  assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:0});
+});
+
+for(const new_node of [true,false])test('REST timeout defaults apply only to new nodes: '+new_node,async()=>{
+ const f=fixture(null,false,null,{empty:true,new_node,timeout:new_node?-1:75,retries:new_node?0:4});
+ const result=await f.run();assert.equal(result.verified,true,result.error);
+ assert.deepEqual(f.values,{pedProduceErrorDescs:true,...(new_node?{pedTimeout:30,pedFailedRequestRepeat:0}:{pedTimeout:75,pedFailedRequestRepeat:4}),pedUseResponseStub:false,pedResponseStub:''});
+ assert.deepEqual(f.writes,new_node?[["pedTimeout",30]]:[]);
+});
+
+for(const new_node of [true,false])test('C8 configures simulation and rereads saved values on '+(new_node?'new':'existing')+' REST',async()=>{
+ const simulation={enabled:true,file_path:'/own/response.json'},f=fixture(null,false,null,{empty:true,new_node,simulation});
+ const result=await f.run();assert.equal(result.verified,true,result.error);
+ assert.deepEqual(result.configuration.simulation,simulation);
+ assert.equal(f.values.pedUseResponseStub,true);assert.equal(f.values.pedResponseStub,simulation.file_path);
+});
+test('C8 omission preserves an existing simulation and explicit false disables only its flag',async()=>{
+ const savedSimulation={enabled:true,file_path:'/own/response.json'};
+ const preserved=fixture(null,false,null,{empty:true,savedSimulation});
+ const read=await preserved.run();assert.equal(read.verified,true,read.error);assert.deepEqual(read.configuration.simulation,savedSimulation);
+ assert.deepEqual(preserved.writes,[]);
+ const disabled=fixture(null,false,null,{empty:true,savedSimulation,simulation:{enabled:false}});
+ const result=await disabled.run();assert.equal(result.verified,true,result.error);
+ assert.deepEqual(result.configuration.simulation,{...savedSimulation,enabled:false});
+ assert.deepEqual(disabled.writes,[['pedUseResponseStub',false]]);
 });

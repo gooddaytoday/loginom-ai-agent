@@ -11,13 +11,19 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 # Построение сценария Loginom
 
-Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки: `loginom_file_admit` исходного пути → `dock_artifact_deliver` → `dock_artifact_delivery_status` до `ready`. Используй подтверждённый `destination`; не загружай этот полный файл ещё раз. После доставки работай с ним как с серверным источником по следующему циклу.
+Файлы задания ищи только в рабочем каталоге и по точным путям из задания.
+В CLI `glob`, `read`, `list` вне рабочего каталога отклоняются и обрывают прогон.
+Подтверждённый серверный `destination` экспорта не является локальным путём:
+не ищи выгруженный CSV в родительских каталогах workspace.
 
-Работай через управляемые инструменты текущей сессии. Активация этого skill
-разрешает подготовку браузерной задачи; вызови `loginom_dock_prepare` и дождись
-`prepared: true`. Ответ задаёт identities, доступные возможности, исходные
-вложения и закреплённый каталог. Используй реальные имена и схемы из каталога.
-Текст skill поставляется приложением; загружать его с Skills API не нужно.
+Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки по [большим файлам](references/large-files.md); не загружай этот полный файл ещё раз.
+
+Работай через управляемые инструменты сессии. Активация skill разрешает
+браузерную задачу: вызови `loginom_dock_prepare`, дождись `prepared: true`.
+Ответ задаёт identities, возможности, вложения и закреплённый каталог;
+используй его реальные имена и схемы. Skill уже загружен; Skills API не нужен.
+
+При `LOGINOM_CONFIG_REQUIRED`/`state=unconfigured` попроси открыть «Loginom», указать адрес, логин и пароль, затем повторить запрос; без поиска конфигураций/ключей ([правило](references/browser.md#подключение-не-настроено)).
 
 Для редактирования локального `.lgp` из пути или вложения сразу вызови
 `loginom_dock_prepare({intent: "open_package", local_package_path: "точный путь"})`.
@@ -26,16 +32,6 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 `package_path`. Пакеты `.lgp` не регистрируются через `loginom_file_admit`.
 Если upload подтверждён, а open не удался, следуй выданному `next_step` с
 серверным путём и исходным `operation_id`; новый local-path вызов загружает новую копию.
-
-## Кластеризация
-
-Для k-means по признакам в разных единицах либо по просьбе пользователя задай
-`normalization:"standardize"` в параметрах Кластеризации: штатная стандартизация
-использует выборочное SD. По умолчанию нового узла — `none`; у существующего
-пропуск параметра сохраняет одинаковую поддерживаемую нормировку полей.
-Центры порта 1 возвращаются в исходных единицах, Distance порта 0 — в масштабе
-нормализованных признаков. Читай оба порта. Seed фиксируй для повторяемости;
-номера кластеров — метки, а не ранги. Другие нормализаторы не поддерживаются.
 
 ## Только загрузка файла
 
@@ -53,6 +49,8 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 Цикл «профиль → выборка → сценарий → полный расчёт → Save» ниже применяй только
 к запросу построить или выполнить расчёт.
 
+[Save retry](references/browser.md).
+
 ## Загрузка данных для расчёта
 
 Если небольшие файлы данных указаны путями в prompt, после подготовки зарегистрируй каждый
@@ -62,18 +60,30 @@ destination. Несколько путей, в том числе одинако�
 требуют отдельных регистраций. После повторной подготовки зарегистрируй файлы
 заново: прежние `artifact_id` использовать нельзя.
 
-Для построения расчёта на большом файле — путь в сообщении, вложение Desktop или CLI `--file` —
-сначала получи профиль (`loginom_file_profile`) и точный проход (`loginom_file_scan`), создай выборку и
-отладь на ней сценарий. Затем зарегистрируй полный файл по исходному пути:
-больше 16 МиБ передаётся по частной ссылке, без bytes/base64 в IPC. Вызови
-`loginom_dock_artifact_deliver` один раз с устойчивым `operation_id`. Это start;
-жди `upload_status: ready`, опрашивая `loginom_dock_artifact_delivery_status`
-не чаще раза в 5 секунд (тот же ID). Прогресс содержит байты, процент и время.
-Для отмены — `loginom_dock_artifact_delivery_cancel`, затем status до `cancelled`
-или `uncertain`. При `uncertain` не начинай новую загрузку и не меняй сценарий.
-После ready переключи существующий источник на подтверждённый destination,
-выполни один расчёт и сверь полный N и бизнес-итог, как описано ниже.
-Затем Save. Честно разделяй проверку на выборке и проверку полного файла.
+Большой локальный файл (XLSX любого размера, CSV/TSV/TXT >16 МиБ, CLI-ссылка >10 МиБ
+или файл неизвестного размера) и «выборка → полный»: до действий выполни
+[правила больших файлов](references/large-files.md), начиная с `loginom_file_profile`, не Read/полной доставки.
+Серверный файл любого размера: storage source → автоопределение Loginom → Execute;
+N и типы — из порта. По умолчанию без скачивания. Download→cache/profile/scan —
+лишь по просьбе точной проверки, при противоречии типов/предупреждении/ошибке Execute
+или для локального sample→full. Явный запрет скачивания/доставки соблюдай; отчёт:
+«типы по автоопределению Loginom, точная проверка редких значений не выполнялась».
+Серверный или доставленный полный файл повторно не загружай; при `uncertain` не
+начинай новую загрузку и не меняй сценарий.
+Не выдавай сценарий или суммы по выборке за полный расчёт: пока полный источник не
+доставлен, прямо сообщи «полный расчёт будет после загрузки полного файла».
+После переключения на полный файл сверь полный N — число исходных записей из
+завершённого выходного порта импорта, не строки выборки и не число групп — и
+бизнес-итог; без такой сверки пиши «N не сверено» с причиной.
+
+Серверные папки без имён файлов: не проси имена у пользователя. Непосредственно перед
+импортом каждой папки вызови `dock_storage_list({path:"точная папка", pattern:"*.csv"})`
+(ссылки свежие, как у `dock_storage_source`). Один файл —
+обычный импорт по его `server_source_ref`; 2–16 файлов одной структуры — один
+`imports.text` на папку с маской: [список файлов](references/nodes/imports.text.md#file-list).
+Поля, типы и число строк каждого импорта бери из readback и порта.
+Before Export/report compare Import port types with task/source values: imported decimals must be real, not numeric strings.
+Preview can infer string from a NULL token; set null_marker, fix SAME Import `settings.columns`, reread types/values/NULL.
 
 При ошибке локального файла сообщи причину и путь из результата инструмента.
 Только при отклонённом запросе разрешения добавляй: «приложите файл — `--file`
@@ -84,6 +94,9 @@ destination. Несколько путей, в том числе одинако�
 с `open_package` и точного пути из просьбы или подтверждённого Save. `existing_workflow`
 принимает только ссылку, выданную этим runtime: история чата и diagnostics её не заменяют.
 Не создавай новый draft вместо продолжения; при pending сначала следуй recovery.
+Пакет открылся «только чтение» (открыт в другой сессии): сразу сообщи причину и предложи
+сохранить копию под новым именем (`package.save_checkpoint`, `conflict_policy:"fail"`);
+не повторяй попытки записи.
 
 ## Один расчёт цепочки
 
@@ -92,7 +105,15 @@ destination. Несколько путей, в том числе одинако�
 или сразу создай X с финишем, активирующим выход, и дождись успеха.
 `finish:"done"` лишь сохраняет настройки. Пустая таблица после Execute — тоже
 активный выход. Уже активный выход повторно не выполняй; не жди отказа
-`requires an active source output`.
+`requires an active source output`. В продолжении после открытия пакета
+сохранение не доказывает активность выхода.
+
+Для `variables.user/values` после изменения значений выполни
+`package.save_checkpoint`, затем отдельный `dock_node_read` от успешной
+values-операции с `read:{ports:[],variable_ports:[4]}`. Получи полный snapshot
+с новым `read_id` до `package.save_as`, повторного открытия и завершения задачи.
+`configuration.readback` подтверждает изменение настроек; сохранённые значения
+показывай по этому отдельному snapshot.
 
 Если пользователь называет поле или колонку (`RequestId`, `Key`, `EchoPath`…),
 выходное техническое имя должно быть ровно таким, как в просьбе: без приставок
@@ -115,8 +136,6 @@ patch по схеме его типа. Дождись подтверждённо
 Последний вычисляющий узел (например, Группировку) выполни один раз через
 `loginom_dock_node_apply` с `finish:"execute"` и чтением его результата:
 `read:{ports:[0],sample_rows:100,require_exact_numbers:true}` для одного выхода.
-GET по полному URL без query-параметров допустим: `query_parameters:[]`, `inputs:[]`,
-`finish:"execute"`; входная таблица и URL-кодировщик не нужны.
 Для нескольких выходов используй порты по контракту узла. Для небольшой итоговой
 таблицы запрашивай не меньше её числа строк и проверь `sample_complete:true`.
 Значения для ответа, включая суммы и количества исходных записей, бери из этого
@@ -124,64 +143,114 @@ GET по полному URL без query-параметров допустим: 
 итогам; не выдавай число групп за число исходных записей.
 
 Затем настрой и выполни `exports.text` от того же уже активного результата,
-не меняя вычисляющую цепочку. Для Экспорта передай `read:{ports:[]}`: он возвращает
-`file_artifacts`, а не табличный порт. После расчёта не вызывай
-`loginom_dock_node_read`: этот инструмент выполняет узел заново. Не повторяй
+не меняя вычисляющую цепочку. `loginom_dock_node_read` читает выход последнего
+завершённого выполнения и ждёт идущее. Изменения внешнего файла/БД/REST не обнаруживает;
+если пользователь сообщил об изменении источника, нужен `execution:"execute"`. Не повторяй
 Execute вычисляющих узлов ради чтения, ответа или экспорта.
 Округление значений и дополнительные узлы для него добавляй только по явной
 просьбе пользователя; формат отображения числа сам по себе этого не требует.
 
-## Экспорт
-
-Для текстового экспорта по умолчанию используй UTF-8. Только по явной просьбе
-пользователя укажи `encoding:"Windows-1251"` (как в Текстовом импорте).
-В Loginom 7.4.2 BOM для CP1251 игнорируется; выбирай `bom:false`.
-Символы вне CP1251 заменяются байтом `0x1A` (SUB): наблюдалось для `漢` и emoji.
-Предупреди пользователя об этой потере; не обещай сохранность произвольного Unicode.
-
-Для книги Excel выбирай `dock_node_apply` с `target.type:"exports.excel"`,
-`mode:"xlsx"`, одним входом 0 и `parameters.excel_export`:
-`destination` — новый `.xlsx` в выбранном каталоге экспорта, `sheet_name` —
-явное имя единственного листа, `header:"none"|"names"|"labels"`, `overwrite:"reject"`.
-У нового узла нужны все четыре параметра. `finish:"execute"`,
-`read:{ports:[],sample_rows:0,require_exact_numbers:false}` возвращают
-`output.file_artifacts`: доставь этот XLSX пользователю. Сохраняй типы и порядок
-исходной таблицы без округления и преобразования текста в формулы.
-Существующий файл отклоняется; выбирай новый путь. Для существующего узла
-пропущенные настройки сохраняются. `done` сохраняет настройки без файла,
-`close` отменяет черновик; пакет сохраняй отдельно. Для самой выгрузки в Excel
-используй этот узел; вычисляющие узлы нужны только для запрошенных вычислений.
-
-Если в выгружаемых данных есть NULL и пустые строки, а пользователь не задал маркер выгрузки,
-для `exports.text` явно передай в параметре `null_marker` непустой маркер,
-не совпадающий с не-NULL значениями. По умолчанию выбери тот же непустой маркер, что при импорте,
-если он был задан; иначе `NULL`. Назови выбранный маркер пользователю.
-
 ## Выбор узлов
+
+Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript.
 
 По умолчанию решай задачу стандартными узлами из текущего каталога, включая
 их композиции. Перед выбором JavaScript проверь, можно ли выразить каждый
 требуемый шаг доступными стандартными узлами и режимами.
 
-Для операций ниже используй указанные штатные узлы и режимы, без замены
-Калькулятором или JavaScript. **Перед настройкой прочитай соответствующий раздел
-[настроек узлов](references/node-settings.md)**: там обязательные параметры,
-порты, patch, порядок результатов и ограничения; затем запроси `parameter_schema`.
+Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`: правила узла — в `guidance` карточки, параметры — в `parameter_schema`; [разметка правил](references/nodes/README.md).
+После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply.
+Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
+для словаря соответствий с другим типом результата — Замену.
+На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
+Не подменяй эти режимы другим алгоритмом.
 
-| Задача | Тип и режим | Граница поддержки |
+Пути `references/nodes/…` в таблице заданы относительно `Base directory for this skill`
+из вывода SkillTool. Присоединяй к этому каталогу путь ссылки буквально: не сокращай
+и не набирай вручную. Список ресурсов SkillTool содержит только выборку (≤10 файлов);
+путь нужного узла бери из таблицы, даже если его нет в этой выборке.
+
+| Просьба пользователя | Тип / режим | Файл узла |
 | --- | --- | --- |
-| Пирсон числовых полей | `research.corr_analysis`, `pearson` | Непустой источник, ≥2 совместных наблюдений на пару; другие коэффициенты недоступны. |
-| Тип значений замены | `transform.replace_columns`, `exact` | Для словаря соответствий с другим типом результата выбирай Замену; для вычисляемой формулы или разбора произвольного текста — Калькулятор. См. `references/node-settings.md`. |
-| Regex-замена | `transform.replace_columns`, `regex` | Первое совпадение заменяет всю ячейку константой; без подстановок групп. Смешанные exact/regex таблицы и неподдержанные конструкции — отказ. |
-| Выбросы SD/IQR | `preprocessing.elim_outlier`, `detect` | Непрерывные числовые поля, keep/keep, обучение на текущем входе. Другие политики, quality и apply недоступны. |
-| Лаги предыдущих/следующих строк | `transform.sliding_window`, `lag` | Время задаёт входной порядок; явная политика неполных краёв. |
-| Слияние двух таблиц по ключам | `transform.join_data`, `right`/`full`/`difference` | Все правые / обе стороны / левые без пары. Типы ключей совпадают. |
-| Первые/последние N строк | `preprocessing.sampling`, `sequential` | `position:first/last`, размеры в строках. |
-| Последовательное разбиение | `preprocessing.data_partition`, `sequential` | Размеры train/test и порядок выделения; без обучения. |
-| Случайная выборка/разбиение | Те же sampling/data_partition, `mode:"random"` | Явные размеры и seed; повтор на том же источнике/seed. Stratified, biased и равномерный случайный метод: «Этот режим пока не поддерживается». Не подменяй эти режимы другим алгоритмом. |
-| Бинарная строковая цель, вероятность и отбор факторов | `datamining.log_regression`, `enter/forward/backward/stepwise` | Пользовательские критерии и пороги включения/исключения не поддерживаются; сообщи ограничение без подмены стандартным отбором. |
-| LinReg на новых данных | Обученный LinReg, `apply` | Сохранённые input_fields/target_field; enter обучает/переобучает. |
-| Календарные признаки datetime | `transform.date_time`, `calendar` | Год/квартал/месяц/день/час, границы периодов, ISO-год/неделя/понедельник. `iso_week_end` недоступен из-за ошибки Loginom: сообщи ограничение без подстановки вычисления. |
+| Переменные в таблицу | `variables.to_table` / columns, rows | [читать](references/nodes/variables.to_table.md) |
+| User variables | `variables.user` / values | [reference](references/nodes/variables.user.md) |
+| Соединить переменные | `variables.column_union` / append_variables | [читать](references/nodes/variables.column_union.md) |
+| Переменные | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
+| Замена переменных | `variables.replace` / exact | [читать](references/nodes/variables.replace.md) |
+| Качество таблицы | `research.quality` / `profile` | [Пять выходов](references/nodes/research.quality.md), `parameters:{}`. |
+| Тренд Ходрика–Прескотта | `preprocessing.smoothing` / hodrick_prescott | [читать](references/nodes/preprocessing.smoothing.md) |
+| Конечные классы | `preprocessing.coarse_classes` / internal, apply | [читать](references/nodes/preprocessing.coarse_classes.md) |
+| Интервалы числового поля | `preprocessing.binning` / internal, apply | [читать](references/nodes/preprocessing.binning.md) |
+| JSON в дерево | `trees.from_json` / auto_structure | [читать](references/nodes/trees.from_json.md) |
+| Дерево в таблицу | `trees.to_table` / selected_nodes | [читать](references/nodes/trees.to_table.md) |
+| Таблица в дерево | `trees.from_table` / manual_structure | [читать](references/nodes/trees.from_table.md) |
+|id/parent_id|`programming.javascript`|[рецепт](references/nodes/parent-child-recipe.md)|
+| Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
+|Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
+|Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
+| Выбросы SD/IQR | `preprocessing.elim_outlier` / detect, edit | [читать](references/nodes/preprocessing.elim_outlier.md) |
+| Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise, apply | [читать](references/nodes/datamining.log_regression.md) |
+| Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
+| Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
+| Факторный анализ | `research.factor_analysis` / pca_fixed, apply | [читать](references/nodes/research.factor_analysis.md) |
+| REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
+| Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply, forward | [читать](references/nodes/datamining.lin_regression.md) |
+| Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
+| Ассоциативные правила | `datamining.assn_rules` / fp_growth | [читать](references/nodes/datamining.assn_rules.md) |
+| Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
+| Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
+| Пропуски: среднее, медиана, мода, предыдущее, линейно, случайное, удаление | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
+| Экспорт XLSX | `exports.excel` / xlsx | [читать](references/nodes/exports.excel.md) |
+| Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |
+| Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |
+| Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |
+|Импорт Loginom Data|`imports.lgd` / native|[читать](references/nodes/imports.lgd.md)|
+|Импорт из базы данных (SQLite)|`imports.database` / table, sql|[читать](references/nodes/imports.database.md)|
+|Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
+| Формулы, в том числе Var.* | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
+| Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
+| Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
+| Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
+|Цикл|`control.loop` /group_rows,for|[читать](references/nodes/control.loop.md)|
+|Подмодель|`control.supernode` /tabular_boundary, variable_boundary|[читать](references/nodes/control.supernode.md)|
+|Выход Подмодели|`control.supernode_output`|[читать](references/nodes/control.supernode_output.md)|
+| Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
+|Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
+|Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
+| Замена | `transform.replace_columns` / exact, regex, mixed, external | [читать](references/nodes/transform.replace_columns.md) |
+| Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
+| Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
+| Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
+| Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
+| Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |
+| Добавление строк таблиц | `transform.union_data` / append_all | [читать](references/nodes/transform.union_data.md) |
+| Дополнение данных | `transform.enrich_data` / left | [читать](references/nodes/transform.enrich_data.md) |
+| Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
+| Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
+| Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
+
+Новый CSV/TXT: автоопределение Loginom по [справке](references/nodes/imports.text.md).
+Import edits on the SAME existing node: resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches). Only unchanged Execute may omit source. After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip), settings.format (explicit decimal_separator "." or ",", never "Не задано (…)"), and columns or auto_detect_columns:"new"/"all". Reuse the verified delivery; do not upload again.
+Превью усечено (`columns_omitted>0`): не спрашивай имена; `auto_detect_columns:"new"`
+без `columns`, все имена/типы — из readback/порта после Execute. Правки — того же узла.
+Локальный образец сверь; серверный не скачивай по умолчанию. Типы пользователя главнее.
+Исправляй наблюдённые противоречия; сохраняй ведущие нули, NULL, секунды дат.
+Сообщи итоговые типы/формат даты и пределы проверки.
+В одиночном файле столбец сумм с десятичными значениями и пробелами разрядов
+по умолчанию числовой; явно заданный пользователем строковый тип главнее.
+Сохраняй числовое значение суммы. Строковый тип после Import — промежуточный:
+нативный real теряет такие значения. Добавь штатный Калькулятор: убери только
+пробелы разрядов, преобразуй в real с исходным именем. Перед Export и отчётом
+прочитай выход Калькулятора: тип real, все значения и NULL сохранены. Сообщи
+итоговый числовой тип и преобразование; исходный файл и строковый Import сохранены.
+
+Prevent avoidable retries:
+- Describe one node type and only needed modes: `{node_types:["imports.text"],modes:["delimited"]}`; request Save separately. This avoids `USER_RESPONSE_BUDGET`.
+- `Preparation operation conflict`: repeat the original prepare arguments and operation_id to reconcile; follow its next_step before changing intent/path/navigation. A new preparation uses a new ID only after reconciliation.
+- After open_package, old source_operation_id receipts are invalid. Take current NodeRef from fresh workspace_observe; use the node's described existing-node form, then read from its new successful local operation (cleanup_complete:true).
+- Switching an Import's file: keep the SAME node; pass the new verified source AND `settings.source.source_path` equal to the verified delivery destination, not the old path. For an unresolved refusal, inspect/recover first.
+- Manual Import columns require nonempty name and label, e.g. `name:"Amount",label:"Amount"`; never copy `label:null` from preview. Native auto-detection: omit columns.
+- Continuation: reuse the existing Export and its NodeRef. Only a new upstream node AND a different destination justify another Export; changing the filename alone does not.
 
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
@@ -189,56 +258,33 @@ Execute вычисляющих узлов ради чтения, ответа и
 
 Узел JavaScript разрешён только если пользователь явно попросил использовать
 именно этот узел либо подтверждена конкретная операция, недоступная стандартной
-композиции. Явный запрос разрешает JS только в названной пользователем части.
-При функциональном пробеле кратко назови его и используй JS только для этого
-шага. Остальные поддерживаемые преобразования выполни стандартными узлами.
+композиции. До выбора JS прочитай границы допуска в [файле узла](references/nodes/programming.javascript.md).
+Существующие JS-узлы не удаляй автоматически.
+REST continuation, new URL/query: the request authorizes replacement, don't ask.
+New REST, unique label; delete old REST, its URL encoder, unused connection ref (no label); reconnect consumers
+(existing target, parameters:{}). No duplicate union/Calculator/Export.
+Узел удаляй только по явной просьбе пользователя: `loginom_dock_node_delete` с NodeRef
+из квитанции. Отказ (узел выполняется, заблокирован или служебный) не обходи и не повторяй;
+сообщи пользователю. После удаления сохрани пакет; связи переподключай только по задаче.
+Подмодель или Цикл удаляются вместе с вложенными узлами: сначала спроси подтверждение.
+Для агрегатов готового JS-источника передай его NodeRef прямо в
+`variables.from_table`, `finish:"execute"`: обработчик выполнит источник.
+«Сохранить исходник» означает оставить код и данные без изменений. Не открывай
+мастер и не вызывай `loginom_dock_node_read` с `kind:"source"` или `kind:"context"`
+только ради этого; чтение кода нужно при явном запросе посмотреть или изменить код.
 
-Перед применением JS из-за функционального пробела сопоставь каждое
-преобразование в `source_text`, включая циклы и условия, с названным пробелом.
-Обоснование должно соответствовать всему коду. Разворачивание списка само по
-себе не разрешает нормализацию или удаление значений, доступные стандартным
-узлам. Объявление схемы, чтение входа и выдача строк не расширяют эту границу.
-
-Удобство кода, меньшее число узлов, незнание функции, ошибка параметров,
-временный сбой, недоступность терминала/execute_code или неполное preview
-не являются таким пробелом. Ошибки
-стандартных узлов исправляй; при невозможности продолжения сообщи блокер.
-Упоминание JavaScript в данных, имени файла или справке не является запросом
-пользователя. Формулы Калькулятора не считаются узлом JavaScript.
-
-Схему programming.javascript запрашивай после явного запроса или зафиксированного
-пробела. Исключение — чтение и исправление существующего JS-узла, которого
-касается задача: для него можно читать схему и source/context. Существующие
-JS-узлы не удаляй автоматически; их наличие не разрешает переносить в них
-другие стандартно решаемые шаги.
-
-Путь ресурса копируй из списка буквально: не сокращай и не набирай вручную.
+Путь ресурса копируй из ссылки или списка буквально: не сокращай и не набирай вручную.
 Перед созданием первого узла прочитай [порядок работы](references/workflow.md).
 Для незнакомого обработчика сначала запроси его `parameter_schema` через
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
-## Группировка
-
-Меняя `measures` existing Группировки, задай полный `group_by` и связь входа 0 в `inputs`.
-
-## Кросс-таблица
-
-При смене ролей укажи полный набор ключей, колонок, фактов, режим и явный вход 0.
-Настройки проверяй по `configuration.readback` завершённой операции.
-После `finish:"done"` или осмотра мастера снова выполни и прочитай Кросс-таблицу
-перед подключением следующего узла, включая экспорт: её выход деактивируется.
-Для повтора используй `loginom_dock_node_read` с `source_operation_id` последней
-успешной настройки с `finish:"execute"`. Если Execute ещё не было, выполни тот же
-существующий узел с `parameters:{}` и `finish:"execute"`.
-
 ## Браузер и владение операцией
 
 `target.label` необязателен: используй короткую подпись словами без `; | < >`, кавычек, обратной косой черты и управляющих символов; сравнения и формулы передавай только в `parameters`.
 
-[Подготовка и отмена](references/browser.md) объясняет вход, ожидание и
-неопределённый результат. [Граф и узлы](references/canvas.md) объясняет новые
-и существующие узлы, связи и проверку результата.
+Вход, ожидание и неопределённый результат — [Подготовка и отмена](references/browser.md);
+узлы, связи и источники данных — [Граф и узлы](references/canvas.md).
 
 Сессия работает в одном аутентифицированном контексте Loginom. Не вызывай
 Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы сервера для обхода
@@ -248,164 +294,15 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 `node.add` и связи через `link.create` в action API. Зависимые операции выполняй
 последовательно.
 
-Большие вложения представлены ссылкой на исходный путь, а не готовым `input_artifacts`.
-Для расчёта начни с профиля; ссылка сохраняет отпечаток файла в момент приложения.
 `LOGINOM_FILE_CHANGED` требует нового вложения; `LOGINOM_FILE_NOT_FOUND` — восстановления
 исходника или нового пути. Не обновляй старый отпечаток и не обходи явный deny.
 Если небольшие inline-вложения не подтверждены в `input_artifacts`, сообщи об этом;
 не угадывай серверный путь. Доставку выполняет `loginom_dock_artifact_deliver`.
 Не перезаписывай чужие файлы и не меняй разрешённые каталоги.
 
-Для расчёта локальный XLSX любого размера, CSV/TSV/TXT больше 16 МиБ, CLI-вложение по ссылке
-(порог CLI больше 10 МиБ) или файл неизвестного размера сначала исследуй
-через `loginom_file_profile({path})`, вместо Read и попытки доставить весь файл.
-При неоднозначности кодировки, заголовка или диалекта уточни настройки; для
-широкой таблицы дочитай continuation. `loginom_file_scan` — отдельный отменяемый
-полный проход для точного числа записей и проверки типов. Для сценария создай
-`loginom_file_sample`, зарегистрируй возвращённый путь через `loginom_file_admit`
-и доставь только выборку. Настройки импорта бери из полного профиля, а
-`source_path` — из подтверждённой доставки выборки. Выборка не проверяет весь
-датасет. Пока полный источник не доставлен, прямо сообщи: «полный расчёт будет
-после загрузки полного файла». Не выдавай сценарий или суммы по выборке за
-полный расчёт.
-
-Если исходный файл уже в разрешённом хранилище Loginom, не загружай его повторно.
-Вызови `loginom_dock_storage_source` с точным `path` и новым `operation_id`:
-он открывает «Файлы», находит файл в разрешённом каталоге и возвращает
-`output.source.server_source_ref` из наблюдения его строки (native size/mtime).
-Если раздел «Файлы» уже открыт, ссылка также доступна в `storage_entry.server_source_ref`.
-Для серверного CSV/TSV/TXT больше 16 МиБ или неизвестного размера перед полным
-импортом обязательно выполни описанные ниже download→cache, профиль и точный scan.
-Готовый серверный источник и известные настройки формата не отменяют этот шаг.
-Скачивание и scan не являются Execute в Loginom: выполни их и при требовании
-единственного полного расчёта цепочки. Не переходи от preview сразу к полному импорту.
-Для импорта передай
-`source:{kind:"storage",server_source_ref:"<полученная ссылка>"}` и точный
-`settings.source.source_path`. Произвольный путь или придуманные artifact/upload IDs
-не доказывают происхождение. Структура и preview мастера имеют `coverage=preview`:
-это не SHA, не точный полный N и не проверка редких значений.
-Для серверного текста сначала вызови `dock_node_apply` для `imports.text` с
-`parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
-`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`. Это открывает
-мастер и возвращает `output.server_profile`, затем закрывает черновик без Execute.
-Если кодировка известна, укажи её в `settings.source.encoding` (например, `CP1251`). Если кириллица preview искажена при UTF-8, снова найди исходный путь через `dock_storage_source` и повтори preview с `CP1251`; не считай искажённый текст данными файла.
-Preview — до 25 отображённых строк, с явной неполнотой и ограничением ответа;
-полный N и редкие типы не доказаны. После скачивания и создания выборки переиспользуй
-этот узел по возвращённому ref: пустая конфигурация после Close требует полных
-настроек импорта выборки из локального профиля.
-
-Для серверного цикла «скачать источник в cache → выборка → полный файл» снова
-найди исходный путь через `loginom_dock_storage_source`, затем вызови
-`loginom_dock_storage_download_start` с возвращённым `server_source_ref` и новым
-`operation_id`. Дождись завершения через status/wait с тем же `operation_id`.
-Только успешный download разрешает профиль, точный `loginom_file_scan` и
-`loginom_file_sample` по возвращённому локальному `output.path`.
-Зарегистрируй и доставь только выборку; полный файл уже есть на сервере.
-Построй сценарий на выборке и сохрани checkpoint. Для `source_switch` передай
-`profile_id` скачанной копии и исходный серверный источник `kind:"storage"`.
-Перед переключением снова открой его каталог через `loginom_dock_storage_source`.
-Runtime заново сверяет native size/mtime и связь точного scan с копией в cache.
-При `LOGINOM_FILE_CHANGED` останови полный расчёт: найди исходник заново и повтори
-скачивание и точную сверку в новой операции. Старый cache не подтверждает подменённый файл.
-Проверка источника может оставить навигацию в Files. Перед Save вернись через
-`loginom_dock_prepare` с `intent:"existing_workflow"` и последним `workflow_ref`
-этого runtime, включив `document_id`; после Save бери ссылку из
-`workflow_continuations`. Затем Save с новым `operation_id`. Такой возврат
-восстанавливает навигацию, но не разрешает полный расчёт по старому cache.
-Не подменяй точную сверку числом видимых строк или preview, не экспортируй и
-не загружай полный серверный исходник повторно. После завершения вызови
-`loginom_dock_storage_download_cleanup` с operation_id скачивания.
-
-Для цикла «выборка → полный файл» сначала нужен полный локальный
-источник (либо проверенная серверная копия в cache) и успешный `loginom_file_scan` без ошибок типов.
-Построй и проверь сценарий на
-доставленной выборке, затем сохрани пакет через `package.save_checkpoint` и запомни его operation_id.
-Для локального источника после этого зарегистрируй исходный полный файл через `loginom_file_admit`, доставь
-его по ссылке и дождись `ready`. Перед переключением найди доставленный серверный путь
-через `loginom_dock_storage_source`, чтобы сохранить native identity файла. Не загружай полный файл повторно.
-У существующего текстового или Excel-импорта используй `source_switch` с `profile_id`,
-и `save_operation_id`; число `expected_records` передавать запрещено. Backend сам
-загружает receipt точного прохода текущей сессии и связывает его SHA/bytes с
-проверенной доставкой. Без receipt или digest-связи (включая storage preview)
-результат «N не сверено» с причиной; успешной сверкой это не называй. Для текста в `settings`
-передай только `source:{source_path:"<полный файл>"}`, без columns/format/mappings.
-Для Excel передай только `excel:{source_path:"<полная книга>",sheet_name:"<выбранный лист>"}`,
-без columns/header_rows/mappings. Лист, заголовки и политика пустых строк должны
-совпадать с точным XLSX-проходом. Автоопределение должно быть «Нет»; определения
-не пересоздавай и типы заново не определяй. В локальном sample→full источник — проверенная доставка полного файла;
-в серверном — исходный storage ref со связью точного scan и проверенной копии в cache.
-Этот режим сверяет колонки и mapping до и после повторного открытия мастера
-и не нажимает «Определить типы». Для текста переключай с `finish:"done"` и
-`read.ports:[]`, без отдельного Execute импорта. Непосредственно перед единственным
-Execute конечного узла снова вызови `loginom_dock_storage_source` для полного исходника:
-runtime повторно сверяет identity/размер/SHA с точным scan до использования данных;
-при отсутствии сверки или подмене отказывает, старый результат не принимается.
-Cache сохраняй до завершения расчёта. Полный N подтверждай вычисленным в цепочке
-количеством исходных записей, не числом агрегированных групп. Для Excel остаётся
-отдельный Execute импорта; проверь `full_import_verification` с expected/actual N и execution_id. Полный N берётся
-из завершённого выходного порта импорта: sample_rows, видимые строки, capped
-BufferedStore и число групп не заменяют его. Затем проверь бизнес-итог полного
-сценария, CSV, Save и cold. Несовпадение N, ошибка конвертации или незавершённый
-расчёт — FAIL. При timeout сначала inspect той же операции, повторный Execute
-запрещён.
-Успешный `exports.text` уже возвращает скачанные, проверенные `file_artifacts`.
-Не скачивай этот итог повторно через server source cache; сохрани пакет и сообщи результат.
-
-Для XLSX профиль показывает листы и видимость, declared и наблюдённую размерность,
-систему дат, формулы и cached values. Выбери нужный `sheet_name`; declared dimension
-не доказывает число записей. `loginom_file_sample` создаёт XLSX с теми же типами и
-форматами, его доставляй как XLSX и настраивай Excel-импорт по `settings.excel`
-профиля; `source` (artifact/upload IDs) и `excel.source_path` заполни из доставки.
-Не преобразуй книгу в CSV. Формулы в выборке — cached values, без пересчёта;
-отсутствующий cache требует уточнения исходника. `settings_complete=false`
-запрещает объявлять настройки готовыми: Excel-узел поддерживает 1–12 колонок,
-1–10 строк заголовка и импорт пустых строк. Более широкую книгу профилировать можно.
-Указанный пользователем лист передавай точным именем в `excel.sheet_name`;
-без выбора листа сохраняется прежнее поведение — первый лист книги.
-
-Если просьба меняет настройки существующего Импорта, сначала проверь наличие
-подтверждённого исходного CSV. Без него запроси файл до выполнения или чтения
-неизменённого Импорта: такое чтение добавляет таблицу визуализатора в пакет даже при
-последующем отказе изменения настроек. Если запрос изменения уже отклонён с
-`NOT_APPLIED`, `effect_possible=false`, не выполняй baseline и не сохраняй пакет
-ради cleanup; сообщи отказ и попроси исходный CSV.
-
-В продолжении после открытия пакета сохранение не доказывает активность выхода.
-Перед новым `transform.calculator`, `transform.filter_data` или `transform.sorting` подтверди нужный
-выход того же существующего табличного источника. Используй `loginom_dock_node_read`
-с успешной локальной операцией текущей подготовки; если её нет — existing apply
-с точным ref, прежним типом/mode, `inputs:[]`, пустым patch по схеме и `finish=execute`.
-Например, Группировка сохраняет настройки при `parameters:{}`, Параметры полей —
-при `parameters:{changes:[]}`. Дождись подтверждённого выполнения/чтения источника.
-Отказ `calculator/filter/sorting preflight requires an active source output` с
-`NOT_APPLIED`, `effect_possible=false`, `cleanup_complete=true` означает, что новый
-узел ещё не создан: после выполнения источника повтори запрос с новым operation_id,
-не пересоздавая источник и не освобождая несуществующий целевой узел. Это не разрешает
-повтор неизвестного запуска или автоматический запуск REST/JS/экспорта вне просьбы.
-
-Калькулятор проверяет формулы через «Предпросмотр» до завершения настройки.
-При `WIZARD_CALCULATOR_VALIDATION_FAILED` используй текст Loginom и имена
-вычисляемых полей из отказа: исправь формулу и выполни `next_step` с новым
-operation_id на том же узле. После подтверждённой отмены черновика не вызывай
-`node_wait` и не жди отключения узла; сохрани существующие связи.
-
-## JSON в дерево и дерево в таблицу
-
-Для ответа REST → таблица используй Калькулятор → Свёртка → Кросс-таблица; при отказе деревьев вернись к этому пути. `trees.from_json` / `auto_structure` → `trees.to_table` / `selected_nodes` выбирай по просьбе о дереве или для ровных записей без вложенных контейнеров. Сначала прочитай [параметры и ограничения](references/node-settings.md#json-в-дерево-и-дерево-в-таблицу).
-
-## Квантование числового поля
-
-Для интервалов числового поля выбирай `preprocessing.binning`, без Калькулятора и JavaScript; перед настройкой прочитай [детали internal/apply, параметров и обоих выходов](references/node-settings.md#квантование-числового-поля). Сохранение узла не сохраняет пакет — в конце используй `package.save_checkpoint`.
-
 ## Справка и происхождение
 
-[Источники](references/sources.md) объясняют поиск и атрибуцию:
-
-| Назначение                                 | Корень                                                 |
-| ------------------------------------------ | ------------------------------------------------------ |
-| Назначение узла, настройки, формулы, типы  | `viking://resources/loginom-dock/sources/loginom-help` |
-| Закреплённые исходники UI-процедур         | `viking://resources/loginom-dock/sources/e2e-tests`    |
-| Оригинальный skill и история происхождения | `viking://resources/loginom-dock/sources/ai-skills`    |
+[Источники](references/sources.md) — справка Loginom, как в ней искать, атрибуция.
 
 Используй доступные инструменты Help `loginom_find`, `loginom_search`,
 `loginom_read`, `loginom_grep`, `loginom_glob`, `loginom_list`, `loginom_tree`.
@@ -426,14 +323,13 @@ operation_id на том же узле. После подтверждённой 
 Сохранённый пакет не доказывает правильность вычислений и полноту анализа.
 
 Сообщи полный подтверждённый серверный путь .lgp, результаты и ограничения.
+Закрытие пакета и выход из учётной записи выполняет приложение после ответа; таких
+инструментов нет. На просьбу закрыть пакет или выйти не пиши, что пакет останется открытым,
+сеанс авторизованным или уборка не выполнена; после квитанции сохранения напиши: «Пакет
+сохранён; закрытие и выход выполнит приложение». В `file_artifacts` нет ссылки скачивания:
+серверный путь пиши в `коде`, не ссылкой «Скачать» и не Markdown-ссылкой; ссылку давай,
+только если её вернул инструмент.
 После работы с локальным пакетом прямо скажи: «Локальный файл не изменён».
 Если пользователь далее просит документацию, активируй `package-docs` после
 завершения текущей операции. Для документации требуется локальный .lgp:
 автоматического скачивания сохранённого серверного пакета в этом workflow нет.
-
-## Автокорреляция и сглаживание
-
-Для зависимости ряда от предыдущих значений выбирай `research.auto_correlation` / `time_domain`; перед настройкой прочитай [детали параметров, NULL и выходов](references/node-settings.md#автокорреляция). Не заменяй узел корреляцией сдвинутых полей, Калькулятором или JavaScript.
-
-Для тренда Ходрика–Прескотта выбирай `preprocessing.smoothing` / `hodrick_prescott`; перед настройкой прочитай [детали параметров, NULL и выходов](references/node-settings.md#сглаживание-ходрикапрескотта). Не заменяй узел Калькулятором или JavaScript.
-После замены файла выполняй прежний узел, не пересоздавай его.

@@ -1,0 +1,144 @@
+{
+  "type": "transform.ungroup_data",
+  "title": "Разгруппировка",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-ungroupdata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 2,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "shares",
+    "computed"
+  ],
+  "semantics": "Distribute totals from table input 0 over support items from input 1 using supplied fractional shares. Explicit group links, one numeric total, item name and numeric share field. Output 0: input-0 fields, total_Rounded, item, OutputValue (real); preserve totals order then support order within each group. With rounding none and balance none use Total*max(Share,0), without normalization. NULL totals and unmatched groups produce no detail rows; NULL group keys match, empty strings remain distinct. Round group total and details using none/precision/multiple; balance none/last/proportional/equal is explicit, last means input order. No training; Execute recomputes current inputs, existing parameters={} preserves saved supported configuration. Computed weights, seasonality, variables and port 1 reads are unsupported. Totals must have one row per group; duplicate totals fail. NULL share rows are omitted; NULL item names are retained. PROPOSAL: computed uses the same share_field role for raw weights; sum duplicate item weights within each group and normalize by group weight. Read output 0 details and output 1 (empty Item,Group for this fixture). Native integer total yields integer Total_Rounded and OutputValue. Seasonal pages, indices, NULL/negative/zero weights and real output typing remain unconfirmed; do not advertise seasonal support.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "ungroup-shares-v1",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/transformation/ungrouping.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "shares",
+    "computed"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "description": "Parameters for transform.ungroup_data / shares only. Two active table inputs. New requires ungroup; existing {} reexecutes supported saved settings.",
+    "properties": {
+      "ungroup": {
+        "type": "object",
+        "description": "Complete shares configuration on create. Existing omission preserves saved settings; a supplied ungroup object replaces this entire selection. In proposed computed mode, share_field names raw weights, not supplied fractions.",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "description": "Ordered complete group links: totals input 0 to support input 1. Exact observed names, compatible scalar types. NULL keys match NULL; empty string is distinct. Totals require exactly one row per composite key; duplicates cause native execution refusal.",
+            "items": {
+              "type": "object",
+              "description": "One explicit group link.",
+              "properties": {
+                "total": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Group field on totals input 0."
+                },
+                "support": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Matching group field on support input 1."
+                }
+              },
+              "required": [
+                "total",
+                "support"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "value_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "One continuous integer/real total field on input 0. NULL totals produce no detail rows."
+          },
+          "item_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "One string position-name field on input 1; exact technical name, retained in output. NULL names are retained."
+          },
+          "share_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "One continuous integer/real share field on input 1. Already supplied fractions, not weights. Negative shares contribute zero; no normalization with balance none. NULL share rows are omitted."
+          },
+          "rounding": {
+            "type": "object",
+            "description": "Explicit rounding policy; rounds the group total too.",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "precision",
+                  "multiple"
+                ],
+                "description": "Native rounding: none; precision decimal places; multiple positive integer step. Ties 2.5 -> 2 observed at precision 0."
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647,
+                "description": "Required for precision/multiple, omitted for none. Proposed supported precision 0..12; multiple 1..2147483647. Reject incompatible range before UI."
+              }
+            },
+            "required": [
+              "format"
+            ],
+            "additionalProperties": false
+          },
+          "balance": {
+            "type": "string",
+            "enum": [
+              "none",
+              "last",
+              "proportional",
+              "equal"
+            ],
+            "description": "Native balance method: no correction, all remainder to last item, proportional, or equal. Order is the support order within each totals row. Pin exact examples in acceptance; never normalize silently."
+          }
+        },
+        "required": [
+          "keys",
+          "value_field",
+          "item_field",
+          "share_field",
+          "rounding",
+          "balance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {}
+}

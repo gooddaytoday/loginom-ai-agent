@@ -1,0 +1,8 @@
+{
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "bun"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/entry.ts", "src/builder/**/*.ts", "src/publisher/**/*.ts", "src/contract/**/*.ts", "src/web/**/*.ts", "src/agent/**/*.ts", "src/draft/server.ts", "test/draft/entry.types.ts", "script/*.ts"]
+}

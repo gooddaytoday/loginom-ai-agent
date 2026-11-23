@@ -30,3 +30,6 @@ resources/*.metainfo.xml
 
 resources/loginom/
 resources/loginom.staging/
+
+# Built-in read-only S3 key; generated from release secrets, never source.
+resources/updates-s3.json

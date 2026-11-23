@@ -1,9 +1,11 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
+import { downloadBunBaselineArchive, useBunBaseline } from "./native-resource-candidates"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import { tmpdir } from "node:os"
 import { stageResources } from "./stage-resources"
 import { buildNodeHost } from "./build-node-host"
 import { buildCliInstaller } from "./build-cli-installer"
@@ -20,11 +22,11 @@ const repo = resolve(import.meta.dir, "../../..")
 const args = process.argv.slice(2)
 const destination = args[0]
 const noArchive = args.slice(1).includes("--no-archive")
-// Linux x64 hosts without AVX2 (for example Ivy Bridge Xeons) need Bun's
-// baseline runtime; the default native build stays unchanged.
-const baseline = args.slice(1).includes("--baseline")
+// Linux and Windows x64 clients can lack AVX2 even when the build runner supports it.
+const baseline = useBunBaseline(process.platform, process.arch, args.slice(1))
 if (args.slice(1).some((arg) => arg !== "--no-archive" && arg !== "--baseline")) throw new Error("Unknown build option")
-if (baseline && (process.platform !== "linux" || process.arch !== "x64")) throw new Error("Baseline builds are linux-x64 only")
+if (baseline && (!["linux", "win32"].includes(process.platform) || process.arch !== "x64"))
+  throw new Error("Baseline builds require linux-x64 or win32-x64")
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
 await lstat(destination).then(
@@ -49,7 +51,28 @@ const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
 if (process.platform === "win32" && (!systemRoot || !isAbsolute(systemRoot)))
   throw Error("LOGINOM_ARCHIVER_UNAVAILABLE")
 const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.exe") : "/usr/bin/tar"
-const source = await cliSourceSnapshot(repo)
+// Build with the verified baseline executable so compile reuses it instead of
+// downloading an unchecked target. This also avoids Bun's Windows extraction bug.
+if (baseline && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
+  const runtime = await mkdtemp(join(tmpdir(), "loginom-cli-bun-"))
+  try {
+    const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
+    const target = `bun-${process.platform === "win32" ? "windows" : "linux"}-x64-baseline`
+    const archive = await downloadBunBaselineArchive(`${url}/${target}.zip`, process.platform as "linux" | "win32")
+    await Bun.write(join(runtime, "bun.zip"), archive)
+    if (process.platform === "win32") await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
+    if (process.platform === "linux") await $`/usr/bin/unzip -q ${join(runtime, "bun.zip")} -d ${runtime}`
+    await $`${join(runtime, target, process.platform === "win32" ? "bun.exe" : "bun")} ${import.meta.path} ${args}`.env({
+      ...process.env,
+      LOGINOM_CLI_BASELINE_CHILD: "1",
+    })
+  } finally {
+    await rm(runtime, { recursive: true, force: true })
+  }
+  process.exit(0)
+}
+const sourceEntries = new Map<string, string>()
+const source = await cliSourceSnapshot(repo, sourceEntries)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
 try {
   await $`${process.execPath} script/build.ts --standalone --single --skip-install ${baseline ? ["--baseline"] : []}`
@@ -77,7 +100,6 @@ try {
       browsers,
       target: { platform: process.platform, arch: process.arch },
       flavor: "cli",
-      knowledgeKey: process.env.LOGINOM_MCP_API_KEY,
     }),
   )
   await buildPhase("cli-node-host", () => buildNodeHost(join(resources, "host")))
@@ -135,8 +157,16 @@ try {
       "Runtime, Node, Dock and browser notices are described in resources/loginom/THIRD_PARTY_NOTICES.md.\n",
   )
 
-  if (JSON.stringify(source) !== JSON.stringify(await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo))))
-    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
+  const finalEntries = new Map<string, string>()
+  const finalSource = await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo, finalEntries))
+  if (JSON.stringify(source) !== JSON.stringify(finalSource)) {
+    const changed = [...new Set([...sourceEntries.keys(), ...finalEntries.keys()])]
+      .filter(path => sourceEntries.get(path) !== finalEntries.get(path))
+    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD: " + JSON.stringify({
+      changed_paths: changed.slice(0, 30), changed_count: changed.length,
+      before: source, after: finalSource,
+    }))
+  }
   const pkg = await Bun.file(join(artifact, "package.json")).json()
   await buildPhase("cli-manifest", () =>
     writeCliManifest(artifact, {

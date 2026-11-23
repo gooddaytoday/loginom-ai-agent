@@ -1,0 +1,49 @@
+{
+  "package_path": "/own/text.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "output_node_type": "export_input",
+  "column_order": "exact",
+  "ordered": true,
+  "columns": [
+    {
+      "name": "Code",
+      "label_any": true,
+      "type": "string"
+    },
+    {
+      "name": "Amount",
+      "label_any": true,
+      "type": "real"
+    },
+    {
+      "name": "Money",
+      "label_any": true,
+      "type": "real"
+    }
+  ],
+  "rows": [
+    {
+      "Code": "А",
+      "Amount": 1234.567,
+      "Money": 9.999
+    },
+    {
+      "Code": "Б",
+      "Amount": -2.5,
+      "Money": -12.344
+    },
+    {
+      "Code": "В",
+      "Amount": 0,
+      "Money": 0
+    }
+  ],
+  "header": false
+}

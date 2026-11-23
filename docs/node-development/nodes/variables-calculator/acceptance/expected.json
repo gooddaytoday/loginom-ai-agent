@@ -1,0 +1,123 @@
+{
+  "status": "proposal_pending_criteria_and_W1",
+  "initial": {
+    "output_node_type": "variables.calculator",
+    "output_port": 0,
+    "port_kind": "variables",
+    "ordered": true,
+    "variables": [
+      {
+        "name": "limit",
+        "label": "Лимит",
+        "type": "integer",
+        "value": 100
+      },
+      {
+        "name": "skip",
+        "label": "Пропуск",
+        "type": "integer",
+        "value": 0
+      },
+      {
+        "name": "remaining",
+        "label": "Осталось",
+        "type": "integer",
+        "value": 100
+      },
+      {
+        "name": "title",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Страница"
+      },
+      {
+        "name": "enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "name": "ratio",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.125,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "missing",
+        "label": "Нет значения",
+        "type": "integer",
+        "value": null
+      }
+    ]
+  },
+  "updated": {
+    "output_node_type": "variables.calculator",
+    "output_port": 0,
+    "port_kind": "variables",
+    "ordered": true,
+    "variables": [
+      {
+        "name": "limit",
+        "label": "Лимит",
+        "type": "integer",
+        "value": 120
+      },
+      {
+        "name": "skip",
+        "label": "Пропуск",
+        "type": "integer",
+        "value": 0
+      },
+      {
+        "name": "remaining",
+        "label": "Осталось",
+        "type": "integer",
+        "value": 120
+      },
+      {
+        "name": "title",
+        "label": "Заголовок",
+        "type": "string",
+        "value": "Страница"
+      },
+      {
+        "name": "enabled",
+        "label": "Включено",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "name": "ratio",
+        "label": "Доля",
+        "type": "real",
+        "value": 0.125,
+        "tolerance": {
+          "abs": 1e-12,
+          "rel": 1e-12
+        }
+      },
+      {
+        "name": "empty",
+        "label": "Пустая строка",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "name": "missing",
+        "label": "Нет значения",
+        "type": "integer",
+        "value": null
+      }
+    ]
+  }
+}

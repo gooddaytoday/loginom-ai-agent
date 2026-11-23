@@ -1,0 +1,912 @@
+{
+  "status": "proposal_requires_owner_approval_not_stock_expected",
+  "package_path": "{{PACKAGE_PATH}}",
+  "collation_scope": "declared Russian fixture alphabet only; actual locale identifier must be observed before acceptance",
+  "source": "../../fixtures/modes.csv",
+  "cases": {
+    "cache": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "cache_all": false
+        },
+        {
+          "cache_all": true
+        }
+      ],
+      "task": "task-cache.md"
+    },
+    "threads": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "max_threads": 1
+        },
+        {
+          "max_threads": 2
+        }
+      ],
+      "task": "task-threads.md"
+    },
+    "auto": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "max_threads": 2
+        },
+        {
+          "max_threads": 0
+        }
+      ],
+      "task": "task-auto.md"
+    },
+    "locale": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "compare_with_locale": false
+        },
+        {
+          "compare_with_locale": true
+        }
+      ],
+      "task": "task-locale.md"
+    },
+    "case": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Word",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Amount",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 9,
+              "Word": null,
+              "Amount": 0
+            },
+            {
+              "RowID": 10,
+              "Word": "",
+              "Amount": 0
+            },
+            {
+              "RowID": 3,
+              "Word": "а",
+              "Amount": 10
+            },
+            {
+              "RowID": 6,
+              "Word": "А",
+              "Amount": 10
+            },
+            {
+              "RowID": 2,
+              "Word": "Б",
+              "Amount": 30
+            },
+            {
+              "RowID": 5,
+              "Word": "б",
+              "Amount": 30
+            },
+            {
+              "RowID": 1,
+              "Word": "я",
+              "Amount": 20
+            },
+            {
+              "RowID": 4,
+              "Word": "Я",
+              "Amount": 20
+            },
+            {
+              "RowID": 7,
+              "Word": "a",
+              "Amount": 40
+            },
+            {
+              "RowID": 8,
+              "Word": "A",
+              "Amount": 40
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "case_sensitive": true
+        },
+        {
+          "case_sensitive": false
+        }
+      ],
+      "task": "task-case.md"
+    },
+    "variant": {
+      "stages": [
+        {
+          "output_node_type": "transform.sorting",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Names",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Values",
+              "type": "variant",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 3,
+              "Names": "IntValue",
+              "Values": null
+            },
+            {
+              "RowID": 3,
+              "Names": "RealValue",
+              "Values": null
+            },
+            {
+              "RowID": 3,
+              "Names": "TextValue",
+              "Values": null
+            },
+            {
+              "RowID": 2,
+              "Names": "IntValue",
+              "Values": {
+                "cell_type": "integer",
+                "value": 2
+              }
+            },
+            {
+              "RowID": 2,
+              "Names": "RealValue",
+              "Values": {
+                "cell_type": "real",
+                "value": 2.5
+              }
+            },
+            {
+              "RowID": 1,
+              "Names": "RealValue",
+              "Values": {
+                "cell_type": "real",
+                "value": 3.5
+              }
+            },
+            {
+              "RowID": 1,
+              "Names": "IntValue",
+              "Values": {
+                "cell_type": "integer",
+                "value": 10
+              }
+            },
+            {
+              "RowID": 1,
+              "Names": "TextValue",
+              "Values": {
+                "cell_type": "string",
+                "value": "text"
+              }
+            },
+            {
+              "RowID": 2,
+              "Names": "TextValue",
+              "Values": {
+                "cell_type": "string",
+                "value": "word"
+              }
+            }
+          ]
+        }
+      ],
+      "settings": [
+        {
+          "compare_with_locale": false
+        }
+      ],
+      "source": "../../fixtures/variant-wide.csv",
+      "source_preparation": "scalar import -> Collapse(RowID information, IntValue/RealValue/TextValue transposed, ignore_empty=false); retain RowID, Names, Values via output mapping",
+      "task": "task-variant.md"
+    }
+  }
+}

@@ -15,7 +15,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Format } from "../format"
 import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
-import { assertExternalDirectoryEffect } from "./external-directory"
+import { assertExternalDirectoryEffect, workspaceWriter } from "./external-directory"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import * as Bom from "@/util/bom"
 
@@ -77,10 +77,11 @@ export const EditTool = Tool.define(
           }
 
           const instance = yield* InstanceState.context
+          const writer = workspaceWriter(afs, ctx, instance.directory)
           const filePath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
-          yield* assertExternalDirectoryEffect(ctx, filePath)
+          yield* assertExternalDirectoryEffect(ctx, filePath, { write: true })
 
           let diff = ""
           let contentOld = ""
@@ -108,8 +109,8 @@ export const EditTool = Tool.define(
                     diff,
                   },
                 })
-                yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-                if (yield* format.file(filePath)) {
+                yield* writer.write(filePath, Bom.join(contentNew, desiredBom))
+                if (!ctx.dashboardWork && (yield* format.file(filePath))) {
                   contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
                 }
                 yield* events.publish(FileSystem.Event.Edited, { file: filePath })
@@ -152,8 +153,8 @@ export const EditTool = Tool.define(
                 },
               })
 
-              yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-              if (yield* format.file(filePath)) {
+              yield* writer.write(filePath, Bom.join(contentNew, desiredBom))
+              if (!ctx.dashboardWork && (yield* format.file(filePath))) {
                 contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
               }
               yield* events.publish(FileSystem.Event.Edited, { file: filePath })

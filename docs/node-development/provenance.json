@@ -5127,13 +5127,16 @@
       "source_bytes": 11480,
       "path": "../../services/loginom-ai/docs/plans/loginom-dock/04-calculator.md",
       "repo_path": "services/loginom-ai/docs/plans/loginom-dock/04-calculator.md",
-      "adapted_sha256": "7f8bb1ec33435dbaa7fdecd1d19d9fd4078e19719d556940f0ada43abbbbddb9",
-      "bytes": 12485,
+      "adapted_sha256": "0cc87537a21dbf9de2508ecef44c3ca466f6a24b4a544034a376e2726c159760",
+      "bytes": 17362,
       "disposition": "reuse_navigation_banner",
       "transformations": [
         {
           "type": "resolved_links",
           "count": 15
+        },
+        {
+          "type": "refresh_retained_v040_documentation_preserve_original_checksum"
         }
       ]
     },
@@ -7640,11 +7643,12 @@
       "repo_path": "services/loginom-ai/docs/loginom-dock/operations.md",
       "source_git_commit": "eae76488b70ca5c5c18f41111997e9d7fbc0982f",
       "source_sha256": "7407f2f64cdd3af827bb696218bcd35682891d823b3a205bb0cdb1a4922a6da1",
-      "adapted_sha256": "8ffa9017b434f5d8b8718c94a4d3edd59b9cb810fbe98e6e57a93d6161dc7a8c",
+      "adapted_sha256": "10b9c52abc08e4963998f9a6a4d834c3dd9129ace9072b70dd699d56119063a8",
       "transformations": [
         "historical_scope_notice",
         "old_checkout_to_unavailable_reference",
-        "relative_navigation_and_classified_legacy_paths"
+        "relative_navigation_and_classified_legacy_paths",
+        "refresh_retained_v040_documentation_preserve_original_checksum"
       ]
     },
     {
@@ -7652,11 +7656,12 @@
       "repo_path": "services/loginom-ai/docs/loginom-dock/agent-handoff.md",
       "source_git_commit": "eae76488b70ca5c5c18f41111997e9d7fbc0982f",
       "source_sha256": "3ea2f67253ef2d70a720f203b59fe024a6d7eb9535cc00b7b93a6573c5311f8b",
-      "adapted_sha256": "3b76063268769cd8a62d083d8252fef92537a905b1b2ecbe0af4b364cb4d62bc",
+      "adapted_sha256": "f54d017ac3a5e3b44cc7268f9175b7e5930b274ecb4a4ae80a2bc251c0590754",
       "transformations": [
         "historical_scope_notice",
         "old_checkout_to_unavailable_reference",
-        "relative_navigation_and_classified_legacy_paths"
+        "relative_navigation_and_classified_legacy_paths",
+        "refresh_retained_v040_documentation_preserve_original_checksum"
       ]
     },
     {
@@ -8051,9 +8056,10 @@
       "repo_path": "docs/node-development/nodes/programming-javascript/README.md",
       "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
       "source_sha256": "6e33a5c8c9e6697d494efc91108ca080bac2e5b0554ae8e576d17ff8958df990",
-      "adapted_sha256": "c98837dc7a7ad41b064a4681e5892a9bd6bb802ae40620e3784f4d22253e88af",
+      "adapted_sha256": "5175c7c1846bfe468bbf315f1a674c0d429b573de9c3175e86b8732e9a7090ce",
       "transformations": [
-        "add_training_archive_navigation_preserve_target_decisions"
+        "add_training_archive_navigation_preserve_target_decisions",
+        "refresh_retained_v040_documentation_preserve_original_checksum"
       ]
     },
     {
@@ -8061,9 +8067,10 @@
       "repo_path": "docs/node-development/nodes/programming-javascript/plan.md",
       "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
       "source_sha256": "1b6c74456d25a28220cfbdd8baad7b3414613c845b7c56842e846bb301898971",
-      "adapted_sha256": "1d395fedb56d340aa2bab98a87a1245e8724a92eb4548021acea52aee83bf8ff",
+      "adapted_sha256": "34c61ca97e3b4553e4d1fefcaf9bb81b922907b8f515204ff38213988f6d7fde",
       "transformations": [
-        "add_training_archive_navigation_preserve_target_decisions"
+        "add_training_archive_navigation_preserve_target_decisions",
+        "refresh_retained_v040_documentation_preserve_original_checksum"
       ]
     },
     {
@@ -8121,9 +8128,10 @@
       "repo_path": "docs/node-development/registry.json",
       "source_git_commit": "4ca0a4b07f04e2b4039ae6cb6d97c05c64310c2b",
       "source_sha256": "74cf54d2be7f38aaa84c1d53d056e016969ebe3327a4bd2a3d57b7fe788b064f",
-      "adapted_sha256": "474af24c930c20ff0e2bf3553d6ce32d429adb86ff05f7c4bb10e718ffc0f506",
+      "adapted_sha256": "5febc1d5a43d73ad7c73c1db27a0e8c0dde3385842e3bc5aa9c4e936f1f1498b",
       "transformations": [
-        "retain_historical_candidate_evidence_without_readiness_change"
+        "retain_historical_candidate_evidence_without_readiness_change",
+        "refresh_retained_v040_documentation_preserve_original_checksum"
       ]
     }
   ]

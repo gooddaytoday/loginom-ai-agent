@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { supervise } from "../src/supervisor"
+import { fileURLToPath } from "node:url"
 
 test("private disconnect rejects pending and future requests without waiting for timeout", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -7,7 +8,7 @@ test("private disconnect rejects pending and future requests without waiting for
   // Bun 1.3.11 does not emit worker_threads MessagePort close; exercise Node's
   // real event delivery, which is the runtime used by the private host/sidecar.
   const built = await Bun.build({
-    entrypoints: [new URL("../src/transport.ts", import.meta.url).pathname],
+    entrypoints: [fileURLToPath(new URL("../src/transport.ts", import.meta.url))],
     target: "node",
   })
   if (!built.success) throw new Error("Transport test bundle failed")
@@ -55,7 +56,6 @@ test("managed launch rejects relative executable paths before starting any proce
       stateDir: "/data",
       chat: "chat",
       generation: 1,
-      endpoint: "https://example.test/mcp",
       connection: { apiKey: "key", password: "", url: "http://example.test", username: "user" },
     }),
   ).rejects.toThrow("LOGINOM_ABSOLUTE_PATH_REQUIRED")

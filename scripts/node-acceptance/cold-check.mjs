@@ -1,8 +1,25 @@
-import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
+import {observeSupernodeSaved,observeLoopForSaved} from './supernode-audit.mjs';
+import {verifyN18JavascriptStep} from './n18-cold.mjs';
+import {observeSortingSaved} from './sorting-modes.mjs';
+import {observeColUnionSavedSettings} from './col-union-settings.mjs';
+import {observeAssnRulesExclusionSaved} from './assnrules-exclude.mjs';
+
+import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
+import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
+import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
+import {observeReformCacheSaved} from './reform-cache.mjs';
+import {inspectSavedLgd} from './lgd-cold.mjs'
+import {observeImportBindingInventory} from './import-bindings.mjs';
+import {observeFilterBindingInventory} from './filter-bindings.mjs';
+import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {inspectSavedExcelAuto} from './imports-excel-auto.mjs';
+import {inspectColdConditionBranches} from './control-condition.mjs';
+import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
+import {excelColdExpected,verifyExcelColdSettings,verifyExcelColdBindings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
-import {parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
+import {observeSamplingSavedSettings,parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
+import {parseExpectedVariableInventory,selectVariableInventoryNode,matchVariableInventoryOutput,matchVariableInventoryLinks,parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -10,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -24,10 +41,12 @@ const args = parseArgs({
     output: { type: "string" },
     csv: { type: "string" },
     xlsx: { type: "string" },
+    "excel-books": { type: "string" },
     "xlsx-expected": { type: "string" },
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'csv-encoding': { type: "string", default: 'UTF-8' },
+    'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
@@ -36,6 +55,7 @@ const args = parseArgs({
 if (!args.config || !args.resources || !args.saved || !args.expected || !args.output)
   throw Error("Required: --config --resources --saved --expected --output")
 
+const treeAuditPath=new URL('./run-check.py',import.meta.url).pathname
 const root = resolve(args.resources)
 const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
 const { verifyResources } = await load("src/resources.mjs")
@@ -49,8 +69,9 @@ const { loginBrowser } = await load("src/connection-check.mjs")
 const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
 const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
 const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
-const { createNodeExecutionProcedure } = await load("client/lib/node-execution-procedure.mjs")
+const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
+const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
 const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
 const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
@@ -62,13 +83,23 @@ const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
+if(args['text-export-case']){
+ if(!args.csv||!['fixed-width','windows-1252','utf16-le','utf16-be'].includes(args['text-export-case']))throw Error('COLD_TEXT_FILE_REQUIRED');
+ execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/text-export/acceptance/modes/oracle.py',import.meta.url).pathname,'--case',args['text-export-case'],'--file',resolve(args.csv)],{stdio:'pipe'});
+}
 const rawExpected = JSON.parse(await readFile(args.expected, "utf8"))
 const excelExpected=excelColdExpected(rawExpected)
-if(excelExpected){
+if(excelExpected&&rawExpected.excel_books){
+ if(!args["excel-books"])throw Error("COLD_EXCEL_BOOKS_REQUIRED");
+ const books=JSON.parse(await readFile(resolve(args["excel-books"]),"utf8"));
+ if(books.length!==rawExpected.excel_books.length)throw Error("COLD_EXCEL_BOOKS_COUNT");
+ for(const book of books)if(rawExpected.excel_variables)execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/exports-excel/acceptance/variables/oracle.py',import.meta.url).pathname,'--verify',book.phase,book.file],{stdio:'pipe'});else execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py",import.meta.url).pathname,"--case",book.case,"--file",book.file],{stdio:"pipe"});
+}else if(excelExpected){
  if(!args.xlsx||!args["xlsx-expected"])throw Error("COLD_XLSX_REQUIRED")
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
 }
-const expected = excelExpected??rawExpected
+const expected = excelExpected??(rawExpected.clustering_apply?applyColdExpected(rawExpected):rawExpected.clustering_gmeans?gmeansColdExpected(rawExpected):rawExpected)
+const variableInventory=parseExpectedVariableInventory(expected);
 const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(expected)
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
 if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
@@ -77,7 +108,7 @@ const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
-const exportCsv=args.csv?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
+const exportCsv=args.csv&&expectedOutputs.at(-1)?.header!==false?{columns:parseExportCsvHeader(new TextDecoder(args['csv-encoding']??'UTF-8',{fatal:true}).decode(await readFile(resolve(args.csv))),args['csv-delimiter']),
  header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)
@@ -165,16 +196,32 @@ page = context.pages()[0]
   }
 
   const origin = new URL(config.loginom_url).origin
+  const modifiedOptions={sessionId:session,documentId:prepared.document_id,account:config.workflow_profile.loginom_user,
+   packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_open'});
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
   let graph = await adapter.observe(
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  const loopFor=expected.outputs.some(o=>o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId'));
+  if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'||o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId')))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,loopFor,expected:loopFor?{...expected,supernode_variables:[{name:'Page',type:'integer',value:99},{name:'Limit',type:'integer',value:2}]}:expected});
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  if(graph.supernode_variable_boundary&&expected.outputs.some(o=>o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId')))graph.loop_for=await observeLoopForSaved({graph,prepared,execute,origin,channelFor,record});
+  if(expected.lgd&&!expected.lgd.source_variable&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
+  if(expected.coarse_frozen){
+   const nodes=graph.nodes.filter(n=>n.type==='preprocessing.coarse_classes');
+   if(nodes.length!==1)throw Error('COARSE_FROZEN_ONE_SAVED_NODE');
+   const {observeCoarseFrozenSavedSettings}=await import('./coarse-classes-frozen.mjs');
+   const settings=await observeCoarseFrozenSavedSettings({load,channel:channelFor(nodes[0].ref,'coarse-frozen-saved')});
+   await record({phase:'coarse_frozen_saved_settings',node:nodes[0].ref,...settings});
+  }
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');
@@ -209,32 +256,139 @@ page = context.pages()[0]
     if(!source.source)throw Error('COLD_SOURCE_PROVENANCE_MISSING');
    }
   }
+  if(expected.variable_inventory){
+   const links=matchVariableInventoryLinks(graph,variableInventory),outputs=[];
+   // Inspect the clean builtin before any executable source can dirty native state.
+   for(const want of [...variableInventory.outputs].sort((a,b)=>Number(b.node.type==='variables.user')-Number(a.node.type==='variables.user'))){
+    const target=selectVariableInventoryNode(graph,want.node),node=target.ref;
+    const operation={id:'cold-variable-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_variables',revision:'1'},deadline:Date.now()+540000};
+    const channel=createNodeProcedure({operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+    let result,execution=null;
+    if(target.type==='variables.user')result=await channel.readUserVariables();
+    else{
+     const driver=createNodeExecutionProcedure(channel,node,{allowDeactivate:true});
+     execution=await runColdExecution({driver,channel,node,operation,record,readReceipt:async r=>(await execute(withBrowserReceipt('null',{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.operation_id,receipt_read:true}))).output});
+     if(execution.status!=='completed'||execution.verified!==true||execution.owner_verified!==true)throw Error('COLD_VARIABLE_EXECUTION_UNCONFIRMED');
+     result=await channel.readVariablePort({port:want.port,execution});
+    }
+    matchVariableInventoryOutput(result.output,want);
+    outputs.push({node,type:target.type,label:target.label,execution,output:result.output});
+    await record({phase:'cold_variable_output',node,output:result.output,execution,settings_applied:false});
+   }
+   graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   const after=matchVariableInventoryLinks(graph,variableInventory);
+   if(JSON.stringify(links)!==JSON.stringify(after))throw Error('COLD_VARIABLE_LINK_CHANGED');
+   state.variableInventory={outputs,links};
+  }
+  // A bound text filename resolves through its saved variable source. Execute
+  // that source (a builtin is a snapshot) before reading the export, unchanged.
+  if(expected.text_binding){
+   const links=(graph.variable_links??[]).filter(l=>l.kind==='variables'&&l.input===0&&graph.nodes.some(n=>n.ref.node_id===l.target&&n.type==='exports.text'));
+   const sources=links.length===1?graph.nodes.filter(n=>n.ref.node_id===(links[0].source?.node_id??links[0].source)):[];
+   if(sources.length!==1)throw Error('TEXT_COLD_VARIABLE_SOURCE');
+   if(sources[0].type!=='variables.user'){
+    const node=sources[0].ref;
+    const operation={id:'cold-text-binding-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_variables',revision:'1'},deadline:Date.now()+540000};
+    const channel=createNodeProcedure({operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+    const driver=createNodeExecutionProcedure(channel,node,{allowDeactivate:true});
+    const execution=await runColdExecution({driver,channel,node,operation,record,readReceipt:async r=>(await execute(withBrowserReceipt('null',{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.operation_id,receipt_read:true}))).output});
+    if(execution.status!=='completed'||execution.verified!==true||execution.owner_verified!==true)throw Error('TEXT_COLD_VARIABLE_SOURCE_EXECUTION');
+    await record({phase:'cold_text_binding_source',node,execution,settings_applied:false});
+   }
+  }
+  // A bound LGD destination needs the saved variable source's fresh value.
+  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
+  // The existing inventory audit executes/reads it without changing settings.
+  if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
-  if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
+  if(expected.excel_sinks)for(const sink of expected.excel_sinks)verifyExcelColdSettings(destinations,sink);
+  else if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
+  if(expected.excel_bindings)verifyExcelColdBindings(destinations,expected);
+  // A saved text filename binding resolves to the last path and keeps its variable.
+  if(expected.text_binding){
+   const bound=(destinations??[]).filter(d=>d.destination===destination);
+   if(bound.length!==1||bound[0].text_binding!==expected.text_binding.variable)throw Error('TEXT_COLD_VARIABLE_BINDING');
+  }
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
-    if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
+    if(want.alternative_types!==undefined){
+      if(expected.n18_javascript_step!==true)throw Error('COLD_NODE_ALTERNATIVE_UNSUPPORTED');
+      const proof=await verifyN18JavascriptStep({graph,requirement:want,load,channelFor});
+      await record({phase:'n18_saved_javascript_step',...proof});
+    }else if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
+  // A deleted node must stay absent from the saved graph.
+  for(const type of expected.absent_node_types??[])if(graph.nodes.some(node=>node.type===type))throw Error(`COLD_NODE_TYPE_PRESENT:${type}`)
 
-  const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
-  if(expected.clustering_normalized){
+  const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
+   ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+  if(expected.tree_outputs){
+   for(const contract of expected.tree_outputs){
+    const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
+    if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
+    reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
+   }
+  }
+  if(expected.sorting_mode){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.sorting');
+   if(nodes.length!==1)throw Error('SORTING_MODES_ONE_SAVED_NODE');
+   const settings=await observeSortingSaved({load,channel:channelFor(nodes[0].ref,'sorting-saved'),mode:expected.sorting_mode});
+   await record({phase:'sorting_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.col_union_settings){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.col_union_data');
+   if(nodes.length!==1)throw Error('COL_UNION_ONE_SAVED_NODE');
+   const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
+   await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.assnrules_exclusion){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.assn_rules');
+   if(nodes.length!==1)throw Error('ASSNRULES_EXCLUDE_ONE_SAVED_NODE');
+   state.assnrulesExclusion=await observeAssnRulesExclusionSaved({load,channel:channelFor(nodes[0].ref,'exclusion-saved'),expected});
+   await record({phase:'assnrules_exclusion_saved_settings',node:nodes[0].ref,...state.assnrulesExclusion});
+  }
+  if(expected.logreg_normalization||expected.logreg_kfold){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
+   if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
+   const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved'),kfold:expected.logreg_kfold===true});
+   await record({phase:expected.logreg_kfold?'logreg_kfold_saved_settings':'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.reform_cache){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.reform_columns');
+   if(nodes.length!==1)throw Error('REFORM_CACHE_ONE_SAVED_NODE');
+   const settings=await observeReformCacheSaved({load,channel:channelFor(nodes[0].ref,'reform-cache-saved'),target:nodes[0],expected});
+   await record({phase:'reform_cache_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.clustering_apply||expected.clustering_normalized||expected.clustering_gmeans){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
-   const settings=await observeClusteringSavedSettings({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
+   const settings=await (expected.clustering_apply?observeApplySavedSettings:expected.clustering_gmeans?observeGmeansSavedSettings:observeClusteringSavedSettings)({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected,execute,record});
    await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
   }
+  if(expected.sampling_modes?.mode==='uniform'){
+   const nodes=graph.nodes.filter(n=>n.type===expected.sampling_modes.node_type);
+   if(nodes.length!==1)throw Error('SAMPLING_UNIFORM_ONE_SAVED_NODE');
+   const target=nodes[0];
+   const settings=await observeSamplingSavedSettings({load,channel:channelFor(target.ref,'uniform-saved'),expected});
+   await record({phase:'sampling_saved_settings',node:target.ref,...settings});
+  }
   const actual=[],ownedExecutions=[];
-  const readPlans=sampling?[...reads,...reads]:reads;
-  for(const [outputIndex,{node:target,ports}] of readPlans.entries()){
+  const readPlans=sampling?[...reads,...reads]:expected.clustering_gmeans?[...reads,...reads.filter(r=>r.node.type==='datamining.clustering')]:reads;
+  const gmeansRounds=[];
+  for(const [outputIndex,{node:target,ports,treeContract}] of readPlans.entries()){
   const node=target.ref;
 
   const operation = {
     id: "cold-read-expected-"+outputIndex,
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
+    ...(target.type==='research.quality'?{parameters:{target:{type:target.type}}}:{}),
   }
   const coldReadCeiling={operation_id:operation.id,node:structuredClone(node),deadline_at:operation.deadline,total_ms:540_000};
   const processObservation=coldProcessObservation(execute,{node,operation,record});
@@ -276,6 +430,22 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
+   const training=await trainConfiguredNode(channel,node);
+   await record({phase:'gmeans_seed_repeat_training',node,training,settings_applied:false});
+  }
+  if(expected.excel_auto&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelAuto({load,channel,execute,graph,node,expected:expected.excel_auto,origin});
+   await record({phase:'cold_excel_auto_saved_settings',node,...settings});
+  }
+  if(expected.excel_named_range&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});
+   await record({phase:'cold_excel_named_saved_settings',node,...settings});
+  }
+  if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
+   const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
+   await record({phase:'cold_tree_saved_settings',node,...settings});
+  }
   let javascriptAdmission;
   if(target.type==='programming.javascript'){
    const {createJavascriptSourceAdmission}=await load('client/lib/javascript-source-admission.mjs');
@@ -302,6 +472,12 @@ page = context.pages()[0]
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+  if(target.type==='control.condition'){
+   // Only the branch whose port is read may have executed; its data alone does not prove blocking.
+   if(ports.length!==1)throw Error('CONDITION_COLD_PORTS');
+   const branch_activity=await inspectColdConditionBranches(channel,ports[0].port);
+   await record({phase:'cold_condition_branch_activity',node,execution_id:execution.execution_id,read_port:ports[0].port,branch_activity});
+  }
   const samplingMappings=new Map();
   if(sampling)for(const {port} of ports){
    const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
@@ -318,6 +494,7 @@ page = context.pages()[0]
    await record({phase:'sampling_cold_reactivated_after_cancel',node,execution,settings_applied:false});
   }
 
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering')gmeansRounds.push([]);
   for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
@@ -328,12 +505,28 @@ page = context.pages()[0]
    if(!useNative)await closeOwnedNativePreview(channel,ctx,ownedPreview.port,ownedPreview.preview.root_tid);
   }
 
+  if(treeContract){
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind!=='tree'||read.output?.fresh!==true||read.output.execution_id!==execution.execution_id)throw Error('COLD_TREE_READ_INCOMPLETE');
+   execFileSync('python3',['-B','-c',"import importlib.util,json,sys;spec=importlib.util.spec_from_file_location('runner',sys.argv[1]);r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r);v=json.load(sys.stdin);r.check_tree(v['port'],v['expected'])",treeAuditPath],{input:JSON.stringify({port:read.output,expected:treeContract}),stdio:['pipe','pipe','pipe']});
+   state.treeOutputs??=[];state.treeOutputs.push({node,execution,output:read.output});
+   await record({phase:'cold_tree_read_verified',node,execution,output:read.output});
+   continue;
+  }
   let data;
-  if(target.type==='trees.to_table'){
+  if(target.type==='preprocessing.coarse_classes'){
+   const read=await readColdNativeOutput(channel,{type:target.type,port:outputPort,execution});
+   if(!read.verified||!read.cleanup_complete||read.output?.sample_complete!==true)throw Error('COLD_COARSE_CLASSES_TABLE_INCOMPLETE');
+   data=read.output;
+  }
+  // Variant cells have no exact table-visualizer proof; read them through the completed port.
+  const variantPortRead=['transform.replace_columns','transform.group_data','transform.sorting'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
+  if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
-   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true});
-   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error('COLD_TREE_TABLE_INCOMPLETE');
+   const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
+    ...(variantPortRead||['variables.to_table','transform.collapse_columns','imports.lgd','trees.to_table'].includes(target.type)?{typedVariants:true}:{}),...(variantPortRead&&target.type==='transform.replace_columns'?{variantEmptyIsNull:true}:{})});
+   if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }
   if(args['exact-port-windows']){
@@ -384,6 +577,16 @@ page = context.pages()[0]
   await returnFromOutputTable(channel, opened.table)
   }
 
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
+   gmeansRounds.at(-1).push({node,type:target.type,output_port:outputPort,execution,data});
+   if(gmeansRounds.length===2){
+    if(gmeansRounds[1].length===ports.length){
+     const proof=checkGmeansSeedRepeat(rawExpected,...gmeansRounds);
+     await record({phase:'gmeans_seed_repeat_verified',...proof,settings_applied:false});
+    }
+    continue;
+   }
+  }
   actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,cold_read_ceiling:coldReadCeiling,
    ...(sampling?{sampling_mapping:samplingMappings.get(outputPort)}:{}),
    ...(content_candidate?{content_candidate:true}:{})});
@@ -394,6 +597,9 @@ page = context.pages()[0]
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   }
+  // LGD sources materialize their output definitions on the first cold Execute.
+  if(expected.lgd)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin,outputProperties:true});
+  if(expected.lgd?.source_variable)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
   // REST-dependent schemas are restored by cold execution. Inspect the saved
   // export input only after its source has executed and its output was read.
   if(exportInput){
@@ -404,13 +610,27 @@ page = context.pages()[0]
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
    state.exportObservation={node_id:savedExport.node_id,input_fields:savedExport.input_fields,
     ...(exportCsv?{csv_order:exportCsv}: {})};
-   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
+   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact'&&o.header!==false)&&!exportCsv)
     throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
+  if(expected.clustering_apply)checkApplyRound(rawExpected,actual.filter(r=>r.type==='datamining.clustering'),{cold:true});
+  if(expected.clustering_gmeans){
+   if(gmeansRounds.length!==2||gmeansRounds[1].length!==2)throw Error('CLUSTERING_GMEANS_REPEAT_MISSING');
+   checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
+  }
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
-  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
+
+  if(variableInventory?.outputs.length===0){
+   const returned=await adapter.activateWorkflow({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},{deadline:Date.now()+30000,receipt_id:'cold-return-for-variable-links'});
+   if(returned.status!=='SUCCEEDED'||!returned.verified||!returned.cleanup_complete)throw Error('COLD_VARIABLE_LINK_RETURN_UNCONFIRMED');
+   const graph=await adapter.observe({document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},Date.now()+30000);
+   const links=matchVariableInventoryLinks(graph,variableInventory);
+   if(JSON.stringify(links)!==JSON.stringify(state.variableInventory.links))throw Error('COLD_VARIABLE_LINK_CHANGED_AFTER_TABLE');
+   await record({phase:'cold_variable_links_after_table',links,settings_applied:false});
+  }
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
@@ -445,6 +665,12 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(graph.loop_for?{loop_for:graph.loop_for}:{}),
+    ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
+    ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
+    ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
+    ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),
+    ...(state.treeOutputs?{tree_outputs:state.treeOutputs}:{}),
     ...(samplingResult?{sampling_invariants:samplingResult.evidence}:{}),
     cleanup: {
       package_closed: cleanup.package_closed === true,
@@ -509,9 +735,10 @@ page = context.pages()[0]
         diagnosticReadOnly: readOnly,
         // Cancellation has no complete persisted-change inventory proving
         // Table-only changes. Never turn package ownership into discard proof.
+        // Failed checks also preserve their dirty state for diagnosis.
         // Clean packages close normally; dirty/unknown ones retain BLOCKED.
-        diagnosticDiscard: !readOnly && !state.cancelled,
-        diagnosticWaitForIdle: !readOnly && !state.cancelled,
+        diagnosticDiscard: !readOnly && !state.cancelled && !state.failure,
+        diagnosticWaitForIdle: !readOnly && !state.cancelled && !state.failure,
       }),
     )
       .then(async (result) => {
@@ -549,4 +776,14 @@ async function loadSaved(value) {
   if (typeof parsed === "string" && parsed.endsWith(".lgp")) return { path: parsed }
   if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node }
   throw Error("SAVED_SHAPE_INVALID")
+}
+
+async function recordColdPackageModified({execute,record,makeSavedPackageStateCode,options,stage}) {
+ let modified=null;
+ try {
+  const state=await execute(makeSavedPackageStateCode(options));
+  if(typeof state?.modified==='boolean'&&state.read_only===true&&state.package_path===options.packagePath)modified=state.modified;
+ } catch { /* Diagnostic failure must not replace an existing scenario outcome. */ }
+ await record({phase:'cold_package_modified_observed',stage,package_path:options.packagePath,
+  modified,available:modified!==null,read_only:true,settings_applied:false});
 }

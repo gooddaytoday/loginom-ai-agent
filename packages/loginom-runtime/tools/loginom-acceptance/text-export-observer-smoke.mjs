@@ -41,6 +41,7 @@ const wire=async(name,args)=>{
  await fs.appendFile(join(runDir,'public-wire.jsonl'),JSON.stringify(redactor.redact({phase:'response',at:performance.now(),name,args,result}))+'\n');return result;
 };
 const node=async request=>{
+ if(config.resultProfile==='user-v1')await wire('dock_action_describe',{node_types:[request.target.type],modes:[request.mode]});
  let r=await wire('dock_node_apply',request);
  while(r.state==='running'){guard();r=await wire('dock_node_wait',{operation_id:request.operation_id,timeout_ms:10000});}
  need(r.state==='settled','Node outcome unsettled');await save(request.operation_id+'.json',{request,result:r});return r.outcome?{...r,...r.outcome,...r.outcome.output,output:r.outcome.output?.output}:r;

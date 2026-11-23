@@ -1,0 +1,38 @@
+{
+  "status": "proposal_before_execution",
+  "encoding": "UTF-8",
+  "line_ending": "LF",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "text_qualifier": "\"",
+  "null_marker": "?",
+  "columns": [
+    {
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "Document",
+      "label": "Document",
+      "type": "string"
+    }
+  ],
+  "model_inputs": [
+    "documents.csv"
+  ],
+  "private_inputs": [
+    "document.json"
+  ],
+  "source_identity": "Fresh owned imports.text output 0 -> trees.from_json auto_structure output 0; complete typed read before serialization. No external/prepared package.",
+  "files": {
+    "documents.csv": {
+      "bytes": 278,
+      "sha256": "d394ef691db7e1448a8d70422fac523d93676bd12067a1055a5bbe4137c010b8"
+    },
+    "document.json": {
+      "bytes": 387,
+      "sha256": "ce76d760b25bb8f698a0780e245342f8e03ff7dcf4fd86a8872226472c94dd9b"
+    }
+  }
+}

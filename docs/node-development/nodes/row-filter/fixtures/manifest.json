@@ -1,0 +1,38 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "line_ending": "LF",
+  "header": true,
+  "null_marker": "?",
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "label_any": true
+    },
+    {
+      "name": "Amount",
+      "type": "integer",
+      "label_any": true
+    },
+    {
+      "name": "Category",
+      "type": "string",
+      "label_any": true
+    }
+  ],
+  "files": [
+    {
+      "path": "variables.csv",
+      "bytes": 62,
+      "sha256": "465920bf60f33778e931ef9b2982d86e78cb0a2f9e01df445eb18b270bcfa73d",
+      "records": 6
+    },
+    {
+      "path": "variables-empty.csv",
+      "bytes": 22,
+      "sha256": "967fdbcf205d169961b40b516a0afb2ee1a5fca225627769f11fd5ab5ba4b6a4",
+      "records": 0
+    }
+  ]
+}

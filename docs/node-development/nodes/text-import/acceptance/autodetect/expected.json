@@ -1,0 +1,228 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "IsoId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "IsoDate",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "IsoStamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "IsoAmount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "IsoActive",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "IsoText",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "IsoId": "0012",
+          "IsoDate": "2026-04-23T00:00:00.000",
+          "IsoStamp": "2026-04-23T19:20:59.000",
+          "IsoAmount": 1234.5,
+          "IsoActive": true,
+          "IsoText": "first"
+        },
+        {
+          "IsoId": "0007",
+          "IsoDate": "2026-04-03T00:00:00.000",
+          "IsoStamp": "2026-04-03T00:00:01.000",
+          "IsoAmount": -2.75,
+          "IsoActive": false,
+          "IsoText": "second"
+        },
+        {
+          "IsoId": "0100",
+          "IsoDate": null,
+          "IsoStamp": null,
+          "IsoAmount": null,
+          "IsoActive": null,
+          "IsoText": null
+        },
+        {
+          "IsoId": "0000",
+          "IsoDate": "2026-12-31T00:00:00.000",
+          "IsoStamp": "2026-12-31T23:59:58.000",
+          "IsoAmount": 0.25,
+          "IsoActive": true,
+          "IsoText": "last"
+        }
+      ],
+      "output_node_label": "ISO"
+    },
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SlashId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "SlashDate",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "SlashStamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "SlashAmount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "SlashActive",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "SlashText",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SlashId": "0012",
+          "SlashDate": "2026-04-23T00:00:00.000",
+          "SlashStamp": "2026-04-23T19:20:59.000",
+          "SlashAmount": 1234.5,
+          "SlashActive": true,
+          "SlashText": "first"
+        },
+        {
+          "SlashId": "0007",
+          "SlashDate": "2026-04-03T00:00:00.000",
+          "SlashStamp": "2026-04-03T00:00:01.000",
+          "SlashAmount": -2.75,
+          "SlashActive": false,
+          "SlashText": "second"
+        },
+        {
+          "SlashId": "0100",
+          "SlashDate": null,
+          "SlashStamp": null,
+          "SlashAmount": null,
+          "SlashActive": null,
+          "SlashText": null
+        },
+        {
+          "SlashId": "0000",
+          "SlashDate": "2026-12-31T00:00:00.000",
+          "SlashStamp": "2026-12-31T23:59:58.000",
+          "SlashAmount": 0.25,
+          "SlashActive": true,
+          "SlashText": "last"
+        }
+      ],
+      "output_node_label": "Slash"
+    },
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RuId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RuDate",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "RuStamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "RuAmount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "RuActive",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "RuText",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RuId": "0012",
+          "RuDate": "2026-04-23T00:00:00.000",
+          "RuStamp": "2026-04-23T19:20:59.000",
+          "RuAmount": 1234.5,
+          "RuActive": true,
+          "RuText": "Москва"
+        },
+        {
+          "RuId": "0007",
+          "RuDate": "2026-04-03T00:00:00.000",
+          "RuStamp": "2026-04-03T00:00:01.000",
+          "RuAmount": -2.75,
+          "RuActive": false,
+          "RuText": "Тверь"
+        },
+        {
+          "RuId": "0100",
+          "RuDate": null,
+          "RuStamp": null,
+          "RuAmount": null,
+          "RuActive": null,
+          "RuText": null
+        },
+        {
+          "RuId": "0000",
+          "RuDate": "2026-12-31T00:00:00.000",
+          "RuStamp": "2026-12-31T23:59:58.000",
+          "RuAmount": 0.25,
+          "RuActive": true,
+          "RuText": "Казань"
+        }
+      ],
+      "export_destination": "ru-result.csv"
+    }
+  ]
+}

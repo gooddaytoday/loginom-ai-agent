@@ -108,3 +108,34 @@ test('native chained strata inventory may filter a complete local parent but ref
   assert.equal(result.verified,fault==='none',fault);
  }
 });
+
+function uniformFixture(f){
+ const base='MF;TF-1;WizrdMCF;SamplingComponentWizard;',main=base+'SizeGridForm',nested=base+'RandomUniformMethodForm;SizeGridForm';
+ for(const [tid,es] of Object.entries(f.tids).filter(([tid])=>tid.startsWith(main))){
+  const next=tid.replace(main,nested);
+  f.tids[next]=es.map(e=>{const clone={...e,id:'group-'+e.id,getAttribute:key=>key==='data-tid'?next:null};
+   if(f.components[e.id])f.components[clone.id]={...f.components[e.id],el:{dom:clone}};return clone;});
+ }
+ const abs=f.tids[nested+';colAbsoluteSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl'][0],rel=f.tids[nested+';colRelativeSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl'][0];
+ const row={getAttribute:()=> 'group',querySelectorAll:()=>[abs,rel]},icon={getAttribute:()=>''},cell=f.tids[nested+';colSizeType_0'][0];
+ Object.assign(cell,{querySelectorAll:()=>[icon],querySelector:()=>icon,closest:()=>row});
+ f.observedRefs.ids.set(icon,'ui-group-icon');f.observedRefs.refs.set('ui-group-icon',{deref:()=>icon});
+ f.components['group-sizes'].getStore=()=>({$className:'Ext.data.Store',getData:()=>({items:[{internalId:'group',data:{SizePath:'GroupSize'}}]}),getCount:()=>1,isLoading:()=>false});
+ f.components[abs.id].getValue=()=>1;f.components[abs.id].isDisabled=()=>false;f.components[rel.id].isDisabled=()=>true;
+ f.controls.absolute_disabled=false;f.controls.relative_disabled=true;
+}
+test('uniform binds primary and nested size grids to distinct owned row editors',()=>{
+ const r=fixture(uniformFixture,false,'Равномерный случайный',false);
+ assert.equal(r.verified,true);assert.equal(r.units[0].absolute_size,10);assert.equal(r.group_units[0].absolute_size,1);
+ assert.equal(r.group_units[0].record_id,'group');assert.equal(r.group_units[0].icon_ref,'ui-group-icon');
+ assert.notEqual(r.units[0].absolute_control_tid,r.group_units[0].absolute_control_tid);
+});
+test('uniform refuses missing, loading or unbound nested group grids',()=>{
+ for(const fault of ['absent','loading','unbound']){
+  const r=fixture(f=>{uniformFixture(f);
+   if(fault==='absent')delete f.tids['MF;TF-1;WizrdMCF;SamplingComponentWizard;RandomUniformMethodForm;SizeGridForm;grdDataSet'];
+   if(fault==='loading')f.components['group-sizes'].getStore=()=>({isLoading:()=>true});
+   if(fault==='unbound')f.observedRefs.refs.delete('ui-group-icon');
+  },false,'Равномерный случайный',false);assert.equal(r.verified,false,fault);
+ }
+});

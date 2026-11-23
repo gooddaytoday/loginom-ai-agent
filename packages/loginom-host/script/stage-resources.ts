@@ -6,11 +6,12 @@ import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
+import { ripgrepPinForTarget, stageRipgrep } from "./ripgrep-resource"
 import { buildPackageDocs } from "./build-package-docs"
 import { collectBuildNotices } from "./collect-build-notices"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
-import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 
 export function actionCatalogForPlatform(platform: string) {
@@ -34,9 +35,6 @@ export async function stageResources(input: {
   browsers: string
   target: { platform: string; arch: string }
   flavor: "desktop" | "cli"
-  // Built-in knowledge service key; never committed. release.yml requires it,
-  // local and PR builds may stage without it.
-  knowledgeKey?: string
 }) {
   const target = `${input.target.platform}-${input.target.arch}`
   if (input.target.platform !== process.platform || input.target.arch !== process.arch)
@@ -62,14 +60,13 @@ export async function stageResources(input: {
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const source = resolve(import.meta.dir, "../../loginom-runtime")
   const docsSource = resolve(import.meta.dir, "../src/package-docs")
+  const dashboard = resolve(import.meta.dir, "../../dashboard")
   const destination = resolve(input.destination)
   const node = input.node
   const browsers = input.browsers
   const staging = destination + ".staging"
-  for (const paths of [
-    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource],
-    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource].map(canonicalBuildPath)),
-  ]) {
+  const buildPaths = [destination, staging, source, node, browsers, productSkillsDirectory, productHelpDirectory, docsSource, dashboard]
+  for (const paths of [buildPaths, await Promise.all(buildPaths.map(canonicalBuildPath))]) {
     if (
       paths
         .slice(0, 2)
@@ -103,9 +100,28 @@ export async function stageResources(input: {
   }
   await rm(staging, { recursive: true, force: true })
   await mkdir(join(staging, "bin"), { recursive: true })
-  if (input.knowledgeKey?.trim()) await Bun.write(join(staging, "knowledge-key"), input.knowledgeKey.trim())
   await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
+  await cp(productHelpDirectory, join(staging, "help"), { recursive: true, verbatimSymlinks: true })
+  const npm = resolve(
+    dirname(node),
+    process.platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "../lib/node_modules/npm/bin/npm-cli.js",
+  )
+  await $`${process.execPath} run script/build.ts`.cwd(dashboard)
+  const template = join(staging, "dashboard/template")
+  // Install the locked kit; never copy a developer's dependencies or build output.
+  await cp(join(dashboard, "template"), template, {
+    recursive: true,
+    filter: (path) => !["node_modules", "dist", ".vite-cache"].includes(relative(join(dashboard, "template"), path).split(sep)[0]!),
+  })
+  await $`${node} ${npm} ci --ignore-scripts --no-audit --fund=false --workspaces=false`
+    .cwd(template)
+    .env({ ...process.env, PATH: `${dirname(node)}${delimiter}${process.env.PATH ?? ""}` })
+  await rm(join(template, "node_modules/.bin"), { recursive: true, force: true })
+  await cp(join(dashboard, "dist/draft.js"), join(staging, "dashboard/draft.js"))
+  await cp(join(dashboard, "src/draft/selfcheck.mjs"), join(staging, "dashboard/selfcheck.mjs"))
   await cp(node, join(staging, pins.node))
+  // Bundled so the agent's glob/grep never download ripgrep at runtime.
+  await stageRipgrep({ resources: staging, pin: ripgrepPinForTarget(target) })
   await cp(browsers, join(staging, "browsers"), {
     recursive: true,
     verbatimSymlinks: true,
@@ -124,10 +140,6 @@ export async function stageResources(input: {
   ]) {
     await cp(join(source, path), join(staging, "runtime", path))
   }
-  const npm = resolve(
-    dirname(node),
-    process.platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "../lib/node_modules/npm/bin/npm-cli.js",
-  )
   await $`${node} ${npm} ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false`
     .cwd(join(staging, "runtime/client"))
     .env({
@@ -163,7 +175,8 @@ export async function stageResources(input: {
     await setLinuxSandboxMode(sandbox)
   }
   if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
-  await mkdir(join(staging, "licenses"))
+  // stageRipgrep has already created licenses/ripgrep.
+  await mkdir(join(staging, "licenses"), { recursive: true })
   const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
     buildPackageDocs(join(staging, "skills/package-docs/scripts")))
   await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
@@ -181,6 +194,7 @@ export async function stageResources(input: {
   Loginom AI Agent includes code derived from OpenCode (MIT) and Loginom Dock (AGPL-3.0).
   The original copyright/license notices are preserved in licenses/.
   Node.js license and bundled dependency notices are in licenses/Node.txt.
+  ripgrep (MIT or Unlicense) is bundled in ripgrep/; its license texts are in licenses/ripgrep/.
   Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
   Its emitted npm dependency notices are in licenses/package-docs/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.

@@ -5,11 +5,13 @@ export const USER_PREVIEW_WIRE_BUDGET=46000;
 export const previewWireSize=value=>Buffer.byteLength(JSON.stringify({result:JSON.stringify(value)}),'utf8');
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefined).map(k=>[k,value[k]]));
 
-export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
+export function budgetUserPreview(reply,{wireSize=previewWireSize,preserveConfiguration=false}={}) {
  if(wireSize(reply)<=USER_PREVIEW_WIRE_BUDGET)return;
  const ports=reply.output?.ports??[];
- if(ports.some(p=>p.port_kind==='tree'||p.exact_table||p.read_coverage||p.cell_precision||p.sample?.some(r=>r.some(c=>c.precision==='exact_native'))))return;
- for(const port of ports)for(const row of port.sample??[])for(const cell of row){
+ if(ports.some(p=>p.port_kind==='tree'||p.exact_table||p.read_coverage||p.cell_precision))return;
+ // Keep native summary ports intact without blocking ordinary sibling previews.
+ const previews=ports.filter(p=>!p.sample?.some(r=>r.some(c=>c.precision==='exact_native')));
+ for(const port of previews)for(const row of port.sample??[])for(const cell of row){
   // Decimal is the already verified round-trip binary64 value. Remove only
   // equivalent display/number duplicates, never infer numbers from UI text.
   if(cell.is_null===false&&cell.type==='real'&&cell.precision==='17_significant_digits'&&cell.representation==='binary64'
@@ -29,7 +31,7 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
     ||(cell.precision==='source_text'&&cell.representation==='data_source_string'))
     &&typeof cell.value==='string')delete cell.representation;
  }
- if(wireSize(reply)>USER_PREVIEW_WIRE_BUDGET&&reply.configuration){
+ if(wireSize(reply)>USER_PREVIEW_WIRE_BUDGET&&reply.configuration&&!preserveConfiguration&&previews.length===ports.length){
   reply.configuration={...pick(reply.configuration,['verified','mode']),
    readback:pick(reply.configuration.readback,['kind','scope','node','values_are','receipt_ids','package_persistence_verified']),
    readback_summary:true};
@@ -37,10 +39,10 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
  let omitted=0;
  const limitationIndex=reply.limitations.length;
  while(wireSize(reply)>USER_PREVIEW_WIRE_BUDGET){
-  const candidates=ports.filter(p=>p.sample?.length);
+  const candidates=previews.filter(p=>p.sample?.length);
   if(!candidates.length)break;
   const port=candidates.reduce((a,b)=>JSON.stringify(a.sample).length>=JSON.stringify(b.sample).length?a:b);
   port.sample.pop();port.sample_rows=port.sample.length;port.sample_complete=false;omitted++;
-  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete. For full text, connect the original output to an exports.text node and download its UTF-8 file; for analysis, compute smaller analytical outputs in nodes.';
+  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete. Reconcile the original operation before corrections; never repeat unconfirmed mutations. For full text, connect the original output to an exports.text node and download its UTF-8 file; for analysis, compute smaller analytical outputs in nodes.';
  }
 }

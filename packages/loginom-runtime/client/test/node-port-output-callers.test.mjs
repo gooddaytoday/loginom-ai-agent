@@ -100,3 +100,27 @@ test('REST actual support reads its fixed schemas without repeating execution or
  assert.deepEqual(structuredClone(result.ports.map(p=>p.schema.map(f=>f.name))),[schemas[1],schemas[0]].map(schema=>schema.map(f=>f.name)));
  assert.equal(result.ports[1].schema[1].data_kind,'Дискретный');assert.notEqual(result.ports[0].port_guid,result.ports[1].port_guid);
 });
+
+for(const [name,code,bodies,requested,missing] of [
+ ['timeout empty',-1,[],[1],true],['HTTP error NULL',6,[[7,null]],[0,1],true],
+ ['different request body',6,[[8,'body']],[1,0],true],['failure with body',6,[[7,'body']],[0,1],false],
+ ['successful empty',0,[],[1],false],['successful body',0,[[7,'body']],[0],false],
+])test('REST missing body diagnostic: '+name,async()=>{
+ const source=readFileSync(new URL('../lib/rest-request-node.mjs',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/^export /gm,'');
+ const reader=vm.runInNewContext(source+'\nreadRestOutputs;',{alignReadSchema});
+ const cell=(value,type)=>({type,is_null:value===null,value,precision:'exact_ui'});
+ const labels={RequestID:'Идентификатор запроса',Response:'Ответ сервера',ErrorCode:'Код завершения',ErrorDesc:'Описание ошибки',HttpStatusCode:'Код состояния HTTP'};
+ const schemas=[[['RequestID','integer'],['Response','string']],[['RequestID','integer'],['ErrorCode','integer'],['ErrorDesc','string'],['HttpStatusCode','integer']]];
+ const calls=[];
+ const channel={async readOutputPort(options){calls.push(options);const port=options.port,rows=port===0?bodies:[[7,code,code?'native failure':'',code?null:200]];
+  return {output:{port,port_guid:'rest-'+port,execution_id:'exec',fresh:true,schema:schemas[port].map(([name,type],index)=>({index,name,label:labels[name],type})),
+   row_count:rows.length,sample_rows:rows.length,sample_complete:true,sample:rows.map(row=>row.map((v,i)=>cell(v,schemas[port][i][1]))),precision:{numbers_verified:true,limitations:[]},limitations:[]}};}};
+ const result=await reader(channel,{...read,ports:requested},ctx);
+ assert.deepEqual(Array.from(result.ports,p=>p.port),requested);
+ assert.ok(calls.every(c=>c.execution===ctx.portExecution));
+ const diagnostic=result.ports.flatMap(p=>p.limitations??[]).join(' ');
+ assert.equal(diagnostic.includes('REST_RESPONSE_BODY_MISSING'),missing,diagnostic);
+ if(missing)assert.match(diagnostic,/тело ответа не получено: повтори запрос или уменьши ответ \(select, limit\/skip\)/);
+ else assert.equal(diagnostic,'');
+ if(!code)assert.deepEqual(calls.map(c=>c.port),requested,'successful replies keep the original reads');
+});

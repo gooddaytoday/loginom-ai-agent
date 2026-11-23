@@ -1,0 +1,221 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "datamining.lin_regression",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Y_rergession",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Price",
+          "type": "integer"
+        },
+        {
+          "name": "Distance",
+          "type": "integer"
+        },
+        {
+          "name": "Promo",
+          "type": "integer"
+        },
+        {
+          "name": "Y",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 0,
+          "Y": 0.25,
+          "Y_rergession": 0.5
+        },
+        {
+          "RowID": 2,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 0,
+          "Y": 0.75,
+          "Y_rergession": 0.5
+        },
+        {
+          "RowID": 3,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 1,
+          "Y": 0.25,
+          "Y_rergession": 0.5
+        },
+        {
+          "RowID": 4,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 1,
+          "Y": 0.75,
+          "Y_rergession": 0.5
+        },
+        {
+          "RowID": 5,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 0,
+          "Y": 1.25,
+          "Y_rergession": 1.5
+        },
+        {
+          "RowID": 6,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 0,
+          "Y": 1.75,
+          "Y_rergession": 1.5
+        },
+        {
+          "RowID": 7,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 1,
+          "Y": 1.25,
+          "Y_rergession": 1.5
+        },
+        {
+          "RowID": 8,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 1,
+          "Y": 1.75,
+          "Y_rergession": 1.5
+        },
+        {
+          "RowID": 9,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 0,
+          "Y": 4.25,
+          "Y_rergession": 4.5
+        },
+        {
+          "RowID": 10,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 0,
+          "Y": 4.75,
+          "Y_rergession": 4.5
+        },
+        {
+          "RowID": 11,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 1,
+          "Y": 4.25,
+          "Y_rergession": 4.5
+        },
+        {
+          "RowID": 12,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 1,
+          "Y": 4.75,
+          "Y_rergession": 4.5
+        },
+        {
+          "RowID": 13,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 0,
+          "Y": 5.25,
+          "Y_rergession": 5.5
+        },
+        {
+          "RowID": 14,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 0,
+          "Y": 5.75,
+          "Y_rergession": 5.5
+        },
+        {
+          "RowID": 15,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 1,
+          "Y": 5.25,
+          "Y_rergession": 5.5
+        },
+        {
+          "RowID": 16,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 1,
+          "Y": 5.75,
+          "Y_rergession": 5.5
+        }
+      ],
+      "ordered": true
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Y_coefficients",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "Y_coefficients": 3.0
+        },
+        {
+          "Name": "Price",
+          "Y_coefficients": 2.065591117977289
+        },
+        {
+          "Name": "Distance",
+          "Y_coefficients": 0.5163977794943222
+        },
+        {
+          "Name": "Promo",
+          "Y_coefficients": 0.0
+        }
+      ],
+      "ordered": true
+    }
+  ]
+}

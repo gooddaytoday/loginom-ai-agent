@@ -58,6 +58,17 @@ export function crossTableInputSourceSchema(inputFields,mapping,node){
  return schema(sources);
 }
 
+// Collapse→Collapse lineage: the first Collapse may rename its own output fields
+// (the next Collapse reads them), but must take its input from the import unchanged.
+export function collapseAncestorSources(history,ctx,node){
+ try{
+  const own=item=>(item.outcome?.output?.node??item.request?.target?.ref)?.node_id===node.node_id;
+  return completedCrossTableCollapses(history.filter(i=>!own(i)),ctx).filter(c=>{
+   const m=c.configuration.input_mapping,o=c.configuration.output_mapping;
+   return m?.port===0&&o?.port===0&&Array.isArray(m.fields)&&m.fields.every(f=>f.name===f.source_name)&&Array.isArray(o.fields)&&o.fields.length>0;
+  });
+ }catch{return [];}
+}
 export function validateCrossTableNativeSources(imports,collapses,inputFields,inputMapping=null,node=null){
  need(Array.isArray(imports)&&imports.length>0&&imports.length<=128&&Array.isArray(collapses)&&collapses.length<=128,'source provenance required');
  for(const source of imports)need(typeof source.node_id==='string'&&typeof source.execution_id==='string'

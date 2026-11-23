@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "input_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "maxItems": 1000,
+      "minItems": 1
+    },
+    "output_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "maxItems": 1000,
+      "minItems": 0
+    }
+  },
+  "required": [
+    "input_fields",
+    "output_fields"
+  ],
+  "additionalProperties": false
+}

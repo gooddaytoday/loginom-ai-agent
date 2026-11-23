@@ -3,7 +3,7 @@ const name=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!/[\x00-\x1f]/.tes
 export function validateUnionParameters(p,mode,r){
  need(mode==='append_all','Union supports append_all');
  need(p&&Object.keys(p).filter(k=>k!=='auto_match').sort().join(',')==='prefixes,tables','Explicit union tables and prefixes required');
- need(p.auto_match===undefined||['name_type','label_type'].includes(p.auto_match),'Union auto_match must be name_type or label_type');
+ need(p.auto_match===undefined||['name_type','label_type','name_then_label_type'].includes(p.auto_match),'Union auto_match must be name_type, label_type or name_then_label_type');
  need(p.prefixes&&Object.keys(p.prefixes).sort().join(',')==='enabled,label,name'&&typeof p.prefixes.enabled==='boolean'
   &&typeof p.prefixes.label==='string'&&p.prefixes.label.length<=128&&typeof p.prefixes.name==='string'&&p.prefixes.name.length<=128,'Explicit union prefix settings required');
  need(!p.prefixes.enabled||/^[A-Za-z_][A-Za-z0-9_]*$/.test(p.prefixes.name),'Union prefix must be an identifier');
@@ -37,17 +37,22 @@ export function resolveUnionTables(p,schemas){
   // Reserve explicit destinations first, including explicit null sources.
   // Native FindBestLink compares uppercase names/labels and exact types.
   const declared=new Map(t.fields.map(f=>[f.source,f.main])),reserved=new Set(t.fields.map(f=>f.main).filter(n=>n!==null));
-  const key=p.auto_match==='label_type'?'label':'name',automatic=new Map(),claimed=new Set();
-  if(p.auto_match)for(const source of input.filter(f=>!declared.has(f.name))){
-   const matches=main.filter(f=>!reserved.has(f.name)&&f.type===source.type&&typeof f[key]==='string'&&typeof source[key]==='string'&&f[key].toUpperCase()===source[key].toUpperCase());
+  const keys=p.auto_match==='name_then_label_type'?['name','label']:[p.auto_match==='label_type'?'label':'name'],automatic=new Map(),claimed=new Set();
+  if(p.auto_match)for(const key of keys){
+   // Reserve the whole name pass before considering any label, independent
+   // of source order. Competing matches within one pass remain ambiguous.
+   const prior=new Set(claimed);
+   for(const source of input.filter(f=>!declared.has(f.name)&&!automatic.has(f.name))){
+   const matches=main.filter(f=>!reserved.has(f.name)&&!prior.has(f.name)&&f.type===source.type&&typeof f[key]==='string'&&typeof source[key]==='string'&&f[key].toUpperCase()===source[key].toUpperCase());
    if(matches.length>1||matches.length===1&&claimed.has(matches[0].name)){
     const error=Error('UNION_AUTO_MATCH_AMBIGUOUS: '+p.auto_match+' has competing fields on input '+t.port+'; provide explicit tables[].fields');
     error.code='UNION_AUTO_MATCH_AMBIGUOUS';throw error;
    }
-   automatic.set(source.name,matches[0]?.name??null);if(matches.length)claimed.add(matches[0].name);
+   if(matches.length){automatic.set(source.name,matches[0].name);claimed.add(matches[0].name);}
+   }
   }
   const pairs=[],unmatched=[];
-  const fields=p.auto_match?input.map(f=>({source:f.name,main:declared.has(f.name)?declared.get(f.name):automatic.get(f.name)})):t.fields;
+  const fields=p.auto_match?input.map(f=>({source:f.name,main:declared.has(f.name)?declared.get(f.name):automatic.get(f.name)??null})):t.fields;
   for(const f of fields){const source=input.find(s=>s.name===f.source);
    if(f.main===null){unmatched.push(source.name);continue;}
    const targets=main.filter(s=>s.name===f.main);need(targets.length===1,'Union main field is missing or ambiguous');

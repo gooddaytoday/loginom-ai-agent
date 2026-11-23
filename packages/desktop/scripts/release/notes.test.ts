@@ -1,13 +1,30 @@
 import { expect, test } from "bun:test"
 import { $ } from "bun"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
-test("release notes require all platforms, matching provenance, checksums and passing reports", async () => {
+const updateAssets = [
+  "latest.yml",
+  "latest-linux.yml",
+  "loginom-ai-agent-win-x64.exe.blockmap",
+  "loginom-ai-agent-linux-x86_64.AppImage.blockmap",
+]
+const macUpdateAssets = ["latest-mac.yml", "loginom-ai-agent-mac-arm64.zip.blockmap"]
+
+test("0.4.0 release notes require all platforms, matching provenance, checksums and passing reports", async () => {
+  const tag = "v0.4.0"
   const root = resolve(import.meta.dir, "../../../..")
   const dir = await mkdtemp(join(tmpdir(), "loginom-release-notes-"))
-  const commit = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+  const repository = join(dir, "git")
+  await mkdir(repository)
+  await $`git init -q ${repository}`.quiet()
+  await $`git -c user.name=Fixture -c user.email=fixture@example.test commit --allow-empty -qm fixture`
+    .cwd(repository)
+    .quiet()
+  if (tag !== "HEAD") await $`git tag ${tag}`.cwd(repository).quiet()
+  const commit = (await $`git rev-parse HEAD`.cwd(repository).text()).trim()
+  const version = tag.replace(/^v/, "")
   const assets = [
     "loginom-ai-agent-linux-amd64.deb",
     "loginom-ai-agent-linux-x86_64.AppImage",
@@ -20,10 +37,10 @@ test("release notes require all platforms, matching provenance, checksums and pa
     "loginom-ai-agent-HEAD-source.tar.gz",
     "loginom-ai-agent-HEAD-windows-source.tar.gz",
     "loginom-ai-agent-HEAD-macos-source.tar.gz",
-  ]
+  ].map((file) => file.replaceAll("HEAD", version))
   const digest = new Bun.CryptoHasher("sha256").update("fixture").digest("hex")
   const manifest = {
-    version: "HEAD",
+    version,
     source: { commit, dirty: false },
     artifacts: assets.map((file) => ({ file, sha256: digest })),
   }
@@ -33,12 +50,12 @@ test("release notes require all platforms, matching provenance, checksums and pa
   }
   const write = (name: string, value: unknown) => Bun.write(join(dir, name), JSON.stringify(value))
   const run = () =>
-    $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag HEAD --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
-      .cwd(root)
+    $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag ${tag} --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
+      .cwd(repository)
       .quiet()
       .nothrow()
   try {
-    for (const name of assets) await Bun.write(join(dir, name), "fixture")
+    for (const name of [...assets, ...updateAssets, ...macUpdateAssets]) await Bun.write(join(dir, name), "fixture")
     for (const name of ["release-manifest.json", "windows-release-manifest.json", "macos-release-manifest.json"])
       await write(name, manifest)
     for (const name of [
@@ -54,7 +71,25 @@ test("release notes require all platforms, matching provenance, checksums and pa
       await write(name, { status: "PASS" })
     await write("linux-matrix.json", matrix)
     expect((await run()).exitCode).toBe(0)
-    expect(await Bun.file(join(dir, "notes.md")).text()).toContain("Pre-release")
+    const notes = await Bun.file(join(dir, "notes.md")).text()
+    expect(notes).toContain("Pre-release")
+    const manual =
+      "Users of 0.3.9 or 0.3.10 on any platform must install 0.4.0 manually over the existing installation; these versions have their update feed disabled. Keep the existing profile; do not uninstall or delete application data first."
+    expect(notes).toContain(manual)
+    expect(notes).not.toContain("Windows 0.3.9 users")
+    expect(notes).toContain("Recommended screen resolution: 1280×800 or higher.")
+    expect(notes).toContain("New (preview): node dashboards opened from Loginom Studio")
+    expect(notes).toContain("silently drops connections, a session can wait up to about 970 s")
+    for (const name of [...updateAssets, ...macUpdateAssets]) {
+      expect(await Bun.file(join(dir, "notes.md")).text()).toContain(name)
+      expect(await Bun.file(join(dir, "SHA256SUMS.txt")).text()).toContain(`${digest}  ${name}\n`)
+      await rm(join(dir, name))
+      const missing = await run()
+      expect(missing.exitCode).not.toBe(0)
+      expect(missing.stderr.toString()).toContain(`Required release asset missing: ${name}`)
+      await Bun.write(join(dir, name), "fixture")
+    }
+    expect((await run()).exitCode).toBe(0)
     await write("macos-release-manifest.json", { ...manifest, source: { commit: "wrong", dirty: false } })
     expect((await run()).stderr.toString()).toContain("Release provenance mismatch")
     await write("macos-release-manifest.json", manifest)
@@ -67,7 +102,7 @@ test("release notes require all platforms, matching provenance, checksums and pa
     await write("linux-matrix.json", { ...matrix, reports: matrix.reports.slice(1) })
     expect((await run()).stderr.toString()).toContain("complete passing Linux matrix")
     await write("linux-matrix.json", matrix)
-    await rm(join(dir, "loginom-ai-agent-cli-HEAD-win32-x64.zip"))
+    await rm(join(dir, `loginom-ai-agent-cli-${version}-win32-x64.zip`))
     expect((await run()).exitCode).not.toBe(0)
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -88,7 +123,11 @@ test("a release without a macOS runner is allowed only by LOGINOM_RELEASE_SKIP_M
     "loginom-ai-agent-HEAD-windows-source.tar.gz",
   ]
   const digest = new Bun.CryptoHasher("sha256").update("fixture").digest("hex")
-  const manifest = { version: "HEAD", source: { commit, dirty: false }, artifacts: assets.map((file) => ({ file, sha256: digest })) }
+  const manifest = {
+    version: "HEAD",
+    source: { commit, dirty: false },
+    artifacts: assets.map((file) => ({ file, sha256: digest })),
+  }
   const write = (name: string, value: unknown) => Bun.write(join(dir, name), JSON.stringify(value))
   const run = (skip: string) =>
     $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag HEAD --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
@@ -97,9 +136,10 @@ test("a release without a macOS runner is allowed only by LOGINOM_RELEASE_SKIP_M
       .quiet()
       .nothrow()
   try {
-    for (const name of assets) await Bun.write(join(dir, name), "fixture")
+    for (const name of [...assets, ...updateAssets]) await Bun.write(join(dir, name), "fixture")
     for (const name of ["release-manifest.json", "windows-release-manifest.json"]) await write(name, manifest)
-    for (const name of ["static-deb.json", "static-appimage.json", "static-nsis.json"]) await write(name, { status: "PASS" })
+    for (const name of ["static-deb.json", "static-appimage.json", "static-nsis.json"])
+      await write(name, { status: "PASS" })
     await write("linux-matrix.json", {
       artifactHash: digest,
       reports: ["ubuntu22", "ubuntu24", "ubuntu26", "debian12", "debian13"].map((name) => ({ name, status: "PASS" })),
@@ -109,6 +149,17 @@ test("a release without a macOS runner is allowed only by LOGINOM_RELEASE_SKIP_M
     const notes = await Bun.file(join(dir, "notes.md")).text()
     expect(notes).toContain("macOS: not built for this release")
     expect(notes).not.toContain("mac-arm64.dmg")
+    for (const name of macUpdateAssets) expect(notes).not.toContain(name)
+    for (const name of updateAssets) {
+      expect(notes).toContain(name)
+      expect(await Bun.file(join(dir, "SHA256SUMS.txt")).text()).toContain(`${digest}  ${name}\n`)
+      await rm(join(dir, name))
+      const missing = await run("true")
+      expect(missing.exitCode).not.toBe(0)
+      expect(missing.stderr.toString()).toContain(`Required release asset missing: ${name}`)
+      await Bun.write(join(dir, name), "fixture")
+    }
+    expect((await run("true")).exitCode).toBe(0)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

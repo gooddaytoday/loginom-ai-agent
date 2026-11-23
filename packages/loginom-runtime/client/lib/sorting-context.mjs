@@ -1,5 +1,6 @@
+import {readBooleanBindingBrowser} from './variable-binding-readback.mjs';
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
-export function makeSortingContextCode(binding){validatePreparedNodeContext(binding);return `async page=>(${readSortingContext.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},${readSortingBrowser.toString()})`;}
+export function makeSortingContextCode(binding){validatePreparedNodeContext(binding);return `async page=>(${readSortingContext.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},prefix=>(${readSortingBrowser.toString()})(prefix,${readBooleanBindingBrowser.toString()}))`;}
 export async function readSortingContext(page,binding,readNode=readPreparedNodeContext,readBrowser=readSortingBrowser){
  const before=await readNode(page,binding);
  if(!before.verified||before.surface!=='wizard'||before.input_port||before.output_port)return {verified:false,reason:'sorting_node_surface'};
@@ -9,7 +10,7 @@ export async function readSortingContext(page,binding,readNode=readPreparedNodeC
 }
 // Cached local stores only. The input chain retains all source fields; the
 // sorting store's item order is priority (its Index/totalCount are stale).
-export function readSortingBrowser(prefix){
+export function readSortingBrowser(prefix,readBinding){
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;SortingWizard;SortingColumnCollection;';
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const roots=exact(base.slice(0,-1));if(roots.length!==1||!roots[0].checkVisibility({checkVisibilityCSS:true}))return fail('sorting_root');
@@ -43,6 +44,7 @@ export function readSortingBrowser(prefix){
   const c=cmp(k+';ValueControl'),sw=cmp(k+';SwitchButton'),v=c?.getValue?.();
   if(!c||!sw||typeof sw.pressed!=='boolean'||(k==='cbxMaxThreadCount'?!Number.isSafeInteger(v)||v<0:typeof v!=='boolean'))return fail('sorting_option');
   options[k]={value:v,switch_pressed:sw.pressed};
+  if(k==='chkLocaleAware'&&options[k].switch_pressed){const binding=readBinding?.(base+k,roots[0]);if(!binding)return fail('sorting_binding');options[k].binding=binding;}
  }
  return {verified:true,inventory_complete:true,state_source:'cached_sorting_stores',input_fields:fields,keys:ordered,selections,options,
   comparison:{mode:options.chkLocaleAware.value?'user_locale':'binary',locale:null,locale_verified:false,

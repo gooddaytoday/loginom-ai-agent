@@ -49,24 +49,87 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['packages/product/skills/loginom-automation/references/nodes/transform.collapse_columns.md','variant-reader-collapse'],
+ ['scripts/node-acceptance/assnrules-holdout.mjs','assnrules-holdout'],
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-recommendations.md','assnrules-holdout'],
+ ['packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md','assnrules-holdout'],
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-consequents.md','assnrules-consequents'],
+ ['docs/node-development/nodes/datamining-assnrules/fixtures/v040/train.csv','assnrules-consequents'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-numeric-aggregates.md','crosstable-numeric'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-scalar-aggregates.md','crosstable-scalar'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-null-cells.md','crosstable-null-cells'],
+ ['packages/loginom-runtime/client/lib/calculator-context.mjs','calculator-vars-update'],
  ['packages/loginom-runtime/client/lib/workspace-ui.mjs','s5'],
  ['packages/loginom-runtime/client/lib/observation-pages.mjs','s5'],
  ['packages/loginom-runtime/client/lib/node-procedure.mjs','s1'],
  ['packages/loginom-runtime/client/lib/node-port-output.mjs','n19'],
  ['packages/loginom-runtime/client/lib/crosstable-readback.mjs','n13'],
+ ['packages/loginom-runtime/client/lib/variables-calculator-context.mjs','variables-calculator'],
+ ['packages/loginom-runtime/client/lib/variables-vartodata-node.mjs','variables-columns'],
  ['packages/loginom-runtime/client/lib/rest-connection.mjs','n11'],
  ['packages/loginom-runtime/client/lib/log-regression-node.mjs','logreg-enter'],
+ ['packages/loginom-runtime/client/lib/linregression-procedure.mjs','linreg-partition-sequential'],
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
  ['packages/loginom-runtime/client/lib/date-time-parameters.mjs','date-time-iso'],
  ['packages/loginom-runtime/client/lib/date-time-removal.mjs','date-time-iso-empty'],
+ ['packages/loginom-runtime/client/lib/date-time-procedure.mjs','date-time-formats'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
  assert.ok(ids(text).includes('live-ui'));assert.match(text,/run-check.py start/);
- assert.ok(text.includes(scenario));assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
+ assert.ok(text.includes(scenario));
+ if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator,variables-calculator-modes --pair/);
+ assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });
 
+for(const path of ['docs/node-development/nodes/duplicates/acceptance/task-typed-keys.md',
+ 'docs/node-development/nodes/duplicates/fixtures/typed-empty.csv',
+ 'packages/product/skills/loginom-automation/references/nodes/research.duplicates.md'])
+test(`duplicates typed acceptance paths require all three cases: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['duplicates-typed','duplicates-empty','duplicates-singleton'])assert.ok(text.includes(name));
+});
+
+for(const path of ['packages/loginom-runtime/client/lib/binning-procedure.mjs',
+ 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/semantics.txt'])
+test(`Binning current and default next acceptance remain required: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['binning-ties-current','binning-frequency-ties','binning-sd','binning-count','binning-apply'])assert.ok(text.includes(name));
+});
+
+test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
+ for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
+ assert.ok(!text.includes('rest-methods-body'));
+});
+test('REST reference keeps literal and variable headers without the deferred query case',t=>{
+ const r=repo(t);r.commit('packages/product/skills/loginom-automation/references/nodes/integration.rest_request.md');
+ const text=r.list();
+ for(const name of ['rest-headers','rest-variables'])assert.ok(text.includes(name),name);
+ assert.ok(!text.includes('rest-query-variables'));
+});
+test('REST query kit and package persistence require the registered variable-query case',t=>{
+ for(const path of ['docs/node-development/variables/acceptance/README.md','packages/loginom-runtime/client/lib/package-persistence.mjs']){
+  const r=repo(t);r.commit(path);assert.ok(r.list().includes('rest-query-variables'));
+ }
+});
+for(const path of ['packages/loginom-runtime/client/lib/rest-request.mjs',
+ 'packages/loginom-runtime/client/lib/rest-request-parameters.mjs',
+ 'docs/node-development/nodes/integration-restrequest/acceptance/modes/headers/expected.json',
+ 'docs/node-development/nodes/integration-restrequest/acceptance/task-headers.md'])
+test('REST C2 requires the headers scenario: '+path,t=>{
+ const r=repo(t);r.commit(path);assert.ok(r.list().includes('rest-headers'));
+});
+test('tree changes require J2 scenarios and includes tree-empty-containers from J3',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/tree-parameters.mjs');const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['table-tree-json','json-tree-json','tree-null-leaves','tree-nested-records'])assert.ok(text.includes(name));
+ assert.ok(text.includes('tree-empty-containers'));
+});
 test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t=>{
  const r=repo(t);assert.deepEqual(ids(r.list()),[]);
  r.commit('unrelated file.md');const head=r.git('rev-parse','HEAD');
@@ -129,6 +192,42 @@ test('approval has no executable command and cannot be cleared with exit 0',t=>{
  assert.equal(r.run('verify','--base','base','--report',report).status,1);
  writeFileSync(report,result(row,'FAIL; журнал: owner-decision.md:3'));
  assert.equal(r.run('verify','--base','base','--report',report).status,0);
+});
+
+test('verify accepts NOT_RUN, CI, COVERED and APPROVED and prints an outcome summary',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/src/managed-entry.mjs');
+ r.commit('scripts/node-acceptance/run-check.md');r.commit('packages/opencode/src/example.ts');
+ const checks=rows(r.list()),report=join(r.cwd,'report.md');
+ const row=id=>checks.find(x=>x.startsWith('| `'+id+'`'));
+ const verify=lines=>{writeFileSync(report,lines.join('\n'));return r.run('verify','--base','base','--report',report);};
+ const ci='CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/123';
+ const rest=checks.filter(x=>!/`(host-unit|acceptance-tests|main-chat-approval)`/.test(x)).map(x=>result(x));
+ for(const [id,outcome] of [['host-unit','NOT_RUN; причина: docs-only этап'],['host-unit',ci],['host-unit',ci+'/job/456'],
+  ['host-unit','COVERED; LAB-1533'],['main-chat-approval','APPROVED; решение LAB-1538'],['main-chat-approval','NOT_RUN; причина: этап 0'],
+  ['main-chat-approval','COVERED; LAB-1551'],['main-chat-approval',ci]]){
+  const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
+  const out=verify([result(row(id),outcome),...other,...rest]);
+  assert.equal(out.status,0,outcome+'\n'+out.stdout);
+ }
+ for(const [id,bad] of [['host-unit','NOT_RUN'],['host-unit','NOT_RUN; причина:'],['host-unit','NOT_RUN; причина:  '],
+  ['host-unit','CI'],['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/pull/1086'],
+  ['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/'],['host-unit','CI; https://example.com/actions/runs/1'],
+  ['host-unit','COVERED'],['host-unit','COVERED; 1533'],['host-unit','APPROVED; решение LAB-1538'],
+  ['main-chat-approval','APPROVED'],['main-chat-approval','APPROVED; решение'],['main-chat-approval','exit 0']]){
+  const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
+  const out=verify([result(row(id),bad),...other,...rest]);
+  assert.equal(out.status,1,bad);assert.match(out.stdout,new RegExp('Недостающие / неполные ID: .*'+id));
+ }
+ const out=verify([result(row('host-unit'),'NOT_RUN; причина: этап 0'),result(row('acceptance-tests'),'COVERED; LAB-1533'),
+  result(row('main-chat-approval'),'APPROVED; решение LAB-1538'),...rest]);
+ assert.equal(out.status,0,out.stdout);
+ const summary=out.stdout.split('\n').filter(x=>x.startsWith('Исходы: '));
+ assert.equal(summary.length,1,out.stdout);
+ assert.match(summary[0],/exit 0: \d+/);assert.match(summary[0],/FAIL: 0(;|$)/);assert.match(summary[0],/CI: 0(;|$)/);
+ assert.match(summary[0],/NOT_RUN: 1 \(host-unit\)/);assert.match(summary[0],/COVERED: 1 \(acceptance-tests\)/);
+ assert.match(summary[0],/APPROVED: 1 \(main-chat-approval\)/);
+ const partial=verify([result(row('host-unit'),'NOT_RUN; причина: этап 0')]);
+ assert.equal(partial.status,1);assert.match(partial.stdout,/^Исходы: .*NOT_RUN: 1 \(host-unit\)/m);
 });
 
 test('live/cold/full-client reports preserve complete commands and multiple IDs',t=>{

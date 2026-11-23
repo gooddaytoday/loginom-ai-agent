@@ -1,0 +1,59 @@
+{
+  "type": "variables.replace",
+  "title": "Замена (переменные)",
+  "candidate_modes": ["exact"],
+  "platform_availability": "requires_live_preflight",
+  "semantics": "Replace scalar variable values by a per-variable exact lookup table. One variables input and variables output 0; W1 owns typed links and reads. Each original value is looked up once, without chaining. Preserve names, labels, types and input order, including unconfigured variables. NULL is distinct from empty string, false and zero; NULL pairs keep the variable type. Stage 1 uses case-sensitive strings, zero numeric matching precision and keep for unmatched values. Reject duplicate keys, regex, type conversion, file rules, approximate matching and non-simple types before mutation. A patch replaces all pairs for each listed variable while preserving unlisted rules and output mappings. Execute computes current values without training; Done alone saves settings. Explicitly preserve output labels: native defaults append a replacement suffix.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "Exact rules for simple typed variables. Required on creation; omitted rules on an existing node preserve its configuration.",
+    "additionalProperties": false,
+    "properties": {
+      "rules": {
+        "type": "array",
+        "description": "1–32 variable rule sets. Replace the full pair table for each listed variable; preserve unlisted variables, rules and order. Variable names must be unique.",
+        "minItems": 1,
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "description": "Complete exact rule set for one existing input variable; output type must remain its input type.",
+          "additionalProperties": false,
+          "properties": {
+            "variable": {
+              "type": "object",
+              "description": "Address one variable by exact technical name in the bound W1 input inventory, never by display label.",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {"type":"string","enum":["input_variable"],"description":"Reference to a variable in this node's connected variables input."},
+                "name": {"type":"string","minLength":1,"maxLength":128,"description":"Exact unique input variable name; missing or ambiguous names refuse before mutation."}
+              },
+              "required": ["kind", "name"]
+            },
+            "type": {"type":"string","enum":["integer","real","string","boolean"],"description":"Declared input and output type. Both sides of every pair use this type; null is typed absence. Integer values must be safe JavaScript integers."},
+            "pairs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "description": "Ordered exact pairs. Keys must be unique under the declared type; each original value is looked up once. JSON true and 1 are not interchangeable.",
+              "items": {
+                "type": "object",
+                "description": "One original value and same-type replacement; null on either side does not change type.",
+                "additionalProperties": false,
+                "properties": {
+                  "from": {"type":["string","number","boolean","null"],"description":"Exact original value in rule.type. JSON null matches only NULL; empty string matches only an empty string. No NaN, infinity or type coercion."},
+                  "to": {"type":["string","number","boolean","null"],"description":"Replacement in rule.type, or JSON null for a typed missing value. Never interpret a string as a formula, regex or another type."}
+                },
+                "required": ["from", "to"]
+              }
+            },
+            "other": {"type":"string","enum":["keep"],"description":"Keep the original value when no exact pair matches; stage 1 has no other unmatched-value policies."},
+            "case_sensitive": {"type":"boolean","const":true,"description":"String rules require true. Omit for other types. Case-insensitive matching is outside this slice."},
+            "precision": {"type":"number","minimum":0,"maximum":0,"description":"Numeric matching precision is exactly zero. Required for integer/real rules; omit for string/boolean. This is separate from output comparison tolerance."}
+          },
+          "required": ["variable", "type", "pairs", "other"]
+        }
+      }
+    }
+  },
+  "port_contract_dependency": "W1; proposal only, not registered"
+}

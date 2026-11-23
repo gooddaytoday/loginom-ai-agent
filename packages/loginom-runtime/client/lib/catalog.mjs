@@ -52,9 +52,19 @@ export function startupDiagnostic(error, knownSecrets = []) {
   function record(item, depth = 0) {
     if (!item || seen.has(item) || depth > 2) return undefined;
     seen.add(item);
+    // loginPage already emits a structured, sanitized cause. Preserve only
+    // its fixed diagnostic fields rather than stringify it as [object Object].
+    if (item.login && typeof item.login === 'object') {
+      const login = item.login;
+      return record({ name: login.original_name, code: login.original_code, message: login.original_message,
+        phase: login.phase, duration_ms: login.duration_ms, elapsed_ms: login.elapsed_ms, url: login.url }, depth);
+    }
     const fields = redactor.redact({ name: String(item.name ?? 'Error'), code: String(item.code ?? item.status ?? ''),
       message: String(item.message ?? item) });
     return { name: clean(fields.name ?? 'Error'), code: clean(fields.code ?? ''), message: clean(fields.message ?? '[diagnostic unavailable]'),
+      ...(typeof item.phase === 'string' ? { phase: clean(item.phase) } : {}),
+      ...Object.fromEntries(['duration_ms','elapsed_ms'].filter(key => Number.isFinite(item[key]) && item[key] >= 0).map(key => [key,item[key]])),
+      ...(typeof item.url === 'string' ? { url: clean(item.url) } : {}),
       ...(item.cause ? { cause: record(item.cause, depth + 1) } : {}) };
   }
   return record(error);

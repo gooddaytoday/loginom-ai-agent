@@ -1,0 +1,14 @@
+{
+  "initial": [
+    {"name":"Count","type":"integer","pairs":[{"from":2,"to":5}]},
+    {"name":"Amount","type":"real","pairs":[{"from":1.25,"to":2.5}]},
+    {"name":"Color","type":"string","pairs":[{"from":"red","to":"blue"},{"from":"blue","to":"green"}]},
+    {"name":"Case","type":"string","pairs":[{"from":"red","to":"blue"}]},
+    {"name":"Enabled","type":"boolean","pairs":[{"from":true,"to":false}]},
+    {"name":"Missing","type":"string","pairs":[{"from":null,"to":"missing"}]},
+    {"name":"Empty","type":"string","pairs":[{"from":"","to":"blank"}]},
+    {"name":"Zero","type":"integer","pairs":[{"from":0,"to":null}]}
+  ],
+  "update": {"name":"Count","pairs":[{"from":2,"to":8}]},
+  "source_update": {"name":"Color","value":"blue"}
+}

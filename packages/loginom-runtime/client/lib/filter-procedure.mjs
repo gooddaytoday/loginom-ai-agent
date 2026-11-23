@@ -1,4 +1,7 @@
-import {FILTER_OPERATORS,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
+import {FILTER_OPERATORS,isFilterVariable,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {openPreparedWizard} from './node-wizard-open.mjs';
+import {configureVariableBinding} from './variable-binding-procedure.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sameField=(a,b)=>a?.kind===b?.kind&&(a?.kind==='row_number'||a?.kind==='input_field'&&a.name===b.name);
@@ -10,6 +13,8 @@ export function filterConditionMatches(actual,wanted,code=FILTER_OPERATORS[wante
  const arity=FILTER_OPERATORS[wanted.operator]?.arity??1;
  if(wanted.type==='string'&&arity!==0&&actual.case_sensitive!==wanted.case_sensitive)return false;
  if(arity===0)return true;
+ const key=arity==='list'?'values':'value';
+ if(isFilterVariable(actual[key])||isFilterVariable(wanted[key]))return actual[key]?.kind==='variable'&&wanted[key]?.kind==='variable'&&actual[key].name===wanted[key].name;
  if(arity===2)return literal(actual.lower,wanted.lower,wanted.type)&&literal(actual.upper,wanted.upper,wanted.type);
  if(arity==='list')return actual.values?.length===wanted.values.length&&actual.values.every((v,i)=>literal(v,wanted.values[i],wanted.type));
  return literal(actual.value,wanted.value,wanted.type);
@@ -38,21 +43,53 @@ export function filterInputText(value,type,decimalSeparator='.',datetimeCombo=fa
 
 // Complete replacement with observed, identity-bound gestures. A lost reply
 // escapes through the common receipt/reconciliation mechanism; never re-add.
-export async function configureFilter(channel,parameters){
+export async function configureFilter(channel,parameters,{newNode=false,controlVariables,initialObservation,validateBaseline}={}){
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
- let s=await observe('complete filter baseline');
- const baseline=s.node_filter;
+ let s=initialObservation??await observe('complete filter baseline');
+ let baseline=s.node_filter;
+ validateBaseline?.(baseline);
  if(parameters.groups===undefined){
   need(Object.keys(parameters).length===0&&!baseline.dialogs.length&&!baseline.editor,'Saved filter must be settled before reuse');
   const groups=filterGroupsFromNative(baseline);
   return {verified:true,cleanup_complete:true,effect_possible:false,baseline,configuration:baseline,groups,preserved:true};
  }
  validateFilterConditions(parameters);
- const groups=resolveFilterConditions(parameters,baseline.input_fields),expected=[];
+ if(newNode&&!controlVariables){
+  const references=parameters.groups.flat().flatMap(c=>isFilterVariable(c.value??c.values)?[{name:(c.value??c.values).name,type:c.values?'string':c.type}]:[]);
+  if(references.length){
+   resolveFilterConditions(parameters,baseline.input_fields);
+   const variables=references.map(ref=>{
+    const matches=baseline.control_variables?.filter(v=>v.name===ref.name)??[];
+    need(matches.length===1,'Missing or ambiguous mapped filter variable: '+ref.name);
+    need(matches[0].type===ref.type&&typeof matches[0].is_null==='boolean','Filter variable type or NULL differs: '+ref.name);
+    return matches[0];
+   });
+   if(variables.some(v=>v.is_null)){
+    // Only a new, untouched wizard may refresh its initial NULL cache. The
+    // shared close/open drivers retain receipt and node ownership guards.
+    const before=s,node=s.prepared_node_context;
+    const owner=n=>n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof node?.[k]==='string'&&n[k]===node[k]);
+    need(owner(node)&&owner(baseline.node_context)&&s.wizard.owner_context?.status==='observed'
+     &&baseline.inventory_complete===true&&!baseline.editor&&!baseline.dialogs.length
+     &&baseline.rows.every(r=>r.kind==='condition'&&r.field?.kind==='input_field'&&r.field.name===''&&r.type===null),'New filter cache refresh requires its untouched owned wizard');
+    const fields=f=>f.input_fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
+    const bindings=f=>f.control_variables.map(({name,type,index})=>({name,type,index}));
+    const wizard=w=>({node:{tid:w.owner_context.node.tid,label:w.owner_context.node.label},path:w.owner_context.path.map(({tid,label})=>({tid,label}))});
+    await closePreparedWizard(channel,{initialObservation:s});
+    await openPreparedWizard(channel);
+    s=await observe('new filter control cache reread');
+    need(owner(s.prepared_node_context)&&owner(s.node_filter.node_context)&&s.wizard.root_tid===before.wizard.root_tid
+     &&same(wizard(s.wizard),wizard(before.wizard)),'Reopened filter node or wizard identity changed');
+    need(same(fields(s.node_filter),fields(baseline))&&same(bindings(s.node_filter),bindings(baseline)),'Reopened filter input schema or control binding identity changed');
+    baseline=s.node_filter;
+   }
+  }
+ }
+ const groups=resolveFilterConditions(parameters,baseline.input_fields,controlVariables??baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
-  if(values.some(v=>v.length>19&&!v.endsWith('.000'))){
+  if(values.some(v=>typeof v==='string'&&v.length>19&&!v.endsWith('.000'))){
    const field=baseline.input_fields.find(f=>f.name===c.field.name);
    need(field?.data_kind==='Дискретный','Datetime scalar/range milliseconds require an observed discrete input field; the continuous native editor supports whole seconds');
   }
@@ -167,7 +204,13 @@ export async function configureFilter(channel,parameters){
     await action('commit typed filter value',s,s=>({verb:'press',ref:one(s,e=>predicate(e)&&e.allowed_actions.includes('press'),'Typed filter commit unavailable').ref,key:'Tab'}),identity);
     s=await observe('typed filter input committed');
    };
-   if(arity===2||arity==='list'){
+   const variable=arity==='list'?wanted.values:wanted.value;
+   if(isFilterVariable(variable)){
+    const editor=arity==='list'?'StringTriggerPropEdit':'VariantPropEdit';
+    const base=s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;'+editor;
+    const option=e=>e.filter_cell?.record_id===id&&e.filter_cell.part==='variable_option'&&e.filter_cell.variable_name===variable.name;
+    s=await configureVariableBinding({channel,observe,ready,state:s,base,identity,option,committed:s=>same(current(s)[arity==='list'?'values':'value'],variable)});
+   }else if(arity===2||arity==='list'){
     s=await observe('filter value dialog trigger',s=>s.ui.elements.some(e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker')&&e.allowed_actions.includes('click')));
     await click('open bound filter value dialog',s,e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker'),identity);
     const kind=arity===2?'range':'list';

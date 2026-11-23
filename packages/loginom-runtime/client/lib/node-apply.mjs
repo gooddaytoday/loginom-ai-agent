@@ -1,9 +1,13 @@
+import {validateVariableBindings} from './variable-binding-parameters.mjs';
+import {validateVariablePortMapping} from './variable-port-mapping.mjs';
+import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
+import {journalCopy} from './execution-journal.mjs';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
-import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
+import {verifiedJavascriptSourcePolicyRefusal,verifiedJavascriptEffectsSourceRefusal,JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT} from './javascript-source-policy-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 
@@ -20,12 +24,14 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
  */
 export function validateNodeApplyRequest(request, handlers) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
-    'mode','parameters','mappings','finish','read','budgets']);
+    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[]),...(Object.hasOwn(request??{},'bindings')?['bindings']:[])]);
+  validateVariableBindings(request.bindings,request.target?.type);
   requireValue(id(request.operation_id) && request.contract_revision === NODE_CONTRACT_REVISION,
     'Unsupported node.apply operation ID or contract revision');
-  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs'].map(k=>[k,request[k]]));
+  const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
   const installed = handlers.get(request.target.type);
+  requireValue(!request.bindings?.length||installed?.binding_schema&&request.mode!==NODE_READ_MODE,'BINDING_PARAMETER_UNSUPPORTED: bindings require a registered configuration mode');
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
   requireValue(handler && typeof handler.validate === 'function' && typeof handler.configure === 'function'
     && typeof handler.revision === 'string' && handler.revision.length > 0, 'No local configuration handler for this node type');
@@ -33,16 +39,18 @@ export function validateNodeApplyRequest(request, handlers) {
   requireValue(handler.modes.includes(request.mode), 'Unsupported node configuration mode');
   requireValue(['done','execute','close'].includes(request.finish), 'Choose Done, Execute or Close explicitly');
   requireValue(Array.isArray(request.mappings) && request.mappings.length <= 16, 'Bounded port mappings required');
+  if(request.target.type==='variables.column_union')requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
-      && Object.keys(mapping).every(k=>['direction','port','autosync','fields','changes'].includes(k))
+      && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
-    const key = mapping.direction + ':' + mapping.port;
+    if(mapping.kind!==undefined){validateVariablePortMapping(mapping);requireValue(request.mode!==NODE_READ_MODE&&request.target.type!=='variables.user'&&request.finish!=='close','Variable mapping cannot configure a builtin, reread or cancelled draft');}
+    const key = (mapping.kind??'table')+':'+mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
-    requireValue(mapping.changes===undefined||mapping.direction==='output'&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
+    requireValue(mapping.changes===undefined||(mapping.direction==='output'||mapping.kind!==undefined)&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
     const entries=mapping.fields??mapping.changes;
     if (entries !== undefined) {
       requireValue(Array.isArray(entries) && entries.length <= 1000, 'Bounded mapping fields required');
@@ -68,7 +76,7 @@ export function validateNodeApplyRequest(request, handlers) {
       }
     }
   }
-  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
+  object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[]),...(Object.hasOwn(request.read??{},'variable_ports')?['variable_ports']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
   if(request.read.coverage==='full')requireValue(request.finish==='execute'&&JSON.stringify(request.read.ports)==='[0]'
     &&(['transform.collapse_columns','transform.cross_table'].includes(request.target.type)
@@ -80,13 +88,16 @@ export function validateNodeApplyRequest(request, handlers) {
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
     && Number.isInteger(request.read.sample_rows) && request.read.sample_rows>=0 && request.read.sample_rows<=100
     && typeof request.read.require_exact_numbers==='boolean', 'Invalid output read request');
-  requireValue(request.finish==='execute' || request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
+  if(request.read.variable_ports!==undefined)requireValue(Array.isArray(request.read.variable_ports)&&request.read.variable_ports.length<=16
+    &&new Set(request.read.variable_ports).size===request.read.variable_ports.length&&request.read.variable_ports.every(p=>Number.isInteger(p)&&p>=0&&p<100)
+    &&(request.finish==='execute'||request.mode===NODE_READ_MODE||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
+  requireValue(request.finish==='execute'||request.mode===NODE_READ_MODE||request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
   // A handler rejects unsupported mapping/read modes and parameters here, before
   // even the target phase can create a node. Validation must be pure.
-  handler.validate(request.parameters, request.mode, request);
+  handler.validate(request.parameters, request.mode, request.mappings.some(m=>m.kind!==undefined)?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request);
   return {graph,handler};
 }
 
@@ -128,6 +139,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
+  const builtinSnapshot=request.target.type==='variables.user'&&request.mode===NODE_READ_MODE;
   const separateOutput=handler.output_wizard==='separate';
   const javascriptConfigurationOnly=request.target.type==='programming.javascript'
     &&handler.materialize_output===true&&request.finish!=='execute';
@@ -140,7 +152,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const acknowledge=async entry=>{
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,...entry};
     const saved=await record(event);
-    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),
+    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),
       'Node phase journal acknowledgement differs');
     return saved;
   };
@@ -211,6 +223,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(['source','target','read'].includes(name)&&request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing'
+        &&refusal?.verification==='existing_output_read_only'&&refusal.phase===name
+        &&refusal.effect_possible===false&&refusal.cleanup_complete===true
+        &&['document_id','workflow_id','node_id'].every(k=>refusal.node?.[k]===request.target.ref[k])){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.existing_read_refusal=true;
+      }
       if(name==='read'&&request.target.type==='programming.javascript'
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&(verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)
@@ -219,7 +239,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.javascript_read_refusal=true;
       }
-      if(name==='read'&&['exports.text','exports.excel'].includes(request.target.type)&&operation.cleanupConfirmed===true&&!operation.transportUncertain
+      if(name==='read'&&['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedExportReadRefusal(refusal,state.node,state.execution,operation.id)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
@@ -238,6 +258,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&verifiedJavascriptSourcePolicyRefusal(refusal,request,state.node)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        if(refusal.proof.closed.reason==='declared_output_required')state.javascript_declared_output_required=true;
       }
       if(name==='node_finish'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
         &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&verifiedJavascriptWizardRefusal(refusal,request)) {
@@ -246,6 +267,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.javascript_wizard_refusal=structuredClone(refusal.proof);
       }
       const importClosed=refusal?.proof?.closed;
+      if(name==='configure'&&request.target.type==='imports.lgd'&&refusal?.verification==='lgd_import_native_refused'
+        &&refusal.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&refusal.execution_started===false
+        &&importClosed?.verified===true&&importClosed.cleanup_complete===true&&importClosed.draft_discarded===true
+        &&importClosed.settings_applied===false&&importClosed.execution_started===false
+        &&importClosed.node_context?.verified===true&&importClosed.node_context.surface==='graph'
+        &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+      }
       if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source_switch&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&(refusal.verification===(request.target.type==='imports.excel'?'excel_import_source_switch_schema_refused':'text_import_source_switch_schema_refused')&&['configure','output_mapping','finish'].includes(name)
@@ -287,21 +318,23 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.calculator_default_expression=refusal.proof.before.expressions?.length===1
          &&refusal.proof.before.expressions[0].name==='Expr1'&&refusal.proof.before.expressions[0].formula==='';
       }
-      if(name==='configure'&&['exports.text','exports.excel'].includes(request.target.type)&&refusal?.phase===name&&refusal.status==='FAILED'
+      if(name==='configure'&&['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&['text_export_conflict_rejected','text_export_unsupported_retained'].includes(refusal.verification)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.export_destination_conflict=refusal.verification==='text_export_conflict_rejected';
       }
-      if(name==='input_mapping'&&request.target.type==='research.duplicates'&&refusal?.phase===name
+      const inputRefusal={'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused','exports.text':'text_export_binding_refused'}[request.target.type];
+      if(name==='input_mapping'&&inputRefusal&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&refusal.settings_unchanged===true&&refusal.verification==='duplicates_input_validation_refused'){
+        &&(['exports.excel','exports.text'].includes(request.target.type)?refusal.settings_unchanged===false&&refusal.input_saved===true:refusal.settings_unchanged===true)
+        &&refusal.verification===inputRefusal){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
-      const regressionRefusal=['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply'
-        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='preprocessing.binning'?'binning_apply_preserved':'linregression_apply_preserved')
+      const regressionRefusal=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','datamining.assn_rules','research.factor_analysis'].includes(request.target.type)&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='research.factor_analysis'?'factor_analysis_apply_preserved':request.target.type==='datamining.assn_rules'?'assn_rules_apply_preserved':request.target.type==='datamining.clustering'?'clustering_apply_preserved':request.target.type==='preprocessing.coarse_classes'?'coarse_classes_apply_preserved':request.target.type==='preprocessing.binning'?'binning_apply_preserved':request.target.type==='datamining.log_regression'?'logregression_apply_preserved':'linregression_apply_preserved')
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
@@ -313,6 +346,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
+          ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending
           ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal||regressionRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
@@ -320,11 +354,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
-      if((name==='target'||name==='source'&&state.phases.length===0&&!previousEffect)
+      const effectsOutputRefusal=name==='source'&&verifiedJavascriptEffectsSourceRefusal(refusal,request);
+      if((name==='target'||name==='source'&&state.phases.length===0&&!previousEffect||effectsOutputRefusal)
         && refusal?.phase===name && refusal.status==='NOT_APPLIED'
         && refusal.effect_possible===false && refusal.cleanup_complete===true){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
+        if(effectsOutputRefusal)state.javascript_declared_output_required=true;
       }
       const pause=error.nodeExecutionWaitPause;
       if(executionPhase&&signal?.aborted&&!stopSignal?.aborted
@@ -356,10 +392,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
+  const existingOutputRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
+          &&(value.status==='failed'||!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
           &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
@@ -391,6 +429,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
       return null;
   };
   try {
+    // Builtin variables prove their source by reading the prepared graph. An
+    // upload may have selected Files; activate only its still-owned inactive tab
+    // in the existing workflow phase before that read, never inside readGraph.
+    if(!state.phases.length&&drivers.activateWorkflow&&drivers.needsWorkflowActivation
+      &&await drivers.needsWorkflowActivation(context()))
+      await phase('workflow',ctx=>drivers.activateWorkflow({...ctx,waitForActive:true}));
     // File verification does not infer identity from the displayed path. The
     // driver checks an already completed upload/inspect/verify receipt chain.
     await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
@@ -405,7 +449,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(['datamining.lin_regression','preprocessing.binning'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
+      if(['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','datamining.assn_rules','research.factor_analysis'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
         &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
         'Applying a saved regression must discard the inspected draft without committing or training');
       else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
@@ -416,7 +460,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
       else requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
         'Intermediate node Done must save settings without execution');
     }});
-    if(materialize){
+    const declaredOutput=materialize&&state.phases.find(p=>p.phase==='node_finish')?.value?.schema_mode==='declared';
+    if(declaredOutput){
+      // Native declared columns already expose complete output mapping before
+      // Execute. Keep the existing receipt vocabulary without inventing a run.
+      for(const name of ['materialization_start','materialization_execute']){
+        const prior=state.phases.find(p=>p.phase===name);
+        if(prior){requireValue(prior.status==='not_requested','Declared materialization was already dispatched');continue;}
+        check();
+        const receipt={phase:name,receipt_id:operation.id+':'+name,status:'not_requested',effect_possible:false,
+          value:{verified:true,cleanup_complete:true,effect_possible:false,materialization_required:false,schema_mode:'declared'}};
+        await acknowledge({phase:'node_phase_completed',signature,receipt});
+        state.phases.push(receipt);
+      }
+    }else if(materialize){
       const first=await phase('materialization_start',ctx=>drivers.materializeOutput(ctx),{verify:value=>requireValue(
         value.mode==='execute'&&id(value.execution_id),'Materialization requires a fresh execution identity')});
       state.execution={status:'pending',execution_id:first.execution_id};
@@ -430,7 +487,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
-      if(request.finish==='execute')requireValue(id(value.execution_id)
+      if(existingOutputRead)requireValue(value.execution_started===false&&id(value.execution_id),'Current-output reading must preserve its native execution without Execute');
+      else if(request.finish==='execute')requireValue(id(value.execution_id)
         &&(!materialize||value.execution_id!==state.execution.execution_id), 'A fresh execution identity is required');
       else if(request.target.type==='programming.javascript'&&request.finish==='done'){
         // Loginom does not expose whether Done ran internal work. The owned
@@ -444,20 +502,35 @@ export async function applyNode({request, operation, handlers, drivers, record,
       }else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
       if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
     }});
-    if(request.finish==='execute') {
+    if(request.finish==='execute'||existingOutputRead) {
       state.execution={status:'pending',execution_id:finish.execution_id};
       const terminal=await waitForExecution('execute');
       if(terminal)return terminal;
       // Output reading has its own work (formats, paging, restoration). The
       // configuration limit does not cap it; the total operation deadline still does.
-      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||request.read.variable_ports?.length>0||handler.fileOutput===true,verify:value=>requireValue(
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length
+        && (request.read.variable_ports===undefined||request.read.variable_ports.length===0&&!value.variable_ports?.length||Array.isArray(value.variable_ports)&&value.variable_ports.length===request.read.variable_ports.length
+          &&value.variable_ports.every((p,i)=>p.port===request.read.variable_ports[i]&&p.kind==='variables'&&p.source==='execution'&&p.native_source==='VariablesForm'
+            &&p.execution_id===state.execution.execution_id&&p.fresh===true&&p.complete===true&&typeof p.read_id==='string'&&p.read_id.length>0
+            &&p.count===p.variables?.length&&p.count===p.completeness?.count&&p.count===p.completeness.store_count&&p.count===p.completeness.unique_ids))
         && value.ports.every((p,i)=>p.port===request.read.ports[i] && p.fresh===true)
         &&(request.read.coverage!=='full'||request.target.type!=='programming.javascript'
           ||value.status==='complete'&&value.ports.every(p=>p.sample_complete===true&&p.sample_rows===p.row_count)),
         'Output is not bound to the requested execution, ports or full JavaScript row coverage')});
+      state.output=output;
+    }
+    if(builtinSnapshot){
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:true,verify:value=>requireValue(
+        value.status==='complete'&&value.source==='snapshot'&&value.native_source==='VariablesEditValuesWizard'&&value.execution_id===null
+        &&typeof value.evidence_ref==='string'&&value.ports?.length===0&&value.variable_ports?.length===1
+        &&value.variable_ports[0].port===4&&value.variable_ports[0].source==='snapshot'&&value.variable_ports[0].native_source==='VariablesEditValuesWizard'
+        &&value.variable_ports[0].execution_id===null&&value.variable_ports[0].fresh===true&&value.variable_ports[0].complete===true
+        &&value.variable_ports[0].package_modified===false&&typeof value.variable_ports[0].read_id==='string'&&value.variable_ports[0].read_id.length>0
+        &&value.variable_ports[0].count===value.variable_ports[0].variables?.length&&value.variable_ports[0].completeness?.loaded===true
+        &&['count','store_count','unique_ids'].every(k=>value.variable_ports[0].completeness[k]===value.variable_ports[0].count),'Builtin snapshot is incomplete, modified or misidentified')});
       state.output=output;
     }
     check();
@@ -473,9 +546,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+    if(['imports.text','imports.excel'].includes(request.target.type)&&operation.importBindingInventory)result.configuration.bindings=structuredClone(operation.importBindingInventory);
+    const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
+    if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
+        const bindings=state.phases.find(p=>p.phase==='node_finish')?.value?.bindings;
+        if(['row_filter','grouping','sorting'].includes(result.configuration.readback.kind)&&bindings)result.configuration.bindings=structuredClone(bindings);
       }catch(error){
         // Projection uses only accepted receipts. Its failure cannot make the
         // completed UI phases uncertain or strand a quiet node without a phase.
@@ -490,6 +568,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    if(calculatorVariableMappingRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
+      ||variablesCalculatorDeactivationRefusal(operation,error.receipt)){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
+        failure:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}});}
+      catch { /* Foreign owners/masks and unknown cleanup retain the original phase. */ }
+    }
     if(error.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED'&&state.node&&state.pending&&!operation.transportUncertain) {
       try {return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.nodeExecutionFailure});}
       catch { /* A native error never promotes an unconfirmed cleanup to PASS. */ }
@@ -498,7 +582,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
     if(state.pending?.phase==='configure'&&!operation.transportUncertain
-      &&(error.restConfigureFailure||['exports.text','exports.excel'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
+      &&(error.restConfigureFailure||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
       catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
     }
@@ -515,6 +599,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
+      ...(state.existing_read_refusal?{next_step:{tool:'dock_node_read',original_operation_id:operation.id,
+        instruction:error.code==='NODE_EXECUTION_RUNNING'
+         ?'The native server execution is still running. To wait again, use a NEW operation_id and source_operation_id:"'+request.parameters.source_operation_id+'" to repeat the wait and read the same output.'
+         :'Current output freshness could not be proved. No Execute was sent. Explain the reason and ask whether to execute; only an explicit request permits execution:"execute".'}}:{}),
       ...(state.javascript_wizard_refusal&&state.verified_refusal?{configuration:{status:'discarded'},
         checkpoint_kind:'local_node_failed',persisted_package_verified:false}:{}),
       ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
@@ -530,15 +618,17 @@ export async function applyNode({request, operation, handlers, drivers, record,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node,state.export_destination_conflict===true)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='initial_settings'
-          ?'This node has no saved source. Supply complete settings.source with explicit source_path equal to the verified upload destination, encoding, rows_to_skip and first_line_as_title, complete settings.format and nonempty settings.columns with at least one used field. Submit a NEW operation_id with target:'
+          ?'This node has no saved source. Supply complete settings.source with explicit source_path equal to the verified upload destination, encoding, rows_to_skip and first_line_as_title, complete settings.format and either nonempty settings.columns with at least one used field or auto_detect_columns=new/all without columns. Submit a NEW operation_id with target:'
           :state.correctable_import_request==='readiness'
           ?'The wizard did not reach an expected state, so no setting was saved. Submit a NEW operation_id with the SAME settings and target:'
-          :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
+          :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply the complete source, format and column settings (or native detection) again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
+      ...(state.javascript_declared_output_required&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
+        instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:error.nodeExecutionFailure?.code??/^(UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
@@ -574,7 +664,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
       phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
     const saved=await record(event);
-    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
     state.pending=null;state.cleanup_complete=true;state.result=structuredClone(result);
     return result;
   }
@@ -587,10 +677,10 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
-  const exportRelease=['exports.text','exports.excel'].includes(request.target.type);
+  const exportRelease=['exports.text','exports.excel','exports.lgd'].includes(request.target.type);
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
@@ -633,7 +723,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
     phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
   const saved=await record(event);
-  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
   state.pending=null;state.cleanup_complete=true;state.effect_possible=true;state.result=structuredClone(result);
   return result;
 }

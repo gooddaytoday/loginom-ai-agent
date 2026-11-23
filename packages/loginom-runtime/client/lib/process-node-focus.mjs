@@ -51,7 +51,7 @@ export async function restoreProcessNodeFocus(page, ticket) {
   const model=t.card.Controller?.FController,tree=t.card.Controller?.Node?.data?.node;
   if(!(model instanceof app.ModelForm)||!app.ModelNodeTreeNode||!(tree instanceof app.ModelNodeTreeNode)||tree.FGuid!==binding.node.node_id||tree.FModelNode!==t.nodeData)return null;
   let n=tree,workflow,packageNode;const ancestors=new Set();
-  for(let i=0;n&&i<32&&!ancestors.has(n);i++,n=n.ParentNode){ancestors.add(n);if(n instanceof app.WorkFlowTreeNode)workflow=n;if(n instanceof app.PackageTreeNode){packageNode=n;break;}}
+  for(let i=0;n&&i<32&&!ancestors.has(n);i++,n=n.ParentNode){ancestors.add(n);if(!workflow&&n instanceof app.WorkFlowTreeNode)workflow=n;if(n instanceof app.PackageTreeNode){packageNode=n;break;}}
   if(workflow!==t.workflowNode||packageNode!==t.packageNode)return null;
   const nodes=model.FDiagram?.FNodes?.FCollection,graph=model.FDiagram?.FmxGraph;
   if(!Array.isArray(nodes)||nodes.length>200||nodes.filter(o=>o.FGuid===binding.node.node_id).length!==1||!nodes.includes(t.owner)||t.owner.data!==t.nodeData)return null;

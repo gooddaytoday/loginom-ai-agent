@@ -44,7 +44,6 @@ for (const headless of [true, false]) {
     generation: 1,
     chat,
     headless,
-    endpoint: manifest.endpoint,
     actionManifestUri: manifest.actionManifestUri,
     actionManifestSha256: manifest.actionManifestSha256,
     connection: { apiKey: login.api_key, password: login.password ?? "", url, username },

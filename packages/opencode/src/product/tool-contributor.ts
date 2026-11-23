@@ -268,6 +268,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                   output: content,
                   metadata: {
                     generation: loginom.generation,
+                    ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
                     truncated: truncated.truncated,
                     ...(state === "pending" ? { loginomPending: true } : {}),
                     ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),
@@ -299,6 +300,17 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
 })
 
 const definitions = Effect.fnUntraced(function* (profile: TaskScope.Profile) {
+  if (profile === "loginom-dashboard") {
+    const { DashboardDeleteTool, DashboardDraftTool, DashboardPublishTool } = yield* Effect.promise(() => import("@/tool/dashboard"))
+    const draft = yield* DashboardDraftTool
+    const publish = yield* DashboardPublishTool
+    const remove = yield* DashboardDeleteTool
+    return [
+      { ...(yield* Tool.init(draft)), origin: "builtin" as const },
+      { ...(yield* Tool.init(publish)), origin: "builtin" as const },
+      { ...(yield* Tool.init(remove)), origin: "builtin" as const },
+    ]
+  }
   if (profile !== "package-docs") return []
   const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
   const docs = yield* PackageDocsTool

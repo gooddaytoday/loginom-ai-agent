@@ -1,0 +1,309 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "datamining.lin_regression",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Y_rergession",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X",
+          "type": "integer"
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Y",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": -2,
+          "Category": "A",
+          "Y": -1.1,
+          "Y_rergession": -1.042857142857143
+        },
+        {
+          "RowID": 2,
+          "X": -1,
+          "Category": "A",
+          "Y": 1.1,
+          "Y_rergession": 0.9742857142857143
+        },
+        {
+          "RowID": 3,
+          "X": 0,
+          "Category": "A",
+          "Y": 2.9,
+          "Y_rergession": 2.9914285714285715
+        },
+        {
+          "RowID": 4,
+          "X": 1,
+          "Category": "A",
+          "Y": 5.1,
+          "Y_rergession": 5.008571428571429
+        },
+        {
+          "RowID": 5,
+          "X": 2,
+          "Category": "A",
+          "Y": 6.9,
+          "Y_rergession": 7.025714285714286
+        },
+        {
+          "RowID": 6,
+          "X": 3,
+          "Category": "A",
+          "Y": 9.1,
+          "Y_rergession": 9.042857142857143
+        },
+        {
+          "RowID": 7,
+          "X": -2,
+          "Category": "B",
+          "Y": 1.9,
+          "Y_rergession": 1.957142857142857
+        },
+        {
+          "RowID": 8,
+          "X": -1,
+          "Category": "B",
+          "Y": 4.1,
+          "Y_rergession": 3.974285714285714
+        },
+        {
+          "RowID": 9,
+          "X": 0,
+          "Category": "B",
+          "Y": 5.9,
+          "Y_rergession": 5.991428571428571
+        },
+        {
+          "RowID": 10,
+          "X": 1,
+          "Category": "B",
+          "Y": 8.1,
+          "Y_rergession": 8.008571428571429
+        },
+        {
+          "RowID": 11,
+          "X": 2,
+          "Category": "B",
+          "Y": 9.9,
+          "Y_rergession": 10.025714285714285
+        },
+        {
+          "RowID": 12,
+          "X": 3,
+          "Category": "B",
+          "Y": 12.1,
+          "Y_rergession": 12.042857142857143
+        },
+        {
+          "RowID": 13,
+          "X": -2,
+          "Category": "C",
+          "Y": -0.1,
+          "Y_rergession": -0.04285714285714286
+        },
+        {
+          "RowID": 14,
+          "X": -1,
+          "Category": "C",
+          "Y": 2.1,
+          "Y_rergession": 1.9742857142857142
+        },
+        {
+          "RowID": 15,
+          "X": 0,
+          "Category": "C",
+          "Y": 3.9,
+          "Y_rergession": 3.9914285714285715
+        },
+        {
+          "RowID": 16,
+          "X": 1,
+          "Category": "C",
+          "Y": 6.1,
+          "Y_rergession": 6.008571428571429
+        },
+        {
+          "RowID": 17,
+          "X": 2,
+          "Category": "C",
+          "Y": 7.9,
+          "Y_rergession": 8.025714285714285
+        },
+        {
+          "RowID": 18,
+          "X": 3,
+          "Category": "C",
+          "Y": 10.1,
+          "Y_rergession": 10.042857142857143
+        }
+      ],
+      "ordered": true
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "DisplayName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "UniqueValues",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Y_coefficients",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Y_stdError",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          },
+          "label_any": true
+        },
+        {
+          "name": "Y_TStat",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          },
+          "label_any": true
+        },
+        {
+          "name": "Y_PValue",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          },
+          "label_any": true
+        },
+        {
+          "name": "Y_lowerBound",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          },
+          "label_any": true
+        },
+        {
+          "name": "Y_upperBound",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          },
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "DisplayName": null,
+          "UniqueValues": null,
+          "Y_coefficients": 2.9914285714285715,
+          "Y_stdError": 0.044890537419975576,
+          "Y_TStat": 66.63828823081617,
+          "Y_PValue": 6.352119209738578e-19,
+          "Y_lowerBound": 2.895147944356732,
+          "Y_upperBound": 3.087709198500411
+        },
+        {
+          "Name": "X",
+          "DisplayName": "X",
+          "UniqueValues": null,
+          "Y_coefficients": 2.0171428571428573,
+          "Y_stdError": 0.014963512473325192,
+          "Y_TStat": 134.8041016932843,
+          "Y_PValue": 3.357261907455914e-23,
+          "Y_lowerBound": 1.9850493147855774,
+          "Y_upperBound": 2.049236399500137
+        },
+        {
+          "Name": "Category",
+          "DisplayName": "Category",
+          "UniqueValues": "A",
+          "Y_coefficients": 0.0,
+          "Y_stdError": null,
+          "Y_TStat": null,
+          "Y_PValue": null,
+          "Y_lowerBound": null,
+          "Y_upperBound": null
+        },
+        {
+          "Name": "Category",
+          "DisplayName": "Category",
+          "UniqueValues": "B",
+          "Y_coefficients": 3.0,
+          "Y_stdError": 0.06259686371487612,
+          "Y_TStat": 47.92572378170204,
+          "Y_PValue": 6.291332632269472e-17,
+          "Y_lowerBound": 2.865743079998929,
+          "Y_upperBound": 3.134256920001071
+        },
+        {
+          "Name": "Category",
+          "DisplayName": "Category",
+          "UniqueValues": "C",
+          "Y_coefficients": 1.0,
+          "Y_stdError": 0.06259686371487612,
+          "Y_TStat": 15.975241260567348,
+          "Y_PValue": 2.20558005869027e-10,
+          "Y_lowerBound": 0.8657430799989289,
+          "Y_upperBound": 1.1342569200010713
+        }
+      ],
+      "ordered": true
+    }
+  ]
+}

@@ -16,6 +16,7 @@ export function filterConfigurationReadback({node,phases,operation_id}){
  need(JSON.stringify(schema(inputFields))===JSON.stringify(schema(c.input_fields)),'input schema differs');
  const flat=groups.flatMap((group,i)=>[...(i?[null]:[]),...group]);need(flat.length===c.rows.length,'condition count');
  need(flat.every((w,i)=>w?filterConditionMatches(c.rows[i],w):c.rows[i].kind==='or'),'condition readback');
+ need(flat.every((w,i)=>w?.value?.kind!=='variable'||c.rows[i].variable_mode===1),'scalar variable mode');
  need(mapped.value.ports?.length===2,'both mappings required');
  const outputs=mapped.value.ports.map((p,port)=>{
   const m=p.native_mapping;need(p.port===port&&m?.verified&&m.inventory_complete&&m.source_identity_verified&&owner(m.node_context)

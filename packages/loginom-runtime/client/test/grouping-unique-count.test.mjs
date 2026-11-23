@@ -14,14 +14,14 @@ const configuration={keys:[{name:'Region',label:'Region',type:'string'}],measure
  {name:'Customer',label:'Customer',type:'string',functions:258},
  {name:'CustomerId',label:'CustomerId',type:'integer',functions:256}]};
 
-test('Grouping unique_count is advertised and resolves string/integer with count',()=>{
+test('Grouping unique_count is advertised and resolves observed types with count',()=>{
  assert.ok(groupingMeasureSchema.properties.function.enum.includes('unique_count'));
  validateGroupingParameters(parameters,'aggregate',request);
  assert.deepEqual(resolveGroupingParameters(parameters,fields).functions,[{name:'Customer',mask:258},{name:'CustomerId',mask:256}]);
  for(const type of ['real','boolean','datetime','variant']){
-  assert.throws(()=>resolveGroupingParameters(parameters,fields.map(f=>f.name==='CustomerId'?{...f,type}:f)),/incompatible/);
+  assert.deepEqual(resolveGroupingParameters(parameters,fields.map(f=>f.name==='CustomerId'?{...f,type}:f)).functions,[{name:'Customer',mask:258},{name:'CustomerId',mask:256}]);
  }
- for(const fn of ['median','mode','stddev','list','null_count']){
+ for(const fn of ['concat','list']){
   assert.throws(()=>validateGroupingParameters({...parameters,measures:[measure('Customer',fn,'Bad')]},'aggregate',request));
  }
  assert.throws(()=>validateGroupingParameters({...parameters,measures:[...parameters.measures,measure('Customer','unique_count','Duplicate')]},'aggregate',request),/Duplicate field\/function/);
@@ -47,16 +47,17 @@ test('Grouping unique_count output binds Uniq integer sources and renames mixed/
  }
 });
 
-test('Grouping preserves saved unique_count masks, refusing all other new bits and types',async()=>{
+test('Grouping preserves saved unique_count masks, refusing unknown bits and incompatible types',async()=>{
  const channel=c=>({observe:async options=>{const s={wizard:{stage:'grouping'},node_grouping:{...c,verified:true}};assert.ok(options.ready(s));return s;},perform:()=>assert.fail('preservation must not mutate')});
  const saved=await configureGrouping(channel(configuration),{});
  assert.equal(saved.preservation.unchanged,true);
- for(const bit of [32,64,128,512,1024,2048,4096,8192]){
+ for(const bit of [16384,32768]){
   const c=structuredClone(configuration);c.measures[0].functions|=bit;
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);
  }
- const c=structuredClone(configuration);c.measures[1].type='real';
- await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
- assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);
+ for(const type of ['real','boolean','datetime','variant']){
+  const c=structuredClone(configuration);c.measures[1].type=type;
+  assert.equal((await configureGrouping(channel(c),{})).preservation.unchanged,true);
+ }
 });

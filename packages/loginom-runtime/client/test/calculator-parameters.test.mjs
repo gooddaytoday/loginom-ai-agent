@@ -8,6 +8,18 @@ const expression=(name,index=0)=>({name,index,record_id:'r'+index,expression_id:
 const observed=()=>({verified:true,inventory_complete:true,mode:'expression',expressions:[expression('A'),expression('B',1)]});
 const inputs=[{name:'Amount',type:'real'}];
 const request=()=>({target:{kind:'existing'},inputs:[],read:{ports:[0]},mappings:[]});
+test('calculator accepts its table mappings alongside one ordinary W1 variable mapping',()=>{
+ const r={...request(),variable_inputs:[{kind:'variables',input:0}],mappings:[
+  {direction:'input',port:0},{direction:'output',port:0},
+  {kind:'variables',direction:'input',port:0,autosync:false,fields:[{source:{kind:'configured_field',name:'Amount'}}]}]};
+ assert.doesNotThrow(()=>validateCalculatorParameters({expressions:[]},'expression',r));
+ for(const patch of [{kind:'control'},{port:1},{direction:'output'}]){
+  const bad=structuredClone(r);Object.assign(bad.mappings[2],patch);
+  assert.throws(()=>validateCalculatorParameters({expressions:[]},'expression',bad));
+ }
+ const duplicate=structuredClone(r);duplicate.mappings.push(duplicate.mappings[2]);
+ assert.throws(()=>validateCalculatorParameters({expressions:[]},'expression',duplicate));
+});
 test('published calculator schema and handler agree on new expressions and saved patches',()=>{
  const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
  const added={target:{kind:'new'},name:'Ratio',label:'Ratio',type:'real',formula:'Amount / 3',replace:false};
@@ -71,6 +83,26 @@ test('only a pristine new-node default may be reused',()=>{
  const r=resolveCalculatorPatch(p,o,inputs,{newNode:true});assert.equal(r.changes[0].reuse_default,true);assert.equal(r.expressions[0].record_id,'r0');
  o.expressions[0].formula='123';assert.throws(()=>resolveCalculatorPatch(p,o,inputs,{newNode:true}),/default expression changed/);
 });
+test('owned-template cleanup still permits an explicitly requested Expr1 at any position',async()=>{
+ const {planCalculatorEdits}=await import('../lib/calculator-parameters.mjs');
+ for(const names of [['Flag','Expr1'],['Expr1','Flag'],['Flag','expr1'],['Flag','EXPR1']]){
+  const o=observed();o.expressions=[{...expression('Expr1'),formula:'',cached:false,description:''}];
+  const parameters={expressions:names.map(name=>({target:{kind:'new'},name,label:name,type:'real',formula:'1',replace:false}))};
+  const plan=resolveCalculatorPatch(parameters,o,inputs,{newNode:true,removeDefault:true});
+  assert.doesNotThrow(()=>planCalculatorEdits(plan,inputs));
+  assert.deepEqual(plan.expressions.map(e=>e.name),names);
+  assert.equal(plan.discard_default,null);
+ }
+});
+for(const count of [128,127])test('owned-template cleanup stays within the reader bound for '+count+' new expressions',()=>{
+ const o=observed();o.expressions=[{...expression('Expr1'),formula:'',cached:false,description:''}];
+ const parameters={expressions:Array.from({length:count},(_,i)=>({target:{kind:'new'},name:'Field'+i,label:'Field'+i,type:'real',formula:'1',replace:false}))};
+ validateCalculatorParameters(parameters,'expression',{...request(),target:{kind:'new'},inputs:[{input:0}]});
+ const plan=resolveCalculatorPatch(parameters,o,inputs,{newNode:true,removeDefault:true});
+ assert.deepEqual(plan.discard_default,count===128?null:o.expressions[0]);
+ assert.equal(plan.changes[0].reuse_default,count===128);
+ assert.deepEqual(plan.expressions.map(e=>e.name),parameters.expressions.map(e=>e.name));
+});
 test('Close refuses a separate input mapping before any UI work',()=>{
  const p={expressions:[{target:{kind:'existing',name:'A'},formula:'2'}]};
  for(const mapping of [{direction:'input',port:0},{direction:'input',port:0,autosync:true},{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'NewAmount'}]}])
@@ -92,4 +124,40 @@ test('rename planning handles chains, cycles, new reuse and reserved temporary n
   }
   assert.deepEqual(current.map(e=>e.name),plan.expressions.map(e=>e.name));
  }
+});
+
+test('intermediate and cached are optional booleans on a new or saved expression',()=>{
+ const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
+ const added={target:{kind:'new'},name:'Helper',label:'Helper',type:'integer',formula:'Field.Amount + 1',replace:false,intermediate:true,cached:true};
+ for(const item of [added,{target:{kind:'existing',name:'A'},cached:false}]) {
+  const parameters={expressions:[item]};assert.equal(check(parameters).valid,true);
+  assert.doesNotThrow(()=>validateCalculatorParameters(parameters,'expression',request()));
+ }
+ for(const flag of ['intermediate','cached'])for(const value of ['true',1,null]) {
+  const parameters={expressions:[{target:{kind:'existing',name:'A'},[flag]:value}]};
+  assert.equal(check(parameters).valid,false);assert.throws(()=>validateCalculatorParameters(parameters,'expression',request()),/must be boolean/);
+ }
+});
+test('flags default to false for added expressions and survive an unrelated patch of a saved one',()=>{
+ const before=observed();before.expressions[0].intermediate=true;
+ const p={expressions:[{target:{kind:'existing',name:'A'},cached:false},{target:{kind:'new'},name:'C',label:'C',type:'real',formula:'1',replace:false,intermediate:true}]};
+ validateCalculatorParameters(p,'expression',request());const r=resolveCalculatorPatch(p,before,inputs);
+ assert.deepEqual(r.expressions.map(e=>[e.name,e.intermediate,e.cached]),[['A',true,false],['B',false,true],['C',true,false]]);
+ const q={expressions:[{target:{kind:'existing',name:'A'},formula:'2'}]};
+ assert.deepEqual(resolveCalculatorPatch(q,before,inputs).expressions.map(e=>[e.intermediate,e.cached]),[[true,true],[false,true]]);
+});
+
+test('syntax selects one language for the node; a language change needs a formula for every retained expression',()=>{
+ const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
+ for(const syntax of ['expression','javascript']){
+  assert.equal(check({expressions:[],syntax}).valid,true);assert.doesNotThrow(()=>validateCalculatorParameters({expressions:[],syntax},'expression',request()));
+ }
+ assert.equal(check({expressions:[],syntax:'python'}).valid,false);
+ assert.throws(()=>validateCalculatorParameters({expressions:[],syntax:'python'},'expression',request()),/syntax/);
+ const o=observed();o.syntax='expression';
+ assert.throws(()=>resolveCalculatorPatch({expressions:[{target:{kind:'existing',name:'A'},formula:'return 1;'}],syntax:'javascript'},o,inputs),/does not translate formulas/);
+ const plan=resolveCalculatorPatch({expressions:[{target:{kind:'existing',name:'A'},formula:'return 1;'},{target:{kind:'existing',name:'B'},formula:'return 2;'}],syntax:'javascript'},o,inputs);
+ assert.deepEqual(plan.expressions.map(e=>e.formula),['return 1;','return 2;']);
+ assert.doesNotThrow(()=>resolveCalculatorPatch({expressions:[],syntax:'expression'},o,inputs));
+ assert.doesNotThrow(()=>resolveCalculatorPatch({expressions:[]},o,inputs));
 });

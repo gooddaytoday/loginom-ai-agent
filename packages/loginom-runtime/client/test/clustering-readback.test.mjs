@@ -27,9 +27,36 @@ test('ordinary execution alone cannot claim a trained model',()=>{
   assert.throws(()=>clusteringConfigurationReadback(input),/training on the connected source/);
  }
 });
+test('g-means readback reports observed automatic bounds and threshold without fixed k',()=>{
+ const input=candidate(),c=input.phases[1].value.configuration;
+ Object.assign(c,{mode:'g_means',min_clusters:2,max_clusters:4,threshold:1});delete c.clusters;
+ const r=clusteringConfigurationReadback(input);
+ assert.equal(r.mode,'g_means');assert.equal(r.min_clusters,2);assert.equal(r.max_clusters,4);assert.equal(r.threshold,1);
+ assert.equal(Object.hasOwn(r,'clusters'),false);
+ c.min_clusters=5;assert.throws(()=>clusteringConfigurationReadback(input),/bounds/);
+});
 test('Done commits settings without claiming training and foreign settings refuse',()=>{
  const input=candidate();input.phases.at(-1).value.mode='done';delete input.phases.at(-1).value.training;
  assert.equal(clusteringConfigurationReadback(input).training.status,'not_requested');
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>clusteringConfigurationReadback(input),/configuration owner/);
+});
+
+for(const [norm_type,normalization] of [[2,'scale_minus_one_one'],[3,'scale_zero_one'],[4,'absolute_scale']])test('readback names observed native scaling: '+normalization,()=>{
+ const input=candidate();
+ input.phases[1].value.configuration.normalization.forEach(f=>f.norm_type=norm_type);
+ assert.equal(clusteringConfigurationReadback(input).normalization,normalization);
+ input.phases[1].value.configuration.normalization[1].norm_type=5;
+ assert.throws(()=>clusteringConfigurationReadback(input),/normalization/);
+});
+
+test('apply readback requires discarded settings and cannot claim training',()=>{
+ const input=candidate();input.phases[1].value.configuration.mode='apply';
+ Object.assign(input.phases[2].value,{settings_applied:false,draft_discarded:true});
+ Object.assign(input.phases.at(-1).value,{settings_applied:false});delete input.phases.at(-1).value.training;
+ const result=clusteringConfigurationReadback(input);
+ assert.equal(result.mode,'apply');assert.equal(result.training.status,'not_requested');assert.equal(result.clusters,3);
+ for(const alter of [v=>v.phases[2].value.settings_applied=true,v=>v.phases[2].value.draft_discarded=false,v=>v.phases.at(-1).value.settings_applied=true,v=>v.phases.at(-1).value.training={status:'trained'}]){
+  const bad=structuredClone(input);alter(bad);assert.throws(()=>clusteringConfigurationReadback(bad));
+ }
 });

@@ -16,11 +16,22 @@ describe("updaterAction", () => {
       label: "settings.updates.action.downloading",
     })
     expect(updaterAction({ status: "ready", version: "2.0.0" })).toEqual({
-      label: "toast.update.action.installRestart",
+      label: "settings.updates.closeAndUpdate",
       run: "install",
     })
     expect(updaterAction({ status: "installing", version: "2.0.0" })).toEqual({
       label: "settings.updates.action.installing",
     })
+    expect(
+      updaterAction({
+        status: "available",
+        version: "2.0.0",
+        url: "https://feed.test/stable/2.0.0/loginom-ai-agent.deb",
+      }),
+    ).toEqual({
+      label: "settings.updates.download",
+      run: "download",
+    })
+    expect(updaterAction({ status: "disabled" })).toEqual({ label: "settings.updates.action.checkNow" })
   })
 })

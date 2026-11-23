@@ -19,6 +19,7 @@ const reservedMetadata = [
 type Input = {
   sessionID: SessionID
   messages: readonly History[]
+  base?: Profile
   revert?: { messageID: MessageID; partID?: PartID }
 }
 
@@ -49,7 +50,7 @@ export function derive(input: Input): Info | undefined {
         !replay &&
         message.parts.some((part) => part.type !== "compaction" && (part.type !== "text" || part.synthetic !== true))
       )
-        scope = { sessionID: input.sessionID, taskMessageID: message.info.id, profile: "default" }
+        scope = { sessionID: input.sessionID, taskMessageID: message.info.id, profile: input.base ?? "default" }
       tasks.set(message.info.id, replay ? tasks.get(replay) : scope?.taskMessageID)
     }
     if (

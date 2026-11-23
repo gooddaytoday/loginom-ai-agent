@@ -46,7 +46,7 @@ test('wrong or ambiguous original sources never authorize deletion',()=>{
 test('unsupported native ISO and string removals are refused before flag changes',()=>{
  for(const kind of ['iso','string']){
   const f=fixture();if(kind==='iso'){f.original.field_matrices[0].matrix[4].iso=true;f.original.field_matrices[0].matrix[4].func=5;}
-  else f.original.field_matrices[0].matrix[4].string=true;
+  else f.original.field_matrices[0].matrix[5].string=true;
   assert.throws(()=>planDateTimeRemovals(f.original,f.parameters,f.baseline),/ISO\/string\/unsupported/);
  }
 });
@@ -103,4 +103,16 @@ test('fresh Date/time source retrieval may only append exact passthrough copies 
   if(mode==='removed_old')b.target_fields.shift();
   assert.throws(()=>verifyDateTimeSourceFetch(a,b),undefined,mode);
  }
+});
+test('removing a string operation binds its string source, not the same-label integer or datetime output',()=>{
+ const f=fixture();
+ for(const r of f.original.field_matrices[0].matrix){r.number=r.func===4;r.string=r.func===4||r.func===18;}
+ const year={record_id:'y1',field_id:'1',name:'DateA_Y_1',label:'Дата (Год)',type:'integer',required:true};
+ const yearText={record_id:'y2',field_id:'2',name:'DateA_Y_2',label:'Дата (Год)',type:'string',required:true};
+ const stamp={record_id:'u1',field_id:'3',name:'DateA_U_1',label:'Дата (Свой формат)',type:'string',required:true};
+ f.baseline.source_fields=[year,yearText,stamp];
+ f.baseline.target_fields=[year,yearText,stamp].map((source,i)=>({...f.baseline.target_fields[0],record_id:'t'+i,field_id:String(10+i),name:['Year','YearText','Stamp'][i],type:source.type,source}));
+ f.parameters.fields[0].transformations=[{operation:'year',name:'Year',label:'Год'},{operation:'string_year',name:'YearText',label:'Год строкой'}];
+ const result=planDateTimeRemovals(f.original,f.parameters,f.baseline);
+ assert.deepEqual(result.map(r=>[r.operation,r.source.name,r.target.name]),[['string_custom','DateA_U_1','Stamp']]);
 });

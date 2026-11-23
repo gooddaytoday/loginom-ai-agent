@@ -1,22 +1,26 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
-import { productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { productHelpDirectory, productSkillsDirectory, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { dashboardResources } from "../../dashboard/src/agent/resources"
+import { buildDashboard } from "../../dashboard/src/agent/build"
 import { verifyBundledSkills } from "../src/bundled-skills"
+import { ripgrepPins } from "../script/ripgrep-resource"
+import { removeFixture } from "./remove-fixture"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
-    actionManifestSha256: "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-linux-candidate/manifest.json",
+    actionManifestSha256: "118ee37cccf1a80fafa628b370786da9f9e753308c064ac460f83b40f98e8716",
   })
   expect(actionCatalogForPlatform("win32")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-windows-candidate/manifest.json",
-    actionManifestSha256: "174258527893d1d8d5491407630b33ffdeef677aa83ad686945cc000f819beb8",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-windows-candidate/manifest.json",
+    actionManifestSha256: "0ac3ebe8ca6036012c521f2c4e70661c65ee3d073dfd2cd8d26f418a77e1c05d",
   })
   expect(() => actionCatalogForPlatform("freebsd")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
 })
@@ -28,8 +32,8 @@ test("native catalog selection retains Linux pins and admits only the reviewed m
   })
   expect(catalogForTarget("darwin-arm64")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-macos-candidate/manifest.json",
-    actionManifestSha256: "d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-macos-candidate/manifest.json",
+    actionManifestSha256: "da96c141cdf7df26680ff5a3ef026b6fc6d7b3473e684e26d4b083ba197c4b09",
   })
   expect(catalogForTarget("win32-x64")).toEqual(actionCatalogForPlatform("win32"))
   expect(() => catalogForTarget("darwin-x64")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
@@ -79,6 +83,7 @@ posixTest.each([
   { destination: "/missing/output", browsers: "/missing/output.staging/browser" },
   { destination: "/missing/output", browsers: "/missing/output.staging" },
   { destination: resolve(import.meta.dir, "../../loginom-runtime/generated"), browsers: "/missing/browser" },
+  { destination: resolve(import.meta.dir, "../../dashboard/generated"), browsers: "/missing/browser" },
 ])("resource output and staging cannot overlap inputs: %j", async (paths) => {
   await expect(
     stageResources({
@@ -130,46 +135,87 @@ test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid b
 // Full staging uses the same pinned Node distribution and Chromium as release builds.
 // Release/acceptance runners provide these paths; the small boundary tests above do not need them.
 test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_AGENT_TEST_BROWSERS)(
-  "full resource staging delivers the canonical product skills before inventory",
+  "full resource staging inventories product skills and a buildable dashboard kit",
   async () => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE!
     const browsers = process.env.LOGINOM_AI_AGENT_TEST_BROWSERS!
     const root = await mkdtemp(join(tmpdir(), "loginom-stage-product-skills-"))
     try {
       const destination = join(root, "resources")
-      await stageResources({ destination, node, browsers, target, flavor: "cli", knowledgeKey: " UNIT-NONSECRET\n" })
-      // The built-in key is a separate inventoried resource, never part of the manifest itself.
-      expect(await readFile(join(destination, "knowledge-key"), "utf8")).toBe("UNIT-NONSECRET")
-      expect(await readFile(join(destination, "resource-manifest.json"), "utf8")).not.toContain("UNIT-NONSECRET")
+      await stageResources({ destination, node, browsers, target, flavor: "cli" })
+      // Loginom Help ships as inventoried resource files; no knowledge service key or endpoint is staged.
+      await expect(stat(join(destination, "knowledge-key"))).rejects.toMatchObject({ code: "ENOENT" })
+      expect(await readFile(join(destination, "help/help-manifest.json"), "utf8")).toBe(
+        await readFile(join(productHelpDirectory, "help-manifest.json"), "utf8"),
+      )
+      for (const path of [
+        "template/node_modules/typescript/bin/tsc",
+        "template/node_modules/vite/bin/vite.js",
+        "template/index.html",
+        "template/tsconfig.json",
+        "template/env.d.ts",
+        "template/vite.config.mjs",
+        "template/resolver.mjs",
+        "template/scan.mjs",
+        "template/src/main.tsx",
+        "template/src/loginom.ts",
+        "draft.js",
+        "selfcheck.mjs",
+      ]) expect(await Bun.file(join(destination, "dashboard", path)).exists()).toBe(true)
+      await expect(stat(join(destination, "dashboard/template/node_modules/.bin"))).rejects.toMatchObject({ code: "ENOENT" })
+      for (const [staged, source] of [["draft.js", "dist/draft.js"], ["selfcheck.mjs", "src/draft/selfcheck.mjs"]]) {
+        expect(await readFile(join(destination, "dashboard", staged!)))
+          .toEqual(await readFile(resolve(import.meta.dir, "../../dashboard", source!)))
+      }
+      const dashboard = dashboardResources(destination)
+      const work = join(root, "work")
+      await cp(join(dashboard.template, "src"), join(work, "src"), { recursive: true })
+      const build = await buildDashboard({ work, template: dashboard.template, node: dashboard.node, out: join(root, "builds") })
+      expect(build.ok, build.output).toBe(true)
       const skills = await verifyBundledSkills(destination)
       expect(skills.map((skill) => skill.name).toSorted()).toEqual([...reservedSkillNames].toSorted())
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
-      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "help/help-manifest.json")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(false)
+      expect(manifest).not.toHaveProperty("endpoint")
+      for (const path of ["dashboard/template/src/main.tsx", "dashboard/draft.js"]) {
+        expect(manifest.files.some((file: { path: string }) => file.path === path)).toBe(true)
+      }
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
+      expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("licenses/ripgrep/")
+      const rg = process.platform === "win32" ? "ripgrep/rg.exe" : "ripgrep/rg"
+      expect(manifest.files.some((file: { path: string }) => file.path === rg)).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "licenses/ripgrep/LICENSE-MIT")).toBe(true)
+      const version = Bun.spawnSync([join(destination, rg), "--version"]).stdout.toString()
+      expect(version).toStartWith(`ripgrep ${ripgrepPins.version}`)
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@xmldom/xmldom")).toBe(true)
       expect(await readFile(join(destination, "licenses/Golos-OFL.txt")))
         .toEqual(await readFile(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt")))
       const script = join(destination, "skills/package-docs/scripts/package-docs.mjs")
-      const skeleton = Bun.spawn([join(destination, manifest.node), script, "skeleton", "--lgp",
+      const alias = join(root, "docs entry alias")
+      await symlink(dirname(script), alias, process.platform === "win32" ? "junction" : "dir")
+      const environment = { LANG: "C.UTF-8", ...(process.platform === "win32"
+        ? { SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT } : {}) }
+      const skeleton = Bun.spawn([join(destination, manifest.node), "--preserve-symlinks-main", join(alias, "package-docs.mjs"), "skeleton", "--lgp",
         join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
-        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
-      const paths = new Response(skeleton.stdout).json()
+        { cwd: root, env: environment, stdout: "pipe", stderr: "pipe" })
+      const paths = new Response(skeleton.stdout).text()
       const errors = new Response(skeleton.stderr).text()
       expect(await skeleton.exited).toBe(0)
       expect(await errors).toBe("")
-      const report = (await paths).report
+      const report = JSON.parse(await paths).report
       await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."))
       const emit = Bun.spawn([join(destination, manifest.node), script, "emit", "--lgp",
         join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
-        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
-      const result = new Response(emit.stdout).json()
+        { cwd: root, env: environment, stdout: "pipe", stderr: "pipe" })
+      const result = new Response(emit.stdout).text()
       const failure = new Response(emit.stderr).text()
       expect(await emit.exited).toBe(0)
       expect(await failure).toBe("")
-      expect((await readFile((await result).output)).subarray(0, 8).toString()).toBe("%PDF-1.4")
+      expect((await readFile(JSON.parse(await result).output)).subarray(0, 8).toString()).toBe("%PDF-1.4")
       for (const path of [
         "loginom-automation/SKILL.md",
         "loginom-automation/references/workflow.md",
@@ -181,7 +227,9 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
         expect(manifest.files.some((file: { path: string }) => file.path === "skills/" + path)).toBe(true)
       }
     } finally {
-      await rm(root, { recursive: true, force: true })
+      // The pinned node.exe and rg.exe children above have exited, but Windows
+      // can keep their copied images locked briefly afterwards (EBUSY).
+      await removeFixture(root)
     }
   },
   300000,

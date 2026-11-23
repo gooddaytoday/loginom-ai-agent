@@ -226,17 +226,19 @@ test('local validation or staging failure never marks verification as dispatched
 });
 
 
-test('XLSX preflight and download retain exact byte/hash verification and format refusals',async()=>{
+test('Excel preflight and download retain exact byte/hash verification and format refusals',async()=>{
  const bytes=Buffer.from([0x50,0x4b,0xff,0x00]);
- const f=await fixture({name:'sales.XLSX',bytes});
+ for(const extension of ['XLSX','XLS']){
+ const f=await fixture({name:'sales.'+extension,bytes});
  try {
-  for(const name of ['sales.xlsx','sales.XLSX','sales.csv','sales.tsv','sales.txt'])assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name}));
-  for(const name of ['sales.xls','sales.xlsm','file.lgp','sales.xlsx.exe','file.json'])assert.throws(()=>f.rt.preflightDeliveredArtifact({name}),e=>e.code==='ARTIFACT_VERIFICATION_UNSUPPORTED');
+  for(const name of ['sales.xlsx','sales.XLSX','sales.xls','sales.XLS','sales.csv','sales.tsv','sales.txt','response.json','response.JSON'])assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name}));
+  for(const name of ['sales.xlsm','file.lgp','sales.xlsx.exe','file.json.exe'])assert.throws(()=>f.rt.preflightDeliveredArtifact({name}),e=>e.code==='ARTIFACT_VERIFICATION_UNSUPPORTED');
   const result=await f.rt.verifyArtifact(await f.request());
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verified,true);
   assert.equal(result.output.sha256,createHash('sha256').update(bytes).digest('hex'));
   assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
  }finally{await f.cleanup();}
+ }
  const wrong=await fixture({name:'wrong.xlsx',bytes});
  try {
   wrong.page.downloadBytes=Buffer.from([0x50,0x4b,0xfe,0x00]);
@@ -244,4 +246,32 @@ test('XLSX preflight and download retain exact byte/hash verification and format
   assert.equal(r.status,'FAILED');assert.equal(r.error.code,'DOWNLOADED_ARTIFACT_MISMATCH');
   assert.equal(r.output.bytes_verified,false);
  }finally{await wrong.cleanup();}
+});
+
+test('LGD delivery verifies original binary bytes and refuses a changed server copy',async()=>{
+ const bytes=Buffer.from([0x42,0x47,0x44,0x41,0x54,0x41,0,0xff]);
+ for(const changed of [false,true]){
+  const f=await fixture({name:'source.LGD',bytes});
+  try{
+   assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name:'source.LGD'}));
+   if(changed)f.page.downloadBytes=Buffer.from([...bytes.subarray(0,-1),0xfe]);
+   const r=await f.rt.verifyArtifact(await f.request());
+   assert.equal(r.status,changed?'FAILED':'SUCCEEDED');
+   assert.equal(r.output.bytes_verified,!changed);
+   if(changed)assert.equal(r.error.code,'DOWNLOADED_ARTIFACT_MISMATCH');
+   else assert.equal(r.output.sha256,createHash('sha256').update(bytes).digest('hex'));
+   assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+  }finally{await f.cleanup();}
+ }
+});
+
+test('C8 JSON uses the existing exact server-copy byte and hash verification',async()=>{
+ const bytes=Buffer.from('{"message":"REST offline fixture","amount":17,"ok":true}'),f=await fixture({name:'response.json',bytes});
+ try{
+  assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name:'response.json'}));
+  const result=await f.rt.verifyArtifact(await f.request());
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verified,true);
+  assert.equal(result.output.sha256,createHash('sha256').update(bytes).digest('hex'));
+  assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+ }finally{await f.cleanup();}
 });

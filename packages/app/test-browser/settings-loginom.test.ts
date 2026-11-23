@@ -4,6 +4,7 @@ import { Product } from "@loginom-ai-agent/product"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 import {
   createLoginomSettings,
+  createLoginomConnectionStatus,
   loginomBrowserMessage,
   watchLoginomApplication,
 } from "../src/components/settings-loginom-state"
@@ -58,6 +59,43 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("connection notice follows actual configuration, including saving and resetting a passwordless connection", async () => {
+    const f = setup({ state: "unconfigured", generation: 0 })
+    const notice = createRoot((dispose) => ({ dispose, connection: createLoginomConnectionStatus(f.api) }))
+    try {
+      expect(notice.connection.required()).toBe(false)
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(true)
+      f.update({ state: "ready", generation: 1, hasPassword: false })
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(false)
+      f.update({ state: "unconfigured", generation: 0 })
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(true)
+      f.api.status = async () => {
+        throw new Error("offline")
+      }
+      await notice.connection.refresh()
+      expect(notice.connection.required()).toBe(false)
+    } finally {
+      notice.dispose()
+      f.dispose()
+    }
+  })
+
+  test("connection status ignores a bridge response after the button is disposed", async () => {
+    const f = setup()
+    const pending = Promise.withResolvers<Loginom.View>()
+    f.api.status = () => pending.promise
+    const notice = createRoot((dispose) => ({ dispose, connection: createLoginomConnectionStatus(f.api) }))
+    const refresh = notice.connection.refresh()
+    notice.dispose()
+    pending.resolve({ ...(await f.api.read()), state: "unconfigured" })
+    await refresh
+    expect(notice.connection.required()).toBe(false)
+    f.dispose()
+  })
+
   test("a new profile can check and save unchanged connection defaults", async () => {
     const f = setup({
       revision: 0,
@@ -90,6 +128,103 @@ describe("Loginom settings", () => {
       expect(f.form.canSave()).toBe(false)
     } finally {
       f.dispose()
+    }
+  })
+  test("a rejected first-run login keeps the wizard open without saving and can be corrected", async () => {
+    const f = setup({ state: "unconfigured", revision: 0, generation: 0 })
+    f.api.check = async () => ({
+      validationId: "checked",
+      expiresAt: Date.now() + 10000,
+      browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" },
+    })
+    try {
+      await f.form.load()
+      f.form.edit({ username: "draft", password: "incorrect", passwordMode: "replace" })
+      await f.form.submit(true)
+      expect(f.saves).toHaveLength(0)
+      expect(f.closed).toHaveLength(0)
+      expect(f.form.state.view).toMatchObject({ state: "unconfigured", revision: 0, generation: 0 })
+      expect(f.form.state.failed).toBe(true)
+      expect(f.form.state.message).toBe("loginom.invalidPassword")
+      expect(f.form.state.checkedBrowser).toEqual({ state: "failed", failure: "LOGINOM_LOGIN_REJECTED" })
+      expect(f.form.state.username).toBe("draft")
+      expect(f.form.state.password).toBe("incorrect")
+      expect(f.form.canSave()).toBe(true)
+      await f.form.refresh()
+      expect(f.form.state.message).toBe("loginom.invalidPassword")
+
+      f.form.edit({ password: "correct" })
+      expect(f.form.state.message).toBeUndefined()
+      f.api.check = async () => ({
+        validationId: "corrected",
+        expiresAt: Date.now() + 10000,
+        browser: { state: "verified" },
+      })
+      f.update({ state: "ready", browser: { state: "verified" } })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 0, validationId: "corrected" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", revision: 1, generation: 1 })
+    } finally {
+      f.dispose()
+    }
+  })
+  test("an unavailable first-run server still allows saving with a browser warning", async () => {
+    const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" }
+    const f = setup({ state: "unconfigured", revision: 0, generation: 0 })
+    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    try {
+      await f.form.load()
+      f.update({ state: "ready", browser })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 0, validationId: "checked" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", generation: 1, browser })
+      expect(f.form.state.failed).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("a configured profile still allows saving after a rejected login", async () => {
+    const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" }
+    const f = setup({ browser })
+    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    try {
+      await f.form.load()
+      f.form.edit({ password: "replacement", passwordMode: "replace" })
+      await f.form.submit(true)
+      expect(f.saves).toEqual([{ revision: 1, validationId: "checked" }])
+      expect(f.closed).toHaveLength(1)
+      expect(f.closed[0]).toMatchObject({ state: "ready", generation: 2, browser })
+      expect(f.form.state.failed).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("checking unchanged defaults in a new profile reports the connection as not saved", async () => {
+    const defaults = {
+      revision: 0,
+      generation: 0,
+      url: Product.connection.url,
+      username: Product.connection.username,
+    }
+    const fresh = setup({ ...defaults, state: "unconfigured" })
+    const configured = setup({ ...defaults, revision: 1, generation: 1 })
+    try {
+      await fresh.form.load()
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.checked")
+      const browser = { state: "unknown" as const }
+      fresh.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      await fresh.form.submit(false)
+      expect(fresh.form.state.message).toBe("loginom.helpChecked")
+
+      await configured.form.load()
+      await configured.form.submit(false)
+      expect(configured.form.state.message).toBe("loginom.checkedSaved")
+    } finally {
+      fresh.dispose()
+      configured.dispose()
     }
   })
   test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {

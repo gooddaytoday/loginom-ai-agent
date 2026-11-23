@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
+import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { acquireProfile } from "../../src/cli/profile"
 
 export async function standaloneFixture(binary?: string) {
@@ -46,14 +47,16 @@ export async function standaloneFixture(binary?: string) {
       ])
       expect({ buildExit, buildError, buildOutput }).toEqual({ buildExit: 0, buildError: "", buildOutput: "" })
       await copyProductSkillsFixture(bundle)
-      // The fake knowledge server accepts this built-in key.
-      await writeFile(join(bundle, "knowledge-key"), "UNIT-NONSECRET")
+      // A small shipped Help; tests that need it unavailable remove or change it.
+      await writeHelp(join(bundle, "help"))
+      await writeFile(join(bundle, "browser"), "controlled browser payload")
       await writeFile(
         join(bundle, "resource-manifest.json"),
         JSON.stringify({
           protocol: 1,
+          nodeVersion: "24.19.0",
           node: "bin/node",
-          endpoint: "http://127.0.0.1:1/mcp",
+          browser: "browser",
           files: await resourceInventory(bundle),
         }),
       )
@@ -81,48 +84,59 @@ export async function standaloneFixture(binary?: string) {
   }
 }
 
+export function standaloneRun(
+  fixture: Awaited<ReturnType<typeof standaloneFixture>>,
+  args: string[],
+  environment?: NodeJS.ProcessEnv,
+  directory = true,
+) {
+  return {
+    argv: [
+      ...(fixture.binary ? [fixture.binary] : [process.execPath, "run", "./src/standalone.ts"]),
+      "run",
+      "--format=json",
+      ...(directory ? ["--dir", fixture.directory] : []),
+      "--model",
+      "test/test-model",
+      ...args,
+    ],
+    cwd: fixture.binary ? fixture.directory : resolve(import.meta.dir, "../.."),
+    env: {
+      ...process.env,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_CHANNEL: fixture.channel,
+      LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
+      LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
+      LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
+      LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
+      DISPLAY: "",
+      WAYLAND_DISPLAY: "",
+      HOME: join(fixture.directory, "home"),
+      XDG_CONFIG_HOME: join(fixture.directory, "desktop-config"),
+      XDG_DATA_HOME: join(fixture.directory, "desktop-data"),
+      XDG_STATE_HOME: join(fixture.directory, "desktop-state"),
+      XDG_CACHE_HOME: join(fixture.directory, "desktop-cache"),
+      ...environment,
+    },
+  }
+}
+
 export async function invoke(
   fixture: Awaited<ReturnType<typeof standaloneFixture>>,
   args: string[],
   onStart?: (interrupt: () => void) => void,
   environment?: NodeJS.ProcessEnv,
+  directory = true,
 ) {
-  const child = Bun.spawn(
-    [
-      ...(fixture.binary ? [fixture.binary] : [process.execPath, "run", "./src/standalone.ts"]),
-      "run",
-      "--format=json",
-      "--dir",
-      fixture.directory,
-      "--model",
-      "test/test-model",
-      ...args,
-    ],
-    {
-      cwd: fixture.binary ? fixture.directory : resolve(import.meta.dir, "../.."),
-      env: {
-        ...process.env,
-        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        LOGINOM_AI_AGENT_PURE: "1",
-        LOGINOM_AI_AGENT_CHANNEL: fixture.channel,
-        LOGINOM_AI_AGENT_CLI_PROFILE: fixture.profile,
-        LOGINOM_AI_AGENT_CLI_BUNDLE: fixture.bundle,
-        LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
-        LOGINOM_AI_AGENT_STRICT_RECOVERY: "0",
-        DISPLAY: "",
-        WAYLAND_DISPLAY: "",
-        HOME: join(fixture.directory, "home"),
-        XDG_CONFIG_HOME: join(fixture.directory, "desktop-config"),
-        XDG_DATA_HOME: join(fixture.directory, "desktop-data"),
-        XDG_STATE_HOME: join(fixture.directory, "desktop-state"),
-        XDG_CACHE_HOME: join(fixture.directory, "desktop-cache"),
-        ...environment,
-      },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  )
+  const command = standaloneRun(fixture, args, environment, directory)
+  const child = Bun.spawn(command.argv, {
+    cwd: command.cwd,
+    env: command.env,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   const output = new Response(child.stdout).text()
   const errors = new Response(child.stderr).text()
   const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)

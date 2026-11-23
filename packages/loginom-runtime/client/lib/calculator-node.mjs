@@ -46,6 +46,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
   revision:implementation.revision,modes:implementation.modes??[implementation.mode],output_wizard:'separate',
   configurationReadback:implementation.readback,parameter_schema:implementation.parameterSchema,
+  ...(implementation.bindingSchema?{binding_schema:implementation.bindingSchema}:{}),
   ...(implementation.fullUiOutput===true?{fullUiOutput:true}:{}),
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
@@ -71,7 +72,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    const verb=mode==='execute'?'execute_wizard':'finish_wizard',key=mode==='execute'?'btnExecute':'btnDone';
    // Complete definition paging leaves the grid on its last addressed page.
    const offset=definition?Math.floor((definition.total_columns-1)/8)*8:0;
-   const s=await channel.observe({condition:'calculator '+mode+' available',...(port?{outputColumnPage:{offset,limit:8}}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))});
+   const s=await channel.observe({condition:'calculator '+mode+' available',...(port?{outputColumnPage:{offset,limit:8},...(implementation?.type==='imports.excel'?{readMappings:true}:{})}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))});
    if(recovery){
     const direction=recovery===outputCheckpoint?'output':'input';
     requireValue(s.wizard.stage===direction+'_mapping'&&sameInputRecovery(s.prepared_node_context,recovery.value.native_mapping.node_context),'Mapping owner changed before Done');
@@ -132,6 +133,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      if(implementation.inspectConfigure){configureProgress.signature??=operation.nodeApply.signature;configureProgress.node??=structuredClone(operation.nodeApply.node);}
      try{
       const changed=await implementation.configure(channel,p,{request:operation.nodeApply.request,inputMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping,preconfiguration,
+       ...(implementation.bindingSchema?{bindingSource:operation.variableBindingSource,bindingMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.variable_mappings?.find(m=>m.kind==='control')??operation.variableBindingMapping}:{}),
+       ...(implementation.type==='transform.col_union_data'?{inputMappings:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.ports}:{}),
        ...(implementation.inspectConfigure?{progress:configureProgress}:{})});configured=changed.configuration;return changed;
      }catch(error){
       if(implementation.inspectConfigure&&configureProgress.pending){
@@ -143,6 +146,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const request=operation.nodeApply.request;
     let baseline;
     const changed=await configureCalculator(channel,p,{newNode:request.target.kind==='new',
+     createdByOperation:operation.nodeApply.phases?.find(p=>p.phase==='target')?.value?.target?.created===true,
      captureBaseline:s=>{baseline=s;},
      recoverRejectedRequest:request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0});configured=changed.configuration;
     // Close discards this editor draft directly. Next can validate a formula or
@@ -196,7 +200,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      }
      enter(ctx);
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
-     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
+     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,...(implementation.type==='transform.col_union_data'?[{inputCount:operation.colUnionInputCount}]:[]));
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;
@@ -204,7 +208,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      const requested=mappings[0]??{direction:'input',port:0},sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
      const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping),changes=[];
      await implementation?.validateInput?.(operation.nodeApply.request.parameters,resolved,s.node_mapping,
-       {channel,record:onRecord,operationId:operation.id});
+       {channel,record:onRecord,operationId:operation.id,request:operation.nodeApply.request});
      if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
      if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
@@ -293,13 +297,18 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const finish=await finishWizard('done',true,definition,outputCheckpoint);
     return verified({effect_possible:true,native_mapping:mapping,definition,changes,finish,source_identity_verified:true});
    },
-   async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
+   async finish(mode,ctx){
+    enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');
+    const result=await finishWizard(mode);
+    if(implementation?.afterDone)result.bindings=await implementation.afterDone(channel,operation.nodeApply.request,configured,{options,ctx,readGraph:()=>operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},ctx.deadline,ctx.signal)});
+    return result;
+   },
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
-    if(mode==='execute'&&!implementation){
-     // Preview creates native process groups. Capture them after the wizard
-     // and port commits, before attributing the one final graph launch.
+    if(mode==='execute'&&(!implementation||implementation.executionBaselineAfterConfigure?.(operation.nodeApply.request)===true)){
+     // Preview and opt-in node configuration can create native process groups.
+     // Capture them after port commits, before the one final graph launch.
      executionDriver=createNodeExecutionProcedure(channel,ctx.node);
      await executionDriver.prepare();
     }
@@ -318,7 +327,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Closing the inspected LinReg apply draft asynchronously replaces its SVG
     // body. Settle that selection by reading, before issuing the first click;
     // retain the original observation/operation deadlines and gesture guards.
-    const settleApply=['datamining.lin_regression','preprocessing.binning'].includes(implementation?.type)&&operation.nodeApply.request.mode==='apply';
+    const settleApply=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','research.factor_analysis'].includes(implementation?.type)&&operation.nodeApply.request.mode==='apply';
     const selection=s=>s.ui.elements.filter(e=>
      (e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
       ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
@@ -332,7 +341,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
-     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true});
+     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true||implementation?.type==='research.factor_analysis'&&operation.nodeApply.request.mode==='apply'});
     const finish=await finishConfiguredGraph(channel,executionDriver,mode,ctx.node);
     if(training)finish.training=training;
     if(mode==='execute')finish.continuation_surface=finishedImportSurface(await channel.observe({

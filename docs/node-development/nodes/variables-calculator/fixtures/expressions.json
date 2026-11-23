@@ -1,0 +1,55 @@
+{
+  "expressions": [
+    {
+      "name": "limit",
+      "label": "Лимит",
+      "type": "integer",
+      "formula": "100"
+    },
+    {
+      "name": "skip",
+      "label": "Пропуск",
+      "type": "integer",
+      "formula": "0"
+    },
+    {
+      "name": "remaining",
+      "label": "Осталось",
+      "type": "integer",
+      "formula": "Expr.limit-Expr.skip"
+    },
+    {
+      "name": "title",
+      "label": "Заголовок",
+      "type": "string",
+      "formula": "\"Страница\""
+    },
+    {
+      "name": "enabled",
+      "label": "Включено",
+      "type": "boolean",
+      "formula": "TRUE"
+    },
+    {
+      "name": "ratio",
+      "label": "Доля",
+      "type": "real",
+      "formula": "1/8"
+    },
+    {
+      "name": "empty",
+      "label": "Пустая строка",
+      "type": "string",
+      "formula": "\"\""
+    },
+    {
+      "name": "missing",
+      "label": "Нет значения",
+      "type": "integer",
+      "formula": "NULL"
+    }
+  ],
+  "update": {
+    "limit": "120"
+  }
+}

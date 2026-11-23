@@ -1,0 +1,7 @@
+Key,Name,Rate
+1,b1,0.5
+1,b1copy,0.75
+2,b2,1.25
+?,b-null,2.5
+?,b-null-copy,3.5
+99,b-unused,8

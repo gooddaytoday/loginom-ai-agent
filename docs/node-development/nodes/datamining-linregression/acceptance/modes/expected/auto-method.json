@@ -1,0 +1,204 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "datamining.lin_regression",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Y_rergession",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X1",
+          "type": "integer"
+        },
+        {
+          "name": "X2",
+          "type": "integer"
+        },
+        {
+          "name": "X3",
+          "type": "integer"
+        },
+        {
+          "name": "Y",
+          "type": "real"
+        },
+        {
+          "name": "IsTest",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X1": -1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 2,
+          "X1": -1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 3,
+          "X1": -1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 4,
+          "X1": -1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 5,
+          "X1": -1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 6,
+          "X1": -1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 7,
+          "X1": -1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 8,
+          "X1": -1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 9,
+          "X1": 1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 10,
+          "X1": 1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 11,
+          "X1": 1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 12,
+          "X1": 1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 13,
+          "X1": 1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 14,
+          "X1": 1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 15,
+          "X1": 1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        },
+        {
+          "RowID": 16,
+          "X1": 1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 0.0,
+          "IsTest": false,
+          "Y_rergession": 0.0
+        }
+      ],
+      "ordered": true
+    }
+  ]
+}

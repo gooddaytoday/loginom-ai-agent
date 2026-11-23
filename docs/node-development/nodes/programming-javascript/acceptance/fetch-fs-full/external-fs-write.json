@@ -1,0 +1,36 @@
+{
+  "http": [],
+  "files": {
+    "report.txt": "d09fd180d0b8d0b2d0b5d1822c20d081d0b60a34320ae282ac",
+    "utf16le.txt": "01043604",
+    "utf16bom.txt": "fffe01043604",
+    "cp1251.txt": "a8e6",
+    "bytes.bin": "00017f80ff"
+  },
+  "inventory": [
+    {
+      "path": "bytes.bin",
+      "kind": "file"
+    },
+    {
+      "path": "cp1251.txt",
+      "kind": "file"
+    },
+    {
+      "path": "report.txt",
+      "kind": "file"
+    },
+    {
+      "path": "utf16bom.txt",
+      "kind": "file"
+    },
+    {
+      "path": "utf16le.txt",
+      "kind": "file"
+    }
+  ],
+  "reserved_artifacts": [],
+  "required_artifacts": [],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

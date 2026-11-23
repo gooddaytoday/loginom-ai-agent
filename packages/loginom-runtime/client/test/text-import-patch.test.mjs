@@ -37,6 +37,17 @@ test('partial column updates preserve order, other fields and unspecified proper
  assert.deepEqual(result,[{...fields[0],name:'RecordId',source_name:'Id'},fields[1],{...fields[2],label:'Сумма'}]);
  assert.deepEqual(baseline,fields);assert.equal(patch[0].label,undefined);
 });
+test('an omitted continuous kind follows the native reset on a string or boolean type change (LAB-1866)',()=>{
+ // After refresh types RuId parses as integer/Непрерывный; Loginom resets the
+ // kind to «Дискретный» on string, whose list has no «Непрерывный» option.
+ const parsed=[{name:'RuId',label:'RuId',type:'integer',data_kind:'Непрерывный',used:true},
+  {name:'RuAmount',label:'RuAmount',type:'string',data_kind:'Дискретный',used:true}];
+ assert.deepEqual(mergeImportColumnPatch(parsed,[{source_name:'RuId',type:'string'},{source_name:'RuAmount',type:'real'}]),
+  [{...parsed[0],type:'string',data_kind:'Дискретный'},{...parsed[1],type:'real'}],'a kind valid for the new type is kept');
+ assert.deepEqual(reconcileImportColumnPatch(parsed,parsed,[{source_name:'RuId',type:'boolean'}])[0],{...parsed[0],type:'boolean',data_kind:'Дискретный'});
+ assert.equal(mergeImportColumnPatch(parsed,[{source_name:'RuId',type:'string',data_kind:'Неопределенное'}])[0].data_kind,'Неопределенное','explicit kind wins');
+ assert.equal(mergeImportColumnPatch(parsed,[{source_name:'RuId',type:'integer'}])[0].data_kind,'Непрерывный','same type keeps parsed kind');
+});
 test('existing import patches accept unique Russian labels without requiring a rename',()=>{
  const source=fields.map(c=>({...c,label:c.name==='Id'?'Код товара':c.label}));
  assert.deepEqual(mergeImportColumnPatch(source,[{source_name:'Код товара',used:false}]),

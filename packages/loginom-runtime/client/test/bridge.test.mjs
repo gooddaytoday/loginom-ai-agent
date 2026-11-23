@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { createRedactor } from '../lib/redact.mjs';
 import { actionReply, browserProcessEnvironment } from '../lib/bridge.mjs';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -126,15 +127,31 @@ test('observation usage is a separate bounded hint and never changes the authori
   assert.deepEqual(JSON.parse(actionReply(ambiguous, { observe: true }).content[1].text).root_read_arguments, []);
 });
 
+// The contract child is CPU-bound (~6 s alone). Each child stays below the
+// 60 s per-test timeout, and all seven sequential children together stay
+// within the outer `timeout 5m` of the CI step even if every one hangs. That
+// outer limit covers the whole client suite (`test/*.test.mjs`,
+// `--test-concurrency=2`), not bridge.test alone.
+const childBudgetMs = 40000;
+const catalogFaults = ['initialize-one', 'list-one', 'read-one', 'list-two', 'read-two', 'list-semantic'];
+
+test('bridge child budgets fit the per-test and outer CI suite timeouts', () => {
+  const workflow = readFileSync(new URL('../../../../.github/workflows/test.yml', import.meta.url), 'utf8');
+  const suite = workflow.match(/timeout --kill-after=\S+ (\d+)m nice -n 19 "\$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=(\d+) /);
+  assert.ok(suite, 'client suite timeouts');
+  assert.ok(childBudgetMs < Number(suite[2]));
+  assert.ok(childBudgetMs * (catalogFaults.length + 1) <= Number(suite[1]) * 60000);
+});
+
 // Module mocks are isolated to this child process, so actual SDK and bridge
 // imports used by the other suites retain their original implementations.
-for (const fault of ['initialize-one', 'list-one', 'read-one', 'list-two', 'read-two', 'list-semantic']) {
+for (const fault of catalogFaults) {
   test(`bridge startup ${fault}: retry only catalog reads before a single prepare`, async () => {
     const environment = { ...process.env, LOGINOM_TEST_CATALOG_FAULT: fault };
     delete environment.NODE_TEST_CONTEXT;
     const result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
       fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))],
-    { timeout: 30000, env: environment });
+    { timeout: childBudgetMs, env: environment });
     assert.match(result.stdout, /pass 1/); assert.match(result.stdout, /fail 0/);
   });
 }
@@ -145,7 +162,7 @@ test('bridge keeps application feedback recoverable over the MCP protocol', asyn
   let result;
   try {
     result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
-      fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))], { timeout: 30000, env: environment });
+      fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))], { timeout: childBudgetMs, env: environment });
   } catch (error) {
     const redactor = createRedactor();
     const diagnostic = redactor.text(`stdout:\n${String(error.stdout ?? '')}\nstderr:\n${String(error.stderr ?? '')}`).slice(0, 16000);

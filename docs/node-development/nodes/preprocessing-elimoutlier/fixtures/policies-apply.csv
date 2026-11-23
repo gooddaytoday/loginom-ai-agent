@@ -1,0 +1,5 @@
+RowID,X,Note
+1,2,new_normal
+2,12,new_outlier
+3,30,new_extreme
+4,?,missing

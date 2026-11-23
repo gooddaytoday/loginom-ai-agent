@@ -3,8 +3,23 @@ import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 import { execFileSync } from "node:child_process"
+import { createPublicKey } from "node:crypto"
 
 const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
+
+// Fixture trust is a build input, never a runtime override. Release CI cannot opt in.
+const updateTestKey = (() => {
+  if (
+    process.env.LOGINOM_AI_AGENT_UPDATE_TEST_BUILD !== "1" ||
+    process.env.GITHUB_WORKFLOW === "release" ||
+    process.env.GITHUB_WORKFLOW_REF?.includes("/.github/workflows/release.yml@")
+  )
+    return null
+  const pem = process.env.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
+  if (!pem?.startsWith("-----BEGIN PUBLIC KEY-----") || createPublicKey(pem).asymmetricKeyType !== "ed25519")
+    throw Error("LOGINOM_UPDATE_TEST_PUBLIC_KEY_INVALID")
+  return pem
+})()
 
 // Capture provenance at build time, never from the user's working directory.
 const source = (() => {
@@ -54,6 +69,14 @@ const sentry =
 export default defineConfig({
   main: {
     define: {
+      LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: JSON.stringify(updateTestKey),
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_API: JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API?.trim() || null,
+      ),
+      LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD?.trim() || null,
+      ),
+      LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_SHA": JSON.stringify(source.sha),
       "import.meta.env.LOGINOM_AI_AGENT_SOURCE_DIRTY": JSON.stringify(source.dirty),
@@ -79,7 +102,12 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       },
       externalizeDeps: {
         include: [nodePtyPkg],
-        exclude: ["@loginom-ai-agent/product", "@opencode-ai/schema", "@loginom-ai-agent/loginom-host"],
+        exclude: [
+          "@loginom-ai-agent/product",
+          "@opencode-ai/schema",
+          "@loginom-ai-agent/loginom-host",
+          "@loginom-ai-agent/dashboard",
+        ],
       },
     },
     plugins: [

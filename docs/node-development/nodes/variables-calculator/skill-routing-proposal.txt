@@ -1,0 +1,2 @@
+| Параметры | `variables.calculator` / expression | [читать](references/nodes/variables.calculator.md) |
+| Итоги таблицы | `variables.from_table` / aggregate | [читать](references/nodes/variables.from_table.md) |

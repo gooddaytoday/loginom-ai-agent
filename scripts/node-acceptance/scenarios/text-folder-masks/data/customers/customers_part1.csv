@@ -1,0 +1,4 @@
+CustomerID,FullName,Segment,RiskScore
+C-001,Анна Смирнова,retail,0.15
+C-002,Игорь Волков,premium,0.62
+C-003,Ольга Ким,retail,0.33

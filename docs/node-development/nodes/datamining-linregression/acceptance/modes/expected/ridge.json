@@ -1,0 +1,241 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "datamining.lin_regression",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Y_rergession",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X1",
+          "type": "integer"
+        },
+        {
+          "name": "X2",
+          "type": "integer"
+        },
+        {
+          "name": "X3",
+          "type": "integer"
+        },
+        {
+          "name": "Y",
+          "type": "real"
+        },
+        {
+          "name": "IsTest",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X1": -1,
+          "X2": -1,
+          "X3": -1,
+          "Y": -2.75,
+          "IsTest": false,
+          "Y_rergession": -2.3529411764705883
+        },
+        {
+          "RowID": 2,
+          "X1": -1,
+          "X2": -1,
+          "X3": -1,
+          "Y": -2.25,
+          "IsTest": false,
+          "Y_rergession": -2.3529411764705883
+        },
+        {
+          "RowID": 3,
+          "X1": -1,
+          "X2": -1,
+          "X3": 1,
+          "Y": -2.75,
+          "IsTest": false,
+          "Y_rergession": -2.3529411764705883
+        },
+        {
+          "RowID": 4,
+          "X1": -1,
+          "X2": -1,
+          "X3": 1,
+          "Y": -2.25,
+          "IsTest": false,
+          "Y_rergession": -2.3529411764705883
+        },
+        {
+          "RowID": 5,
+          "X1": -1,
+          "X2": 1,
+          "X3": -1,
+          "Y": -1.75,
+          "IsTest": false,
+          "Y_rergession": -1.411764705882353
+        },
+        {
+          "RowID": 6,
+          "X1": -1,
+          "X2": 1,
+          "X3": -1,
+          "Y": -1.25,
+          "IsTest": false,
+          "Y_rergession": -1.411764705882353
+        },
+        {
+          "RowID": 7,
+          "X1": -1,
+          "X2": 1,
+          "X3": 1,
+          "Y": -1.75,
+          "IsTest": false,
+          "Y_rergession": -1.411764705882353
+        },
+        {
+          "RowID": 8,
+          "X1": -1,
+          "X2": 1,
+          "X3": 1,
+          "Y": -1.25,
+          "IsTest": false,
+          "Y_rergession": -1.411764705882353
+        },
+        {
+          "RowID": 9,
+          "X1": 1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 1.25,
+          "IsTest": false,
+          "Y_rergession": 1.411764705882353
+        },
+        {
+          "RowID": 10,
+          "X1": 1,
+          "X2": -1,
+          "X3": -1,
+          "Y": 1.75,
+          "IsTest": false,
+          "Y_rergession": 1.411764705882353
+        },
+        {
+          "RowID": 11,
+          "X1": 1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 1.25,
+          "IsTest": false,
+          "Y_rergession": 1.411764705882353
+        },
+        {
+          "RowID": 12,
+          "X1": 1,
+          "X2": -1,
+          "X3": 1,
+          "Y": 1.75,
+          "IsTest": false,
+          "Y_rergession": 1.411764705882353
+        },
+        {
+          "RowID": 13,
+          "X1": 1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 2.25,
+          "IsTest": false,
+          "Y_rergession": 2.3529411764705883
+        },
+        {
+          "RowID": 14,
+          "X1": 1,
+          "X2": 1,
+          "X3": -1,
+          "Y": 2.75,
+          "IsTest": false,
+          "Y_rergession": 2.3529411764705883
+        },
+        {
+          "RowID": 15,
+          "X1": 1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 2.25,
+          "IsTest": false,
+          "Y_rergession": 2.3529411764705883
+        },
+        {
+          "RowID": 16,
+          "X1": 1,
+          "X2": 1,
+          "X3": 1,
+          "Y": 2.75,
+          "IsTest": false,
+          "Y_rergession": 2.3529411764705883
+        }
+      ],
+      "ordered": true
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Y_coefficients",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "Y_coefficients": 0.0
+        },
+        {
+          "Name": "X1",
+          "Y_coefficients": 1.8823529411764706
+        },
+        {
+          "Name": "X2",
+          "Y_coefficients": 0.47058823529411764
+        },
+        {
+          "Name": "X3",
+          "Y_coefficients": 0.0
+        }
+      ],
+      "ordered": true
+    }
+  ]
+}

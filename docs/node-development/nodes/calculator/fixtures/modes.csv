@@ -1,0 +1,5 @@
+RowID;Quantity;UnitPrice;Amount
+1;2;5;100
+2;0;3;7
+3;-2;4;-5
+4;NULL;8;9

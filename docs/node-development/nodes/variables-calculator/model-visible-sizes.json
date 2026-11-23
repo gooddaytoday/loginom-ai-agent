@@ -1,0 +1,25 @@
+{
+  "base_sha": "aa49dc7d88b79917b1ba93d721880b155c4f19c9",
+  "counting": "UTF-8 bytes; JSON.stringify separators for cards/schema; exact file bytes for skill",
+  "full_node_apply_schema": 58948,
+  "published_node_apply_schema": 50099,
+  "published_limit": 20000,
+  "skill_current": 39686,
+  "routing_rows": [
+    120,
+    126
+  ],
+  "skill_proposed": 39932,
+  "cards": {
+    "variables-calculator": {
+      "compact_card": 2712,
+      "formatted_card_file": 3884,
+      "skill_reference_file": 2041
+    },
+    "variables-datatovar": {
+      "compact_card": 2167,
+      "formatted_card_file": 3180,
+      "skill_reference_file": 1857
+    }
+  }
+}

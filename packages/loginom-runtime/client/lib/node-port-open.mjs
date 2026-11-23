@@ -22,7 +22,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Output port opening deadline');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  const inspect=mode=>page.evaluate(({task,mode})=>{
-  const direction=task.direction??'output',input=direction==='input',control=task.kind==='control';
+  const direction=task.direction??'output',input=direction==='input',control=task.kind==='control',variables=task.kind==='variables';
+  if(variables&&!input&&task.port!==4)throw Error('Only builtin user output four is editable');
   if(control&&(!input||task.port!==0))throw Error('Control input only');
   if(!['input','output'].includes(direction))throw Error('Invalid port direction');
   const b=task.binding,app=globalThis.bg?.app,p=globalThis.__loginomDockPreparationV1;
@@ -37,14 +38,18 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(!prepared||records.some(r=>r.tab!==prepared.tab||r.packageNode!==prepared.packageNode)
     ||tabs.length!==1||tabs[0]!==prepared.tab||!tabs[0].classList.contains('x-tab-active'))fail('Port opening workflow changed');
   const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller?.FController;
+  const calculatorInput=input&&!control&&!variables&&model?.FDiagram?.FNodes?.FCollection?.some(n=>n.FGuid===b.node.node_id&&n.FIconCls==='bg-vendor-icon-calcdata');
   const ownGroupingGraphMask=e=>{
    const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    const nodes=model?.FDiagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
-   return input&&model instanceof app.ModelForm&&card.Controller.Node?.data?.node===prepared.nodeTargetWorkflowNode
+   const user=variables&&!input&&task.port===4&&prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode;
+   return (input||user)&&model instanceof app.ModelForm&&card.Controller.Node?.data?.node===prepared.nodeTargetWorkflowNode
     &&roots.length===1&&roots[0]===e&&e.getAttribute('data-tid')===b.workflow_ref.prefix+';ModelForm'&&model.FView?.el?.dom===e
     &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
     &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
-    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FIconCls==='bg-vendor-icon-groupdata'&&nodes[0].FLocked===false
+    &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FLocked===false
+    &&(calculatorInput||variables&&input&&['bg-vendor-icon-importtextfile','bg-vendor-icon-importexcelfile'].includes(nodes[0].FIconCls)
+      ||(user?nodes[0].FIconCls==='bg-vendor-icon-modelvariables':['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls)))
     &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
       &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
       &&(r.port.FPortIndex===undefined||r.port.FPortIndex===r.nativeIndex));
@@ -63,9 +68,11 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const dialog=dialogs[0],native=globalThis.Ext?.getCmp?.(dialog.id);
    const normalize=s=>s.replace(/\s+/g,' ').trim();
    const question='Loginom '+task.build+' Настройка порта приведет к деактивации узла. Вы действительно хотите начать настраивать порт? Да Да, больше не спрашивать Нет';
-   if(dialogs.length!==1||native?.el?.dom!==dialog||normalize(dialog.innerText)!==question
-     ||model!==r.graph||r.graph.FCurrentPortMenu!==r.port||r.node.FLocked===true
-     ||card.Controller.Node?.data?.node!==r.workflow)fail('Port deactivation question owner changed');
+   const checks={one_dialog:dialogs.length===1,native_dialog:native?.el?.dom===dialog,question:normalize(dialog.innerText)===question,
+     graph:model===r.graph,port:r.graph.FCurrentPortMenu===r.port,unlocked:r.node.FLocked!==true,workflow:card.Controller.Node?.data?.node===r.workflow};
+   if(Object.values(checks).some(v=>!v))fail('Port deactivation question owner changed: '+JSON.stringify({checks,
+     controller:typeof model?.constructor?.name==='string'?model.constructor.name.slice(0,64):null,
+     wizard_visible:exact(b.workflow_ref.prefix+';WizrdMCF').some(visible)}));
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible);
    if(masks.some(e=>!ownGroupingGraphMask(e)&&!(e.classList.contains('bg-mask-message')&&e.getAttribute('data-tid')===b.workflow_ref.prefix
        &&e.contains(r.graph.FDiagram.FmxGraph.container))
@@ -92,14 +99,22 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   const blocked=blockers.find(e=>{
    const parent=e.parentElement,column=parent&&globalThis.Ext?.getCmp?.(parent.id),roots=exact(b.workflow_ref.prefix+';WizrdMCF'),grid=exact(b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;grdTargetColumns');
-   const ownDisabledHeader=control&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
+   const ownDisabledHeader=(control||variables&&input)&&mode==='finish'&&e.classList?.contains('x-mask')===true&&e.classList?.contains('x-mask-msg')!==true&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===b.workflow_ref.prefix+';WizrdMCF;TuneVariablesMappingWizard;colTargetDelete'
     &&column?.$className==='Ext.grid.column.Action'&&column.el.dom===parent&&column.disabled===true&&roots.length===1&&roots[0].contains(parent)
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
    // Ext masks a disabled delete-all column even when the output wizard is ready.
    // This one native control mask is not a wizard loading overlay.
-   const columnTid=b.workflow_ref.prefix+';WizrdMCF;DataSetOutputSocketWizard;colTargetDelete';
-   const ownDisabledOutputHeader=mode==='finish'&&!input&&e.classList?.contains('x-mask')
+   const emptyJavascriptInput=input&&task.port===0&&r?.node?.FIconCls==='bg-vendor-icon-javascript'
+    &&['grdSourceColumns;tbl','grdTargetColumns;tbl'].every(key=>{
+     const grids=exact(b.workflow_ref.prefix+';WizrdMCF;TuneDataSourceMappingWizard;'+key);
+     const view=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.();
+     return grids.length===1&&roots.length===1&&roots[0].contains(grids[0])&&view?.el?.dom===grids[0]
+      &&store?.$className==='Ext.data.Store'&&store.isLoading?.()===false&&store.getCount?.()===0
+      &&store.getTotalCount?.()===0&&Array.isArray(store.getData?.()?.items)&&store.getData().items.length===0;
+    });
+   const columnTid=b.workflow_ref.prefix+';WizrdMCF;'+(emptyJavascriptInput?'TuneDataSourceMappingWizard':variables?'VariablesEditValuesWizard':'DataSetOutputSocketWizard')+';colTargetDelete';
+   const ownDisabledOutputHeader=mode==='finish'&&(!input||emptyJavascriptInput)&&e.classList?.contains('x-mask')
     &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
     &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1
@@ -124,9 +139,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    }catch{}
    fail('Port opening blocked'+detail);
   }
-  // A completed Grouping/rename can still leave its native graph busy. Wait
+  // Grouping/rename, Calculator input mapping or user-variable Done can leave its native graph busy. Wait
   // for this exact surface to settle; never issue a port gesture through it.
-  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy'};
+  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput?{sample_limit:150}:{})};
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');
@@ -137,15 +152,20 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const ns=d.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
    if(ns?.length!==1||ns[0].FLocked===true)fail('Port opening node unavailable');
    const node=ns[0],nodeDom=d.FmxGraph.view.getState(node.FCell)?.shape?.node,tid=nodeDom?.getAttribute('data-tid');
+   if(variables&&!input&&(node.FIconCls!=='bg-vendor-icon-modelvariables'||!(prepared.nodeTargetWorkflowNode.ParentNode instanceof app.ModelUnitItemTreeNode)))fail('Root builtin variables required');
    if(!tid||!roots[0].contains(nodeDom)||!Array.isArray(node.FPorts)||node.FPorts.length>16)fail('Port opening graph binding');
    const candidates=[];
    for(const list of node.FPorts){if(!Array.isArray(list.FCollection)||list.FCollection.length>100)fail('Port inventory bound');candidates.push(...list.FCollection);}
    const ports=[],graphBox=roots[0].getBoundingClientRect();
-   for(const dom of document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+'_Data-'))+']')) {
+   for(const dom of document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+(variables?'_Var-':'_Data-')))+']')) {
     // The outline keeps a cloned SVG with identical tids after closing. Only
     // the prepared graph's own port can participate in native hit binding.
     if(!roots[0].contains(dom))continue;
-    const ptid=dom.getAttribute('data-tid'),suffix=ptid.slice((tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+'_Data-')).length);
+    const ptid=dom.getAttribute('data-tid'),suffix=ptid.slice((tid+';'+(control?'Input_ControlVar':(input?'Input':'Output')+(variables?'_Var-':'_Data-'))).length);
+    // A just-cancelled builtin wizard can retain a duplicate output-3 SVG.
+    // Only output 4 participates in the user-value operation; bind its exact
+    // live hit and retained native identity without borrowing other outputs.
+    if(variables&&!input&&suffix!=='4')continue;
     if(control?suffix!=='':!/^[0-9]{1,2}$/.test(suffix))fail('Unknown output port identifier');
     const index=control?candidates.findIndex(p=>p.FCell===d.FmxGraph.view.getState(p.FCell)?.cell&&d.FmxGraph.view.getState(p.FCell)?.shape?.node===dom):Number(suffix),box=dom.getBoundingClientRect();
     if(index<0)fail('Control port native ordinal unavailable');
@@ -159,15 +179,21 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // Union's dynamic tabular inputs retain an SVG creation index that includes
    // the hidden variable socket. Their native tree indexes are tabular ordinals.
    // Rebind on every opening; the exact cell, GUID and tree owner remain required.
-   const dynamicUnion=input&&node.FIconCls==='bg-vendor-icon-uniondata';
+      const dynamicUnion=input&&['bg-vendor-icon-uniondata','bg-vendor-icon-enrichdata','bg-vendor-icon-coluniondata','bg-vendor-icon-replacecolumns'].includes(node.FIconCls);
    for(const [ordinal,p] of ports.entries()){
     p.nativeIndex=dynamicUnion?ordinal:p.index;
     if(p.port.FPortIndex!==undefined&&p.port.FPortIndex!==p.nativeIndex)fail('Port native hit identity unavailable');
    }
    if(new Set(ports.map(v=>v.index)).size!==ports.length||new Set(ports.map(v=>v.port.FGuid)).size!==ports.length)fail('Duplicate output ports');
-   const target=ports[task.port];if(!target)fail('Requested output port absent');
+   const target=variables&&!input?ports.find(p=>p.index===4):ports[task.port];if(!target)fail('Requested output port absent');
+   if(variables&&!input){
+    const previous=prepared.nodeTargetPortIdentities?.get(target.port);
+    if(target.port.FType!==1||target.port.FSubType!==3||!previous||previous.graph!==d.FmxGraph||previous.node!==node
+      ||previous.cell!==target.port.FCell||previous.guid!==target.port.FGuid||previous.data!==target.port.data||previous.tid!==target.tid)fail('Retained builtin user output identity changed');
+   }
+   if(variables&&input&&(target.port.FType!==0||target.port.FSubType!==3))fail('Variable input native kind changed');
    if(exact('mn').some(e=>e.checkVisibility({checkVisibilityCSS:true})))fail('An existing context menu is open');
-   const rec={direction,request:JSON.stringify(b)+':'+task.port,phase:'reserved',graph:model,node,nodeData:node.data,
+   const rec={direction,...(variables?{kind:'variables'}:{}),request:JSON.stringify(b)+':'+task.port,phase:'reserved',graph:model,node,nodeData:node.data,
     port:target.port,portData:target.port.data,portGuid:target.port.FGuid,portDom:target.dom,
     portTid:target.tid,nativeIndex:target.nativeIndex,portIndex:task.port,workflow:prepared.nodeTargetWorkflowNode,packageNode:prepared.packageNode,
     document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,operation_id:task.operation_id};
@@ -296,13 +322,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const wizardTree=card.Controller.Node?.data?.node,portTree=wizardTree?.ParentNode,group=portTree?.ParentNode,nodeTree=group?.ParentNode;
    const roots=exact(b.workflow_ref.prefix+';WizrdMCF');
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
-    ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof app.ModelNodeTreeNode)
+    ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof (variables&&!input?app.ModelServiceNodeTreeNode:app.ModelNodeTreeNode))
     ||nodeTree.FGuid!==r.node_id||nodeTree.FModelNode!==r.node.data||portTree.FModelNodePort!==r.port.data
     ||portTree.FIndex!==r.nativeIndex||nodeTree.ParentNode!==r.workflow
-    ||model?.constructor?.name!=='WizardModelComponentForm'||!(input?model.FModelSocket:model.FModelEnginePort)||model.FModelNode
+    ||model?.constructor?.name!=='WizardModelComponentForm'||!(input||variables?model.FModelSocket:model.FModelEnginePort)||model.FModelNode
     ||roots.length!==1||model.FView?.el?.dom!==roots[0])fail('Opened port wizard owner differs');
-   if(r.phase==='verified'&&(r.wizard!==model||r.enginePort!==(input?model.FModelSocket:model.FModelEnginePort)||r.portTree!==portTree||r.nodeTree!==nodeTree))fail('Port wizard receipt became stale');
-   r.wizard=model;r.enginePort=input?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;r.phase='verified';
+   if(r.phase==='verified'&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)||r.portTree!==portTree||r.nodeTree!==nodeTree))fail('Port wizard receipt became stale');
+   r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;r.phase='verified';
    return {phase:r.phase,verified:true,document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
   }
@@ -313,6 +339,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   while(remaining()>0){
    const result=await inspect(mode);if(result.reason!=='port_graph_busy')return result;
    if(!busy){busy={event:direction+'_port_graph_busy',mode,samples:0};trace.push(busy);}
+   if(result.sample_limit&&busy.samples>=result.sample_limit)throw Error('Port opening blocked: ModelForm remained busy');
    busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
   }
  };

@@ -1,0 +1,196 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "exports.lgd",
+      "label": "WriteEmpty"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadEmpty"
+    },
+    {
+      "type": "exports.lgd",
+      "label": "WriteVariant"
+    },
+    {
+      "type": "imports.lgd",
+      "label": "ReadVariant"
+    }
+  ],
+  "lgd": {
+    "kind": "edges",
+    "formats": [
+      {
+        "name": "Empty",
+        "import_label": "ReadEmpty",
+        "export_label": "WriteEmpty",
+        "native_compression": 2,
+        "native_checksum": 1,
+        "compression_display": "LZ4",
+        "checksum_display": "Сжатых данных",
+        "columns": [
+          {
+            "name": "Id",
+            "label": "Номер",
+            "type": "integer",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Text",
+            "label": "Текст",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Amount",
+            "label": "Сумма",
+            "type": "real",
+            "data_kind": "continuous",
+            "tolerance": {
+              "abs": 0,
+              "rel": 0
+            }
+          },
+          {
+            "name": "Occurred",
+            "label": "Момент",
+            "type": "datetime",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Active",
+            "label": "Активен",
+            "type": "boolean",
+            "data_kind": "discrete"
+          }
+        ]
+      },
+      {
+        "name": "Variant",
+        "import_label": "ReadVariant",
+        "export_label": "WriteVariant",
+        "native_compression": 2,
+        "native_checksum": 1,
+        "compression_display": "LZ4",
+        "checksum_display": "Сжатых данных",
+        "columns": [
+          {
+            "name": "Name",
+            "label": "Имя",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "DisplayName",
+            "label": "Метка",
+            "type": "string",
+            "data_kind": "discrete"
+          },
+          {
+            "name": "Value",
+            "label": "Значение",
+            "type": "variant",
+            "data_kind": "Неопределенное"
+          }
+        ]
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Номер",
+          "type": "integer",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Text",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "continuous",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Occurred",
+          "label": "Момент",
+          "type": "datetime",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Active",
+          "label": "Активен",
+          "type": "boolean",
+          "data_kind": "discrete"
+        }
+      ],
+      "rows": [],
+      "output_node_label": "ReadEmpty"
+    },
+    {
+      "output_node_type": "imports.lgd",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Name",
+          "label": "Имя",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "DisplayName",
+          "label": "Метка",
+          "type": "string",
+          "data_kind": "discrete"
+        },
+        {
+          "name": "Value",
+          "label": "Значение",
+          "type": "variant",
+          "data_kind": "Неопределенное"
+        }
+      ],
+      "rows": [
+        {
+          "Name": "Count",
+          "DisplayName": "Count",
+          "Value": {
+            "cell_type": "integer",
+            "value": 7
+          }
+        },
+        {
+          "Name": "Text",
+          "DisplayName": "Text",
+          "Value": {
+            "cell_type": "string",
+            "value": "native"
+          }
+        },
+        {
+          "Name": "Missing",
+          "DisplayName": "Missing",
+          "Value": null
+        }
+      ],
+      "output_node_label": "ReadVariant"
+    }
+  ]
+}

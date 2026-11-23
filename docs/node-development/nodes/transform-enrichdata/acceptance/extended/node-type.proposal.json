@@ -1,0 +1,157 @@
+{
+  "type": "transform.enrich_data",
+  "title": "Дополнение данных",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-enrichdata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 2,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": true,
+  "modes": [
+    "left"
+  ],
+  "semantics": "Left enrich input 0 with 1..14 independent lookups; every key is an observed compatible field. NULL matches NULL, duplicate matches multiply, unmatched main rows survive, lookup keys are excluded. Complete keys and literal prefixes required for input changes. Exact output order needs autosync=false. Native UI has no join selector, computed keys or key conversion. Full coverage is a separate owner decision; this card does not admit it.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "enrich-v1-internal-1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/transformation/enrich-data.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "left"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "description": "Complete native left enrichment. Up to 14 lookup inputs within the existing 15-input envelope; ports contiguous.",
+    "additionalProperties": false,
+    "properties": {
+      "enrichment": {
+        "type": "object",
+        "description": "Complete replacement of supported lookup key pairs and global prefix settings; no partial table patch.",
+        "additionalProperties": false,
+        "required": [
+          "tables",
+          "prefixes"
+        ],
+        "properties": {
+          "tables": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 14,
+            "description": "All lookups in ascending contiguous logical port order, independently linked to main input 0.",
+            "items": {
+              "type": "object",
+              "description": "One lookup joined directly to the main input, independently of other lookups.",
+              "additionalProperties": false,
+              "required": [
+                "port",
+                "keys"
+              ],
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 14,
+                  "description": "Lookup logical input index 1..14; bind through observed native port identity."
+                },
+                "keys": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "description": "Complete nonempty composite key; exact compatible technical field names, each used once per table.",
+                  "items": {
+                    "type": "object",
+                    "description": "One equality between a main field and this lookup's field; no conversion or expression.",
+                    "additionalProperties": false,
+                    "required": [
+                      "main",
+                      "lookup"
+                    ],
+                    "properties": {
+                      "main": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Observed technical field name on main input 0."
+                      },
+                      "lookup": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Observed technical field name on this lookup input; excluded from generated output."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "prefixes": {
+            "type": "object",
+            "description": "Native global name/label prefixes for lookup fields; final generated names must be read back.",
+            "additionalProperties": false,
+            "required": [
+              "enabled",
+              "name",
+              "label"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable native prefixes for appended lookup fields; main fields stay unchanged."
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "Literal native technical name prefix; require valid unambiguous resulting identifiers."
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "Literal native display label prefix; independent of technical name prefix."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}

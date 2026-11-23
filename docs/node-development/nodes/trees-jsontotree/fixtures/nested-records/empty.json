@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "parts": [
+        {
+          "qty": 2
+        }
+      ],
+      "details": {
+        "code": "A"
+      }
+    },
+    {
+      "id": 2,
+      "parts": [],
+      "details": {}
+    },
+    {
+      "id": 3,
+      "parts": [
+        {
+          "qty": 0
+        }
+      ],
+      "details": {
+        "code": ""
+      }
+    }
+  ]
+}

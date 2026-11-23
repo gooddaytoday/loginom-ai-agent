@@ -24,17 +24,19 @@ for(const signal of ['SIGINT','SIGTERM','SIGHUP'])for(const policy of ['last_con
 for(const dirty of [false,true])test(signal+' orders native close/logout before browser; '+policy+' dirty='+dirty,async()=>{
  const events=[],timers=[];const process=new EventEmitter();let done;
  process.exit=code=>{events.push('exit:'+code);done?.();};
- const state={browser:{close:async()=>events.push('browser')},client:{close:async()=>events.push('client')},
+ Object.defineProperty(process,'exitCode',{set(code){events.push('exit:'+code);done?.();}});
+ const state={timers:new Map([[1,{unref:()=>events.push('timer-unref')}]]),browser:{close:async()=>events.push('browser')},client:{close:async()=>events.push('client')},
   bridge:{close:async()=>{events.push('saved-state');events.push(dirty?'UNSAVED_CHANGES':'native-close');if(!dirty)events.push('logout');
    return {browser_transport_closed:true,browser_process_terminated:true,clipboard_leases_retained:0,
     package_cleanup:{policy,status:dirty?'BLOCKED':'SUCCEEDED',package_closed:!dirty,logged_out:!dirty}};}}};
  const finished=new Promise(resolve=>{done=resolve;});
  vm.runInNewContext(body,{state,process,terminalTrace:()=>{},close:()=>closeManagedResources(state,[]),
-  setTimeout:(fn,ms)=>{const timer={fn,ms,unref(){}};timers.push(timer);return timer;},clearTimeout:()=>{}});
+  setTimeout:(fn,ms)=>{const timer={fn,ms,unref(){this.unreferenced=true;}};timers.push(timer);return timer;},clearTimeout:()=>{}});
  assert.equal(process.listenerCount(signal),1);
  process.emit(signal);process.emit(signal);await finished;
- assert.deepEqual(events,['client','saved-state',dirty?'UNSAVED_CHANGES':'native-close',...dirty?[]:['logout'],'browser','exit:'+(dirty?1:0)]);
- assert.equal(timers.length,1);assert.equal(timers[0].ms,30000);
+ assert.deepEqual(events,['client','saved-state',dirty?'UNSAVED_CHANGES':'native-close',...dirty?[]:['logout'],'browser','exit:'+(dirty?1:0),...dirty?[]:['timer-unref']]);
+ assert.equal(timers.length,dirty?1:2);assert.equal(timers[0].ms,30000);
+ if(!dirty){assert.equal(timers[1].ms,3000);assert.equal(timers[1].unreferenced,true);}
 });
 test('signal cleanup budget records possible lock and closes only its own browser before failed exit',async()=>{
  const events=[],timers=[],process=new EventEmitter();process.exit=code=>events.push('exit:'+code);

@@ -69,14 +69,19 @@ export async function bindCollapseNative(page,args) {
   need(manager?.FPreviewVisible===true&&node?.FGuid===a.node_id&&port?.FGuid===a.port_guid,'native preview owner');
   const nodes=model.FDiagram.FNodes.FCollection,links=model.FDiagram.FLinks.FCollection;
   let imports,static_chain;
-  if(a.cross_table){
-   need(node.FIconCls==='bg-vendor-icon-crosstab','owned CrossTable required');
-   const incoming=n=>links.filter(l=>l.FTargetPort?.parent===n);
+  const incoming=n=>links.filter(l=>l.FTargetPort?.parent===n);
+  // Collapse→Collapse is admitted only from an explicit private ancestor list and only
+  // when the direct parent is a Collapse; an import parent keeps the original path.
+  const chained=!a.cross_table&&a.collapse_chain&&node.FIconCls==='bg-vendor-icon-columnflipping'
+   &&incoming(node).length===1&&incoming(node)[0].FSourcePort?.parent?.FIconCls==='bg-vendor-icon-columnflipping';
+  const chain=a.cross_table??a.collapse_chain;
+  if(a.cross_table||chained){
+   need(a.cross_table?node.FIconCls==='bg-vendor-icon-crosstab':chained,'owned CrossTable required');
    const edge=incoming(node);need(edge.length===1,'CrossTable must have exactly one static input');
    const parent=edge[0].FSourcePort?.parent;need(parent&&parent!==node,'static ancestor required');
    let source=parent,collapse;
    if(parent.FIconCls==='bg-vendor-icon-columnflipping'){
-    const candidates=a.cross_table.collapses.filter(c=>c.node_id===parent.FGuid);need(candidates.length===1,'Collapse lacks settled private provenance');collapse=candidates[0];
+    const candidates=chain.collapses.filter(c=>c.node_id===parent.FGuid);need(candidates.length===1,'Collapse lacks settled private provenance');collapse=candidates[0];
     const upstream=incoming(parent);need(upstream.length===1,'Collapse must have exactly one static input');source=upstream[0].FSourcePort?.parent;
     need(source&&source!==parent&&source!==node,'acyclic static chain required');
    }
@@ -86,8 +91,9 @@ export async function bindCollapseNative(page,args) {
    const fields=imports[0].configuration.output_mapping.fields;
    if(collapse){
     need(JSON.stringify(project(collapse.configuration.input_mapping.fields))===JSON.stringify(project(fields)),'Collapse input differs from verified import');
-    need(JSON.stringify(project(collapse.configuration.output_mapping.fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified Collapse');
-   }else need(JSON.stringify(project(fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified import');
+    if(a.cross_table)need(JSON.stringify(project(collapse.configuration.output_mapping.fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified Collapse');
+   }else if(chained)need(false,'Collapse ancestor provenance required');
+   else need(JSON.stringify(project(fields))===JSON.stringify(a.cross_table.input_source_schema??a.cross_table.input_schema),'CrossTable input differs from verified import');
    // Opening a readonly definition deactivates its output. The owned CrossTable
    // execution may therefore run an ancestor again. Accept only the original
    // completed group or this exact, independently verified execution group.
@@ -111,7 +117,7 @@ export async function bindCollapseNative(page,args) {
     return {...proof,provenance_execution_id:proof.execution_id,execution_id:a.document_id+':'+owned[0]+':'+latest};
    };
    imports=[effective(source,imports[0])];if(collapse)collapse=effective(parent,collapse);
-   static_chain={kind:'crosstable_static_1',nodes:[{node_id:source.FGuid,icon:'bg-vendor-icon-importtextfile',execution_id:imports[0].execution_id},
+   static_chain={kind:a.cross_table?'crosstable_static_1':'collapse_static_1',nodes:[{node_id:source.FGuid,icon:'bg-vendor-icon-importtextfile',execution_id:imports[0].execution_id},
     ...(collapse?[{node_id:parent.FGuid,icon:'bg-vendor-icon-columnflipping',execution_id:collapse.execution_id}]:[])],
     edges:links.filter(l=>l.FTargetPort?.parent===node||collapse&&l.FTargetPort?.parent===parent).map(l=>({guid:l.FGuid,source:l.FSourcePort.parent.FGuid,target:l.FTargetPort.parent.FGuid,source_port:l.FSourcePort.FGuid,input_port:l.FTargetPort.FGuid}))};
   }else{

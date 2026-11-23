@@ -1,4 +1,7 @@
 import { verifyBundledSkills } from './bundled-skill-manifest.mjs';
+import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {createHash} from 'node:crypto';
 
 export function createSkillLoader({ resources }) {
   let pinned;
@@ -16,7 +19,31 @@ export function createSkillLoader({ resources }) {
         content: bundle.content } };
     return pinned;
   }
-  return { prepare() {
+  return { async describeNodes(cards, modes) {
+    if(modes!==undefined&&(!Array.isArray(modes)||!modes.length||new Set(modes).size!==modes.length
+      ||modes.some(mode=>typeof mode!=='string'||!cards.some(card=>card.modes.includes(mode)))))
+      throw Error('Select distinct supported modes for the selected node types');
+    const prepared=await this.prepare();
+    return Promise.all(cards.map(async card=>{
+      const type=card.type==='control.supernode_output'?'control.supernode':card.type;
+      const path=`skills/loginom-automation/references/nodes/${type}.md`;
+      const file=prepared.detail.files.find(file=>file.path===path);
+      if(!file)throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING: '+path);
+      const text=await readFile(join(prepared.directory,'references/nodes',type+'.md'),'utf8');
+      if(createHash('sha256').update(text).digest('hex')!==file.sha256)throw Error('LOGINOM_SKILL_HASH_MISMATCH: '+path);
+      const pattern=/^<!-- mode: ([a-z0-9_]+(?: [a-z0-9_]+)*) -->\r?\n([\s\S]*?)^<!-- \/mode -->\r?$/gm;
+      const sections=[...text.matchAll(pattern)].filter(section=>type===card.type||section[1].split(' ').some(mode=>card.modes.includes(mode)));
+      const common=text.replace(pattern,'').trim();
+      if(common.includes('<!-- mode:')||common.includes('<!-- /mode -->')
+        ||sections.some(section=>section[2].includes('<!-- mode:')||section[1].split(' ').some(mode=>!card.modes.includes(mode)))
+        ||card.modes.some(mode=>!sections.some(section=>section[1].split(' ').includes(mode))))
+        throw Error('LOGINOM_SKILL_NODE_MODES_INVALID: '+card.type);
+      const selected=sections.filter(section=>modes?.some(mode=>section[1].split(' ').includes(mode)));
+      const guidance=[common,...selected.map(section=>section[2].trim())].filter(Boolean).join('\n\n');
+      return {...card,guidance,cache_key:createHash('sha256').update(JSON.stringify([card.cache_key,prepared.detail.revision,guidance])).digest('hex'),
+        guidance_modes:[...card.modes]};
+    }));
+  }, prepare() {
     pending ??= load().finally(() => { pending = undefined; });
     return pending;
   } };
@@ -31,6 +58,7 @@ export const prepareTool = {
     intent: {type:'string',enum:['new_draft','open_package','existing_workflow'],description:'For a NEW task use new_draft without package_path; a requested future Save destination does not mean the package exists. For a saved-package continuation without a reference issued by THIS runtime, first use open_package with the exact confirmed Save path. existing_workflow requires a reference from successful dock_prepare in this runtime, never chat history or diagnostics. Resolve any pending operation through recovery before preparing again.'},
     package_path: {type:'string',minLength:1,maxLength:2048,description:'open_package ONLY: the exact path of an ALREADY SAVED package the user asks to continue, or a confirmed Save receipt. A future Save destination for a new scenario is NOT an opening path: use new_draft, omit package_path and keep that same destination for final Save. Never guess a path or replace a saved-package continuation with a new draft.'},
     workflow_ref: {type:'object',description:'existing_workflow only: the complete unchanged reference issued by successful dock_prepare in THIS runtime. Chat history, familiar GUIDs and diagnostics do not prepare this runtime; without a current reference use open_package and its confirmed Save path.',properties:{workflow_id:{type:'string'},document_id:{type:'string'},tab_tid:{type:'string'},prefix:{type:'string'},navigation_path:{type:'array',items:{type:'object',properties:{tid:{type:'string'},label:{type:'string'}},required:['tid','label'],additionalProperties:false}}},required:['workflow_id','document_id','tab_tid','prefix','navigation_path'],additionalProperties:false},
+    graph_navigation: {type:'object',description:'existing_workflow only. Enter a Submodel by its observed node ref, or leave to its prepared parent. Returns a fresh workflow_ref; observe again for fresh node refs. Never reuse refs from the departed graph. Reconcile an uncertain transition with the SAME operation_id.',properties:{direction:{type:'string',enum:['enter','leave']},node_ref:{type:'object',properties:{document_id:{type:'string'},workflow_id:{type:'string'},node_id:{type:'string'}},required:['document_id','workflow_id','node_id'],additionalProperties:false}},required:['direction'],additionalProperties:false},
     timeout_ms: {type:'integer',minimum:1,maximum:120000},
   }, additionalProperties: false },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },

@@ -1,0 +1,64 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "null_marker": "?",
+    "header": "names",
+    "line_ending": "LF"
+  },
+  "fields": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "X",
+      "type": "real",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "Y",
+      "type": "real",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "Z",
+      "type": "real",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "Tag",
+      "type": "string",
+      "data_kind": "discrete"
+    }
+  ],
+  "oracle": "Python 3 stdlib, sample correlation PCA and population-standardized factor scores",
+  "fixtures": [
+    {
+      "file": "constant.csv",
+      "rows": 8,
+      "bytes": 112,
+      "sha256": "2a02626361bc1a1413833e55482cd5b033e73d9ceb86480f1fb232a4bef22c3c"
+    },
+    {
+      "file": "matrix.csv",
+      "rows": 8,
+      "bytes": 116,
+      "sha256": "119d96a8e6d467e5cfb99ba26f00316f6283b3c2a632f11896f4723f514a10a8"
+    },
+    {
+      "file": "null.csv",
+      "rows": 8,
+      "bytes": 115,
+      "sha256": "24d327126ede41c8aff03eec97baa8b6eccb8aeb027474682e4c575812029bc6"
+    },
+    {
+      "file": "update.csv",
+      "rows": 8,
+      "bytes": 118,
+      "sha256": "df1effb7f03e1562ae087b1c5652a31174c5f6b33fa6632e0e341916ccd13be0"
+    }
+  ]
+}

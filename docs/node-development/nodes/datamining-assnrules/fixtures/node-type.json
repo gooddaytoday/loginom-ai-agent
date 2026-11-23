@@ -1,0 +1,16 @@
+{
+  "type": "datamining.assn_rules",
+  "title": "Ассоциативные правила",
+  "palette_group": "Data_Mining",
+  "icon_class": "bg-vendor-icon-assnrules",
+  "tabular_inputs": 2,
+  "tabular_outputs": 3,
+  "additional_tabular_inputs": false,
+  "modes": ["fp_growth"],
+  "semantics": "Association rules on one prepared table of discrete string transaction IDs and items, input 0 only. Set transaction_field, item_field, min_support_pct, min_confidence_pct and max_items; percentages are 0..100, thresholds inclusive. Execute explicitly trains current input then executes; existing omitted settings are preserved, repeated Execute retrains. Fixed: min lift 0, singletons included, native consequence limit 1. Read BOTH ports [0,1]: frequent itemsets and rules. Output Support and Confidence are fractions 0..1; padding is NULL, not empty text. Recommendation port 2, auxiliary input, saved-model holdout apply and other filters are deferred. Save the package separately.",
+  "sources": {
+    "e2e": ["bg/helpers/workflow/node.ts", "bg/helpers/workflow/ports.ts", "bg/helpers/workflow/links.ts"],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/datamining/association-rules.md"
+  }
+}

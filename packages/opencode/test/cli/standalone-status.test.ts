@@ -6,8 +6,9 @@ import { createHash } from "node:crypto"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
-import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
+import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
@@ -19,6 +20,71 @@ afterAll(async () => {
 // CI provisions the pinned Node through LOGINOM_AI_AGENT_TEST_NODE; locally the Desktop build stages it under resources.
 const bundledNode =
   process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
+
+test("help says what status shows and where readiness is checked", async () => {
+  const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "--help"], {
+    cwd: resolve(import.meta.dir, "../.."),
+    env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const out = new Response(child.stdout).text()
+  expect(await child.exited).toBe(0)
+  expect(await out).toContain(
+    "loginom setup/check/status (saved connection and pending recovery; readiness: check)/cancel-pending/recover\n",
+  )
+})
+
+test("status prints the saved connection and recovery work instead of a new Host's starting phase", async () => {
+  const { statusText, statusView } = await import("../../src/cli/loginom-management")
+  const base = {
+    revision: 1,
+    generation: 1,
+    url: "https://app.loginom.ai/app/",
+    username: "worker",
+    folder: "/worker",
+    hasPassword: true,
+    browser: { state: "unknown" as const },
+  }
+  const unconfigured = { ...base, generation: 0, revision: 0, state: "unconfigured" as const }
+  expect(statusText(statusView(unconfigured))).toBe("Подключение не настроено — `loginom setup`.")
+  expect(statusView({ ...unconfigured, state: "starting" }).state).toBe("unconfigured")
+  const starting = { ...base, state: "starting" as const }
+  expect(statusView(starting)).toEqual({ ...starting, state: "configured" })
+  expect(statusView({ ...base, state: "ready" }).state).toBe("ready")
+  const configured =
+    "Подключение настроено: https://app.loginom.ai/app/, пользователь worker. " +
+    "Незавершённых операций нет. Проверить соединение — `loginom check`."
+  expect(statusText(statusView(starting))).toBe(configured)
+  expect(statusText(statusView({ ...base, state: "ready" }))).toBe(configured)
+  const pending = statusView({ ...base, revision: 2, state: "pending" })
+  expect(pending.state).toBe("pending")
+  expect(statusText(pending)).toBe(
+    configured + "\nСохранённое изменение подключения ещё не применено; отменить его — `loginom cancel-pending`.",
+  )
+  const recovery = (count: number) =>
+    statusText(
+      statusView({
+        ...base,
+        state: "recoverable-error",
+        recoveries: Array.from({ length: count }, (_, index) => String(index)),
+      }),
+    )
+  const required = (count: string) =>
+    "Подключение настроено: https://app.loginom.ai/app/, пользователь worker.\n" +
+    `Требуется восстановление: ${count} — проверьте сценарий в Loginom и выполните \`loginom recover\`.`
+  expect(recovery(1)).toBe(required("1 операция"))
+  expect(recovery(2)).toBe(required("2 операции"))
+  expect(recovery(5)).toBe(required("5 операций"))
+  expect(recovery(11)).toBe(required("11 операций"))
+  expect(recovery(21)).toBe(required("21 операция"))
+  expect(
+    statusText(statusView({ ...base, state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })),
+  ).toBe(
+    "Подключение настроено: https://app.loginom.ai/app/, пользователь worker.\n" +
+      "Ошибка подключения: LOGINOM_RUNTIME_START_FAILED. Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",
+  )
+})
 
 test("startup timeout retains the writer through Help close and permits a real status retry", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-startup-")))
@@ -35,7 +101,7 @@ test("startup timeout retains the writer through Help close and permits a real s
     await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await cp(host, join(bundle, "host"), { recursive: true })
-    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
+    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({}))
     await writeFile(
       join(bundle, "runtime/src/knowledge-entry.mjs"),
       `import fs from "node:fs";
@@ -153,7 +219,11 @@ test("startup timeout retains the writer through Help close and permits a real s
       const retryErrors = new Response(retry.stderr).text()
       expect(await retry.exited).toBe(0)
       expect(await retryErrors).toBe("")
-      expect(JSON.parse(await status)).toMatchObject({ state: "ready", generation: 1 })
+      // Status never waits for Help: a retry on a slower host may report the saved
+      // connection as configured before Help is loaded; readiness is `loginom check`.
+      const retried = JSON.parse(await status)
+      expect(retried).toMatchObject({ generation: 1 })
+      expect(["ready", "configured"]).toContain(retried.state)
       expect(await readdir(profile)).not.toContain(".writer")
     } finally {
       clearTimeout(timer)
@@ -257,6 +327,20 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect(await child.exited).toBe(0)
     expect(await errors).toBe("")
     expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", generation: 0 })
+    const text = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", "status"], {
+      cwd: resolve(import.meta.dir, "../.."),
+      env: {
+        ...process.env,
+        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+        LOGINOM_AI_AGENT_CLI_PROFILE: join(directory, "profile"),
+        LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const textOutput = new Response(text.stdout).text()
+    expect(await text.exited).toBe(0)
+    expect(await textOutput).toBe("Подключение не настроено — `loginom setup`.\n")
     expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
@@ -328,32 +412,34 @@ test("actual standalone status launches bundled Node and releases the isolated p
   }
 }, 15_000)
 
-test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
+test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancellation"])(
   "management commands share durable setup and recovery semantics through the real Node host: %s",
   async (phase) => {
     const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
-    const cleanup: (() => void | Promise<void>)[] = []
     try {
       const bundle = join(directory, "bundle")
       const profile = join(directory, "profile")
-      const files = await copyProductSkillsFixture(bundle)
-      const help = await knowledgeServer(
-        { after: (callback) => cleanup.push(callback) },
-        { apiKey: "private-setup-key" },
-      )
+      await copyProductSkillsFixture(bundle)
+      await writeHelp(join(bundle, "help"))
       await mkdir(join(bundle, "bin"), { recursive: true })
       await mkdir(join(bundle, "runtime/src"), { recursive: true })
-      await writeFile(join(bundle, "knowledge-key"), "private-setup-key")
-      await symlink(bundledNode, join(bundle, "bin/node"))
+      await cp(bundledNode, join(bundle, "bin/node"))
+      await writeFile(join(bundle, "browser"), "controlled browser payload")
       if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
       await cp(host, join(bundle, "host"), { recursive: true })
+      await writeFile(
+        join(bundle, "resource-manifest.json"),
+        JSON.stringify({
+          protocol: 1,
+          nodeVersion: "24.19.0",
+          node: "bin/node",
+          browser: "browser",
+          files: await resourceInventory(bundle),
+        }),
+      )
       await symlink(
         resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
         join(bundle, "runtime/src/knowledge-entry.mjs"),
-      )
-      await writeFile(
-        join(bundle, "resource-manifest.json"),
-        JSON.stringify({ protocol: 1, endpoint: help.endpoint, files }),
       )
       // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
       await writeFile(
@@ -386,9 +472,9 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       });
     `,
       )
-      async function command(args: string[], input = "", extra: NodeJS.ProcessEnv = {}) {
+      async function command(args: string[], input = "", extra: NodeJS.ProcessEnv = {}, format = "json") {
         const child = Bun.spawn(
-          [process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format", "json"],
+          [process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format", format],
           {
             cwd: resolve(import.meta.dir, "../.."),
             env: {
@@ -410,7 +496,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         const errors = await stderr
         expect(text + errors).not.toContain("private-setup-key")
         expect(await readdir(profile)).not.toContain(".writer")
-        return { code, result: JSON.parse(text), errors }
+        return { code, result: format === "json" ? JSON.parse(text) : text, errors }
       }
       expect(await command(["check"])).toMatchObject({ code: 2, result: { code: "LOGINOM_CONFIG_REQUIRED" } })
       expect(await command(["setup"])).toMatchObject({ code: 2, result: { code: "CLI_STDIN_REQUIRED" } })
@@ -421,7 +507,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
       expect(
         await command(
           ["setup", "--stdin-json"],
-          // Older setup scripts still send a key; the built-in one is used and never stored.
+          // Older setup scripts still send a key; it is ignored and never stored.
           JSON.stringify({ apiKey: "legacy-setup-key", password: "initial-password" }),
         ),
       ).toMatchObject({
@@ -460,6 +546,12 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         const journal = await recoveryStore(join(profile, "loginom/recovery"), { strict: true })
         const id = await journal.begin("a".repeat(64), 2)
         await journal.settle(id, false)
+        expect(await command(["status"], "", strictRecovery, "default")).toMatchObject({
+          code: 0,
+          result: expect.stringContaining(
+            "Требуется восстановление: 1 операция — проверьте сценарий в Loginom и выполните `loginom recover`.",
+          ),
+        })
         expect(await command(["recover"], "", strictRecovery)).toMatchObject({
           code: 4,
           result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
@@ -486,8 +578,12 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         await journal.settle(dropped, false)
         const advisory = await command(["status"])
         expect(advisory.code).toBe(0)
-        expect(["starting", "ready"]).toContain(advisory.result.state)
+        expect(["configured", "ready"]).toContain(advisory.result.state)
         expect(advisory.result.recoveries).toBeUndefined()
+        expect(await command(["status"], "", {}, "default")).toMatchObject({
+          code: 0,
+          result: expect.stringContaining("Незавершённых операций нет. Проверить соединение — `loginom check`."),
+        })
         expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
         const run = Bun.spawn(
           [
@@ -676,6 +772,31 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
           expect(await readdir(profile)).not.toContain(".writer")
           return
         }
+        if (phase === "read-offset") {
+          const filePath = join(directory, "node-settings.md")
+          await writeFile(filePath, Array.from({ length: 316 }, (_, index) => `setting ${index + 1}`).join("\n"))
+          await provider.runPromise(llm.tool("read", { filePath, offset: 380, limit: 180 }))
+          await provider.runPromise(llm.tool("read", { filePath, offset: 220, limit: 100 }))
+          await provider.runPromise(llm.text("tenure-churn-profile complete"))
+          const child = invoke(true, undefined, [], false)
+          const output = new Response(child.stdout).text()
+          const errors = new Response(child.stderr).text()
+          expect(await child.exited).toBe(0)
+          const events = (await output)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          const reads = events.filter((event) => event.type === "tool_use" && event.part.tool === "read")
+          expect(reads.map((event) => event.part.state.status)).toEqual(["error", "completed"])
+          expect(reads[0].part.state.error).toBe("Offset 380 is out of range for this file (316 lines)")
+          expect(
+            events.some((event) => event.type === "text" && event.part.text === "tenure-churn-profile complete"),
+          ).toBe(true)
+          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
+          expect(await errors).not.toContain("private-setup-key")
+          expect(await readdir(profile)).not.toContain(".writer")
+          return
+        }
         if (phase === "outcomes") {
           await provider.runPromise(llm.reset)
           await prepare()
@@ -802,7 +923,6 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
         await provider.dispose()
       }
     } finally {
-      for (const callback of cleanup) await callback()
       if (process.platform === "darwin") {
         const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
         if (root) {

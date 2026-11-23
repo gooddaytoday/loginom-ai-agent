@@ -10,6 +10,12 @@ function fixture(){
  source:{verified:true,node_context:context,values},format:{prepared_node_context:context,wizard:{stage:'text_import_format',settings:{fields:structuredClone(fields)}}},schema:{definition_complete:true,schema_id:'schema',fields:[structuredClone(column)]}};
 }
 test('same configured draft may continue without reopening or reconfiguring',()=>assert.equal(verifyConfiguredImportContinuation(fixture()),true));
+test('configured continuation requires the same observed thread count',()=>{
+ const f=fixture();f.configured.source.fields.max_threads={status:'observed',value:'2'};
+ f.source.values.max_threads='2';assert.equal(verifyConfiguredImportContinuation(f),true);
+ f.source.values.max_threads='4';assert.equal(verifyConfiguredImportContinuation(f),false);
+ delete f.source.values.max_threads;assert.equal(verifyConfiguredImportContinuation(f),false);
+});
 test('changed source, format, fields, schema or ownership reject continuation',()=>{
  const changes=[f=>f.source.values.source_path='/test/other.csv',f=>f.source.values.encoding='Windows-1251',f=>f.source.values.first_line_as_title=false,
  f=>f.source.node_context.node_id='foreign',f=>f.format.prepared_node_context.workflow_id='foreign',f=>f.format.wizard.stage='done',
@@ -22,6 +28,22 @@ test('source reader refuses graph or a changed wizard around the cached read',as
  let reads=0;const page={evaluate:async()=>{reads++;return {verified:true}}};
  assert.equal((await readRetainedImportSource(page,{},async()=>({verified:true,surface:'graph'}))).verified,false);assert.equal(reads,0);
  let n=0;assert.equal((await readRetainedImportSource(page,{},async()=>({verified:true,surface:'wizard',tid:'W',node_id:String(n++)}))).verified,false);assert.equal(reads,1);
+});
+test('retained source reads disabled thread count from its owned DOM control',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const {readRetainedImportSourceBrowser}=await import('../lib/node-import-continuation.mjs');
+ const page=new Page(),rootTid='MF;TF-1;WizrdMCF',root=page.add('div',rootTid),prefix=rootTid+';ImportTextFilePreviewWizard;';
+ for(const [tid,value] of [['edtFileName;ValueControl','/test/file.csv'],['edtConnection','Локальное'],
+  ['edtCodePage;ValueControl','UTF-8 (65001)'],['edtRowsToSkip;ValueControl','0'],['cbbMaxThreadCount;ValueControl','2']]){
+  const owner=page.add('div',prefix+tid,'',undefined,root),input=page.add('input',null,'',undefined,owner);input.value=value;
+  if(tid.startsWith('cbbMax'))input.disabled=true;
+ }
+ const checkbox=page.add('div',prefix+'edtFirstLineAsTitle;ValueControl','',undefined,root);
+ page.add('div',prefix+'edtFirstLineAsTitle;ValueControl;DisplayEl','',undefined,checkbox).attrs.class='x-form-checkbox';
+ const old=globalThis.document;
+ try{globalThis.document=page.document;const read=readRetainedImportSourceBrowser({rootTid});
+  assert.equal(read.verified,true,read.reason);assert.equal(read.values.max_threads,'2');
+ }finally{globalThis.document=old;}
 });
 
 test('mapped continuation checks retained unused fields, source mapping and completion settings',async()=>{
@@ -84,4 +106,35 @@ test('a paused execution permits progress changes but binds the same launch and 
   f=>f.checkpoint.read_only=false,f=>f.surface.node_processes.processes[0].error=true]) {
   const f=structuredClone(completed);mutate(f);assert.equal(verify(f),false,String(mutate));
  }
+});
+
+test('mapped continuation reads back every observed import format field, including detection mode and analysis rows',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const {readRetainedImportFormatBrowser,verifyMappedImportContinuation}=await import('../lib/node-import-continuation.mjs');
+ const page=new Page(),rootTid='MF;TF-1;WizrdMCF',form=page.add('div',rootTid),p=rootTid+';ImportTextFileParamsWizard;';
+ const input=(tid,value)=>{const owner=page.add('div',p+tid,'',undefined,form);page.add('input',null,'',undefined,owner).value=value;};
+ page.add('div',p+'edtValueNull','',undefined,form);
+ for(const [tid,value] of [['edtDelimiterChar',';'],['edtTextQualifier','"'],['edtValueNull','NULL'],['edtDecimalSeparator','.'],['edtDateFormat','yyyy-mm-dd'],['edtDateSeparator','Дефис (-)']])input(tid+';ValueControl',value);
+ input('cbbAutoDetectColumnsMode;ValueControl','Только новые');input('ColumnDefsTuning;seReadRowCount','25');
+ const multiple=page.add('div',p+'edtMultipleDelimiters;ValueControl','',undefined,form);page.add('div',p+'edtMultipleDelimiters;ValueControl;DisplayEl','',undefined,multiple).attrs.class='x-form-checkbox';
+ const gridTid=p+'ColumnDefsTuning;grdSettings;grd-1',grid=page.add('div',gridTid,'',undefined,form),header=page.add('div',gridTid+';normalHeaderCt','',undefined,grid),body=page.add('div',gridTid+';tbl','',undefined,grid);
+ page.add('div',gridTid+';normalHeaderCt;0','',undefined,header).attrs.class='x-column-header x-column-header-first x-column-header-last';
+ ['A','Amount','Вещественный','Непрерывный'].forEach((text,row)=>page.add('div',gridTid+';normalHeaderCt;0_'+row,text,undefined,body));
+ page.add('div',null,'',undefined,page.add('div',gridTid+';normalHeaderCt;0_4','',undefined,body)).attrs.class='x-grid-checkcolumn x-grid-checkcolumn-checked';
+ const variant=page.add('div',p+'edtVariantAsGeneralType;ValueControl','',undefined,form);variant.attrs.class='x-form-cb-checked';
+ page.add('div',p+'edtVariantAsGeneralType;ValueControl;DisplayEl','',undefined,variant).attrs.class='x-form-checkbox';
+ const format=(await page.observe()).wizard.settings;
+ assert.equal(format.fields.variant_as_general_type.value,true);
+ assert.equal(format.fields.auto_detect_columns.value,'Только новые');assert.equal(format.fields.analysis_rows.value,'25');
+ const oldDocument=globalThis.document;let read;
+ try{globalThis.document=page.document;read=readRetainedImportFormatBrowser({rootTid});}finally{globalThis.document=oldDocument;}
+ assert.equal(read.verified,true,read.reason);
+ const configured=fixture(),context={...configured.node,verified:true,surface:'wizard'};
+ configured.configured.format=format;configured.configured.columns=structuredClone(read.fields);
+ const mapping={verified:true,node_context:context,autosync:false,target_fields:[{name:'A',source:{record_id:'source'}}]};
+ const completion={ready:true,fields:{label:{status:'observed',value:'Import'}}};
+ const base={node:configured.node,configured:configured.configured,source:configured.source,retained:{...read,node_context:context},
+  surface:{prepared_node_context:context,wizard:{stage:'done',completion:structuredClone(completion)},node_mapping:structuredClone(mapping)},mapped:{native_mapping:mapping,completion}};
+ assert.equal(verifyMappedImportContinuation(base),true);
+ for(const key of ['auto_detect_columns','analysis_rows','variant_as_general_type']){const f=structuredClone(base);f.retained.values[key]='changed';assert.equal(verifyMappedImportContinuation(f),false,key);}
 });

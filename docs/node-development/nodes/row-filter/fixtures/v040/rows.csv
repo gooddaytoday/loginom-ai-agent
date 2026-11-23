@@ -1,0 +1,7 @@
+RowID;Region;Amount
+1;North;10
+2;South;20
+3;North;30
+4;East;20
+5;NULL;40
+6;north;50

@@ -12,7 +12,8 @@ export function observeJavascriptSource({context, owner, epoch, held = null, cap
   const tab = form?.Items?.Workspace?.getActiveTab?.();
   const receipts = [...(preparation?.receipts?.values() ?? [])].filter(receipt => receipt.phase === 'verified' && receipt.workflowId === owner.workflow_id);
   need(preparation?.document === document && preparation.id === owner.document_id && binding?.document === document
-    && receipts.length === 1 && receipts[0].nodeTargetWorkflowNode === binding.workflow, 'prepared owner changed');
+    && receipts.length >= 1 && receipts.every(receipt => receipt.tab === receipts[0].tab
+      && receipt.packageNode === receipts[0].packageNode && receipt.nodeTargetWorkflowNode === binding.workflow), 'prepared owner changed');
   need(app.Version === context.build && form.FMapTree.FServerConnection.UserName === context.account, 'account/build changed');
   need(tab === binding.tab && tab?.Controller?.Node?.data?.node === native && native?.FParentNode?.FParentNode === binding.workflow
     && native.FParentNode.FGuid === owner.node_id && native.FParentNode.FModelNode === binding.nodeData

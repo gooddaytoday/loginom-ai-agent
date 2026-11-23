@@ -2,10 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prepareNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
 import { describeNodeTypes, validateNodeTargetRequest } from '../lib/node-contracts.mjs';
+import {journalCopy} from '../lib/execution-journal.mjs';
 const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{tid:'path',label:'Scenario'}] };
 const source = { ref: ref('source'), type: 'imports.text', label: 'Source', position: {x:8,y:8}, inputs: [], outputs: [0] };
 const request = () => ({ document_id:'doc', workflow_ref:workflow, target:{kind:'new',type:'transform.union_data',label:'Target',position:{x:160,y:160}}, inputs:[{source:ref('source'),output:0,input:0},{source:ref('source'),output:0,input:1},{source:ref('source'),output:0,input:2}] });
+test('W1 builtin is existing-only before any browser work',()=>{
+ assert.throws(()=>validateNodeTargetRequest({...request(),target:{kind:'new',type:'variables.user'},inputs:[]}),/existing/);
+});
+for(const kind of ['variables','control'])test('W1 '+kind+' links retain table ordinal zero and preserve omitted variable links',async()=>{
+ const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:4,port_guid:'same'}];
+ f.graph.nodes.push({ref:ref('target'),type:'transform.union_data',label:'Target',inputs:[0,1],outputs:[0],variable_inputs:[{kind:'variables',port:0,port_guid:'v'},{kind:'control',port:0,port_guid:'c'}]});
+ const mutate=f.adapter.mutate;f.adapter.mutate=async effect=>{
+  if(effect.parameters.edge?.kind){f.calls.push('variable_connect');(f.graph.variable_links??=[]).push({...effect.parameters.edge,source_port_guid:'same',target_port_guid:kind==='variables'?'v':'c'});return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};}
+  return mutate(effect);
+ };
+ const r={...request(),target:{kind:'existing',type:'transform.union_data',ref:ref('target')},inputs:[{source:ref('source'),output:0,input:0}],variable_inputs:[{source:ref('source'),output:4,input:0,kind}]};
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);assert.deepEqual(f.calls,['connect','variable_connect']);
+ assert.equal(f.graph.links[0].input,0);assert.equal(result.variable_links[0].kind,kind);
+ const next=await prepareNodeTarget({request:{...r,inputs:[],variable_inputs:[]},operation:{id:'next',deadline:Date.now()+10000},adapter:f.adapter,record:async e=>e});
+ assert.equal(next.status,'SUCCEEDED',next.error);assert.equal(f.graph.variable_links.length,1);
+});
+for(const change of [r=>{r.variable_inputs[0].source.workflow_id='foreign';},r=>{r.variable_inputs.push({...r.variable_inputs[0]});},r=>{r.variable_inputs[0].kind='table';},r=>{r.variable_inputs[0].kind='control';r.variable_inputs[0].input=1;}])test('W1 rejects invalid variable inputs before observation',()=>{
+ const r={...request(),variable_inputs:[{source:ref('source'),output:4,input:0,kind:'variables'}]};change(r);assert.throws(()=>validateNodeTargetRequest(r));
+});
 function fixture() {
  let graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[structuredClone(source)],links:[]};
  const calls=[],events=[],operation={id:'op',deadline:Date.now()+10000};
@@ -22,6 +42,92 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+test('failed native marker records fresh topology privately without node labels or URLs',async()=>{
+ const f=fixture();f.graph.nodes[0].label='https://private.invalid/?token=secret';
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  if(effect.kind!=='connect')return mutate(effect);
+  f.graph.nodes[1].position.x+=8;
+  return {status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true,error:{message:'Validated link target is no longer ready'}};
+ };
+ const r=await prepareNodeTarget({request:request(),operation:f.operation,adapter:f.adapter,record:async e=>{f.events.push(e);return journalCopy(e);}}),event=f.events.find(e=>e.phase==='node_target_link_graph_refused');
+ assert.equal(r.status,'AMBIGUOUS',JSON.stringify(r));assert.match(r.error,/Graph effect needs reconciliation/);
+ assert.equal(event.after.nodes[1].position.x,event.before.nodes[1].position.x+8);
+ assert.deepEqual(event.after.links,[]);
+ assert.doesNotMatch(JSON.stringify(event),/https:|private.invalid|secret/);
+ assert.doesNotMatch(JSON.stringify(r),/label_digest|node_target_link_graph_refused/);
+});
+for(const uncertain of [-1,0,1])test('variable union first native caption change never repeats a connection, uncertain='+uncertain,async()=>{
+ const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:0,port_guid:'source-var'}];
+ f.graph.nodes.push({...structuredClone(f.graph.nodes[0]),ref:ref('right'),label:'Right'});
+ f.graph.nodes.push({ref:ref('union'),type:'variables.column_union',label:'Соединение (переменные)',inputs:[],outputs:[],
+  variable_inputs:[0,1].map(port=>({kind:'variables',port,port_guid:'input-'+port})),variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]});
+ f.adapter.mutate=async effect=>{f.calls.push(effect.kind);const edge=effect.parameters.edge;
+  f.graph.variable_links??=[];f.graph.variable_links.push({...edge,source_port_guid:'source-var',target_port_guid:'input-'+edge.input});
+  f.graph.nodes[2].label=edge.input===0?'amount, empty':'amount, empty, amount, enabled';
+  return {status:edge.input===uncertain?'AMBIGUOUS':'SUCCEEDED',cleanup_complete:edge.input!==uncertain,effect_possible:true};
+ };
+ const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'variables.column_union',ref:ref('union')},inputs:[],
+  variable_inputs:['source','right'].map((id,input)=>({kind:'variables',source:ref(id),output:0,input}))};
+ const result=await f.run(r);assert.equal(result.status,uncertain>=0?'AMBIGUOUS':'SUCCEEDED',result.error);
+ if(uncertain>=0){await f.run(r);assert.deepEqual(f.calls,Array(uncertain+1).fill('connect'));assert.equal(f.graph.variable_links.length,uncertain+1);}
+ else {assert.deepEqual(f.calls,['connect','connect']);assert.equal(f.graph.variable_links.length,2);}
+});
+for(const replacement of ['source','output'])test('existing text export refuses '+replacement+' replacement without advising a second export',async()=>{
+ const f=fixture();
+ f.graph.nodes.push({ref:ref('export'),type:'exports.text',label:'CSV',inputs:[0],outputs:[]});
+ f.graph.nodes[0].outputs=[0,1];
+ f.graph.nodes.push({...structuredClone(source),ref:ref('formatted')});
+ f.graph.links.push({source:'source',output:0,target:'export',input:0});
+ const before=structuredClone(f.graph);
+ const result=await f.run({document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'exports.text',ref:ref('export')},
+  inputs:[{source:ref(replacement==='source'?'formatted':'source'),output:replacement==='output'?1:0,input:0}]});
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(result.partial_effect,false);
+ assert.match(result.error,/unowned link/);
+ assert.match(result.error,/upstream chain/);
+ assert.match(result.error,/final formatting before.*Export/);
+ assert.match(result.error,/Do not create a second Export/);
+ assert.doesNotMatch(result.error,/use a NEW exports.text target|target.kind:"new"/);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph,before);
+ const reconfigure=await prepareNodeTarget({request:{document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'exports.text',ref:ref('export')},inputs:[]},
+  operation:{id:'reconfigure',deadline:Date.now()+10000},adapter:f.adapter,record:async e=>e});
+ assert.equal(reconfigure.status,'SUCCEEDED',reconfigure.error);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph,before);
+});
+for(const kind of ['variables','control'])for(const automatic of [false,true])test('W1 creates a target with '+kind+' input and owned automatic link='+automatic,async()=>{
+ const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:4,port_guid:'source-var'}];
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  const edge=effect.parameters.edge;
+  if(effect.kind==='reveal_control'){
+   f.calls.push(effect.kind);f.graph.nodes[1].variable_inputs=[{kind:'control',port:0,port_guid:'target-control',native_index:0}];f.graph.nodes[1].other_ports=['Input_ControlVar'];
+  }else if(effect.kind==='remove_link'&&edge.kind){f.calls.push('variable_remove');f.graph.variable_links=f.graph.variable_links.filter(e=>e.output!==edge.output);}
+  else if(effect.kind==='connect'&&edge.kind){f.calls.push('variable_connect');(f.graph.variable_links??=[]).push({...edge,source_port_guid:'source-var',target_port_guid:'target-'+kind});}
+  else {
+   const result=await mutate(effect);
+   if(effect.kind==='create'){
+    if(kind==='variables')f.graph.nodes[1].variable_inputs=[{kind,port:0,port_guid:'target-variables',native_index:0}];
+    if(automatic&&kind==='variables')f.graph.variable_links=[{source:'source',output:0,target:'target',input:0,kind,source_port_guid:'auto-source',target_port_guid:'target-variables'}];
+   }
+   return result;
+  }
+  return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
+ };
+ const r={...request(),target:{kind:'new',type:'transform.union_data',position:{x:160,y:160}},inputs:[],variable_inputs:[{source:ref('source'),output:4,input:0,kind}]};
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,['create',...(kind==='control'?['reveal_control']:automatic?['variable_remove']:[]),'variable_connect']);
+ assert.equal(result.variable_links[0].output,4);assert.equal(result.variable_links[0].kind,kind);
+});
+test('W1 rejects an absent source variable port before creating a target',async()=>{
+ const f=fixture(),r={...request(),variable_inputs:[{source:ref('source'),output:4,input:0,kind:'variables'}]};
+ const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/Source variable/);assert.deepEqual(f.calls,[]);
+});
 // Reduced from rest-countries:graph:0, 2026-10-24T11:02:34.527Z:
 // native dropped (520,580) at (520,584) and connected a nearby REST reference.
 function restServiceCase() {
@@ -190,7 +296,7 @@ test('contract rejects foreign references, dual targets and absent ports',()=>{
 test('selected cards distinguish semantics, support and all cache pins',()=>{
  const types=['transform.join_data','transform.union_data'];const a=describeNodeTypes(types,{runtime:'1',skill:'a'});const b=describeNodeTypes(types,{runtime:'1',skill:'b'});
  assert.match(a[0].semantics,/keys/);assert.match(a[1].semantics,/duplicates/);assert.notEqual(a[0].cache_key,b[0].cache_key);assert.equal(a[0].full_node_apply_available,false);
- assert.throws(()=>describeNodeTypes(['transform.col_union_data']));assert.throws(()=>describeNodeTypes([types[0],types[0]]));
+ assert.throws(()=>describeNodeTypes(['transform.not_registered']));assert.throws(()=>describeNodeTypes([types[0],types[0]]));
 });
 test('lost-reply recovery requires both a completed receipt and the exact graph delta',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;let first=true;
@@ -399,4 +505,33 @@ test('D19 lost disconnect reply remains uncertain and is never repeated',async()
  f.adapter.mutate=async e=>{await mutate(e);throw Error('lost reply');};
  assert.equal((await f.run(r)).status,'AMBIGUOUS');assert.equal((await f.run(r)).status,'AMBIGUOUS');
  assert.deepEqual(f.calls,['remove_link']);assert.ok(f.operation.targetPhase.pending);
+});
+
+// LAB-1904 c-r5/model.stdout:82→87: the union was rewired to the new REST before
+// the replaced REST was deleted; the bare occupied-input refusal stopped the model.
+for(const occupant of ['integration.rest_request','imports.text'])test('LAB-1904 occupied union input names the replaced REST deletion first: '+occupant,async()=>{
+ const f=fixture();
+ f.graph.nodes.push({ref:ref('old'),type:occupant,label:'Old',position:{x:160,y:8},inputs:[],outputs:[0,1]},
+  {ref:ref('new'),type:'integration.rest_request',label:'New',position:{x:160,y:160},inputs:[],outputs:[0,1]},
+  {ref:ref('union'),type:'transform.col_union_data',label:'Union',position:{x:320,y:8},inputs:[0,1,2],outputs:[0]});
+ f.graph.links.push({source:'old',output:0,target:'union',input:0},{source:'old',output:1,target:'union',input:1},{source:'source',output:0,target:'union',input:2});
+ const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'transform.col_union_data',ref:ref('union')},
+  inputs:[{source:ref('new'),output:0,input:0},{source:ref('new'),output:1,input:1}]};
+ const before=structuredClone(f.graph),result=await f.run(r);
+ assert.equal(result.status,'NOT_APPLIED');assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
+ assert.match(result.error,/occupied by an unowned link/);
+ if(occupant==='integration.rest_request')assert.match(result.error,/first dock_node_delete REST old and its generated URL encoder, then repeat this request with a NEW operation_id/);
+ else assert.doesNotMatch(result.error,/dock_node_delete/);
+});
+
+for(const fault of ['none','y','ordinary','identity','port'])test('connect verifies native output boundary horizontal relayout: '+fault,()=>{
+ const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[structuredClone(source),{ref:ref('boundary'),type:'control.supernode_output',boundary_role:'output',position:{x:906,y:272},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
+ if(fault==='ordinary'){before.nodes[1].type='transform.calculator';delete before.nodes[1].boundary_role;}
+ const after=structuredClone(before),edge={source:'source',output:0,target:'boundary',input:0};
+ after.nodes[1].position.x=967;after.links.push(edge);
+ if(fault==='y')after.nodes[1].position.y++;
+ if(fault==='identity')after.nodes[1].ref.node_id='foreign';
+ if(fault==='port')after.nodes[1].inputs.push(1);
+ const result=verifyNodeTargetEffect({kind:'connect',before,parameters:{edge}},after);
+ if(fault==='none')assert.ok(result);else assert.equal(result,null);
 });

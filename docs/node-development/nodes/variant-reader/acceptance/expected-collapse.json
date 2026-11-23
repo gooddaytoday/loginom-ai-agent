@@ -1,0 +1,187 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.collapse_columns"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.collapse_columns",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Names",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "DisplayNames",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Values",
+          "type": "variant",
+          "label_any": true
+        },
+        {
+          "name": "DataTypes",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Names": "I",
+          "DisplayNames": "I",
+          "Values": {
+            "cell_type": "integer",
+            "value": 10
+          },
+          "DataTypes": 4
+        },
+        {
+          "Id": 1,
+          "Names": "R",
+          "DisplayNames": "R",
+          "Values": {
+            "cell_type": "real",
+            "value": 1.25
+          },
+          "DataTypes": 3
+        },
+        {
+          "Id": 1,
+          "Names": "S",
+          "DisplayNames": "S",
+          "Values": {
+            "cell_type": "string",
+            "value": "alpha"
+          },
+          "DataTypes": 5
+        },
+        {
+          "Id": 1,
+          "Names": "B",
+          "DisplayNames": "B",
+          "Values": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "DataTypes": 1
+        },
+        {
+          "Id": 1,
+          "Names": "D",
+          "DisplayNames": "D",
+          "Values": {
+            "cell_type": "datetime",
+            "value": "2026-11-07T12:00:00.000"
+          },
+          "DataTypes": 2
+        },
+        {
+          "Id": 2,
+          "Names": "I",
+          "DisplayNames": "I",
+          "Values": {
+            "cell_type": "integer",
+            "value": 0
+          },
+          "DataTypes": 4
+        },
+        {
+          "Id": 2,
+          "Names": "R",
+          "DisplayNames": "R",
+          "Values": {
+            "cell_type": "real",
+            "value": -2.5
+          },
+          "DataTypes": 3
+        },
+        {
+          "Id": 2,
+          "Names": "S",
+          "DisplayNames": "S",
+          "Values": {
+            "cell_type": "string",
+            "value": ""
+          },
+          "DataTypes": 5
+        },
+        {
+          "Id": 2,
+          "Names": "B",
+          "DisplayNames": "B",
+          "Values": {
+            "cell_type": "boolean",
+            "value": false
+          },
+          "DataTypes": 1
+        },
+        {
+          "Id": 2,
+          "Names": "D",
+          "DisplayNames": "D",
+          "Values": {
+            "cell_type": "datetime",
+            "value": "2026-11-08T00:00:00.000"
+          },
+          "DataTypes": 2
+        },
+        {
+          "Id": 3,
+          "Names": "I",
+          "DisplayNames": "I",
+          "Values": null,
+          "DataTypes": 4
+        },
+        {
+          "Id": 3,
+          "Names": "R",
+          "DisplayNames": "R",
+          "Values": null,
+          "DataTypes": 3
+        },
+        {
+          "Id": 3,
+          "Names": "S",
+          "DisplayNames": "S",
+          "Values": null,
+          "DataTypes": 5
+        },
+        {
+          "Id": 3,
+          "Names": "B",
+          "DisplayNames": "B",
+          "Values": null,
+          "DataTypes": 1
+        },
+        {
+          "Id": 3,
+          "Names": "D",
+          "DisplayNames": "D",
+          "Values": null,
+          "DataTypes": 2
+        }
+      ]
+    }
+  ]
+}

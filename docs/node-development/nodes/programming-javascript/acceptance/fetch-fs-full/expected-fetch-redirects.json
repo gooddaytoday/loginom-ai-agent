@@ -1,0 +1,51 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Code": 301,
+          "Count": 3,
+          "Amount": 46.0
+        },
+        {
+          "Code": 302,
+          "Count": 3,
+          "Amount": 46.0
+        },
+        {
+          "Code": 307,
+          "Count": 3,
+          "Amount": 46.0
+        }
+      ]
+    }
+  ]
+}

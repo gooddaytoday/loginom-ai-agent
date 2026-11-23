@@ -1,0 +1,77 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.join_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.join_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "LeftID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LeftKey",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RightID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RightKey",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "LeftID": "L1",
+          "LeftKey": 1,
+          "RightID": "R1",
+          "RightKey": 2
+        },
+        {
+          "LeftID": "L1",
+          "LeftKey": 1,
+          "RightID": "R2",
+          "RightKey": 3
+        },
+        {
+          "LeftID": "L2",
+          "LeftKey": 2,
+          "RightID": "R1",
+          "RightKey": 2
+        },
+        {
+          "LeftID": "L2",
+          "LeftKey": 2,
+          "RightID": "R2",
+          "RightKey": 3
+        },
+        {
+          "LeftID": "L3",
+          "LeftKey": 2,
+          "RightID": "R1",
+          "RightKey": 2
+        },
+        {
+          "LeftID": "L3",
+          "LeftKey": 2,
+          "RightID": "R2",
+          "RightKey": 3
+        }
+      ]
+    }
+  ]
+}

@@ -27,7 +27,8 @@ export function readClusteringBrowser(prefix) {
    switches[name]=buttons.length===1&&globalThis.Ext?.getCmp?.(buttons[0].id)?.pressed===true;
   }
   const seed=values['RandSeedEdit;edtRandSeed'];if(typeof values.pedAutoClusters!=='boolean'||!Number.isSafeInteger(values.pedClusters)||!(typeof seed==='number'||typeof seed==='string'&&/^\d+$/.test(seed))||!Number.isSafeInteger(Number(seed)))return {verified:false,reason:'clustering_parameter_value'};
-  return {verified:true,kind:'parameters',auto:values.pedAutoClusters,clusters:values.pedClusters,seed:Number(seed),values,switches};
+  if(!['pedClustersMin','pedClustersMax'].every(k=>Number.isSafeInteger(values[k]))||typeof values.pedThreshold!=='number'||!Number.isFinite(values.pedThreshold))return {verified:false,reason:'clustering_parameter_value'};
+  return {verified:true,kind:'parameters',auto:values.pedAutoClusters,clusters:values.pedClusters,min_clusters:values.pedClustersMin,max_clusters:values.pedClustersMax,threshold:values.pedThreshold,seed:Number(seed),values,switches};
  }
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];
  if(normRoots.length===1&&normRoots[0].checkVisibility({checkVisibilityCSS:true})){

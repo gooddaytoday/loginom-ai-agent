@@ -1,0 +1,87 @@
+import { expect, test } from "bun:test"
+import { readdir } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
+
+const root = new URL("../skills/loginom-automation/", import.meta.url)
+const skill = await Bun.file(new URL("SKILL.md", root)).text()
+
+test("automation entry stays below 40 KB as the node catalog grows", () => {
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+  const fileScope = "Файлы задания ищи только в рабочем каталоге и по точным путям из задания."
+  expect(skill).toContain(fileScope)
+  expect(skill).toContain("В CLI `glob`, `read`, `list` вне рабочего каталога отклоняются и обрывают прогон.")
+  expect(skill.indexOf(fileScope)).toBeLessThan(skill.indexOf("Если пользователь явно просит сначала загрузить"))
+})
+
+test("row filter routing includes both registered modes without growing its row", () => {
+  const row = skill.split("\n").find((line) => line.includes("`transform.filter_data`"))
+  expect(row).toContain("conditions")
+  expect(row).toContain("row_number")
+  expect(Buffer.byteLength(row!)).toBeLessThanOrEqual(
+    Buffer.byteLength("| Фильтр строк, включая условия из переменных | `transform.filter_data` / conditions | [читать](references/nodes/transform.filter_data.md) |"),
+  )
+})
+
+test("every installed node handler has one routing row and one bounded reference", async () => {
+  // Ask the production registration function, without launching a browser.
+  const inventory = Bun.spawnSync([
+    process.execPath,
+    "--eval",
+    `import { createCandidateNodeSupport } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/node-support.mjs", import.meta.url).href)};
+     import { NODE_TYPES } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/node-contracts.mjs", import.meta.url).href)};
+     console.log(JSON.stringify({registered:Object.keys(NODE_TYPES),handlers:[...createCandidateNodeSupport({targetOrigin:"https://app.loginom.ai",targetBuild:"7.4.2"}).nodeApplyHandlers.keys()]}));`,
+  ])
+  expect(inventory.exitCode, inventory.stderr.toString()).toBe(0)
+  const { handlers, registered }: { handlers: string[]; registered: string[] } = JSON.parse(inventory.stdout.toString())
+  const references = [...skill.matchAll(/^\|.*\[([^\]]+)\]\((references\/nodes\/([\w.-]+)\.md)\).*\|$/gm)]
+  // A recipe uses existing handlers; it does not add a node type or handler.
+  const rows = references.filter((row) => row[1] !== "рецепт")
+  expect(rows.map((row) => row[3]).toSorted()).toEqual(handlers.toSorted())
+  expect((await readdir(new URL("references/nodes/", root))).filter(name => name !== "README.md").toSorted()).toEqual(
+    references.map((row) => `${row[3]}.md`).toSorted(),
+  )
+  for (const row of rows) {
+    expect(registered).toContain(row[3])
+    expect(row[0]).toContain(`\`${row[3]}\``)
+  }
+  for (const row of references) {
+    const node = Bun.file(new URL(row[2], root))
+    expect(await node.exists(), fileURLToPath(new URL(row[2], root))).toBe(true)
+    expect(node.size, row[3]).toBeLessThanOrEqual(6_000)
+    expect((await node.text()).trim().length).toBeGreaterThan(0)
+  }
+})
+
+test("node paths are usable beyond the sampled SkillTool resource list", () => {
+  expect(skill).toContain("Base directory for this skill")
+  expect(skill).toContain("Список ресурсов")
+  expect(skill).toContain("буквально")
+  expect(skill).toContain("references/nodes/")
+})
+
+test('node selection preserves the standard-node restriction', () => {
+  expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
+})
+
+test("final message leaves package cleanup to the host and never links server paths", () => {
+  const finish = skill.slice(skill.indexOf("## Завершение"))
+  // The host closes the saved package and logs out after the answer; no tool does it.
+  expect(finish).toContain("закрытие и выход выполнит приложение")
+  expect(finish).toContain("не пиши, что пакет останется открытым")
+  // Export results carry artifact_id/destination, not a download URL.
+  expect(finish).toContain("серверный путь пиши в `коде`, не ссылкой")
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+})
+
+test("skill markdown links resolve inside the skill, as the bundled manifest requires", async () => {
+  // Same link pattern as verifyBundledSkills: an example like [x](/path) escapes the skill.
+  for (const name of ["SKILL.md", ...(await readdir(new URL("references/", root), { recursive: true }))
+    .filter((file) => file.endsWith(".md")).map((file) => "references/" + file)]) {
+    const text = await Bun.file(new URL(name, root)).text()
+    for (const link of text.matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
+      const target = link[1] ?? link[2]
+      if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue
+      expect(target.startsWith("/"), name + ": " + target).toBe(false)
+    }
+  }
+})

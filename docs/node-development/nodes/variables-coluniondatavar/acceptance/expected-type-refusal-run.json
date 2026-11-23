@@ -1,0 +1,9 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {"type": "variables.calculator", "label": "Left"},
+    {"type": "variables.calculator", "label": "Right"}
+  ],
+  "outputs": [],
+  "refusal": {"text": "7.4.2"}
+}

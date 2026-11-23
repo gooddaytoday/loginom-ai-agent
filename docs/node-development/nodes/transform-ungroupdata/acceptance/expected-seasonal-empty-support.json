@@ -1,0 +1,15 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [],
+  "refusal": {
+    "text": "устой вход"
+  }
+}

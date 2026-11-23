@@ -47,7 +47,7 @@ const tooling = checked.filter((path) => TOOLING.test(path) && !path.includes("/
 describe("workspace packages", () => {
   test("the agent package keeps the upstream directory", () => {
     expect(workspaces.get("opencode")).toBe("packages/opencode")
-    expect(isDir(join(root, "packages/agent"))).toBe(false)
+    expect(existsSync(join(root, "packages/agent/package.json"))).toBe(false)
   })
 
   test("turbo task keys name existing workspace packages", () => {

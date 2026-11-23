@@ -113,6 +113,40 @@ function basePart(messageID: string, id: string) {
 }
 
 describe("session.message-v2.toModelMessage", () => {
+  test("private outputFiles never change the model-visible export receipt", async () => {
+    const output =
+      ' {"status":"SUCCEEDED","output":{"file_artifacts":[{"artifact_id":"csv-1","destination":"/server/result.csv"}]}}\n'
+    const message = (metadata: Record<string, unknown>): SessionV1.WithParts[] => [
+      {
+        info: assistantInfo("msg_export", "msg_user"),
+        parts: [
+          {
+            ...basePart("msg_export", "prt_export"),
+            type: "tool",
+            tool: "loginom_dock_node_wait",
+            callID: "export",
+            state: { status: "completed", input: {}, title: "export", output, metadata, time: { start: 0, end: 1 } },
+          },
+        ],
+      },
+    ]
+    const base = await MessageV2.toModelMessages(message({}), model)
+    const actual = await MessageV2.toModelMessages(
+      message({
+        outputFiles: [
+          {
+            artifact_id: "csv-1",
+            path: "/runtime/private/result.csv",
+            name: "result.csv",
+          },
+        ],
+      }),
+      model,
+    )
+    expect(JSON.stringify(actual)).toBe(JSON.stringify(base))
+    expect(JSON.stringify(actual)).not.toContain("/runtime/private/")
+    expect(JSON.stringify(actual)).toContain("artifact_id")
+  })
   test("filters out messages with no parts", async () => {
     const input: SessionV1.WithParts[] = [
       {

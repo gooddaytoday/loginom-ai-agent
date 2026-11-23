@@ -1,0 +1,7 @@
+[
+  {"case": "ok", "url": "https://httpbin.org/anything?RequestId=lab842-errors", "read": "json"},
+  {"case": "missing", "url": "https://httpbin.org/status/404", "read": "text"},
+  {"case": "server", "url": "https://httpbin.org/status/500", "read": "text"},
+  {"case": "malformed", "url": "https://httpbin.org/html", "read": "json"},
+  {"case": "slow", "url": "https://httpbin.org/delay/3", "read": "json", "abort_after_ms": 100}
+]

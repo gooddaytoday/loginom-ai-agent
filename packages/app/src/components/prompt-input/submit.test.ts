@@ -1,10 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { createStore } from "solid-js/store"
+import { createPromptState } from "@/context/prompt-state"
 import type { Prompt, PromptStore } from "@/context/prompt"
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
 let sendFollowupDraft: typeof import("./submit").sendFollowupDraft
+let useSync: typeof import("@/context/sync").useSync
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -32,6 +35,9 @@ const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string
 const sentPrompts: string[] = []
 const promptInputs: unknown[] = []
 const sentCommands: unknown[] = []
+const toasts: unknown[] = []
+let lookupDashboard: (id: string) => Promise<boolean>
+const snapshotReads: string[] = []
 let onPrompt: (() => void) | undefined
 const commands: Array<{ name: string }> = []
 let serverSessionSyncs = 0
@@ -136,7 +142,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@/utils/toast", () => ({
-    showToast: () => 0,
+    showToast: (toast: unknown) => toasts.push(toast),
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
@@ -267,6 +273,11 @@ beforeAll(async () => {
   mock.module("@/context/platform", () => ({
     usePlatform: () => ({
       fetch: fetch,
+      getDashboardTarget: async (id: string) => {
+        snapshotReads.push(id)
+        return { nodeName: "A", directory: "/repo/main", action: "edit", fresh: false }
+      },
+      checkDashboardTarget: (id: string) => lookupDashboard(id),
     }),
   }))
 
@@ -279,6 +290,7 @@ beforeAll(async () => {
   const mod = await import("./submit")
   createPromptSubmit = mod.createPromptSubmit
   sendFollowupDraft = mod.sendFollowupDraft
+  useSync = (await import("@/context/sync")).useSync
 })
 
 beforeEach(() => {
@@ -305,6 +317,9 @@ beforeEach(() => {
   createSessionGate = undefined
   serverSessionSyncs = 0
   onPrompt = undefined
+  lookupDashboard = async () => true
+  snapshotReads.length = 0
+  toasts.length = 0
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
 
@@ -779,4 +794,272 @@ describe("prompt submit worktree selection", () => {
     expect(storedSessions["/repo/worktree-a"]?.[0]).toMatchObject({ id: "session-1", title: "New session 1" })
     expect(optimisticSeeded).toEqual([true])
   })
+})
+
+function dashboardDraft(prompt: string) {
+  const state = createPromptState({ prompt })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  return state
+}
+
+function sendQueuedDashboard(prompt: string, checkDashboard?: (id: string) => Promise<void>) {
+  commands.push({ name: "review" })
+  return sendFollowupDraft({
+    checkDashboard,
+    api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+    serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+    sync: useSync()(),
+    draft: {
+      sessionID: "ses",
+      sessionDirectory: "/repo/main",
+      prompt: [{ type: "text", content: prompt, start: 0, end: prompt.length }],
+      context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "A", action: "edit" }],
+      agent: "build",
+      model: { modelID: "m", providerID: "p" },
+    },
+  })
+}
+
+test("a queued slash command includes its pinned dashboard in the accepted message", async () => {
+  await sendQueuedDashboard("/review chart")
+  expect(sentCommands[0]).toMatchObject({
+    arguments: "chart",
+    legacyParts: [
+      expect.objectContaining({
+        type: "text",
+        synthetic: true,
+        text: dashboardPrompt("edit"),
+      }),
+    ],
+  })
+})
+
+test("a rejected dashboard prompt restores the user's words and target for retry", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit chart")
+  const submit = dashboardSubmit(state)
+  onPrompt = () => {
+    throw new Error("request rejected")
+  }
+  await submit.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(promptInputs[0]).toMatchObject({
+    legacyParts: [
+      expect.objectContaining({ text: "Edit chart" }),
+      expect.objectContaining({ synthetic: true, text: dashboardPrompt("edit") }),
+    ],
+  })
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ type: "dashboard", id: "target-a" })
+})
+
+function dashboardSubmit(
+  state: ReturnType<typeof createPromptState>,
+  options?: Partial<Parameters<typeof createPromptSubmit>[0]>,
+) {
+  return createPromptSubmit({
+    prompt: state,
+    info: () => ({ id: "session-1" }),
+    imageAttachments: () => [],
+    commentCount: () => 0,
+    autoAccept: () => false,
+    mode: () => "normal",
+    working: () => false,
+    editor: () => undefined,
+    queueScroll: () => {},
+    promptLength: () => 10,
+    addToHistory: () => {},
+    resetHistoryNavigation: () => {},
+    setMode: () => {},
+    setPopover: () => {},
+    ...options,
+  })
+}
+
+test("an expired dashboard keeps the draft and tells the user to reopen it in Loginom", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit chart")
+  lookupDashboard = async (id) => {
+    expect(id).toBe("target-a")
+    return false
+  }
+
+  await dashboardSubmit(state).handleSubmit(new Event("submit"))
+  expect(promptInputs).toHaveLength(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.snapshotGone", variant: "error" }))
+})
+
+test("a Desktop snapshot check failure keeps the dashboard draft available for retry", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit chart")
+  const submit = dashboardSubmit(state)
+  lookupDashboard = async () => {
+    throw new Error("IPC unavailable")
+  }
+
+  await submit.handleSubmit(new Event("submit"))
+  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.checkFailed", variant: "error" }))
+  expect(promptInputs).toHaveLength(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+
+  lookupDashboard = async () => true
+  await submit.handleSubmit(new Event("submit"))
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("queueing a validated dashboard keeps a newer selection and text in the editor", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit first")
+  const gate = Promise.withResolvers<boolean>()
+  lookupDashboard = () => gate.promise
+  const queued: import("./submit").FollowupDraft[] = []
+  const submit = dashboardSubmit(state, { shouldQueue: () => true, onQueue: (draft) => queued.push(draft) })
+  const pending = submit.handleSubmit(new Event("submit"))
+  state.context.add({ type: "dashboard", id: "target-b", nodeName: "B", action: "edit" })
+  state.set([{ type: "text", content: "Edit second", start: 0, end: 11 }])
+  gate.resolve(true)
+  await pending
+
+  expect(queued[0]?.context[0]).toMatchObject({ id: "target-a" })
+  expect(queued[0]?.prompt[0]).toMatchObject({ content: "Edit first" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-b" })
+  expect(state.current()[0]).toMatchObject({ content: "Edit second" })
+})
+
+test("an expired queued dashboard rejects delivery without sending its command", async () => {
+  const ids: string[] = []
+  await expect(
+    sendQueuedDashboard("/review chart", async (id) => {
+      ids.push(id)
+      throw new Error("dashboard.target.snapshotGone")
+    }),
+  ).rejects.toThrow("dashboard.target.snapshotGone")
+  expect(ids).toEqual(["target-a"])
+  expect(sentCommands).toHaveLength(0)
+})
+
+test("text queued with an expired dashboard never appears in the timeline", async () => {
+  await expect(
+    sendQueuedDashboard("Edit chart", async () => {
+      throw new Error("dashboard.target.snapshotGone")
+    }),
+  ).rejects.toThrow("dashboard.target.snapshotGone")
+
+  expect(optimistic).toHaveLength(0)
+  expect(promptInputs).toHaveLength(0)
+})
+
+test("repeat Enter during a dashboard lookup submits the captured draft once", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit A")
+  const gate = Promise.withResolvers<boolean>()
+  const ids: string[] = []
+  lookupDashboard = (id) => {
+    ids.push(id)
+    return gate.promise
+  }
+  const submit = dashboardSubmit(state)
+  const sends = [submit.handleSubmit(new Event("submit")), submit.handleSubmit(new Event("submit"))]
+  gate.resolve(true)
+  await Promise.all(sends)
+  expect(ids).toEqual(["target-a"])
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("a failed send restores the text and target alongside a newly added file", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("Edit A")
+  onPrompt = () => {
+    state.context.add({ type: "file", path: "new.txt" })
+    throw new Error("network failure")
+  }
+  await dashboardSubmit(state).handleSubmit(new Event("submit"))
+  expect(state.current()[0]).toMatchObject({ content: "Edit A" })
+  expect(state.context.items()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ type: "file", path: "new.txt" }),
+      expect.objectContaining({ type: "dashboard", id: "target-a" }),
+    ]),
+  )
+})
+
+test("a shell command leaves the selected dashboard for the next model request", async () => {
+  params = { id: "session-1" }
+  const state = dashboardDraft("pwd")
+  const ids: string[] = []
+  lookupDashboard = async (id) => {
+    ids.push(id)
+    throw new Error("404")
+  }
+  await dashboardSubmit(state, { mode: () => "shell" }).handleSubmit(new Event("submit"))
+  expect(sentShell[0]).toMatchObject({ command: "pwd" })
+  expect(promptInputs).toHaveLength(0)
+  expect(ids).toHaveLength(0)
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+})
+
+test("repeat Enter while creating a session for a dashboard produces one message", async () => {
+  const gate = Promise.withResolvers<void>()
+  createSessionGate = gate.promise
+  const state = dashboardDraft("Edit A")
+  const submit = dashboardSubmit(state, { info: () => undefined })
+  const first = submit.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  const repeated = submit.handleSubmit(new Event("submit"))
+  gate.resolve()
+  await Promise.all([first, repeated])
+  expect(createdSessions).toHaveLength(1)
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("a dashboard that expires during session creation stays in the draft", async () => {
+  const gate = Promise.withResolvers<void>()
+  createSessionGate = gate.promise
+  let available = true
+  lookupDashboard = async () => available
+  const state = dashboardDraft("Edit A")
+  const sending = dashboardSubmit(state, { info: () => undefined }).handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  available = false
+  gate.resolve()
+  await sending
+  expect(promptInputs).toHaveLength(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit A" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+})
+
+test("the promoted chat cannot submit the same draft during its final dashboard lookup", async () => {
+  const first = dashboardDraft("Edit A")
+  const chat = createPromptState()
+  const gate = Promise.withResolvers<boolean>()
+  let reads = 0
+  lookupDashboard = async () => (++reads === 1 ? true : gate.promise)
+  const original = dashboardSubmit(first, {
+    info: () => undefined,
+    prompt: { ...first, capture: (scope) => (scope ? chat.capture() : first.capture()) },
+  })
+  const sending = original.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(chat.current()[0]).toMatchObject({ content: "Edit A" })
+  params = { id: "session-1" }
+  const repeated = dashboardSubmit(chat).handleSubmit(new Event("submit"))
+  gate.resolve(true)
+  await Promise.all([sending, repeated])
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("sending a dashboard checks its local folder without fetching the consumed snapshot", async () => {
+  params = { id: "session-1" }
+  const ids: string[] = []
+  lookupDashboard = async (id) => {
+    ids.push(id)
+    return true
+  }
+  await dashboardSubmit(dashboardDraft("Edit chart")).handleSubmit(new Event("submit"))
+  expect(ids).toEqual(["target-a"])
+  expect(snapshotReads).toEqual([])
+  expect(promptInputs).toHaveLength(1)
 })

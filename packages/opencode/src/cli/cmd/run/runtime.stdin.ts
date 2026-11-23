@@ -1,4 +1,5 @@
 import fs from "fs"
+import { createInterface } from "node:readline"
 import { standaloneCancellation } from "../../standalone-cancellation"
 import * as tty from "node:tty"
 
@@ -53,5 +54,48 @@ export async function readPromptStdin(cancellable: boolean) {
     ])
   } finally {
     process.off("SIGINT", interrupt)
+  }
+}
+
+export async function readTerminalConfirmation(prompt: string, choice: string, signal: AbortSignal) {
+  if (signal.aborted) return false
+  let terminal: InteractiveStdin
+  try {
+    terminal = resolveInteractiveStdin()
+  } catch {
+    process.stderr.write("Удаление отклонено: требуется управляющий терминал.\n")
+    return false
+  }
+
+  const answer = Promise.withResolvers<boolean>()
+  const cancel = () => answer.resolve(false)
+  // The CLI owner handles cancellation and waits for the private Host to close.
+  const interrupt = () => {
+    cancel()
+    process.emit("SIGINT")
+  }
+  const eof = (chunk: Buffer | string) => {
+    if (chunk.toString().includes("\x04")) cancel()
+  }
+  const reader = createInterface({
+    input: terminal.stdin,
+    output: process.stderr.isTTY ? process.stderr : undefined,
+    terminal: true,
+  })
+  // EOF can emit readline's buffered text as a line without an Enter.
+  terminal.stdin.prependListener("end", cancel)
+  terminal.stdin.prependListener("data", eof)
+  process.stderr.write(prompt)
+  try {
+    reader.once("line", line => answer.resolve(line === choice))
+    reader.once("close", cancel).once("error", cancel).once("SIGINT", interrupt)
+    signal.addEventListener("abort", cancel, { once: true })
+    if (signal.aborted || terminal.stdin.readableEnded || terminal.stdin.destroyed) return false
+    return await answer.promise && !signal.aborted
+  } finally {
+    signal.removeEventListener("abort", cancel)
+    reader.close()
+    terminal.stdin.off("end", cancel).off("data", eof)
+    terminal.cleanup?.()
   }
 }

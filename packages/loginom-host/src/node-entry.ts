@@ -6,6 +6,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
+import { DashboardRead } from "./dashboard"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -18,7 +19,8 @@ const state: {
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
   closed: boolean
-} = { closed: false }
+  setupVerified: boolean
+} = { closed: false, setupVerified: false }
 const port: HostPort = {
   postMessage: (value) => reply(value),
   on: (event, listener) => {
@@ -45,15 +47,16 @@ process.on("disconnect", () => {
     process.exitCode = 1
   })
 })
-for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => {
-  void stop()
-    .finally(() => {
-      if (process.connected) process.disconnect()
-    })
-    .catch(() => {
-      process.exitCode = 1
-    })
-})
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
+  process.on(signal, () => {
+    void stop()
+      .finally(() => {
+        if (process.connected) process.disconnect()
+      })
+      .catch(() => {
+        process.exitCode = 1
+      })
+  })
 
 async function dispatch(message: unknown) {
   if (
@@ -103,7 +106,8 @@ async function dispatch(message: unknown) {
         headless: input.headless,
         preflightHeadless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
-        closeSavedPackageOnShutdown: "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
+        closeSavedPackageOnShutdown:
+          "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
@@ -119,6 +123,11 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "dashboard.read") {
+      const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
+      reply({ id: message.id, result })
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return
@@ -148,6 +157,15 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
       throw new Error("LOGINOM_CONNECTION_NOT_READY")
     return after
   }
+  if (method === "connection.verify-resources") {
+    state.setupVerified = false
+    await host.verifyInstallationResources({ reusePrewarm: true }).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "LOGINOM_KNOWLEDGE_UNAVAILABLE") throw error
+      throw new Error("LOGINOM_RUNTIME_START_FAILED")
+    })
+    state.setupVerified = true
+    return { verified: true }
+  }
   if (method === "connection.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
@@ -156,6 +174,10 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
+    // Setup prepares resources before check mints its five-minute token.
+    // No hashing may consume that validation lifetime between check and save.
+    if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
+    state.setupVerified = false
     await host.api.save(value.value)
     await host.settled()
     return host.api.status()

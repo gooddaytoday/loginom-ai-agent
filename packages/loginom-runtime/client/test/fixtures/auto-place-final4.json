@@ -1,0 +1,14 @@
+{
+  "source": "LAB-1693 final4/main-0-execution-events.jsonl:5836 placement_navigation.view and placement_refusal",
+  "view": {
+    "x": 324, "y": 100, "width": 950, "height": 694,
+    "viewportWidth": 1280, "viewportHeight": 800,
+    "scale": 0.3855432894295314,
+    "translate": {"x": 0, "y": 0}, "scroll": {"x": 0, "y": 0}
+  },
+  "refused": {"x": 208, "y": 2016},
+  "screen_point": {"x": 404.19300420134255, "y": 877.2552714899354},
+  "suggested": {"x": 312, "y": 1776},
+  "packing_note": "Synthetic drawings force the fallback in the recorded viewport; these are not captured native drawing bounds.",
+  "rects": [[324, 100, 950, 600], [350, 730, 56, 19.2552714899354]]
+}

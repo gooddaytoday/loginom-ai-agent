@@ -12,12 +12,15 @@ import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { afterAll, expect } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer, Schema } from "effect"
-import { cp, mkdtemp, rm } from "fs/promises"
+import { cp, mkdir, mkdtemp, rm, symlink } from "fs/promises"
 import { tmpdir } from "node:os"
+import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { isRecord } from "@/util/record"
+import { InstanceRef } from "@/effect/instance-ref"
 import { EffectBridge } from "@/effect/bridge"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -38,7 +41,7 @@ import { Image } from "../../src/image/image"
 import { Question } from "../../src/question"
 import { Todo } from "../../src/session/todo"
 import { Session } from "@/session/session"
-import { SessionMessageTable } from "@opencode-ai/core/session/sql"
+import { SessionTable, SessionMessageTable } from "@opencode-ai/core/session/sql"
 import { LLM } from "../../src/session/llm"
 import { MessageV2 } from "../../src/session/message-v2"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -64,10 +67,11 @@ import { Truncate } from "@/tool/truncate"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Format } from "../../src/format"
-import { provideTmpdirInstance, TestInstance } from "../fixture/fixture"
+import { provideInstance, provideTmpdirInstance, TestInstance } from "../fixture/fixture"
 import { SessionRetry } from "../../src/session/retry"
 import { awaitWithTimeout, pollWithTimeout, testEffect } from "../lib/effect"
 import { raw, reply, TestLLMServer } from "../lib/llm-server"
+import { DashboardSession } from "@/product/dashboard-session"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -124,22 +128,26 @@ function errorTool(parts: SessionV1.Part[]) {
   return part?.state.status === "error" ? (part as ErrorToolPart) : undefined
 }
 
-function makeMcp(instructions: MCP.ServerInstructions[] = []) {
+function makeMcp(instructions: MCP.ServerInstructions[] = [], onCall?: (method: string) => void) {
+  const call = <A>(method: string, value: A) => Effect.sync(() => {
+    onCall?.(method)
+    return value
+  })
   return Layer.succeed(
     MCP.Service,
     MCP.Service.of({
       status: () => Effect.succeed({}),
       clients: () => Effect.succeed({}),
-      instructions: () => Effect.succeed(instructions),
+      instructions: () => call("instructions", instructions),
       tools: () => Effect.succeed({}),
-      prompts: () => Effect.succeed({}),
+      prompts: () => call("prompts", {}),
       resources: () => Effect.succeed({}),
       resourceTemplates: () => Effect.succeed({}),
       add: () => Effect.succeed({ status: { status: "disabled" as const } }),
       connect: () => Effect.void,
       disconnect: () => Effect.void,
-      getPrompt: () => Effect.succeed(undefined),
-      readResource: () => Effect.succeed(undefined),
+      getPrompt: () => call("getPrompt", undefined),
+      readResource: () => call("readResource", undefined),
       startAuth: () => Effect.die("unexpected MCP auth in prompt-effect tests"),
       authenticate: () => Effect.die("unexpected MCP auth in prompt-effect tests"),
       finishAuth: () => Effect.die("unexpected MCP auth in prompt-effect tests"),
@@ -223,11 +231,11 @@ const promptRoot = LayerNode.group([
   RuntimeFlags.node,
 ])
 
-function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking" }) {
+function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; mcpCall?: (method: string) => void; processor?: "blocking" }) {
   const replacements = [
     [SessionSummary.node, summary],
     [LSP.node, lsp],
-    [MCP.node, makeMcp(input?.mcpInstructions)],
+    [MCP.node, makeMcp(input?.mcpInstructions, input?.mcpCall)],
     [RuntimeFlags.node, runtimeFlags],
   ] as const
   if (input?.processor === "blocking") {
@@ -236,12 +244,12 @@ function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; proces
   return LayerNode.compile(promptRoot, replacements)
 }
 
-function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking"; resources?: string }) {
+function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; mcpCall?: (method: string) => void; processor?: "blocking"; resources?: string }) {
   const root = LayerNode.group([promptRoot, testLLMServerNode])
   const replacements = [
     [SessionSummary.node, summary],
     [LSP.node, lsp],
-    [MCP.node, makeMcp(input?.mcpInstructions)],
+    [MCP.node, makeMcp(input?.mcpInstructions, input?.mcpCall)],
     [
       RuntimeFlags.node,
       input?.resources
@@ -255,15 +263,17 @@ function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; processo
   return LayerNode.compile(root, replacements)
 }
 
-function makeHttpNoLLMServer(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking" }) {
+function makeHttpNoLLMServer(input?: { mcpInstructions?: MCP.ServerInstructions[]; mcpCall?: (method: string) => void; processor?: "blocking" }) {
   return makePrompt(input)
 }
 
 const it = testEffect(makeHttp())
 const noLLMServer = testEffect(makeHttpNoLLMServer())
 const raceNoLLMServer = testEffect(makeHttpNoLLMServer({ processor: "blocking" }))
+const dashboardMcpCalls: string[] = []
 const withMcpInstructions = testEffect(
   makeHttp({
+    mcpCall: method => { dashboardMcpCalls.push(method) },
     mcpInstructions: [
       {
         name: "guide-server",
@@ -1564,6 +1574,354 @@ for (const mode of ["resume", "cancel", "cancel-followup"] as const) {
     30_000,
   )
 }
+
+function dashboardInstance<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  return Effect.gen(function* () {
+    yield* Effect.promise(() => mkdir(DashboardSession.dashboardRoot(), { recursive: true }))
+    const folder = yield* Effect.acquireRelease(
+      Effect.promise(() => mkdtemp(path.join(DashboardSession.dashboardRoot(), "prompt-"))),
+      (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+    )
+    const work = path.join(folder, "work")
+    yield* Effect.promise(() => mkdir(work))
+    return yield* effect.pipe(provideInstance(work), Effect.provideService(TestInstance, { directory: work }))
+  })
+}
+
+it.instance(
+  "a persisted dashboard alias cannot become an ordinary session after metadata replacement and alias loss",
+  () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+      const sessions = yield* Session.Service
+      const prompt = yield* SessionPrompt.Service
+      const alias = path.join(dir, "dashboard-alias")
+      const requests: unknown[] = []
+      LoginomHost.connect({
+        start() {},
+        on() {},
+        postMessage(value) {
+          requests.push(value)
+          throw Error("Unexpected Host request")
+        },
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+      const chat = yield* dashboardInstance(
+        Effect.gen(function* () {
+          const work = yield* TestInstance
+          yield* Effect.promise(() => symlink(work.directory, alias, process.platform === "win32" ? "junction" : "dir"))
+          const ctx = yield* InstanceRef
+          if (!ctx) throw Error("Missing instance")
+          return yield* sessions
+            .create({ title: "Pinned", metadata: { previous: "value" } })
+            .pipe(Effect.provideService(InstanceRef, { ...ctx, directory: alias }))
+        }),
+      )
+      expect(chat.directory).toBe(alias)
+      yield* sessions.setMetadata({ sessionID: chat.id, metadata: { current: "value" } })
+      expect((yield* sessions.listGlobal({ directory: alias })).map((session) => session.id)).toContain(chat.id)
+      yield* Effect.promise(() => rm(alias))
+      const database = yield* Database.Service
+      const restored = yield* Session.use
+        .get(chat.id)
+        .pipe(
+          Effect.provide(
+            Layer.fresh(LayerNode.compile(Session.node, [[Database.node, Layer.succeed(Database.Service, database)]])),
+          ),
+        )
+      expect(restored.directory).toBe(alias)
+      expect(restored.metadata?.current).toBe("value")
+      yield* llm.text("unexpected ordinary reply")
+      const exit = yield* prompt
+        .prompt({ sessionID: chat.id, agent: "build", model: ref, parts: [{ type: "text", text: "Continue" }] })
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(requests).toEqual([])
+      expect(yield* llm.inputs).toEqual([])
+    }),
+)
+
+it.instance("execution adopts an older dashboard row once and preserves its current metadata", () =>
+  dashboardInstance(
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const events = yield* EventV2Bridge.Service
+      const { db } = yield* Database.Service
+      const chat = yield* sessions.create({ title: "Old dashboard" })
+      // Model a row written before dashboard recognition became durable.
+      yield* db
+        .update(SessionTable)
+        .set({ metadata: { note: "latest" } })
+        .where(eq(SessionTable.id, chat.id))
+        .run()
+        .pipe(Effect.orDie)
+      const updates: unknown[] = []
+      const unsubscribe = yield* events.listen((event) => {
+        if (event.type === Session.Event.Updated.type && (event.data as { sessionID: string }).sessionID === chat.id)
+          updates.push(event.data)
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsubscribe)
+      for (const _ of [1, 2]) {
+        const adopted = yield* sessions.getForExecution(chat.id)
+        expect(adopted.metadata).toEqual({ note: "latest", [DASHBOARD_SESSION_MARKER]: true })
+      }
+      expect(updates).toHaveLength(1)
+    }),
+  ),
+)
+
+withMcpInstructions.instance("the first dashboard prompt advertises only dashboard builtins to the provider", () =>
+  dashboardInstance(
+    Effect.gen(function* () {
+      dashboardMcpCalls.length = 0
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* llm.text("dashboard reply")
+      const result = yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "build",
+        model: ref,
+        parts: [{ type: "text", text: "Build this chart" }],
+      })
+      expect(result.parts.some((part) => part.type === "text" && part.text === "dashboard reply")).toBe(true)
+      const inputs = yield* llm.inputs
+      expect(inputs).toHaveLength(1)
+      expect(dashboardMcpCalls).toEqual([])
+      expect(JSON.stringify(inputs[0])).not.toContain("guide-server")
+      expect(JSON.stringify(inputs[0])).not.toContain("Use lookup before mutate.")
+      const tools = inputs[0].tools
+      expect(Array.isArray(tools)).toBe(true)
+      const names = Array.isArray(tools)
+        ? tools.flatMap((tool) =>
+            isRecord(tool) && isRecord(tool.function) && typeof tool.function.name === "string"
+              ? [tool.function.name]
+              : [],
+          )
+        : []
+      expect(
+        names.every((name) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish", "dashboard_delete"].includes(name)),
+      ).toBe(true)
+      for (const name of ["read", "glob", "grep", "skill", "edit", "write", "dashboard_draft", "dashboard_publish", "dashboard_delete"]) expect(names).toContain(name)
+    }),
+  ),
+)
+
+it.instance("successful dashboard deletion ends its turn and retires every old chat across recreation", () =>
+  Effect.gen(function* () {
+    const binding = { packagePath: "/fixture/orders.lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() }
+    const prepare = Effect.promise(() => {
+      const id = crypto.randomUUID()
+      return prepareDashboard({
+        id, origin: "http://127.0.0.1:0", dashboards: DashboardSession.dashboardRoot(),
+        template: path.resolve(import.meta.dir, "../../../dashboard/template"),
+        readPublication: async () => null,
+        fetch: Object.assign(async () => Response.json({
+          id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
+          binding,
+          parameters: [], sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
+        }), { preconnect: () => undefined }),
+      })
+    })
+    const target = yield* Effect.acquireRelease(prepare, (target) =>
+      Effect.promise(() => rm(path.dirname(target.directory), { recursive: true, force: true })),
+    )
+    let receive: ((event: { data: unknown }) => void) | undefined
+    LoginomHost.connect({
+      start() {},
+      on(_event, listener) { receive = listener },
+      postMessage(value) {
+        if (!isRecord(value)) throw Error("Invalid Host request")
+        const result = value.method === "acquire" ? { generation: 1 }
+          : value.method === "scope" && isRecord(value.input) ? value.input.scope
+          : value.method === "dashboardVersions" ? { generation: 1, versions: [] }
+          : value.method === "dashboardDelete" ? { status: "empty" }
+          : true
+        receive?.({ data: { id: value.id, result } })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+    yield* Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const permissions = yield* Permission.Service
+      const chat = yield* sessions.create({ title: "Заказы" })
+      const other = yield* sessions.create({ title: "Другой чат заказов" })
+      const input = { sessionID: chat.id, model: ref, agent: "build" }
+      yield* prompt.prompt({
+        ...input, sessionID: other.id, noReply: true, parts: [{ type: "text", text: "Сохрани этот запрос" }],
+      })
+      yield* prepare
+      expect((yield* sessions.getForExecution(other.id)).id).toBe(other.id)
+      yield* llm.tool("dashboard_delete", {})
+      const deletion = yield* prompt.prompt({
+        ...input, parts: [{ type: "text", text: "Удали этот дашборд" }],
+      }).pipe(Effect.forkChild)
+      const request = yield* pollWithTimeout(
+        permissions.list().pipe(Effect.map(items => items.find(item => item.permission === "dashboard_delete"))),
+        "missing deletion confirmation",
+      )
+      yield* permissions.reply({ requestID: request.id, reply: "once" })
+      const result = yield* Fiber.join(deletion)
+      expect(result.info.role).toBe("assistant")
+      if (result.info.role === "assistant") {
+        expect(result.info.error).toBeUndefined()
+        expect(result.info.time.completed).toBeDefined()
+      }
+      const history = yield* sessions.messages({ sessionID: chat.id })
+      expect(completedTool(history.find(message => message.info.id === result.info.id)?.parts ?? [])?.state.output)
+        .toContain("Дашборд удалён")
+      expect(yield* llm.calls).toBe(1)
+      const subsequent = yield* prompt.prompt({
+        ...input, parts: [{ type: "text", text: "Собери дашборд снова" }],
+      }).pipe(Effect.exit)
+      expect(Exit.isFailure(subsequent)).toBe(true)
+      if (Exit.isFailure(subsequent)) expect(String(Cause.squash(subsequent.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(yield* llm.calls).toBe(1)
+      expect((yield* prepare).directory).toBe(target.directory)
+      for (const previous of [chat, other]) {
+        const denied = yield* sessions.getForExecution(previous.id).pipe(Effect.exit)
+        expect(Exit.isFailure(denied)).toBe(true)
+        if (Exit.isFailure(denied)) expect(String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
+        expect(yield* sessions.messages({ sessionID: previous.id })).not.toHaveLength(0)
+      }
+      const fresh = yield* sessions.create({ title: "Новый черновик заказов" })
+      expect((yield* sessions.getForExecution(fresh.id)).id).toBe(fresh.id)
+      yield* sessions.setMetadata({
+        sessionID: other.id, metadata: { [DASHBOARD_SESSION_MARKER]: fresh.metadata?.[DASHBOARD_SESSION_MARKER] },
+      })
+      const fork = yield* sessions.fork({ sessionID: other.id })
+      for (const previous of [other, fork]) {
+        const denied = yield* sessions.getForExecution(previous.id).pipe(Effect.exit)
+        expect(Exit.isFailure(denied)).toBe(true)
+        if (Exit.isFailure(denied)) expect(String(Cause.squash(denied.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      }
+    }).pipe(provideInstance(target.directory), Effect.provideService(TestInstance, { directory: target.directory }))
+  }),
+)
+
+withMcpInstructions.instance("a dashboard prompt refuses an MCP resource before reading it", () =>
+  dashboardInstance(Effect.gen(function* () {
+    dashboardMcpCalls.length = 0
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({ title: "Pinned" })
+    const exit = yield* prompt.prompt({
+      sessionID: chat.id, agent: "build", model: ref, noReply: true,
+      parts: [{ type: "file", mime: "text/plain", filename: "fixture-resource", url: "mcp://guide-server/chart-data", source: { type: "resource", clientName: "guide-server", uri: "fixture://chart-data", text: { value: "@fixture", start: 0, end: 8 } } }],
+    }).pipe(Effect.exit)
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+    expect(dashboardMcpCalls).toEqual([])
+    expect(yield* llm.inputs).toEqual([])
+  })),
+)
+
+withMcpInstructions.instance("a local dashboard command does not discover MCP prompts", () =>
+  dashboardInstance(Effect.gen(function* () {
+    dashboardMcpCalls.length = 0
+    const { llm } = yield* useServerConfig(url => ({ ...providerCfg(url), command: { local: { template: "Build a chart" } } }))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({ title: "Pinned" })
+    yield* llm.text("local reply")
+    const result = yield* prompt.command({ sessionID: chat.id, agent: "build", model: "test/test-model", command: "local", arguments: "" })
+    expect(result.parts.some(part => part.type === "text" && part.text === "local reply")).toBe(true)
+    expect(dashboardMcpCalls).toEqual([])
+  })),
+)
+
+withMcpInstructions.instance("a dashboard command refuses a non-dashboard execution directory before MCP discovery", () =>
+  Effect.gen(function* () {
+    dashboardMcpCalls.length = 0
+    const { llm } = yield* useServerConfig(url => ({ ...providerCfg(url), command: { local: { template: "Build a chart" } } }))
+    const prompt = yield* SessionPrompt.Service
+    const chat = yield* dashboardInstance(Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      return yield* sessions.create({ title: "Pinned" })
+    }))
+    yield* llm.text("unexpected command reply")
+    const exit = yield* prompt.command({ sessionID: chat.id, agent: "build", model: "test/test-model", command: "local", arguments: "" }).pipe(Effect.exit)
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+    expect(dashboardMcpCalls).toEqual([])
+    expect(yield* llm.inputs).toEqual([])
+  }),
+)
+
+it.instance("a restored dashboard json_schema format is refused before title or provider dispatch", () =>
+  dashboardInstance(Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({ permission: [{ permission: "*", pattern: "*", action: "allow" }] })
+    yield* prompt.prompt({
+      sessionID: chat.id, agent: "build", model: ref, noReply: true,
+      format: new SessionV1.OutputFormatJsonSchema({ type: "json_schema", schema: { type: "object", properties: { answer: { type: "number" } }, required: ["answer"], additionalProperties: false }, retryCount: 0 }),
+      parts: [{ type: "text", text: "Return a chart" }],
+    })
+    yield* llm.tool("StructuredOutput", { answer: 4 })
+    const exit = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.exit)
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+    expect(yield* llm.inputs).toEqual([])
+  })),
+)
+
+it.instance("ordinary sessions retain structured output with a valid format", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({ title: "Pinned" })
+    yield* llm.tool("StructuredOutput", { answer: 4 })
+    const result = yield* prompt.prompt({
+      sessionID: chat.id, agent: "build", model: ref,
+      format: new SessionV1.OutputFormatJsonSchema({ type: "json_schema", schema: { type: "object", properties: { answer: { type: "number" } }, required: ["answer"], additionalProperties: false }, retryCount: 0 }),
+      parts: [{ type: "text", text: "Return a number" }],
+    })
+    expect(result.info.role).toBe("assistant")
+    if (result.info.role === "assistant") expect(result.info.structured).toEqual({ answer: 4 })
+  }),
+)
+
+it.instance("a dashboard directory rejects a persisted subtask without an activation grant", () =>
+  dashboardInstance(
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      const message = yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "build",
+        model: ref,
+        noReply: true,
+        parts: [{ type: "text", text: "Build this chart" }],
+      })
+      yield* addSubtask(chat.id, message.info.id)
+      yield* llm.text("unwanted child execution")
+      yield* llm.text("parent reply")
+      const exit = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.exit)
+      expect(yield* sessions.children(chat.id)).toEqual([])
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(yield* llm.inputs).toEqual([])
+      expect((yield* sessions.get(chat.id)).permission).toEqual(chat.permission)
+    }),
+  ),
+)
 
 for (const profile of ["package-docs", "loginom-automation"] as const) {
   it.instance(`a restored ${profile} task cannot dispatch a persisted subtask outside the tool catalog`, () =>
@@ -3121,7 +3479,10 @@ noLLMServer.live(
                 const data = event.data as typeof SessionStatus.Event.Status.data.Type
                 if (data.sessionID === chat.id && data.status.type === "retry") retries.push(data.status.attempt)
               }
-              if (event.type === Session.Event.Error.type) errors.push(event.data)
+              if (event.type === Session.Event.Error.type) {
+                const data = event.data as typeof Session.Event.Error.data.Type
+                if (data.sessionID === chat.id) errors.push(data)
+              }
               return Effect.void
             })
             const failed = yield* prompt.prompt({

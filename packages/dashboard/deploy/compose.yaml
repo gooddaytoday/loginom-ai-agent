@@ -1,0 +1,67 @@
+name: ${DASHBOARD_PROJECT:?}
+x-common: &common
+  image: ${DASHBOARD_IMAGE:?}
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  labels: ["${DASHBOARD_OWNER_KEY:?}=${DASHBOARD_OWNER_VALUE:?}"]
+  logging:
+    options: { max-size: "10m", max-file: "3" }
+services:
+  web:
+    <<: *common
+    container_name: ${DASHBOARD_WEB:?}
+    command: [web]
+    user: ${DASHBOARD_WEB_USER:?}
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    volumes: ["${DASHBOARD_STATE:?}/builds:/builds:ro"]
+    networks: [studio]
+    ports: ["127.0.0.1:${DASHBOARD_APP_PORT:?}:8101"]
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?}
+      DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?}
+      DASHBOARD_STUDIO_PROXY: ${DASHBOARD_STUDIO_PROXY:?}
+      DASHBOARD_MODE: ${DASHBOARD_MODE:-normal}
+      DASHBOARD_CLI_BUTTON: ${DASHBOARD_CLI_BUTTON:-0}
+      DASHBOARD_BUILDS: /builds
+  publisher:
+    <<: *common
+    container_name: ${DASHBOARD_PROJECT:?}-publisher
+    command: [publisher]
+    user: ${DASHBOARD_PUBLISHER_USER:?}
+    group_add: ["${DASHBOARD_JOB_GROUP:?}"]
+    network_mode: none
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    environment:
+      DASHBOARD_BUILDER_IMAGE: ${DASHBOARD_BUILDER_IMAGE-}
+    volumes:
+      - userstorage:/storage:ro
+      - ${DASHBOARD_STATE:?}/builds:/builds:rw
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:rw
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+  builder:
+    <<: *common
+    container_name: ${DASHBOARD_PROJECT:?}-builder
+    command: [builder]
+    user: ${DASHBOARD_WEB_USER:?}
+    network_mode: none
+    mem_limit: 1g
+    pids_limit: 256
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=512m,mode=1777"]
+    volumes:
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:ro
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+volumes:
+  userstorage:
+    external: true
+    name: ${DASHBOARD_USERSTORAGE:?}
+networks:
+  studio:
+    external: true
+    name: ${DASHBOARD_NETWORK:?}

@@ -1,0 +1,104 @@
+{
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "paths-unsaved.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Exists",
+          "label_any": true,
+          "type": "boolean"
+        },
+        {
+          "name": "Text",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Exists": false,
+          "Text": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "export_input",
+      "export_destination": "paths-saved.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Exists",
+          "label_any": true,
+          "type": "boolean"
+        },
+        {
+          "name": "Text",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Exists": true,
+          "Text": "LAB1549_SIDE"
+        }
+      ]
+    },
+    {
+      "output_node_type": "export_input",
+      "export_destination": "paths-missing.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Exists",
+          "label_any": true,
+          "type": "boolean"
+        },
+        {
+          "name": "Text",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Exists": false,
+          "Text": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "export_input",
+      "export_destination": "paths-sidecar.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Exists",
+          "label_any": true,
+          "type": "boolean"
+        },
+        {
+          "name": "Text",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Exists": true,
+          "Text": "LAB1549_SIDE"
+        }
+      ]
+    }
+  ]
+}

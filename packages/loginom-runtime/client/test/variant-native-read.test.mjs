@@ -158,3 +158,23 @@ test('CrossTable rechecks the entire ancestor chain after an awaited response',a
  const check=assert.rejects(pending,/stale|static/);f.middle.FPorts[1].FCollection[0].FGuid='changed';f.finish(false);await check;
  assert.deepEqual(f.counters,{sent:1,released:2});assert.equal((await nativeVariantStatus(f.page)).published,false);
 });
+
+function collapseChain(){
+ const f=crossFixture({collapse:true});f.node.FIconCls='bg-vendor-icon-columnflipping';f.b.static_chain.kind='collapse_static_1';return f;
+}
+test('Collapse exact read admits import→Collapse→Collapse and keeps fixed321',async()=>{
+ const f=collapseChain();const r=await readNativeVariant(f.page,f.b,decodeVariantFrame);
+ assert.equal(r.cells[0].tag,5);assert.deepEqual(f.counters,{sent:1,released:2});
+});
+for(const [name,change] of [
+ ['CrossTable kind on a Collapse target',f=>f.b.static_chain.kind='crosstable_static_1'],
+ ['Collapse kind on a CrossTable target',f=>f.node.FIconCls='bg-vendor-icon-crosstab'],
+ ['direct import without a Collapse ancestor',f=>{f.b.static_chain.nodes.pop();f.b.static_chain.edges.pop();}],
+ ['missing ancestor execution',f=>f.b.static_chain.nodes[1].execution_id='d:1:9'],
+ ['foreign source',f=>f.b.static_chain.nodes[0].node_id='foreign'],
+ ['inactive ancestor',f=>f.middle.FStatus=0],
+ ['wrong ancestor type',f=>f.middle.FIconCls='bg-vendor-icon-calcdata'],
+ ['new ancestor execution',f=>f.root.childNodes.push({internalId:12,data:{id:'3.1',Status:3,ErrorDetails:'',ModelNode:f.middle.data},childNodes:[]})],
+])test('Collapse static chain refuses '+name+' before dispatch',async()=>{
+ const f=collapseChain();change(f);await assert.rejects(()=>readNativeVariant(f.page,f.b,decodeVariantFrame));assert.equal(f.counters.sent,0);
+});

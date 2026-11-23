@@ -1,0 +1,18 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "source": "variables.csv",
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "header": "names",
+  "null_marker": "NULL",
+  "columns": [
+    {"name": "RowID", "type": "integer"},
+    {"name": "Amount", "type": "integer"}
+  ],
+  "scenario_variable": {"name": "Amount", "type": "integer", "initial": 7, "updated": 11},
+  "expressions": [
+    {"name": "Shifted", "type": "integer", "formula": "Amount + Var.Amount", "replace": false},
+    {"name": "ScenarioAmount", "type": "integer", "formula": "Var.Amount", "replace": false}
+  ],
+  "output_order": ["RowID", "Amount", "Shifted", "ScenarioAmount"]
+}

@@ -21,20 +21,45 @@ export function readLinRegressionBrowser(prefix) {
  const active=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],e=es[0],b=e?.getBoundingClientRect();return es.length===1&&e.checkVisibility({checkVisibilityCSS:true})&&b.width>0&&b.height>0&&b.x>=0&&b.y>=0&&b.x<innerWidth&&b.y<innerHeight;};
  for(const [kind,card,names] of [
   ['parameters','LinRegressionWizard',['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs']],
-  ['details','LinRegressionWizard-1',['pedEpsilon','pedIntercept','pedPredictionIntervalLevel','pedLambdaLasso','pedLambdaRidge']]
+  ['details','LinRegressionWizard-1',['pedEpsilon','pedIntercept','pedPredictionIntervalLevel','pedLassoSetupMethod','pedLambdaLasso','pedRidgeSetupMethod','pedLambdaRidge','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
-  const values={},switches={};
-  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'linregression_control'};values[name]=c.getValue();const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'linregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
+  const values={},switches={},disabled={};
+  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'linregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge','pedLassoSetupMethod','pedLambdaLasso'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'linregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'linregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
   if(kind==='parameters'&&(!Number.isInteger(values.pedRegressionMethod)||!['pedAutoMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'].every(k=>typeof values[k]==='boolean')))return {verified:false,reason:'linregression_initializing'};
   if(kind==='details'&&(!(typeof values.pedEpsilon==='number'&&values.pedEpsilon>0)||typeof values.pedIntercept!=='boolean'))return {verified:false,reason:'linregression_initializing'};
-  return {verified:true,kind,values,switches};
+  const selection=kind==='details'&&exactValue(base+';pedRegSelQuality;ValueControl'),store=selection?.getStore?.(),records=store?.getData?.()?.items;
+  const selection_choices=Array.isArray(records)&&records.length===7&&!store.isLoading?.()?records.map(r=>({value:r.data?.[selection.valueField],label:r.data?.[selection.displayField]})):[];
+  const options=name=>{const c=exactValue(base+';'+name+';ValueControl'),store=c?.getStore?.(),rs=store?.getData?.()?.items;return Array.isArray(rs)&&!store.isLoading?.()?rs.map(r=>({value:r.data?.[c.valueField],label:r.data?.[c.displayField]})):[];};
+  return {verified:true,kind,values,switches,disabled,selection_choices,...(kind==='parameters'?{method_choices:options('pedRegressionMethod')}:{ridge_choices:options('pedRidgeSetupMethod'),lasso_choices:options('pedLassoSetupMethod')})};
  }
  const partitionBase=prefix+';WizrdMCF;LearnPartitionWizard';
  if(active(partitionBase)){
   const values={},names={train:'SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer',test:'SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer',sampling:'pedSamplingMethod',validation:'ValidationSettings;pedLearnValidationMethod'};
   for(const [key,path] of Object.entries(names)){const c=exactValue(partitionBase+';'+path+';ValueControl');if(!c||!Number.isFinite(c.getValue()))return {verified:false,reason:'linregression_partition'};values[key]=c.getValue();}
-  return {verified:true,kind:'partition',values};
+  const sizes=[];
+  for(const index of [0,1]){
+   const suffix=index?'-1':'',base=partitionBase+';SizeGridForm;',path=';FloatPropEdit'+suffix+';PropContainer;ValueContainer;ValueControl';
+   const absolute_control_tid=base+'colAbsoluteSize'+path,absolute=exactValue(absolute_control_tid),relative=exactValue(base+'colRelativeSize'+path);
+   const cells=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+'colSizeType_'+index)+']')].filter(e=>e.querySelectorAll('img[role=button]').length===1),icons=cells.length===1?cells[0].querySelectorAll('img[role=button]'):[];
+   const identity=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')],icon=icons[0],icon_ref=identity?.document===document?identity.ids?.get(icon):null;
+   if(!absolute||!relative||typeof absolute.isDisabled!=='function'||typeof relative.isDisabled!=='function'||absolute.isDisabled()===relative.isDisabled()
+    ||!Number.isSafeInteger(absolute.getValue())||absolute.getValue()<0||icons.length!==1||typeof icon_ref!=='string'||identity.refs?.get(icon_ref)?.deref()!==icon)return {verified:false,reason:'linregression_partition_units'};
+   for(const key of ['colAbsoluteSize','colRelativeSize']){
+    const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+key+';FloatPropEdit'+suffix+';SwitchButton')+']')];
+    if(es.length!==1||globalThis.Ext?.getCmp?.(es[0].id)?.pressed!==false)return {verified:false,reason:'linregression_partition_binding'};
+   }
+   sizes.push({index,unit:absolute.isDisabled()?'percent':'rows',count:absolute.getValue(),absolute_control_tid,icon_ref});
+  }
+  let sequence=null;
+  if(values.sampling===1){
+   const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(partitionBase+';SequenceMethodForm;grdSequence')+']')],grid=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id),store=grid?.getStore?.(),records=store?.getData?.()?.items;
+   if(grid?.el?.dom!==es[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(records)||records.length!==3||store.getCount?.()!==3
+    ||records.some((r,i)=>!r.isModel||r.data?.SequenceOrder!==i||![0,1,2].includes(r.data?.PartitionType)||r.data?.SizePath!==''))return {verified:false,reason:'linregression_partition_sequence'};
+   sequence=records.map(r=>r.data.PartitionType);
+   if(new Set(sequence).size!==3)return {verified:false,reason:'linregression_partition_sequence'};
+  }
+  return {verified:true,kind:'partition',values,sizes,sequence};
  }
 
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];
@@ -44,16 +69,22 @@ export function readLinRegressionBrowser(prefix) {
   const grid=component(normBase+'grdNormColumns;tbl'),store=grid?.getStore?.(),records=store?.getData?.()?.items;
   if(store?.$className!=='Ext.data.Store'||store.getProxy?.()?.$className!=='bg.ext.CollectionProxy'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(records)||records.length>1000||store.getCount?.()!==records.length)return fail('linregression_norm_inventory');
   const selected=grid.getSelectionModel?.().getSelection?.();if(!Array.isArray(selected)||selected.some(r=>!records.includes(r)))return fail('linregression_norm_selection');
-  const fields=[];for(const r of records){const d=r?.data;if(!r?.isModel||typeof d?.Name!=='string'||![3,4].includes(d.DataType)||![3,4].includes(d.UsageType)||!Number.isInteger(d.NormType)||typeof d.Importance!=='number'||typeof d.Irremovable!=='boolean')return fail('linregression_norm_record');
-   fields.push({record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:d.DataType===3?'real':'integer',index:d.Index,norm_type:d.NormType,importance:d.Importance,irremovable:d.Irremovable});}
+  const fields=[];for(const r of records){const d=r?.data;if(!r?.isModel||typeof d?.Name!=='string'||![3,4,5].includes(d.DataType)||![3,4].includes(d.UsageType)||!Number.isInteger(d.NormType)||typeof d.Importance!=='number'||typeof d.Irremovable!=='boolean')return fail('linregression_norm_record');
+   fields.push({record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:{3:'real',4:'integer',5:'string'}[d.DataType],index:d.Index,norm_type:d.NormType,importance:d.Importance,irremovable:d.Irremovable});}
   if(new Set(fields.map(f=>f.name)).size!==fields.length||new Set(fields.map(f=>f.record_id)).size!==fields.length)return fail('linregression_norm_identity');
   const editorBase=prefix+';WizrdMCF;ColumnsEditForm',editors=exact(editorBase).filter(e=>e.checkVisibility({checkVisibilityCSS:true}));let editor=null;
   if(editors.length){const c=component(editorBase)?.Controller,rs=c?.FRecords,choice=component(editorBase+';cbxNormType');
    if(editors.length!==1||c?.FView?.el?.dom!==editors[0]||!Array.isArray(rs)||rs.length===0||rs.length!==selected.length||rs.some(r=>!records.includes(r)||!selected.includes(r))||!Number.isInteger(choice?.getValue?.()))return fail('linregression_norm_editor');
    editor={root_tid:editorBase,record_ids:rs.map(r=>String(r.internalId)),norm_type:choice.getValue()};
   }
+  let indicator;
+  if(!editor&&selected.length===1&&selected[0].data.DataType===5){
+   const base=normBase+'NormSettingsForm;DiscreteNormParamsForm;',reference=component(base+'cbxReferenceType'),valuesGrid=component(base+'grdUniqueValues;tbl'),valuesStore=valuesGrid?.getStore?.(),values=valuesStore?.getData?.()?.items;
+   if(!reference||!Number.isInteger(reference.getValue?.())||reference.isDisabled?.()!==false||valuesStore?.$className!=='Ext.data.Store'||valuesStore.getProxy?.()?.$className!=='Ext.data.proxy.Memory'||valuesStore.isLoading?.()||valuesStore.isBufferedStore||!Array.isArray(values)||values.length>1000||valuesStore.getCount?.()!==values.length||values.some(r=>!r.isModel||typeof r.data?.UniqueValue!=='string'||typeof r.data.Selected!=='boolean'||!Number.isSafeInteger(r.data.RefCount)||r.data.RefCount<0)||new Set(values.map(r=>r.data.UniqueValue)).size!==values.length)return fail('linregression_indicator_values');
+   indicator={record_id:String(selected[0].internalId),field:selected[0].data.Name,reference_type:reference.getValue(),values:values.map((r,index)=>({index,value:r.data.UniqueValue,count:r.data.RefCount,selected:r.data.Selected}))};
+  }
   const status=exact(normBase+'txtActivationPortStatus'),input=status.length===1?status[0].querySelector('input'):null;
-  return {verified:true,kind:'normalization',inventory_complete:true,fields,selected:selected.map(r=>String(r.internalId)),editor,source_status:typeof input?.value==='string'?input.value:null};
+  return {verified:true,kind:'normalization',inventory_complete:true,fields,selected:selected.map(r=>String(r.internalId)),editor,...(indicator?{indicator}:{}),source_status:typeof input?.value==='string'?input.value:null};
  }
 
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;TuneDataSourceInputPortWizard;';

@@ -10,7 +10,7 @@ export function groupingOutputDefinitions(configuration){
   const functions=Object.entries(GROUPING_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0);
   need(supportedGroupingMeasure(f),'Unsupported grouping functions');
   for(const [fn,v] of functions)fields.push({name:f.name+(functions.length>1?'_'+v.suffix:''),label:f.label+'|'+v.label,
-   type:fn==='sum'||fn==='avg'?'real':['count','unique_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
+   type:fn==='concat'?'string':['sum','avg','median','stddev'].includes(fn)?'real':['count','unique_count','null_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
  }
  return fields;
 }
@@ -61,14 +61,19 @@ export function resolveGroupingOutput(configuration,parameters,native,mapping={}
  return {fields:ordered};
 }
 export async function configureGroupingOutput(channel,configuration,parameters,mapping={}){
+ // A binding reruns the saved node without reapplying its output definition.
+ // Freeze its declared layout before Save, including an initially matching
+ // native order; autosync can otherwise reorder exported columns on reopen.
+ if(configuration.options?.pedSortResult?.switch_pressed&&mapping.autosync===undefined)mapping={...mapping,autosync:false};
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
- // Auto-sync restores the source order on a fresh execution. Freeze a custom
- // order unless the caller explicitly requests synchronization.
- const reordered=planned.fields&&!same(planned.fields.map(f=>f.current.record_id),initial.node_mapping.target_fields.map(f=>f.record_id));
- if(mapping.autosync!==undefined||reordered)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
+ // Native regeneration can reorder even an initially matching layout after
+ // reopen (LAB-1100: Region,Metric -> Metric,Region with autosync=true).
+ // Freeze every newly configured layout, retaining an explicit autosync
+ // choice and options-only/legacy preservation requests.
+ if(mapping.autosync!==undefined||planned.fields)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
  if(planned.fields){
   // Finish table edits before exclusion introduces a separate native group.
   // Existing exclusions stay excluded; new exclusions use the same guarded

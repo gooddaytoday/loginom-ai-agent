@@ -1,0 +1,10 @@
+[
+  {"name":"A","label":"Количество","type":"integer","value":7},
+  {"name":"B","label":"Флаг","type":"boolean","value":false},
+  {"name":"Text","label":"Текст","type":"string","value":"Привет"},
+  {"name":"Moment","label":"Момент","type":"datetime","value":"2026-01-02T03:04:05.006"},
+  {"name":"Missing","label":"Пропуск","type":"integer","value":null},
+  {"name":"Rate","label":"Ставка","type":"real","value":1.25},
+  {"name":"Empty","label":"Пустая строка","type":"string","value":""},
+  {"name":"Zero","label":"Ноль","type":"integer","value":0}
+]

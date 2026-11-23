@@ -1,0 +1,406 @@
+{
+  "status": "proposal_requires_owner_approval_not_stock_expected",
+  "package_path": "{{PACKAGE_PATH}}",
+  "cases": {
+    "real": {
+      "task": "task-real.md",
+      "source": "../../fixtures/types/types.csv",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "PriceMedian",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "PriceMode",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "PriceStd",
+              "type": "real",
+              "label_any": true,
+              "tolerance": {
+                "abs": 1e-12,
+                "rel": 1e-12
+              }
+            }
+          ],
+          "rows": [
+            {
+              "Region": "A",
+              "PriceMedian": 2.5,
+              "PriceMode": 2.5,
+              "PriceStd": 1.385640646055102
+            },
+            {
+              "Region": "B",
+              "PriceMedian": 3.75,
+              "PriceMode": 3.75,
+              "PriceStd": 1.4433756729740654
+            },
+            {
+              "Region": "C",
+              "PriceMedian": null,
+              "PriceMode": 0.0,
+              "PriceStd": null
+            },
+            {
+              "Region": "D",
+              "PriceMedian": 4.5,
+              "PriceMode": 4.5,
+              "PriceStd": 0.0
+            },
+            {
+              "Region": "E",
+              "PriceMedian": 1.0,
+              "PriceMode": 0.5,
+              "PriceStd": 0.5773502691896257
+            }
+          ]
+        }
+      ]
+    },
+    "date": {
+      "task": "task-date.md",
+      "source": "../../fixtures/types/types.csv",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "FirstDay",
+              "type": "datetime",
+              "label_any": true
+            },
+            {
+              "name": "LastDay",
+              "type": "datetime",
+              "label_any": true
+            },
+            {
+              "name": "FinalDay",
+              "type": "datetime",
+              "label_any": true
+            },
+            {
+              "name": "MissingDays",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "A",
+              "FirstDay": "2026-01-05T00:00:00.000",
+              "LastDay": "2026-02-10T00:00:00.000",
+              "FinalDay": null,
+              "MissingDays": 1
+            },
+            {
+              "Region": "B",
+              "FirstDay": "2026-06-20T00:00:00.000",
+              "LastDay": "2026-07-14T00:00:00.000",
+              "FinalDay": "2026-07-14T00:00:00.000",
+              "MissingDays": 0
+            },
+            {
+              "Region": "C",
+              "FirstDay": null,
+              "LastDay": null,
+              "FinalDay": null,
+              "MissingDays": 2
+            },
+            {
+              "Region": "D",
+              "FirstDay": "2026-02-01T00:00:00.000",
+              "LastDay": "2026-02-01T00:00:00.000",
+              "FinalDay": "2026-02-01T00:00:00.000",
+              "MissingDays": 0
+            },
+            {
+              "Region": "E",
+              "FirstDay": "2026-01-20T00:00:00.000",
+              "LastDay": "2026-01-22T00:00:00.000",
+              "FinalDay": "2026-01-22T00:00:00.000",
+              "MissingDays": 0
+            }
+          ]
+        }
+      ]
+    },
+    "boolean": {
+      "task": "task-boolean.md",
+      "source": "../../fixtures/types/types.csv",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "FlagMin",
+              "type": "boolean",
+              "label_any": true
+            },
+            {
+              "name": "FlagMax",
+              "type": "boolean",
+              "label_any": true
+            },
+            {
+              "name": "FlagMode",
+              "type": "boolean",
+              "label_any": true
+            },
+            {
+              "name": "FlagValues",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "FlagMissing",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "A",
+              "FlagMin": false,
+              "FlagMax": true,
+              "FlagMode": true,
+              "FlagValues": 2,
+              "FlagMissing": 1
+            },
+            {
+              "Region": "B",
+              "FlagMin": true,
+              "FlagMax": true,
+              "FlagMode": true,
+              "FlagValues": 1,
+              "FlagMissing": 1
+            },
+            {
+              "Region": "C",
+              "FlagMin": null,
+              "FlagMax": null,
+              "FlagMode": false,
+              "FlagValues": 0,
+              "FlagMissing": 2
+            },
+            {
+              "Region": "D",
+              "FlagMin": false,
+              "FlagMax": false,
+              "FlagMode": false,
+              "FlagValues": 1,
+              "FlagMissing": 0
+            },
+            {
+              "Region": "E",
+              "FlagMin": false,
+              "FlagMax": true,
+              "FlagMode": false,
+              "FlagValues": 2,
+              "FlagMissing": 0
+            }
+          ]
+        }
+      ]
+    },
+    "variant": {
+      "task": "task-variant.md",
+      "source": "../../fixtures/types/variant.csv",
+      "source_preparation": "scalar import -> Collapse(RowID information; IntValue/RealValue/TextValue transposed; empty kept); Grouping by RowID",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "RowID",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Cells",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "EmptyCells",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "FirstValue",
+              "type": "variant",
+              "label_any": true
+            },
+            {
+              "name": "LastValue",
+              "type": "variant",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "RowID": 1,
+              "Cells": 3,
+              "EmptyCells": 0,
+              "FirstValue": {
+                "cell_type": "integer",
+                "value": 10
+              },
+              "LastValue": {
+                "cell_type": "string",
+                "value": "text"
+              }
+            },
+            {
+              "RowID": 2,
+              "Cells": 3,
+              "EmptyCells": 1,
+              "FirstValue": null,
+              "LastValue": {
+                "cell_type": "string",
+                "value": "word"
+              }
+            },
+            {
+              "RowID": 3,
+              "Cells": 3,
+              "EmptyCells": 3,
+              "FirstValue": null,
+              "LastValue": null
+            },
+            {
+              "RowID": 4,
+              "Cells": 3,
+              "EmptyCells": 1,
+              "FirstValue": {
+                "cell_type": "integer",
+                "value": -4
+              },
+              "LastValue": null
+            }
+          ]
+        }
+      ]
+    },
+    "mode_tie": {
+      "task": "task-mode-tie.md",
+      "source": "../../fixtures/types/mode-tie.csv",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "AmountMode",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMode",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "T1",
+              "AmountMode": 3,
+              "TextMode": "alpha"
+            },
+            {
+              "Region": "T2",
+              "AmountMode": 7,
+              "TextMode": "x"
+            },
+            {
+              "Region": "T3",
+              "AmountMode": 2,
+              "TextMode": "eta"
+            }
+          ]
+        }
+      ]
+    },
+    "empty": {
+      "task": "task-empty.md",
+      "source": "../../fixtures/types/empty.csv",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Rows",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "Total",
+              "type": "real",
+              "label_any": true
+            },
+            {
+              "name": "FirstDay",
+              "type": "datetime",
+              "label_any": true
+            },
+            {
+              "name": "AnyFlag",
+              "type": "boolean",
+              "label_any": true
+            }
+          ],
+          "rows": []
+        }
+      ]
+    }
+  }
+}

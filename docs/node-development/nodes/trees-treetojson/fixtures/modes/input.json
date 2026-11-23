@@ -1,0 +1,14 @@
+{
+  "document": {
+    "batch":"Бета",
+    "items":[{"code":"x","qty":2},{"code":"y","qty":0}],
+    "tags":[{"tag":"a"},{"tag":"b"},{"tag":"c"}],
+    "when":"2026-11-07T12:34:56.789"
+  },
+  "root_array":[{"code":"x","qty":2},{"code":"y","qty":0}],
+  "empty_root_array":[],
+  "labels":{"batch":"Партия","items":"Позиции","code":"Код","qty":"Количество","tags":"Теги","tag":"Тег","when":"Момент"},
+  "types":{"/batch":"string","/items/code":"string","/items/qty":"integer","/tags/tag":"string","/when":"datetime"},
+  "datetime":"civil milliseconds, no timezone conversion",
+  "delivery":"JSON is a value description, not proof of a native datetime or a root-array tree. Check the prepared tree before serialization."
+}
