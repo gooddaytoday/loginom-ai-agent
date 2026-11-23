@@ -1,5 +1,4 @@
 import { Splash } from "@opencode/ui/logo"
-import { Wordmark } from "@opencode/ui/wordmark"
 import type { Platform } from "@opencode/app/desktop"
 import { onCleanup, onMount, Show } from "solid-js"
 import "./splash.css"
@@ -19,8 +18,8 @@ export function LoadingSplash(props: {
     const start = () => {
       if (document.visibilityState !== "visible" || !document.hasFocus()) return
       props.onDrawStart()
-
-      if (motion.matches) props.onDrawEnd()
+      // Loginom AI Agent (B4.11d): the product mark has no outline to draw, so the drawing ends as it starts.
+      props.onDrawEnd()
     }
 
     window.addEventListener("focus", start)
@@ -79,12 +78,8 @@ export function LoadingSplash(props: {
         <div class="relative size-full">
           <div class="absolute inset-x-0 top-[25.375%]">
             <div class="mx-auto w-full max-w-[720px]">
-              <Wordmark
-                outline
-                fade={false}
-                muted={false}
-                class="mx-auto block h-auto w-4/5 text-v2-icon-icon-faint opacity-50"
-              />
+              {/* Loginom AI Agent (B4.11d): the product mark of the startup splash, not the OpenCode wordmark. */}
+              <Splash class="mx-auto block w-16 h-20 opacity-50" />
             </div>
           </div>
         </div>
