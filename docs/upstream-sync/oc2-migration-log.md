@@ -10561,7 +10561,7 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 
 ## B2.7b loginom setup и status
 
-22.11.2026. Ветка `b27b-loginom-setup` от `oc2-migration` (`96dd4a13e1`), рабочее дерево `.claude/worktrees/b27b`. Bun 1.4.4
+22–23.11.2026. Ветка `b27b-loginom-setup` от `oc2-migration` (`96dd4a13e1`), рабочее дерево `.claude/worktrees/b27b`. Bun 1.4.4
 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код
 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` и `bun install
 --frozen-lockfile` в `evals` — в этом дереве и в дереве базы `<scratchpad>/b27b-base` (`96dd4a13e1`, detached); хук
@@ -10576,11 +10576,13 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 | Коммит | Что | `bun run secrets staged` |
 |---|---|---|
 | `04d5ffd107` `feat(cli): loginom setup, status, check, cancel-pending and recover of the product CLI (B2.7b)` | файл форка `cli/src/loginom-management.ts` (новый); вызов во входе продукта — `cli/src/standalone.ts` (`Standalone.early`), комментарий в `cli/src/loginom-cli.ts`; тест `cli/test/cli-loginom.test.ts` (новый) | `clean` |
-| `69179b1a05` `fix(evals): prepare the profile with loginom status, setup and auth list of the product CLI on OpenCode 2 (B2.7b)` | `evals/src/profile.ts` (+16 −8), фикстура `evals/fixtures/fake-cli.ts`, тесты `evals/test/profile.test.ts` | `clean` |
+| `69179b1a05` `fix(evals): prepare the profile with loginom status, setup and auth list of the product CLI on OpenCode 2 (B2.7b)` | `evals/src/profile.ts`, фикстура `evals/fixtures/fake-cli.ts`, тесты `evals/test/profile.test.ts`: `configured`, затравка моделей и `assertAuth` по `auth list` (последнее возвращено в `6f9da0a708`) | `clean` |
 | `3090388507` `test(cli): the browser mode of loginom setup reaches the validation login (B2.7b)` | режим браузера в проверке входа: до прогона мутаций его не проверял ни один тест (M4) | `clean` |
 | `8a3cadb443` `test(cli): loginom status reports a held Help as a configured connection (B2.7b)` | случай с придержанным Help — после выжившей мутации M9 | `clean` |
 | `15aa8e99b9` `chore(cli): name v0.4.0 as the reference of the loginom commands (B2.7b, В-99)` | ссылки в комментариях новых файлов | `clean` |
-| следующий | этот раздел | |
+| `bf4981ccd5` `docs(upstream-sync): record loginom setup and status of the product CLI on OpenCode 2 (B2.7b)` | этот раздел, первая версия | `clean` |
+| `6f9da0a708` `fix(evals): keep assertAuth reading the profile's key file (B2.7b)` | `assertAuth`, его тест и заглушка `auth list` — как на базе (ниже); в `fake-cli.ts` остаётся только приём профиля | `clean` |
+| следующий | поправки этого раздела после ревью | |
 
 Правок upstream нет: все файлы кода — файлы форка, `catalog.json` и `catalog.md` не менялись.
 
@@ -10631,16 +10633,18 @@ Linux (`dpapi`/`keychain` на Windows/macOS), каждое сохранение
 `refresh_required`). В 0.4 этой команды нет: `git grep "shared-oauth-status-v1\|SHARED_AUTH_DIR" <ref> -- packages`
 пуст и на `a080f7725c`, и на `v0.4.0`, а адаптация `87c7d497d6` из архивного журнала evals
 (`docs/archive/2026-10-16-evals-parallel-history.md`) жила в отдельном дереве и в репозитории отсутствует (`git cat-file
--t` — нет объекта). Общего OAuth-хранилища нет ни в
-0.4, ни в v2. Переносить из 0.4 нечего, а `auth list` v2 не даёт ни поколения, ни хеша. Выбрано меньшее:
+-t` — нет объекта). Общего OAuth-хранилища нет ни в 0.4, ни в v2. Переносить из 0.4 нечего. Равнозначной команды в
+v2 тоже нет: `auth list` не даёт ни поколения, ни хеша. Выбрано меньшее — **`assertAuth` не менялся** (обе ветки):
 
-- **Ветка без общего OAuth** (`data/auth.json` и подсказка `providers login`) переведена на `auth list --standalone
-  --format json` профиля и подсказку `auth login`. v2 держит ключи в базе профиля (`credential`) и импортирует
-  `data/auth.json` 0.4 только при создании базы (миграция `import_legacy_credentials`, B3.2), поэтому прямое чтение файла
-  не видит ни `auth login`, ни удалённых ключей. `--standalone` обязателен: без него `auth list` оставляет службу профиля,
-  следующая команда `loginom` получила бы `PROFILE_BUSY`, а надзор процессов `evals` не подтвердил бы очистку.
-- **Ветка общего OAuth не менялась.** На v2 команда `providers` неизвестна, разбор `shared-oauth-status-v1` отказывает:
+- **Общий OAuth.** На v2 команда `providers` неизвестна, разбор `shared-oauth-status-v1` отказывает:
   `SHARED_AUTH_STATUS_INVALID`, код 2 — подготовка слота останавливается, а не идёт на чужих ключах. Вопрос владельцу ниже.
+- **Ветка без общего OAuth** по-прежнему читает `<профиль>/data/auth.json`. Первая версия (`69179b1a05`) переводила её на
+  `auth list --standalone --format json` профиля; после ревью возвращено (`6f9da0a708`): `auth list` читает базу профиля, а
+  `archiveProfileHistory` уносит базу в архив после каждой попытки (`retainedProfileFiles` хранит `data/auth.json`, но не
+  базу). Ключ, который есть только в базе (`auth login` v2), прошёл бы проверку и пропал бы к прогону, а сама проверка
+  оставляла бы в профиле базу и журнал CLI. Между попытками у `evals` остаётся только `data/auth.json`, и v2 импортирует его
+  в каждую новую базу (миграция `import_legacy_credentials`, B3.2) — прогон ниже это показывает. Подсказка `providers login`
+  называет команду 0.4; где держать ключи `evals` на v2 — вопрос владельцу.
 
 ### Потребители
 
@@ -10678,7 +10682,7 @@ $ bun run-check-accept.ts <repo>                     # код 0
  "profile": ["cache", "cli-profile.json", "config", "data", "loginom", "state"]}
 ```
 
-**`evals`** (`<scratchpad>/b27b-runs/evals-accept.ts`): шаги `prepareProfile` из `evals/src/run.ts` —
+**`evals`** (`<scratchpad>/b27b-runs/evals-accept.ts`, итог — на `6f9da0a708`): шаги `prepareProfile` из `evals/src/run.ts` —
 `releaseStaleWriter`, `ensureProfile`, `assertAuth`, `recoverIfNeeded`, `archiveProfileHistory` — кодом `evals`, команда —
 `agentCommand` в режиме source (`bun run src/loginom-cli.ts`, `LOGINOM_AI_AGENT_RESOURCES` — ресурсы стенда), каждая
 команда управления — под надзором процессов `evals` (`superviseProcess`: ноль оставшихся процессов, защёлка снята).
@@ -10688,14 +10692,15 @@ $ bun run-check-accept.ts <repo>                     # код 0
 # до правок evals (новый CLI, evals как на 96dd4a13e1)
 {"done": false, "steps": {"releaseStaleWriter": {"ok": true},
  "ensureProfile": {"ok": false, "error": "loginom setup завершился кодом 1:\nPROFILE_FORMAT_INVALID"}}, "profile": ["cache"]}
-# после 69179b1a05
+# после правок evals (6f9da0a708)
 {"done": true,
  "steps": {"releaseStaleWriter": {"ok": true, "value": false}, "ensureProfile": {"ok": true, "value": {"fresh": true}},
    "assertAuth": {"ok": true},
    "recoverIfNeeded": {"ok": true, "value": {"revision": 1, "generation": 1, "url": "https://loginom.example.test/app/",
      "username": "fixture-user", "folder": "/fixture-user", "hasPassword": true, "state": "ready", "browser": {"state": "unknown"}}},
-   "archiveProfileHistory": {"ok": true, "value": "b27b-initial-P0AFxR"}},
- "connection": {"generation": 1, "url": "https://loginom.example.test/app/", "username": "fixture-user", "protection": "plaintext"},
+   "archiveProfileHistory": {"ok": true, "value": "b27b-initial-…"},
+   "auth list after archive": {"exitCode": 0, "integrations": ["openai"]},        # новая база снова импортировала data/auth.json
+   "connection after archive and the next Host": ["v040-migration.json", "generations"]},   # connection.json удалён — «Найдено»
  "logins": [{"validation": true, "url": "https://loginom.example.test/app/", "username": "fixture-user", "secretMatches": true}]}
 ```
 
@@ -10726,10 +10731,9 @@ Keychain), нужен `LOGINOM_AI_AGENT_TEST_NODE`. Команды — вход 
 | a command exits after failed Host cleanup despite retained process handles | `standalone-status` | вход с вечным `setInterval`: код 1 за 8 с, `LOGINOM_HOST_CLEANUP_FAILED`, `{code: LOGINOM_HOST_CLOSED}`, защёлка осталась |
 | startup failure releases the profile only after confirmed cleanup | `standalone-startup` (режим `management`) | `confirmed`, `bad-ack`, `exit-without-ack`, `secret-error`: код 1, код отказа или `LOGINOM_HOST_CLEANUP_FAILED`, защёлка снята только при подтверждённой очистке, `private-startup-sentinel` нигде, Node host завершён |
 
-`evals/test/profile.test.ts`: +3 и один переписанный — `assertAuth` по `auth list` (аргументы `auth list --standalone
---format json`, `data/auth.json` сам по себе не допускает), `recoverIfNeeded` и `verifyProfile` с `configured` без
+`evals/test/profile.test.ts`: +3 — `recoverIfNeeded` и `verifyProfile` с `configured` без
 `hasApiKey` (`status`, затем `check`), `ensureProfile` source в профиле, который CLI принимает только пустым
-(`EVAL_FAKE_ADMIT_PROFILE` в `fake-cli.ts`). По `evals/AGENTS.md` — сначала красные (4 из 4 упали на коде до правки), затем код.
+(`EVAL_FAKE_ADMIT_PROFILE` в `fake-cli.ts`). По `evals/AGENTS.md` — сначала красные (все упали на коде до правки), затем код.
 
 Тесты 0.4, не перенесённые:
 
@@ -10750,7 +10754,8 @@ Keychain), нужен `LOGINOM_AI_AGENT_TEST_NODE`. Команды — вход 
 
 `<scratchpad>/b27b-runs/mutate.py`: одна точная замена, тесты, `git checkout` файла; на `3090388507` (M9 повторена на
 `8a3cadb443`). Без мутаций — `cli-loginom.test.ts` 10/0, `evals/test/profile.test.ts` 98/0 (2 skip). После прогона `git
-status` — чистое дерево.
+status` — чистое дерево. Мутации E1 и E2 первой версии проверяли `assertAuth` по `auth list` (оба 97/1) и ушли
+вместе с ним; E3–E5 на `6f9da0a708` относятся к неизменённому коду.
 
 | Мутация | Тесты | Итог |
 |---|---|---|
@@ -10765,8 +10770,6 @@ status` — чистое дерево.
 | M9 `status` без `statusView` (фаза `starting` своего Host) | `cli-loginom` | на `3090388507` — 10/0, **не ловил**: Help-заглушка отвечала раньше `status`. Добавлен случай с придержанным Help (`8a3cadb443`) → **9/1** |
 | M10 `Standalone.early` не отдаёт `loginom` | `cli-loginom` | **3/7**: команда уходит в дерево CLI v2 |
 | M11 `PROFILE_BUSY` — код 1 | `cli-loginom` | **9/1** |
-| E1 `assertAuth` допускает любой список `auth list` | `evals` `profile` | **97/1** |
-| E2 `auth list` без `--standalone` | `evals` `profile` | **97/1** |
 | E3 `recoverIfNeeded` без ветки `configured` | `evals` `profile` | **97/1** |
 | E4 `verifyProfile` не принимает `configured` | `evals` `profile` | **97/1** |
 | E5 затравка `cache/models.json` до первой команды CLI (как на базе) | `evals` `profile` | **97/1** |
@@ -10780,7 +10783,7 @@ status` — чистое дерево.
 |---|---|---|---|
 | `cli` | `bun test --timeout 60000` | 505 pass, 9 skip, 0 fail | 515 pass (+10 `cli-loginom`), 9 skip, 0 fail |
 | `product` | `bun test` | 60 pass, 3 fail (`repo-paths`) | 60 pass, 3 fail — те же три теста, те же строки |
-| `evals` | `bun run test:unit` | 1323 pass, 66 skip, 24 fail | 1327 pass (+3 новых, +1 бывшее падение), 66 skip, 23 fail — новых падений нет; «ordinary exec: live changed image reaches deadline without signal» упал только на базе (надзор процессов по времени, код задачи его не касается) |
+| `evals` | `bun run test:unit` | 1323 pass, 66 skip, 24 fail | 1327 pass (+3 новых, +1 бывшее падение), 66 skip, 23 fail — новых падений нет; «ordinary exec: live changed image reaches deadline without signal» упал только на базе (надзор процессов по времени, код задачи его не касается). На `6f9da0a708` (`assertAuth` и его тест — как на базе) повторены `test/profile.test.ts` — 98 pass, 2 skip, 0 fail — и `bun run typecheck` — код 0 |
 
 ```text
 $ cd packages/cli && bun test --timeout 120000 --rerun-each 3 test/cli-loginom.test.ts
@@ -10839,7 +10842,7 @@ $ loginom status --format json                             # код 0, generatio
   `standalone-bundle.ts` 0.4 (`serve` с B2.7a2b причину печатает).
 - **Строгий журнал** берётся из окружения только у команд управления, как в 0.4; Host службы его не получает
   (`loginom-agent`, B2.7a3).
-- **Потребители поправлены минимально** (выше): `assertAuth`, `configured`, порядок затравки моделей. Ветка общего OAuth,
+- **Потребители поправлены минимально** (выше): `configured` и порядок затравки моделей; `assertAuth` — как на базе. Ветка общего OAuth,
   `run-node-selection-attempt.ts`, `evals/AGENTS.md` и ранбук `standalone-cli.md` не менялись.
 - **Тест «служба видит подключение»** — по старту Help: Host запускает Help поколения только для прочитанной и раскрытой
   записи подключения (`connectionService.loadProfile`: `store.read` с `cliCredentials.decode`, затем `prepare`); без записи
@@ -10854,6 +10857,10 @@ $ loginom status --format json                             # код 0, generatio
   служба профиля живёт в фоне после TUI, `service start` и `auth`/`models` без `--standalone`. Варианты: оставить (команда
   велит остановить службу — сейчас в сообщении этого нет); или маршрут службы к `connection.*` её Host (правка
   `loginom-agent` и сервера, новый контракт), и тогда служба применит новое поколение без перезапуска.
+- **Где `evals` держит ключи провайдеров на v2.** База профиля уходит в архив после каждой попытки, поэтому `auth login`
+  v2 для `evals` бесполезен; сейчас работает только `data/auth.json`, который v2 импортирует в каждую новую базу (подсказка
+  `evals` всё ещё называет `providers login` 0.4). Варианты: оставить `data/auth.json`; хранить базу или её ключи между
+  попытками; общий OAuth (ниже).
 - **Общий OAuth `evals` на v2** (`providers status`, `shared-oauth-status-v1`, `LOGINOM_AI_AGENT_SHARED_AUTH_DIR`): в 0.4
   его не было, на v2 подготовка слота с `auth.sharedDir` останавливается с `SHARED_AUTH_STATUS_INVALID`. Нужен ли он
   продукту v2 и в каком виде.
@@ -10861,6 +10868,15 @@ $ loginom status --format json                             # код 0, generatio
   отвечал по-старому (`starting`, `hasApiKey`), это смена контракта `Loginom.View`.
 
 ### Найдено, не чинил
+
+- **`evals` теряет подключение Loginom после первого архива профиля** (на `v0.4.0` так же). `retainedProfileFiles` хранит
+  `loginom/connection/connection.json`, но не маркер `loginom/connection/v040-migration.json` (с `9d9d9b47b7`, 06.11) и не
+  `generations/`. Следующий Host без маркера проводит перенос 0.4.0 и удаляет записи с адресом не `app.loginom.ai`
+  (`connection-store.ts`, `migrate`) — то есть подключение к локальному стенду. Прогон `evals` выше: после
+  `archiveProfileHistory` и одного запуска Host в `loginom/connection` остались только маркер и пустой `generations`. Чинить —
+  в `evals` (сохранять маркер) или в Host; не трогал: правило архива — `evals`, перенос — 0.4.
+- **Ключи OAuth в `evals` на v2.** Каждая новая база попытки импортирует один и тот же `data/auth.json`, а обновлённые
+  токены v2 пишет в базу, которая уходит в архив: после истечения токена в `auth.json` прогоны начнут с просроченного.
 
 - `evals/script/run-node-selection-attempt.ts:136-140` требует у `status` `hasApiKey === true` и `ready`/`starting` — на
   0.4 и v2 всегда `SELECTION_CONNECTION_MISMATCH`; кроме того, на v2 он не пройдёт из-за `run --command` и таблиц v1
@@ -10878,3 +10894,7 @@ $ loginom status --format json                             # код 0, generatio
 - Windows и macOS (конверты `dpapi`/`keychain`), интерактивные `setup` и `recover` в TTY, Ctrl+C во время `setup`.
 - `evals` в режиме binary (нет `bwrap`) и с `auth.sharedDir`; `run-node-selection-attempt.ts`.
 - Режимы очистки `disconnect` и `ack-without-exit` через CLI (их тесты — в `loginom-host`).
+
+**Сужение против 0.4:** процессные тесты команд в 0.4 шли на Linux, macOS (с `buildKeychain`) и Windows с конвертом своей
+платформы; здесь — только Linux и конверт `plaintext` (`cliCredentials("linux")`), фикстура не собирает помощник
+Keychain и не кладёт `node.exe`.
