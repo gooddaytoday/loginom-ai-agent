@@ -16478,7 +16478,8 @@ B4.13; `packages/desktop/AGENTS.md` (Tests); SEC-01 в `docs/testing/loginom-ai-
 | `f08bf8f867` `test(desktop): copy the 0.4 tests and tools that need no Desktop as they are (B4.14d)` | десять файлов и четыре фикстуры, побайтно |
 | `9b1ac4c658` `fix: keep committed-hash inputs byte-exact on every checkout, as 0.4 did (B4.14d)` | блок 0.4 в `.gitattributes`; CAT-02 в `catalog.md` |
 | `06b065e9cb` `test(desktop): run the 0.4 safeStorage smoke of SEC-01 on Linux too (B4.14a)` | B4.14a, раздел ниже |
-| следующий | этот раздел и B4.14a |
+| `7771e771ce` `docs(upstream-sync): record the 0.4 Desktop-free tests and the Linux safeStorage smoke (B4.14d, B4.14a)` | этот раздел и B4.14a |
+| следующий | поправки обоих разделов после проверки утверждений |
 
 ### Что скопировано
 
@@ -16517,8 +16518,15 @@ B4.13; `packages/desktop/AGENTS.md` (Tests); SEC-01 в `docs/testing/loginom-ai-
     записях `packages/ai/test/fixtures/recordings`. Git и так считает их двоичными, поэтому поведение checkout не меняется.
   - Почему так, а не иначе. Править тест — значит ослабить охрану. Оставить его красным — новое падение в `bun test`
     пакета `desktop`.
-  - `git status` после правки чистый, в том числе с `core.autocrlf=true`. `catalog-check` — 592 файла (база — 591),
-    CAT-02: 57 (было 56). CAT-02 в `catalog.md` описывает блок и проверку.
+  - Байты в дереве не меняются. Правила `-text` ничего не переписывают, а у четырёх целей `text eol=lf` (два
+    `sales.csv`, `models.json`, `package-lock.json`) индекс уже `i/lf` (`git ls-files --eol`).
+  - `catalog-check` — 592 файла (база — 591), CAT-02: 57 (было 56). CAT-02 в `catalog.md` описывает блок и проверку.
+  - **Корень, а не вложенные файлы — выбор, который владелец может поменять.** Прецедент дерева v2 —
+    `packages/loginom-host/licenses/.gitattributes` (`bun/** -text`, B1.x): корень остаётся как у upstream.
+    - Вложенные `.gitattributes` в семи каталогах не дают расхождения с upstream и конфликта в конце файла при
+      следующей синхронизации.
+    - Но правила задевают и каталоги upstream (`packages/ai`), а 0.4 держал их в корне, где их видно одним блоком.
+    - Взят корень, как в 0.4; цена — один файл upstream в CAT-02.
 
 ### Проверки
 
@@ -16557,9 +16565,13 @@ AssertionError [ERR_ASSERTION]: 310 committed-hash inputs need -text or eol=lf i
 
 База — `41ecea7d39`: то же дерево с `packages/desktop/test` вынесенным наружу, `.gitattributes` ещё базовый. Итог —
 `06b065e9cb`. Тесты `desktop` на итоге повторены с `HOME` и `XDG_*` во временном каталоге; база и первый прогон итога шли
-с настоящим `HOME`. Файлов в `~/.local/share` и `~/.config` от прогонов нет (`find -newer <задание>`).
-В `~/.cache` сменилось только время каталога `loginom-bootstrap/ripgrep` (08:48:34), между прогонами тестов
-(08:44:47–08:45:01 и 08:53–08:54). Тесты `desktop` его не читают: путь знает только `loginom-host/script/ripgrep-resource.ts`.
+с настоящим `HOME`.
+
+- `find ~/.local/share ~/.config -newer <задание>` без ограничения глубины находит только файлы `agent-kit` (плагин
+  оркестратора) и `herdr` — не от прогонов. Прогон итога с временным `HOME` создал во временном каталоге только `tmp/` и `.cache/bun`.
+- В `~/.cache` сменилось время каталога `loginom-bootstrap/ripgrep` (кеш `ripgrep-resource.ts`): 08:48:34. Это вне
+  окон обоих прогонов тестов `desktop` (08:44:47–08:45:01 и 08:53–08:54); мои команды в этом окне — линтер, `git` и
+  `secrets staged`, ресурсы Loginom они не собирают.
 
 | Пакет | Команда | `41ecea7d39` | `06b065e9cb` |
 |---|---|---|---|
@@ -16571,8 +16583,9 @@ AssertionError [ERR_ASSERTION]: 310 committed-hash inputs need -text or eol=lf i
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
 against a6b15d33daf6: 592 divergent upstream files              # база — 591 (B4.12); CAT-02: 57, было 56 — .gitattributes
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
-would change: 0 files                                            # код 0
-$ bun run check                                                  # код 0, на 06b065e9cb, временный HOME и XDG_*
+would change: 0 files                                            # код 0; обе команды повторены на 7771e771ce — то же
+$ bun run check                                                  # код 0, на 06b065e9cb, временный HOME и XDG_*;
+                                                                 # дальше менялся только журнал
 Found 905 warnings and 0 errors.                                 # база — 554 (B4.12); +351 — файлы 0.4, ниже
 @opencode/desktop:typecheck: ✓ No type errors in 3,370 files across 2 projects
  Tasks:    39 successful, 39 total
@@ -16651,7 +16664,7 @@ smoke проверяет только формат.
 
 - `0600` в Electron 44 проверено в B4.13 собранным приложением: файлы обоих хранилищ — `600`, каталог 0.4 с `755` —
   отказ `LOGINOM_STORE_PERMISSIONS_INVALID`.
-- Отдельно — `connection-store` в тестах `loginom-host`.
+- Отдельно — `loginom-host/test/cli-credentials.test.ts:25`: `connection.json` хранилища — `0600` вне Windows.
 
 ### Прогоны на Linux
 
@@ -16682,7 +16695,8 @@ temporary HOME after the runs: []
 
 ### Мутации
 
-Каждая — один прогон, код возврата и первая строка ошибки, которую напечатал не Chromium.
+Каждая — один прогон, код возврата и первая строка ошибки, которую напечатал не Chromium. Вывод сокращён: различие
+утверждения пересказано в одну строку.
 
 ```text
 -- M1: the codec loses the Linux plaintext branch (platform === "linux" → "none")
@@ -16716,6 +16730,9 @@ temporary HOME after the runs: []
 - **macOS: в ресурсах Desktop нет помощника Keychain** (находка B4.13). Шаг CAND на macOS проверит чтение `safeStorage`, но
   запись в хранилище службы (`cliCredentials`) там по-прежнему откажет.
 - **Шага Linux в CI нет.** Smoke на Linux запускал только этот прогон. Нужен `xvfb-run` и `--no-sandbox` для root — B5.1.
+- **`docs/testing/loginom-ai-agent/windows-release-coverage.md:29`** называет юнит-тест 0.4
+  `desktop/src/main/loginom/credentials.test.ts`, которого в дереве v2 нет (B4.13 — `credential-migration.test.ts`), и
+  «production-кодек Desktop» без пути. Документ — B5.1 и B6.
 
 ### Не проверено
 
