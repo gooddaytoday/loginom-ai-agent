@@ -162,6 +162,8 @@ export default Plugin.define({
       files,
       profiles,
       lease: hold,
+      // Before the Host's handshake every lease, even one already asked for, would wait for it.
+      ready: () => ServiceHost.connected(),
       failure: (sessionID) => refused.get(sessionID),
       task,
     })

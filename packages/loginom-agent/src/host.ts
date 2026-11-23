@@ -19,6 +19,7 @@ export type Connection = { port: Port; close(): Promise<void> }
 type Started = {
   readonly directory: string
   ready: Promise<Connection | undefined>
+  connected?: boolean
   held: Map<Lease, string>
   closing?: Promise<void>
 }
@@ -62,12 +63,18 @@ export async function start(input: { data: string; resources?: string; connect?:
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
       if (connection) LoginomHost.connect(connection.port)
+      current.connected = !!connection
       return connection
     },
     () => undefined,
   )
   state.current = current
   return { recovered, close }
+}
+
+/** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
+export function connected() {
+  return !!state.current?.connected && !state.current.closing
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

@@ -366,6 +366,28 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
   )
 
   it.live(
+    "a Host still in its handshake holds up no session: no Dock tools until it is connected",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost({ catalog: () => [dockTool("find")] })
+        const handshake = Promise.withResolvers<void>()
+        const test = yield* boot({ ...host, connect: () => handshake.promise.then(host.connect) })
+        const early = yield* test.create("early")
+        yield* test.prompt(early, script({ text: "end" }))
+        const [before] = yield* test.requests(early)
+        expect(loginom(before)).toEqual([])
+        expect(system(before)).not.toContain("Loginom")
+        expect(host.log).toEqual([])
+        handshake.resolve()
+        yield* until(() => Effect.succeed(ServiceHost.connected() || undefined))
+        const later = yield* test.create("later")
+        yield* test.prompt(later, script({ text: "end" }))
+        expect(loginom((yield* test.requests(later))[0])).toEqual(["loginom_find"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "a failed catalog request adds nothing and tells the model the failure; a refused lease too",
     () =>
       Effect.gen(function* () {
@@ -591,7 +613,12 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
         expect(content).not.toContain("Данные")
         const retained = table.state.metadata?.outputPath
         if (typeof retained !== "string") throw Error("expected the retained output")
-        expect(yield* Effect.promise(() => fs.readFile(retained, "utf8"))).toBe(JSON.stringify(large))
+        // The product keeps it where OpenCode keeps a truncated result, under the machine's data directory; as 0.4's
+        // truncation test did, the case removes it.
+        const original = yield* Effect.promise(() =>
+          fs.readFile(retained, "utf8").finally(() => fs.rm(retained, { force: true })),
+        )
+        expect(original).toBe(JSON.stringify(large))
         expect(table.state.metadata?.truncated).toBe(true)
         // The pasted file reaches Dock calls as an admission of its message; the file on disk and help calls do not.
         const attached = (yield* test.sessions.messages({ sessionID: id })).find(

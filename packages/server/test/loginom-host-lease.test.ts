@@ -286,6 +286,27 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     timeout,
   )
 
+  // A prompt takes the lease when it is admitted (B2.5d); an execution that starts without one — a synthetic message, a
+  // resume after a restart — takes it when it starts.
+  it.live(
+    "S2 synthetic wake: an execution without a prompt leases when it starts and releases the lease when it succeeds",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const id = yield* test.create("synthetic")
+        yield* test.sessions.synthetic({ sessionID: id, text: script({ tool: "hold" }, { text: "end" }) })
+        yield* until(() => Effect.succeed(test.holding.includes(id) || undefined))
+        // Taken on `session.execution.started` once the Host's handshake is done, which may come after the tool starts.
+        yield* until(() => test.leased.pipe(Effect.map((sessions) => (sessions.includes(id) ? true : undefined))))
+        expect(yield* test.leased).toEqual([id])
+        yield* test.release
+        yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 0 || undefined)))
+        yield* until(() => Effect.succeed(test.ended(id).length > 0 || undefined))
+        expect(test.ended(id)).toEqual(["succeeded"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "S2 provider error: the lease taken for the execution is released when it fails",
     () =>
@@ -358,6 +379,8 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
+        // Until its handshake the Host holds up no session, and a session has no Dock tools (B2.5d).
+        yield* until(() => Effect.succeed(ServiceHost.connected() || undefined))
         const plain = yield* test.create("default")
         const grant = (id: Session.ID) =>
           test.sessions.setPermissions({

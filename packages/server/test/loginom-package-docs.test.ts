@@ -377,7 +377,8 @@ describe("package_docs_run (B2.5c)", () => {
 
   // 0.4 replayed the compacted prompt with its attachment, which kept authorizing the file. OpenCode 2 keeps the recent
   // tail beside the summary as text only (`metadata.keepID`), so the session's context starts at the summary; the
-  // module's `compaction` hook carries the attachments past it (B2.5d), and the call asks nothing.
+  // module's `compaction` hook carries the attachments past it (B2.5d), and the call asks nothing. A second compaction
+  // carries what the first one carried.
   it.live(
     "a completed compaction preserves the visible original attachment's read authorization",
     () =>
@@ -393,8 +394,13 @@ describe("package_docs_run (B2.5c)", () => {
         })
         yield* test.sessions.compact({ sessionID: ctx.sessionID })
         yield* test.sessions.wait(ctx.sessionID)
+        yield* test.prompt(ctx.sessionID, script({ text: "between" }))
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
         const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
         expect(history[0]).toMatchObject({ type: "compaction", status: "completed" })
+        expect(test.compactions(ctx.sessionID)).toHaveLength(2)
+        expect(history[0].id).not.toBe(test.compactions(ctx.sessionID)[0].open)
         expect(history.some((item) => item.type === "user")).toBe(false)
         const output = yield* test.execute({ operation: "extract", lgp: fixture }, ctx)
         expect(yield* exists(output.structure)).toBe(true)
@@ -1237,7 +1243,8 @@ describe("OpenCode hooks the attachment carry relies on (contract)", () => {
 const summaries = { fail: false }
 
 function respond(request: LLMRequest) {
-  if (request.messages.some((message) => text(message).includes("You MUST summarize the conversation above")))
+  // The first summary and an update of a checkpoint share this line of the summary prompt.
+  if (request.messages.some((message) => text(message).includes("Do not continue the task or call tools.")))
     return summaries.fail
       ? TestLLM.text("No summary.", `text_${randomUUID()}`)
       : TestLLM.text("## Objective\n- Document the attached package.", "text_summary")

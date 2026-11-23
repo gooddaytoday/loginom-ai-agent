@@ -65,6 +65,8 @@ export async function dockTools(input: {
   profiles: string
   /** The execution's Host lease (B2.3) and why it is missing, if acquiring it failed. */
   lease: (sessionID: string) => Promise<Lease | undefined>
+  /** Whether a lease is at hand without waiting for the Host's handshake. */
+  ready: () => boolean
   failure: (sessionID: string) => string | undefined
   task: (sessionID: string) => Promise<string>
 }) {
@@ -111,7 +113,8 @@ export async function dockTools(input: {
    * fail silently.
    */
   const refresh = async (sessionID: string, profile: Profile, model: Model.Ref | undefined, eager = false) => {
-    const lease = await input.lease(sessionID)
+    // A Host still starting holds up no session: until its handshake the session has no Dock tools, as in 0.4.
+    const lease = input.ready() ? await input.lease(sessionID) : undefined
     if (!lease) {
       const failure = input.failure(sessionID)
       if (failure) catalogs.set(sessionID, { names: new Set(), failure })
@@ -134,7 +137,10 @@ export async function dockTools(input: {
     const offered = catalog.tools.filter(
       (item) => item.inputSchema.type === "object" && (item.name !== "browser_take_screenshot" || image),
     )
+    catalogs.set(sessionID, { names: new Set(offered.map((item) => `loginom_${item.name}`)) })
+    // A run of an earlier generation, still finishing across a reconnect, leaves the registry to the newer one.
     const generation = lease.generation
+    if (registry.generation !== undefined && generation < registry.generation) return
     const changed =
       registry.generation !== generation ||
       offered.some((item) => JSON.stringify(registry.tools.get(`loginom_${item.name}`)) !== JSON.stringify(item))
@@ -144,7 +150,6 @@ export async function dockTools(input: {
       registry.tools.set(`loginom_${item.name}`, item)
       registered.add(`loginom_${item.name}`)
     })
-    catalogs.set(sessionID, { names: new Set(offered.map((item) => `loginom_${item.name}`)) })
     if (changed) await plugin.tool.reload().catch(() => undefined)
   }
 
