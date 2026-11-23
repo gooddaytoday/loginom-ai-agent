@@ -49,7 +49,15 @@ const productIcon = await Bun.file(
   new URL("../../../apps/loginom-site/assets/loginom-icon.svg", import.meta.url),
 ).text()
 
-const desktop = { os: "linux", openExternal() {} } as unknown as Platform
+const desktop: Platform = {
+  platform: "desktop",
+  os: "linux",
+  windowID: "product-brand",
+  openExternal: () => undefined,
+  restart: async () => undefined,
+  notify: async () => undefined,
+  openDirectoryPickerDialog: async () => null,
+}
 
 function mount(component: () => JSX.Element) {
   const root = document.createElement("div")
@@ -88,6 +96,7 @@ test("the empty side pane draws the product mark", async () => {
 
 test("the first-launch splash draws the product mark and still finishes the onboarding preview", async () => {
   const drawing: string[] = []
+
   // A focused, visible window with motion allowed: the case where the OpenCode wordmark waited for its outline.
   const page = mount(() =>
     createComponent(LoadingSplash, {
@@ -113,10 +122,17 @@ test("the first-launch splash draws the product mark and still finishes the onbo
 
 test("the error page names the product and sends reports to the product", () => {
   const opened: string[] = []
-  const platform = { platform: "web", restart: async () => {}, openExternal: (url: string) => opened.push(url) }
+
+  const web: Platform = {
+    platform: "web",
+    openExternal: (url) => void opened.push(url),
+    restart: async () => undefined,
+    notify: async () => undefined,
+  }
+
   const page = mount(() =>
     createComponent(PlatformProvider, {
-      value: platform as unknown as Platform,
+      value: web,
       get children() {
         return createComponent(LanguageProvider, {
           locale: "en",
@@ -150,6 +166,7 @@ test("About states the license of Desktop 0.4 in en and ru", () => {
 
 test("pairing and the settings rows that 0.4 named the product do not say OpenCode", async () => {
   const pairing = (await import("../../gui-plugins/src/pairing/i18n/en")).default
+
   const keys = [
     "provider.connect.apiKey.description",
     "error.chain.mcpFailed",
@@ -157,6 +174,7 @@ test("pairing and the settings rows that 0.4 named the product do not say OpenCo
     "settings.general.row.colorScheme.description",
     "settings.general.row.theme.description",
   ] as const
+
   const values = [...Object.values(pairing), ...[en, dict].flatMap((messages) => keys.map((key) => messages[key]))]
 
   expect(values.filter((value) => /opencode/i.test(value))).toEqual([])
@@ -167,6 +185,7 @@ test("the Desktop page and the public folder carry no OpenCode favicons", async 
   const upstream = realpathSync(new URL("../../ui/src/assets/favicon/", import.meta.url))
   const page = await Bun.file(new URL("../../desktop/src/renderer/index.html", import.meta.url)).text()
   const links = [...page.matchAll(/<link[^>]+href="\.\/([^"]+)"/g)].map((match) => match[1]!)
+
   // A link to a removed file throws here, so the page cannot point at a favicon that no longer ships.
   const fromUpstream = (names: string[]) =>
     names.filter((name) => realpathSync(new URL(name, pub)).startsWith(upstream))
