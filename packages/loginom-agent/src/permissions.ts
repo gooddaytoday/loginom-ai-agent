@@ -9,7 +9,8 @@
 //   command of the agent that always asks (В-31), a schedule's `run` check that never runs, subagents, whose own rules
 //   may not loosen the product's defaults, and reading the product's own directories outside the project;
 // - a refused call does not end the turn (B2.6b, В-75): the user's «Отклонить» and a rule's deny reach the model as text
-//   (`refusal`, applied in the plugin's `execute.after` and `execute.before`).
+//   (`refusal`, applied in the plugin's `execute.after` and `execute.before`), and the call's metadata says which;
+// - the kinds the settings deny are named to the model before it tries them (`deniedKinds`, B2.6b2).
 import type { Permission } from "@opencode/schema/permission"
 
 export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
@@ -153,6 +154,38 @@ export const deniedText = (entry: Pick<Entry, "action" | "kind">) =>
   "выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему; " +
   "разрешить это пользователь может в «Настройки → Разрешения»."
 
+/**
+ * The kinds whose every table entry the rules deny, as the settings' «Запрещено» writes them (B2.6b2). OpenCode then
+ * offers none of their tools whose action is denied outright. The terminal, off by default, is not named. `rules` are
+ * the product's defaults and settings (the rules of the default agent `build`, which has no denies of its own) and the
+ * session's; a later rule wins, as in OpenCode's `Permission.evaluate`.
+ */
+export function deniedKinds(rules: readonly Permission.Rule[]) {
+  return (Object.keys(kinds) as Kind[]).filter(
+    (kind) =>
+      kind !== "terminal" &&
+      table
+        .filter((entry) => entry.kind === kind)
+        .every(
+          (entry) =>
+            rules.findLast((rule) => wildcard(entry.action, rule.action) && wildcard(entry.resource, rule.resource))
+              ?.effect === "deny",
+        ),
+  )
+}
+
+/** The system text that names the denied kinds to the model. */
+export const deniedKindsText = (denied: readonly Kind[]) =>
+  `LOGINOM_PERMISSIONS_DENIED: в «Разрешениях» запрещено: ${denied.map((kind) => `«${kinds[kind]}»`).join(", ")}. ` +
+  "Не пытайтесь делать эти действия и не обходите их другими инструментами. Если задача их требует, скажите " +
+  "пользователю, что это запрещено в «Разрешениях» и разрешить может только он сам, и продолжайте без них."
+
+/** The call metadata of a refusal, for clients (0.4 `permissionDenied`): `declined` by the user, `denied` by a rule. */
+export const refusalMetadata = (text: string) => ({
+  permissionDenied: true,
+  permissionRefusal: text === declinedText ? ("declined" as const) : ("denied" as const),
+})
+
 export const terminalDenied = "LOGINOM_TERMINAL_DENIED: subagents do not run terminal commands in Loginom AI Agent"
 export const scheduleRunDenied =
   "LOGINOM_SCHEDULE_RUN_DENIED: schedule checks do not run terminal commands in Loginom AI Agent; use a code check"
@@ -193,4 +226,16 @@ function blockedError(value: unknown) {
     resources: "resources" in value && Array.isArray(value.resources) ? value.resources.map(String) : [],
     reason: "reason" in value && typeof value.reason === "string" ? value.reason : undefined,
   }
+}
+
+// OpenCode's `Wildcard.match` (`core/src/util/wildcard.ts`), which the plugin cannot import: `*` and `?` in the pattern,
+// `/` for `\`, and a pattern ending in ` *` also matches without its arguments.
+function wildcard(input: string, pattern: string) {
+  const escaped = pattern
+    .replaceAll("\\", "/")
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".")
+  const tail = escaped.endsWith(" .*") ? escaped.slice(0, -3) + "( .*)?" : escaped
+  return new RegExp("^" + tail + "$", process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"))
 }

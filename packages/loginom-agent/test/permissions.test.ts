@@ -2,12 +2,15 @@ import { describe, expect, test } from "bun:test"
 import {
   classify,
   declinedText,
+  deniedKinds,
+  deniedKindsText,
   deniedText,
   grantable,
   isDecline,
   kinds,
   ownRead,
   refusal,
+  refusalMetadata,
   rules,
   scheduleRunDenied,
   settle,
@@ -255,6 +258,44 @@ describe("refusals (B2.6b)", () => {
       undefined,
     ])
       expect([cause, refusal(cause)]).toEqual([cause, undefined])
+  })
+})
+
+describe("denied kinds in the context (B2.6b2)", () => {
+  // The settings' «Запрещено» for a kind: a deny for each of its table entries, after OpenCode's catch-all and the
+  // product's defaults, as the rules of `build` hold them.
+  const settings = withDefaults([{ action: "*", resource: "*", effect: "allow" }])
+  const forbid = (kind: Kind) =>
+    table
+      .filter((entry) => entry.kind === kind)
+      .map((entry) => ({ action: entry.action, resource: entry.resource, effect: "deny" as const }))
+
+  test("only a kind whose every entry the rules deny is named; the terminal, off by default, never", () => {
+    expect(deniedKinds(settings)).toEqual([])
+    expect(deniedKinds([...settings, ...forbid("save")])).toEqual(["save"])
+    expect(deniedKinds([...settings, ...forbid("web"), ...forbid("export")])).toEqual(["export", "web"])
+    // One entry of the kind is not the kind: the upload of a local package stays asked.
+    expect(deniedKinds([...settings, { action: "loginom_dock_action_run", resource: "*", effect: "deny" }])).toEqual([])
+    // A later rule wins: the session allows again what the settings deny.
+    expect(
+      deniedKinds([...settings, ...forbid("save"), { action: "loginom_*", resource: "*", effect: "allow" }]),
+    ).toEqual([])
+    // Patterns match as in OpenCode.
+    expect(deniedKinds([...settings, { action: "*", resource: "*", effect: "deny" }])).toEqual(
+      everyKind().filter((kind) => kind !== "terminal"),
+    )
+    expect(deniedKinds([...settings, { action: "web*", resource: "*", effect: "deny" }])).toEqual(["web"])
+  })
+
+  test("the text names each denied kind as the settings do; the metadata tells a decline from a deny", () => {
+    const text = deniedKindsText(["save", "web"])
+    expect(text).toStartWith("LOGINOM_PERMISSIONS_DENIED: ")
+    expect(text).toContain("«Сохранять пакеты в Loginom», «Открывать сайты»")
+    expect(refusalMetadata(declinedText)).toEqual({ permissionDenied: true, permissionRefusal: "declined" })
+    expect(refusalMetadata(deniedText({ action: "edit", kind: "write" }))).toEqual({
+      permissionDenied: true,
+      permissionRefusal: "denied",
+    })
   })
 })
 

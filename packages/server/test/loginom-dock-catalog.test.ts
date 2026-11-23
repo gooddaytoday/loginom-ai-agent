@@ -20,7 +20,7 @@ import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServiceHost } from "../../loginom-agent/src/host"
-import { declinedText, deniedText, table } from "../../loginom-agent/src/permissions"
+import { declinedText, deniedKindsText, deniedText, table } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
@@ -845,6 +845,14 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
           { text: "", finish: "tool-calls" },
           { text: "end", finish: "stop" },
         ])
+        // B2.6b2: every request names the denied kind before the model tries it, and each refused call says it was a
+        // rule's deny.
+        for (const request of yield* test.requests(id)) expect(system(request)).toContain(deniedKindsText(["save"]))
+        expect(
+          (yield* test.calls(id)).map((part) =>
+            refusalOf(part.state.status === "error" ? part.state.metadata : undefined),
+          ),
+        ).toEqual(["denied", "denied"])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -876,6 +884,14 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
         ).toEqual([declinedText, declinedText].map((message) => ({ type: "tool.execution", message })))
         expect(host.requests("call")).toEqual([])
         expect(yield* test.told(id)).toEqual([declinedText, declinedText])
+        // B2.6b2: nothing is denied, so no request names a denied kind; each refused call says the user declined it.
+        for (const request of yield* test.requests(id))
+          expect(system(request)).not.toContain("LOGINOM_PERMISSIONS_DENIED")
+        expect(
+          (yield* test.calls(id)).map((part) =>
+            refusalOf(part.state.status === "error" ? part.state.metadata : undefined),
+          ),
+        ).toEqual(["declined", "declined"])
         expect(yield* test.answers(id)).toEqual([
           { text: "", finish: "tool-calls" },
           { text: "", finish: "tool-calls" },
@@ -928,6 +944,11 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
         yield* test.wizard(id, script(save, { text: "end" }))
         expect(host.requests("call")).toEqual([])
         expect(yield* test.told(id)).toEqual([reason])
+        expect(
+          (yield* test.calls(id)).map((part) =>
+            refusalOf(part.state.status === "error" ? part.state.metadata : undefined),
+          ),
+        ).toEqual([undefined])
         expect((yield* test.answers(id)).at(-1)).toEqual({ text: "end", finish: "stop" })
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
@@ -1041,6 +1062,11 @@ function loginom(request: LLMRequest | undefined) {
 
 function system(request: LLMRequest) {
   return request.system.map((part) => part.text).join("\n")
+}
+
+// The refusal a failed call's metadata names for clients (B2.6b2), or nothing.
+function refusalOf(metadata: Record<string, unknown> | undefined) {
+  return metadata?.permissionDenied === true ? metadata.permissionRefusal : undefined
 }
 
 function until<A, E, R>(read: () => Effect.Effect<A | undefined, E, R>, timeout = 20_000) {

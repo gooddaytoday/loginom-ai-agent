@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
+import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
@@ -17,10 +18,13 @@ import { packageDocs } from "./package-docs"
 import {
   classify,
   declinedText,
+  deniedKinds,
+  deniedKindsText,
   grantable,
   isDecline,
   ownRead,
   refusal,
+  refusalMetadata,
   settle,
   withDefaults,
   type Kind,
@@ -193,6 +197,8 @@ export default Plugin.define({
     const calls = new Map<string, string>()
     // The tools each session's latest request offered the model (B2.6b).
     const offered = new Map<string, Set<string>>()
+    // The product's defaults and settings: the rules of the default agent `build`, which has none of its own (B2.6b2).
+    const settings: Permission.Rule[] = []
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
@@ -203,6 +209,7 @@ export default Plugin.define({
             item.permissions.length,
             ...withDefaults(item.permissions).map((rule) => ({ ...rule })),
           )
+          if (item.id === "build") settings.splice(0, settings.length, ...item.permissions.map((rule) => ({ ...rule })))
         })
       })
     })
@@ -302,6 +309,10 @@ export default Plugin.define({
       hide(event)
       offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
+      // The kinds the settings deny, named before the model tries them: OpenCode does not offer their tools (B2.6b2).
+      const session = await ctx.session.get({ sessionID: event.sessionID })
+      const denied = deniedKinds([...settings, ...(session.permissions ?? [])])
+      if (denied.length > 0) event.system.push({ type: "text", text: deniedKindsText(denied) })
     })
     await ctx.session.hook("compaction", hide)
     await ctx.session.hook("generate", hide)
@@ -318,7 +329,7 @@ export default Plugin.define({
       const error =
         action !== undefined && classify(action, [])?.resource === "*" ? await rules(event, action) : undefined
       const text = error instanceof Tool.Error ? refusal(error.error) : undefined
-      if (text) throw new Tool.Error({ message: text })
+      if (text) throw new Tool.Error({ message: text, metadata: refusalMetadata(text) })
       calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
@@ -330,10 +341,7 @@ export default Plugin.define({
         // В-75). A Location that shuts down (a reload) cancels its open questions with the same decline; that one stays.
         const text = refusal(event.error.error)
         if (!text || (text === declinedText && isDecline(await rules(event, marker)))) return
-        event.error = new Tool.Error({
-          message: text,
-          ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }),
-        })
+        event.error = new Tool.Error({ message: text, metadata: { ...event.error.metadata, ...refusalMetadata(text) } })
         return
       }
       if (event.tool === "skill") {

@@ -21,7 +21,14 @@ import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
-import { declinedText, deniedText, scheduleRunDenied, table, type Kind } from "../../loginom-agent/src/permissions"
+import {
+  declinedText,
+  deniedKindsText,
+  deniedText,
+  scheduleRunDenied,
+  table,
+  type Kind,
+} from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
@@ -637,6 +644,17 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
           (yield* test.tools(id)).map((part) => (part.state.status === "error" ? part.state.error.message : "ran")),
         ).toEqual(said)
         expect(told((yield* test.requests(id)).at(-1))).toEqual(said)
+        // B2.6b2: each refused call says for clients whether the user declined it or a rule denied it; rules for some
+        // files and one site deny no kind as a whole, so no request names one.
+        expect(
+          (yield* test.tools(id)).map((part) =>
+            part.state.status === "error"
+              ? [part.state.metadata?.permissionDenied, part.state.metadata?.permissionRefusal]
+              : [],
+          ),
+        ).toEqual([[true, "declined"], ...Array(4).fill([true, "denied"])])
+        for (const request of yield* test.requests(id))
+          expect(request.system.map((part) => part.text).join("\n")).not.toContain("LOGINOM_PERMISSIONS_DENIED")
         for (const name of ["declined.md", "denied.md"])
           expect([name, yield* Effect.promise(() => Bun.file(path.join(test.dir, name)).exists())]).toEqual([
             name,
@@ -661,6 +679,14 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
         )
         expect(names((yield* test.requests(hidden))[0])).not.toContain("write")
         expect(told((yield* test.requests(hidden)).at(-1))).toEqual([deniedText({ action: "edit", kind: "write" })])
+        // B2.6b2: the session's rule denies the kind as a whole, and every request names it.
+        for (const request of yield* test.requests(hidden))
+          expect(request.system.map((part) => part.text).join("\n")).toContain(deniedKindsText(["write"]))
+        expect(
+          (yield* test.tools(hidden)).map((part) =>
+            part.state.status === "error" ? part.state.metadata?.permissionRefusal : undefined,
+          ),
+        ).toEqual(["denied"])
         expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "hidden.md")).exists())).toBe(false)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
