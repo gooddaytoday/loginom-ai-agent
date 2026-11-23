@@ -240,6 +240,29 @@ test.skipIf(!Bun.which("unzip"))(
   90_000,
 )
 
+// The product CLI is removed by the installer of its archive (B2.7a8). OpenCode's `uninstall` would remove the profile's
+// cache and leave the installed copy behind (B2.7a9).
+test("uninstall refuses, names the archive's uninstaller and removes nothing", async () => {
+  const root = await temporary()
+  expect((await product(root, ["debug", "paths"])).code).toBe(0)
+  const keep = path.join(root, "profile", "cache", "keep")
+  await fs.writeFile(keep, "")
+  for (const args of [
+    ["uninstall", "--force"],
+    ["--print-logs", "uninstall", "-f"],
+    ["uninstall", "--dry-run"],
+  ]) {
+    const result = await product(root, args)
+    expect({ args, code: result.code }).toEqual({ args, code: 1 })
+    expect(result.stdout).toContain("loginom-ai-agent-cli is removed by the installer of its archive.")
+    expect(result.stdout).toContain(
+      `then run ${process.platform === "win32" ? "uninstall.cmd" : "./uninstall.sh"} from the extracted archive`,
+    )
+    expect(result.stdout).not.toContain("Installation method")
+    expect(await Bun.file(keep).exists()).toBe(true)
+  }
+}, 60_000)
+
 async function temporary() {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "loginom-cli-standalone-")))
   roots.push(root)
