@@ -16456,3 +16456,270 @@ CAT-04 — запись OpenCode 2: `pending: B2.7d, B4.1` снят, файлы 
 - Собранное приложение: `setFeedURL`, `User-Agent`, вызов `isProductBuild` в `platform.ts` и связка `main.ts` в
   Electron не запускались; проверки на настоящей ленте (UPDATE-01 целиком) нет — этап C.
 - macOS и Windows: имена их установщиков проверены таблицей по `Product.artifactName`, не сборкой.
+
+## B4.14d Тесты 0.4 без Desktop
+
+23.11.2026. Ветка `b414d-desktop-tests` от `oc2-migration` (`41ecea7d39`), рабочее дерево `.claude/worktrees/b414d`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. Эталон 0.4 —
+`v0.4.0`. `loginom-host/script/stage-resources.ts` и «Install CLI» Desktop (B4.8c, B4.7b) не трогал. Модель не
+вызывалась: ни один из файлов модель не вызывает, стенд Loginom не запускался.
+
+Прочитано: этот журнал — B4.1 (п. 2 «Учётные данные», п. 14 «Тесты `desktop/test/loginom`», строки B4.14a и B4.14d),
+B4.13; `packages/desktop/AGENTS.md` (Tests); SEC-01 в `docs/testing/loginom-ai-agent/README.md` и
+`windows-release-coverage.md`; 0.4 — десять файлов задания, `safe-storage-smoke.cjs`, `desktop/{package,tsconfig}.json`,
+`.gitattributes`, шаг `Desktop safeStorage DPAPI across Electron restarts` в `.github/workflows/loginom-windows.yml`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `f08bf8f867` `test(desktop): copy the 0.4 tests and tools that need no Desktop as they are (B4.14d)` | десять файлов и четыре фикстуры, побайтно |
+| `9b1ac4c658` `fix: keep committed-hash inputs byte-exact on every checkout, as 0.4 did (B4.14d)` | блок 0.4 в `.gitattributes`; CAT-02 в `catalog.md` |
+| `06b065e9cb` `test(desktop): run the 0.4 safeStorage smoke of SEC-01 on Linux too (B4.14a)` | B4.14a, раздел ниже |
+| следующий | этот раздел и B4.14a |
+
+### Что скопировано
+
+`git diff v0.4.0 f08bf8f867 -- <десять файлов> packages/desktop/test/loginom/fixtures` — пусто: правок в файлах нет.
+
+| Файл | Что это | На v2 |
+|---|---|---|
+| `committed-hash-attributes.test.mjs` | автотест: у каждого файла, чей SHA256 закоммичен, есть `-text` или `eol=lf` | зелёный после `9b1ac4c658`, ниже |
+| `observed-click.test.ts` + `observed-click.ts` | автотест помощника жеста Dock | 4 pass |
+| `runtime-acceptance-contract.test.ts` | автотест: запросы `runtime-acceptance.ts` проходят схемы клиента `loginom-runtime` | 2 pass, нужен `npm ci` клиента |
+| `environment-proxy.ts` | инструмент: прокси из окружения в Node | прогон: `PASS` |
+| `no-proxy-contract.mjs` | инструмент: `NO_PROXY` в Node и Bun | прогон: `PASS` в обоих |
+| `runtime-acceptance.ts`, `runtime-smoke.ts`, `parent-crash.ts`, `cold-readback.mjs` | инструменты стенда: конфиг, ресурсы и учётная запись Loginom | импорты разрешаются, без конфига каждый останавливается на своей проверке |
+
+- **Переменные и пути.** `LOGINOM_AI_AGENT_TEST_ROOT` в десяти файлах нет (grep), менять нечего. Пути пакетов на v2 те
+  же: `@loginom-ai-agent/loginom-host/*` (зависимость `desktop`) и `../../../loginom-runtime/client/lib/*`.
+- **API Host.** Модули, которые импортируют инструменты, — `supervisor.ts`, `inputs.ts`,
+  `connection/cli-credentials.ts`, `script/{desktop,cli}-oracle-transport.ts` — побайтно те же, что в `v0.4.0`
+  (`git diff --stat` пуст).
+- **Typecheck.** Не менял: `tsconfig.json` v2 включает `src`, `perf`, `package.json`, а 0.4 — `src`, `package.json`.
+  `test/` не входит ни туда, ни туда. Число файлов `bun typecheck` — 3 370 на базе и на ветке.
+
+### Где решал сам
+
+- **Четыре фикстуры `fixtures/standalone-cli` — сверх десяти файлов.**
+  - `runtime-acceptance.ts` импортирует их `manifest.json` и читает оба `sales.csv`.
+  - `committed-hash-attributes` требует, чтобы `A/sales.csv` был под защитой: «Fixture manifests missing from guard».
+  - В п. 14 B4.1 счёт «41 файл без фикстур» их не считает, но и не исключает. Скопированы как есть.
+- **`.gitattributes`: блок 0.4 возвращён, тест не тронут.**
+  - Дерево v2 взяло `.gitattributes` v2.3.0 без правил форка (B1.1, «Опись»).
+  - С фикстурами тест нашёл 603 файла без защиты: Help, каталоги действий, лицензии, фикстуры `docs/node-development`.
+    На Windows с `core.autocrlf` их байты, а с ними закоммиченные хеши, поменялись бы.
+  - Возвращены 12 правил 0.4. Одно поправлено по пути v2: корпус маршрутизации переехал из
+    `packages/opencode/test/cli/package-docs-routing/fixtures` в `packages/loginom-host/test/fixtures/package-docs-routing/fixtures`.
+  - Добавлено одно правило: `packages/ai/test/fixtures/audio/** -text`. Это два mp3 upstream, их SHA256 закоммичены в
+    записях `packages/ai/test/fixtures/recordings`. Git и так считает их двоичными, поэтому поведение checkout не меняется.
+  - Почему так, а не иначе. Править тест — значит ослабить охрану. Оставить его красным — новое падение в `bun test`
+    пакета `desktop`.
+  - `git status` после правки чистый, в том числе с `core.autocrlf=true`. `catalog-check` — 592 файла (база — 591),
+    CAT-02: 57 (было 56). CAT-02 в `catalog.md` описывает блок и проверку.
+
+### Проверки
+
+```text
+$ cd packages/desktop && bun test test/loginom            # до 9b1ac4c658, без фикстур
+ 6 pass, 1 fail: AssertionError: Fixture manifests missing from guard
+$ node --test test/loginom/committed-hash-attributes.test.mjs   # с фикстурами, без блока .gitattributes
+AssertionError [ERR_ASSERTION]: 603 committed-hash inputs need -text or eol=lf in .gitattributes:
+  docs/node-development/nodes/control-condition/fixtures/orders.csv …
+$ … блок 0.4 без поправок v2
+4 committed-hash inputs need …: packages/ai/test/fixtures/audio/{dialog,hello}.mp3,
+  packages/loginom-host/test/fixtures/package-docs-routing/fixtures/{edit-source.lgp,sales.csv}
+$ node --test test/loginom/committed-hash-attributes.test.mjs   # 9b1ac4c658
+Verified Git attributes for 653 committed-hash inputs
+✔ committed Help, catalogs, build pins and fixture hashes have byte-preserving Git attributes
+$ мутация: без строки packages/product/help/** -text
+AssertionError [ERR_ASSERTION]: 310 committed-hash inputs need -text or eol=lf in .gitattributes   # возвращено
+```
+
+Инструменты — `<scratchpad>/b414d/tools.sh`: `env -i`, `HOME` и `TMPDIR` во временном каталоге.
+
+```text
+== environment-proxy.ts (bun, LOGINOM_AI_AGENT_TEST_NODE = node v24.19.0)
+{"status":"PASS","http":true,"httpsConnect":true,"nodeHttp":true,"loopbackBypass":true,"noDirectFallback":true}
+== no-proxy-contract.mjs (node)
+{"status":"PASS","runtime":"node","node":"24.19.0"}
+== no-proxy-contract.mjs (bun)
+{"status":"PASS","runtime":"bun","node":"26.3.0"}
+== runtime-acceptance.ts, runtime-smoke.ts without a stand config: LOGINOM_AI_AGENT_TEST_CONFIG is required (exit 1)
+== parent-crash.ts: PRIVATE_TEST_CONFIG_REQUIRED (exit 1)
+== cold-readback.mjs without arguments: Required: --config --resources --saved --output (exit 1)
+== bun build --target=bun: runtime-acceptance.ts, runtime-smoke.ts, parent-crash.ts, environment-proxy.ts, observed-click.ts: exit 0
+```
+
+### Приёмка обеих задач
+
+База — `41ecea7d39`: то же дерево с `packages/desktop/test` вынесенным наружу, `.gitattributes` ещё базовый. Итог —
+`06b065e9cb`. Тесты `desktop` на итоге повторены с `HOME` и `XDG_*` во временном каталоге; база и первый прогон итога шли
+с настоящим `HOME`. Файлов в `~/.local/share` и `~/.config` от прогонов нет (`find -newer <задание>`).
+В `~/.cache` сменилось только время каталога `loginom-bootstrap/ripgrep` (08:48:34), между прогонами тестов
+(08:44:47–08:45:01 и 08:53–08:54). Тесты `desktop` его не читают: путь знает только `loginom-host/script/ripgrep-resource.ts`.
+
+| Пакет | Команда | `41ecea7d39` | `06b065e9cb` |
+|---|---|---|---|
+| `desktop` | `bun typecheck` | 3 370 файлов, ошибок нет | 3 370 файлов, ошибок нет |
+| `desktop` | `bun run typecheck:tsc` | — | код 0 |
+| `desktop` | `LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> bun test --timeout 30000` | 598 pass, 4 skip, 0 fail (602, 75 файлов) | 605 pass, 4 skip, 0 fail (609, 78): +1 `committed-hash-attributes`, +4 `observed-click`, +2 `runtime-acceptance-contract` |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 592 divergent upstream files              # база — 591 (B4.12); CAT-02: 57, было 56 — .gitattributes
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, на 06b065e9cb, временный HOME и XDG_*
+Found 905 warnings and 0 errors.                                 # база — 554 (B4.12); +351 — файлы 0.4, ниже
+@opencode/desktop:typecheck: ✓ No type errors in 3,370 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+### Найдено, не чинил
+
+- **Новый хеш upstream покрасит охрану.** `committed-hash-attributes` берёт хеши из всех `packages/*/test/**/*.{ts,mjs,js}`
+  и JSON-фикстур. Если upstream закоммитит SHA256 нового файла без атрибута, тест покраснеет после синхронизации.
+  Так и вышло с mp3 `packages/ai`. Это записано в «Проверке при обновлении» CAT-02.
+- **Предупреждения линтера.** У одиннадцати файлов 0.4 — 351 предупреждение `anti-slop` (oxlint, 0 ошибок): 323 у
+  десяти файлов B4.14d, 28 у `safe-storage-smoke.cjs`. Файлы скопированы как есть, стиль не правил.
+- **В B4.1 версия Electron 0.4 устарела.** Там написано «42.3.3», а `v0.4.0` и `a080f7725c` закрепляют `42.11.18`
+  (`ca36c86566`). B4.14a проверял на `42.11.18`.
+
+### Не проверено
+
+- **Инструменты стенда** (`runtime-acceptance`, `runtime-smoke`, `parent-crash`, `cold-readback`) на стенде Loginom не
+  запускались: нет конфига и ресурсов. Проверено только, что они загружаются и останавливаются на своих проверках.
+  - Транспорт `desktopOracleTransport` (`LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE`) водит окно Desktop 0.4. С Desktop v2
+    он, скорее всего, не работает — это B4.14b/c.
+- **`committed-hash-attributes` на Windows.** На checkout с `core.autocrlf=true` тест проверяет атрибуты по индексу,
+  а не байты рабочего дерева. Сам checkout Windows не запускался.
+
+## B4.14a SEC-01
+
+23.11.2026. Та же ветка и дерево, что у B4.14d; коммит `06b065e9cb`. Electron — из кеша `~/.cache/electron` (только
+чтение), распакован во временный каталог:
+
+- `electron-v44.9.1-linux-x64.zip` — SHA256 `994bc366…45e2` совпал с `checksums.json` пакета `electron@44.9.1`;
+- `electron-v42.11.18-linux-x64.zip` (закрепление `v0.4.0`) — SHA256 `c703693e…1a96` совпал с `SHASUMS256.txt` выпуска
+  v42.11.18 на GitHub.
+
+Прогоны — `<scratchpad>/b414d/smoke.sh`: на каждый процесс Electron `env -i`, новый временный `HOME` и `XDG_*`, свой
+профиль и свой файл доказательства (`wx`), `xvfb-run -a`, `--no-sandbox` (root). Временный `HOME` после прогонов пуст.
+
+### Что пришлось поменять
+
+**Кодек.** Задание называет `src/main/loginom/credentials.ts`. После B4.13 это слой Electron
+(`DesktopCredentials.layer`), функции `credentials` он не экспортирует.
+
+- Бандл этого файла, как его собирает `loginom-windows.yml:184`, в Electron даже не загружается:
+  `Cannot use 'import.meta' outside a module` (мутация M5 ниже).
+- Кодек `safeStorage`, которым Desktop читает 0.4, — `credentials` из `loginom-host/src/connection/credentials.ts`.
+  Его импортирует `credential-migration.ts:11` и передаёт ему `safeStorage`.
+- Этот файл не менялся с `v0.4.0`: blob `82df7ac1a1` в обоих. Desktop 0.4 реэкспортировал именно его
+  (`export * from "@loginom-ai-agent/loginom-host/connection/credentials"`).
+- Его и собирает `bun build --target=node --format=cjs` в `LOGINOM_SAFE_STORAGE_CODEC`. В комментарии smoke это
+  записано.
+
+**Linux.** Smoke 0.4 шёл только на раннере Windows. На Linux он падает дважды:
+
+- `write` требует `safeStorage.isEncryptionAvailable()`, а без хранилища секретов оно `false` и в Electron 42, и в 44
+  (бэкенд `basic_text`, проба);
+- `unavailable` ждёт отказа `encode`, а кодек на Linux пишет открытый текст.
+
+Это мутация M4 ниже.
+
+В `06b065e9cb` добавлена ветка `linux` (+40 −3), путь Windows и macOS не изменился. Что проверяет ветка:
+
+- `write` и `read`:
+  - запись — `{apiKey, password}` открытым текстом;
+  - новый процесс Electron её читает;
+  - без защиты `safeStorage` запись `{encrypted}` получает отказ `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`, а не
+    угаданное значение.
+- `unavailable` с заглушкой без защиты:
+  - Linux кодирует и читает открытый текст, заглушку не трогая;
+  - `{encrypted}` получает отказ;
+  - `credentials("win32" | "darwin", заглушка)` отказывает в `encode` и в `decode` — это логика по имени платформы,
+    не DPAPI и не Keychain;
+  - файла данных нет.
+- Доказательство Linux не пишет `available` и `tamperRejected`: защиты и шифротекста здесь нет.
+
+**`0600`.** Права файла — работа хранилища (`connection-store.ts`), а не кодека: smoke пишет файл сам, с umask. Поэтому
+smoke проверяет только формат.
+
+- `0600` в Electron 44 проверено в B4.13 собранным приложением: файлы обоих хранилищ — `600`, каталог 0.4 с `755` —
+  отказ `LOGINOM_STORE_PERMISSIONS_INVALID`.
+- Отдельно — `connection-store` в тестах `loginom-host`.
+
+### Прогоны на Linux
+
+```text
+codec blob HEAD:   82df7ac1a1f3f3fe8ab3eb806b8cee900df40557
+codec blob v0.4.0: 82df7ac1a1f3f3fe8ab3eb806b8cee900df40557
+-- A: Electron 44, one profile: write, read by a new process, unavailable
+== electron 44.9.1 write (codec-v2.cjs): exit 0
+   evidence: {"mode":"write","pid":1593096,"platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+   data keys: ['apiKey', 'password']
+== electron 44.9.1 read (codec-v2.cjs): exit 0
+   evidence: {"mode":"read","pid":1593169,"platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+== electron 44.9.1 unavailable (codec-v2.cjs): exit 0
+   evidence: {"mode":"unavailable","platform":"linux","plaintext":true,"encryptedRejected":true,"forcedPlatformsRejected":["win32","darwin"]}
+   must-not-exist.json: absent
+-- B: the 0.4 pin Electron 42.11.18 writes with the 0.4 codec, Electron 44 reads with the Desktop codec, same profile
+== electron 42.11.18 write (codec-v04.cjs): exit 0
+   evidence: {"mode":"write","pid":1593297,"platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+   data keys: ['apiKey', 'password']
+   profile after 42: Crashpad Local State
+== electron 44.9.1 read (codec-v2.cjs): exit 0
+   evidence: {"mode":"read","pid":1593387,"platform":"linux","plaintext":true,"roundtrip":true,"protectionAvailable":false,"encryptedRejected":true}
+temporary HOME after the runs: []
+```
+
+`codec-v04.cjs` собран из `v0.4.0:packages/loginom-host/src/connection/credentials.ts`, `codec-v2.cjs` — из того же
+пути дерева v2. Smoke в обоих Electron — версия `06b065e9cb`: это стенд, а не предмет проверки.
+
+### Мутации
+
+Каждая — один прогон, код возврата и первая строка ошибки, которую напечатал не Chromium.
+
+```text
+-- M1: the codec loses the Linux plaintext branch (platform === "linux" → "none")
+== electron 44.9.1 write (codec-m1.cjs): exit 1    error: LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE
+-- M2: the record is protected ({encrypted}), as Windows or macOS would write it
+== electron 44.9.1 read (codec-v2.cjs): exit 1     error: Expected values to be strictly deep-equal: ['encrypted'] ≠ ['apiKey','password']
+-- M3: the codec stops refusing without protection (isEncryptionAvailable check → false)
+== electron 44.9.1 unavailable (codec-m3.cjs): exit 1   error: message 'UNEXPECTED_DECRYPT' ≠ 'LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE'
+-- M4: the 0.4 smoke as it was
+== electron 44.9.1 write: exit 1                   error: LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE
+== electron 44.9.1 unavailable: exit 1             error: Missing expected exception.
+-- M5: the post-B4.13 Desktop credentials.ts as the codec
+== electron 44.9.1 write (codec-layer.cjs): exit 1  error: Cannot use 'import.meta' outside a module
+```
+
+### Что проверено на Linux и что осталось
+
+| | Linux, здесь | Windows (DPAPI), macOS (Keychain) |
+|---|---|---|
+| Кодек Desktop в Electron 44: запись, чтение новым процессом | да, открытый текст | шаг CAND B5.1 |
+| Отказ без защиты | `decode({encrypted})` с настоящим `safeStorage` без хранилища секретов и с заглушкой; `encode`/`decode` для `win32`/`darwin` — только по имени платформы | `unavailable` smoke без изменений, B5.1 |
+| Повреждённый шифротекст | — (шифротекста нет) | путь smoke без изменений, B5.1 |
+| Запись Electron 42.11.18 → чтение Electron 44 в одном профиле | да: проверка формата, кодек побайтно тот же | B5.1: ключ `safeStorage` в `Local State` под DPAPI и в Keychain под именем приложения — не проверено |
+| `0600` | B4.13, собранное приложение | — |
+
+### Найдено, не чинил
+
+- **`loginom-windows.yml:184`** собирает `packages/desktop/src/main/loginom/credentials.ts`. На v2 это слой, и бандл не
+  загружается (M5). Для B5.1 путь — `packages/loginom-host/src/connection/credentials.ts`. Workflow форка — вход B5.1,
+  не трогал.
+- **macOS: в ресурсах Desktop нет помощника Keychain** (находка B4.13). Шаг CAND на macOS проверит чтение `safeStorage`, но
+  запись в хранилище службы (`cliCredentials`) там по-прежнему откажет.
+- **Шага Linux в CI нет.** Smoke на Linux запускал только этот прогон. Нужен `xvfb-run` и `--no-sandbox` для root — B5.1.
+
+### Не проверено
+
+- DPAPI и Keychain, повреждённый шифротекст и перенос ключа Electron 42 → 44 на Windows и macOS — шаг CAND B5.1.
+- SEC-01 в установленном Desktop (журналы, UI API, экспорт диагностики) — шлюз C по В-86.
+- Linux с хранилищем секретов (`gnome-libsecret`, `kwallet`): здесь `basic_text`, ветка `protectionAvailable: true` не
+  выполнялась.
