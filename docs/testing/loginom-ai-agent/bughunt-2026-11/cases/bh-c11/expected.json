@@ -1,0 +1,71 @@
+{
+  "package_path": "/bughunt/bh-c11.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.duplicates"
+    },
+    {
+      "type": "preprocessing.data_recovery"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "export_destination": "/bughunt/bh-c11.csv",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Account",
+          "label": "Account",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Account": "A",
+          "Amount": 10.5
+        },
+        {
+          "RowID": 2,
+          "Account": "B",
+          "Amount": 20.5
+        },
+        {
+          "RowID": 3,
+          "Account": "C",
+          "Amount": 25.5
+        },
+        {
+          "RowID": 4,
+          "Account": "D",
+          "Amount": 30.5
+        },
+        {
+          "RowID": 7,
+          "Account": "G",
+          "Amount": 40.5
+        }
+      ]
+    }
+  ]
+}
