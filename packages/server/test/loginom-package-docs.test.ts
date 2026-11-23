@@ -28,6 +28,7 @@ import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { localFiles } from "../../loginom-agent/src/local-file"
 import { packageDocs, Parameters } from "../../loginom-agent/src/package-docs"
+import { deniedText } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { productSkillsDirectory } from "../../product/src/skills"
 import { createEmbeddedRoutes } from "../src/routes"
@@ -653,7 +654,10 @@ describe("package_docs_run (B2.5c)", () => {
           write,
           script({ tool: "write", input: { path: ".work/package-docs/note.md", content: "x" } }, { text: "end" }),
         )
-        expect(JSON.stringify((yield* test.requests(write))[1]?.messages)).toContain("Permission denied: edit")
+        // The product tells the model which kind the rules deny (B2.6b), instead of OpenCode's `Permission denied: edit`.
+        expect(JSON.stringify((yield* test.requests(write))[1]?.messages)).toContain(
+          deniedText({ action: "edit", kind: "write" }),
+        )
         expect(yield* exists(path.join(test.dir, ".work"))).toBe(false)
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,

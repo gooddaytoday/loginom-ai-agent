@@ -308,16 +308,18 @@ export default Plugin.define({
     await ctx.tool.hook("execute.before", async (event) => {
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
-      calls.set(`${event.messageID} ${event.id}`, event.tool)
       // OpenCode does not offer a tool whose action the rules deny outright, and fails a call to it as unknown. A model
       // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b).
       const offer = offered.get(event.sessionID)
-      if (!offer || offer.has(event.tool)) return
-      const action = (await ctx.tool.list()).find((tool) => tool.id === event.tool)?.options?.permission ?? event.tool
-      if (classify(action, [])?.resource !== "*") return
-      const error = await rules(event, action)
-      const text = error instanceof Tool.Error ? refusal(error) : undefined
+      const action =
+        offer && !offer.has(event.tool)
+          ? ((await ctx.tool.list()).find((tool) => tool.id === event.tool)?.options?.permission ?? event.tool)
+          : undefined
+      const error =
+        action !== undefined && classify(action, [])?.resource === "*" ? await rules(event, action) : undefined
+      const text = error instanceof Tool.Error ? refusal(error.error) : undefined
       if (text) throw new Tool.Error({ message: text })
+      calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
@@ -326,7 +328,7 @@ export default Plugin.define({
       if (event.status === "error") {
         // The user's «Отклонить» and a rule's deny reach the model as text, so it explains and the turn goes on (B2.6b,
         // В-75). A Location that shuts down (a reload) cancels its open questions with the same decline; that one stays.
-        const text = refusal(event.error)
+        const text = refusal(event.error.error)
         if (!text || (text === declinedText && isDecline(await rules(event, marker)))) return
         event.error = new Tool.Error({
           message: text,
@@ -334,7 +336,6 @@ export default Plugin.define({
         })
         return
       }
-      if (event.status !== "completed") return
       if (event.tool === "skill") {
         const current = profile(event.sessionID)
         const requested = next(current, (event.input as { id?: unknown } | undefined)?.id)

@@ -212,7 +212,7 @@ describe("the product's own directories outside the project (B2.6a2)", () => {
 })
 
 describe("refusals (B2.6b)", () => {
-  // The fields of OpenCode's permission errors as the plugin receives them inside a `Tool.Error`.
+  // OpenCode's permission errors as the cause inside a call's `Tool.Error`; Core's classes stay out of the plugin.
   const declined = { _tag: "Permission.DeclinedError" }
   const blocked = (permission: string, resources: string[], reason?: string) => ({
     _tag: "Permission.BlockedError",
@@ -223,49 +223,38 @@ describe("refusals (B2.6b)", () => {
   })
 
   test("the user's «Отклонить» is told as such, whatever the tool", () => {
-    expect(refusal({ message: "", error: declined })).toBe(declinedText)
-    expect(refusal({ message: "The user declined this tool call", error: declined })).toBe(declinedText)
+    expect(refusal(declined)).toBe(declinedText)
     expect(isDecline(declined)).toBe(true)
     expect(isDecline(new Error("Permission.DeclinedError"))).toBe(false)
     expect(isDecline(undefined)).toBe(false)
   })
 
-  test("a rule's deny of a kind names the kind, from the error or from OpenCode's bare text", () => {
-    expect(
-      refusal({
-        message: "Permission denied: loginom_dock_action_run",
-        error: blocked("loginom_dock_action_run", ["*"]),
-      }),
-    ).toBe(deniedText({ action: "loginom_dock_action_run", kind: "save" }))
-    expect(refusal({ message: "x", error: blocked("loginom_dock_prepare", ["local_package"]) })).toBe(
-      deniedText({ action: "loginom_dock_prepare", kind: "save" }),
-    )
-    expect(refusal({ message: "x", error: blocked("loginom_dock_node_apply", ["exports.excel"]) })).toBe(
-      deniedText({ action: "loginom_dock_node_apply", kind: "export" }),
-    )
-    // `write` wraps the deny with its own text; `webfetch` keeps only the deny's text.
-    expect(refusal({ message: "Unable to write a.md", error: blocked("edit", ["a.md"]) })).toBe(
-      deniedText({ action: "edit", kind: "write" }),
-    )
-    expect(refusal({ message: "Permission denied: webfetch" })).toBe(deniedText({ action: "webfetch", kind: "web" }))
-    expect(refusal({ message: "Permission denied: shell" })).toBe(deniedText({ action: "shell", kind: "terminal" }))
+  test("a rule's deny of a kind names the kind", () => {
+    for (const [action, resources, kind] of [
+      ["loginom_dock_action_run", ["*"], "save"],
+      ["loginom_dock_prepare", ["local_package"], "save"],
+      ["loginom_dock_node_apply", ["exports.excel"], "export"],
+      ["edit", ["a.md"], "write"],
+      ["external_directory", ["/elsewhere/*"], "read"],
+      ["webfetch", ["https://example.com"], "web"],
+      ["shell", ["ls"], "terminal"],
+    ] as const)
+      expect(refusal(blocked(action, [...resources]))).toBe(deniedText({ action, kind }))
     expect(deniedText({ action: "loginom_dock_action_run", kind: "save" })).toContain("«Сохранять пакеты в Loginom»")
   })
 
   test("anything else keeps its text: a reasoned deny, the user's words, an action of no kind, other failures", () => {
-    for (const failure of [
-      { message: "admin says no", error: blocked("loginom_dock_action_run", ["*"], "admin says no") },
-      { message: "x", error: blocked("shell", ["ls"], "LOGINOM_TERMINAL_DENIED: …") },
-      { message: "use the copy", error: { _tag: "Permission.CorrectedError", feedback: "use the copy" } },
-      { message: "x", error: blocked("loginom_dock_node_apply", ["transform.sort"]) },
-      { message: "x", error: blocked("question", ["*"]) },
-      { message: "Permission denied: question" },
-      { message: "Permission denied: webfetch", error: new Error("Permission denied: webfetch") },
-      { message: "Permission denied: webfetch now" },
-      { message: "File not found: a.md" },
-      { message: "LOGINOM_SCOPE_DENIED: tool x is not available in this task", error: new Error("x") },
+    for (const cause of [
+      blocked("loginom_dock_action_run", ["*"], "admin says no"),
+      blocked("shell", ["ls"], terminalDenied),
+      { _tag: "Permission.CorrectedError", feedback: "use the copy" },
+      blocked("loginom_dock_node_apply", ["transform.sort"]),
+      blocked("question", ["*"]),
+      new Error("Permission denied: webfetch"),
+      "Permission denied: webfetch",
+      undefined,
     ])
-      expect([failure.message, refusal(failure)]).toEqual([failure.message, undefined])
+      expect([cause, refusal(cause)]).toEqual([cause, undefined])
   })
 })
 

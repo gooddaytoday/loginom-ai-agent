@@ -126,22 +126,16 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
 
 /**
  * What the model reads instead of a refused call's error (B2.6b, В-75), so that it explains and the turn goes on: the
- * user's «Отклонить» (`Permission.DeclinedError`, which would end the step) and a rule that denies a kind (OpenCode's bare
- * `Permission denied: <action>`). A deny with its own reason (a hook's: a subagent's terminal, a schedule check, nobody
- * present) and a rejection with the user's words (`Permission.CorrectedError`) keep their text.
+ * user's «Отклонить» (`Permission.DeclinedError`, which would end the step) and a rule that denies a kind
+ * (`Permission.BlockedError` without a reason), by the cause inside the call's `Tool.Error`. A deny with its own reason
+ * (a hook's: a subagent's terminal, a schedule check, nobody present) and a rejection with the user's words
+ * (`Permission.CorrectedError`) keep their text.
  */
-export function refusal(failure: { readonly message: string; readonly error?: unknown }) {
-  if (isDecline(failure.error)) return declinedText
-  const blocked = blockedError(failure.error)
-  if (blocked?.reason !== undefined) return
-  // A built-in tool that maps the deny itself keeps only its text: the `BlockedError` message without a reason.
-  const action = blocked
-    ? blocked.permission
-    : failure.error === undefined
-      ? /^Permission denied: (\S+)$/.exec(failure.message)?.[1]
-      : undefined
-  if (action === undefined) return
-  const entry = classify(action, blocked?.resources ?? [])
+export function refusal(cause: unknown) {
+  if (isDecline(cause)) return declinedText
+  const blocked = blockedError(cause)
+  if (!blocked || blocked.reason !== undefined) return
+  const entry = classify(blocked.permission, blocked.resources)
   return entry && deniedText(entry)
 }
 

@@ -592,17 +592,21 @@ describe("loginom.product permissions (B2.6a)", () => {
 
 describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
   it.live(
-    "«Отклонить» on a write and «Запрещено» for a file and a site: nothing is done, the model is told why, the turn goes on",
+    "«Отклонить» on a write and «Запрещено» for files, a site and a hidden tool: nothing is done, the model is told why, the turn goes on",
     () =>
       Effect.gen(function* () {
-        // Rules for one file and one site leave `write` and `webfetch` offered; the save kind, whose rule denies the
-        // whole tool, is the Dock case (`loginom-dock-catalog.test.ts`).
+        // Rules for some files and one site leave `write`, `edit`, `read` and `webfetch` offered.
         const test = yield* boot({
           permissions: [
             { action: "edit", resource: "denied.md", effect: "deny" },
+            { action: "edit", resource: "inside.txt", effect: "deny" },
+            { action: "external_directory", resource: "*", effect: "deny" },
             { action: "webfetch", resource: "https://denied.example/*", effect: "deny" },
           ],
         })
+        const outside = path.join(path.dirname(test.dir), `${path.basename(test.dir)}-outside.txt`)
+        yield* Effect.promise(() => Bun.write(outside, "outside\n"))
+        yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(outside, { force: true })))
         const id = yield* test.create("built-in refusals")
         const running = yield* test
           .prompt(
@@ -610,6 +614,8 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
             script(
               { tool: "write", input: { path: "declined.md", content: "declined" } },
               { tool: "write", input: { path: "denied.md", content: "denied" } },
+              { tool: "edit", input: { path: "inside.txt", oldString: "inside", newString: "changed" } },
+              { tool: "read", input: { path: outside } },
               { tool: "webfetch", input: { url: "https://denied.example/page" } },
               { text: "end" },
             ),
@@ -623,6 +629,8 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
         const said = [
           declinedText,
           deniedText({ action: "edit", kind: "write" }),
+          deniedText({ action: "edit", kind: "write" }),
+          deniedText({ action: "external_directory", kind: "read" }),
           deniedText({ action: "webfetch", kind: "web" }),
         ]
         expect(
@@ -637,10 +645,23 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
         const answers = (yield* test.sessions.messages({ sessionID: id })).filter((item) => item.type === "assistant")
         expect(answers.map((item) => (item.type === "assistant" ? [item.finish, item.error] : []))).toEqual([
           ["stop", undefined],
-          ["tool-calls", undefined],
-          ["tool-calls", undefined],
-          ["tool-calls", undefined],
+          ...Array(5).fill(["tool-calls", undefined]),
         ])
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "inside.txt")).text())).toBe("inside\n")
+
+        // A rule that denies the whole action hides its tools; `write`, called by name anyway, asks the action `edit`.
+        const hidden = yield* test.create("hidden write")
+        yield* test.sessions.setPermissions({
+          sessionID: hidden,
+          permissions: [{ action: "edit", resource: "*", effect: "deny" }],
+        })
+        yield* test.prompt(
+          hidden,
+          script({ tool: "write", input: { path: "hidden.md", content: "x" } }, { text: "end" }),
+        )
+        expect(names((yield* test.requests(hidden))[0])).not.toContain("write")
+        expect(told((yield* test.requests(hidden)).at(-1))).toEqual([deniedText({ action: "edit", kind: "write" })])
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "hidden.md")).exists())).toBe(false)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
