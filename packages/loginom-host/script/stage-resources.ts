@@ -174,7 +174,8 @@ export async function stageResources(input: {
     await cp(join(dirname(join(staging, browser)), "chrome_sandbox"), sandbox)
     await setLinuxSandboxMode(sandbox)
   }
-  if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
+  // Desktop's service keeps its Loginom connection with cliCredentials too (B4.13), so both flavors carry the helper.
+  if (process.platform === "darwin") await buildKeychain(join(staging, "bin"))
   // stageRipgrep has already created licenses/ripgrep.
   await mkdir(join(staging, "licenses"), { recursive: true })
   const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
