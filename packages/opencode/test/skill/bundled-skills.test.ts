@@ -31,7 +31,7 @@ test("the product has one canonical directory for each shipped skill", async () 
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .toSorted()
-  expect(directories).toEqual(["loginom-automation", "loginom-dashboard", "package-docs"])
+  expect(directories).toEqual([...reservedSkillNames].toSorted())
 })
 
 test("shipped skill metadata conforms to the Agent Skills specification", async () => {
