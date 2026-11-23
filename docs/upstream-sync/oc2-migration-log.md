@@ -17005,3 +17005,217 @@ temporary HOME after the runs: []
 - SEC-01 в установленном Desktop (журналы, UI API, экспорт диагностики) — шлюз C по В-86.
 - Linux с хранилищем секретов (`gnome-libsecret`, `kwallet`): здесь `basic_text`, ветка `protectionAvailable: true` не
   выполнялась.
+
+## B2.7a5–a6 Имя команды в сообщениях
+
+23.11.2026. Задачи B2.7a5a, a5b, a6a, a6b одной веткой `b27a5-command-name` от `oc2-migration` (`f53ef3bc76`), рабочее
+дерево `.claude/worktrees/b27a5`. Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и
+`git commit`. `bun install --frozen-lockfile` — код 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` в этом дереве и в дереве базы. Хук `pre-commit` (`bun run secrets staged`) — `clean` на
+каждом коммите. База тестов — отдельное дерево `<scratchpad>/b27a5-base` (`f53ef3bc76`, detached). Тесты пакетов и пробы
+bun — с временными `HOME`, `TMPDIR` и `XDG_*` в scratchpad; `test_tools.py`, `test_acceptance.py` и мутации — с настоящим
+`HOME` и системным `/tmp` (их фикстуры — во временных каталогах `tempfile`). Модель не вызывалась: `run` и `serve` вручную
+не запускались, тесты пакетов `cli` и `server` запускают их так же, как на базе. Способ решён
+оркестратором: правило в `apply-identity`, а не define в каждом файле. `packages/desktop/test/loginom/*` (B4.14b) не трогал.
+
+Прочитано: этот журнал — B2.7a (нарезка, строки a5a…a6b, «Имя корня справки»), B1.3a и B1.4a (`apply-identity`);
+`scripts/upstream-sync/{apply-identity.py,test_tools.py,README.md}`, вызовы `transform` в `merge_oracle.py` и
+`acceptance_cells.py`; `procedure.md` (правило 3 шага 2), `catalog.md`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `2a4819be1a` `fix(upstream-sync): name the product command in CLI, TUI and server messages` | правило в `apply-identity.py`; путь файла в `transform` из `merge_oracle.py` и `acceptance_cells.py`; тесты в `test_tools.py`; строка README |
+| `5b8b766978` `chore(identity): apply the product command name to CLI, TUI and server messages` | 30 файлов, только вывод скрипта: `cli` 14, `tui` 13, `server` 3 |
+| `9b24edad4f` `fix(tui): open the product documentation and report status as the product` | a6b вручную: `app.tsx`, `context/program-status.ts`; тесты `context/program-status.test.ts`, `mini/splash.test.ts` |
+| `e7f8c572f6` `fix(upstream-sync): find the command right after an escape too` | правило ловит имя и после `\n`, `\r`, `\t`, как `VARIABLE`; случай в тесте; дерево не меняется (`--check` — 0) |
+| следующий | этот раздел; `catalog.md` (шапка, правило записей, CAT-03, CAT-11, CAT-12), `procedure.md` (правило 3 шага 2) |
+
+### Правило
+
+`transform(text, path)`: правило команды действует только в `packages/(cli|server|tui)/(src|test)/`. Скрипт, оракул
+(`merge_oracle.py`) и независимая модель (`acceptance_cells.py`) передают путь файла; без пути правило не применяется.
+Имя начинается после не-словесного символа или после экранирования `\n`, `\r`, `\t` в строке (`e7f8c572f6`).
+
+| Ловит → `loginom-ai-agent-cli …` | Пример |
+|---|---|
+| `opencode service …`, `pair`, `mini`, `stats`, `acp`, `mcp add`, `-s` через пробел или ` / ` | `Usage: opencode service get ${selected}`, `` `opencode pair --remote` ``, `opencode mini requires a TTY stdout`, `opencode acp: ${failure}`, `opencode -s ${id}`, `opencode / stats` |
+| `` `opencode models` `` — только в обратных кавычках | `` Try: `opencode models` to list available models `` |
+| `run opencode to use`, и со вставками `${…}` между словами | `then run opencode to use the new version`, `` Run ${reset}${bold}opencode${reset}${dim} to use `` |
+
+| Не трогает | Почему |
+|---|---|
+| `@opencode/client`, `anomalyco/opencode`, `bin/opencode service`, `opencode.ai`, `opencode-pty` | перед именем `[\w$./@-]` или после него не пробел: область пакета, путь, хост, бинарник сборки по умолчанию |
+| `providerID: "opencode"`, `"opencode.stats"`, `APP = "opencode"` | провайдер и внутренние ключи: после имени не подкоманда |
+| `"opencode models"`, `"opencode mcp list"`, `opencode mcp auth [flags]` | путь команды и справка CLI из исходников: корень Spec без define сборки — `opencode` (`cli/test/server-connection.test.ts`, `mcp-auth-choices.test.ts`) |
+| `run opencode upgrade again`, `` `opencode auth login` `` | B2.7d и B2.7a7 |
+| `opencode --session`, `opencode serve`, `opencode pairing` | не в списке; `\b` после подкоманды |
+| те же фразы в `app`, `core` (навыки), `gui-plugins`, `.github`, скриптах пакетов | другие задачи: словари приложения, B2.4, комментарии плагинов |
+
+### Прогон
+
+```text
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check     # на 2a4819be1a
+would change: 30 files                                                   # код 1
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo .
+changed: 30 files
+$ git diff --shortstat 2a4819be1a 5b8b766978
+ 30 files changed, 46 insertions(+), 46 deletions(-)
+```
+
+Дерево коммита прогона совпало с прогоном скрипта в чистой копии `2a4819be1a` (`git write-tree`, `25ed383c08…` в обоих).
+Из 30 файлов 17 — файлы строк a5a…a6b (`cli/src` 9, `tui/src` 6, `server/src` 2; `app.tsx` и `program-status.ts` —
+вручную, ниже), 10 — тесты, которые их проверяют (`cli` 5, `tui` 4 — `app-lifecycle`, `splash`, `stats.view`,
+`presentation`; `server` 1), 3 — вне строк задания: комментарии `tui/src/mini/{runtime,types}.ts` и текст выпуска в
+`storybook/highlights.tsx`.
+
+### a6b вручную
+
+- «Open docs» (`tui/src/app.tsx`) открывает `Product.documentation` вместо `https://opencode.ai/docs` (0.4 оставлял адрес
+  upstream).
+- `program-status.ts`: поле `app` отчёта OSC 7501 — `Product.slug` (`loginom-ai-agent`). Тип opentui описывает его как
+  «stable program identifier such as `cargo`». Проба на настоящем renderer (`createTestRenderer`, `setupTerminal`):
+
+```text
+"loginom-ai-agent" true
+"Loginom AI Agent" THROW -1 NativeError: ot_session_control failed: InvalidArgument
+"opencode" true
+```
+
+  `Product.name` уронил бы TUI. Новый тест `names the product in a form the terminal accepts` гонит отчёты через
+  настоящий renderer.
+- `test/mini/splash.test.ts`: команда ищется по `loginom-ai-agent` вместо `opencode` (3 строки). Правило заменило
+  команду, но не голое слово, которым тест находит её в кадре; на 16 колонках имя в 20 символов переносится, поэтому
+  `loginom-ai-agent`, а не полное имя. Без правки — 8 падений `exit retains the complete resume command`. Команда в
+  кадре цела на всех ширинах теста (16, 56, 80).
+
+### Тесты
+
+`test_tools.py`: класс `ApplyIdentityCommand` — что переименовывает (строки из файлов задания), что нет (таблица выше),
+другие пакеты и пустой путь; `GateCommandName` — слияние, где upstream добавляет одну подсказку в `server` и в `app`,
+разрешение — `apply-identity --since`, шлюз `accepted` принимает (оракул применяет правило по пути).
+
+Мутации на `e7f8c572f6` (`<scratchpad>/b27a5-runs/mutate-rule.py`: копия `scripts/upstream-sync` во временном каталоге,
+одна правка, 26 тестов `ApplyIdentityCommand`, `ApplyIdentityRules`, `GateCommandName`, `GateNewFiles`,
+`OracleIsMechanical`, `ApplyIdentitySince`). Без мутаций — `Ran 26`, `OK`.
+
+| Мутация | Итог |
+|---|---|
+| M1 правило во всех путях | **FAILED** (2): `other_packages_keep_the_words`, `the_resolution_apply_identity_leaves_is_the_oracle` |
+| M2 без `service` | **FAILED** (2): `the_command_in_messages…`, `other_packages…` |
+| M3 без проверки символа перед именем | **FAILED** (1): `names_that_are_not_the_command…` (`bin/opencode service start`) |
+| M4 `models` без обратных кавычек | **FAILED** (1): `names_that_are_not…` (`"opencode models"`) |
+| M5 без вставок `${…}` в «run … to use» | **FAILED** (1): `the_command_in_messages…` (`presentation.ts`) |
+| M6 без правила «run … to use» | **FAILED** (1): `the_command_in_messages…` |
+| M7 без разделителя ` / ` | **FAILED** (1): `the_command_in_messages…` (`opencode / stats`) |
+| M8 без `\b` после подкоманды | **FAILED** (1): `names_that_are_not…` (`opencode pairing`) |
+| M9 скрипт не передаёт путь | **FAILED** (1): `the_resolution…` |
+| M10 оракул не передаёт путь | **FAILED** (1): `the_resolution…` — шлюз отклоняет разрешение |
+| M11 `upgrade` в списке | **FAILED** (1): `names_that_are_not…` |
+| M12 `auth` в списке | **FAILED** (1): `names_that_are_not…` |
+| M13 команда не после экранирования | **FAILED** (1): `the_command_in_messages…` (`Usage:\nopencode service …`) |
+| M14 «run … to use» не после экранирования | **FAILED** (1): `the_command_in_messages…` |
+
+`program-status`: `APP = Product.name` — 3 из 5 тестов красные (в том числе `NativeError … InvalidArgument`),
+`APP = "opencode"` — 2 из 5.
+
+```text
+$ python3 -I scripts/upstream-sync/test_tools.py           # на e7f8c572f6
+Ran 74 tests in 7.905s
+OK
+$ python3 -I scripts/upstream-sync/test_acceptance.py      # на e7f8c572f6
+Ran 12 tests in 110.185s
+OK
+```
+
+`doctest_procedure.py` (через `selftest.sh`) не гонял: стенд требует не-root (`stand.sh`), а здесь root. Правка
+`procedure.md` — текст правила 3 шага 2, блоки `doc-test` не менялись.
+
+### Приёмка
+
+Полные прогоны по пакетам: база — `f53ef3bc76` в `<scratchpad>/b27a5-base`, итог — `9b24edad4f`;
+`bun test --timeout 60000`, временные `HOME`, `TMPDIR`, `XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` задан, `npm ci` клиента
+`loginom-runtime` в обоих деревьях (`<scratchpad>/b27a5-runs/run-tests.sh`).
+
+| Пакет | `f53ef3bc76` | `9b24edad4f` |
+|---|---|---|
+| `cli` | 525 pass, 9 skip, 0 fail, 2298 expect | 525 pass, 9 skip, 0 fail, 2298 expect |
+| `tui` | 1669 pass, 5 skip, 1 fail, 108946 expect | 1670 pass, 5 skip, 1 fail, 108947 expect (+1 тест `program-status`); падение то же — `the art stops every frame when hidden…` |
+| `server` | 277 pass, 3 skip, 0 fail, 7178 expect | 277 pass, 3 skip, 0 fail, 7362 expect |
+
+Число `expect` у `server` плавает от прогона к прогону и на базе: повторный прогон `f53ef3bc76` — 7327.
+`e7f8c572f6` после этих прогонов меняет только `scripts/upstream-sync/` (пакеты те же).
+`stats.view.test.tsx` действительно находит новый заголовок: со старым `opencode / stats` в строке поиска тест падает
+(`Received value must be an array type…`).
+
+```text
+$ cd packages/{tui,cli,server} && bun typecheck
+✓ No type errors in 1,941 files across 2 projects      # tui
+✓ No type errors in 2,219 files across 2 projects      # cli
+✓ No type errors in 1,640 files across 2 projects      # server
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 609 divergent upstream files                  # база — 593: +10 CAT-11, +6 CAT-12
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun run check                                     # код 0, перед коммитом журнала
+Found 905 warnings and 0 errors.                    # предупреждений в изменённых файлах нет
+ Tasks:    39 successful, 39 total                  # typecheck cli, tui, server, sdk — заново, остальное из кэша turbo
+```
+
+`prettier --check` правленых вручную файлов: `program-status.{ts,test.ts}`, `splash.test.ts` — проходят;
+`tui/src/app.tsx` не проходил и на базе.
+
+### Что осталось в файлах строк a5a…a6b
+
+`grep -i opencode` по 19 файлам строк, без импортов `@opencode/*` и клиента `OpenCode`:
+
+| Где | Что | Почему |
+|---|---|---|
+| `cli/src/commands/handlers/stats.ts:120,131`, `tui/src/feature-plugins/system/stats.tsx:134` | `opencode.ai` в подвале статистики | сайт upstream, не команда; видимая строка бренда — CAT-03, решение по строке |
+| `tui/src/app.tsx`, `stats.tsx` | `opencode.status`, `opencode.update`, `opencode.debug`, `opencode.stats`, `opencode.highlights`, `opencode.storybook` | внутренние id команд и плагинов |
+| `cli/src/services/service-config.ts:13` | комментарий «how to spawn opencode» | не сообщение |
+| `server/src/process.ts:121` | комментарий `` `opencode serve` `` | не сообщение, `serve` не в списке |
+
+`opencode <подкоманда>` в сообщениях этих файлов — 0.
+
+### Где решал сам
+
+- **Правило только в `cli`, `tui`, `server`.** «Прогон по файлам строк» и «`--check` — 0 файлов» вместе выполнимы только
+  так: без области правило задело бы `opencode pair` в словарях `app` (все локали), навык
+  `core/src/plugin/skill/opencode.md` (B2.4), комментарии `gui-plugins`. Это меньший вариант.
+- **`models` только в обратных кавычках.** Голое `"opencode models"` в `cli/test/server-connection.test.ts` — путь команды
+  CLI из исходников (корень Spec — `opencode` без define); переименование покрасило бы тест.
+- **`opencode / stats` — правилом,** разделитель ` / ` к тому же списку. Заголовок экрана статистики TUI повторяет
+  заголовок `opencode stats` CLI; оба стали `loginom-ai-agent-cli …`.
+- **`app` статуса программы — `Product.slug`,** а не `Product.name` (проба выше) и не `Product.cliExecutable`: в задании —
+  «имя продукта».
+- **Комментарии в области меняются тем же правилом** (`mini/{runtime,types}.ts`): правило механическое, как и правила имён
+  B1.4a.
+- **Теста на «Open docs» нет.** Наблюдать вызов `openUrl` можно только подменой модуля (`import * as`, против правил стиля);
+  проверено чтением и `bun typecheck`.
+
+### Найдено, не чинил
+
+- Сборка по умолчанию (её берёт Desktop, B4.7) и запуск из исходников печатают корень справки `opencode`
+  (`LOGINOM_AI_AGENT_CLI_NAME`, `cli/src/commands/commands.ts:49`), а сообщения теперь называют `loginom-ai-agent-cli`.
+  В standalone-сборке совпадают.
+- `app/src/runtime/i18n/*.ts` (`server.connect.link.expired`, `server.connect.scan.*`): «Run opencode pair» — свой текст
+  приложения, не сообщение сервера; e2e `app/e2e/regression/settings.spec.ts:2587` сверяет его. Словари Desktop — вне задачи.
+- Навык `core/src/plugin/skill/opencode.md` (`opencode mcp add`, `opencode service restart/status`) — B2.4.
+- **Служба Desktop и сообщения `server`.** Сборку по умолчанию берёт служба Desktop (B4.7, B4.13). Сообщения сервера
+  (`server/src/process.ts:247` «Run `loginom-ai-agent-cli service restart`…», `handlers/server.ts:42` «Run
+  `loginom-ai-agent-cli pair`…») теперь отправляют пользователя Desktop к CLI продукта, у которого отдельный профиль и своя
+  служба (дизайн standalone): `service restart` из CLI не перезапустит службу Desktop. Вопрос владельцу, не правка.
+- Будущий тест upstream со справкой `opencode service … [flags]` в области правила будет переименован и покраснеет: справка
+  из исходников называет корень `opencode`. Ловит прогон тестов при синхронизации.
+
+### Не проверено
+
+- Собранный бинарник (`build.ts --standalone`) со строками нового вида — не собирался; сообщения проверены тестами из
+  исходников.
+- «Open docs» в живом TUI: браузер не открывался.
+- Передачу пути в `acceptance_cells.py` не краснит ни один тест: в клетках модели нет файлов `cli`, `tui`, `server`.
+  Скрипт и оракул закрыты мутациями M9 и M10.
+- Тест `program-status` на настоящем renderer ждёт `true` на трёх отчётах и гонялся только на Linux: на других ОС
+  нативная сессия может ответить `false` (нет возможности терминала) — тогда тест покраснеет без поломки продукта.
