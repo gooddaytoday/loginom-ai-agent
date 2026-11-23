@@ -29,6 +29,10 @@ if (built) await copyBuiltCliToResources(cli)
 
 if (!built) await downloadCliToResources(channel === "beta" ? "beta" : undefined)
 
+// Loginom AI Agent (B4.8a): resources/loginom — Node, the Host entry, Chromium, the Dock runtime, help and the product
+// skills. Every channel needs LOGINOM_AI_AGENT_NODE_SOURCE and LOGINOM_AI_AGENT_BROWSER_SOURCE, as in 0.4.
+await $`bun ./scripts/bundle-loginom.ts`
+
 await $`bunx electron-vite build`
 
 await verifyBundles(path.join(dir, "out"))

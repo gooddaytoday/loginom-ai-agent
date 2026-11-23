@@ -4,6 +4,7 @@ import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect
 import { SidecarChanged } from "../../shared/ipc-rpc/events"
 import { CHANNEL } from "../constants"
 import { emitIpcEvent } from "../ipc-events"
+import { LoginomResources } from "../loginom/resources"
 import { getMainWindows } from "../windows"
 import { BackgroundServiceMachine } from "./background-service-machine"
 import { cleanStages } from "./cli-stages"
@@ -63,6 +64,7 @@ const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: Background
     setup.client.Service.ensure({
       file: setup.file,
       version,
+      env: setup.env,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: [
@@ -109,8 +111,10 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
 
   const file = serviceFile()
+  // Loginom AI Agent (B4.8a): a packaged app's service takes its Loginom resources, or the app does not start it.
+  const env = yield* Effect.promise(() => LoginomResources.serviceEnvironment(LoginomResources.installation(app)))
 
-  return { cli, client, file, isolated, version }
+  return { cli, client, env, file, isolated, version }
 })
 
 const adopt = Effect.fn("BackgroundService.adopt")(function* (
