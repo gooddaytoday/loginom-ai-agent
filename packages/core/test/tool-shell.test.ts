@@ -992,13 +992,14 @@ describe("ShellTool", () => {
               sessionID,
               variables: { AGENT: "0", OPENCODE: "0", AI_AGENT: "", LOGINOM_AI_AGENT_SESSION_ID: "stale" },
             })
+            // Fork (B2.7a12): user scripts see the agent marker OPENCODE=1, as in 0.4, and no LOGINOM_AI_AGENT marker.
             const command = isWindows
-              ? '[Console]::Out.Write("$env:AGENT|$env:OPENCODE|$env:AI_AGENT|$env:LOGINOM_AI_AGENT_SESSION_ID")'
-              : 'printf %s "$AGENT|$OPENCODE|$AI_AGENT|$LOGINOM_AI_AGENT_SESSION_ID"'
+              ? '[Console]::Out.Write("$env:AGENT|$env:OPENCODE|$env:AI_AGENT|$env:LOGINOM_AI_AGENT_SESSION_ID|$env:LOGINOM_AI_AGENT")'
+              : 'printf %s "$AGENT|$OPENCODE|$AI_AGENT|$LOGINOM_AI_AGENT_SESSION_ID|$LOGINOM_AI_AGENT"'
             const settled = yield* executeTool(registry, call({ command }))
 
             expect(settled.status).toBe("completed")
-            expect(settled.content?.[0]).toEqual({ type: "text", text: `1|1|opencode|${sessionID}` })
+            expect(settled.content?.[0]).toEqual({ type: "text", text: `1|1|opencode|${sessionID}|` })
           }),
         )
       }),
