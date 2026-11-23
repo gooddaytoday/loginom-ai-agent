@@ -1,5 +1,5 @@
 // Loginom AI Agent (B2.7b): `loginom setup/status/check/cancel-pending/recover` of the product CLI, as in 0.4
-// (`a080f7725c:packages/opencode/src/cli/{loginom-management,standalone-command}.ts`). A command opens the CLI profile
+// (`v0.4.0:packages/opencode/src/cli/{loginom-management,standalone-command}.ts`). A command opens the CLI profile
 // under its writer latch and starts its own Node host in `<profile>/loginom`, the directory of the Host that the profile's
 // server starts (B2.3). Setup saves the connection there as a new generation through `cliCredentials` (decision В-97,
 // п. 4), and the server reads it when it starts. Nothing else runs: no server and no database. While the profile's server

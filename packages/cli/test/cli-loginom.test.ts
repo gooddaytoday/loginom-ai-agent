@@ -12,7 +12,8 @@ import { isolatedEnv } from "./fixture/environment"
 
 // Loginom AI Agent (B2.7b): `loginom setup/status/check/cancel-pending/recover` of the product CLI, the cases of 0.4
 // `test/cli/{loginom-management,standalone-status,standalone-preflight,standalone-startup}.test.ts`
-// (`a080f7725c:packages/opencode`) and the callers of this stage: `scripts/node-acceptance/run-check.py` and `evals`.
+// (`v0.4.0:packages/opencode`, decision В-99) and the callers of this stage: `scripts/node-acceptance/run-check.py`
+// and `evals`.
 // Each command runs the product CLI entry from source with the real Node host (`LOGINOM_AI_AGENT_TEST_NODE`) and fixture
 // resources: Help and the browser are stubs, so a fictional Loginom stand answers without Chromium or a network. The
 // cases left behind, and why, are in the migration log (B2.7b).
