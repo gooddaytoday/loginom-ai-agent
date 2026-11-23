@@ -23,6 +23,8 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const compatibility={profile_id:`loginom-7.4.2-${platform}-chromium-ru`,loginom_build:'7.4.2',platform,browser:'chromium'};
  const catalog=await createActionCatalogFixture(compatibility);
  const openPackage=process.env.LOGINOM_TEST_OPEN_PACKAGE==='1';
+ const uploadFault=process.env.LOGINOM_TEST_PACKAGE_UPLOAD;
+ let deliveryRequest,deliverySignal,resumeCalls=0;
  const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;
  const smoothingHp=process.env.LOGINOM_TEST_SMOOTHING_HP==='1',fullWorkspace=openPackage||smoothingHp;
  const account=(smoothingHp?'lab111-3-reviewer-':'lab-66-monkey-')+'a'.repeat(36),documentId='d'.repeat(36),operationId=smoothingHp?'prepare':'o'.repeat(36);
@@ -86,11 +88,28 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  mock.module('../../lib/executor.mjs',{namedExports:{...executor,createActionRuntime:options=>({
   ...executor.createActionRuntime(options),inspect:async()=>inspection,
   ...(openPackage?{async deliverPackageArtifact(request){
+   deliveryRequest=request;
    const artifact=options.artifactStore.getUploadGrant(request.artifact_id,request.upload_grant_id);
+   if(uploadFault)return {operation_id:request.operation_id,state:'settled',outcome:{status:uploadFault==='ambiguous'?'AMBIGUOUS':'NOT_APPLIED',
+    effect_possible:false,upload_submitted_or_unknown:uploadFault==='submitted',cleanup_complete:uploadFault!=='cleanup',
+    inspection_required:uploadFault==='inspection',next_step:{tool:'dock_artifact_delivery_resume',
+     original_operation_id:uploadFault==='foreign'?'foreign':request.operation_id}}};
    return {outcome:{status:'SUCCEEDED',artifact_id:artifact.artifact_id,destination:artifact.upload.destination,bytes:artifact.bytes,
     bytes_source:'native_file_store',upload_completion_verified:true,load_count:3,
     files_entry:{document_id:documentId,tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',directory:'/'+account},
     source_sha256:artifact.sha256,cleanup_complete:true}};
+  },async resumeArtifactDelivery(request,{signal}){
+   resumeCalls++;
+   assert.equal(request.operation_id,deliveryRequest.operation_id);
+   assert.ok(request.resume_id!==request.operation_id);
+   assert.ok(request.budget_ms<=deliveryRequest.budget_ms);
+   assert.equal(signal,deliverySignal);
+   if(uploadFault==='persistent')return {outcome:{status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+    upload_submitted_or_unknown:false,inspection_required:false,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:request.operation_id}}};
+   assert.equal(uploadFault,'safe');
+   const artifact=options.artifactStore.getUploadGrant(deliveryRequest.artifact_id,deliveryRequest.upload_grant_id);
+   return {outcome:{status:'SUCCEEDED',destination:artifact.upload.destination,bytes:artifact.bytes,
+    upload_completion_verified:true,source_sha256:artifact.sha256,cleanup_complete:true}};
   }}:{})})}});
  mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
  mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
@@ -162,8 +181,19 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
     name:'a'.repeat(64)+'-0-'+name,bytes:7,sha256:createHash('sha256').update('fixture').digest('hex'),
     upload:{directory:'/'+account,overwrite:'reject'}})));
    packageArtifact=artifacts[0];
+   deliverySignal=new AbortController().signal;
    const prepared=await bridge.prepareLocalPackage({intent:'open_package',operation_id:operationId},
-    {artifactID:packageArtifact.artifact_id,uploadGrantID:packageArtifact.upload.grant_id},{signal:new AbortController().signal});
+    {artifactID:packageArtifact.artifact_id,uploadGrantID:packageArtifact.upload.grant_id},{signal:deliverySignal});
+   if(uploadFault&&uploadFault!=='safe'){
+    assert.equal(prepared.isError,true);
+    assert.match(prepared.content[0].text,/Local package upload remains unconfirmed/);
+    assert.equal(resumeCalls,uploadFault==='persistent'?1:0);
+    assert.equal(session.metadata.workspaceReady,false);
+    assert.equal(session.metadata.workspacePreparation.effect_possible,true);
+    return;
+   }
+   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+   assert.equal(resumeCalls,uploadFault==='safe'?1:0);
    const diagnosticPath=join(directory,'diagnostics',createHash('sha256').update('dock:'+session.metadata.sessionId).digest('hex'),'events.jsonl');
    const retained=JSON.parse((await readFile(diagnosticPath,'utf8')).trim().split('\n')[0]).result;
    const original=structuredClone(retained);

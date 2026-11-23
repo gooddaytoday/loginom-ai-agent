@@ -387,8 +387,17 @@ export async function createBridge(config, session, { browserTransport: managedB
                     build:identity.target.loginom_build,documentId:identity.document_id,account:identity.loginom_account,directories:config.storageDirectories});
                   extra.signal.throwIfAborted();
                   const budget=remaining();if(budget<1000)throw Error('Local package upload deadline elapsed');
-                  const delivered=await actionRuntime.deliverPackageArtifact({operation_id:'package-'+randomUUID(),artifact_id:privatePackage.artifact_id,
+                  let delivered=await actionRuntime.deliverPackageArtifact({operation_id:'package-'+randomUUID(),artifact_id:privatePackage.artifact_id,
                     upload_grant_id:privatePackage.upload.grant_id,budget_ms:budget},{signal:extra.signal});
+                  // Resume only the acknowledged pre-upload checkpoint, once, in
+                  // the original job/deadline. No uncertain upload is repeated.
+                  const stopped=delivered.outcome;
+                  if(stopped?.status==='NOT_APPLIED'&&stopped.upload_submitted_or_unknown===false
+                    &&stopped.cleanup_complete===true&&stopped.inspection_required===false
+                    &&stopped.next_step?.tool==='dock_artifact_delivery_resume'
+                    &&stopped.next_step.original_operation_id===delivered.operation_id)
+                    delivered=await actionRuntime.resumeArtifactDelivery({operation_id:delivered.operation_id,
+                      resume_id:'package-resume-'+randomUUID(),budget_ms:remaining()},{signal:extra.signal});
                   const proof=delivered.outcome;
                   if(proof?.status!=='SUCCEEDED'||proof.cleanup_complete!==true||proof.upload_completion_verified!==true
                     ||proof.destination!==privatePackage.upload.destination||proof.bytes!==privatePackage.bytes||proof.source_sha256!==privatePackage.sha256)

@@ -234,6 +234,14 @@ test('local open_package delivers its first full knowledge bundle and retains ge
  assert.match(result.stdout,/# fail 0/);
 });
 
+for(const fault of ['safe','ambiguous','submitted','cleanup','inspection','foreign','persistent'])test('local package resumes only its proven preupload checkpoint once: '+fault,async()=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+   new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+   env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_OPEN_PACKAGE:'1',LOGINOM_TEST_PACKAGE_UPLOAD:fault}});
+ assert.match(result.stdout,/# pass 1/);
+ assert.match(result.stdout,/# fail 0/);
+});
+
 for(const scenario of ['s4','union-auto-match'])test(scenario+' three-file prepare retains knowledge and inputs with 3000 bytes of headroom',async()=>{
  const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
   new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
