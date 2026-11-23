@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { promisify } from "node:util"
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
+import { Product } from "@loginom-ai-agent/product"
 import installer from "../../../../../install?raw"
 import { DesktopPaths } from "../paths"
 import { BUNDLED_CLI_VERSION_KEY } from "../storage/keys"
@@ -106,7 +107,7 @@ const bundledVersion = Effect.fn("DesktopCli.bundledVersion")(function* (bundled
   // async read waits behind everything else the main thread is doing at that moment.
   const shipped = yield* Effect.sync(() => {
     try {
-      return readFileSync(path.join(path.dirname(bundled), "opencode-cli.version"), "utf8").trim()
+      return readFileSync(path.join(path.dirname(bundled), `${Product.cliExecutable}.version`), "utf8").trim()
     } catch {
       return ""
     }
@@ -225,10 +226,11 @@ const runInstaller = Effect.fn("DesktopCli.installForUser")(function* (binary: s
   )
 })
 
+// Loginom AI Agent (B4.7): the bundled CLI, its stage copy and so the service process carry the product name, as in 0.4.
 function executableName() {
-  return process.platform === "win32" ? "opencode-cli.exe" : "opencode-cli"
+  return process.platform === "win32" ? `${Product.cliExecutable}.exe` : Product.cliExecutable
 }
 
 function developmentExecutableName() {
-  return process.platform === "win32" ? "opencode-cli-dev.exe" : "opencode-cli-dev"
+  return process.platform === "win32" ? `${Product.cliExecutable}-dev.exe` : `${Product.cliExecutable}-dev`
 }

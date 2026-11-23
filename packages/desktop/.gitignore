@@ -24,7 +24,8 @@ dist-ssr
 *.sw?
 out/
 
-resources/opencode-cli*
+# Loginom AI Agent (B4.7): the bundled CLI, its version file and the development copies (script/utils.ts, script/dev.ts).
+resources/loginom-ai-agent-cli*
 resources/icons
 resources/*.metainfo.xml
 

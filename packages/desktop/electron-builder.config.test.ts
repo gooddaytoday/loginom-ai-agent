@@ -27,8 +27,8 @@ const channels = [
   { channel: "prod", appId: "com.loginom.aiagent", name: "Loginom AI Agent", slug: "loginom-ai-agent" },
 ] as const
 
-// The bundled CLI keeps its upstream file name until the Desktop service and script/utils.ts rename it (B4.7).
-const bundledCli = ["!resources/opencode-cli*", "opencode-cli", "opencode-cli.exe", "opencode-cli.version"]
+// The file name of the CLI that Desktop 0.4 ran its service from (v0.4.0:packages/desktop/src/main/background-cli.ts).
+const bundledCli = "loginom-ai-agent-cli"
 
 function load(channel: string, target?: string, feed?: string): Configuration {
   const env = {
@@ -108,11 +108,11 @@ test.each(channels)("channel identity for $channel", ({ channel, appId, name, sl
   expect(config.deb?.fpm).not.toContain("--rpm-rpmbuild-define=_build_id_links none")
 })
 
-test.each(channels)("the $channel packaging names nothing of OpenCode but the bundled CLI", ({ channel }) => {
+test.each(channels)("the $channel packaging names nothing of OpenCode", ({ channel }) => {
   // Every key and string value that mentions it, without the absolute path of this package.
   const json = JSON.stringify(load(channel)).replaceAll(JSON.stringify(import.meta.dirname).slice(1, -1), "")
   const names = (json.match(/"(?:[^"\\]|\\.)*opencode(?:[^"\\]|\\.)*"/gi) ?? []).map((name) => JSON.parse(name))
-  expect(names.toSorted()).toEqual(bundledCli.toSorted())
+  expect(names).toEqual([])
 })
 
 // The per-user install directory and the updater cache come from the package name, not from the config's
@@ -346,8 +346,8 @@ test.skipIf(process.platform !== "linux")(
       elf.set([2, 1, 1], 4)
       elf.writeUInt16LE(62, 18)
       elf.writeUInt32LE(1, 20)
-      await writeFile(path.join(resources, "opencode-cli"), elf, { mode: 0o700 })
-      await writeFile(path.join(resources, "opencode-cli.version"), "fixture", { mode: 0o600 })
+      await writeFile(path.join(resources, bundledCli), elf, { mode: 0o700 })
+      await writeFile(path.join(resources, `${bundledCli}.version`), "fixture", { mode: 0o600 })
 
       // SAFETY: getBase sets afterPack to an async function that reads only these fields of its context.
       const afterPack = load("dev", "linux-x64").afterPack as (context: {
@@ -365,8 +365,8 @@ test.skipIf(process.platform !== "linux")(
       })
       expect(await mode(sandbox)).toBe(0o4755)
       expect(await mode(path.dirname(sandbox))).toBe(0o755)
-      expect(await mode(path.join(resources, "opencode-cli"))).toBe(0o755)
-      expect(await mode(path.join(resources, "opencode-cli.version"))).toBe(0o644)
+      expect(await mode(path.join(resources, bundledCli))).toBe(0o755)
+      expect(await mode(path.join(resources, `${bundledCli}.version`))).toBe(0o644)
       expect(await mode(app)).toBe(0o755)
       expect(await mode(path.dirname(icon))).toBe(0o755)
       expect(await mode(icon)).toBe(0o644)
@@ -388,9 +388,9 @@ test("shared packaging defaults", async () => {
   const include = path.join(import.meta.dirname, "resources/windows/installer.nsh")
   expect(config.nsis?.include).toBe(include)
   expect(await Bun.file(include).exists()).toBe(true)
-  expect(config.files).toContain("!resources/opencode-cli*")
+  expect(config.files).toContain(`!resources/${bundledCli}*`)
   expect(config.extraResources).toEqual([
-    { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
+    { from: "resources/", to: "", filter: [bundledCli, `${bundledCli}.exe`, `${bundledCli}.version`] },
     { from: "resources/loginom", to: "loginom" },
     { from: "resources/icons", to: "icons", filter: ["**/*", "!dock.png"] },
   ])
@@ -403,6 +403,10 @@ test("shared packaging defaults", async () => {
   expect(included("resources/loginom/host/node-host.mjs")).toBe(false)
   expect(included("resources/updates-s3.json")).toBe(false)
   expect(included("resources/windows/installer.nsh")).toBe(true)
+
+  // Loginom AI Agent (B4.7): the bundled CLI ships beside app.asar, never inside it, and its development copies nowhere.
+  const cli = [bundledCli, `${bundledCli}.exe`, `${bundledCli}.version`, `${bundledCli}-dev`, `${bundledCli}-wsl`]
+  expect(cli.filter((name) => included(`resources/${name}`))).toEqual([])
 })
 
 test("trims external dependencies without excluding runtime files", () => {

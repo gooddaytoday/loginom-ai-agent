@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { app } from "electron"
+import { Product } from "@loginom-ai-agent/product"
 import type { Endpoint } from "@opencode/client/service"
 import { CHANNEL } from "../constants"
 import { serviceFile } from "./service-identity"
@@ -32,7 +33,8 @@ export function takeSidecarProbe() {
 
 function bundledVersion() {
   try {
-    return readFileSync(path.join(process.resourcesPath, "opencode-cli.version"), "utf8").trim()
+    // Loginom AI Agent (B4.7): the build writes it beside the bundled CLI, both under the product name.
+    return readFileSync(path.join(process.resourcesPath, `${Product.cliExecutable}.version`), "utf8").trim()
   } catch {
     return ""
   }
