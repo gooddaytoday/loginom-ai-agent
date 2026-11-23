@@ -104,12 +104,14 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
   ])
 
   const previousTarget = process.env.LOGINOM_AI_AGENT_TARGET
+  const previousFeed = process.env.LOGINOM_AI_AGENT_UPDATE_FEED
   // Build against the opposite architecture to prove cross-packaging resolves the target's native package, not the host's.
   const crossTarget = process.arch === "arm64" ? "windows-x64" : "windows-arm64"
   const crossNodePty = nodePtyPackage(crossTarget)
 
   try {
     process.env.LOGINOM_AI_AGENT_TARGET = crossTarget
+    process.env.LOGINOM_AI_AGENT_UPDATE_FEED = "https://updates.example.test/loginom/"
     const result = await load("build")
 
     if (!result.config.main) throw new Error("Missing main-process build configuration")
@@ -149,9 +151,15 @@ test("bundles one Effect runtime and Drizzle while keeping native dependencies e
     expect(imports).not.toContain(`@lydell/node-pty-${process.platform}-${process.arch}`)
     expect(modules.some((id) => id.includes("/node_modules/msgpackr"))).toBe(false)
     expect(chunks.some((chunk) => chunk.code.includes("msgpackr"))).toBe(false)
+    // Loginom AI Agent (B4.12): the bundler folds the define into packages/product, so Product.updateFeed is the feed.
+    const productFeed = /updateFeed: "https:\/\/updates\.example\.test\/loginom\/"/
+    expect(chunks.some((chunk) => productFeed.test(chunk.code))).toBe(true)
   } finally {
     delete process.env.LOGINOM_AI_AGENT_TARGET
+    delete process.env.LOGINOM_AI_AGENT_UPDATE_FEED
 
     if (previousTarget !== undefined) process.env.LOGINOM_AI_AGENT_TARGET = previousTarget
+
+    if (previousFeed !== undefined) process.env.LOGINOM_AI_AGENT_UPDATE_FEED = previousFeed
   }
 }, 30_000)

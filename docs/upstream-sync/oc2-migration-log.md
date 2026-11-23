@@ -15974,7 +15974,8 @@ B4.12), B4.5a, B4.6 (значок веб-уведомлений), B4.11c; UPDATE
 | Коммит | Что |
 |---|---|
 | `189e0439b5` `feat(desktop): update only from the product feed, never from opencode.ai (B4.12)` | код, тесты, зависимость `gui-plugins` от `@loginom-ai-agent/product` |
-| следующий | этот раздел; CAT-01, CAT-02, CAT-04 в `catalog.md` и `catalog.json` |
+| `7afb5a8e82` `docs(upstream-sync): record the product update feed of the desktop updater (B4.12)` | этот раздел; CAT-01, CAT-02, CAT-04 в `catalog.md` и `catalog.json` |
+| следующий | проверка ленты в собранном главном бандле (`electron.vite.config.test.ts`), мутации `main.ts`, уточнения раздела |
 
 Файлы кода — шесть (предел задания — пять, «Где решал сам»): `gui-plugins/src/updater/main.ts` (+6 −2),
 `updater/platform.ts` (+10 −2), `updater/whats-new.tsx` (+6 −1), новый файл форка `updater/feed.ts` (21),
@@ -16011,18 +16012,21 @@ B4.12), B4.5a, B4.6 (значок веб-уведомлений), B4.11c; UPDATE
 |---|---|
 | `gui-plugins/src/updater/feed.test.ts` (новый, 8 случаев) | свои установщики Windows, macOS (zip и dmg), AppImage абсолютным адресом ленты принимаются; `opencode-desktop-*`, смесь своего и чужого, свой файл на `opencode.ai`, свой файл вне пути ленты (`../beta/`), пустой список — отклоняются |
 | `desktop/electron.vite.config.test.ts`, «a build with $build gives the main bundle the product update feed $define» (3 случая) | без переменной и с пустой — `define` `null`; с лентой — она без пробелов; для `build` и `serve` |
+| там же, «bundles one Effect runtime …» (+1 проверка) | настоящая сборка главного бандла (`write: false`) с лентой: в коде `packages/product` — `updateFeed: "<лента>"`, то есть сборщик подставил `define` и в `typeof LOGINOM_AI_AGENT_UPDATE_FEED`. Проба до теста: в бандле `index.js` — `updateFeed: "https://updates.example.test/probe/"`, в чанке `main-*.js` — `const feed = build.packaged ? Product.updateFeed : null` |
 | `desktop/src/renderer/platform/notifications.test.ts`, «shows the product icon the renderer serves, not a remote one» | значок — `/loginom-icon.png`, и файл есть в `app/public` |
 | `app/test-browser/whats-new-feed.test.ts` (новый) | `loadWhatsNewHighlights` с уже прерванным сигналом возвращает `[]`: любой `fetch` с таким сигналом сразу отклоняется, поэтому запрос (opencode.ai или другой) красит тест, не выходя в сеть |
 
 Тест «Что нового» лежит в `app`: `whats-new.tsx` — Solid TSX, а `bun test` в `gui-plugins` его не собирает (нет
 `solid-jsx` preload; проба — `Export named 'jsxDEV' not found`). Прецедент импорта `gui-plugins/src` из
 `app/test-browser` — `plugin-migrations.test.ts`. `main.ts` и `platform.ts` импортируют `electron`, `bun test` их не
-загружает, а подмены Electron `gui-plugins/AGENTS.md` запрещает. Их связку держат типы: `make(channel, feed: string)`
-без ленты не вызвать, `enabled` выводится из той же `feed`.
+загружает, а подмены Electron `gui-plugins/AGENTS.md` запрещает. `make(channel, feed: string)` без ленты не вызвать:
+мутация `enabled = build.packaged` даёт ошибку типов (MU10). Запасную ленту в самом `main.ts` (`?? "…"`, MU11) не
+ловит ничто, кроме чтения кода.
 
 ### Мутации
 
-`<scratchpad>/b412/mutate.py`: одна замена, тесты файла, возврат файла; после — `git status` чистый.
+`<scratchpad>/b412/mutate.py`: одна замена, тесты файла (MU10, MU11 — `bun typecheck` пакета), возврат файла; после
+— `git status` чистый. `HOME` и `XDG_*` — во временном корне.
 
 ```text
 === MU1 the product build check ignores the file name (an OpenCode build passes): 6 pass / 2 fail
@@ -16033,11 +16037,14 @@ B4.12), B4.5a, B4.6 (значок веб-уведомлений), B4.11c; UPDATE
 === MU6 Desktop notifications load the OpenCode icon again: 4 pass / 1 fail
 === MU7 the build falls back to the placeholder feed (updater on without a feed): 3 pass / 2 fail
 === MU8 the build falls back to the OpenCode feed: 3 pass / 2 fail
-=== MU9 the main bundle gets no product feed (define removed): 2 pass / 3 fail
+=== MU9 the main bundle gets no product feed (define removed): 1 pass / 4 fail     # и «bundles one Effect runtime …»
+=== MU10 main.ts turns the updater on in every packaged build again (enabled = build.packaged): bun typecheck exit 1
+    <error file="src/updater/main.ts" line="32" column="89" code="TS2345">         # make(build.channel, feed): string | null
+=== MU11 main.ts falls back to the placeholder feed (feed ?? fallback): bun typecheck exit 0
 ```
 
-Требования задания: «обновлятор включён без ленты» — MU7, MU8; «запрос к opencode.ai» — MU4, MU5, MU6;
-«принята чужая сборка» — MU1, MU3. Мутация `main.ts` (`enabled = build.packaged`) юнит-тестами не ловится (выше).
+Требования задания: «обновлятор включён без ленты» — MU7, MU8 (тесты), MU10 (типы); «запрос к opencode.ai» — MU4,
+MU5, MU6; «принята чужая сборка» — MU1, MU3. Не ловится: MU11 — запасная лента в `main.ts`.
 
 ### Приёмка
 
@@ -16062,7 +16069,7 @@ against a6b15d33daf6: 591 divergent upstream files                    # база
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                                 # код 0
 $ bun run check                                                       # код 0, на 189e0439b5 с правкой каталога
-Found 554 warnings and 0 errors.                                      # как на базе
+Found 554 warnings and 0 errors.                                      # bun run lint на 71b1e31eee — те же 554
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total
 $ bun script/lint-changed.ts 71b1e31eee
@@ -16089,7 +16096,8 @@ CAT-04 — запись OpenCode 2: `pending: B2.7d, B4.1` снят, файлы 
   `electron.vite.config.ts` всегда `null`, и с лентой обновлятор не включился бы; (б) проверку п. 3 нельзя проверить
   юнит-тестом в `platform.ts` — он импортирует `electron`, подмены Electron запрещены. Чистая функция — новый файл
   форка `feed.ts` (21 строка). Меньший вариант — без теста п. 3 — не выполнял бы приёмку «принята чужая сборка
-  краснит».
+  краснит». Вернуть к пяти механически: перенести `isProductBuild` в `platform.ts`, удалить `feed.ts` и его тест —
+  ценой юнит-теста п. 3. Выбор — за владельцем.
 - **Проверка п. 3 — правило 0.4 без подписи.** Адрес, путь и префикс имени; формат `sha512`, подпись манифеста и
   каналы — этап C. Код ошибки — `LOGINOM_UPDATE_TARGET_INVALID`, как в 0.4.
 - **`User-Agent` — `loginom-ai-agent/<канал>/<версия>/desktop`** (0.4 — `Product.slug`): та же форма, что у upstream.
@@ -16102,6 +16110,9 @@ CAT-04 — запись OpenCode 2: `pending: B2.7d, B4.1` снят, файлы 
 - **Кнопка «Проверить обновления» на странице ошибки** (`app/src/shell/errors/error.tsx:452`) видна, пока доступен
   Ipc обновлятора, в том числе в состоянии `disabled`; нажатие ничего не делает. Как в 0.4
   (`pages/error.tsx`: `<Show when={platform.updater}>`). Правка — файл `app`, вне строки задания.
+- **Скрытая команда `updater.check`** (`renderer.tsx`, `hidden: true`) — не в палитре, но доступна сочетанию клавиш
+  пользователя (в том числе перенесённому `app.checkForUpdates`, `settings/keybinds/migration.ts:12`). Без ленты она
+  показывает уведомление «Проверка…», а затем ничего: тот же класс, что кнопка на странице ошибки.
 - **`allowDowngrade = true`** в `platform.ts` (upstream; 0.4 — `false`) и `verifyUpdateCodeSignature: false` в
   `electron-builder.config.ts` — этап C с подписью.
 - **Внешняя карта блоков AppImage** (`afterAllArtifactBuild` 0.4): журнал B4.5b и CAT-02 относили её к B4.12, в
