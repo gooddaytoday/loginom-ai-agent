@@ -8305,3 +8305,281 @@ $ bun run check                                     # код 0
 Found 558 warnings and 0 errors.                    # как на базе (B2.7c)
  Tasks:    39 successful, 39 total
 ```
+
+## B2.7a2 Артефакт CLI
+
+22.11.2026. Ветка `b27a2-cli-artifact` от `oc2-migration` (`cdbce3efc3`), рабочее дерево `.claude/worktrees/b27a2`. Bun
+1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile`
+— код 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` в этом дереве и в дереве
+базы. База тестов — отдельное дерево `<scratchpad>/b27a2-base` (`cdbce3efc3`, detached). `packages/loginom-agent` и
+`packages/core` (B2.6a) не трогал. Основа — 0.4 на `a080f7725c`: `loginom-host/script/build-cli.ts` и то, что он вызывает
+(`stage-resources`, `build-node-host`, `build-cli-installer`, `collect-build-notices`, `cli-manifest`, архив),
+`opencode/src/cli/standalone-bundle.ts`, ранбук `docs/testing/loginom-ai-agent/standalone-cli.md`.
+
+### B2.7a2: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `82ebab48b8` `feat(loginom-host): build the CLI artifact from the product CLI of OpenCode 2 (B2.7a2)` | `loginom-host/script/build-cli.ts` (+8 −8, файл форка) | `clean` |
+| `d0cd88c5bd` `feat(cli): give a built product CLI's server the resources next to its binary (B2.7a2)` | файл форка `cli/src/resources.ts`; правка upstream `cli/src/server-process.ts` (+3, CAT-07); `cli/package.json` и `bun.lock` (+1 и +1, CAT-01); тест `cli/test/cli-resources.test.ts` | `clean` |
+| `b7c385f143` `test(cli): require Node, the Host entry and the product skills of a built CLI (B2.7a2, G5)` | случаи «артефакт без Node, входа Host, навыков продукта» и явное значение рядом с полным артефактом | `clean` |
+| следующий | этот раздел, строка G5 в `guarantees.md`, CAT-01, CAT-07, CAT-08 в `catalog.md` | |
+
+### B2.7a2: сборка
+
+Одна команда (из `packages/loginom-host`, Bun 1.4.4 `38afee6c`, после `npm ci` клиента; скрипт —
+`<scratchpad>/b27a2-runs/build.sh`):
+
+```text
+$ LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node \
+  LOGINOM_AI_AGENT_BROWSER_SOURCE=<каталог с chromium-1246> \
+  bun script/build-cli.ts <новый каталог>/cli
+building cli-linux-x64-baseline
+[build] … END cli-resource-staging 8794ms
+[build] … END cli-node-host 89ms
+[build] … END cli-installer 76ms
+[build] … END cli-notices 667ms
+[build] … END cli-manifest 4446ms
+[build] … END cli-manifest-verify 2948ms
+[build] … END cli-archive 64687ms
+[build] … END cli-roundtrip-extract 10215ms
+[build] … END cli-roundtrip-verify 2989ms
+{"artifact":"<out>/cli","archive":"<out>/loginom-ai-agent-cli-0.0.0-dev-202611230240-linux-x64.tar.gz",
+ "checksum":"<out>/…tar.gz.sha256","sha256":"3ce7762a…","version":"0.0.0-dev-202611230240",
+ "sourceCommit":"d0cd88c5bd…","sourceTreeSha256":"11cf5d11…","sourceDirty":false}
+# код 0; 2 мин 9 с, пик RSS 1,5 ГБ
+```
+
+Что поменялось в `build-cli.ts` против 0.4 — только вызов сборки бинарника:
+
+- `packages/cli/script/build.ts --standalone --single --skip-install --skip-web-ui --outdir=<work>/native` с
+  `cwd` `packages/cli` (в 0.4 — `packages/opencode`, каталог из `LOGINOM_AI_AGENT_BUILD_OUTPUT`, которого v2 не читает);
+- цель задана явно: `LOGINOM_AI_AGENT_TARGET=linux-x64-baseline` (см. «Где решал сам»);
+- каталог бинарника — `cli-<os>-<arch>[-baseline]`, корень метаданных для уведомлений — `packages/cli`.
+
+Раскладка ресурсов, уведомления, манифест, установщик, архив и проверка распакованного архива — код 0.4 без изменений.
+Строка `packages/loginom-host/script/build-cli.ts: packages/opencode` ушла из `repo-paths`: в тесте путей осталось 9 строк
+(workflows и `script/test-windows-profile.ps1` — B5.1 и хвост B2.7c, `evals` — B2.7a4, `required-checks.test.mjs` —
+B2.7a10, комментарий в `cli/script/build.ts` — B2.7a1).
+
+Состав (Linux x64, `cli-manifest.json` формата `loginom-cli-artifact-v1`, 13 786 файлов; архив 498 МБ, распакованный —
+1,3 ГБ):
+
+| Путь | Что |
+|---|---|
+| `bin/loginom-ai-agent-cli` | бинарник 243 МБ, Bun 1.4.4 baseline, вход `cli/src/loginom-cli.ts` |
+| `bin/*.js.map` | 668 карт исходников, 57 МБ — только в канале `dev` (см. «Найдено») |
+| `resources/loginom/bin/node`, `host/node-host.mjs` (+ `host/build-inputs.json`) | Host: закреплённый Node 24.19.0 и вход `node-entry.ts` |
+| `resources/loginom/browsers/` | `chromium-1246` (`chrome-sandbox` 4755), `chromium_headless_shell-1246`, `ffmpeg-1011` — 597 файлов, 661 МБ |
+| `resources/loginom/skills/` | `loginom-automation`, `loginom-dashboard`, `package-docs` — 73 файла |
+| `resources/loginom/{runtime,dashboard,help,ripgrep}` | рантайм Dock с `node_modules` (4804), шаблон дашбордов (6577), справка Loginom (312), ripgrep 15.1.0 |
+| `resources/loginom/resource-manifest.json`, `THIRD_PARTY_NOTICES.md`, `licenses/` | инвентарь ресурсов (12 378 файлов), уведомления ресурсов |
+| `licenses/{bundled-npm,bun,chromium}`, `licenses/README.md` | уведомления npm бинарника и Host, комплект Bun 1.4.4 (B1.6), credits Chromium 1246 |
+| `install.sh`, `uninstall.sh`, `install.mjs`, `INSTALL.md` | установщик 0.4 (B2.7a8 решает, оставлять ли) |
+| `package.json`, `build-inputs.json`, `cli-manifest.json` | версия и цель, метаданные Bun, манифест (канал, `sourceCommit`, зависимости: bun 1.4.4, node 24.19.0, playwright, chromium 1246) |
+
+Диск: каталог сборки рядом с назначением держит артефакт, архив и проверочную распаковку — около 3,1 ГБ на пике, после
+— 1,8 ГБ (артефакт и архив). Перед сборкой было 22 ГБ свободно.
+
+### B2.7a2: поиск ресурсов при запуске
+
+`cli/src/resources.ts` (файл форка), вызов — одна строка в `server-process.ts` перед `ServiceHost.start`, только у
+процесса в профиле CLI (Desktop и его служба на `index.ts` не затронуты):
+
+- `LOGINOM_AI_AGENT_RESOURCES` задана — используется как есть (как `LOGINOM_AI_AGENT_CLI_BUNDLE` 0.4: явное значение —
+  не проверенная поставка).
+- Запуск из исходников (`process.execPath` — `bun` или `node`) — ничего, как на базе.
+- Собранный бинарник — `verifyCliManifest(<bin>/.., {platform, arch, version})`, как `standaloneBundle` 0.4: каждый файл
+  артефакта по хешу и режиму, обязательные `bin/loginom-ai-agent-cli`, `resources/loginom/{bin/node,host/node-host.mjs,
+  resource-manifest.json}`, на Linux — навыки продукта (`verifyProductSkills`). Прошла — переменная ставится, её берут
+  Host (B2.3) и плагин продукта (каталог навыков B2.4, `package_docs` B2.5c). Не прошла (файла нет, изменён, лишний, нет
+  манифеста) — `LOGINOM_BUNDLE_INCOMPLETE: …` в stderr и `WARN` в журнале, сервер работает без Host и навыков продукта.
+- Проверка — 3,4 с на каждом старте сервера (все 13 786 файлов артефакта): `serve` слушает через 0,45 с с явной
+  переменной и через 3,8 с с поиском; `service start` — 5,1 с.
+
+### B2.7a2: Host и навыки в собранном CLI
+
+Распакованный архив (`tar --same-permissions -xzf`), пустые HOME и XDG, явный профиль, весь сценарий под одним
+`xvfb-run -a`, `LOGINOM_AI_AGENT_RESOURCES` не задана (`<scratchpad>/b27a2-runs/accept{,2,3}.sh`):
+
+```text
+$ sha256sum -c loginom-ai-agent-cli-0.0.0-dev-202611230240-linux-x64.tar.gz.sha256
+loginom-ai-agent-cli-0.0.0-dev-202611230240-linux-x64.tar.gz: OK
+$ loginom-ai-agent-cli --version
+loginom-ai-agent-cli v0.0.0-dev-202611230240                       # код 0
+$ loginom-ai-agent-cli serve --port 0
+server listening on http://127.0.0.1:33361                          # stderr пуст
+$ ps --ppid <serve>
+<R>/x/resources/loginom/bin/node --use-system-ca <R>/x/resources/loginom/host/node-host.mjs
+$ cat <R>/p1/loginom/startup-phases.jsonl
+{"phase":"resources.verify","status":"starting","pid":<node host>}
+{"phase":"resources.verify","status":"ready","duration_ms":3497,"files":12378,"mode":"full","hashedFiles":12378,…}
+# SIGTERM: serve 143, процессов артефакта не осталось
+$ loginom-ai-agent-cli service start
+http://127.0.0.1:27345                                              # код 0, 5,05 с
+$ loginom-ai-agent-cli api GET "/api/skill?directory=<R>/work"     # сводка ответа: id и путь
+skills: 6
+  opencode skill://opencode/SKILL.md
+  report skill://report/SKILL.md
+  browser skill://browser/SKILL.md
+  loginom-automation <R>/x/resources/loginom/skills/loginom-automation/SKILL.md
+  loginom-dashboard <R>/x/resources/loginom/skills/loginom-dashboard/SKILL.md
+  package-docs <R>/x/resources/loginom/skills/package-docs/SKILL.md
+$ loginom-ai-agent-cli run --format json "Reply with the single word OK"
+step_start / text: OK / step_finish                                 # код 0, свободная модель по умолчанию
+# во время исполнения (опрос каталога каждые 50 мс):
+<R>/p1/loginom/leases/1dbc9f1f-….json  {"session":"ses_df9b…","pid":<служба>}
+# после исполнения leases пуст; у службы — тот же дочерний Node host из resources/loginom
+$ loginom-ai-agent-cli service stop                                 # код 0; процессов артефакта нет
+$ find <R>/home <R>/p1 -iname '*opencode*'                          # пусто
+```
+
+Частный сервер (`run --standalone`, тот же бинарник) находит и проверяет ресурсы сам:
+
+```text
+$ loginom-ai-agent-cli run --standalone --format json "Reply with the single word OK"
+step_start / text: OK / step_finish                                 # код 0, 10,2 с; stderr пуст
+<R>/p1/loginom/leases/fc98e92f-….json  {"session":"ses_df9a…","pid":<частный сервер>}   # во время исполнения
+# после — процессов артефакта нет
+```
+
+Handshake: запись аренды пишет `ServiceHost.acquire` только после того, как `ready` вернул подключение, то есть после
+ответа Node host на `start` (`node-client.ts`, проверка `protocol`, `ready`, `pid`); без handshake аренда `undefined` и
+записи нет. Второй и следующие старты (`service start` после `serve`, повторные `serve` ниже) снова проходят проверку:
+Host своим первым запуском артефакт не меняет.
+
+### B2.7a2: G5 и мутации
+
+На распакованном артефакте (`accept3.sh`; файл портится и возвращается на место):
+
+| Артефакт | `serve` | stderr | Host | Навыки продукта (служба) |
+|---|---|---|---|---|
+| явная `LOGINOM_AI_AGENT_RESOURCES` | 0,45 с | — | есть | — |
+| полный, поиск | 3,84 с | — | есть | 3 (выше) |
+| нет `resources/loginom/host/node-host.mjs` | 3,83 с | `LOGINOM_BUNDLE_INCOMPLETE: the CLI files do not match cli-manifest.json; the Loginom Host and the product skills are unavailable, reinstall the CLI` | нет | 0: `['browser', 'opencode', 'report']`; в журнале службы `level=WARN … LOGINOM_BUNDLE_INCOMPLETE` |
+| один байт в `skills/loginom-automation/SKILL.md` | 3,57 с | то же | нет | — |
+| восстановлен | 4,08 с | — | есть | — |
+
+Мутации кода (`<scratchpad>/b27a2-runs/mutate.sh`: одна правка `sed`, два набора, `git checkout` файла; на
+`b7c385f143`). `cli-manifest.test.ts` под root без мутаций — 5/1 (падение «umask» — базовое, «Базовые падения стенда»).
+
+| Мутация | `cli/test/cli-resources.test.ts` | `loginom-host/test/cli-manifest.test.ts` |
+|---|---|---|
+| M0 нет | 10/0 | 5/1 |
+| M1 манифест не требует `host/node-host.mjs` | **9/1**: артефакт без входа Host | 5/1 — не ловит |
+| M2 манифест не требует `bin/node` | **9/1**: артефакт без Node | 5/1 — не ловит |
+| M3 манифест не проверяет навыки продукта (`if (false)`) | **9/1**: артефакт без навыков | **3/3** |
+| M4 манифест не требует помощник Keychain (мутация G5 0.4) | 10/0 | **4/2**, как в 0.4 |
+| M5 поиск принимает непрошедшую проверку | **3/7**: все семь повреждённых артефактов | 5/1 |
+| M6 поиск перезаписывает явное значение | **9/1** | 5/1 |
+| M7 вызов `CliResources.apply()` убран из `server-process.ts` | 10/0 — не ловит (сервер из исходников поиска не делает) | — |
+
+M7 проверен на собранном артефакте: `build-cli.ts --no-archive` с мутацией (`sourceDirty: true`), тот же сценарий —
+`server listening …`, stderr пуст, **дочернего Node host нет**, в `<R>/p1/loginom` только `leases`. После — `git
+checkout`, `git status` чистый, мутированный артефакт удалён.
+
+G5-наборы `loginom-host` (`stage-resources`, `cli-manifest`, `ci-inputs`, `build-notices`, `bundled-skills`), `xvfb-run -a`:
+база и итог — 30 pass, 1 skip, 1 fail (то же «umask»).
+
+### B2.7a2: тесты
+
+| Файл | Что |
+|---|---|
+| `cli/test/cli-resources.test.ts` (новый, 10 тестов, только Linux) | артефакт с раскладкой `build-cli.ts` и настоящими навыками продукта (Node и вход Host — заглушки, ничего не запускается): полный — `locate` отдаёт `resources/loginom`, `apply` ставит переменную; явное значение рядом с полным артефактом не меняется; нет входа Host, изменён навык, лишний файл, нет манифеста — `LOGINOM_BUNDLE_INCOMPLETE`, переменная не ставится; артефакт без Node, входа Host или навыков при заново записанных манифестах — то же; запуск из исходников — `undefined` |
+
+### B2.7a2: приёмка
+
+Полные прогоны по пакетам: база — `cdbce3efc3` в `<scratchpad>/b27a2-base`, итог — `b7c385f143`; `npm ci` клиента
+`loginom-runtime` в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан; `loginom-host` — `xvfb-run -a`. Падения сравнивались
+по именам.
+
+| Пакет | Команда | `cdbce3efc3` | `b7c385f143` |
+|---|---|---|---|
+| `loginom-host` | `xvfb-run -a bun test` | 539 pass, 12 skip, 5 fail (из задания) | 539 pass, 12 skip, 5 fail — те же: «umask», 3 `bundled-ripgrep`, `managed-work-entry` |
+| `cli` | `bun test --timeout 60000` | 430 pass, 9 skip, 0 fail | 440 pass, 9 skip, 0 fail (+10 `cli-resources`) |
+| `server` | `bun test` | 250 pass, 3 skip, 1 fail | 250 pass, 3 skip, 1 fail — то же «S2 synthetic wake» (см. «Найдено») |
+| `product` | `bun test` | 60 pass, 3 fail (`repo-paths`) | 60 pass, 3 fail — те же три теста, строки `build-cli.ts` нет |
+
+G5-наборы и `cli-resources.test.ts` — выше. Проверки дерева:
+
+```text
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,197 files across 2 projects
+$ cd packages/loginom-host && bun typecheck        # ✓ No type errors in 174 files; bun run typecheck:tsc — код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 451 divergent upstream files                  # как после B2.7a1: server-process.ts, cli/package.json и bun.lock уже в каталоге
+  CAT-01: 9
+  CAT-07: 6
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0; с журналом и документами этого коммита
+Found 558 warnings and 0 errors.                    # как на базе (B2.7a1); у новых файлов предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+`prettier`: новые файлы и мои строки форматированы; `build-cli.ts` и `server-process.ts` и до правки не проходили
+`prettier --check` (строки 0.4 и `apply-identity`).
+
+### B2.7a2: где решал сам
+
+- **Цель сборки — `LOGINOM_AI_AGENT_TARGET`, а не одно `--single`.** `build-cli.ts` 0.4 на Linux x64 и Windows x64 всегда
+  собирает baseline (`useBunBaseline`: клиенты без AVX2) и перезапускает себя под baseline Bun 1.4.4 из закреплённого zip.
+  В 0.4 `build.ts` форка при `--single --baseline` собирал одну цель; фильтр v2 (upstream) при тех же флагах собирает три:
+  обычную, baseline и baseline-musl, а musl без `bun install` для чужой libc не собирается. Явная цель — без правки
+  upstream `build.ts`; флаги из задания (`--standalone --single --skip-install --skip-web-ui`) переданы, `--single` при
+  заданной цели ничего не меняет. Каталог — `cli-linux-x64-baseline`, имя архива — как в 0.4, без `baseline`.
+- **Поиск — в сервере, а не в каждом процессе CLI.** Задание: «собранный CLI находит ресурсы и передаёт службе»; нарезка
+  называла `cli/src/loginom-cli.ts`. Вход CLI исполняет каждая команда, включая `--version` и клиента TUI, а полная
+  проверка манифеста — 3,4 с. 0.4 проверял только там, где запускал Host (`standalone-run`, `standalone-command`); на v2
+  Host запускает сервер. Поэтому `loginom-cli.ts` не менялся, вызов — строка в `server-process.ts` перед
+  `ServiceHost.start` (CAT-07, там же запуск Host B2.3), только у процесса в профиле CLI: служба Desktop идёт через
+  `index.ts` и профиля не имеет. Клиент переменную службе не передаёт: служба — тот же бинарник и находит ресурсы сама.
+- **Непрошедший проверку артефакт не останавливает сервер.** 0.4 отказывал в `run` с `LOGINOM_BUNDLE_INCOMPLETE` и кодом
+  1. B2.3 записал: «Сбой `start` не останавливает сервер: без Host продукт работает». Меньший вариант — работать без Host
+  и навыков продукта, но громко: строка в stderr (видна у `serve` и у частного сервера `run` с `--print-logs`) и `WARN` в
+  журнале (служба stderr после готовности не показывает). Менять ли это на отказ — B2.7a3 (предварительная проверка
+  `run`, `standalone-preflight`) или владельцу.
+- **Бинарник без манифеста — тоже `LOGINOM_BUNDLE_INCOMPLETE`.** Голый `build.ts --standalone` (B2.7a1) теперь
+  предупреждает на каждом старте сервера и работает, как на базе. Запуск из исходников (`bun`, `node`) не проверяется —
+  иначе упали бы все тесты `cli`, поднимающие `serve`.
+- **Зависимость `cli` от `loginom-host`** (`package.json`, `bun.lock` +1, CAT-01): у рабочего пространства изолированная
+  раскладка, транзитивно через `loginom-agent` пакет не виден. Импорт `cli-manifest` динамический: проверка навыков
+  тянет `yaml` из npm-дерева клиента `loginom-runtime` (так же сделал B2.4).
+- **Версия — `LOGINOM_AI_AGENT_VERSION`** (define сборки), как `InstallationVersion` в 0.4; `build.ts` пишет ту же
+  `Script.version` в `package.json` артефакта.
+- **Установщик 0.4 оставлен в артефакте** (`build-cli-installer`, строка 0.4 не менялась). Ставит ли CLI продукта он или
+  `install` v2 — B2.7a8; здесь установщик не запускался.
+- **Ранбук `standalone-cli.md` не правил** (задание: только свой раздел журнала); его команда сборки с Bun 1.3.14 —
+  историческая, на v2 — команда выше.
+- **Не перенесено из 0.4** (вне задания): `withBundledRipgrep` (ripgrep из ресурсов в окружение — B2.7a10 и `core`),
+  `headless`, `strictRecovery`, `closeSavedPackageOnShutdown` и `browserRecovery` Host для CLI (B2.3 оставил умолчания, выбор
+  — B2.7a3/B2.7a4), переменная разработки `LOGINOM_AI_AGENT_CLI_BUNDLE` (её ещё читают `loginom-host/src/diagnostics-cli.ts`,
+  `script/browser-acceptance.ts` и `javascript_cli_controller.py`; на v2 её роль у явной `LOGINOM_AI_AGENT_RESOURCES`).
+
+### B2.7a2: найдено, не чинил
+
+- **Канал `dev` кладёт рядом с бинарником 668 файлов `bin/chunk-*.js.map` (57 МБ).** `build.ts` v2 (upstream) в каналах
+  `dev` и `local` собирает с `sourcemap: "inline"`, и Bun 1.4.4 при `compile` со `splitting` всё равно пишет карты в
+  каталог вывода. Они входят в манифест и в проверку при старте. `build-cli.ts` по умолчанию берёт канал `dev`, как в
+  0.4, а 0.4 собирал без карт (`sourcemap: "none"` без `--sourcemaps`). В `beta` и `prod` карт нет (B2.7a1: в `bin` один
+  бинарник). Для выпуска — канал явно (B5.2).
+- **Режимы файлов артефакта — от umask сборки.** Сборка шла под umask 077: файлы артефакта 0600 и 0700 (бинарник и Node —
+  0755, `chrome-sandbox` — 4755), так их и записал манифест. Установщик ставит для одного пользователя; выпускную сборку
+  стоит запускать с umask 022 — не проверял.
+- **Отказ проверки без причины.** `locate` сводит любой отказ `verifyCliManifest` (`LOGINOM_MANIFEST_PAYLOAD_MISMATCH`,
+  `…_INCOMPLETE`, `LOGINOM_PRODUCT_SKILLS_INCOMPLETE`, сбой импорта) к `LOGINOM_BUNDLE_INCOMPLETE`, как 0.4; какой файл не
+  совпал, пользователь не видит.
+- `server` на базе — 1 падение «S2 synthetic wake» (`loginom-host-lease.test.ts`, 20 с): база шла одновременно со
+  сборкой артефакта; на итоге, без сборки рядом, — то же падение (`Timed out waiting for condition`,
+  `loginom-host-lease.test.ts:588`). Код `server` и `loginom-agent` задача не меняла; причину не искал.
+
+### B2.7a2: не проверено
+
+- Windows и macOS: сборка, поиск и проверка манифеста (PE-заголовки, помощник Keychain, подпись) только по коду;
+  `cli-resources.test.ts` — только Linux. Цель без baseline, musl и arm64 не собирались.
+- Установщик артефакта (`install.sh`, `uninstall.sh`) и обычный пользователь (не root): `test/cli-install-native.mjs` не
+  запускался.
+- Настоящий Loginom и Chromium: подключение Host — `unconfigured`, браузер не запускался; Dock и `loginom_file_admit`
+  в собранном CLI не вызывались.
+- TUI собранного бинарника.
+- Сборка в канале `beta`/`prod` с ресурсами — собирался только `dev`.
