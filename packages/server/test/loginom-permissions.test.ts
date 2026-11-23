@@ -2,10 +2,12 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Schedule } from "@opencode/core/schedule"
+import { ScheduleTable } from "@opencode/core/schedule/sql"
 import { Session } from "@opencode/core/session"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
@@ -19,7 +21,7 @@ import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
-import { table, type Kind } from "../../loginom-agent/src/permissions"
+import { scheduleRunDenied, table, type Kind } from "../../loginom-agent/src/permissions"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
 
@@ -174,7 +176,54 @@ const boot = (
               ),
           ),
         )
-    return { dir, sessions, create, ask, open, reply, conversation, saved, call, prompt, requests, tools }
+    // A schedule with a `run` check as one created before B2.6a2 lies in the database, already due; the case runs the
+    // scheduler's tick itself, since a row written past the service does not wake its loop.
+    const database = Context.get(context, Database.Service)
+    const schedules = Context.get(context, Schedule.Service)
+    const stored = (sessionID: Session.ID, run: string) =>
+      Effect.gen(function* () {
+        const id = Schedule.ID.create()
+        const now = Date.now()
+        yield* database.db
+          .insert(ScheduleTable)
+          .values({
+            id,
+            session_id: sessionID,
+            action: { type: "prompt", prompt: "never" },
+            check: { mode: "if", condition: { type: "shell", run } },
+            when: { type: "in", in: "1 second" },
+            tz: "UTC",
+            next_due_at: now,
+            time_created: now,
+            time_updated: now,
+          })
+          .run()
+          .pipe(Effect.orDie)
+        return id
+      })
+    const outcome = (scheduleID: string) =>
+      until(() =>
+        schedules.tick.pipe(
+          Effect.andThen(call(`/api/experimental/schedule/${scheduleID}`)),
+          Effect.map((response) => response.body.data.lastOutcome as string | undefined),
+        ),
+      )
+    return {
+      dir,
+      sessions,
+      create,
+      ask,
+      open,
+      reply,
+      conversation,
+      saved,
+      call,
+      prompt,
+      requests,
+      tools,
+      stored,
+      outcome,
+    }
   })
 
 describe("loginom.product permissions (B2.6a)", () => {
@@ -370,57 +419,94 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
-    "schedule: with the terminal off a `run` check is neither created nor executed",
+    "schedule: a `run` check is neither created nor executed, with the terminal off or on (B2.6a2)",
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
-        const marker = path.join(test.dir, "check-ran")
-        const id = yield* test.create("schedule")
-        const run = `printf x >> ${JSON.stringify(marker)} && false`
-        const refused = yield* test.call("/api/experimental/schedule", {
-          sessionID: id,
-          when: { in: "1 second" },
-          if: { run },
-          prompt: "never",
-        })
-        expect(refused.status).toBe(403)
-        expect((yield* test.call(`/api/experimental/schedule?sessionID=${id}`)).body).toEqual({ data: [] })
-
-        // Created while this session turned the terminal on, then the terminal goes off before the check is due.
         const allow = [{ action: "shell", resource: "*", effect: "allow" as const }]
-        yield* test.sessions.setPermissions({ sessionID: id, permissions: allow })
-        const created = yield* test.call("/api/experimental/schedule", {
-          sessionID: id,
-          when: { in: "1 second" },
-          if: { run },
-          prompt: "never",
-        })
-        expect(created.status).toBe(200)
-        yield* test.sessions.setPermissions({ sessionID: id, permissions: [] })
-        // A control session keeps the terminal on: its check runs.
-        const control = yield* test.create("control")
-        yield* test.sessions.setPermissions({ sessionID: control, permissions: allow })
-        const controlMarker = path.join(test.dir, "control-ran")
-        expect(
-          (yield* test.call("/api/experimental/schedule", {
-            sessionID: control,
+        const off = yield* test.create("terminal off")
+        const on = yield* test.create("terminal on")
+        yield* test.sessions.setPermissions({ sessionID: on, permissions: allow })
+        const marker = (name: string) => path.join(test.dir, name)
+        const run = (name: string) => `printf x >> ${JSON.stringify(marker(name))} && false`
+        const create = (sessionID: Session.ID, name: string) =>
+          test.call("/api/experimental/schedule", {
+            sessionID,
             when: { in: "1 second" },
-            if: { run: `printf x >> ${JSON.stringify(controlMarker)} && false` },
+            if: { run: run(name) },
             prompt: "never",
-          })).status,
-        ).toBe(200)
-        const outcome = (scheduleID: string) =>
-          test
-            .call(`/api/experimental/schedule/${scheduleID}`)
-            .pipe(Effect.map((response) => response.body.data as { lastOutcome?: string }))
-        const checked = yield* until(() =>
-          outcome(created.body.data.id).pipe(Effect.map((item) => (item.lastOutcome ? item : undefined))),
+          })
+        // Off: the product's `shell * deny` rule refuses it before any hook. On: the product's hook refuses it.
+        const refusedOff = yield* create(off, "created-off")
+        expect([refusedOff.status, refusedOff.body.message]).toEqual([403, "Permission denied: shell"])
+        const refusedOn = yield* create(on, "created-on")
+        expect([refusedOn.status, refusedOn.body.message]).toEqual([403, scheduleRunDenied])
+        for (const sessionID of [off, on])
+          expect((yield* test.call(`/api/experimental/schedule?sessionID=${sessionID}`)).body).toEqual({ data: [] })
+
+        // Checks stored before: at their tick neither runs. A check that ran would end `checked` (`false` exits 1);
+        // `failed` is its refused permission. On the session that allows `shell`, only the hook refuses it, although
+        // nobody is present to answer (`Permission.Unattended`): a hook's deny holds there too.
+        const storedOff = yield* test.stored(off, run("stored-off"))
+        const storedOn = yield* test.stored(on, run("stored-on"))
+        expect(yield* test.outcome(storedOff)).toBe("failed")
+        expect(yield* test.outcome(storedOn)).toBe("failed")
+        for (const name of ["created-off", "created-on", "stored-off", "stored-on"])
+          expect([name, yield* Effect.promise(() => Bun.file(marker(name)).exists())]).toEqual([name, false])
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the product's own directories outside the project are read without a question; a neighbour and a write still ask (B2.6a2)",
+    () =>
+      Effect.gen(function* () {
+        // Bundled skills and the home of the `plan` agent's plans, outside the project, as in an installation.
+        const outside = (yield* tmpdirScoped("loginom-permissions-outside-")).path
+        const resources = path.join(outside, "resources")
+        const home = path.join(outside, "home")
+        yield* environment("LOGINOM_AI_AGENT_RESOURCES", resources)
+        yield* environment("LOGINOM_AI_AGENT_TEST_HOME", home)
+        const guide = path.join(resources, "skills", "loginom-automation", "references", "guide.md")
+        const plan = path.join(home, ".loginom-ai-agent", "plan", "plan.md")
+        const neighbour = path.join(outside, "neighbour", "notes.md")
+        // The machine's data directory keeps a large tool result, as OpenCode and `dock.ts` do; the case removes it.
+        const result = path.join(Global.Path.data, "tool-output", `b26a2-${crypto.randomUUID()}.txt`)
+        yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(result, { force: true })))
+        yield* Effect.promise(() =>
+          Promise.all(
+            [guide, plan, neighbour, result].map((file) =>
+              fs.mkdir(path.dirname(file), { recursive: true }).then(() => Bun.write(file, `${path.basename(file)}\n`)),
+            ),
+          ),
         )
-        expect(checked.lastOutcome).toBe("failed")
-        yield* until(() =>
-          Effect.promise(() => Bun.file(controlMarker).exists()).pipe(Effect.map((ran) => ran || undefined)),
+        const test = yield* boot()
+
+        const reader = yield* test.create("own")
+        yield* test.prompt(
+          reader,
+          script(
+            { tool: "read", input: { path: guide } },
+            { tool: "read", input: { path: plan } },
+            { tool: "read", input: { path: result } },
+            { text: "end" },
+          ),
         )
-        expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
+        expect((yield* test.tools(reader)).map((part) => part.state.status)).toEqual(Array(3).fill("completed"))
+
+        // A neighbouring directory asks; so does writing into the plans.
+        for (const step of [
+          { tool: "read", input: { path: neighbour } },
+          { tool: "write", input: { path: path.join(path.dirname(plan), "new.md"), content: "new" } },
+        ]) {
+          const id = yield* test.create(step.tool)
+          const running = yield* test.prompt(id, script(step, { text: "end" })).pipe(Effect.forkScoped)
+          const pending = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+          expect([step.tool, pending.action]).toEqual([step.tool, "external_directory"])
+          expect(yield* test.reply(id, pending.id, "reject")).toBe(204)
+          yield* Fiber.join(running).pipe(Effect.ignore)
+        }
+        expect(yield* Effect.promise(() => Bun.file(path.join(path.dirname(plan), "new.md")).exists())).toBe(false)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -429,18 +515,16 @@ describe("loginom.product permissions (B2.6a)", () => {
 describe("permission.evaluate contract (B2.6a)", () => {
   // A probe plugin without the product's rules: the effects the product relies on beyond B2.5a's `ask` → `allow`.
   it.live(
-    "a hook turns `allow` into a question, and `deny` with a message fails the call with it, even unattended",
+    "a hook turns `allow` into a question, and `deny` with a message fails the call with it",
     () =>
       Effect.gen(function* () {
         const failures: string[] = []
-        // Set once the schedule below exists: from then on the hook denies its command.
-        const unattended = { deny: false }
         const test = yield* boot({}, (ctx) =>
           Effect.gen(function* () {
             yield* ctx.permission.hook("evaluate", (event) =>
               Effect.sync(() => {
                 if (event.resources.includes("to-ask")) event.effect = "ask"
-                if (event.resources.includes("to-deny") || (unattended.deny && event.action === "shell")) {
+                if (event.resources.includes("to-deny")) {
                   event.effect = "deny"
                   event.message = "probe says no"
                 }
@@ -478,28 +562,26 @@ describe("permission.evaluate contract (B2.6a)", () => {
         expect((yield* test.ask(id, { action: "contract_probe", resources: ["plain"] })).effect).toBe("allow")
         yield* test.prompt(id, script({ tool: "probe", input: { resource: "to-deny" } }, { text: "end" }))
         expect(failures).toEqual(["probe says no"])
-
-        // Unattended: a schedule's check that the hook denies at its tick does not run, although the session allows it.
-        const marker = path.join(test.dir, "check-ran")
-        const created = yield* test.call("/api/experimental/schedule", {
-          sessionID: id,
-          when: { in: "1 second" },
-          if: { run: `printf x >> ${JSON.stringify(marker)} && false` },
-          prompt: "never",
-        })
-        expect(created.status).toBe(200)
-        unattended.deny = true
-        const checked = yield* until(() =>
-          test
-            .call(`/api/experimental/schedule/${created.body.data.id}`)
-            .pipe(Effect.map((response) => (response.body.data.lastOutcome ? response.body.data : undefined))),
-        )
-        expect(checked.lastOutcome).toBe("failed")
-        expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
 })
+
+// Sets an environment variable for the rest of the case; the product plugin reads these when the Location activates.
+function environment(name: string, value: string) {
+  return Effect.acquireRelease(
+    Effect.sync(() => {
+      const previous = process.env[name]
+      process.env[name] = value
+      return previous
+    }),
+    (previous) =>
+      Effect.sync(() => {
+        if (previous === undefined) delete process.env[name]
+        else process.env[name] = previous
+      }),
+  )
+}
 
 function respond(request: LLMRequest) {
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))

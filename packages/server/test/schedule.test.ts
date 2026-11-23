@@ -25,11 +25,7 @@ it.live("manages schedules through the experimental API when enabled and honors 
     const disabled = path.join(dir, "disabled")
     yield* Effect.promise(async () => {
       await Promise.all([global, enabled, disabled].map((item) => fs.mkdir(item, { recursive: true })))
-      // The product's terminal is off by default (B2.6a); the shell checks below need it on.
-      await fs.writeFile(
-        path.join(enabled, "loginom-ai-agent.json"),
-        JSON.stringify({ experimental: { schedules: true }, permission: { shell: "allow" } }),
-      )
+      await fs.writeFile(path.join(enabled, "loginom-ai-agent.json"), JSON.stringify({ experimental: { schedules: true } }))
       await fs.writeFile(path.join(disabled, "loginom-ai-agent.json"), JSON.stringify({ experimental: { schedules: false } }))
     })
     const handler = yield* ServerFetch.make({
@@ -99,18 +95,14 @@ it.live("manages schedules through the experimental API when enabled and honors 
         _tag: "ForbiddenError",
       })
 
-      // Shell until check that already passes returns done immediately with its output.
-      const matched = await api.experimental.schedule.create({
-        sessionID: session.id,
-        until: { run: "printf ready" },
-        prompt: "ready now",
-      })
-      expect(matched).toMatchObject({
-        status: "done",
-        lastOutcome: "fired",
-        lastOutput: "ready",
-        until: { type: "shell", run: "printf ready" },
-      })
+      // The product never runs a shell check (B2.6a2): creating one is 403 ForbiddenError, the terminal off or on.
+      await expect(
+        api.experimental.schedule.create({
+          sessionID: session.id,
+          until: { run: "printf ready" },
+          prompt: "ready now",
+        }),
+      ).rejects.toMatchObject({ _tag: "ForbiddenError" })
 
       // Stateless HTTP create settles an "ask" command as 403 ForbiddenError instead of hanging.
       const askDir = path.join(dir, "ask")
@@ -162,7 +154,8 @@ it.live("ticks due schedules in standalone ServerProcess.start without lifecycle
       const created = await api.experimental.schedule.create({
         sessionID: session.id,
         when: { in: "150 millis" },
-        if: { run: "false" },
+        // A code check: the product never runs a shell check (B2.6a2).
+        if: { code: "return false" },
         prompt: "wake from serve",
       })
       expect(created.status).toBe("active")
@@ -185,7 +178,6 @@ it.live("elects one scheduler leader when two server processes boot against a du
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("opencode-schedule-leader-")).path
     const dbPath = path.join(dir, "shared.db")
-    const marker = path.join(dir, "runs.txt")
     yield* Effect.promise(() =>
       fs.writeFile(path.join(dir, "loginom-ai-agent.json"), JSON.stringify({ experimental: { schedules: true }, permission: { shell: "allow" } })),
     )
@@ -206,7 +198,9 @@ it.live("elects one scheduler leader when two server processes boot against a du
           const created = await seededApi.experimental.schedule.create({
             sessionID: session.id,
             when: { in: "80 millis" },
-            if: { run: `printf 'x\\n' >> ${JSON.stringify(marker)} && false` },
+            // The product never runs a shell check (B2.6a2), so nothing outside counts the runs any more: the case
+            // keeps two servers booting against one due row and checks that it ends `done` and `checked`.
+            if: { code: "return false" },
             prompt: "single leader check",
           })
           return created.id
@@ -242,9 +236,7 @@ it.live("elects one scheduler leader when two server processes boot against a du
         current = await api.experimental.schedule.get({ scheduleID: createdID })
       }
       await new Promise((resolve) => setTimeout(resolve, 150))
-      const lines = (await fs.readFile(marker, "utf8")).trim().split("\n").filter(Boolean)
-      expect(current.status).toBe("done")
-      expect(lines).toEqual(["x"])
+      expect(current).toMatchObject({ status: "done", lastOutcome: "checked" })
     })
   }).pipe(Effect.scoped),
 )

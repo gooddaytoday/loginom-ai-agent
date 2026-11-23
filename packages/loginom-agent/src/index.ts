@@ -13,7 +13,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
-import { classify, grantable, settle, withDefaults, type Kind } from "./permissions"
+import { classify, grantable, ownRead, settle, withDefaults, type Kind } from "./permissions"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -166,6 +166,16 @@ export default Plugin.define({
     // asks again, and a subagent's or a fork's session holds none.
     const subagents = new Set<string>()
     const conversation = new Map<string, Set<Kind>>()
+    // The product's own directories outside the project, which the agent reads without the «outside the project»
+    // question (B2.6a2): the full text of a large tool result (`<data>/tool-output`, where OpenCode and `dock.ts` keep
+    // it), the bundled skills' files and the `plan` agent's plans (the directory of `core/src/plugin/plan.ts`).
+    const own = [
+      join(Global.Path.data, "tool-output"),
+      ...(resources ? [join(resources, "skills")] : []),
+      join(Global.Path.home, ".loginom-ai-agent", "plan"),
+    ]
+    // The tool behind a running call (`<message> <call>`), so the hook can tell a read from a write.
+    const calls = new Map<string, string>()
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
@@ -180,10 +190,12 @@ export default Plugin.define({
       })
     })
     await ctx.permission.hook("evaluate", (event) => {
+      const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
       const settled = settle(
         event,
         event.agent !== undefined && subagents.has(event.agent),
         conversation.get(event.sessionID) ?? new Set(),
+        ownRead(tool, event, own),
       )
       event.effect = settled.effect
       if (settled.message) event.message = settled.message
@@ -251,12 +263,14 @@ export default Plugin.define({
     await ctx.session.hook("compaction", hide)
     await ctx.session.hook("generate", hide)
     await ctx.tool.hook("execute.before", (event) => {
-      if (permits(profile(event.sessionID), event.tool)) return
-      throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      if (!permits(profile(event.sessionID), event.tool))
+        throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
     await ctx.tool.hook("execute.after", async (event) => {
+      calls.delete(`${event.messageID} ${event.id}`)
       if (event.status !== "completed") return
       if (event.tool === "skill") {
         const current = profile(event.sessionID)

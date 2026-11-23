@@ -3,7 +3,9 @@ import {
   classify,
   grantable,
   kinds,
+  ownRead,
   rules,
+  scheduleRunDenied,
   settle,
   table,
   terminalDenied,
@@ -138,13 +140,18 @@ describe("settle", () => {
     })
   })
 
-  test("the terminal: an agent command always asks, a schedule check follows the rules, a subagent never runs one", () => {
+  test("the terminal: an agent command always asks, a schedule check never runs, a subagent never runs one", () => {
     const all = new Set(everyKind())
     expect(settle({ action: "shell", resources: ["ls"], source, effect: "allow" }, false, all)).toEqual({
       effect: "ask",
     })
     expect(settle({ action: "shell", resources: ["ls"], source, effect: "ask" }, false, all)).toEqual({ effect: "ask" })
-    expect(settle({ action: "shell", resources: ["ls"], effect: "allow" }, false, none)).toEqual({ effect: "allow" })
+    // A schedule's check has no source; the terminal on (`allow` or `ask` from the rules) changes nothing (B2.6a2).
+    for (const effect of ["allow", "ask"] as const)
+      expect(settle({ action: "shell", resources: ["ls"], effect }, false, all)).toEqual({
+        effect: "deny",
+        message: scheduleRunDenied,
+      })
     expect(settle({ action: "shell", resources: ["ls"], source, effect: "allow" }, true, all)).toEqual({
       effect: "deny",
       message: terminalDenied,
@@ -158,6 +165,43 @@ describe("settle", () => {
     })
     expect(settle({ action: "read", resources: ["a"], effect: "allow" }, true, none)).toEqual({ effect: "allow" })
     expect(settle({ action: "webfetch", resources: ["u"], effect: "allow" }, true, new Set(["web"]))).toEqual({
+      effect: "allow",
+    })
+  })
+})
+
+describe("the product's own directories outside the project (B2.6a2)", () => {
+  const own = ["/data/tool-output", "/res/skills", "C:\\Users\\u\\.loginom-ai-agent\\plan"]
+  const outside = (resources: string[]) => ({ action: "external_directory", resources })
+
+  test("a read inside them asks nothing; a neighbour, a write or another question still asks", () => {
+    for (const tool of ["read", "glob", "grep"]) {
+      expect(ownRead(tool, outside(["/data/tool-output/*"]), own)).toBe(true)
+      expect(ownRead(tool, outside(["/res/skills/loginom-automation/references/*"]), own)).toBe(true)
+      expect(ownRead(tool, outside(["C:/Users/u/.loginom-ai-agent/plan/*"]), own)).toBe(true)
+    }
+    for (const resources of [
+      ["/data/tool-output-other/*"],
+      ["/data/*"],
+      ["/res/*"],
+      ["/data/tool-output/*", "/x/*"],
+      [],
+    ])
+      expect(ownRead("read", outside(resources), own)).toBe(false)
+    for (const tool of ["write", "edit", "patch", "shell", undefined])
+      expect(ownRead(tool, outside(["/data/tool-output/*"]), own)).toBe(false)
+    expect(ownRead("read", { action: "read", resources: ["/data/tool-output/a.txt"] }, own)).toBe(false)
+  })
+
+  test("settle allows such a read, also for a subagent", () => {
+    expect(
+      settle(
+        { action: "external_directory", resources: ["/data/tool-output/*"], effect: "ask" },
+        true,
+        new Set(),
+        true,
+      ),
+    ).toEqual({
       effect: "allow",
     })
   })
