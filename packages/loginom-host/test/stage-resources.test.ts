@@ -134,6 +134,7 @@ test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid b
 
 // Full staging uses the same pinned Node distribution and Chromium as release builds.
 // Release/acceptance runners provide these paths; the small boundary tests above do not need them.
+// It stages the Desktop set: the CLI artifact build verifies its own (cli-manifest.ts), Desktop has no such build.
 test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_AGENT_TEST_BROWSERS)(
   "full resource staging inventories product skills and a buildable dashboard kit",
   async () => {
@@ -142,7 +143,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
     const root = await mkdtemp(join(tmpdir(), "loginom-stage-product-skills-"))
     try {
       const destination = join(root, "resources")
-      await stageResources({ destination, node, browsers, target, flavor: "cli" })
+      await stageResources({ destination, node, browsers, target, flavor: "desktop" })
       // Loginom Help ships as inventoried resource files; no knowledge service key or endpoint is staged.
       await expect(stat(join(destination, "knowledge-key"))).rejects.toMatchObject({ code: "ENOENT" })
       expect(await readFile(join(destination, "help/help-manifest.json"), "utf8")).toBe(
@@ -175,6 +176,10 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const skills = await verifyBundledSkills(destination)
       expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "loginom-dashboard", "package-docs"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
+      // Desktop's service keeps its Loginom connection with the Keychain helper on macOS (B4.8c), as the CLI does.
+      expect(manifest.files.some((file: { path: string }) => file.path === "bin/loginom-keychain")).toBe(
+        process.platform === "darwin",
+      )
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "help/help-manifest.json")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(false)

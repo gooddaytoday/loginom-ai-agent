@@ -16456,3 +16456,268 @@ CAT-04 — запись OpenCode 2: `pending: B2.7d, B4.1` снят, файлы 
 - Собранное приложение: `setFeedURL`, `User-Agent`, вызов `isProductBuild` в `platform.ts` и связка `main.ts` в
   Electron не запускались; проверки на настоящей ленте (UPDATE-01 целиком) нет — этап C.
 - macOS и Windows: имена их установщиков проверены таблицей по `Product.artifactName`, не сборкой.
+
+## B4.8c Помощник связки ключей macOS
+
+23.11.2026. Ветка `b48c-keychain-install-cli` от `oc2-migration` (`6f7de71d23`), рабочее дерево `.claude/worktrees/b48c`;
+та же ветка несёт B4.7b (раздел ниже). Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и
+`git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов
+снята в этом же дереве до первой правки. Все прогоны тестов и мутаций — с `XDG_{DATA,CONFIG,STATE,CACHE}_HOME` во
+временном корне. В конце `find ~/.local/share ~/.config ~/.loginom-ai-agent -newer <отметка до базы>` — за всю работу,
+вместе с мутациями — не нашёл файлов продукта: только чужие `herdr` и `agent-kit`, `~/.loginom-ai-agent` нет. `gui-plugins/src/updater` и `desktop/src/renderer/platform/notifications.ts` (B4.12) не
+трогал. Модель не вызывалась: `run` и `serve` не запускались, приложение не собиралось.
+
+Прочитано: этот журнал — B4.5b, B4.7, B4.8a, B4.13 («Найдено»: помощника нет в ресурсах Desktop); `loginom-host/AGENTS.md`
+(staging, Keychain, подпись помощника до манифеста); 0.4 — `v0.4.0:packages/loginom-host/script/{build-keychain,stage-resources}.ts`,
+`v0.4.0:packages/desktop/electron-builder.config.ts` (`signIgnore`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `59e91953a7` `feat(desktop): stage the macOS Keychain helper for Desktop and require it in its resources (B4.8c)` | два файла кода, тест `resources.test.ts` |
+| `6d749598a8` `test(loginom-host): full staging stages the Desktop set and checks the macOS Keychain helper (B4.8c)` | полный тест staging — набор Desktop |
+| следующий | эти два раздела; CAT-10 и CAT-13 в `catalog.md` |
+
+Файлы кода — два: `loginom-host/script/stage-resources.ts` (+2 −1) и `desktop/src/main/loginom/resources.ts` (+20 −13),
+оба файлы форка. Вместе с B4.7b — три из пяти.
+
+### Что сделано
+
+| Пункт | Было (`6f7de71d23`) | Стало |
+|---|---|---|
+| Сборка | `stage-resources.ts:177` собирал `bin/loginom-keychain` только при `flavor === "cli"` | на macOS — для обоих наборов: `if (process.platform === "darwin") await buildKeychain(...)`. Код тот же, `buildKeychain` 0.4: clang arm64, macOS 14, ad-hoc подпись с идентификатором `com.loginom.aiagent.cli.keychain`, `codesign --verify --strict` |
+| Манифест | — | помощник собирается до `resourceInventory(staging)`, поэтому `resource-manifest.json` Desktop его перечисляет, а `--verify-resources` (B4.8a) хеширует вместе с остальными файлами. Кода для этого не нужно |
+| Набор Desktop | `resources.ts`: служба и `--verify-resources` требуют манифест, `bin/node[.exe]`, `host/node-host.mjs` | на macOS — ещё `bin/loginom-keychain`. Без него `LOGINOM_BUNDLE_INCOMPLETE: <resources> lacks bin/loginom-keychain; reinstall the application`, служба не стартует. CLI делает так же (`cli/src/loginom-management.ts:125`, `cli-manifest.ts:77`). Linux и Windows — прежний список |
+| Подпись и `signIgnore` | `mac.signIgnore` Desktop уже содержит `/Contents/Resources/loginom/bin/` (B4.5b, тест «macOS $channel packages … signIgnore») | без изменений. Помощник подписан при сборке ресурсов, до инвентаря, как у CLI 0.4. electron-builder его не переподписывает, хеш в манифесте сохраняется |
+
+**Связка ключей.** Запись помощника — служба `com.loginom.aiagent.cli.profile-key.v1`. Учётная запись — sha256
+канонического корня, у службы Desktop это `<data>/loginom` (B4.13). Ключи Desktop и профилей CLI не пересекаются.
+Слово `cli` в идентификаторе подписи и имени записи оставлено: задание требует тот же код.
+
+### Тесты
+
+`desktop/src/main/loginom/resources.test.ts`, 11 → 16 случаев. Фикстура раскладывается для платформы набора: на
+`win32` — `bin/node.exe`, на `darwin` — ещё `bin/loginom-keychain` до манифеста, как в `stage-resources`.
+
+| Таблица | Строки |
+|---|---|
+| `--verify-resources` | +1: набор macOS без помощника — `LOGINOM_BUNDLE_INCOMPLETE`; без требования (MK1) строка красная |
+| «a packaged $platform app without $name does not start its service» | платформа явная: Linux — вход Host, Node, манифест; Windows — `bin/node.exe`; macOS — помощник. «any resources» — весь набор каждой платформы: Linux и Windows — три файла, как раньше, macOS — четыре |
+
+**Шов платформы.** В `Installation` добавлено поле `platform`. В производстве его задаёт `installation()` из
+`process.platform`, а таблица подставляет `win32` и `darwin`. Так же сделан шов B4.13 (`credential-migration.ts`).
+
+`loginom-host/test/stage-resources.test.ts`, полный тест staging. Он идёт там, где раннер даёт
+`LOGINOM_AI_AGENT_TEST_NODE` и `_TEST_BROWSERS`; по умолчанию пропускается. Теперь он собирает набор `desktop`, а не
+`cli`, и ждёт `bin/loginom-keychain` в манифесте только на macOS. Набор CLI проверяет сборка артефакта (`build-cli.ts`,
+`cli-manifest.ts:77`), у набора Desktop такой проверки нет. На Linux прогон с входами:
+
+```text
+$ cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> LOGINOM_AI_AGENT_TEST_BROWSERS=/root/.cache/loginom-wave2-browsers bun test test/stage-resources.test.ts
+[build] … END desktop-resource-inventory 1960ms
+ 14 pass
+ 0 fail
+ 76 expect() calls
+```
+
+`packages/dashboard/dist` от этого прогона удалён.
+
+### Мутации
+
+`<scratchpad>/b48c/mutate.py`: одна точная замена, тесты контракта, возврат файла из копии; после — `git status` чистый.
+
+```text
+=== M0 none: desktop 16 pass / 0 fail; loginom-host 13 pass / 0 fail; app 36 pass / 0 fail
+=== MK1 the macOS set does not require the helper: desktop 13 pass / 3 fail          # verify macOS, macOS ×2
+=== MK2 every platform requires the helper: desktop 6 pass / 10 fail                 # Linux и Windows
+=== MK3 the set follows the running process, not the installation: desktop 13 pass / 3 fail
+=== MK4 --verify-resources checks the running platform: desktop 15 pass / 1 fail
+=== MK5 staging builds the helper for the CLI only (base line 177): desktop 16 pass / 0 fail; loginom-host 13 pass / 0 fail
+```
+
+MK5 — возврат строки 177 к базе — на Linux зелёная, и это ожидаемо. `stageResources` отказывает чужой цели (строка 40),
+а `buildKeychain` нужны clang и `codesign` на darwin-arm64. Строку 177 краснит только полный тест staging на раннере macOS
+с входами.
+
+### Приёмка
+
+База — `6f7de71d23`, итог — `6f6a065621` (оба кодовых коммита; `6d749598a8` меняет только пропускаемый тест, прогнан
+отдельно выше). Скрипт — `<scratchpad>/b48c/suites.sh`. Падения сравнивались по именам из JUnit (`fails.py`).
+
+| Пакет | Команда | `6f7de71d23` | итог |
+|---|---|---|---|
+| `desktop` | `bun typecheck` | ошибок нет | ошибок нет |
+| `desktop` | `bun run typecheck:tsc` | — | код 0 |
+| `desktop` | `bun test --timeout 30000` | 598, 0 fail, 4 skip | 603 (+5 `resources`), 0 fail, 4 skip |
+| `loginom-host` | `bun typecheck` | ошибок нет | ошибок нет |
+| `loginom-host` | `xvfb-run -a bun test` | 561, 5 fail, 12 skip | 561, 5 fail, 12 skip — те же пять: «umask», три `bundled-ripgrep`, `managed-work-entry` (как в B4.13) |
+| `app` | `bun typecheck` | ошибок нет | ошибок нет |
+| `app` | `bun run test` | код 0; unit 2 719, browser 368, 0 fail | код 0; unit 2 720 (+1 B4.7b), browser 368, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 587 divergent upstream files              # как на базе: файлы форка не считаются, три файла app уже расходились
+  CAT-13: 25
+  CAT-10: 98
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ oxlint изменённых файлов                                       # 0 warnings
+$ prettier --check изменённых файлов                             # чисто, кроме ru.ts, stage-resources.ts и stage-resources.test.ts: их строки вне правки не отформатированы и на базе
+```
+
+`bun run check` — в разделе B4.7b.
+
+### Каталог
+
+`catalog.json` не менялся: `loginom-host` и `desktop/src/main/loginom/resources.ts` — файлы форка. В `catalog.md`
+CAT-13 — отказ службы без помощника на macOS.
+
+### Где решал сам
+
+- **Обязательный набор Desktop на macOS — с помощником.** Без этого «манифест учитывает» выполнялось бы само: файл
+  внесён в манифест, его хеш проверяется. Но набор, собранный без помощника (сборка до B4.8c), проходил бы
+  `--verify-resources`. Служба на нём не сохраняет никакое подключение (B4.13), а в 0.4 сохраняла. Требование в
+  `resources.ts` повторяет CLI и дало тест, который выполняется на Linux.
+- **Шов платформы** — поле `Installation`, а не параметр функций. Шов того же вида принят в B4.13.
+- **Полный тест staging переведён на набор `desktop`.** Строки 177 не проверяет ни один тест на Linux. Без перевода её
+  не проверял бы и раннер macOS: набор CLI с помощником собирался и до правки.
+- **Идентификатор подписи и имя записи связки ключей** — от CLI (`…cli.keychain`, `…cli.profile-key.v1`), см. выше.
+
+### Найдено, не чинил
+
+- `.github/release/sign-desktop-macos.sh` переподписывает каждый Mach-O в `Contents` (B4.5b, «Найдено»). Теперь в их
+  числе и помощник: его подпись и хеш в `resource-manifest.json` изменятся. Это путь выпуска upstream — B5.1.
+- Новый пункт в обязательном наборе Desktop закрывает только отсутствие файла. Поведение настоящего помощника не
+  проверено: заблокированная связка ключей, отказ доступа.
+- **Риск обновления на macOS.** Помощник подписан ad-hoc и запрещает вопросы связки ключей. После обновления Desktop
+  его подпись другая, и доступ к ключу профиля может закрыться: служба не прочтёт сохранённое подключение
+  (`LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`), пока пользователь не разрешит доступ в «Связке ключей» или не введёт
+  подключение заново (`loginom-host/AGENTS.md`, `build-cli-installer.ts`). Desktop 0.4 хранил пароль в `safeStorage`,
+  такого отказа у него не было. Подпись выпуска — B5.1, проверка — B4.14a.
+
+### Не проверено
+
+- **macOS не собиралась и не запускалась.** Сборка помощника для Desktop, его место в `Resources/loginom/bin`,
+  `signIgnore`, `--verify-resources` и сохранение подключения службой проверены только таблицей набора на Linux и по
+  коду. Строка 177 краснеет только на раннере macOS (MK5) — B4.14a.
+- Windows — так же, только таблицей; Linux — тестами, без сборки приложения.
+
+## B4.7b Install CLI
+
+23.11.2026. Та же ветка и то же дерево, что у B4.8c (выше): окружение, база тестов, временные `XDG_*` и проверка
+настоящих каталогов — там. Модель не вызывалась, окно Desktop не запускалось.
+
+Прочитано: этот журнал — B4.7 («Найдено»: Install CLI без задачи), B4.11 (исключение `commandNames`), B2.7c (вход
+продукта и вход `index.ts`); план этапа B (B4.7b); дизайн `2026-09-17-loginom-cli-standalone-design.md` (§1, §10, §12 —
+«Включать CLI внутрь Desktop в первой версии не требуется»); корневой `AGENTS.md`; 0.4 —
+`v0.4.0:packages/desktop/src/main/{background-cli,menu,desktop-menu-actions}.ts`, `v0.4.0:packages/app/src/desktop-menu.ts`,
+словари `v0.4.0:packages/desktop/src/renderer/i18n/{en,ru}.ts`, корневой `install`.
+
+### Задание расходится с 0.4 и с дизайном — сделано как в 0.4
+
+**В 0.4 Install CLI не было.** В меню macOS 0.4 (`DESKTOP_MENU` в `app/src/desktop-menu.ts`) такого пункта нет, а у
+`DesktopMenuAction` нет действия `app.installCli`. От upstream остались только ключи словарей:
+`desktop.menu.installCli` и `desktop.cli.installed.*`, команда в тексте — `'loginom-ai-agent'`. Функция
+`installCli` в `v0.4.0:background-cli.ts` — это копия встроенного CLI в `<userData>/cli/<версия>/` с правами `0755` для
+службы. В `PATH` она ничего не ставит; в v2 то же делает ступень `cli-stages` (B4.7). Пути установки в `PATH` и прав,
+которые можно было бы перенести из 0.4, нет.
+
+**Пункт v2 противоречит дизайну standalone.** Install CLI v2 копирует встроенный CLI Desktop в
+`~/.loginom-ai-agent/bin/opencode` (корневой `install --binary`) и дописывает этот каталог в `PATH` профиля оболочки.
+
+- Этот CLI — сборка по умолчанию из `src/index.ts`, а не `--standalone` из `src/loginom-cli.ts` (B4.7, B2.7c).
+  Профиль CLI он не применяет. Из терминала он работал бы в каталогах канала, где лежат данные службы Desktop (B4.13) —
+  по коду (`cli/script/build.ts:177`, журналы B2.7c и B4.13), не запускал.
+- Дизайн и корневой `AGENTS.md`: у Desktop и CLI отдельные профили; команда CLI — `loginom-ai-agent-cli` из
+  standalone-дистрибутива; лаунчер Desktop `loginom-ai-agent` не переназначается; «включать CLI внутрь Desktop в первой
+  версии не требуется».
+- Имя `loginom-ai-agent` из задания назвало бы этот CLI именем лаунчера Desktop. Прежнее `opencode` дало бы второй CLI
+  на данных Desktop под именем upstream.
+
+По заданию при противоречии — как в 0.4. Это меньший вариант: одна строка меню вместо правок `install` и
+`desktop-cli.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `6f6a065621` `fix(app): leave Install CLI out of the macOS menu and take the 0.4 CLI message (B4.7b)` | один файл кода, словари `en`/`ru`, два теста |
+| следующий | этот раздел и B4.8c; CAT-10 в `catalog.md` |
+
+### Что сделано
+
+| Пункт | Было (`6f7de71d23`) | Стало |
+|---|---|---|
+| Меню macOS | «Install CLI…» вторым пунктом меню приложения | пункта нет, меню приложения — как в 0.4. Проверка обновлений 0.4 приходит от плагина обновлятора (`gui-plugins/src/updater/main.ts`) |
+| `desktop.cli.installed.message` | `en`: `… the 'opencode' command.`; `ru`: `… команду «opencode2».` | тексты 0.4 дословно: `… to use the 'loginom-ai-agent' command.` и `… использовать команду 'loginom-ai-agent'.` |
+| Тест бренда | исключение `commandNames` для этого ключа | исключения нет |
+
+Файл кода — один: `app/src/shell/commands/desktop-menu.ts` (−1 строка пункта, +1 строка комментария). Словари не
+считаются. Всего на обе задачи — три файла.
+
+**Требование «источник имени — `packages/product`» не выполнено и потеряло смысл.** Пункта больше нет, кода с именем
+команды тоже, а в словаре — литерал 0.4. Подставить имя можно было бы так же, как `{{path}}`, но это уже не строка 0.4.
+Сверка значений с `v0.4.0:packages/desktop/src/renderer/i18n/{en,ru}.ts` импортом обоих словарей: `en equal: true ru
+equal: true` (в `en` строка перенесена по `prettier`). Из 0.4 взят только этот текст: `ru` `desktop.cli.failed.title`
+(«Не удалось установить», в 0.4 — «Ошибка установки») и многоточие в «Install CLI…» (в 0.4 — `...`) остались v2 — их
+больше не показывают. Другая правка текста без `opencode` тестом не ловится: тест бренда проверяет только имя.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `app/src/shell/commands/desktop-menu.test.ts` «the macOS app menu holds the 0.4 items» (новый) | меню приложения macOS по порядку: About, Settings, Reload, Restart, Export Logs, разделитель, Hide, Hide Others, Show All, разделитель, Quit — пункты 0.4 без проверки обновлений плагина |
+| `app/src/runtime/i18n/desktop-native.test.ts` «names the product in the en and ru desktop strings» | все ключи `desktop.*` в `en` и `ru` без `opencode`, теперь без исключений |
+
+```text
+=== MI1 the macOS app menu offers Install CLI again: app 35 pass / 1 fail       # меню 0.4
+=== MI2 the en message names opencode: app 35 pass / 1 fail                     # бренд en/ru
+=== MI3 the ru message names opencode2: app 35 pass / 1 fail                    # бренд en/ru
+```
+
+Мутации — тот же `mutate.py` (раздел B4.8c), `git status` после него чистый. Приёмка `desktop`, `loginom-host`, `app` —
+таблица B4.8c.
+
+```text
+$ bun run check                                                  # код 0, на 6d749598a8 с этими разделами
+Found 554 warnings and 0 errors.                                 # как в B4.13; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,369 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+### Каталог
+
+`catalog.json` не менялся: `packages/app/**` — CAT-10. В `catalog.md` CAT-10: вместо «исключение
+`desktop.cli.installed.message` … переименовывается с встроенным CLI (B4.7)» — текст 0.4 и меню без Install CLI;
+проверка — тест меню и тест бренда без исключений.
+
+### Где решал сам
+
+- **Пункт убран из меню, код установки оставлен.** Остались действие `app.installCli` в схеме RPC меню
+  (`desktop/src/shared/ipc-rpc/menu.ts`), его обработчик (`native/menu-actions.ts`, `native/install-cli*.ts`) и
+  `DesktopCli.install`. Без пункта меню их ничто не вызывает. Удалять их — семь файлов Desktop upstream; в 0.4 их не было.
+- **Тексты 0.4 оставлены, хотя их больше не показывают.** Так в 0.4: ключи были, пункта не было. Задание просит тексты
+  0.4.
+- **Корневой `install` не менялся.** `APP=opencode` и обёртка `opencode2` — имя бинарника CLI upstream, по каталогу это
+  B2.7a.
+
+### Найдено, не чинил
+
+- `gui-plugins/src/wsl` ставит в WSL свой `opencode` (`installCli`), его прячет B4.11e — не эта задача.
+- 57 языков словаря, кроме `en` и `ru`, по-прежнему называют команду upstream — этап C, как в B4.11.
+- **Связь с B4.12.** Тест меню сравнивает пункты меню приложения целиком. Если B4.12 перенесёт проверку обновлений в
+  `DESKTOP_MENU`, тест покраснеет и потребует её строку. Абзацы CAT-10 и CAT-13 в `catalog.md` — по одной строке,
+  параллельная правка того же абзаца даст конфликт при слиянии.
+
+### Вопрос владельцу
+
+Если продукту нужен Install CLI на macOS, это новый контракт. Ставить нужно standalone `loginom-ai-agent-cli` со своим
+профилем, а не встроенный CLI Desktop (меню, `install`, `desktop-cli.ts`).
+
+### Не проверено
+
+- Меню macOS собранного приложения не открывалось. Проверено тестом `DESKTOP_MENU`, из которого `native/menu.ts`
+  строит меню.
