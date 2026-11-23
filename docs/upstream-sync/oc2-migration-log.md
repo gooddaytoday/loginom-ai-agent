@@ -9385,7 +9385,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 |---|---|
 | `7ea3af598c` `feat(loginom-agent): a refused call is told to the model and the turn goes on (B2.6b)` | `refusal` и тексты в `packages/loginom-agent/src/permissions.ts`; хуки `execute.before` и `execute.after`, проверка одних правил, набор предложенных модели инструментов — `src/index.ts`; комментарий в `src/local-file.ts`; правка upstream `packages/core/src/tool.ts` (+18 −1), CAT-07 в `catalog.json`; тесты — `packages/loginom-agent/test/permissions.test.ts` (+3), `packages/server/test/loginom-dock-catalog.test.ts` (+5, стенд принимает конфиг и HTTP), `packages/server/test/loginom-permissions.test.ts` (+1), заголовок случая в `loginom-local-file.test.ts` |
 | `a48d9c9f85` `fix(loginom-agent): a refusal is read from its cause; a hidden built-in tool is explained by its action (B2.6b)` | по ревью советника: `refusal` читает только причину (встроенные инструменты её сохраняют — проба ниже), запасной разбор текста `Permission denied: …` убран; `execute.before` записывает вызов в `calls` после проверки скрытого инструмента; в тест встроенных инструментов добавлены `edit`, чтение вне проекта и `write`, скрытый правилом `edit * deny`; `loginom-package-docs.test.ts` ждёт текст продукта |
-| следующий | этот раздел, CAT-05 и CAT-07 в `catalog.md` |
+| `5606b430eb` `docs(upstream-sync): record B2.6b refusals that do not end the turn` | этот раздел, CAT-05 и CAT-07 в `catalog.md` |
+| следующий | устойчивость новых случаев, необязательность правки ядра для приёмки, уточнения раздела |
 
 ### Что было (проба на `e8dc45a3c7`, Host по сценарию, модель по сценарию)
 
@@ -9514,7 +9515,16 @@ DBG webfetch "Unable to fetch https://denied.example/page" Permission.BlockedErr
 ```
 
 M7 — правка ядра без повторного подъёма отказа: прямой вызов всё равно кончает шаг (`model-request` узнаёт отказ внутри
-`Tool.Error`), но тесты upstream `tool-shell.test.ts`, где отказ должен остаться дефектом, падают.
+`Tool.Error`), но тесты upstream `core/test/tool-shell.test.ts`, где отказ должен остаться дефектом, падают: «declarations
+reuse approvals while substitutions retain reject/once/always behavior», «external-directory rejection stops execution
+before a workspace marker is written», «conditional substitutions respect reject».
+
+Устойчивость новых случаев `server`, `a48d9c9f85`:
+
+```text
+$ bun test --rerun-each 20 --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t B2.6b
+ 120 pass, 0 fail                                         # 34.8 с
+```
 
 ### Приёмка
 
@@ -9561,6 +9571,10 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (`QuestionTool.CancelledError`) и «Остановить» — как в OpenCode.
 - **Правка ядра — показать отказ хуку, а не менять сам отказ.** Решать, продолжать ли ход, оставлено плагину; без
   плагина OpenCode ведёт себя как прежде (повторный подъём той же причины), это держат тесты upstream.
+- **Для приёмки задания правка ядра не нужна.** Сохранение в Loginom — инструменты Promise-плагина, их отказ хук видел и
+  без неё (мутация M6: оба случая Dock зелёные, красный только случай встроенных инструментов). Правка нужна, чтобы
+  «Отклонить» не обрывал ход у записи файлов, сайтов, терминала и чтения вне проекта. Если владелец её не примет, её
+  можно откатить отдельно: продукт продолжит ход только для своих инструментов.
 - **Текст для модели — в `execute.after`, по причине ошибки вызова** (`_tag` `DeclinedError` или `BlockedError`), а не по
   тексту: встроенные инструменты оборачивают запрет своим текстом и хранят его причиной. Инструмент, который потерял бы
   причину, оставил бы модели текст OpenCode (тест на голый текст — в `permissions.test.ts`).
@@ -9581,8 +9595,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 ### Согласовать с владельцем
 
-- **Ход больше не кончается на «Отклонить».** Это видят клиенты, которые отвечают `reject` без текста: TUI, ACP,
-  будущие кнопки этапа C. Неинтерактивный `run` CLI уже отклоняет с текстом (`PERMISSION_REJECTED_FEEDBACK` в
+- **Ход больше не кончается на «Отклонить».** Это видят клиенты, которые отвечают `reject` без текста (по коду: TUI —
+  `tui/src/routes/session/permission.tsx`, `reply("reject")`; ACP — `cli/src/acp/permission.ts`), и будущие кнопки
+  этапа C. Неинтерактивный `run` CLI уже отклоняет с текстом (`PERMISSION_REJECTED_FEEDBACK` в
   `cli/src/run/noninteractive.ts`, это `CorrectedError`), и ход у него продолжался и раньше — B2.6b его не меняет.
 - **Тип ошибки вызова для клиентов изменился.** Отказ был `aborted` (и ответ `Step interrupted`), запрет —
   `permission.rejected`; теперь оба — `tool.execution` с текстом продукта. Отличить отказ от сбоя интерфейс этапа C может
