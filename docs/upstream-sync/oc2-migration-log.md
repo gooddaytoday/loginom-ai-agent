@@ -15253,6 +15253,8 @@ $ … home.spec.ts review.spec.ts whats-new.spec.ts -g "<три теста на 
   3 passed (26.9s)
 $ PLAYWRIGHT_STORIES_PORT=3394 bunx playwright test --config playwright.components.config.ts plugin-graph pairing ssh-reconnect
   9 passed (19.2s)                                            # на 573ded0f4d; на f849352fa5 — 2 passed, 7 failed (ssh-reconnect)
+$ … --config playwright.components.config.ts plugin-host
+  39 passed (56.1s)                                           # на 573ded0f4d: настоящий хост окна
 ```
 
 - **`settings-wsl.spec.ts` — красный, записан, не правлен.** Все 12 тестов проверяют вклад плагинов WSL и SSH в окно
@@ -15267,6 +15269,9 @@ $ PLAYWRIGHT_STORIES_PORT=3394 bunx playwright test --config playwright.componen
   stored mode…», «a rejected update check shows one failure title…») WSL не используют — зелёные. Первый прогон шёл
   вместе с девятью наборами тестов, и `whats-new` упал на обоих деревьях в разных местах (итог — строка 119, база — 121);
   на свободной машине `--repeat-each=2` — 2 passed и на итоге, и на базе: падение от нагрузки.
+- Хост окна на страницу сопряжения и на id `pairing`, `ssh`, `wsl` не ссылается: `git grep` по `app/src` без тестов,
+  словарей и историй находит только `servers/connect/scanner.tsx:64` — сканер QR самого `app`. Прочие совпадения в
+  `app/e2e` (`stability/oracle.test.ts`, `utils/visual-stability/*`) — слово `cssHidden`, не плагины.
 - Сопряжение в e2e продукта не открывается: `settings.spec.ts` про «Pairing link» — диалог «Добавить сервер» самого
   `app`, не плагин (ниже).
 
