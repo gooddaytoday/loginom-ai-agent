@@ -1,3 +1,4 @@
+import { $ } from "bun"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { createRequire } from "node:module"
@@ -46,4 +47,52 @@ export async function resolveOpencodePty(target: Target): Promise<OpencodePtyAss
       .update(await readFile(source))
       .digest("hex"),
   }
+}
+
+// Loginom AI Agent (B2.7a9): the product CLI (`build.ts --standalone`) embeds its own `loginom-ai-agent-pty`, built from
+// this fork's packages/process-daemon, which keeps its state and sockets under the product's name (B1.3b:
+// `<state>/loginom-ai-agent/pty`, `/tmp/loginom-ai-agent-pty-<uid>`). It never falls back to the upstream npm binary,
+// whose sockets live in `/tmp/opencode-pty-<uid>`; a binary given in LOGINOM_AI_AGENT_PTY_BIN must be ours too.
+export async function resolveProductPty(target: Target, env = process.env): Promise<OpencodePtyAsset> {
+  if (target.platform !== process.platform || target.arch !== process.arch || target.libc === "musl")
+    throw new Error(
+      `The product CLI builds loginom-ai-agent-pty from packages/process-daemon for this machine only (${process.platform}-${process.arch}), not ${[target.platform, target.arch, target.libc].filter(Boolean).join("-")}`,
+    )
+  const source = env.LOGINOM_AI_AGENT_PTY_BIN ? path.resolve(env.LOGINOM_AI_AGENT_PTY_BIN) : await buildProductPty(env)
+  const output = await $`${source} --version`.env(env).nothrow().quiet()
+  const text = output.stdout.toString().trim() || output.stderr.toString().trim()
+  const version = /^loginom-ai-agent-pty (\S+) \(protocol \d+\)$/.exec(text)?.[1]
+  if (output.exitCode !== 0 || !version)
+    throw new Error(`${source} is not loginom-ai-agent-pty from packages/process-daemon: ${text}`)
+  return {
+    source,
+    version,
+    sha256: createHash("sha256")
+      .update(await readFile(source))
+      .digest("hex"),
+  }
+}
+
+async function buildProductPty(env: NodeJS.ProcessEnv) {
+  const root = path.resolve(import.meta.dirname, "../../process-daemon")
+  // rustup takes the pinned toolchain from the working directory. As in release-process-daemon.yml, Ghostty is built for
+  // a portable CPU (the product CLI also runs on x64 machines without AVX2), and Windows links its C runtime statically.
+  const result = await $`cargo build --locked --release`
+    .cwd(root)
+    .env({
+      ...env,
+      OPENCODE_ZIG_CPU: env.OPENCODE_ZIG_CPU ?? "baseline",
+      ...(process.platform === "win32" ? { RUSTFLAGS: env.RUSTFLAGS ?? "-C target-feature=+crt-static" } : {}),
+    })
+    .nothrow()
+  if (result.exitCode !== 0)
+    throw new Error(
+      "Could not build loginom-ai-agent-pty for the product CLI: `cargo build --locked --release` failed in packages/process-daemon. It needs Rust 1.90.0 (rustup), Zig 0.16.0 on PATH and network access to fetch Ghostty; or set LOGINOM_AI_AGENT_PTY_BIN to a loginom-ai-agent-pty built for this machine.",
+    )
+  return path.resolve(
+    root,
+    env.CARGO_TARGET_DIR ?? "target",
+    "release",
+    process.platform === "win32" ? "loginom-ai-agent-pty.exe" : "loginom-ai-agent-pty",
+  )
 }

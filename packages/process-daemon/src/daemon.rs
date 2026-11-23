@@ -66,8 +66,8 @@ pub fn read_registration(directory: &Path) -> Result<Registration> {
     {
         use anyhow::Context;
         let data = std::fs::read(registration_path(directory))
-            .context("opencode-pty registration is unavailable")?;
-        serde_json::from_slice(&data).context("invalid opencode-pty registration")
+            .context("loginom-ai-agent-pty registration is unavailable")?;
+        serde_json::from_slice(&data).context("invalid loginom-ai-agent-pty registration")
     }
 }
 
@@ -94,7 +94,7 @@ pub use crate::transport::windows::Connection as PipeConnection;
 
 #[cfg(not(any(unix, windows)))]
 pub fn run(_directory: &Path) -> Result<()> {
-    anyhow::bail!("persistent opencode-pty transport is not implemented on this platform")
+    anyhow::bail!("persistent loginom-ai-agent-pty transport is not implemented on this platform")
 }
 
 #[cfg(test)]

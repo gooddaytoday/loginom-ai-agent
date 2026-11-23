@@ -1,4 +1,5 @@
 import { confirm, intro, log, outro, spinner } from "@clack/prompts"
+import { Product } from "@loginom-ai-agent/product"
 import { Service } from "@opencode/client/effect/service"
 import { Global } from "@opencode/util/global"
 import { Effect, FileSystem, Schedule } from "effect"
@@ -15,6 +16,15 @@ export default Runtime.handler(
   Commands.commands.uninstall,
   Effect.fn("cli.uninstall")(function* (input) {
     intro("Uninstall Loginom AI Agent")
+    // Loginom AI Agent (B2.7a9): the product CLI (its entry sets LOGINOM_AI_AGENT_CLI_ROOT) is removed by the installer of
+    // its archive (B2.7a8), which owns the installed copy, the launcher and the receipt; 0.4 had no such command. Desktop's
+    // CLI keeps this one.
+    if (process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined)
+      return yield* Effect.fail(
+        new Error(
+          `${Product.cliExecutable} is removed by the installer of its archive.\nStop every ${Product.cliExecutable} process, then run ${process.platform === "win32" ? "uninstall.cmd" : "./uninstall.sh"} from the extracted archive it was installed from. CLI profiles and Desktop are kept.`,
+        ),
+      )
     const fs = yield* FileSystem.FileSystem
     const global = yield* Global.Service
     const updater = yield* Updater.Service
