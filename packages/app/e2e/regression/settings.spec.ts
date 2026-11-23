@@ -1342,10 +1342,12 @@ test.describe("pages open before slow data", () => {
     expect(await github).toBe(false)
 
     await about.getByRole("button", { name: "Third-party notices", exact: true }).click()
+
     const opencode = page
       .getByRole("dialog")
       .locator(".settings-notice")
       .filter({ has: page.getByRole("link", { name: "OpenCode", exact: true }) })
+
     await expect(opencode.getByRole("link", { name: "OpenCode", exact: true })).toHaveAttribute(
       "href",
       "https://github.com/anomalyco/opencode",
