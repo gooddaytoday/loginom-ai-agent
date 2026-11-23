@@ -102,10 +102,11 @@ export async function generateIcons(options: { check?: boolean; preview?: boolea
       ),
     ),
   )
-  // Loginom AI Agent (B4.6): OpenCode 2 has no UI asset copy, no public-static and no product favicons, so the app
-  // takes only the web notification icon and the landing page keeps the whole web set.
+  // Loginom AI Agent (B4.6): OpenCode 2 has no public-static and no product favicons, so the app takes only the web
+  // notification icon, the UI only the splash mark (B4.6b) and the landing page keeps the whole web set.
   assets.forEach((buffer, name) => files.set(`${site}/${name}`, buffer))
   files.set("packages/app/public/loginom-icon.png", image("linux", 128))
+  files.set("packages/ui/src/assets/loginom/loginom-icon.svg", svg("linux"))
   files.set(
     `${site}/loginom-site-v1.webmanifest`,
     JSON.stringify(

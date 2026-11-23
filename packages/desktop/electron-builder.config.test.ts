@@ -218,6 +218,25 @@ test.each(channels)("the $channel packaging icons are in the staged 0.4 icon set
     expect((await readdir(path.join(directory, String(config.linux?.icon)))).sort()).toEqual(
       [16, 24, 32, 48, 64, 96, 128, 256, 512].map((size) => `${size}x${size}.png`).sort(),
     )
+
+    // Loginom AI Agent (B4.6b): the window icons ship next to app.asar in icons/, where the installed app reads them;
+    // dock.png does not, so the installed macOS Dock keeps the bundle ICNS.
+    const shipped = [config.extraResources]
+      .flat()
+      .flatMap((entry) => (entry instanceof Object && entry.to === "icons" ? [entry] : []))
+
+    expect(shipped).toHaveLength(1)
+
+    const from = path.join(directory, String(shipped[0]?.from))
+    const ships = new FileMatcher(from, "icons", (value: string) => value, shipped[0]?.filter).createFilter()
+
+    for (const [file, expected] of [
+      ["icon.png", true],
+      ["icon.ico", true],
+      ["linux/512x512.png", true],
+      ["dock.png", false],
+    ] as const)
+      expect(ships(path.join(from, file), statSync(path.join(from, file))), file).toBe(expected)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -259,8 +278,9 @@ test.each(channels)(
 )
 
 // Loginom AI Agent (B4.5b): the 0.4 Debian dependencies; rpm keeps electron-builder's.
-test.each(channels)("Linux $channel packages declare the 0.4 dependencies and rebuild nothing", ({ channel }) => {
+test.each(channels)("Linux $channel packages declare the 0.4 category and depends, rebuild nothing", ({ channel }) => {
   const config = load(channel)
+  expect(config.linux?.category).toBe("Office")
   expect(config.npmRebuild).toBe(false)
   expect(config.deb?.depends).toEqual([
     "libgtk-3-0",
@@ -372,6 +392,7 @@ test("shared packaging defaults", async () => {
   expect(config.extraResources).toEqual([
     { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
     { from: "resources/loginom", to: "loginom" },
+    { from: "resources/icons", to: "icons", filter: ["**/*", "!dock.png"] },
   ])
 
   // Loginom AI Agent (B4.8a): the Loginom resources and the 0.4 S3 read key stay out of app.asar.
