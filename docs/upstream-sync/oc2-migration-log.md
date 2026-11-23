@@ -14503,7 +14503,9 @@ Found 554 warnings and 0 errors.                                      # в фа�
 | Коммит | Что |
 |---|---|
 | `a4d5eea4e9` `fix(app): product marks, error page name and license on Desktop (B4.11d)` | пп. 1–5, 7, тексты 0.4, тесты, файлы `app/public` |
-| следующий | этот раздел; CAT-03, CAT-09, CAT-10, CAT-12 в `catalog.md` |
+| `59fd4453ee` `docs(upstream-sync): record the last Desktop brand traces (B4.11d)` | этот раздел; CAT-03, CAT-09, CAT-10, CAT-12 в `catalog.md` |
+| `0378f251d7` `test(app): typed platforms and readable spacing in the brand test (B4.11d)` | 11 предупреждений `bun run check` в новом тесте: `as unknown as Platform` и пустые строки |
+| следующий | итог `bun run check` в этом разделе |
 
 Файлов кода шесть — предел задания: `desktop/src/renderer/startup/splash.tsx`, `ui/src/components/logo.tsx`,
 `app/src/shell/errors/error.tsx`, `desktop/src/renderer/index.html`, `app/test-browser/product-brand.test.ts` (бывший
@@ -14638,7 +14640,7 @@ Locator: … .getByText('Released under MIT AND AGPL-3.0-only')   Expected: visi
 
 ### Приёмка
 
-База `612aba774c` (`<scratchpad>/b411d-base`), итог `a4d5eea4e9`; `<scratchpad>/b411d/suites.sh`.
+База `612aba774c` (`<scratchpad>/b411d-base`), итог `a4d5eea4e9` (тест после `0378f251d7` — 7 pass); `<scratchpad>/b411d/suites.sh`.
 
 | Команда | `612aba774c` | `a4d5eea4e9` |
 |---|---|---|
@@ -14666,7 +14668,16 @@ $ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 
 would change: 0 files
 ```
 
-`bun run check` — ниже, после раздела.
+```text
+$ bun run check                                                       # код 0, на 0378f251d7
+Found 554 warnings and 0 errors.                          # на 59fd4453ee было 565: 11 в product-brand.test.ts, исправлены
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/app:typecheck: ✓ No type errors in 2,391 files across 1 project
+@opencode/desktop:typecheck: ✓ No type errors in 3,518 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+После `0378f251d7` тест и мутации M0–M12 прогнаны заново — те же итоги.
 
 ### Остатки в области `grep`
 
