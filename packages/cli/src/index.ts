@@ -173,8 +173,13 @@ Effect.gen(function* () {
     disableErrorReporting: true,
     teardown: (exit) =>
       defaultTeardown(exit, (code) => {
-        // Commands report failures through process.exitCode.
-        const status = code === 0 ? (process.exitCode ?? 0) : code === 130 && terminated ? 143 : code
+        // Commands report failures through process.exitCode; a failing command keeps the failure code it set.
+        const status =
+          code === 0
+            ? (process.exitCode ?? 0)
+            : code === 130 && terminated
+              ? 143
+              : (code === 1 && process.exitCode) || code
         // process.exit drops output still queued for a pipe; ending the streams waits for it.
         void Promise.all(
           [process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.end(() => resolve()))),

@@ -226,7 +226,8 @@ async function renderToolError(part: SessionMessageAssistantTool, directory: str
 }
 
 export function reportRunError(input: Pick<RunCommandInput, "format">, message: string, sessionID?: string) {
-  process.exitCode = 1
+  // Keep a failure code already reported, such as the private server's (`services/standalone.ts`).
+  process.exitCode ||= 1
   if (input.format === "json") {
     process.stdout.write(
       JSON.stringify({

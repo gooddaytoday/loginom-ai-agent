@@ -95,8 +95,20 @@ test("one server writes a profile: concurrent starts share it, a second server i
 
     // A private server, as `--standalone` starts one, would open the same database and Host.
     const second = await run(["serve", "--port", "0"], item.env)
-    expect(second.code).toBe(1)
+    expect(second.code).toBe(3)
     expect(second.stderr).toContain(`PROFILE_BUSY: the CLI profile ${item.root} is open in another process`)
+    expect(await owner(item.root)).toMatchObject({ pid: first.pid })
+    // A client's private server is refused the same way (B2.7a): the client says why and exits with its code.
+    const busy = `PROFILE_BUSY: the CLI profile ${item.root} is open in another process (pid ${first.pid})`
+    const runs = await run(["run", "--standalone", "--format", "json", "hello"], item.env)
+    expect(runs.code).toBe(3)
+    expect(JSON.parse(runs.stdout)).toMatchObject({
+      type: "error",
+      error: { message: `Standalone server exited before reporting readiness (code 3): Error: ${busy}` },
+    })
+    const acp = await run(["acp"], item.env)
+    expect(acp.code).toBe(3)
+    expect(acp.stderr).toContain(`Standalone server exited before reporting readiness (code 3): Error: ${busy}`)
     expect(await owner(item.root)).toMatchObject({ pid: first.pid })
 
     // SIGKILL runs no finalizer: the latch stays with a dead owner, and the next start takes it over.

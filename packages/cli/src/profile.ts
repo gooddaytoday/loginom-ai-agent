@@ -61,7 +61,7 @@ export function current() {
 /**
  * Holds the writer latch of the profile for the server's scope. A service that finds the profile's service starting in
  * another process leaves, as it does when it finds it listening (`"incumbent"`), and its client waits for that service.
- * Any other second writer fails with `PROFILE_BUSY`.
+ * Any other second writer fails with `PROFILE_BUSY` and exit code 3, as a second CLI process did in 0.4 (design §10).
  */
 export const hold = Effect.fnUntraced(function* (root: string, service: boolean) {
   return yield* Effect.acquireRelease(
@@ -75,6 +75,12 @@ export const hold = Effect.fnUntraced(function* (root: string, service: boolean)
     Effect.catchIf(
       (error) => error instanceof Busy && service && error.owner?.service === true,
       () => Effect.succeed("incumbent" as const),
+    ),
+    // The CLI keeps this code when the server fails (`index.ts`), and a client keeps its private server's.
+    Effect.tapError((error) =>
+      Effect.sync(() => {
+        if (error instanceof Busy) process.exitCode = 3
+      }),
     ),
   )
 })
