@@ -8,20 +8,27 @@ import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "./version"
 // Loginom AI Agent (B2.7a3): the commands of the product CLI that run before it opens its profile, as in 0.4
 // (`a080f7725c:packages/opencode/src/cli/standalone.ts`). Help and version touch no storage: no profile, no channel
 // directory of Desktop, no log. `diagnostics export` reads the profile without opening it or taking its writer latch, so
-// it works while a server holds the profile. Nothing here may import `@opencode/util/global` statically: it fixes its
-// paths on import, and the profile is applied after this.
+// it works while a server holds the profile. The `loginom` commands (B2.7b) open the profile but none of the CLI.
+// Nothing here may import `@opencode/util/global` statically: it fixes its paths on import, and the profile is applied
+// after this.
 
 const headless = ["--headless", "--no-headless"]
 
 /**
- * Runs help, version and `diagnostics export` and exits the process; returns only for a command that needs the profile.
- * Help and version answer the same way they do with the profile: from the command tree, for any command in `args`.
+ * Runs help, version, `diagnostics export` and the `loginom` commands and exits the process; returns only for a command
+ * of the CLI. Help and version answer the same way they do with the profile: from the command tree, for any command.
  */
 export async function early(args: string[]) {
   const options = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
   if (options.some((value) => ["--help", "-h", "--version", "-v"].includes(value))) return exit(await help())
+  const command = options.filter((value) => !headless.includes(value))[0]
+  // `loginom setup/status/check/cancel-pending/recover` start their own Host in the profile, without the CLI (B2.7b).
+  if (command === "loginom") {
+    const { LoginomManagement } = await import("./loginom-management")
+    return exit(await LoginomManagement.command(args))
+  }
   // Diagnostics open no UI, so the headless flags do not apply to them (0.4).
-  if (options.filter((value) => !headless.includes(value))[0] !== "diagnostics") return
+  if (command !== "diagnostics") return
   const channel = productChannel(LOGINOM_AI_AGENT_CHANNEL === "latest" ? "prod" : LOGINOM_AI_AGENT_CHANNEL)
   const { diagnosticsCommand } = await import("@loginom-ai-agent/loginom-host/diagnostics-cli")
   return exit(

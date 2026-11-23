@@ -625,6 +625,22 @@ test("verifyProfile checks a starting standalone host without setup or recovery"
   } finally { await rm(context.profileDir, { recursive: true }) }
 })
 
+test("verifyProfile checks a configured connection of loginom status without hasApiKey", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32792/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "configured", generation: 1, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
+    await Bun.write(state, JSON.stringify({ state: "ready", generation: 1, url: config.loginom.url, username: config.loginom.username }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
 test("verifyProfile accepts the native schema annotation while preserving permissions and file bytes", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
@@ -775,6 +791,18 @@ test("ensureProfile: source без cache/models.json засевает катал
   expect("xiaomi-token-plan-sgp" in seeded).toBe(true)
 })
 
+// The product CLI admits only an empty directory or its own profile (B2.7c), so the seed follows the first command.
+test("ensureProfile: source засевает cache/models.json в профиль, который CLI уже принял", async () => {
+  const { config, command, profileDir } = await fakeProfile({
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready" }),
+    EVAL_FAKE_ADMIT_PROFILE: "1",
+  })
+  const source = { ...config, agent: { ...config.agent, cliMode: "source" as const } }
+  expect(await ensureProfile(source, command)).toEqual({ fresh: false })
+  expect(await Bun.file(path.join(profileDir, "cli-profile.json")).exists()).toBe(true)
+  expect(await Bun.file(path.join(profileDir, "cache", "models.json")).exists()).toBe(true)
+})
+
 test("ensureProfile: fake не засевает cache/models.json", async () => {
   const { config, command, profileDir } = await fakeProfile({
     EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
@@ -831,6 +859,24 @@ test("recoverIfNeeded: process-local starting требует подтвержд�
     const receipts = await readdir(command.cleanupDir)
     const proof = await Promise.all(receipts.map(name => Bun.file(path.join(command.cleanupDir, name, "connection-check.json")).json().catch(() => undefined)))
     expect(proof.filter(value => value !== undefined)).toEqual([{ ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } }])
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(file), { recursive: true, force: true })
+    await rm(path.dirname(check), { recursive: true, force: true })
+  }
+}, 20_000)
+
+// `loginom status` of 0.4 and of the product CLI on OpenCode 2 reports a saved connection whose Help its own Host has
+// not loaded yet as `configured`, and has no `hasApiKey` since the built-in knowledge key (B2.7b).
+test("recoverIfNeeded: configured проверяется check в одном CLI процессе", async () => {
+  const file = await stateFile({ state: "configured", generation: 1 })
+  const check = await stateFile({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "verified" } } })
+  const calls = path.join(path.dirname(file), "calls.jsonl")
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls })
+  try {
+    const result = await recoverIfNeeded(context.command, 1)
+    expect(result).toMatchObject({ recovered: false, view: { state: "configured" } })
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
   } finally {
     await rm(context.profileDir, { recursive: true, force: true })
     await rm(path.dirname(file), { recursive: true, force: true })
