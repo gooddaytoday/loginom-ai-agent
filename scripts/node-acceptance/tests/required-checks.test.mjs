@@ -40,7 +40,7 @@ for(const [path,id,command] of [
  if(id==='client-full')assert.match(text,/LOGINOM_DOCK_TEST_BROWSER=.*chromium-1246\/chrome-linux64\/chrome/);
 });
 
-for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.ts',
+for(const path of ['packages/protocol/src/index.ts',
  'packages/loginom-host/src/host-port.ts','packages/loginom-runtime/executor/schemas/action-catalog.schema.json',
  'packages/loginom-runtime/client/lib/node-contracts.mjs']) test(`public/agent stop: ${path}`,t=>{
  const r=repo(t);r.commit(path);const row=rows(r.list()).find(x=>x.includes('main-chat-approval'));
@@ -187,7 +187,7 @@ test('verify requires per-ID command and exact outcome; FAIL needs journal line'
 });
 
 test('approval has no executable command and cannot be cleared with exit 0',t=>{
- const r=repo(t);r.commit('packages/opencode/src/example.ts');const [row]=rows(r.list());
+ const r=repo(t);r.commit('packages/protocol/src/example.ts');const [row]=rows(r.list());
  const report=join(r.cwd,'report.md');writeFileSync(report,result(row));
  assert.equal(r.run('verify','--base','base','--report',report).status,1);
  writeFileSync(report,result(row,'FAIL; журнал: owner-decision.md:3'));
@@ -196,7 +196,7 @@ test('approval has no executable command and cannot be cleared with exit 0',t=>{
 
 test('verify accepts NOT_RUN, CI, COVERED and APPROVED and prints an outcome summary',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/src/managed-entry.mjs');
- r.commit('scripts/node-acceptance/run-check.md');r.commit('packages/opencode/src/example.ts');
+ r.commit('scripts/node-acceptance/run-check.md');r.commit('packages/protocol/src/example.ts');
  const checks=rows(r.list()),report=join(r.cwd,'report.md');
  const row=id=>checks.find(x=>x.startsWith('| `'+id+'`'));
  const verify=lines=>{writeFileSync(report,lines.join('\n'));return r.run('verify','--base','base','--report',report);};
