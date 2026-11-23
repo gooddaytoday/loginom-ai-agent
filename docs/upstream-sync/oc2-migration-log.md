@@ -12673,7 +12673,7 @@ CAT-03. В `catalog.md`: CAT-01 — автор и сайт Desktop, имя па�
 Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
 --frozen-lockfile` — код 0, 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
 `packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов —
-отдельное дерево `<scratchpad>/b48a-base` (`67c74e23e9`, detached, тот же `npm ci`). `packages/cli` и
+отдельное дерево `<scratchpad>/b48a-base` (`67c74e23e9`, detached, тот же `npm ci`; после прогонов удалено). `packages/cli` и
 `packages/loginom-agent` (B2.7a4b) не трогал. Эталон 0.4 — `v0.4.0`: `scripts/bundle-loginom.ts` с тестом,
 `extraResources` конфига, `src/main/loginom/desktop-service.ts` (`loginomResources`, `verifyDesktopResources`),
 `index.ts:185-193`, `proxy-env.ts` (`sidecarEnvironment` — то, что B4.1 называл `createSidecarEnv`).
@@ -12700,7 +12700,7 @@ Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` то
 | 1. Сборка | `script/build.ts` кладёт в `resources/` значки, metainfo и CLI; `extraResources` — только CLI; маска `files` `resources/**/*` унесла бы в `app.asar` всё из `resources/` | `script/build.ts` перед `electron-vite build` запускает `scripts/bundle-loginom.ts`: файл 0.4 плюс вызов `buildNodeHost(<resources>/loginom/host)` (и пустые строки для `oxlint`) после общего `stageResources({ flavor: "desktop" })`, как `build-cli.ts` (B2.7a2). Без `LOGINOM_AI_AGENT_NODE_SOURCE` и `LOGINOM_AI_AGENT_BROWSER_SOURCE` сборка падает в любом канале, как 0.4 (`prebuild.ts`). Конфиг: `{ from: "resources/loginom", to: "loginom" }` в `extraResources`, `!resources/loginom{,/**/*}` и `!resources/updates-s3.json` в `files` |
 | 2. `--verify-resources` | ключа нет; `customInstall` NSIS (B4.5a) открыл бы окно и ждал его закрытия | `index.ts`: сразу после `configureApplication()` (userData уже задан) и до `acquireApplicationLock()` — `LoginomResources.verify(...)`, затем `app.exit(0)` или ошибка в stderr и `app.exit(1)`; окна, блокировки, службы нет. `verify`: вход Host на месте, затем `verifyInstallationResources` (все файлы `resource-manifest.json` по хешу, кеш и фазы — в `<userData>/loginom`, как 0.4), на Windows — прогрев Chromium и повторная проверка с `forceHash: false`, код 0.4 |
 | 3. Переменная службы | службе ничего не передаётся; Host и навыки продукта есть только при унаследованной переменной | `prepare` в `background-service.ts` берёт `LoginomResources.serviceEnvironment(...)`, `Service.ensure` получает `env`. Упакованное приложение всегда отдаёт свои `<resources>/loginom`: клиент запускает службу с `{ ...process.env, ...env }`, унаследованное значение (из оболочки или окружения) не выигрывает — правило 0.4 (`sidecarEnvironment`, тест `system-proxy.test.ts` 0.4). Запуск из исходников `env` не задаёт: служба наследует явную переменную разработчика или работает без Host, как описали B2.3 и B2.4 |
-| 4. Неполный набор | — | упакованное приложение без `resource-manifest.json`, `bin/node[.exe]` или `host/node-host.mjs` службу не запускает: `LOGINOM_BUNDLE_INCOMPLETE: <resources> lacks <файлы>; reinstall the application`. Ошибка идёт путём любой ошибки запуска службы: `connect.failed` автомата, журнал главного процесса, экран ошибки локального сервера в окне |
+| 4. Неполный набор | — | упакованное приложение без `resource-manifest.json`, `bin/node[.exe]` или `host/node-host.mjs` службу не запускает: `LOGINOM_BUNDLE_INCOMPLETE: <resources> lacks <файлы>; reinstall the application`. Ошибка идёт путём любой ошибки запуска службы: `connect.failed` автомата, журнал главного процесса, отказ `awaitInitialization` окну (`renderer.log`) |
 
 Вход Host `host/node-host.mjs` в `resource-manifest.json` не входит: `stageResources` пишет инвентарь и публикует каталог,
 `buildNodeHost` собирает вход после, как у CLI (там его держит `cli-manifest.json`). `stage-resources.ts` не менял — его
@@ -12815,7 +12815,7 @@ skills: opencode report browser loginom-automation@resources/loginom/skills/… 
 app alive: yes; app windows: 1
 ```
 
-Обычный запуск без `host/node-host.mjs` — службы нет, окно показывает ошибку запуска локального сервера:
+Обычный запуск без `host/node-host.mjs` — службы нет, окно живо, ошибка дошла до окна (по журналам; экран не смотрел):
 
 ```text
 registration: none after 60 s; app windows: 1
@@ -12910,3 +12910,11 @@ Found 558 warnings and 0 errors.                                      # как �
 - macOS, AppImage, deb, rpm не собирались; Linux — только `--linux dir`, от root, с `--no-sandbox`. Права
   `chrome-sandbox` в ресурсах (4755 и владелец root) — B4.5b: здесь сборка шла под umask 077.
 - Настоящий Loginom и браузер: подключение Host `unconfigured`, Chromium не запускался.
+- Экран окна при отказе глазами не смотрел: что ошибка дошла до окна — по `renderer.log`. Текст
+  `LOGINOM_BUNDLE_INCOMPLETE … reinstall the application` английский и, вероятно, виден на странице ошибки локального
+  сервера в деталях; правило пакета о показываемых ошибках требует ключа i18n. Не правил: это словари `app` (этап C,
+  B4.11), за пределами шести файлов.
+- Отказ при старте ловит только отсутствие манифеста, Node и входа Host. Сборка Linux без Chromium или с изменённым
+  навыком службу запускает (установщика с `--verify-resources` на Linux нет): Host и навыки продукта тогда отказывают
+  сами и без сообщения пользователю (B2.3, B2.4). Проверять ли при старте все файлы манифеста (наличие или проверка с
+  кешем) — владельцу.
