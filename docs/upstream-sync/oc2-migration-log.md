@@ -17468,3 +17468,377 @@ CAT-04 — запись дописана (её «не перенесено» н�
 - Новые тесты гонялись только на Linux. На Windows не проверены замена `PATH` в окружении процесса рядом с
   унаследованным `Path` (тест `upgrade` CLI продукта) и две проверки по часам из 0.4 (`< 1500` и `< 1000` мс в
   `update-notifier.test.ts`), от которых предостерегает навык `unit-tests`.
+
+## B4.14b LIFE-01 и установленный Linux
+
+23.11.2026. Ветка `b414b-installed-linux` от `oc2-migration` (`58cbb36107`), рабочее дерево `.claude/worktrees/b414b`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, `.husky/_` есть; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите.
+Эталон 0.4 — `v0.4.0`: `desktop/test/loginom/shutdown-validation.mjs`, `docker/{Dockerfile,installed-smoke.mjs,run-matrix.ts}`,
+раздел Docker в `docs/testing/loginom-ai-agent/linux.md`. Файлы B4.14d в `desktop/test/loginom/` не трогал.
+
+Настоящую модель не вызывал. Все проверки v2 идут без сети (`--network none`) и модель не зовут. Профиль 0.4 писала
+подставная модель `live.mjs` (B3.3) в процессе обвязки: она приняла 10 вызовов, как в B3.3. В журнале бэкенда 0.4
+(`server.log` профиля) — 10 строк `providerID=b33stub`, других провайдеров и адресов, кроме `127.0.0.1`, нет. Исходящий
+трафик того контейнера (у него была сеть ради `apt`) не снимался.
+
+Прочитано: решения В-86, В-87, В-97 (п. 10); `docs/testing/loginom-ai-agent/README.md` — PKG-01, PKG-02, LIFE-01; этот
+журнал — B4.1 (п. 8, 14 и строка B4.14b), B3.3, B4.5a, B4.5b, B4.8a, B4.9, B4.10, B4.13.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `d9a85023e0` `test(desktop): port the installed Linux matrix and LIFE-01 check to Desktop v2 (B4.14b)` | четыре файла: `test/loginom/shutdown-validation.mjs`, `test/loginom/docker/{Dockerfile,installed-smoke.mjs,run-matrix.ts}` |
+| следующий | этот раздел |
+
+Код продукта не менялся. `catalog.json` и `catalog.md` — тоже: это новые файлы форка в тестовом каталоге Desktop.
+
+### Что перенесено из 0.4 и что изменилось
+
+| Файл | 0.4 (`v0.4.0`) | v2 |
+|---|---|---|
+| `docker/Dockerfile` | ставит DEB, `xvfb xauth dbus fonts-liberation ca-certificates`, пользователь UID 1200 | то же; для AppImage — только `Depends` DEB (`apt-get satisfy`), сам AppImage монтируется при запуске; плюс `x11-utils` (`xwininfo`). Пользователь — `test-user`: домашний каталог пользователя `tester` сканер секретов считает личным (`personal-home-path`), разрешены только `user` и `test-user` |
+| `docker/run-matrix.ts` | DEB на Ubuntu 22.04/24.04/26.04, Debian 12/13; smoke без сети, `--init`, `seccomp`/`apparmor=unconfined`; образы остаются | то же плюс цели `<система>-appimage` (`--appimage`), `--shutdown <прогоны>` и `--profile <home>` — LIFE-01 в каждом образе DEB. Сборка — классическим сборщиком без кэша (`DOCKER_BUILDKIT=0`, `--no-cache`), после цели удаляются образ и все промежуточные образы его сборки (`--keep-images` — оставить). Каталог канала — из `Package` DEB |
+| `docker/installed-smoke.mjs` | хеши ресурсов, встроенный Chromium с песочницей, мастер 0.4: три поля, значения, `window.api.loginom.read()` | хеши ресурсов, `<app> --verify-resources` — 0, тот же Chromium (PKG-02). PKG-01 по В-97 п. 10: окно X приложения (`WM_CLASS` — appId) видимо и больше 100×100, renderer загрузил приложение (`#root` не пуст), формы мастера нет, своя служба записала `service-desktop.json` и отвечает на `/api/info`, окно до неё дошло (`main.log`). Ни у одного процесса Electron нет `--no-sandbox` |
+| `shutdown-validation.mjs` | `window.api.loginom.check` к локальной фикстуре, барьер в Chromium, `app.quit()`, через 12 с нет процессов приложения и отладочных портов | `window.api.loginom` и RPC проверки подключения в v2 нет (форма — этап C), поэтому барьера в Chromium нет. Два случая по `LOGINOM_AI_AGENT_TEST_RUNS` раз: закрытие окна (`window.close()` через CDP) и `kill -TERM` главного процесса. Каждый запуск после первого — повторный, служба должна подняться снова: новый pid, свежий файл регистрации. Перед выходом записывается, что работало (служба, Node host, Help, Electron); выход с кодом 0; через 5 с нет ни одного из них и ничего, запущенного из каталога установки или домашнего; файла регистрации нет; порт службы и порт CDP закрыты. Если первый запуск видел подключение (Host запустил Help), его должен видеть каждый следующий |
+
+Процессы — по `/proc`: в `slim`-образах нет `procps`. Свои — потомки главного процесса и службы (она `detached`, B4.1) и
+всё с путём установки или домашнего каталога в командной строке: по B4.1 Desktop запускает службу из копии CLI в
+userData, а не из `/opt`.
+
+### Сборка
+
+`<scratchpad>/b414b/build.sh`, канал `dev`, umask 022: `npm ci --ignore-scripts` клиента `loginom-runtime/client`, встроенный
+CLI (`linux-x64-baseline`), `bun run build` Desktop с Node 24.19.0 и Chromium `/root/.cache/loginom-wave2-browsers`
+(как B4.8a), затем `bunx electron-builder --linux deb AppImage --x64 --publish never`.
+
+```text
+npm ci 2.30 s
+cli build 19.77 s
+Bundled Loginom linux-x64 runtime: 12378 verified resource files
+desktop build 34.33 s
+  • electron-builder  version=26.15.7 os=6.8.0-147-generic
+pack 344.99 s
+555066364 loginom-ai-agent-linux-amd64.deb        a43e055a760920ea…
+654978569 loginom-ai-agent-linux-x86_64.AppImage  bd4cf4fd6c182c10…
+Package: loginom-ai-agent-dev
+Version: 2.3.0
+Depends: libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0, libgbm1,
+ libasound2t64 | libasound2 (>= 1.0.16), ca-certificates, fonts-liberation, libcurl4 | libcurl4t64 | libcurl3-gnutls, libvulkan1
+-rwxr-xr-x 0/0 15232 ./opt/loginom-ai-agent-dev/chrome-sandbox
+-rwsr-xr-x 0/0 15232 ./opt/loginom-ai-agent-dev/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
+```
+
+`chrome-sandbox` Electron в пакете — `0755`; `postinst` electron-builder ставит `4755`, если `unshare --user` не работает. В
+`docker build` он не работает, поэтому в образах DEB — `4755 uid 0`. В AppImage после распаковки — `755`,
+владелец — пользователь, и Electron работает в песочнице пространств имён. `--no-sandbox` нигде не передавался.
+
+### Матрица
+
+Скрипты коммита `d9a85023e0`, один запуск на все десять целей. Из `packages/desktop`, с Bun 1.4.4 в `PATH`. `TMPDIR` — каталог в
+scratchpad: контекст сборки образа — копия DEB.
+
+```text
+$ bun test/loginom/docker/run-matrix.ts --artifact <out>/loginom-ai-agent-linux-amd64.deb \
+    --appimage <out>/loginom-ai-agent-linux-x86_64.AppImage --output <scratchpad>/b414b/matrix \
+    --image-prefix b414b-matrix --shutdown 3 --profile <копия перенесённого в dev профиля 0.4, владелец UID 1200>
+{"name":"ubuntu22","base":"ubuntu:22.04","kind":"deb","status":"PASS","phase":"offline-nonroot-launch","exitCode":0,"shutdown":{"status":"PASS","exitCode":0,"profile":true}}
+{"name":"ubuntu22-appimage","base":"ubuntu:22.04","kind":"appimage","status":"PASS","phase":"offline-nonroot-launch","exitCode":0}
+… (так же ubuntu24, ubuntu26, debian12, debian13 и их -appimage: все PASS)
+real	30m26.209s
+exit=0
+linux-matrix.json: artifactHash.deb a43e055a…0e19ae, artifactHash.appimage bd4cf4fd…658f15, slug loginom-ai-agent-dev, 10 reports
+```
+
+Под umask 077 этой машины файлы `test/loginom`, артефакты и `scripts/live-profiles` создаются `0600`, а каталоги — `0700`.
+Пользователь UID 1200 в контейнере их не читает, поэтому перед прогонами им дан `chmod a+rX` (git хранит только бит
+исполнения). Каталог `--profile` должен принадлежать UID 1200.
+
+| Цель | Система | PKG-02: хеши, `--verify-resources`, Chromium | PKG-01: окно, renderer, служба | `chrome-sandbox` | LIFE-01: закрытие / SIGTERM / повтор |
+|---|---|---|---|---|---|
+| `ubuntu22` | Ubuntu 22.04.5 LTS | PASS: хеши, код 0 (3967 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 567 мс, без мастера, служба :28290 | 4755 uid 0, `--no-sandbox` 0 | PASS: 3/3, 3/3, 5/5; выход 236–315 мс |
+| `ubuntu22-appimage` | Ubuntu 22.04.5 LTS | PASS: хеши, код 0 (3946 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 548 мс, без мастера, служба :28290 | 755 uid 1200, `--no-sandbox` 0 | — |
+| `ubuntu24` | Ubuntu 24.04.5 LTS | PASS: хеши, код 0 (4103 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 597 мс, без мастера, служба :28290 | 4755 uid 0, `--no-sandbox` 0 | PASS: 3/3, 3/3, 5/5; выход 231–375 мс |
+| `ubuntu24-appimage` | Ubuntu 24.04.5 LTS | PASS: хеши, код 0 (5017 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 551 мс, без мастера, служба :28290 | 755 uid 1200, `--no-sandbox` 0 | — |
+| `ubuntu26` | Ubuntu 26.04.1 LTS | PASS: хеши, код 0 (4210 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 563 мс, без мастера, служба :28290 | 4755 uid 0, `--no-sandbox` 0 | PASS: 3/3, 3/3, 5/5; выход 279–534 мс |
+| `ubuntu26-appimage` | Ubuntu 26.04.1 LTS | PASS: хеши, код 0 (4917 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 566 мс, без мастера, служба :28290 | 755 uid 1200, `--no-sandbox` 0 | — |
+| `debian12` | Debian GNU/Linux 12 (bookworm) | PASS: хеши, код 0 (4603 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 546 мс, без мастера, служба :28290 | 4755 uid 0, `--no-sandbox` 0 | PASS: 3/3, 3/3, 5/5; выход 293–324 мс |
+| `debian12-appimage` | Debian GNU/Linux 12 (bookworm) | PASS: хеши, код 0 (4423 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 542 мс, без мастера, служба :28290 | 755 uid 1200, `--no-sandbox` 0 | — |
+| `debian13` | Debian GNU/Linux 13 (trixie) | PASS: хеши, код 0 (4000 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 543 мс, без мастера, служба :28290 | 4755 uid 0, `--no-sandbox` 0 | PASS: 3/3, 3/3, 5/5; выход 243–442 мс |
+| `debian13-appimage` | Debian GNU/Linux 13 (trixie) | PASS: хеши, код 0 (4117 мс), Chromium с песочницей | PASS: «Loginom AI Agent» 1280×800 за 540 мс, без мастера, служба :28290 | 755 uid 1200, `--no-sandbox` 0 | — |
+
+Строка smoke (`ubuntu24-smoke.log`, дословно):
+
+```text
+{"status":"PASS","uid":1200,"node":"v24.19.0","os":"Ubuntu 24.04.5 LTS","manifestHash":"a95df2719a4879026b14a44055fd1f34c83cb24296ba3416098740c90fa7b701","verifyResources":{"exitCode":0,"ms":4103},"browserSandbox":true,"window":{"id":"0x200003","title":"Loginom AI Agent","wmClass":"com.loginom.aiagent.dev","width":1280,"height":800,"ms":597},"renderer":{"url":"oc://renderer/index.html","title":"Loginom AI Agent","wizard":false,"text":"Projects Add project Settings Help Nothing here yet Create a session to get started"},"service":{"pid":327,"port":"28290","version":"0.0.0-dev-202611231712"},"electronSandbox":{"chromeSandbox":"4755 uid 0","processes":10,"noSandbox":0}}
+```
+
+Заголовок работающего окна канала dev — «Loginom AI Agent», и у окна X, и у документа (B4.3 оставил проверку сюда). Это
+литерал 0.4, а не имя канала.
+
+**LIFE-01.** В каждом из пяти образов DEB — три закрытия и три SIGTERM подряд на одном профиле:
+
+- закрытие — 15/15, SIGTERM — 15/15;
+- повторный запуск — 25/25: новый pid службы и свежая регистрация каждый раз;
+- выход — за 231–534 мс с кодом 0.
+
+Перед каждым выходом работали служба, Node host, Help и 8 процессов Electron. Через 5 с — ничего: регистрации нет, порты
+28290 и CDP закрыты. Подключение видно на каждом запуске: в 30 прогонах есть Help. По `main.log` профиля перенос
+подключения был один раз — `moved`, поколение 2, на первом запуске в Ubuntu 22.04. Остальные 29 запусков — `current`.
+Предохранитель перенёс базу один раз.
+
+```text
+$ grep … main.log профиля | sort | uniq -c
+     29 state: 'current'
+      1 state: 'moved', generation: 2
+$ grep 0.3.9/0.4 <data>/log/*.log | uniq -c
+      1 message="migrated a Loginom AI Agent 0.3.9/0.4 database before opening it"
+# ubuntu22-shutdown.log, первые четыре наблюдения, дословно:
+{"case": "close", "run": 1, "relaunch": false, "status": "PASS", "service": {"pid": 132}, "before": {"service": 1, "electron": 8, "node-host": 1, "help": 1}, "exit": {"code": 0, "signal": null, "ms": 315}, "remaining": [], "registration": "removed"}
+{"case": "close", "run": 2, "relaunch": true, "status": "PASS", "service": {"pid": 276, "previous": 132}, "before": {"electron": 8, "service": 1, "node-host": 1, "help": 1}, "exit": {"code": 0, "signal": null, "ms": 307}, "remaining": [], "registration": "removed"}
+{"case": "close", "run": 3, "relaunch": true, "status": "PASS", "service": {"pid": 428, "previous": 276}, "before": {"electron": 8, "service": 1, "node-host": 1, "help": 1}, "exit": {"code": 0, "signal": null, "ms": 308}, "remaining": [], "registration": "removed"}
+{"case": "sigterm", "run": 1, "relaunch": true, "status": "PASS", "service": {"pid": 577, "previous": 428}, "before": {"electron": 8, "service": 1, "node-host": 1, "help": 1}, "exit": {"code": 0, "signal": null, "ms": 237}, "remaining": [], "registration": "removed"}
+```
+
+| Случай | Прогоны | Итог |
+|---|---|---|
+| PKG-01, DEB | 5 систем | PASS |
+| PKG-01, AppImage | 5 систем | PASS |
+| PKG-02 (хеши, `--verify-resources` 0, Chromium с песочницей) | 10 целей | PASS |
+| LIFE-01, закрытие окна | 15 (3 × 5 систем) | PASS |
+| LIFE-01, `kill -TERM` | 15 (3 × 5) | PASS |
+| LIFE-01, повторный запуск поднимает службу | 25 | PASS |
+| Профиль 0.4: перенос B4.13, служба видит подключение, ничего не потеряно | 1 отдельный запуск (`profile-check`) + 30 запусков LIFE-01 на нём | PASS; без git сессия `repo` вне своего проекта (ниже) |
+
+### Профиль 0.4 (B3.3)
+
+**Как сделан.** Профиль B3.3 удалён вместе с `/tmp/b33-lab`, поэтому он сделан заново тем же способом:
+`scripts/live-profiles/live.mjs old`. Использован выпущенный AppImage 0.4.0 (`gh release download v0.4.0`), SHA-256
+`b9b2f3f0…6bf5` — тот же, что в B3.3.
+
+- Запуск — `<scratchpad>/b414b/make-profile.sh`: образ `ubuntu24-appimage` этой матрицы (зависимости DEB, без пакета).
+- AppImage распакован в контейнере (`--appimage-extract`).
+- UID 1200, `HOME=/home/test-user`, Node из ресурсов 0.4.0.
+- Сеть у этого контейнера была, но только ради `apt-get install git`: он нужен `live.mjs` для сессии в git-репозитории.
+
+```text
+v24.19.0
+== old
+{'label': '0.4.0', 'sessions': 4, 'messages': 11, 'parts': 26, 'modelCalls': 10,
+ 'skill': ['/home/test-user/.config/loginom-ai-agent/skills/b33-sales-summary/SKILL.md'],
+ 'databases': ['.local/share/loginom-ai-agent/loginom-ai-agent.db'],
+ 'connection': ['loginom/connection/connection.json', 'loginom/connection/generations/1.json', 'loginom/connection/v040-migration.json'],
+ 'close': {'code': 0, 'ms': 335, 'backendGone': True}}
+{'session': 4, 'message': 11, 'part': 26, 'migrations': 38, 'lastMigration': '20260622202450_simplify_session_input', 'credentialRows': 0}
+{'browser': {'state': 'failed', 'failure': 'LOGINOM_LOGIN_UNAVAILABLE'}, 'saved': {'ok': True, 'state': 'starting', …}}
+```
+
+Числа те же, что у Linux 0.4.0 в B3.3: 4 / 11 / 26, 38 миграций, 10 вызовов модели. Подключение — к выдуманному стенду
+`http://127.0.0.1:9/`, пользователь `b33`, поколение 1.
+
+**Канал.** 0.4.0 — сборка prod, а собранный здесь Desktop — dev. Каталоги профиля переименованы в имена канала dev 0.4:
+`productSlug` и `Product.channels` из `v0.4.0` дают `loginom-ai-agent-dev` и `com.loginom.aiagent.dev`
+(`<scratchpad>/b414b/relocate.sh`). Переименованы `.local/share`, `.config`, `.cache`; содержимое файлов не менялось.
+Затем снят снимок: размер и SHA-256 всех 1 636 файлов домашнего каталога.
+
+**Первый запуск v2 поверх него** — `<scratchpad>/b414b/profile-check.mjs`. Он идёт в образе DEB Ubuntu 24.04, без сети,
+под UID 1200. Скрипт запускает установленный Desktop. Адрес и пароль службы он берёт из `service-desktop.json` и
+пароль не печатает. Службе задаются те же вопросы, что `live.mjs` задавал `serve` в B3.3; затем окно закрывается.
+
+```text
+"mainLog": " [info] (main) Loginom connection of 0.4 for the service { state: 'moved', generation: 2 } …",
+"serviceLog": "message=\"migrated a Loginom AI Agent 0.3.9/0.4 database before opening it\" source=/home/test-user/.local/share/loginom-ai-agent-dev/loginom-ai-agent.db target=… backup=/home/test-user/.local/share/loginom-ai-agent-dev/loginom-ai-agent.v1-backup.db schema=20260622202450_simplify_session_input rows.sessions=4 rows.messages=11 rows.p…",
+"sessions": 4, "oldSessionsListed": "4/4",
+"checks": [ {"messages": "2/2", "missing": 0}, {"messages": "3/3", "missing": 0}, {"messages": "4/4", "missing": 0}, {"messages": "2/2", "missing": 0} ],
+"owners": [ "plain: 3/3", "repo: 0/1" ],
+"skill": "config/skills", "provider": true,
+"serviceStore": { "generation": 2, "url": "http://127.0.0.1:9/" },
+"help": "pid 159, knowledge 2",
+"exit": 0, "status": "PASS"
+```
+
+- **Перенос B4.13 сработал:** `moved`, поколение 2.
+- **Служба видит подключение:** её Host запустил Help для поколения 2 (каталог `knowledge/2`).
+- **Предохранитель B3.1b перенёс базу 0.4.**
+- **Сессии на месте:** все сессии, сообщения v1 по ID, тексты, вызов инструмента и вложение.
+- **Навык** — из каталога конфига, **провайдер** — в конфиге.
+- **`repo: 0/1`** — в «Найдено»: в образе нет git.
+
+Снимок до и после (`<scratchpad>/b414b/compare.py`):
+
+```text
+0.4 files: 1636; missing after: 0; changed: 20; new files: 153
+  changed .cache/fontconfig/…-le64.cache-11 (4)
+  changed .config/com.loginom.aiagent.dev/{Cache,Code Cache,DawnGraphiteCache,DawnWebGPUCache,GPUCache}/…index (5), DevToolsActivePort,
+          Local Storage/leveldb/{000003.log,LOG}, Network Persistent State, Preferences, Session Storage/{000003.log,LOG}
+  changed .config/com.loginom.aiagent.dev/drafts.sqlite
+  changed .config/com.loginom.aiagent.dev/loginom-ai-agent.settings
+  changed .config/com.loginom.aiagent.dev/window-state-58eb85c1-….json
+  changed .local/share/loginom-ai-agent-dev/loginom-ai-agent.db
+backup = original 0.4 database: True 96501fea3cc69ab6
+unchanged: 0.4 connection store, config with skill, auth.json: True 1336 files
+settings: 0.4 keys kept with values: True added: ['backgroundColor', 'firstLaunchOnboardingComplete']
+window state: same keys: True size kept: True
+drafts.sqlite: 0.4 tables and rows kept: True {'document': 0, 'blob': 0} added tables: ['migration', 'plugin', 'state']
+```
+
+**Из профиля 0.4 ничего не потеряно.** Ни один файл не пропал. Изменились три группы файлов:
+
+- состояние Chromium и кеш шрифтов;
+- база: перенесена на месте, копия `v1-backup.db` побайтно равна базе 0.4;
+- три файла Desktop 0.4: `loginom-ai-agent.settings`, `window-state-*.json` и `drafts.sqlite`. Desktop v2 только
+  дописал в них свои ключи и таблицы, значения 0.4 на месте.
+
+Хранилище подключения 0.4, конфиг с навыком и `auth.json` не изменились. Мастера в v2 нет. Онбординг v2 на этом профиле
+проекта по умолчанию не создал: среди новых файлов нет `Documents`, сессий — те же 4, в настройки дописан
+`firstLaunchOnboardingComplete`. Экран окна на профиле 0.4 не снимался; рабочий интерфейс renderer проверен
+`installed-smoke` на чистом профиле.
+
+### Мутации
+
+Пересборки нет. Мутации подаются в образ DEB Ubuntu 24.04 (собран `--keep-images`) монтированием, сам образ не
+меняется. Две подменённые копии `app.asar` сделаны заменой байтов той же длины: целостность asar у сборки не включена.
+
+- `no-stop.asar` — `await e.stop({file:Oe()})` в `out/main/index.js` заменено на `void 0`. Это тело `stopService()` из
+  `service-identity.ts`: участник выхода больше не останавливает службу.
+- `no-renderer.asar` — `src="./assets/main-….js"` в `out/renderer/index.html` указывает на несуществующий файл.
+
+Прогоны — `<scratchpad>/b414b/{run.sh,profile-run2.sh}` (те же монтирования и окружение, что у `run-matrix.ts`).
+Профиль — копия перенесённого профиля 0.4.
+
+```text
+== M1 no-stop.asar: the quit participant no longer stops the service (runs=1)
+FAIL connection True
+  close 1 first FAIL {'pid': 126} {'service': 1, 'node-host': 1, 'electron': 8, 'help': 1} {'code': 0, 'signal': None, 'ms': 326} ['126:service', '141:node-host', '161:help'] None OWN_PROCESSES_REMAIN: 126:service 141:node-host 161:help
+  sigterm 1 relaunch FAIL {'pid': 290, 'previous': 126} {'electron': 8, 'service': 1, 'node-host': 1, 'help': 1} {'code': 0, 'signal': None, 'ms': 101} ['288:electron', '290:service', '300:node-host', '316:help'] None OWN_PROCESSES_REMAIN: 288:electron 290:service 300:node-host 316:help
+== M2 a foreign listener takes 127.0.0.1:28290 when the second launch starts (runs=1)
+FAIL connection True
+  close 1 first PASS {'pid': 254} {'electron': 8, 'service': 1, 'node-host': 1, 'help': 1} {'code': 0, 'signal': None, 'ms': 357} [] removed
+  sigterm 1 relaunch FAIL None None None None None SERVICE_NOT_STARTED
+== M3 no-renderer.asar: the renderer's entry script renamed
+Error: RENDERER_NOT_LOADED
+== M4 one byte of skills/loginom-automation/SKILL.md
+Error: LOGINOM_RESOURCE_HASH_MISMATCH
+damaged: --verify-resources exit=1
+intact: --verify-resources exit=0
+== M5 0.4 store opened to others (755), profile-check
+FAIL |  [warn] (main) Loginom connection of 0.4 not moved to the service { state: 'failed', | store None | help None | sessions 4/4 | exit 0
+```
+
+| Случай | Мутация | Итог |
+|---|---|---|
+| LIFE-01, закрытие окна | M1 | красный: служба, Node host и Help живы через 5 с |
+| LIFE-01, SIGTERM | M1 | красный: то же |
+| LIFE-01, повторный запуск | M2: чужой процесс занимает порт канала, как только начинается второй запуск | красный: `SERVICE_NOT_STARTED` |
+| PKG-01 | M3 | красный: `RENDERER_NOT_LOADED`; голого окна недостаточно |
+| PKG-02 | M4: один байт навыка | красный: `LOGINOM_RESOURCE_HASH_MISMATCH`, `--verify-resources` — 1 |
+| профиль 0.4 | M5: каталог хранилища 0.4 открыт как `755`, как в B4.13 | красный: `failed`, у службы нет подключения, Help не стартует |
+
+M1 и M2 прогнаны на `shutdown-validation.mjs` из `d9a85023e0`, по одному прогону каждого случая. M3 и M4 шли, пока в
+`installed-smoke.mjs` вносилась последняя правка (поле `window.ms` отчёта), проверки не менялись. До переименования
+пользователя образа M1–M4 дали тот же результат.
+
+### Приёмка
+
+Код продукта задача не меняла; новые файлы `bun test` не подхватывает (в именах нет `.test.`), `bun typecheck` их не видит
+(`include` пакета — `src`, `perf`). База — то же дерево без `packages/desktop/test` (`58cbb36107`), итог — с ним;
+`LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0.
+
+| `desktop` | `58cbb36107` | итог |
+|---|---|---|
+| `bun typecheck` | 3 370 файлов, ошибок нет | 3 370 файлов, ошибок нет |
+| `bun test --timeout 30000` | 603 pass, 4 skip, 0 fail (607 тестов, 75 файлов) | 603 pass, 4 skip, 0 fail (607, 75) |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 592 divergent upstream files                      # новые файлы форка не считаются
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # код 0
+would change: 0 files
+$ oxlint и prettier --check трёх файлов JS/TS                          # 0 warnings, чисто; Dockerfile не линтуется
+$ bun run check                                                         # код 0, 25 с, на d9a85023e0
+Found 554 warnings and 0 errors.                                        # как в B4.13 и B4.7b; в test/loginom — ни одного
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,370 files across 2 projects [8.57s]
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **PKG-01 — окно приложения, а не мастер** (В-97 п. 10). Проверка открытого окна — окно X (как B4.8a), renderer с
+  приложением (M3 показывает, что одного окна мало) и своя служба. Поля мастера 0.4 (три поля, значения) — UI-01, он
+  отменён (В-10).
+- **AppImage — распаковкой, без FUSE**, как разрешает `linux.md` 0.4 («рабочий FUSE либо предварительное извлечение»):
+  `--appimage-extract` в контейнере, запуск `AppRun`. Матрица 0.4 AppImage не запускала; здесь он идёт на тех же пяти
+  системах. LIFE-01 — только на DEB: у AppImage тот же главный процесс, а `AppRun` — ещё один процесс между тестом и
+  Electron.
+- **LIFE-01 — на профиле 0.4**, во всех пяти образах DEB подряд на одной копии профиля. Там служба держит подключение и
+  у Host есть рантайм Help, а не только Node host, как в B4.10. Первый запуск в Ubuntu 22.04 и выполнил перенос.
+- **Барьер в Chromium 0.4 не перенесён.** `window.api.loginom.check` нет, RPC проверки подключения в плагине нет (B2.3 —
+  только `loginom.preflight`), а стенда нет. Chromium Host в прогонах не запускался.
+- **Сборка образов — классическим сборщиком без кэша**, удаление — по ID шагов из журнала сборки. Проба показала: при
+  удалении образа по тегу его родители остаются висеть (хранилище образов containerd), у неудачной сборки — тоже.
+  BuildKit оставил бы свой кэш, а чистить его можно только целиком, вместе с чужим.
+- **`test-user` вместо `tester` 0.4** — из-за сканера секретов (выше). Профиль 0.4 снят с тем же `HOME`.
+- **Проверка профиля 0.4 и перенос каталогов — в scratchpad**, как приёмка собранного приложения B4.13: в списке файлов
+  задачи их нет. Запуск поверх профиля входит в `run-matrix.ts --profile`.
+- **Порт CDP фиксированный** (29400 у smoke, 29410 у LIFE-01): в контейнере своя сеть, конфликта нет.
+
+### Найдено, не чинил
+
+- **Сессия из git-репозитория без git попадает не в свой проект.** v2 считает ID проекта по
+  `git rev-list --max-parents=0 HEAD` (`core/src/git.ts:292`). В чистых образах git нет, DEB от него не зависит, как и в
+  0.4. Поэтому сессия `repo` профиля 0.4 в списке есть, со всеми сообщениями, но `GET /api/session?project=` для её
+  каталога её не находит: `repo: 0/1`. Проба в том же образе с git (поставлен `apt`, `docker commit`, удалён после) дала
+  `plain: 3/3`, `repo: 1/1`; она шла на профиле, снятом до переименования пользователя образа (`tester`), тем же
+  `live.mjs`. Пользователь 0.4 с git увидит её на месте. После удаления git сессия выпадет из проекта
+  каталога. Остаётся в общем списке.
+- **`postinst` electron-builder** снимает setuid с `chrome-sandbox` Electron, если пространства имён пользователя работают,
+  и ставит профиль AppArmor на Ubuntu 24+. В контейнере ни то ни другое не проверить: `docker build` отказывает в
+  `unshare`, поэтому `4755`; AppArmor контейнеру недоступен.
+- **Версия службы `0.0.0-dev-202611231712` при версии приложения 2.3.0.** Встроенный CLI собран без
+  `LOGINOM_AI_AGENT_VERSION`, как в B4.8a–B4.13. Номер задаёт выпуск (В-99, B5).
+- В M1 после SIGTERM, кроме службы, остался процесс из `/opt` (`288:electron`). Это только под мутацией: в 30 прогонах
+  без неё таких процессов нет. Не разбирал.
+
+### Не проверено
+
+- **Chromium Host (браузеры LIFE-01).** Без стенда Loginom он не стартует, а запустить проверку подключения у Desktop v2
+  нечем. Закрытие рантаймов Host проверено на Help.
+- **Настоящий рабочий стол.** GNOME/KDE, Wayland, выход из сеанса менеджером сеанса, SIGINT — не проверялись. Проверены
+  только Xvfb в контейнере, `window.close()` через CDP и `kill -TERM`.
+- **Установка не в контейнере.** `dpkg -i` на машине с AppArmor и рабочими пространствами имён (`chrome-sandbox` `0755`),
+  AppImage через FUSE, обновление установленной 0.4 пакетом v2 (`dpkg` поверх `/opt/loginom-ai-agent`) — нет.
+- **Каналы prod и beta** не собирались, только dev. Профиль 0.4 — prod-профиль, переименованный в dev.
+- **AppImage** — только PKG-01 и PKG-02, LIFE-01 на нём не гонялся.
+- **Уборка после неудачной сборки** в `run-matrix.ts` не исполнялась: все сборки матрицы прошли. Прерванная вручную сборка
+  (до переименования пользователя) оставила контейнер и два образа, они удалены вручную.
+- **Настоящие каталоги** проверены поиском файлов новее начала задачи: в `~/.local/share/loginom-ai-agent-dev/log` дописан
+  только журнал канала `local` — запуски CLI из исходников (`auth --help`, `session export/import`) в минуты, когда мои шаги
+  шли в контейнерах или не шли вовсе; это тесты `cli` другой задачи. Других следов нет.
+- **macOS и Windows** — B4.14c и этап G.
+
+### Уборка
+
+Образы матрицы удалены самим `run-matrix.ts` (по 7 `Deleted` на цель в `*-cleanup.log`). Образы проб (`--keep-images`,
+образ с git, проба сборщика, прерванная сборка) удалены по ID. Базовые образы, которые скачала задача, удалены по
+имени: `ubuntu:22.04`, `ubuntu:24.04`, `ubuntu:26.04`, `debian:bookworm-slim`. `debian:trixie-slim` был до задачи и
+остался.
+
+```text
+$ diff <образы до задачи> <образы после>      # пусто: 28 образов, те же ID
+$ docker system df
+Images          28        0         11.87GB   10.02GB (84%)
+Containers      0         0         0B        0B
+Build Cache     171       0         15.06GB   11.04GB          # как до задачи
+$ docker images -a --filter dangling=true -q | wc -l
+0
+$ df -h /
+/dev/vda1       242G  224G   18G  93% /
+```
+
+Сборки, AppImage 0.4.0, подменённые `app.asar`, профили и контекст удалены. В дереве удалены выходы сборки:
+`resources/{icons,*.metainfo.xml,loginom-ai-agent-cli*}`, `packages/cli/.cache`, `packages/dashboard/dist`,
+`node_modules` клиента `loginom-runtime/client`. `git status --ignored` показывает только `.husky/_`, `node_modules` и
+кэши `.turbo` от `bun run check`. Настоящие `~/.local/share` и `~/.config` не трогались: всё шло в контейнерах с
+собственным домашним каталогом.
