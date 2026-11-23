@@ -1313,45 +1313,29 @@ test.describe("pages open before slow data", () => {
     await expect(await skill).toHaveURL(`${consoleUrl}/org_acme/extensions?kind=skills&search=funnel`)
   })
 
-  for (const fails of [false, true]) {
-    test(`about ${fails ? "keeps its fallback when contributors fail" : "updates contributors later"}`, async ({
-      page,
-    }) => {
-      const { settings } = await open(page)
-      const gate = Promise.withResolvers<void>()
-      await page.route(contributors, async (route) => {
-        await gate.promise
+  test("about names the product and asks GitHub for nothing", async ({ page }) => {
+    const { settings } = await open(page)
 
-        if (fails) return route.abort("failed")
-        await route.fulfill({
-          json: [],
-          headers: {
-            "access-control-allow-origin": "*",
-            "access-control-expose-headers": "Link",
-            Link: `<${contributors}&page=1004>; rel="last"`,
-          },
-        })
-      })
-      const requested = page.waitForRequest(contributors)
-      await settings.getByRole("tab", { name: "About", exact: true }).click()
-      await requested
-      await expect(settings.getByText("Released under the MIT License", { exact: true })).toBeVisible()
-      await expect(settings.getByRole("link", { name: "935 others", exact: true })).toBeVisible()
-      await expect(settings.getByRole("button", { name: "Back to app" })).toBeVisible()
+    // Upstream counted contributors from api.github.com when About opened; the product page sends no such request.
+    const github = page
+      .waitForRequest((request) => new URL(request.url()).hostname === "api.github.com", { timeout: 2_000 })
+      .then(
+        () => true,
+        () => false,
+      )
 
-      const website = settings.getByRole("link", { name: "www.opencode.ai", exact: true })
-      await website.focus()
-
-      const settled = fails
-        ? page.waitForEvent("requestfailed", (request) => request.url() === contributors)
-        : page.waitForResponse(contributors)
-
-      gate.resolve()
-      await settled
-      await expect(settings.getByRole("link", { name: fails ? "935 others" : "988 others", exact: true })).toBeVisible()
-      await expect(website).toBeFocused()
-    })
-  }
+    await settings.getByRole("tab", { name: "About", exact: true }).click()
+    const about = settings.locator(".settings-about-content")
+    await expect(about.getByText("Loginom AI Agent", { exact: true })).toBeVisible()
+    await expect(about.getByText("Loginom AI Agent — desktop assistant for Loginom workflows")).toBeVisible()
+    await expect(about.getByRole("link")).toHaveCount(1)
+    await expect(about.getByRole("link", { name: "loginom.ru", exact: true })).toHaveAttribute(
+      "href",
+      "https://loginom.ru/",
+    )
+    await expect(about).not.toContainText(/opencode/i)
+    expect(await github).toBe(false)
+  })
 })
 
 test("the version's Copied tooltip closes when another settings page opens", async ({ page, context }) => {

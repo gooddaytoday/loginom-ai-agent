@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { Product } from "@loginom-ai-agent/product"
+import { DESKTOP_MENU } from "@/shell/commands/desktop-menu"
 import {
   createDesktopNativeBundle,
   DESKTOP_NATIVE_ENGLISH,
@@ -110,5 +112,28 @@ describe("desktop product name", () => {
     )
 
     expect(upstream).toEqual([])
+  })
+
+  test("names the product in the en and ru About strings", () => {
+    // About no longer shows the trademark line: the product's own wording waits for the owner.
+    const upstream = [en, dict].flatMap((messages) =>
+      Object.entries(messages).filter(
+        ([key, value]) =>
+          key.startsWith("settings.about.") && key !== "settings.about.trademark" && /opencode/i.test(value),
+      ),
+    )
+
+    expect(upstream).toEqual([])
+  })
+
+  test("leads the Help menu to the product, as 0.4 did", () => {
+    const help = DESKTOP_MENU.find((menu) => menu.id === "help")?.items ?? []
+
+    expect(help.flatMap((entry) => (entry.type === "item" && entry.href ? [entry.href] : []))).toEqual([
+      Product.documentation,
+      Product.support,
+      Product.support,
+      Product.support,
+    ])
   })
 })
