@@ -88,7 +88,8 @@ test("one server writes a profile: concurrent starts share it, a second server i
   const item = await profile(isolatedEnv(root, { LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile") }), port)
   try {
     const started = await Promise.all([run(["service", "start"], item.env), run(["service", "start"], item.env)])
-    expect(started).toEqual([0, 1].map(() => ({ code: 0, stdout: `http://127.0.0.1:${port}\n`, stderr: "" })))
+    const url = { code: 0, stdout: `http://127.0.0.1:${port}\n`, stderr: "" }
+    expect(started).toEqual([url, url])
     const first = await registered(item.registration)
     expect(await owner(item.root)).toMatchObject({ pid: first.pid, service: true })
 

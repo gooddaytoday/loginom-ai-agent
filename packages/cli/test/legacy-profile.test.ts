@@ -177,7 +177,7 @@ test("a 0.4 CLI profile works in place: its service brings the sessions and the 
   // The inherited config directory and database of isolatedEnv do not apply: the profile replaces them.
   const env = isolatedEnv(root, { LOGINOM_AI_AGENT_CLI_PROFILE: profile })
   // The profile's service port is pinned in its service config; the derived one is fixed per root.
-  const applied = { ...env }
+  const applied: NodeJS.ProcessEnv = { ...env }
   CliProfile.apply(applied)
   const service = `service-${applied.LOGINOM_AI_AGENT_SERVICE_IDENTITY}.json`
   const free = Bun.serve({ port: 0, fetch: () => new Response() })
