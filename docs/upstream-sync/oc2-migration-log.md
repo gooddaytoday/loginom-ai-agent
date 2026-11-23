@@ -10558,3 +10558,323 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 - Настоящий Host и Loginom: коды 2 и 4 и ошибки `loginom_*` — по записанным вызовам, не сквозь процесс; `--headless`.
 - `denied` у `--file` — тесты шли под root. Windows и macOS.
 - `evals` в режиме binary с bubblewrap и его `main()` (подготовка профиля — выше); строка 208 `run-node-selection-attempt.ts`.
+
+## B2.7b loginom setup и status
+
+22.11.2026. Ветка `b27b-loginom-setup` от `oc2-migration` (`96dd4a13e1`), рабочее дерево `.claude/worktrees/b27b`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код
+0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` и `bun install
+--frozen-lockfile` в `evals` — в этом дереве и в дереве базы `<scratchpad>/b27b-base` (`96dd4a13e1`, detached); хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/loginom-agent` (B2.6c) не трогал. Основа —
+0.4 `v0.4.0` (`a63462dde1`, В-99; задание называло `a080f7725c`, разница — в «Приёмке пакетов»):
+`opencode/src/cli/{loginom-management,standalone-command,standalone-bundle}.ts`, тесты
+`test/cli/{loginom-management,standalone-status,standalone-preflight,standalone-startup}.test.ts`; потребители —
+`scripts/node-acceptance/run-check.py:3517`, `evals/src/profile.ts`, `evals/script/run-node-selection-attempt.ts`.
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `04d5ffd107` `feat(cli): loginom setup, status, check, cancel-pending and recover of the product CLI (B2.7b)` | файл форка `cli/src/loginom-management.ts` (новый); вызов во входе продукта — `cli/src/standalone.ts` (`Standalone.early`), комментарий в `cli/src/loginom-cli.ts`; тест `cli/test/cli-loginom.test.ts` (новый) | `clean` |
+| `69179b1a05` `fix(evals): prepare the profile with loginom status, setup and auth list of the product CLI on OpenCode 2 (B2.7b)` | `evals/src/profile.ts` (+16 −8), фикстура `evals/fixtures/fake-cli.ts`, тесты `evals/test/profile.test.ts` | `clean` |
+| `3090388507` `test(cli): the browser mode of loginom setup reaches the validation login (B2.7b)` | режим браузера в проверке входа: до прогона мутаций его не проверял ни один тест (M4) | `clean` |
+| `8a3cadb443` `test(cli): loginom status reports a held Help as a configured connection (B2.7b)` | случай с придержанным Help — после выжившей мутации M9 | `clean` |
+| `15aa8e99b9` `chore(cli): name v0.4.0 as the reference of the loginom commands (B2.7b, В-99)` | ссылки в комментариях новых файлов | `clean` |
+| следующий | этот раздел | |
+
+Правок upstream нет: все файлы кода — файлы форка, `catalog.json` и `catalog.md` не менялись.
+
+### Команды и формат
+
+`loginom status|setup|check|cancel-pending|recover` — команды входа продукта (`cli/src/loginom-cli.ts`): первый аргумент
+без `--headless`/`--no-headless` — `loginom`, и `Standalone.early` отдаёт его `LoginomManagement.command`, как отдаёт
+`diagnostics` (B2.7a3). Дерево команд CLI v2 и сервер не загружаются. Порядок — как в 0.4 (`standalone-command.ts`):
+
+1. разбор аргументов (`--format default|json`, `--headless`/`--no-headless`, `--stdin-json` только у `setup`,
+   `--acknowledge [id…]` только у `recover`); ошибка — `CLI_ARGUMENT_INVALID`, код 2, профиль не открывается;
+2. профиль CLI (`CliProfile.apply`, B2.7c) и его защёлка `.writer` (`CliProfile.take`, владелец `service: false`) на всё
+   время команды. Защёлку держит служба профиля или частный сервер — `PROFILE_BUSY: the CLI profile … (pid N)` в stderr,
+   код 3, второго Host на профиле нет;
+3. ресурсы Host: явная `LOGINOM_AI_AGENT_RESOURCES` (запуск из исходников, `evals`) или проверенные `resources/loginom`
+   собранного CLI (`CliResources.locate`, B2.7a2), в них `bin/node` и `host/node-host.mjs`. Нет —
+   `LOGINOM_BUNDLE_REQUIRED` (2), неполные — `LOGINOM_BUNDLE_INCOMPLETE` (1);
+4. свой Node host (`launchNodeHost`) в `<профиль>/loginom` — каталог Host службы профиля (B2.3); `headless` — из флага,
+   `strictRecovery` — из `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`, как в 0.4;
+5. `loginomManagement` 0.4 без изменений: `connection.status` → (`setup`) `connection.verify-resources` →
+   `connection.check` (Help и вход в браузере) → `connection.save`; закрытие Host; защёлка снимается. Host, чья очистка не
+   подтверждена (`LOGINOM_HOST_CLEANUP_FAILED`, код 1), оставляет защёлку, как в 0.4; следующий сервер заберёт её, когда
+   процесса не станет (B2.7c).
+
+`setup --stdin-json` читает `{url?, username?, password?, apiKey?}` (до 64 КиБ; `apiKey` старых скриптов принимается и не
+хранится). Сохраняет Host (`node-entry.ts`, кодек `cliCredentials`, В-97, п. 4): `<профиль>/loginom/connection/
+generations/<N>.json` и `connection.json`, `secrets` — `{"format":"loginom-cli-secrets-v1","protection":"plaintext"}` на
+Linux (`dpapi`/`keychain` на Windows/macOS), каждое сохранение — новое поколение. Базы и сервера команда не создаёт.
+
+| Вывод | `--format json` | без него |
+|---|---|---|
+| `status` | `Loginom.View` одной строкой; `starting` своего Host — `configured` (есть поколение) или `unconfigured` | текст 0.4: «Подключение настроено: <url>, пользователь <имя>. …» / «Подключение не настроено — `loginom setup`.» и строки об изменении и восстановлении |
+| `setup`, `cancel-pending`, `recover` | `Loginom.View` после операции | тот же JSON с отступами |
+| `check` | `{"ok":true,"code":"LOGINOM_CONNECTION_VALID","help":{"state":"ready"},"browser":{…}}` | то же с отступами |
+| отказ | `{"ok":false,"code":"<КОД>"}` в stdout и `<КОД>` в stderr | `<КОД>` в stderr |
+
+Коды выхода — таблица 0.4: 0; 2 — `CLI_ARGUMENT_INVALID`, `CLI_SETUP_INVALID`, `CLI_SETUP_TOO_LARGE`,
+`CLI_STDIN_REQUIRED`, `LOGINOM_CONFIG_REQUIRED`, `LOGINOM_CANDIDATE_INVALID`, `LOGINOM_URL_INVALID`,
+`LOGINOM_USERNAME_INVALID`, `LOGINOM_BUNDLE_REQUIRED`; 3 — `PROFILE_BUSY`, `LOGINOM_REVISION_CONFLICT`,
+`LOGINOM_APPLICATION_PENDING`, `LOGINOM_APPLICATION_COMMITTING`, `LOGINOM_RECOVERY_BUSY`, `LOGINOM_RECOVERY_CONFLICT`;
+4 — `LOGINOM_RECOVERY_REQUIRED`, `LOGINOM_CALL_UNCERTAIN`, `LOGINOM_RECOVERY_CONFIRMATION_REQUIRED`; 130 —
+`CLI_CANCELLED`; прочее — 1. Секретов в выводе нет: `View` несёт только `hasPassword`, ошибки — коды `hostError`.
+
+### `providers status`: что выбрано
+
+`evals` зовёт `providers status --provider <id> --format json` только в режиме общего OAuth (`config.auth`,
+`LOGINOM_AI_AGENT_SHARED_AUTH_DIR`) и ждёт квитанцию `shared-oauth-status-v1` (поколение UUID, хеш принципала,
+`refresh_required`). В 0.4 этой команды нет: `git grep "shared-oauth-status-v1\|SHARED_AUTH_DIR" <ref> -- packages`
+пуст и на `a080f7725c`, и на `v0.4.0`, а адаптация `87c7d497d6` из архивного журнала evals
+(`docs/archive/2026-10-16-evals-parallel-history.md`) жила в отдельном дереве и в репозитории отсутствует (`git cat-file
+-t` — нет объекта). Общего OAuth-хранилища нет ни в
+0.4, ни в v2. Переносить из 0.4 нечего, а `auth list` v2 не даёт ни поколения, ни хеша. Выбрано меньшее:
+
+- **Ветка без общего OAuth** (`data/auth.json` и подсказка `providers login`) переведена на `auth list --standalone
+  --format json` профиля и подсказку `auth login`. v2 держит ключи в базе профиля (`credential`) и импортирует
+  `data/auth.json` 0.4 только при создании базы (миграция `import_legacy_credentials`, B3.2), поэтому прямое чтение файла
+  не видит ни `auth login`, ни удалённых ключей. `--standalone` обязателен: без него `auth list` оставляет службу профиля,
+  следующая команда `loginom` получила бы `PROFILE_BUSY`, а надзор процессов `evals` не подтвердил бы очистку.
+- **Ветка общего OAuth не менялась.** На v2 команда `providers` неизвестна, разбор `shared-oauth-status-v1` отказывает:
+  `SHARED_AUTH_STATUS_INVALID`, код 2 — подготовка слота останавливается, а не идёт на чужих ключах. Вопрос владельцу ниже.
+
+### Потребители
+
+**`evals` ждал другой `status`, чем давал 0.4.** `loginom status` 0.4 с `e2573bae51` (13.11) отвечает `configured`, когда
+Host своей команды ещё не загрузил Help, а `hasApiKey` в `Loginom.View` нет с `5fa6027fcf` (03.11, встроенный ключ
+знаний). `evals/src/profile.ts` на точке отсечения требует `state` `ready`/`starting` и `hasApiKey === true`: `verifyProfile`
+отказывал любому профилю (`PROFILE_NOT_PREPARED`), `recoverIfNeeded` отказывал `configured` без `check`. CLI оставлен как в
+0.4; потребитель поправлен минимально: `configured` проверяется `loginom check`, как `starting`, `hasApiKey` в
+`verifyProfile` больше не требуется (ветка `starting` + `hasApiKey` в `recoverIfNeeded` осталась).
+
+**Профиль `evals` в режиме source.** `ensureProfile` клал `cache/models.json` в пустой каталог профиля до первой команды
+CLI, а CLI открывает только пустой каталог или свой профиль (B2.7c, так же 0.4): первый `loginom status` и `setup`
+отвечали `PROFILE_FORMAT_INVALID`. Затравка теперь после первой команды.
+
+### Приёмка: `run-check.py` и `evals` на новом CLI
+
+Выдуманный стенд (`<scratchpad>/b27b-runs/fixture.ts`): ресурсы, как в тесте, браузер — в своём каталоге
+`browsers/chromium/chrome`; вход продукта из исходников; Loginom, Chromium и сеть не нужны.
+
+**`run-check.py`** (`<scratchpad>/b27b-runs/run-check-accept.{ts,py}`): модуль `run-check.py` загружается `runpy`,
+`Runner.phase` — его собственный код (stdout/stderr в файлы фазы, код выхода, бюджет). Четыре строки подготовки
+`run-check.py:3517-3520` скопированы дословно: `setup --headless --stdin-json --format json` с паролем в stdin, проверка
+`browser.state == 'verified'`, ссылка `data/auth.json` на общий файл OAuth (в фиктивном `HOME` — ключ
+`fixture-openai-key`), запись `config/loginom-ai-agent.json`. `build/bin/loginom-ai-agent-cli` — обёртка `cd packages/cli
+&& exec bun src/loginom-cli.ts "$@"` (из чужого каталога Bun не находит `bunfig.toml` пакета и не грузит TUI). Затем той же
+`phase` — `auth list --standalone --format json`.
+
+```text
+$ bun run-check-accept.ts <repo>                     # код 0
+{"setup": {"generation": 1, "url": "https://loginom.example.test/app/", "username": "fixture-user", "hasPassword": true,
+           "state": "ready", "browser": {"state": "verified"}},
+ "setup_stderr": "", "secret_in_output": false,
+ "auth_list": ["openai"],                              # ключ из ссылки data/auth.json импортирован при создании базы
+ "writer": false,
+ "profile": ["cache", "cli-profile.json", "config", "data", "loginom", "state"]}
+```
+
+**`evals`** (`<scratchpad>/b27b-runs/evals-accept.ts`): шаги `prepareProfile` из `evals/src/run.ts` —
+`releaseStaleWriter`, `ensureProfile`, `assertAuth`, `recoverIfNeeded`, `archiveProfileHistory` — кодом `evals`, команда —
+`agentCommand` в режиме source (`bun run src/loginom-cli.ts`, `LOGINOM_AI_AGENT_RESOURCES` — ресурсы стенда), каждая
+команда управления — под надзором процессов `evals` (`superviseProcess`: ноль оставшихся процессов, защёлка снята).
+Между `ensureProfile` и `assertAuth` в профиль кладётся `data/auth.json` 0.4 с ключом `openai`.
+
+```text
+# до правок evals (новый CLI, evals как на 96dd4a13e1)
+{"done": false, "steps": {"releaseStaleWriter": {"ok": true},
+ "ensureProfile": {"ok": false, "error": "loginom setup завершился кодом 1:\nPROFILE_FORMAT_INVALID"}}, "profile": ["cache"]}
+# после 69179b1a05
+{"done": true,
+ "steps": {"releaseStaleWriter": {"ok": true, "value": false}, "ensureProfile": {"ok": true, "value": {"fresh": true}},
+   "assertAuth": {"ok": true},
+   "recoverIfNeeded": {"ok": true, "value": {"revision": 1, "generation": 1, "url": "https://loginom.example.test/app/",
+     "username": "fixture-user", "folder": "/fixture-user", "hasPassword": true, "state": "ready", "browser": {"state": "unknown"}}},
+   "archiveProfileHistory": {"ok": true, "value": "b27b-initial-P0AFxR"}},
+ "connection": {"generation": 1, "url": "https://loginom.example.test/app/", "username": "fixture-user", "protection": "plaintext"},
+ "logins": [{"validation": true, "url": "https://loginom.example.test/app/", "username": "fixture-user", "secretMatches": true}]}
+```
+
+Ветка `configured` → `check` в этом прогоне не встретилась (Help-заглушка отвечает сразу, `status` — `ready`); она — в
+тестах `evals` и в случае с придержанным Help в `cli-loginom.test.ts`.
+
+**Служба видит подключение** — тест `cli-loginom.test.ts` (выше): после `setup` сервер профиля (`serve` входа продукта,
+тот же путь `server-process.ts` → `ServiceHost.start`, что у службы) стартует Help сохранённого поколения из своего Node
+host; мутация M1 (Host команды в другом каталоге) его краснит.
+
+### Тесты
+
+`cli/test/cli-loginom.test.ts` — 10 тестов. Процессные — только Linux (фикстура несёт Node Linux и не собирает помощник
+Keychain), нужен `LOGINOM_AI_AGENT_TEST_NODE`. Команды — вход продукта из исходников с настоящим Node host (`build-node-host.ts`)
+и ресурсами выдуманного стенда: Node 24.19.0, Help-фикстура `writeHelp`, `resource-manifest.json` по `resourceInventory`;
+`knowledge-entry.mjs` и `managed-entry.mjs` — заглушки, которые записывают каждый старт Help (поколение, pid) и каждый вход
+в браузере (адрес, пользователь, пароль, `headless`). Ни Chromium, ни Loginom, ни сети. Пароли — `fixture-…`.
+
+| Тест | Из 0.4 | Что |
+|---|---|---|
+| stdin setup distinguishes missing secrets, explicit empty password and replacements | `loginom-management` | разбор JSON `setup` |
+| setup finishes resource verification before minting its validation token | `loginom-management` | порядок `status` → `verify-resources` → `check` → `save` |
+| status prints the saved connection and recovery work instead of a new Host's starting phase | `standalone-status` | `statusView`, тексты, склонение |
+| status starts the Host from the resources and leaves nothing behind | `standalone-status` «actual standalone status…» (без части `run --command`) | `status` JSON и текст на пустом профиле; рядом только `profile` и `resources`, нет защёлки, `runtime`, базы; `--headless --no-headless` и `--stdin-json` у `status` — 2 |
+| setup from stdin JSON saves a new generation through cliCredentials, and the profile's server reads it | новый (приёмка) | командная строка `run-check.py:3517`: код 0, stdout — один JSON с `browser.state: verified`, вход в браузере получил адрес, имя и пароль из stdin и `headless: true`; `connection.json` — поколение 1, конверт `plaintext`, `cliCredentials` раскрывает пароль; в `data/` пусто; вызов `evals` (без `--headless`, с `apiKey`) — поколение 2; `status` — `configured`/`ready` и текст; **`serve` входа продукта с теми же ресурсами стартует Help поколения 2 из своего Node host** (pid Help → Node host → `serve`); пока сервер держит профиль, `status` — 3 и `PROFILE_BUSY`; после остановки защёлки нет |
+| management commands share durable setup and recovery semantics through the real Node host | `standalone-status`, фаза `setup-recovery` (без последнего `run`) | `check` до `setup` — 2; `setup` без `--stdin-json` — 2 `CLI_STDIN_REQUIRED`; мусор — 2 `CLI_SETUP_INVALID`; поколения 1 и 2; `check` — 0; `cancel-pending` — 0; строгий журнал: текст о восстановлении, `recover` без подтверждения — 4, чужой id — 3, свой id и все — 0; без строгого журнала незавершённая операция ушедшего процесса снимается (G4) |
+| management separates Help from browser validation: valid-help, missing-help | `standalone-preflight` | отказ входа в браузере сохраняет поколение 1 с `browser.failed`, `check` — 0 и тот же отказ, процесс браузера завершён; без Help — 1 `LOGINOM_KNOWLEDGE_UNAVAILABLE`, входа не было, `unconfigured` |
+| a command exits after failed Host cleanup despite retained process handles | `standalone-status` | вход с вечным `setInterval`: код 1 за 8 с, `LOGINOM_HOST_CLEANUP_FAILED`, `{code: LOGINOM_HOST_CLOSED}`, защёлка осталась |
+| startup failure releases the profile only after confirmed cleanup | `standalone-startup` (режим `management`) | `confirmed`, `bad-ack`, `exit-without-ack`, `secret-error`: код 1, код отказа или `LOGINOM_HOST_CLEANUP_FAILED`, защёлка снята только при подтверждённой очистке, `private-startup-sentinel` нигде, Node host завершён |
+
+`evals/test/profile.test.ts`: +3 и один переписанный — `assertAuth` по `auth list` (аргументы `auth list --standalone
+--format json`, `data/auth.json` сам по себе не допускает), `recoverIfNeeded` и `verifyProfile` с `configured` без
+`hasApiKey` (`status`, затем `check`), `ensureProfile` source в профиле, который CLI принимает только пустым
+(`EVAL_FAKE_ADMIT_PROFILE` в `fake-cli.ts`). По `evals/AGENTS.md` — сначала красные (4 из 4 упали на коде до правки), затем код.
+
+Тесты 0.4, не перенесённые:
+
+| 0.4 | Почему |
+|---|---|
+| `standalone-status` «help says what status shows…» | справка — из дерева команд v2 (B2.7a3), `loginom` в дереве нет (`commands/commands.ts` upstream); `loginom --help` печатает справку корня |
+| `standalone-status` «startup timeout retains the writer through Help close…» | гонял обёртку 0.4 `standalone()` в процессе с укороченным до 5 с стартом Host и ссылкой `TMPDIR`. На v2 ссылки `TMPDIR` нет (B2.7c), шва для срока старта у CLI нет (180 с); защёлка держится, пока `launchNodeHost` не вернётся, а он закрывает Help до отказа — `node-client.ts` не менялся, его тесты в `loginom-host` |
+| `standalone-status` фазы `permissions`, `outcomes`, `read-offset`, `cancellation` | это `run --command loginom-automation` с Host процесса CLI: разрешения `loginom_*`, итоги вызовов, смещение `read`, Ctrl+C. У `run` v2 нет `--command` (B2.7a3, вопрос владельцу); итоги и отмена перенесены в B2.7a4 |
+| `standalone-status` `setup-recovery`, последний шаг (`run` с несуществующей моделью) | `run`, B2.7a4 |
+| `standalone-preflight` «strict recovery still blocks an ordinary request before the model» | `run`: строгий журнал Host службы не подключён (`ServiceHost`, `loginom-agent` — B2.6c, вопрос B2.7a3) |
+| `standalone-startup` режимы `disconnect` и `ack-without-exit` | ждут 30-секундный бюджет закрытия клиента Host (`launchNodeHost`); по `.opencode/skills/unit-tests` такие сроки не выжидаются, режимы — в `loginom-host/test/node-host.test.ts:530` |
+| `standalone-startup` режимы `run`, `tui`; «the writer stays held during startup cleanup…» | `run` и TUI, B2.7a |
+| `standalone-startup` «the compiled CLI recovers after a real bundled host constructor fails» | только собранный CLI (`skipIf` и в 0.4); артефакт в этой задаче не собирался |
+
+Для `providers status` тестов 0.4 нет (команды нет).
+
+### Мутации
+
+`<scratchpad>/b27b-runs/mutate.py`: одна точная замена, тесты, `git checkout` файла; на `3090388507` (M9 повторена на
+`8a3cadb443`). Без мутаций — `cli-loginom.test.ts` 10/0, `evals/test/profile.test.ts` 98/0 (2 skip). После прогона `git
+status` — чистое дерево.
+
+| Мутация | Тесты | Итог |
+|---|---|---|
+| M1 Host команды в `<профиль>/data`, а не `<профиль>/loginom` | `cli-loginom` | **7/3**: `status`, `setup` (нет `connection.json`, сервер не видит поколение), фаза восстановления |
+| M2 защёлка не берётся | `cli-loginom` | **7/3**: `status` при живом сервере — не 3; защёлка после сбоя очистки не остаётся (оба теста) |
+| M3 защёлка снимается и при неподтверждённой очистке Host | `cli-loginom` | **8/2**: оба теста сбоя очистки |
+| M4 `--headless` не доходит до Host | `cli-loginom` | **9/1**: вход в браузере не `headless` |
+| M5 строгий журнал из окружения не передаётся | `cli-loginom` | **9/1**: фаза восстановления |
+| M6 `setup` без `connection.verify-resources` | `cli-loginom` | **5/5**: порядок вызовов и все `setup` (Host отвечает `LOGINOM_RUNTIME_START_FAILED`) |
+| M7 `CLI_SETUP_INVALID` — код 1 | `cli-loginom` | **9/1** |
+| M8 явная `LOGINOM_AI_AGENT_RESOURCES` не читается | `cli-loginom` | **3/7**: `LOGINOM_BUNDLE_REQUIRED` из исходников |
+| M9 `status` без `statusView` (фаза `starting` своего Host) | `cli-loginom` | на `3090388507` — 10/0, **не ловил**: Help-заглушка отвечала раньше `status`. Добавлен случай с придержанным Help (`8a3cadb443`) → **9/1** |
+| M10 `Standalone.early` не отдаёт `loginom` | `cli-loginom` | **3/7**: команда уходит в дерево CLI v2 |
+| M11 `PROFILE_BUSY` — код 1 | `cli-loginom` | **9/1** |
+| E1 `assertAuth` допускает любой список `auth list` | `evals` `profile` | **97/1** |
+| E2 `auth list` без `--standalone` | `evals` `profile` | **97/1** |
+| E3 `recoverIfNeeded` без ветки `configured` | `evals` `profile` | **97/1** |
+| E4 `verifyProfile` не принимает `configured` | `evals` `profile` | **97/1** |
+| E5 затравка `cache/models.json` до первой команды CLI (как на базе) | `evals` `profile` | **97/1** |
+
+### Приёмка пакетов и дерева
+Полные прогоны (`<scratchpad>/b27b-runs/suites.sh`, один за другим): база — `96dd4a13e1` в `<scratchpad>/b27b-base`, итог
+— `8a3cadb443` (после него — только комментарии и этот раздел); `npm ci` клиента `loginom-runtime` и `bun install` `evals`
+в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан. Падения сравнивались по именам.
+
+| Пакет | Команда | `96dd4a13e1` | `8a3cadb443` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 505 pass, 9 skip, 0 fail | 515 pass (+10 `cli-loginom`), 9 skip, 0 fail |
+| `product` | `bun test` | 60 pass, 3 fail (`repo-paths`) | 60 pass, 3 fail — те же три теста, те же строки |
+| `evals` | `bun run test:unit` | 1323 pass, 66 skip, 24 fail | 1327 pass (+3 новых, +1 бывшее падение), 66 skip, 23 fail — новых падений нет; «ordinary exec: live changed image reaches deadline without signal» упал только на базе (надзор процессов по времени, код задачи его не касается) |
+
+```text
+$ cd packages/cli && bun test --timeout 120000 --rerun-each 3 test/cli-loginom.test.ts
+ 30 pass
+ 0 fail                                            # 66 с
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,217 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc         # код 0
+$ cd evals && bun run typecheck                    # tsc --noEmit, код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 456 divergent upstream files                  # как на 96dd4a13e1: правок upstream нет
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0, с этим разделом в дереве
+Found 558 warnings and 0 errors.                    # как на базе (B2.7a4); у файлов задачи предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+Служба профиля, а не `serve` (`<scratchpad>/b27b-runs/service-probe.ts`, тот же стенд, вход продукта из исходников):
+
+```text
+$ loginom setup --headless --stdin-json --format json      # код 0, generation 1, browser verified
+$ service start                                            # код 0: http://127.0.0.1:27569
+# Help поколения 1: pid 657075 → его родитель 657064 (Node host) → родитель 656883 = владелец .writer {"service": true}
+$ loginom status --format json                             # код 3, stdout пуст
+PROFILE_BUSY: the CLI profile <R>/profile is open in another process (pid 656883)
+$ service stop                                             # код 0
+$ loginom status --format json                             # код 0, generation 1, state ready
+```
+
+**Эталон `v0.4.0`** (`a63462dde1`, В-99; уточнение оркестратора пришло во время работы). От `a080f7725c` его отличают 5
+коммитов исправлений macOS. Перенесённый код (`loginom-management.ts`, `standalone-command.ts`, `standalone-bundle.ts`) и
+перенесённые тесты в них не менялись (`git diff a080f7725c v0.4.0` по этим файлам пуст). Изменён один тест
+`standalone-status` — «startup timeout retains the writer…»: повторный `status` теперь допускает `configured` вместо
+`ready` («Status never waits for Help… readiness is `loginom check`»). Этот тест не перенесён (таблица выше), а его поправка
+подтверждает выбранную семантику `status` и правку `evals`. Строка `buildKeychain` для macOS в
+`loginom-host/test/node-host.test.ts` — пакет `loginom-host`, его приносит слияние тега оркестратором; здесь не трогал.
+Ссылки в комментариях новых файлов — на `v0.4.0` (`15aa8e99b9`).
+
+### Где решал сам
+
+- **Свой Node host в процессе команды, а не служба профиля.** Так было в 0.4 и так требуют потребители: `evals` после
+  каждой команды управления требует ноль оставшихся процессов и свободный `.writer` (`process-supervisor.ts`,
+  `releaseStaleWriter`), а `run-check.py` сразу после `setup` кладёт ссылку `data/auth.json`, которую v2 импортирует только
+  при создании базы. Через службу понадобился бы маршрут сервера к `connection.*` Host — правка `loginom-agent` (B2.6c)
+  или общего HTTP API. Цена: при работающей службе профиля (TUI, `service start`, `auth`/`models` без `--standalone`)
+  команды `loginom` отвечают `PROFILE_BUSY` (3), пока службу не остановят. Вопрос владельцу ниже.
+- **Все пять команд, а не только `setup` и `status`.** Это одна функция 0.4 (`loginomManagement`), а `evals` в
+  `recoverIfNeeded` и `verifyProfile` зовёт ещё `check` и `recover --acknowledge`; нарезка B2.7a относила их к B2.7b.
+  Интерактивный `setup` (TTY, `@clack/prompts`) перенесён как есть, но не запускался.
+- **Вызов — в `Standalone.early`, до `Standalone.forward`**: тому нужен исходный `--headless` (`forward` его снимает), а
+  оба флага вместе у `loginom` дают, как в 0.4, `{"ok":false,"code":"CLI_ARGUMENT_INVALID"}`. Аргументы разбираются до
+  открытия профиля (в 0.4 — после): неверная команда профиль не создаёт.
+- **`PROFILE_BUSY` — сообщение v2** (`PROFILE_BUSY: the CLI profile … (pid N)`, B2.7c), код 3, без JSON в stdout, как в 0.4.
+- **Ресурсы:** явная `LOGINOM_AI_AGENT_RESOURCES` или `CliResources.locate`; код отказа — без причины проверки, как
+  `standalone-bundle.ts` 0.4 (`serve` с B2.7a2b причину печатает).
+- **Строгий журнал** берётся из окружения только у команд управления, как в 0.4; Host службы его не получает
+  (`loginom-agent`, B2.7a3).
+- **Потребители поправлены минимально** (выше): `assertAuth`, `configured`, порядок затравки моделей. Ветка общего OAuth,
+  `run-node-selection-attempt.ts`, `evals/AGENTS.md` и ранбук `standalone-cli.md` не менялись.
+- **Тест «служба видит подключение»** — по старту Help: Host запускает Help поколения только для прочитанной и раскрытой
+  записи подключения (`connectionService.loadProfile`: `store.read` с `cliCredentials.decode`, затем `prepare`); без записи
+  или при сбое раскрытия Help не стартует. Аренда (B2.3) поколения наружу не отдаёт, а маршрута статуса Host у службы нет.
+- **В тесте браузер — файл в корне ресурсов** (как фикстура 0.4); в прогоне подготовки `evals` — свой каталог
+  `browsers/chromium/chrome`: надзор `evals` считает браузером всё, что запущено из каталога браузера манифеста, и корень
+  ресурсов принял бы за него Node (`Browser binding differs`).
+
+### Согласовать с владельцем
+
+- **`loginom` при работающей службе профиля.** Сейчас — `PROFILE_BUSY` (3), как второй процесс CLI в 0.4; но на v2
+  служба профиля живёт в фоне после TUI, `service start` и `auth`/`models` без `--standalone`. Варианты: оставить (команда
+  велит остановить службу — сейчас в сообщении этого нет); или маршрут службы к `connection.*` её Host (правка
+  `loginom-agent` и сервера, новый контракт), и тогда служба применит новое поколение без перезапуска.
+- **Общий OAuth `evals` на v2** (`providers status`, `shared-oauth-status-v1`, `LOGINOM_AI_AGENT_SHARED_AUTH_DIR`): в 0.4
+  его не было, на v2 подготовка слота с `auth.sharedDir` останавливается с `SHARED_AUTH_STATUS_INVALID`. Нужен ли он
+  продукту v2 и в каком виде.
+- **`configured` и `hasApiKey` у потребителей**: `evals` поправлен под `status` 0.4/v2; если владелец хочет, чтобы CLI
+  отвечал по-старому (`starting`, `hasApiKey`), это смена контракта `Loginom.View`.
+
+### Найдено, не чинил
+
+- `evals/script/run-node-selection-attempt.ts:136-140` требует у `status` `hasApiKey === true` и `ready`/`starting` — на
+  0.4 и v2 всегда `SELECTION_CONNECTION_MISMATCH`; кроме того, на v2 он не пройдёт из-за `run --command` и таблиц v1
+  (B2.7a4).
+- `run-check.py` кладёт `data/auth.json` ссылкой на общий файл OAuth; v2 импортирует его один раз, при создании базы
+  профиля, и дальше пишет обновлённые токены в базу, а не в общий файл (в 0.4 профиль читал и писал сам файл).
+- `evals/AGENTS.md` и ранбук `standalone-cli.md` по-прежнему описывают `providers status`/`providers login`.
+
+### Не проверено
+
+- Собранный CLI: команды проверены только из исходников; путь `CliResources.locate` у `loginom` (проверка манифеста
+  артефакта) и бинарник не запускались.
+- Настоящий Loginom, Chromium и Help: вход в браузере и Help — заглушки; `--headless` проверен только как флаг,
+  дошедший до входа.
+- Windows и macOS (конверты `dpapi`/`keychain`), интерактивные `setup` и `recover` в TTY, Ctrl+C во время `setup`.
+- `evals` в режиме binary (нет `bwrap`) и с `auth.sharedDir`; `run-node-selection-attempt.ts`.
+- Режимы очистки `disconnect` и `ack-without-exit` через CLI (их тесты — в `loginom-host`).
