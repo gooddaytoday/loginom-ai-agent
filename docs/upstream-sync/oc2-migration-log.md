@@ -10874,3 +10874,245 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (в тестах — каталог случая), Windows и macOS.
 - `dashboard_publish`, `dashboard_delete` (B2.9) и выгрузки под политикой — только через API; инструменты MCP — не
   проверял.
+
+## B4.3–B4.4 Имя в окнах и схема
+
+22.11.2026. Ветка `b43-desktop-name` от `oc2-migration` (`e09bcb76e3`), рабочее дерево `.claude/worktrees/b43`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1600 пакетов,
+`.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/cli` и
+`packages/loginom-host` (B2.7b) не трогал. Окно Desktop не запускалось, упакованная сборка не собиралась.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `d72409d465` `feat(desktop): product name in the window titles (B4.3)` | `windows/early.ts`, `windows/appearance.ts`: `title: APP_NAME`; `renderer/index.html`: `Loginom AI Agent`; тест в `renderer/html.test.ts` |
+| `8169dbcd36` `feat(desktop): register and read only the product scheme (B4.4)` | `lifecycle/environment.ts`: `setAsDefaultProtocolClient(Product.scheme)`; `lifecycle/deep-link.ts`: `protocolUrls` из 0.4, возврат Console только своей схемы; `lifecycle/index.ts`: второй экземпляр через `protocolUrls`; тесты `lifecycle/deep-link.test.ts`, `deep-links/machine.test.ts` |
+| следующий | этот раздел; CAT-09 в `catalog.md` |
+
+### Что это в 0.4
+
+- **Имя.** По каналу — только имя приложения: `app.setName(productName(app.isPackaged ? CHANNEL : "dev"))` (0.4:
+  `index.ts:176`). Заголовок окна — литерал `"Loginom AI Agent"` (0.4: `windows.ts:184`), `<title>` в
+  `renderer/index.html:6` — тоже он. `<Title>` в `packages/app` 0.4 не было (`git grep '<Title' a080f7725c --
+  packages/app/src` — только `Titlebar*`).
+- **Схема.** Одна на все каналы: `app.setAsDefaultProtocolClient(Product.scheme)` (0.4: `index.ts:381`), в упаковке
+  `protocols: { name: Product.name, schemes: [Product.scheme] }` (0.4: `electron-builder.config.ts:81`). `deep-links.ts`
+  0.4: `protocolUrls(argv)` берёт из командной строки аргументы с префиксом `loginom-ai-agent://`, очередь отдаёт их окну,
+  холодный старт помнит `loginom-ai-agent://dashboard?…`. Тест 0.4 принимал ссылки
+  `loginom-ai-agent://dashboard?id=1&action=create` и `…?id=2&action=edit`. Возврата из Console в 0.4 не было
+  (`git grep 'console/authorized\|return_window' a080f7725c -- packages` — пусто).
+
+### B4.3 Имя в окнах
+
+`APP_NAME` — имя канала из B4.2: `Loginom AI Agent`, `Loginom AI Agent Beta`, `Loginom AI Agent Dev` (запуск из исходников
+и `local` — Dev), источник — `productName` из `packages/product`.
+
+| Место | Было | Стало |
+|---|---|---|
+| `src/main/windows/early.ts:99` раннее окно | `title: "OpenCode"` | `title: APP_NAME` |
+| `src/main/windows/appearance.ts:30` окна приложения (`windowAppearance`) | `title: "OpenCode"` | `title: APP_NAME` |
+| `src/renderer/index.html:7` заголовок до загрузки приложения | `OpenCode` | `Loginom AI Agent` |
+| `src/renderer/migration-status.tsx` | — | без правки |
+
+- `constants.ts` уже в графе входного модуля (`index.ts` → `lifecycle/configure.ts` → `constants.ts`), так что раннее окно
+  нового кода до первого кадра не грузит.
+- `migration-status.tsx`: единственное `OpenCode` — класс клиента SDK `OpenCode.make` из `@opencode/client/promise`.
+  Тексты уведомления — ключи `toast.migration.*`, в `en` и `ru` без имени продукта. Пользователь `OpenCode` здесь не видит.
+- `index.html` — статический HTML, канала он не знает. Литерал — как в 0.4. Новый тест в `renderer/html.test.ts`
+  («index.html titles the window with the product name») держит `<title>` равным `Product.name`, так что второй копии
+  строки, которая может разойтись, нет.
+
+```text
+$ cd packages/desktop && grep -rn 'OpenCode' src/main/windows src/renderer/index.html src/renderer/migration-status.tsx | grep -v '\.test\.ts'
+src/renderer/migration-status.tsx:1:import { OpenCode } from "@opencode/client/promise"
+src/renderer/migration-status.tsx:24:  const client = OpenCode.make({ baseUrl: props.server.url })
+```
+
+### B4.4 Схема протокола
+
+- **Регистрация.** `lifecycle/environment.ts`: `app.setAsDefaultProtocolClient(Product.scheme)`, то есть
+  `loginom-ai-agent`. Условие v2 сохранено: упакованная сборка или запуск без
+  `LOGINOM_AI_AGENT_DESKTOP_DISABLE_PROTOCOL_REGISTRATION=1`. Схема одна на все каналы, как в 0.4: поправки на канал
+  0.4 не делал. Следствие то же, что в 0.4: установленные рядом prod и beta делят ключ схемы, им владеет запущенный
+  последним.
+- **Разбор.** `protocolUrls` перенесён из 0.4 в `lifecycle/deep-link.ts`: префикс `${Product.scheme}://`, отдельная
+  функция, чтобы фильтр второго экземпляра проверялся тестом. `lifecycle/index.ts` (`second-instance`) вызывает её
+  вместо `startsWith("opencode://")`. `consoleReturnWindow` принимает только `loginom-ai-agent://console/authorized?window=…`;
+  `opencode://` — ни там, ни там. `open-url` (macOS) по-прежнему без фильтра, как в 0.4 и v2: macOS отдаёт приложению
+  только схемы из его `Info.plist`.
+- **Ссылки дашбордов (B2.9).** `loginom-ai-agent://dashboard?…` проходит `protocolUrls`, у `consoleReturnWindow` цели нет.
+  Автомат доставки отдаёт такую ссылку предпочтительному окну без цели, как любую ссылку не из Console. Очередь и
+  холодный старт дашбордов не переносились.
+- **Пятый файл.** `deep-links/machine.test.ts` в списке задачи нет, но два его теста держали адресную доставку возврата
+  Console на `opencode://` и покраснели:
+  `(fail) deep link delivery > splits one arrival into a batch and attempt per window` и ещё один, 14 pass, 2 fail.
+  Ссылки `oauth`, `oauthB` переведены на свою схему. Ссылка `project = "opencode://open?project=/repo"` осталась:
+  автомату схема безразлична, это ссылка без цели.
+- **Не менялись.** Имя события DOM `opencode:deep-link` и `window.__OPENCODE__` в `renderer/startup/deep-links.ts` —
+  внутренние имена, не схема. Других мест, где Desktop сравнивает схему: `grep -rn 'opencode:' src | grep -v
+  '@opencode/\|opencode:deep-link'` в `packages/desktop` находит, кроме тестов и комментария, только имя пользователя
+  Basic `opencode:` (`service/sidecar-credentials.ts:41`, `plugin/host.ts:326`; B2.7a) и событие `opencode:drag-cancel`.
+
+**Кто строит ссылку возврата входа.** Ни `app`, ни сервер. `app/src/providers/connect/controller.ts:447-452` добавляет к
+адресу авторизации Console `client_id=opencode-desktop` и `return_window=<id окна>`, а саму ссылку
+`opencode://console/authorized?window=…` строит OpenCode Console (opencode.ai) по своему `client_id`.
+`git grep -n -E 'return_window|console/authorized' -- ':!docs'` по всему репозиторию находит только `controller.ts` и
+тесты Desktop.
+
+Поменять ссылку на своей стороне нельзя. После правки Console по-прежнему вернёт `opencode://…`, Desktop продукта её не
+примет. Вход завершается опросом (B4.1, вопрос 1), теряется только возврат фокуса в окно — вариант А, В-97 п. 1. Просьбу
+о ссылке возврата (`client_id`, `return_window` в `controller.ts`) В-97 убирает в этапе C; здесь `app` не менялся.
+Разбор `loginom-ai-agent://console/authorized` остаётся недостижимым, пока Console такую ссылку не строит; он держит
+только форму ссылки на своей схеме.
+
+### Тесты
+
+`lifecycle/deep-link.test.ts`, литералы схем:
+
+- «reads the originating Desktop window» — `loginom-ai-agent://console/authorized?window=window-a` и `window%20b`;
+- «rejects unrelated and malformed links» — прежние случаи на своей схеме: другой путь, другой хост, `https:`, не URL,
+  без `window`;
+- «rejects the OpenCode scheme» — `opencode://console/authorized?window=window-a` → нет окна;
+- «keeps only links of the product scheme» — из `["/opt/Loginom AI Agent/loginom-ai-agent", "--no-sandbox",
+  <console своей схемы>, "opencode://console/…", "loginom-ai-agent-beta://console/…", <dashboard>]` остаются только
+  console и dashboard своей схемы;
+- «passes dashboard links through without a Console target» — `loginom-ai-agent://dashboard?id=1&action=create` → нет окна.
+
+```text
+$ cd packages/desktop && bun test src/main/lifecycle src/main/deep-links src/main/windows src/renderer
+# база e09bcb76e3
+ 227 pass
+ 0 fail
+Ran 227 tests across 27 files.
+# итог 8169dbcd36
+ 231 pass                                                  # +3 в deep-link.test.ts, +1 в html.test.ts
+ 0 fail
+Ran 231 tests across 27 files.
+```
+
+### Мутации
+
+Каждая мутация — правка `sed` на `8169dbcd36`, прогон, возврат из копии; после — `git status` по коду чистый.
+
+```text
+=== M1: consoleReturnWindow reads opencode: again
+(fail) deep link delivery > waits for the window a console return names instead of the focused one
+(fail) deep link delivery > splits one arrival into a batch and attempt per window
+(fail) Console return deep links > reads the originating Desktop window
+(fail) Console return deep links > rejects the OpenCode scheme
+ 9 pass
+ 4 fail
+=== M2: protocolUrls keeps opencode:// again
+(fail) protocol links on the command line > keeps only links of the product scheme
+ 4 pass
+ 1 fail
+=== M3: consoleReturnWindow without the scheme check
+(fail) Console return deep links > rejects unrelated and malformed links
+(fail) Console return deep links > rejects the OpenCode scheme
+ 3 pass
+ 2 fail
+=== M4: protocolUrls without the :// boundary (startsWith(Product.scheme))
+(fail) protocol links on the command line > keeps only links of the product scheme
+ 4 pass
+ 1 fail
+=== M5: index.html title OpenCode again
+(fail) index.html titles the window with the product name
+ 2 pass
+ 1 fail
+```
+
+### Приёмка
+
+`packages/desktop`:
+
+```text
+# база e09bcb76e3
+$ bun typecheck
+✓ No type errors in 3,504 files across 2 projects [3.88s]
+$ bun test
+ 536 pass
+ 4 skip
+ 0 fail
+Ran 540 tests across 69 files. [5.99s]
+# итог 8169dbcd36
+$ bun typecheck
+✓ No type errors in 3,504 files across 2 projects [3.79s]
+$ bun test
+ 540 pass
+ 4 skip
+ 0 fail
+Ran 544 tests across 69 files. [6.30s]
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary         # код 0
+against a6b15d33daf6: 464 divergent upstream files       # база 456: +8, `environment.ts` уже расходился (B1.4a)
+  CAT-09: 33                                              # база 25
+$ python3 -I scripts/upstream-sync/apply-identity.py --check          # код 0
+would change: 0 files
+$ bun run check                                                       # код 0, на 8169dbcd36
+Found 558 warnings and 0 errors.                          # у изменённых файлов предупреждений oxlint нет
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,504 files across 2 projects [3.65s]
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` на изменённых файлах: два предупреждения (`appearance.ts:16`, `machine.test.ts:62`) — строки upstream,
+на `e09bcb76e3` те же; мои строки чистые.
+
+### Каталог
+
+`catalog.json` не менялся: все девять файлов попадают в CAT-09 по маске `packages/desktop/**`. В `catalog.md` CAT-09 описано:
+
+- назначение — имя в окнах и схема;
+- почему не вынесено и проверка при обновлении — `deep-link.test.ts` и что делать с новыми `title: "OpenCode"` и схемой
+  `opencode` от upstream;
+- политика — схема `fork-owned`;
+- «не перенесено» — заголовок из `packages/app`, упаковка и кэш обновлятора — B4.5a.
+
+### Где решал сам
+
+- **`index.html` — литерал, не по каналу.** Задание просит имя по каналу без новой копии строк. Статический HTML канала
+  не знает, а в 0.4 заголовок окна и `<title>` и так были литералом `Loginom AI Agent`. Подстановка Vite `%…%` из
+  `define` потребовала бы `@loginom-ai-agent/product` в `electron.vite.config.ts`. Загрузчик конфига electron-vite
+  выносит голые импорты наружу, и TS-файл пакета исполнял бы рантайм сборки. Без настоящей сборки этого не проверить,
+  а промах показал бы пользователю сырой `%…%`. Меньший вариант — литерал и тест на равенство `Product.name`. Окна
+  главного процесса имя канала несут.
+- **Одна схема на все каналы** — как в 0.4.
+- **`machine.test.ts` — пятый файл B4.4.** Без него два теста upstream красные. Правка — только данные двух ссылок.
+- **`migration-status.tsx` не менялся** — видимого `OpenCode` в нём нет (выше).
+- **`app` не менялся.** Ссылку возврата строит Console, а не `app` или сервер; просьбу о ней В-97 убирает в этапе C.
+- **`open-url` без фильтра** — как в 0.4 и v2; фильтр понадобится, только если `Info.plist` объявит чужую схему
+  (сейчас объявляет до B4.5a, ниже).
+
+### Найдено, не чинил
+
+- **Заголовок работающего окна ставит `packages/app`.** После загрузки `MetaProvider` заменяет `<title data-sm>` на
+  `<Title>OpenCode</Title>` (`app/src/app.tsx:60`), в сессии — `` `${value} · OpenCode` `` (`app/src/session/route.tsx:293`).
+  Обработчика `page-title-updated` в Desktop нет (`git grep page-title-updated -- packages/desktop` — пусто), так что
+  Electron переносит заголовок документа в заголовок окна. Его видно в рамке окна на Linux, на панели задач и в Alt+Tab
+  на Windows, в меню «Окно» на macOS.
+  - B4.3 меняет имя в раннем окне, в окне до загрузки приложения и в `index.html`. В работающем окне пользователь
+    по-прежнему видит `OpenCode`: цель Р-9 этим не достигнута.
+  - В списке файлов задачи `app` нет, зависимости от `product` у него нет, в 0.4 `<Title>` не было. Задачи на это нет.
+  - Варианты:
+    - а) правка `app` (CAT-10): имя продукта через платформу Desktop или зависимость `app` → `product`; связь пакетов
+      решает владелец;
+    - б) главный процесс в `page-title-updated` подменяет `OpenCode` на `APP_NAME`.
+- **Схема в упаковке — ещё `opencode`.** `electron-builder.config.ts:175-178` (`protocols: { name: "OpenCode", schemes:
+  ["opencode"] }`), `:240` (beta) и `:259` (prod) — B4.5a. До неё:
+  - `Info.plist` (macOS) и `.desktop` (Linux) объявляют `opencode`, и macOS может отдать `opencode://…` через `open-url`.
+    Такая ссылка цели не получит и только поднимет окно.
+  - Регистрация `loginom-ai-agent` на macOS и Linux без объявления в упаковке, по документации Electron, может не
+    сработать. Не проверялось.
+
+### Не проверено
+
+- Заголовки в настоящем окне — B4.14b; окно не запускалось.
+- Действие `setAsDefaultProtocolClient` в ОС: ключ `HKCU\Software\Classes\loginom-ai-agent`, обработчик `xdg` на Linux,
+  LaunchServices на macOS; ключ протокола в SMK — B4.14c.
+- Подключение `protocolUrls` в `lifecycle/index.ts` и регистрация в `environment.ts` тестами не покрыты (слой Effect и
+  Electron); проверены typecheck и чтением. Мутация, возвращающая `startsWith("opencode://")` в `index.ts`, тесты не
+  покраснит.
+- Настоящий вход в OpenCode Console и поведение страницы Console при чужом `client_id` — не запускались.
