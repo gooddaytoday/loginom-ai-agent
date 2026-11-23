@@ -19,6 +19,7 @@ import { ServiceRegistration } from "./services/service-registration"
 import { RemoteTunnel } from "./services/remote-tunnel"
 import { WebUi } from "./services/web-ui"
 import { databasePath } from "./database-path"
+import { ShutdownDeadline } from "./shutdown-deadline"
 
 export type Mode = "default" | "service" | "stdio"
 
@@ -224,7 +225,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       console.log(options.mode === "stdio" ? JSON.stringify({ url }) : `server listening on ${url}`)
       if (foreground && !environmentPassword) console.log(`server password ${password}`)
       return yield* options.mode === "service"
-        ? server.shutdown
+        ? // Loginom AI Agent (B2.3b): once asked to stop, the service gets a bounded time to close its plugins.
+          server.shutdown.pipe(Effect.andThen(ShutdownDeadline.arm(ShutdownDeadline.SERVICE_STOP, "service stop")))
         : options.mode === "stdio"
           ? waitForStdinClose()
           : Effect.never

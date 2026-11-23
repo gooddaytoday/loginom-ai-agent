@@ -1,6 +1,6 @@
 export * as ServerProcess from "./process"
 
-import { NodeHttpServer } from "@effect/platform-node"
+import { NodeHttpServer, NodeHttpServerRequest } from "@effect/platform-node"
 import { Bus } from "@opencode/core/bus"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
 import { Schedule } from "@opencode/core/schedule"
@@ -68,7 +68,9 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   }
   const urls = () => [...localURLs(), ...(remoteURLs?.() ?? [])]
   const application = yield* Ref.make(Option.none<App>())
-  const app = dispatch(password, status, application, options.app?.version ?? "unknown", urls, Global.Path.tmp)
+  // Loginom AI Agent (B2.3b): only a managed service, which has a lifecycle, answers the stop request.
+  const stop = lifecycle ? shutdown.open.pipe(Effect.asVoid) : undefined
+  const app = dispatch(password, status, application, options.app?.version ?? "unknown", urls, Global.Path.tmp, stop)
   // Request fibers may continue inbound trace context, but must not inherit the server startup parent.
   yield* bound.http
     .serve(
@@ -186,11 +188,20 @@ function dispatch(
   version: string,
   urls: () => ReadonlyArray<string>,
   tmp: string,
+  stop: Effect.Effect<void> | undefined,
 ): App {
   const auth = ServerAuth.Config.of({ password: Option.some(password), username: "opencode" })
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest
     const url = new URL(request.url, "http://localhost")
+    // Loginom AI Agent (B2.3b): a soft stop. The service closes its plugins and exits as after SIGTERM, which on Windows
+    // ends the process at once. Answered in every state, so a starting or failed service stops too.
+    if (stop !== undefined && request.method === "POST" && url.pathname === "/api/experimental/service/stop") {
+      if (!(yield* authorizedRequest(request, auth))) return unauthorizedResponse(request)
+      // Shutdown starts by closing every connection, so open the latch only once this answer is out.
+      NodeHttpServerRequest.toServerResponse(request).once("close", () => Effect.runFork(stop))
+      return HttpServerResponse.empty({ status: 202 })
+    }
     const state = yield* status.current
     const app = yield* Ref.get(application)
     const ready = state.type === "ready" && Option.isSome(app)

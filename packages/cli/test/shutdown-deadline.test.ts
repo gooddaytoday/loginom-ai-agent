@@ -30,16 +30,34 @@ posix("a second signal during teardown reports and exits without waiting for the
   })
 })
 
+// Loginom AI Agent (B2.3b): no signal is involved, so this also runs on Windows.
+test("a stop without a signal exits when teardown outlives its deadline and names what is pending", async () => {
+  await hang(
+    200,
+    async (proc) => {
+      const stderr = await new Response(proc.stderr).text()
+      expect(stderr).toContain("shutdown did not finish within 200ms")
+      expect(stderr).toContain("layer test/Hung releasing")
+      expect(await proc.exited).toBe(1)
+    },
+    "arm",
+  )
+})
+
 async function hang(
   deadline: number,
   body: (proc: Bun.Subprocess<"ignore", "pipe", "pipe">, pid: number) => Promise<void>,
+  mode = "signal",
 ) {
-  const proc = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixture/shutdown-hang.ts"), String(deadline)], {
-    cwd: path.join(import.meta.dir, ".."),
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-  })
+  const proc = Bun.spawn(
+    [process.execPath, path.join(import.meta.dir, "fixture/shutdown-hang.ts"), String(deadline), mode],
+    {
+      cwd: path.join(import.meta.dir, ".."),
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  )
   const pid = Number((await readLine(proc.stdout, "SHUTDOWN_READY "))?.split(" ")[1])
   try {
     expect(pid).toBeGreaterThan(0)

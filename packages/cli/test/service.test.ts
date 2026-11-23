@@ -391,6 +391,25 @@ test("clean managed service shutdown removes its registration", async () => {
   }
 }, 30_000)
 
+// Loginom AI Agent (B2.3b): the command asks the service to stop. A signal would end it with 143 on POSIX and 1 on
+// Windows, before plugins close there; the request lets it finish its own teardown and exit with 0.
+test("service stop lets the managed service exit on its own", async () => {
+  const service = await startManagedService("opencode-service-soft-stop-")
+  try {
+    const command = Bun.spawn([process.execPath, path.join(import.meta.dir, "../src/index.ts"), "service", "stop"], {
+      env: serviceEnv(service.root),
+      stderr: "pipe",
+      stdout: "ignore",
+    })
+    expect(await command.exited).toBe(0)
+    expect(await waitForExit(service.owner)).toBe(true)
+    expect(service.owner.exitCode).toBe(0)
+    expect(await Bun.file(service.registration).exists()).toBe(false)
+  } finally {
+    await stopManagedService(service)
+  }
+}, 30_000)
+
 test("concurrent service processes elect one server", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-service-election-"))
   const env = serviceEnv(root)

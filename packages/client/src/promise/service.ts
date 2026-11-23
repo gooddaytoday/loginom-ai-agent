@@ -4,7 +4,7 @@ import { contenderPool, spawnServiceContender } from "../service-contender.js"
 import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service-timing.js"
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
-import { decide, fallback, headers, probeResult, same } from "../service-probe.js"
+import { decide, fallback, headers, probeResult, requestStop, same } from "../service-probe.js"
 
 export * from "../service.js"
 export { fallback, headers }
@@ -142,10 +142,10 @@ function stopped(pid: number) {
   }
 }
 
-async function waitUntilStopped(pid: number, timing: EnsureTiming) {
-  for (let attempt = 0; attempt <= timing.stopPollAttempts; attempt++) {
+async function waitUntilStopped(pid: number, timing: EnsureTiming, attempts = timing.stopPollAttempts) {
+  for (let attempt = 0; attempt <= attempts; attempt++) {
     if (stopped(pid)) return true
-    if (attempt < timing.stopPollAttempts) await delay(timing.stopPollInterval)
+    if (attempt < attempts) await delay(timing.stopPollInterval)
   }
   return false
 }
@@ -153,10 +153,15 @@ async function waitUntilStopped(pid: number, timing: EnsureTiming) {
 async function terminate(info: Info, options: { readonly file?: string }, timing: EnsureTiming) {
   const current = await read(options.file)
   if (current === undefined || !same(current, info)) return
-  signal(info.pid, "SIGTERM")
+  // Loginom AI Agent (B2.3b): ask the service to close its plugins and exit; signals are the fallback. On Windows
+  // SIGTERM ends the process at once, so only the request lets plugins clean up there.
+  const exited =
+    (await requestStop(info, timing.requestTimeout)) &&
+    (await waitUntilStopped(info.pid, timing, Math.ceil(timing.softStopTimeout / timing.stopPollInterval)))
+  if (!exited) signal(info.pid, "SIGTERM")
   // The registration can disappear or change hands before this process exits. Only the PID we
   // signalled can tell us whether it has stopped, so escalate based on that process.
-  if (!(await waitUntilStopped(info.pid, timing))) {
+  if (!exited && !(await waitUntilStopped(info.pid, timing))) {
     signal(info.pid, "SIGKILL")
     if (!(await waitUntilStopped(info.pid, timing))) throw new Error(`Server process ${info.pid} is still running`)
   }

@@ -7108,3 +7108,288 @@ Found 517 warnings and 0 errors.
 - Напоминание G4 читает `session.context` — сообщения от последнего сжатия; 0.4 читал всю историю. Сжатие посреди попытки
   может потерять её `start` или напоминание.
 - Напоминание G4 с настоящими инструментами браузера — после B2.5d.
+
+## B2.3b Мягкая остановка
+
+22–23.11.2026. Ветка `b23b-soft-stop` от `oc2-migration` (`0f9b29f3fe`), рабочее дерево `.claude/worktrees/b23b`.
+Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0,
+`.husky/_` есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/loginom-agent` и
+`packages/loginom-host` (B2.3) не трогал.
+
+Прочитано: план этапа B — B2.3b, строки B4.10 и B4.14b; этот журнал, B4.1, п. 8 «Жизнь службы»; решение В-97, п. 3;
+отчёт spike, B0.2 и B0.4 «Жизнь службы после закрытия» (`origin/stage-b-checks`); `client/src/{promise,effect}/service.ts`,
+`service-timing.ts`, `service-probe.ts`, `cli` (`service stop`, `server-process.ts`, `shutdown-deadline.ts`,
+`service-registration.ts`, `index.ts`), `server/src/process.ts`, адаптер промис-плагинов (`setup` возвращает `dispose`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `2bfcf8f839` `feat(server): stop the background service with a request before signals` | маршрут, клиенты, срок остановки в службе, тесты, CAT-13 и строка в CAT-07 |
+| следующий | этот раздел |
+
+### Сигнал: что и где
+
+- **Маршрут** `POST /api/experimental/service/stop` (`server/src/process.ts`, функция `dispatch`). Есть только у сервера
+  с `lifecycle`, то есть у `serve --service`; у `opencode serve`, stdio и встраивания — 404. Проверка пароля службы —
+  `authorizedRequest`, как у остальных маршрутов: без пароля и с чужим — 401. Обрабатывается раньше проверки готовности,
+  поэтому останавливает и запускающуюся, и упавшую при загрузке службу. Ответ — 202.
+- **Что делает.** Открывает защёлку `shutdown` — тот же путь, которым служба выходит, когда её файл регистрации заменили
+  (`service-registration.ts`). `processEffect` возвращается, область закрывается: статус `stopping`, закрытие соединений,
+  область приложения с плагинами (`dispose`), удаление своей регистрации, выход через `runMain` с кодом 0. На Linux это
+  тот же порядок, что после SIGTERM, только без прерывания и с кодом 0 вместо 143.
+- **Ответ раньше защёлки.** Первый финализатор остановки — `closeAllConnections()`, поэтому защёлка открывается на
+  событии `close` ответа Node (`NodeHttpServerRequest.toServerResponse`). Без этой строки на Linux ответ дошёл в 10 из 10
+  прогонов (`--rerun-each 10` теста CLI с прямым `yield* stop`), но потерянный ответ на Windows — это `TerminateProcess`
+  посреди `dispose`, ради которого задача и делалась. Bun 1.4.4 даёт `close` и `finish` на каждый ответ `node:http`,
+  проверено отдельной пробой.
+- **Вне HttpApi.** Маршрут не входит в публичный протокол и SDK, `bun run generate` не нужен. Префикс
+  `/api/experimental/` — по правилу `AGENTS.md` дерева для новых маршрутов.
+- **Клиенты.** `terminate` в `client/src/promise/service.ts` (Desktop) и `client/src/effect/service.ts` (CLI
+  `service stop` и `service restart`) после проверки, что регистрация та же, шлёт запрос (`requestStop` в
+  `service-probe.ts`, тайм-аут `requestTimeout` = 2 с). Ожидание выхода — только при ответе 2xx. При 404 (служба без
+  маршрута, в том числе старая версия при замене), 401, отказе соединения или тайм-ауте — сразу прежние SIGTERM, 5 с,
+  SIGKILL, 5 с. Так же теперь останавливают `ensure` при замене версии и восстановление после зависшей службы:
+  у них тот же `terminate`. Обработчик `service stop` в CLI не менялся.
+- **Срок остановки в самой службе.** После того как защёлка открылась, `server-process.ts` вызывает
+  `ShutdownDeadline.arm(SERVICE_STOP)`: 65 с, затем отчёт о незакрытых слоях в stderr и журнал и `process.exit(1)` —
+  как 10 с после сигнала (`ShutdownDeadline.install`). Без этого зависший `dispose` держал бы службу, пока её не убьёт
+  клиент, а клиента может не быть: Desktop выходит через 10 с, сторож из В-97 п. 3 работает внутри службы.
+
+### Бюджет
+
+| Что | Значение | Где |
+|---|---|---|
+| Ответ на запрос остановки | 2 с (`requestTimeout`, как у зонда `/api/info`) | клиент |
+| Служба сама заканчивает остановку | 65 с, затем выход с кодом 1 и отчётом | `cli/src/shutdown-deadline.ts`, `SERVICE_STOP` |
+| Клиент ждёт выхода после 2xx | 70 с | `client/src/service-timing.ts`, `softStopTimeout` |
+| Запасной путь | SIGTERM, 5 с, SIGKILL, 5 с — как было | `stopPollAttempts` |
+
+- **Пол — Host.** Без политики сохранённого пакета Host закрывает рантаймы до 30 с и укладывает всю остановку в 60 с
+  (`loginom-host/AGENTS.md`). Плагин продукта ждёт этого в `dispose` (B2.3), так что срок службы — 60 с Host и 5 с на
+  остальные финализаторы. Меньший срок обрывал бы Host внутри его собственного договора.
+- **Порядок.** Клиент ждёт дольше службы: зависшая служба выходит сама через 65 с, плюс 1,5 с на сброс журнала
+  (`LOG_FLUSH`) — в прогонах 66,7 с, — и клиент не шлёт сигнал. Запас до 70 с — 3,3 с.
+- **Потолок — `ensure`.** При замене версии `ensure` ждёт `stop` внутри своих 120 с (`promiseTimeout`): худший случай
+  70 + 5 + 5 = 80 с плюс холодный старт новой службы (19 с на Windows по B0.4) — 99 с.
+- **Desktop, 10 с (B4.10).** Участники `Shutdown` ждут не дольше 10 с (`lifecycle/index.ts`), 70 с туда не входят.
+  Запрос, принятый службой, она доводит сама: после выхода Desktop служба закрывает плагины и выходит не позже чем через
+  65 с. Плохо другое: при 10 с LIFE-01 увидит службу и Chromium ещё живыми, пока Host закрывается, а не ответившую
+  службу некому погасить. Для B4.10 два пути: поднять бюджет участника службы до 80 с (70 + 5 + 5; окна к этому
+  моменту закрыты) или при 10 с отправить запрос и не ждать, а не ответившую службу гасить сигналом сразу. Второму
+  нужен публичный вариант `Service.stop` с другим ожиданием — сейчас бюджет задаётся только скрытым `withEnsureTiming`.
+  Выбор — B4.10, здесь не менял.
+- **Сторож (В-97 п. 3)** может открыть ту же защёлку изнутри службы, без HTTP; срок в 65 с тогда ограничит и его.
+  Здесь сторож не делался, путь ему не закрыт.
+
+### Правки файлов upstream
+
+Все — CAT-13, кроме `cli/src/server-process.ts`: он уже в списке CAT-07 (побеждает первая запись), строка описана в CAT-13
+и упомянута в CAT-07.
+
+| Файл | Строк |
+|---|---|
+| `packages/server/src/process.ts` | +13 −2 |
+| `packages/client/src/service-probe.ts` | +23 −4 |
+| `packages/client/src/service-timing.ts` | +5 |
+| `packages/client/src/promise/service.ts` | +11 −6 |
+| `packages/client/src/effect/service.ts` | +13 −5 |
+| `packages/cli/src/shutdown-deadline.ts` | +26 −14 (`expire` вынесен из `install`, чтобы его брал и `arm`) |
+| `packages/cli/src/server-process.ts` | +3 −1 |
+| тесты: `server/test/process.test.ts`, `client/test/{promise-service,service}.test.ts`, `client/test/fixture/{service,service-timing}.ts`, `cli/test/{service,shutdown-deadline}.test.ts`, `cli/test/fixture/shutdown-hang.ts` | +203 −7 |
+
+Четыре файла тестов уже расходились с upstream именами от `apply-identity` и были в CAT-12 по маске; теперь они в CAT-13.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `server/test/process.test.ts` «a managed service shuts down on an authenticated stop request only» | без пароля и с чужим — 401, `shutdown` не открылся за 200 мс; с паролем — 202 и `shutdown` |
+| там же «a server without a managed lifecycle has no stop request» | без `lifecycle` — 404, `shutdown` не открылся |
+| `client/test/promise-service.test.ts` и `service.test.ts`, по три | `soft`: служба выходит с кодом 0, запрос дошёл с паролем, сигнала нет, регистрации нет; `soft-hung`: принял запрос, не вышел за `softStopTimeout` — SIGTERM; `stop-hanging`: не ответил за `requestTimeout` — SIGTERM |
+| `cli/test/service.test.ts` «service stop lets the managed service exit on its own» | настоящая служба из исходников и настоящая команда `service stop`: команда — 0, служба — 0 (сигнал дал бы 143), регистрации нет |
+| `cli/test/shutdown-deadline.test.ts` «a stop without a signal exits when teardown outlives its deadline…» | после `arm` зависший финализатор: отчёт с именем слоя, выход 1; сигналов нет, поэтому тест не помечен `posix` (на Windows не запускался) |
+
+Режимы фикстуры клиента — новые; для старых режимов маршрута нет (404), поэтому прежние тесты идут прежним путём без
+ожидания. Ускоренному времени добавлено `softStopTimeout: 1_000`.
+
+Устойчивость: `--rerun-each 10` — новые тесты клиента 60/0, сервера 20/0; `--rerun-each 5` — тест CLI 5/0,
+тест срока 5/0.
+
+### Мутации
+
+Файл подменялся `perl` и возвращался `git checkout`; `scratchpad/b23b/mutate.sh`.
+
+```text
+=== M1 маршрут не открывает защёлку     server 4 pass 1 fail; cli «service stop lets…» 0 pass 1 fail
+=== M2 клиент считает 2xx отказом      client 49 pass 2 fail («stop asks…» в обоих клиентах); cli 0 pass 1 fail
+=== M3 клиент ждёт после любого ответа  client 42 pass 9 fail (прежние тесты с 404 ждут 70 с и падают по тайм-ауту)
+=== M4 маршрут без проверки пароля      server 4 pass 1 fail
+=== M5 маршрут и без lifecycle          server 4 pass 1 fail
+=== M6 промис-клиент без ожидания       client 22 pass 1 fail
+=== M7 arm ничего не делает             cli 2 pass 1 fail
+```
+
+Вызов `arm` в `server-process.ts` автотестом не покрыт: его показывают прогоны «never» ниже.
+
+### Пробный плагин
+
+Как в B0.2, встроенный, в git не входит. На время сборки в рабочее дерево клались `core/src/plugin/b23b-probe.ts`
+(`setup` пишет в JSONL `B23B_PROBE_LOG` событие `setup` с pid и Location, `dispose` — `dispose.start`, затем при
+`B23B_DISPOSE=slow` ждёт 20 с, при `never` не возвращается, затем `dispose`) и вторая запись в
+`core/src/plugin/product.ts`:
+
+```diff
++import B23bProbe from "./b23b-probe.js"
+-export const plugins: readonly InternalPlugin[] = [PluginPromise.fromPromise(LoginomAgent)]
++export const plugins: readonly InternalPlugin[] = [PluginPromise.fromPromise(LoginomAgent), PluginPromise.fromPromise(B23bProbe)]
+```
+
+После сборок правка снята, `git status` чистый. Сборки CLI с правкой, канал `latest`, версия `2.3.0-b23b`:
+
+```text
+$ bun run script/build.ts --single --skip-install --skip-web-ui --outdir=<scratchpad>/linux                    # 16 с, код 0
+23743e367fc9f91f…  opencode       linux-x64, 234 436 784 байт
+$ LOGINOM_AI_AGENT_TARGET=windows-x64-baseline … bun run script/build.ts --skip-web-ui --outdir=<scratchpad>/windows  # 30 с, код 0
+d1fc70491305d5cc…  opencode.exe   windows-x64-baseline, 241 284 608 байт
+```
+
+Перед сборкой — `npm ci --ignore-scripts --omit=dev` в `packages/loginom-runtime/client`, как в B3.3; после сборок этот
+`node_modules` удалён. Кросс-сборка поставила пакеты всех платформ: свободное место упало с 23 до 15 ГБ. После — удалены
+568 записей кэша Bun, появившихся за время этой установки: 39 верхнего уровня (среди них рантайм
+`bun-windows-x64-baseline-v1.4.4`) и 529 в каталогах `@scope`, только пакеты чужих платформ (darwin, win32, freebsd,
+android, musl, arm, i686), всего 7,2 ГБ; `@emnapi/runtime` оставлен. `node_modules` пересобраны
+`bun install --frozen-lockfile` (11 → 3,0 ГБ). Свободно снова 23 ГБ. `bun.lock` и манифесты не менялись. Каталоги
+`/tmp/opencode-client-service-*` и `/tmp/opencode-service-soft-stop-*`, оставшиеся от мутаций с тайм-аутом, удалены;
+новых `.bun-*.so` в `/tmp` нет. Это собранный CLI, а не установленный продукт.
+
+### Linux и Windows
+
+Сценарий (`scratchpad/b23b/accept/{linux-run.sh,windows-run.ps1}`): изолированные `HOME`/`USERPROFILE`, `XDG_*`,
+`TEMP`; identity U5 `b23b`, свой порт; `serve --service` запускается напрямую, как это делает Desktop, чтобы видеть код
+выхода; `GET /api/plugin?location[directory]=…` активирует Location, сценарий ждёт `setup` с pid службы и только потом
+останавливает её настоящей командой `opencode service stop`. Режимы: `instant` и `slow` (`dispose` 20 с), `never`
+(`dispose` не возвращается), `unresponsive` (служба заморожена: SIGSTOP на Linux, `NtSuspendProcess` на Windows — на
+запрос не отвечает), `hard` (проверка пробы: служба убита до `stop`, `dispose` быть не должно).
+
+| Режим | Linux: `stop`, с / выход службы / проба / регистрация | Windows: то же |
+|---|---|---|
+| `instant` | 0,21 / 0 / `setup, dispose.start, dispose` / нет | 0,28 / 0 / `setup, dispose.start, dispose` / нет |
+| `slow` | 20,25 / 0 / `… dispose` / нет | 20,28 / 0 / `… dispose` / нет |
+| `never` | 66,69 / 1, отчёт срока / `setup, dispose.start` / нет | 66,7 / 1, отчёт срока / `setup, dispose.start` / нет |
+| `unresponsive` | 7,21 / 137 (SIGKILL) / `setup` / нет | 2,18 / 1 (`TerminateProcess`) / `setup` / нет |
+| `hard` | 0,11 / 137 / `setup` / нет | 0,15 / −1 / `setup` / нет |
+
+Команда `service stop` везде — код 0. Отчёт срока в stderr службы на обеих системах:
+
+```text
+shutdown did not finish within 1m 5s; exiting. Still pending:
+  65.0s  layer @opencode/Worktree releasing
+  65.0s  layer @opencode/example/LocationServiceMap releasing
+  65.0s  layer plugin-supervisor releasing
+```
+
+Журнал пробы, Windows, `instant`:
+
+```text
+{"event":"setup","pid":7712,"at":"2026-11-23T00:17:30.864Z","location":"C:\\lab\\b23b\\run-instant\\project","mode":"instant"}
+{"event":"dispose.start","pid":7712,"at":"2026-11-23T00:17:31.146Z"}
+{"event":"dispose","pid":7712,"at":"2026-11-23T00:17:31.147Z"}
+```
+
+- `slow` 20 с — та же служба при прежних 5 с до SIGKILL на Linux или сразу `TerminateProcess` на Windows `dispose` не
+  закончила бы.
+- `never`: служба вышла сама по сроку, клиент сигнал не слал; регистрацию, оставшуюся после `exit(1)`, удалил клиент.
+- `unresponsive`: на Linux 2 с запроса + 5 с после SIGTERM (замороженный процесс его не обрабатывает) + SIGKILL; на
+  Windows 2 с запроса + `TerminateProcess`.
+- Было до правки (B0.4, Windows): `service stop` 0,16 с, файла нет, `dispose` нет.
+
+**Стенд Windows.** `winstand` по SSH (BatchMode): Windows 11 Pro 26200, учётная запись `lg-pc\user` из
+«Администраторов», уровень целостности высокий (`S-1-16-12288`) — как в B0.2. Права администратора не понадобились.
+Своё — только `C:\lab\b23b`: бинарник (архив `tar.xz` 73 МБ, `scp` за 21 с, хеш на стенде тот же), сценарии, каталоги
+прогонов. Снимок «до» и «после» (`snapshot.ps1`, только чтение: верхний уровень `%USERPROFILE%`, `%APPDATA%`,
+`%LOCALAPPDATA%`, `%TEMP%`, `~\.local\{share,state}`, `~\.config`, `~\.cache`, слушающие порты, процессы
+`opencode*`, `C:\lab`) — одинаковый. После работы: процессов из папки нет, порт 31877 свободен, `C:\lab\b23b` удалена,
+в `C:\lab` 32 записи, как до работы; чужие папки (`cli040`, `diag040`, `upd040` и др.) не тронуты. Остался системный
+след `C:\Windows\Prefetch\OPENCODE.EXE-0B7A6B9D.pf` (обновлён в 3:18 по времени стенда), его удаление требует прав
+администратора, как в B0.2 и B0.4.
+
+### Приёмка
+
+Полные прогоны пакетов: база — `0f9b29f3fe`, после — `2bfcf8f839`, одной цепочкой по пакету
+(`LOGINOM_AI_AGENT_TEST_NODE` задан):
+
+| Пакет | Команда | `0f9b29f3fe` | `2bfcf8f839` |
+|---|---|---|---|
+| `client` | `bun test --timeout 5000` | 262 pass, 0 fail | 268 pass (+6), 0 fail |
+| `server` | `bun test` | 203 pass, 3 skip, 24 fail | 205 pass (+2), 3 skip, 24 fail — те же 24 (`diff` списков пуст) |
+| `cli` | `bun test --timeout 60000` | 417 pass, 9 skip, 0 fail | 419 pass (+2), 9 skip, 0 fail |
+| `desktop` | `bun test --timeout 30000` | 536 pass, 4 skip, 0 fail | 536 pass, 4 skip, 0 fail |
+
+24 падения `server` на базе: 21 `package_docs_run (B2.5c)` и по одному в `loginom.product skill sources (G6)…`,
+`loginom.product access and tool gate (G1)…`, `OpenCode hooks the product gate relies on (contract)…` — каталог навыков
+продукта пуст (`Received: []`) в этом окружении. Код B2.3b их не касается. `desktop` затронут только как потребитель
+промис-клиента, его код не менялся.
+
+Typecheck: `bun typecheck` — `client` 178 файлов, `server` 1609, `cli` 2163, `desktop` 3504, без ошибок;
+`bun run typecheck:tsc` в `client`, `server`, `cli` — код 0.
+
+Итоговая проверка — на `2bfcf8f839` с этим разделом в рабочем дереве (код окончательный), чистое дерево кода:
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py                  # код 0
+against a6b15d33daf6: 449 divergent upstream files       # база 440: +9 новых файлов; CAT-13: 23 (было 10), CAT-12: 182 (было 186)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check # код 0
+would change: 0 files
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                                       # код 0, 53 с, без кэша turbo
+Found 558 warnings and 0 errors.                          # как в базе B4.8b; в изменённых файлах предупреждений нет
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+$ bun run secrets range 0f9b29f3fe HEAD                               # на 2bfcf8f839
+{"status":"clean","commits":1,…}
+```
+
+### Где решал сам
+
+- **Маршрут, а не канал.** HTTP-сервер службы уже есть, пароль и адрес клиент берёт из файла регистрации; именованный
+  канал или сокет — второй транспорт со своей проверкой доступа на двух ОС.
+- **Вне HttpApi, в `dispatch`.** Так маршрут есть только у службы, работает до готовности и не меняет публичный
+  протокол; правка — одно условие. Путь — `/api/experimental/service/stop` по правилу дерева для новых маршрутов; если
+  upstream заведёт свою мягкую остановку, перейти на неё (CAT-13, «Проверка при обновлении»).
+- **Только 2xx ведёт к ожиданию.** Иначе каждый 404 старой службы при замене версии стоил бы 70 с (мутация M3).
+- **Отложенное открытие защёлки** оставлено, хотя на Linux ответ без него не терялся (выше): одна строка против
+  жёсткого завершения посреди `dispose` на Windows. Если рецензент сочтёт гонку невозможной, правка сводится к
+  `yield* stop`.
+- **Срок в службе (65 с) добавлен**, хотя задание прямо его не называет: без него мягкая остановка теряет ограничение,
+  которое у SIGTERM есть (10 с), а Desktop с 10 с и сторож без внешнего клиента не смогут погасить зависшую службу.
+  Отчёт и код выхода — те же, что у `install`.
+- **Статус `stopping` раньше не ставится.** Он и так первый финализатор: сразу после защёлки `/api/info` отвечает 503
+  `stopping`, и `ensure` ждёт выхода, а не переиспользует уходящую службу.
+- **Бюджет — скрытое поле `EnsureTiming`, без публичной опции `StopOptions`.** Публичный выбор ожидания нужен только
+  одному из вариантов B4.10; добавит B4.10, если выберет его.
+- **Обработчик `service stop` в CLI не менялся**: он уже вызывает `Service.stop` эффект-клиента, которому достаточно
+  нового `terminate`.
+- **Пробный плагин — правка дерева на время сборки**, а не пакет из конфига: сервер продукта грузит только встроенные
+  плагины (`pluginPackages: false`, B2.1).
+
+### Найдено, не чинил
+
+- После SIGTERM у службы по-прежнему 10 с (`ShutdownDeadline.DEADLINE`), меньше 60 с Host. Так останавливают службу
+  выход из сеанса Linux, `kill` и запасной путь клиента. Это B4 (жизнь службы), здесь не менял.
+- Отчёт срока пишется в stderr службы; после выхода запустившего процесса (Desktop читает stderr только во время
+  `ensure`) его видно только в журнале службы (`shutdown deadline exceeded` с тем же списком).
+- Регистрацию, оставшуюся после выхода по сроку (`exit(1)` не доходит до финализатора регистрации), удаляет только
+  клиент, который ждал. Если остановку начал сторож или клиент ушёл, файл останется до следующего `ensure`, который
+  увидит мёртвый pid и заменит службу (как после падения).
+
+### Не проверено
+
+- Desktop: участник `Shutdown`, бюджет 10 с и запрет переподключения — B4.10; установленный продукт — B4.14b, B4.14c.
+- Настоящая аренда Host и Chromium в `dispose` (B2.3 идёт параллельно): проверена проба с теми же сроками.
+- macOS; обычная учётная запись Windows без прав администратора (как и в B0.2); выход из сеанса и выключение
+  Windows (`session-end`).
+- `service restart` и замена версии через `ensure` на настоящей службе — тот же `terminate`, проверены фикстурами.
+- Передача постоянных терминалов (`pty: "handoff"`) при мягкой остановке настоящей службы — только тесты фикстур.
+- Новые автотесты запускались только на Linux; на стенде Windows — только сборка CLI с пробой и сценарий выше.
