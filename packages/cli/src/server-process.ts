@@ -20,6 +20,7 @@ import { RemoteTunnel } from "./services/remote-tunnel"
 import { WebUi } from "./services/web-ui"
 import { databasePath } from "./database-path"
 import { CliProfile } from "./profile"
+import { CliResources } from "./resources"
 import { ShutdownDeadline } from "./shutdown-deadline"
 
 export type Mode = "default" | "service" | "stdio"
@@ -90,6 +91,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Loginom AI Agent (B3.1b): a 0.3.9/0.4 database at this path is migrated before v2 opens it, or the start fails.
       const { LegacyMigrate } = yield* Effect.promise(() => import("@opencode/server/legacy-migrate"))
       yield* LegacyMigrate.guard(databasePath(global.data))
+      // Loginom AI Agent (B2.7a2): a built product CLI takes its resources from next to its binary.
+      if (profile) yield* CliResources.apply()
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
       const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
