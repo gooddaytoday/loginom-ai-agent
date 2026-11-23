@@ -17219,3 +17219,252 @@ Found 905 warnings and 0 errors.                    # предупреждени
   Скрипт и оракул закрыты мутациями M9 и M10.
 - Тест `program-status` на настоящем renderer ждёт `true` на трёх отчётах и гонялся только на Linux: на других ОС
   нативная сессия может ответить `false` (нет возможности терминала) — тогда тест покраснеет без поломки продукта.
+
+## B2.7d Обновление CLI продукта
+
+23.11.2026. Ветка `b27d-cli-update` от `oc2-migration` (`520fb96247`), рабочее дерево `.claude/worktrees/b27d`. Эталон
+0.4 — `v0.4.0` (`a63462dde1`). Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и
+`git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` в этом дереве и в дереве базы. Хук `pre-commit` (`bun run secrets staged`) — `clean`.
+Тесты, мутации и пробы — с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и без сети: `unshare -n`, поднят только
+`lo`. Два исключения шли с сетью: первый прогон трёх файлов тестов (запрос уходит только через `request`, который
+отклоняет чужие хосты, и локальный сокет-прокси) и проба прокси Bun (без кода продукта, адрес `updates.example.invalid`,
+с настоящим `HOME`). `find ~/.local/share ~/.config -newer <задание>` — от прогонов новых файлов нет (только `herdr` и
+`agent-kit`, другие программы). Модель не вызывалась: `run` и `serve` вручную не запускались, полный прогон `cli`
+запускает их с подставными моделями, как на базе, и здесь — под `unshare -n`. К opencode.ai, GitHub и npm OpenCode ни
+один прогон не обращался (ниже — как это видно). `packages/desktop/test/loginom/*` (B4.14b) не трогал.
+
+Прочитано: план этапа B, B2.7 и B2.7d; решение В-97 п. 5; UPDATE-01 в `docs/testing/loginom-ai-agent/README.md` (сценарий
+Desktop: запросы — только в канал продукта, приложение не заменяется OpenCode; отказ CLI ему не противоречит); этот
+журнал — B2.7a (строка «Строки обновлятора — B2.7d»), B2.7a5–a6 (правило не трогает `upgrade`), B4.12; B2.7b — только
+сверка `loginom-management.ts` с 0.4 (diff), раздел журнала не читал; `catalog.md`
+(CAT-02, CAT-04); `.opencode/skills/unit-tests`. 0.4 — `v0.4.0:packages/opencode/src/{product/installation.ts,
+installation/index.ts,cli/update-notifier.ts,cli/upgrade.ts,cli/cmd/upgrade.ts,cli/standalone.ts,cli/loginom-management.ts}`,
+тесты `test/installation/product-installation.test.ts`, `test/cli/{update-notifier,upgrade,loginom-management}.test.ts`,
+`opencode/AGENTS.md`, `product/AGENTS.md`, `opencode/script/build.ts:221`, `desktop/src/main/update-policy.ts`. v2 —
+`cli/src/services/{updater,updater-action}.ts`, `commands/handlers/{upgrade,uninstall,default}.ts`, `loginom-cli.ts`,
+`profile.ts`, `standalone.ts`, `loginom-management.ts`, `tui/src/context/update-notification.tsx`,
+`desktop/src/main/service/desktop-cli.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `89f9ac6a56` `fix(cli): never install OpenCode from upgrade, announce product CLI updates (B2.7d)` | код, тесты |
+| следующий | этот раздел; CAT-02, CAT-04 в `catalog.md` и `catalog.json` |
+
+Файлы кода — пять (предел задания): `cli/src/services/updater.ts` (+12 −9), новые файлы форка
+`cli/src/services/product-updater.ts` и `cli/src/update-notifier.ts`, `cli/src/loginom-cli.ts` (+4 −1),
+`cli/script/build.ts` (+2). Тесты: новые `cli/test/product-updater.test.ts`, `cli/test/update-notifier.test.ts`; в
+`cli/test/updater-install.test.ts` +3 −1.
+
+### Что это в 0.4
+
+- `installationNode` (`product/installation.ts`) заменял службу установки: `method` — `unknown`, `latest` — своя версия,
+  `upgrade` и `upgradeMajor` — отказ «Automatic CLI updates are not configured for Loginom AI Agent. Install a Loginom AI
+  Agent package.» при любом способе; реализация upstream оставалась как `upstreamNode`. Источника установки у CLI 0.4 не
+  было вовсе; TUI обновления не предлагал (`cli/upgrade.ts`: способ `unknown` — ничего).
+- `update-notifier.ts`: только лента сборки (`define` `LOGINOM_AI_AGENT_UPDATE_FEED`, `build.ts:221`), без неё — ни
+  запроса, ни записи; подписанный `cli.json` (`@loginom-ai-agent/product/update-signature`), каналы `stable`/`unstable`:
+  политика машины `policy.json` (`updates: "off"`, `channel`) поверх `config/updates.json` профиля; одна строка в stderr
+  терминала, не в CI, не чаще раза в сутки (`data/update-notifier.json`), тайм-аут 2,5 с; ничего не ставит. `feedUrl`
+  политики CLI не читал: «Policy feedUrl replaces both transports. CLI keeps its separate feed contract»
+  (`product/AGENTS.md`), читатель — `desktop/src/main/update-policy.ts`.
+- `standalone.ts` запускал уведомление рядом с каждой командой профиля и отменял по её концу.
+
+### Пункты задания
+
+| № | Было (`520fb96247`) | Стало |
+|---|---|---|
+| 1. `upgrade` не ставит OpenCode | `Updater.layer` — реализация upstream. `upgrade --method npm` спрашивает `https://opencode.ai/update/api/…` и ставит `npm install --global … <пакет OpenCode>@<версия>`; `--method curl` качает `https://opencode.ai/v2/install`; `brew`, `winget` — пакеты OpenCode. CLI, который Desktop ставит на macOS (`~/.loginom-ai-agent/bin/opencode`, `desktop-cli.ts:52`), совпадает с путём установщика curl upstream — `upgrade` без флагов и `/update` в TUI поставили бы поверх него OpenCode (по чтению кода, на macOS не запускалось). TUI раз в 10 минут спрашивал opencode.ai (`updater.run`, `default.ts:68`) | `updater.ts`: реализация upstream — `upstreamLayer`, `layer` — служба продукта (`services/product-updater.ts`, шов `installationNode` 0.4). Способа установки нет; `latest`, `upgrade`, `apply` отказывают; `managed` отдаёт тот же отказ, и `upgrade` без `--method` печатает его, а не «Pass --method»; `check` (`/update`) — `unavailable` с тем же текстом; `run` — ничего, без запроса. Запросов и процессов нет при любом `--method`. `layer` берут оба входа (`index.ts`): CLI продукта и CLI Desktop |
+| 2. `update-notifier` как в 0.4 | уведомления CLI о версии продукта нет; есть только проверка upstream из п. 1 | файл форка `cli/src/update-notifier.ts` — `notifyUpdate` 0.4: лента — `Product.updateFeed` (тот же `define`, что у Desktop, B4.12); `cli/script/build.ts` задаёт `LOGINOM_AI_AGENT_UPDATE_FEED` обоим режимам сборки (пробелы по краям обрезаются, без переменной — пусто); `loginom-cli.ts` запускает уведомление после `CliProfile.apply()` с путями профиля. Без ленты — ни запроса, ни записи; `policy.json` (`updates`, `channel`) — по путям 0.4; `feedUrl` — нет (как 0.4, «Где решал сам») |
+| 3. Строки обновлятора | 7 сообщений «…, then run opencode upgrade again.» и показ команды установщика `opencode upgrade <версия> --method curl` в `updater.ts` | «…, then run loginom-ai-agent-cli upgrade again.», `loginom-ai-agent-cli upgrade …` — правкой (ниже) |
+| 4. `loginom-management` | — | перенесено в B2.7b полностью: тело `loginom-management.ts` 0.4 (`setupCandidate`, `statusView`, `statusText`, `loginomManagement`, `readSetup`, `interactiveSetup`) совпадает с v2 построчно, кроме комментария («Every CLI command» → «Every command») и типа `host` (`Pick<…, "request">`); `statusText` выводит `manage()` (`loginom-management.ts:102`); оба теста 0.4 (`stdin setup distinguishes…`, `setup finishes resource verification…`) — в `cli/test/cli-loginom.test.ts:42,73`. Переносить нечего |
+
+Сообщение `upgrade` CLI продукта (из исходников, без сети):
+
+```text
+$ unshare -n bun --define 'LOGINOM_AI_AGENT_VERSION="0.4.0"' --define 'LOGINOM_AI_AGENT_CHANNEL="prod"' src/loginom-cli.ts upgrade
+┌  Upgrade
+│
+■  Automatic CLI updates are not configured for Loginom AI Agent
+│
+│  loginom-ai-agent-cli does not download or install updates.
+│  Retry    Install a newer Loginom AI Agent package.
+│
+└  Failed
+                                                                       # код 1; `upgrade 9.9.9 --method npm` — то же после
+                                                                       # «Using method: npm», «From 0.4.0 → 9.9.9», «Upgrade failed»
+```
+
+### Без сети: как видно, что запросов нет
+
+- **`upgrade`.** Тест `the product CLI's upgrade refuses without a request or an installer` запускает вход продукта
+  `src/loginom-cli.ts` из исходников (`--define` версии `0.4.0` и канала `prod`, временный профиль) трижды: `upgrade`,
+  `upgrade 9.9.9 --method npm`, `upgrade --method curl`. Все `HTTP(S)_PROXY` указывают на локальный сокет, который
+  записывает первую строку каждого соединения; `NO_PROXY` пуст, `PATH` — пустой каталог (ни `npm`, ни `curl`). Проба до
+  теста: Bun 1.4.4 ведёт `fetch("https://updates.example.invalid/x")` через `HTTPS_PROXY` — сокет получил
+  `CONNECT updates.example.invalid:443 HTTP/1.1`. С мутацией MU1 (ниже) тот же сокет получил два
+  `CONNECT opencode.ai:443 HTTP/1.1` — запрос upstream пойман локально, в сеть не вышел (прогон под `unshare -n`).
+- **Уведомитель.** Во всех тестах `update-notifier.test.ts` запрос идёт через `request`, который записывает адрес и
+  отклоняет любой хост, кроме `127.0.0.1` (в 0.4 он переписывал `https` на `http` и отправил бы запрос куда угодно). Два
+  случая в отдельном процессе Bun делают то же со своим хостом.
+- **Вход продукта запускает уведомитель.** Проба под `unshare -n` (поднят `lo`), stderr — терминал `script -qec`:
+  `bun --define LOGINOM_AI_AGENT_UPDATE_FEED='"https://127.0.0.1:<порт>/feed/"' --define LOGINOM_AI_AGENT_VERSION='"0.3.9"'
+  --define LOGINOM_AI_AGENT_CHANNEL='"prod"' src/loginom-cli.ts debug paths`, на порту — сокет-регистратор:
+
+```text
+=== debug paths: exit 0
+=== upgrade: exit 1
+--- recorder
+port 35155
+connection 127.0.0.1                 # cli.json и cli.json.sig — только лента сборки
+connection undefined
+--- marker
+{"checkedAt":1795458352727}          # <профиль>/data/update-notifier.json; второй запуск (upgrade) в те же сутки — без запроса
+```
+
+  TLS к сокету не устанавливается, подписи нет — строки уведомления нет, как и должно быть. Тестом это не закреплено (MU16).
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `cli/test/product-updater.test.ts` (новый, 20 случаев) | случаи 0.4 `product-installation.test.ts` для службы v2: для каждого из 8 способов (`curl`, `npm`, `pnpm`, `bun`, `yarn`, `vp`, `brew`, `winget`) `latest` и `upgrade` отказывают текстом продукта, `removal` — ничего; способа нет, `managed` — отказ; `run` — ничего, `check` — `unavailable`, `apply` — отказ; ни одного `opencode upgrade` в `updater.ts`; `upgrade` CLI продукта из исходников — выше |
+| `cli/test/update-notifier.test.ts` (новый, 42 случая) | все случаи 0.4 `update-notifier.test.ts`; добавлено: опрошены только `cli.json` и `cli.json.sig` ленты; сборка из исходников (`local`) ничего не спрашивает; версии сравниваются как числа (`0.10.0` новее `0.3.9`); по умолчанию верны только ключи продукта; часть больше `2^53` отклоняется; «без ленты» и «политика off» проверяют список опрошенных адресов, а не только запросы к серверу |
+| `cli/test/updater-install.test.ts` (+3 −1) | реализация upstream — `Updater.upstreamLayer`; «npm upgrades fail when the running copy keeps its old version» — «Retry» кончается `, then run loginom-ai-agent-cli upgrade again.` |
+
+### Мутации
+
+`<scratchpad>/b27d/mutate.py`: одна замена, тесты файла под `unshare -n` (поднят только `lo`), возврат файла; после —
+`git status` тот же. Без мутаций — 62 из 62 (`product-updater` и `update-notifier`).
+
+```text
+=== MU1 upgrade goes to the OpenCode source again (Updater.layer = upstream): 1 pass / 19 fail   # сокет: CONNECT opencode.ai:443 ×2
+    bun typecheck exit 1                                                                       # TS6133: ProductUpdater не используется
+=== MU2 the product upgrade reports success: 11 pass / 9 fail
+=== MU3 no refusal without a method (managed -> undefined): 18 pass / 2 fail                  # upgrade печатает «Pass --method»
+=== MU4 the TUI check offers an upstream release: 19 pass / 1 fail
+=== MU5 notifier asks opencode.ai without a product feed: 41 pass / 1 fail
+=== MU6 notifier asks opencode.ai instead of the feed: 25 pass / 17 fail
+=== MU7 a runtime variable supplies the feed: 41 pass / 1 fail
+=== MU8 policy updates=off ignored: 41 pass / 1 fail
+=== MU9 policy channel ignored: 41 pass / 1 fail
+=== MU10 signature not verified: 38 pass / 4 fail
+=== MU11 versions compared as text: 41 pass / 1 fail
+=== MU12 retry of the stale copy names opencode: 56 pass / 2 fail                              # и updater-install.test.ts
+=== MU13 retry of Git Bash names opencode: 19 pass / 1 fail
+=== MU14 curl display command names opencode: 19 pass / 1 fail
+=== MU15 build without the feed define: 62 pass / 0 fail
+=== MU16 entry does not start the notifier: 62 pass / 0 fail
+```
+
+Требования задания: «`upgrade` идёт в источник OpenCode» — MU1 (и MU2–MU4 для остальных методов службы); «уведомитель
+спрашивает opencode.ai» — MU5, MU6 (и MU7–MU11 для политики, подписи, версий); «строка называет `opencode`» — MU12–MU14.
+Не ловятся тестами: MU15 — `define` ленты в `build.ts` (сборка не запускалась; чтение кода), MU16 — вызов уведомителя во
+входе (из трубы stderr не терминал, уведомитель молчит; проверено пробой через `script` выше).
+
+### Приёмка
+
+Пакет `cli` (`core`, `tui`, `server` не менялись). База — отдельное дерево `<scratchpad>/b27d/base` (`520fb96247`,
+detached); `npm ci --ignore-scripts` клиента `loginom-runtime` в обоих деревьях; `bun test --timeout 60000` под
+`unshare -n`, временные `HOME`, `TMPDIR`, `XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0
+(`<scratchpad>/b27d/run-tests.sh`, отчёты JUnit — там же).
+
+| Пакет | `520fb96247` | `89f9ac6a56` |
+|---|---|---|
+| `cli` | 525 pass, 9 skip, 0 fail, 2298 expect (534 теста, 73 файла) | 587 pass, 9 skip, 0 fail, 2427 expect (596, 75): +20 `product-updater`, +42 `update-notifier` |
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,224 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc                          # tsc -b, код 0
+$ oxlint <8 изменённых файлов cli>
+Found 0 warnings and 0 errors.
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0, с правкой каталога
+against a6b15d33daf6: 609 divergent upstream files                    # как на базе
+  CAT-04: 7                                                           # было 5: + cli/src/services/updater.ts, cli/test/updater-install.test.ts
+  CAT-12: 204                                                         # было 206: оба файла теперь в CAT-04
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+$ bun run check                                     # код 0, на 89f9ac6a56 с правкой каталога (журнал дописан после)
+Found 905 warnings and 0 errors.                    # как на базе (B2.7a5); в изменённых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                  # typecheck cli — заново, остальное из кэша turbo
+```
+
+`prettier --check`: новые файлы и `loginom-cli.ts`, `build.ts`, `updater-install.test.ts` — чисто; `updater.ts` не
+проходил и на базе (длинные строки после переименований `apply-identity`). `lint:changed` проверяет только пакеты GUI —
+«no changed TypeScript files».
+
+### Каталог
+
+CAT-04 — запись дописана (её «не перенесено» называла B2.7d): `cli/src/services/updater.ts` и
+`cli/test/updater-install.test.ts` в путях; «Назначение», «Почему не вынесено», «Компоненты», «Проверка при обновлении»,
+«Политика» — части CLI; «Не перенесено» — что CLI оставил не как в 0.4 (ниже). CAT-02 — `define`
+`LOGINOM_AI_AGENT_UPDATE_FEED` в `cli/script/build.ts`. Файлы форка `product-updater.ts`, `update-notifier.ts` и вызов в
+`loginom-cli.ts` (файл форка) каталог не описывает — они названы в CAT-04. Остальные отличия `updater.ts` от upstream —
+переименования `apply-identity` (правило CAT-12), как у `main.ts` в B4.12.
+
+### Где решал сам
+
+- **`upgrade` отказывает всегда, и с лентой.** Задание: «обновление только из источника продукта; если источника нет —
+  отказ» и «как в 0.4». В 0.4 источника установки у CLI не было вовсе: лента только для строки уведомления со ссылкой
+  на загрузку, `upgrade` отказывал при любом способе. Меньший вариант — как 0.4. Установка из ленты (скачать архив,
+  сверить `sha256` из `cli.json`, заменить бинарник) — новая функция, решение владельца.
+- **`feedUrl` политики CLI не читает.** Задание называет `updates`, `channel`, `feedUrl`, но `update-notifier.ts` 0.4
+  читал только `updates` и `channel`; `feedUrl` — Desktop (`update-policy.ts`), а `product/AGENTS.md` 0.4: «CLI keeps its
+  separate feed contract». Меньший вариант — как 0.4; иначе политика включала бы уведомление в сборке без ленты, вопреки
+  «без источника — молчит».
+- **Строки — правкой, не правилом.** `updater.ts` правится в этой задаче всё равно (шов), и это 8 строк в одном файле.
+  Правило заняло бы шестой файл кода (`apply-identity.py`, предел — пять) и переворачивало бы ожидание B2.7a5 («`upgrade`
+  не в списке», мутация M11). Цена: новую строку «run opencode upgrade again» из upstream правило при синхронизации не
+  исправит — её краснит тест `the upstream updater's messages name the product command`. Заголовки сообщений upstream
+  («Could not check for OpenCode updates», «The OpenCode installer failed»…) называют продукт, а не команду, — не трогал:
+  при `layer` продукта они недостижимы, бренд — CAT-03, решение по строке.
+- **Шов — в `updater.ts`, а не в `index.ts`.** Как 0.4 (`upstreamNode` и `node` в `installation/index.ts`): `layer` один на
+  оба входа, `index.ts` не меняется, и пятый файл остаётся за `define` в `build.ts`. Цена — одна строка в тесте upstream
+  (`upstreamLayer`).
+- **`managed` отдаёт отказ продукта.** Обработчик `upgrade` без способа печатает `managed()`, иначе «Pass --method …».
+  Так `upgrade` без флагов объясняет причину, и обработчик (`handlers/upgrade.ts`) не меняется.
+- **Без `semver`.** У пакета `cli` нет этой зависимости; версии ленты — строго `X.Y.Z` с целыми частями (как
+  `semver.valid` 0.4), сравнение — `Bun.semver.order`. Манифесты не менялись.
+- **Уведомитель не отменяется по концу команды.** В 0.4 `standalone.ts` ждал его после `execute`; в v2 вход
+  `loginom-cli.ts` передаёт управление `index.ts`, а тот выходит через `process.exit` — проверка обрывается выходом или
+  кончается за 2,5 с. Строка, пришедшая после того, как CLI закрыл stderr, отбрасывается (`writableEnded`), иначе запись
+  после `end` дала бы ошибку на выходе.
+- **Команды `loginom …` без уведомления.** Они выходят в `Standalone.early` до `CliProfile.apply()` (B2.7b); в 0.4
+  уведомление шло и для них. Меньший вариант — не трогать `standalone.ts`.
+- **Имена.** `UpdateNotifier.notify` и `UpdateNotifier.policyPath` вместо `notifyUpdate` и `updatePolicyPath` 0.4 —
+  самоэкспорт пакетов v2.
+- **`latest` отказывает, а не отдаёт свою версию, как в 0.4.** Иначе `upgrade --method npm` печатал бы «already
+  installed» и выходил с кодом 0.
+- **Не перенесены случаи тестов 0.4:** `upgradeMajor` (в `Updater` v2 его нет), `userAgent` (не часть `Updater`; в
+  v2 `User-Agent` CLI продукта задаёт сборка, B2.7a1), `shouldNotify` из `test/cli/upgrade.test.ts` (проверка OpenCode 1;
+  тест v2 `cli/test/upgrade.test.ts` на подставной службе не менялся).
+
+### Найдено, не чинил
+
+- **До B2.7d CLI Desktop на macOS ставил бы OpenCode.** Install CLI кладёт бинарник в `~/.loginom-ai-agent/bin/opencode`
+  (`desktop/src/main/service/desktop-cli.ts:52`) — путь установщика curl upstream (`updater.ts`, `curlPath`), поэтому
+  `method()` upstream давал `curl`: `upgrade` скачал бы `https://opencode.ai/v2/install`, а TUI раз в 10 минут спрашивал
+  opencode.ai и через `/update` ставил бы OpenCode. Шов это закрывает. Вывод — по чтению кода, на macOS не запускалось.
+- **`uninstall` того же CLI.** Способа `curl` больше нет, поэтому `uninstall` не предлагает убрать строки `PATH` из
+  профилей оболочки и пишет «Could not detect the installation method» (как 0.4: способ `unknown`). B4.7b переименует
+  бинарник в `loginom-ai-agent` — путь upstream перестанет совпадать и без шва. Решение — B4.7b.
+- `upgrade --help` по-прежнему перечисляет способы `curl, npm, …` у `--method` (Spec upstream); любой из них отказывает.
+- Строка уведомления пишется в stderr и во время TUI — поверх экрана, как в 0.4.
+- Клиенты CLI v2 не держат защёлку `.writer` (её держит сервер профиля, B2.7c), поэтому две команды одновременно могут
+  проверить ленту дважды за сутки — в 0.4 запись метки сериализовала защёлка. Безвредно.
+- `default.ts` по-прежнему запускает `updater.run` раз в 10 минут — теперь без работы.
+
+### Не проверено
+
+- Собранный CLI (`build.ts --standalone`) с лентой: сборка не запускалась; `define` проверен через `bun --define`
+  (тесты, проба), строка в `build.ts` — чтением (MU15).
+- Настоящая лента и подпись выпуска продукта: подписи тестов — свои ключи; ключи продукта лишь отклоняют чужую подпись.
+- Пути политики Windows и macOS — только юнит-тест; запуск на них — нет.
+- Строка уведомления в живом терминале: проба через `script` показала запросы и метку, но не строку (подписи нет).
+- Новые тесты гонялись только на Linux. На Windows не проверены замена `PATH` в окружении процесса рядом с
+  унаследованным `Path` (тест `upgrade` CLI продукта) и две проверки по часам из 0.4 (`< 1500` и `< 1000` мс в
+  `update-notifier.test.ts`), от которых предостерегает навык `unit-tests`.
