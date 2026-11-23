@@ -65,6 +65,7 @@ def audit(journal, config):
             bodies.append(reply['result'])
         if isinstance(reply.get('structuredContent'), dict):
             bodies.append(reply['structuredContent'])
+        primary_bodies = bodies[:]
         outcome = (reply.get('output') or {}).get('outcome') if isinstance(reply.get('output'), dict) else None
         if isinstance(outcome, dict):
             bodies.append(outcome)
@@ -78,7 +79,8 @@ def audit(journal, config):
                     continue
                 if isinstance(body, dict):
                     bodies.append(body)
-        bad = next((b for b in bodies if b.get('status') in
+                    primary_bodies.append(body)
+        bad = next((b for b in primary_bodies if b.get('status') in
                     ('FAILED', 'NOT_APPLIED', 'REFUSED', 'AMBIGUOUS', 'REJECTED')
                     or b.get('result_delivery') == 'refused'
                     or isinstance(b.get('error'), dict) and b['error'].get('code')), None)
