@@ -11,7 +11,9 @@ import { PlatformProvider, usePlatform, type Platform } from "@/runtime/platform
 import { ServerConnection } from "@/runtime/server/registry"
 import type { ServerCollectionController } from "@/servers/registry/controller"
 import { PluginServerRow } from "@/servers/registry/plugin-row"
-import { builtins } from "../../../gui-plugins/src/renderer"
+import type { Entry } from "@opencode/plugin/gui/host"
+import sshDefinition from "../../../gui-plugins/src/ssh"
+import sshRenderer from "../../../gui-plugins/src/ssh/renderer"
 import type { IpcClient, Layout } from "../../../plugin/src/gui/index"
 import type { Ssh, SshConfig, SshHttp, SshItem, SshStart } from "../../../gui-plugins/src/ssh/contract"
 import { DialogSsh } from "../../../gui-plugins/src/ssh/dialog"
@@ -41,7 +43,9 @@ export type SshPlatform = {
 }
 type SshIpc = IpcClient<(typeof Ssh)["spec"]>
 
-const plugin = builtins.find((definition) => definition.id === "ssh")!
+// Loginom AI Agent (B4.11e): the product window leaves SSH out of the built-in list, so the stories mount the plugin
+// itself, as `gui-plugins/src/renderer.ts` would.
+const plugin: Entry = { ...sshDefinition, id: "ssh", windowEntry: () => Promise.resolve({ default: sshRenderer }) }
 const none = new Set<string>()
 const SshPlatformContext = createContext<SshPlatform>()
 const SshIpcContext = createContext<SshIpc>()

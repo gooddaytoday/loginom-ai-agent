@@ -15,14 +15,8 @@ import details from "./details"
 import detailsRenderer from "./details/renderer"
 import browser from "./browser"
 import browserRenderer from "./browser/renderer"
-import pairing from "./pairing"
-import pairingRenderer from "./pairing/renderer"
 import updater from "./updater"
 import updaterRenderer from "./updater/renderer"
-import ssh from "./ssh"
-import sshRenderer from "./ssh/renderer"
-import wsl from "./wsl"
-import wslRenderer from "./wsl/renderer"
 import microsoftOffice from "./microsoft-office"
 import microsoftOfficeRenderer from "./microsoft-office/renderer"
 import sources from "./sources"
@@ -45,10 +39,10 @@ export const builtins = compose({
   review: { ...review, windowEntry: eager(reviewRenderer) },
   details: { ...details, windowEntry: eager(detailsRenderer) },
   browser: { ...browser, windowEntry: eager(browserRenderer) },
-  pairing: { ...pairing, windowEntry: eager(pairingRenderer) },
+  // Loginom AI Agent (B4.11e): the window loads no pairing, ssh or wsl, as in 0.4. SSH and WSL install upstream
+  // OpenCode on the remote machine; pairing opens this computer's server to other devices. main.ts still lists them:
+  // without a window entry they have no UI.
   updater: { ...updater, windowEntry: eager(updaterRenderer) },
-  ssh: { ...ssh, windowEntry: eager(sshRenderer) },
-  wsl: { ...wsl, windowEntry: eager(wslRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },

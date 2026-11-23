@@ -771,7 +771,7 @@ export const builtins = compose({
 })
 ```
 
-The window list adds each window entry, loaded with the app:
+The window list adds each window entry, loaded with the app. Loginom AI Agent leaves pairing, SSH and WSL out of it (B4.11e); main still lists them:
 
 <!-- source: src/renderer.ts#builtins -->
 
@@ -786,10 +786,10 @@ export const builtins = compose({
   review: { ...review, windowEntry: eager(reviewRenderer) },
   details: { ...details, windowEntry: eager(detailsRenderer) },
   browser: { ...browser, windowEntry: eager(browserRenderer) },
-  pairing: { ...pairing, windowEntry: eager(pairingRenderer) },
+  // Loginom AI Agent (B4.11e): the window loads no pairing, ssh or wsl, as in 0.4. SSH and WSL install upstream
+  // OpenCode on the remote machine; pairing opens this computer's server to other devices. main.ts still lists them:
+  // without a window entry they have no UI.
   updater: { ...updater, windowEntry: eager(updaterRenderer) },
-  ssh: { ...ssh, windowEntry: eager(sshRenderer) },
-  wsl: { ...wsl, windowEntry: eager(wslRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },

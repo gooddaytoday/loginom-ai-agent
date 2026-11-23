@@ -11,6 +11,7 @@ import {
   useContext,
 } from "solid-js"
 import { motionTuning } from "../../motion-tuning"
+import productMark from "../../assets/loginom/loginom-icon.svg"
 import { attachGeneratedAvatar } from "./animation"
 import { generateProjectIcon, GENERATED_PROJECT_ICON_STYLE, type GeneratedProjectIcon } from "./generated"
 import "./project-avatar.css"
@@ -80,7 +81,8 @@ export function getProjectAvatarSource(id?: string, icon?: { color?: string; url
 
   if (icon?.color) return undefined
 
-  if (id && LOGINOM_AI_AGENT_PROJECT_IDS.has(id)) return "https://opencode.ai/favicon.svg"
+  // Loginom AI Agent (B4.11e): the product mark from the bundle, as in 0.4, not an image from opencode.ai.
+  if (id && LOGINOM_AI_AGENT_PROJECT_IDS.has(id)) return productMark
 
   return icon?.url
 }
