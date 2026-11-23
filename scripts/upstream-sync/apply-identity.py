@@ -44,11 +44,12 @@ UNTOUCHED = re.compile(r"https?://[^\s\"'`<>]+|\bassets/[\w./-]*")
 # packages: elsewhere the same words are other tasks' (app dictionaries, built-in skills, plugin comments). Upstream's
 # `opencode upgrade` and `opencode auth login` are the updater's and ACP's. `models` only in backticks: a bare
 # "opencode models" is the command path of the CLI run from source, whose root keeps the name opencode without the build
-# define. Not after a package scope, path or host (`@opencode/client`, `anomalyco/opencode`, `opencode.ai`).
+# define. Not after a package scope, path or host (`@opencode/client`, `anomalyco/opencode`, `opencode.ai`); after an escape
+# such as `\n`, as VARIABLE.
 COMMAND_SOURCES = re.compile(r"^packages/(cli|server|tui)/(src|test)/")
-COMMAND = re.compile(r"(?<![\w$./@-])opencode(?=(?: | / )(?:service|pair|mini|stats|acp|mcp add|-s)\b)|(?<=`)opencode(?= models`)")
+COMMAND = re.compile(r"(?:(?<![\w$./@-])|(?<=\\[nrt]))opencode(?=(?: | / )(?:service|pair|mini|stats|acp|mcp add|-s)\b)|(?<=`)opencode(?= models`)")
 # "Run ${reset}${bold}opencode${reset}${dim} to use 2.0.0": the TUI epilogue styles the command between the words.
-RUN_TO_USE = re.compile(r"(\b[Rr]un (?:\$\{\w+\})*)opencode((?:\$\{\w+\})* to use\b)")
+RUN_TO_USE = re.compile(r"((?:\b|(?<=\\[nrt]))[Rr]un (?:\$\{\w+\})*)opencode((?:\$\{\w+\})* to use\b)")
 # Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose; the TUI
 # snapshot test renders sample tool output that names OPENCODE_* variables, and its .snap file (not text here) wraps it;
 # the drizzle-kit config points at an upstream developer's own database, and a changed line would make that path ours.

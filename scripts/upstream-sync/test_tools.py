@@ -252,6 +252,8 @@ class ApplyIdentityCommand(unittest.TestCase):
         self.assertRenamed("packages/tui/src/util/presentation.ts", "`  ${dim}Run ${reset}${bold}opencode${reset}${dim} to use ${reset}`")
         self.assertRenamed("packages/server/src/process.ts", 'action: "Run `opencode service restart` after checking the service logs.",')
         self.assertRenamed("packages/tui/test/util/presentation.test.ts", '["  Loginom AI", "  Run opencode to use 2.0.0"]')
+        # right after an escape, as the names of VARIABLE
+        self.assertRenamed(self.CLI, 'throw new Error("Usage:\\nopencode service get <key>")', '"Done.\\nRun opencode to use 2.0.0"')
 
     def test_names_that_are_not_the_command_keep_their_spelling(self):
         self.assertKept(self.CLI, 'import { OpenCode } from "@opencode/client/promise"', "gh attestation verify --repo anomalyco/opencode",
