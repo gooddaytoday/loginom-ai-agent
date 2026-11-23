@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
+import { Product } from "@loginom-ai-agent/product"
 
 // Packaged windows load the renderer through the privileged `oc://` protocol, where a root-relative
 // path such as `src="/foo.js"` resolves from the protocol origin instead of next to the HTML entry.
@@ -15,6 +16,14 @@ test("index.html references local resources by relative path and has no web mani
   for (const path of paths) expect(path).not.toMatch(/^\/[^/]/)
   // A web app manifest does not apply in Electron.
   expect(content).not.toContain('rel="manifest"')
+})
+
+// Fork (catalog CAT-09): static HTML cannot read the channel, so the pre-load title is the product name for every
+// channel, as in 0.4; the windows themselves carry the channel name (`APP_NAME`).
+test("index.html titles the window with the product name", async () => {
+  const content = await Bun.file(join(import.meta.dirname, "index.html")).text()
+
+  expect(content.match(/<title[^>]*>([^<]*)<\/title>/)?.[1]).toBe(Product.name)
 })
 
 // Telemetry must not delay first paint: nothing awaits before render, and the Sentry SDK loads lazily.
