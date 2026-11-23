@@ -15684,3 +15684,323 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   открывал. Окно Desktop на Linux тоже не запускал: проверены тесты, e2e на dev-сервере Vite и сборка `electron-vite`.
 - Страницу «Расширения › Плагины» с тремя встроенными только главного процесса не открывал — по коду.
 - Аватар в окне: в тесте Bun отдаёт путь к файлу; рендер `<img>` в окне не смотрел.
+
+## B4.13 Учётные данные Desktop для службы
+
+23.11.2026. Ветка `b413-desktop-credentials` от `oc2-migration` (`f502e74bef`), рабочее дерево `.claude/worktrees/b413`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, `.husky/_` есть; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client`; `bun run
+secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов — отдельное дерево `<scratchpad>/b413-base`
+(`f502e74bef`, detached, тот же `npm ci`). Эталон 0.4 — `v0.4.0`. `service/{desktop-cli,sidecar-probe}.ts` и `script/*`
+(B4.7) не трогал. Настоящую модель не вызывал: `serve` в тесте и собранное приложение запросов к модели не делают,
+`LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH` в тесте задан.
+
+Прочитано: решение В-97 п. 4; этот журнал — B4.1 (п. 1 и 2, вопрос 4, строки B4.13 и B4.14a), B2.3, B3.2, B4.2, B4.9,
+B2.7b; 0.4 — `loginom-host/src/connection/credentials.ts`, `desktop/src/main/loginom/{credentials,desktop-service}.ts`; в
+дереве переноса — `loginom-host/src/connection/{connection-store,connection-service,cli-credentials,cli-dpapi,cli-keychain}.ts`,
+`loginom-agent/src/host.ts`, `cli/src/server-process.ts`; `.opencode/skills/unit-tests`, раздел Tests `packages/desktop/AGENTS.md`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `5880cb4880` `feat(desktop): move the 0.4 Loginom connection into the service's store before it starts (B4.13)` | четыре файла кода, тест |
+| следующий | этот раздел; CAT-09 в `catalog.md` |
+
+Файлы кода — четыре: `desktop/src/main/loginom/credential-migration.ts` (+103, новый файл форка: перенос),
+`loginom/credentials.ts` (+28, новый файл форка: слой Electron), `desktop.ts` (+2, upstream, CAT-09),
+`service/service-identity.ts` (+11, файл форка: `serviceData()`). Тест `loginom/credential-migration.test.ts` (+455, новый).
+Четвёртый файл — сверх списка задания, «Где решал сам».
+
+### Как и когда переносится, где корень
+
+| | Откуда: Desktop 0.4 | Куда: Host службы Desktop |
+|---|---|---|
+| Каталог | `<userData>/loginom/connection`; userData — `<appData>/com.loginom.aiagent[.beta\|.dev]` (B4.2) | `<data>/loginom/connection`; data — `${XDG_DATA_HOME:-~/.local/share}/loginom-ai-agent[-beta\|-dev]`, как `Global.Path.data` CLI (B2.3, B4.9); на Windows — `%USERPROFILE%\.local\share\…` |
+| Кодек | `credentials(platform, safeStorage)` 0.4: Linux — открытый `{apiKey, password}`, Windows и macOS — `{encrypted}` | `cliCredentials(platform, {root: <data>/loginom, resources})`: конверт `loginom-cli-secrets-v1` — `plaintext` (Linux, файл `0600`), `dpapi`, `keychain` |
+| Кто пишет | Desktop 0.4 | главный процесс Desktop один раз, дальше — сам Host службы |
+
+**Когда.** Слой `DesktopCredentials` (`credentials.ts`) стоит в цепочке `desktop.ts` ниже `BackgroundService.layer`;
+цепочка строится снизу вверх. Значит, перенос идёт после `DesktopInitialization` и до слоя службы, автомат которого
+сразу запускает службу. К этому моменту `app.whenReady` прошёл, и `safeStorage` уже доступен. Окружение оболочки тоже
+применено, поэтому `serviceData()` читает тот же `XDG_DATA_HOME`, что унаследует служба. В собранном приложении строка
+переноса в `main.log` стоит на 11 мс раньше `starting v2 background service`.
+
+**Что.** Берётся активная запись 0.4 (`connection.json`). У службы она становится поколением
+`max(поколения 0.4, её поколение, поколения в хранилище службы) + 1` через `stage` и `activate` хранилища Host. Это
+`connection-store.ts`, без изменений. Адрес, `urlSource`, имя, `apiKey`, пароль и `revision` переносятся как есть.
+
+`stage` на пустом хранилище сначала выполняет его же `initialize`. Поэтому маркер `v040-migration.json`
+`{"state":"complete"}` ложится раньше поколения, и Host службы не удаляет запись на собственный стенд пользователя
+(находка B2.7b).
+
+Хранилище 0.4 только читается: файлы, права и маркер не меняются. Тест сравнивает дерево userData до и после переноса.
+
+**Один раз.** Исход каждого старта, в порядке проверок:
+
+| Исход | Когда | Что тронуто |
+|---|---|---|
+| `none` | нет `<userData>/loginom/connection/connection.json` | ничего: проверка по файлу, ни хранилищ, ни `safeStorage` |
+| `current` | у службы уже есть `connection.json` или `pending.json`: подключение перенесено раньше или настроено в v2 | ничего, кодеки не вызываются |
+| `reset` | профиль без маркера 0.4.0, стенд — не `app.loginom.ai` | ничего: 0.4.0 удалил бы такую запись |
+| `moved` | иначе | новое поколение у службы |
+| `failed` | отказ чтения или записи | ниже |
+
+### Отказы
+
+| Случай | Исход (`main.log`, `warn`) | Служба |
+|---|---|---|
+| Windows или macOS: `safeStorage` недоступен, как отказал бы 0.4 | `failed`, `read`, `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` | стартует без подключения |
+| DPAPI или Keychain-помощник `cliCredentials` недоступны | `failed`, `write`, `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` | без подключения; в её хранилище только маркер |
+| запись 0.4 — не запись (обрезанный JSON) | `failed`, `read`, `LOGINOM_STORE_INVALID` | без подключения |
+| каталог 0.4 доступен другим (не `0700`) | `failed`, `read`, `LOGINOM_STORE_PERMISSIONS_INVALID` | без подключения |
+| `safeStorage` расшифровал не JSON секретов | `failed`, `read`, `LOGINOM_STORE_READ_FAILED` | без подключения |
+
+- **Повтор.** Пока у службы нет записи, каждый следующий старт пробует перенос заново. Когда подключение перенесено
+  или настроено в v2, исход — `current`.
+- **Где видна причина.** Строка `Loginom connection of 0.4 not moved to the service { state: 'failed', step, reason }`
+  пишется в `<userData>/logs/…/main.log`. Этот журнал уходит в экспорт `DesktopLogging.exportDebug`: экспорт — по коду,
+  строка — в прогоне собранного приложения ниже.
+- **Что попадает в исход.** Только строка вида `LOGINOM_*`, иначе `LOGINOM_STORE_READ_FAILED` или `_WRITE_FAILED`.
+  Сообщение исключения туда не попадает: `JSON.parse` расшифрованного текста цитирует этот текст.
+- **Пароль вне хранилищ.** Его нет ни в окружении, ни в аргументах службы: перенос — это файлы, и служба читает их
+  сама.
+- **Приложение не падает.** `migrate` не отклоняется ни при одном отказе.
+
+### Откат на 0.4: что видит пользователь
+
+- **После отката.** 0.4 открывает своё `<userData>/loginom/connection` таким, каким оно было в момент обновления. Видно
+  то же подключение, пароль читается, ошибки нет. Новое поколение лежит в каталоге службы, который 0.4 не читает.
+- **Что теряется.** Изменения подключения, сделанные в v2: адрес, имя и пароль в 0.4 — прежние.
+- **Повторное обновление.** У службы уже есть подключение, исход — `current`. Изменения, сделанные в 0.4 после отката,
+  в v2 не переходят. Перенести их заново можно, удалив `<data>/loginom/connection` службы; в продукте для этого кнопки
+  нет.
+- **Почему не так, как в В-97.** Формулировка «откат на 0.4 не прочтёт новое активное поколение» писалась для общего
+  каталога. После B2.3 корни у 0.4 и у службы разные, поэтому активное поколение 0.4 не меняется. В-97 этот исход
+  допускал, так что пользователь теряет меньше.
+
+### Тесты
+
+`credential-migration.test.ts`. Профили 0.4 пишет код 0.4: хранилище и кодек `loginom-host/src/connection`, без
+изменений с `v0.4.0`. `safeStorage` Windows и macOS в тесте — обратимое преобразование, в шифртексте пароля нет.
+`XDG_DATA_HOME` задаётся в процессе теста, а `serviceData()` читает его так же, как служба.
+
+Таблица, 14 строк. Каждая строка — два старта: второй даёт `current` после `moved` или тот же исход. После обоих:
+
+- пароля нет в исходах;
+- дерево userData такое же, как до переноса;
+- хранилище службы после второго старта такое же, как после первого;
+- без `moved` новых записей у службы нет.
+
+При `moved` дополнительно проверяется:
+
+- маркер `complete`;
+- запись (поколение, `revision`, адрес, `urlSource`, имя);
+- конверт `plaintext`;
+- `cliCredentials("linux")` раскрывает пароль;
+- поколение лежит в `generations`.
+
+| Строка | Исход |
+|---|---|
+| Linux, собственный стенд, маркер 0.4.0, поколения 1 и 2 | `moved` 3 |
+| Linux, профиль без маркера, `app.loginom.ai` | `moved` 3 |
+| Linux, профиль без маркера, собственный стенд | `reset`, у службы ничего |
+| Linux, нет профиля 0.4 | `none`, корень теста пуст |
+| Linux, у службы уже есть подключение (поколение 1) | `current` |
+| Linux, у службы поколение 3 без активации (оборванный перенос) | `moved` 4 |
+| Linux, `connection.json` 0.4 — обрезанный JSON с паролем | `failed` `read` `LOGINOM_STORE_INVALID` |
+| Linux, каталог 0.4 `0755` | `failed` `read` `LOGINOM_STORE_PERMISSIONS_INVALID` |
+| win32 и darwin: `safeStorage` недоступен | `failed` `read` `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` |
+| win32 и darwin: расшифровано «`<пароль>` is not JSON» | `failed` `read` `LOGINOM_STORE_READ_FAILED` |
+| win32 и darwin: DPAPI и Keychain на этом раннере нет | `failed` `write` `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` |
+
+**«Host службы видит подключение»** — тест в духе B2.7b, только Linux, нужен `LOGINOM_AI_AGENT_TEST_NODE`.
+
+- **Ресурсы.** Комплект ресурсов выдуманного стенда: Node, `host/node-host.mjs` из `build-node-host.ts`, Help-заглушка,
+  которая записывает свой старт.
+- **Перенос.** Профиль 0.4 переносится, исход — `moved` 3.
+- **Служба.** Запускается настоящий `serve` из исходников CLI (`src/index.ts`, тот же вход, что у службы Desktop). Окружение
+  у него Desktop-ское: каталоги XDG теста, ресурсы, без переменных профиля CLI. Каталог данных `serve` находит сам.
+- **Проверки.**
+  - Help стартовал для поколения 3, его дед — процесс `serve`.
+  - В `/proc/<pid>/{environ,cmdline}` службы, Node host и Help пароля нет.
+  - После остановки пароль есть только в двух хранилищах подключения. Его нет ни в выводе службы, ни в её журналах,
+    базе и файлах Host.
+- **Время.** Тест идёт 2,2 с.
+
+```text
+$ cd packages/desktop && LOGINOM_AI_AGENT_TEST_NODE=<node 24.19.0> bun test --timeout 30000 src/main/loginom/credential-migration.test.ts
+ 15 pass
+ 0 fail
+ 114 expect() calls
+Ran 15 tests across 1 file. [3.61s]
+```
+
+### Мутации
+
+`<scratchpad>/b413/mutate.py`: одна точная замена в коде, файл теста, возврат файла. После прогона `git status` по коду
+чистый.
+
+```text
+=== M0 none: 15 pass / 0 fail
+=== M1 service data in another channel's directory: 10 pass / 5 fail          # 4 строки moved/current и служба
+=== M2 the Host root beside, not in, <data>/loginom: 10 pass / 5 fail        # те же; служба — 60 с без Help
+=== M3 the service record with the Desktop codec: 9 pass / 6 fail            # moved, write-отказы win32/darwin, служба
+=== M4 the marker does not stay with the generation: 11 pass / 4 fail        # 3 строки moved и служба: Host удалил запись
+=== M5 a second start moves again: 11 pass / 4 fail
+=== M6 the generation ignores the service store: 14 pass / 1 fail            # оборванный перенос
+=== M7 no 0.4.0 rule for an unmarked profile: 14 pass / 1 fail               # reset
+=== M8 the raw error message as the reason: 13 pass / 2 fail                 # «is not JSON» win32 и darwin
+=== M9 store calls without a 0.4 connection: 14 pass / 1 fail                # none: созданы каталоги
+=== M10 the 0.4 store is initialized before reading: 13 pass / 2 fail        # оба профиля без маркера: 0.4 изменён
+```
+
+**Первый вариант M1 вышел за пределы теста.** Это была подмена `XDG_DATA_HOME` на `XDG_STATE_HOME`; у раннера
+`XDG_STATE_HOME` не задан, и перенос записал выдуманное подключение в настоящий
+`~/.local/share/loginom-ai-agent-dev/loginom` машины. Каталог создан этим прогоном (07:50:32, адрес
+`loginom.example.test`) и удалён; остальное содержимое каталога канала не тронуто. M1 заменена на «каталог другого
+канала» — она остаётся в корне теста. Результат первого варианта тоже был красным: 2/13.
+
+### Собранное приложение
+
+`<scratchpad>/b413/build.sh` — как у B4.10: встроенный CLI канала dev, `bun run build` с источниками Node и Chromium,
+`electron-builder --linux dir`, шаги по 18, 33 и 39 с. Прогон — `accept.sh`: root, `xvfb-run -a`, `--no-sandbox`, свой
+`LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и `HOME`.
+
+Профиль 0.4 пишет код 0.4 (`profile.ts write`): Linux, маркер 0.4.0, поколения 1 и 2, выдуманный стенд
+`https://loginom.example.test/app/`. Затем два старта приложения; каждый раз окно закрывается через CDP.
+
+```text
+== first start
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 1517481, http://127.0.0.1:28290
+help: pid 1517523 (<app>/resources/loginom/runtime/src/knowledge-entry.mjs), parent 1517491 (<app>/resources/loginom/host/node-host.mjs), its parent 1517481
+host knowledge directories: 3
+password in environ or cmdline of app, service, Node host, Help: []
+app exit: code 0
+main.log order:
+  16:[2026-11-23 08:07:57.093] [info]  (main)    Loginom connection of 0.4 for the service { state: 'moved', generation: 3 }
+  35:[2026-11-23 08:07:57.104] [info]  (main)    starting v2 background service
+  55:[2026-11-23 08:07:57.621] [info]  (main)       v2 CLI background service starting { reason: 'missing' }
+service store: {"generation":3,"url":"https://loginom.example.test/app/","username":"fixture-user","envelope":{"format":"loginom-cli-secrets-v1","protection":"plaintext"},"decodes":true,"marker":"{\"state\":\"complete\"}"}
+service store files: ./connection.json 600 ./generations/3.json 600 ./v040-migration.json 600
+0.4 store files: ./connection.json 600 ./generations/1.json 600 ./generations/2.json 600 ./v040-migration.json 600
+files with the password, outside the two stores:                 # grep -rlaF по корню прогона: журналы, база, Host
+  all: <run>/data/loginom-ai-agent-dev/loginom/connection/generations/3.json
+  all: <run>/data/loginom-ai-agent-dev/loginom/connection/connection.json
+  all: <run>/desktop/loginom/connection/generations/2.json
+  all: <run>/desktop/loginom/connection/connection.json
+== second start
+help: pid 1517845 (<app>/resources/loginom/runtime/src/knowledge-entry.mjs), parent 1517825 (<app>/resources/loginom/host/node-host.mjs), its parent 1517798
+  [2026-11-23 08:08:02.139] [info]  (main) Loginom connection of 0.4 for the service { state: 'current' }
+service store after the second start: unchanged
+left (by this build or run path): []
+```
+
+Второй прогон, `accept.sh open open`: тот же профиль, но каталог 0.4 открыт как `755`.
+
+```text
+main.log order:
+  16:[2026-11-23 08:08:17.443] [warn]  (main)    Loginom connection of 0.4 not moved to the service {
+         state: 'failed', step: 'read', reason: 'LOGINOM_STORE_PERMISSIONS_INVALID' }
+  39:[2026-11-23 08:08:17.453] [info]  (main)    starting v2 background service
+  60:[2026-11-23 08:08:18.418] [info]  (main)       v2 CLI background service ready {
+help: pid none                                    # служба работает без подключения: Help не стартует
+service store files: ./v040-migration.json 600    # маркер написал сам Host службы в 08:08:18, при своём старте
+== second start: та же строка warn (08:10:27.934), хранилище службы не изменилось; app exit: code 0 оба раза
+```
+
+Ожидание Help в прогоне `open` упирается в свой срок (120 с на старт), поэтому окно закрывалось позже. Сборка, `out/` и
+ресурсы удалены после прогонов.
+
+### Приёмка
+
+База — `<scratchpad>/b413-base` (`f502e74bef`), итог — `5880cb4880`. В обоих деревьях выполнен `npm ci` клиента,
+`LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `loginom-host` запускается под `xvfb-run -a`. Падения сравнивались по именам
+из JUnit (`<scratchpad>/b413/{suites.sh,compare.py}`).
+
+| Пакет | Команда | `f502e74bef` | итог |
+|---|---|---|---|
+| `desktop` | `bun typecheck`; `bun run typecheck:tsc` | ошибок нет; код 0 | то же |
+| `desktop` | `bun test --timeout 30000` | 582, 0 fail, 4 skip | 597 (+15 `credential-migration`), 0 fail, 4 skip |
+| `loginom-host` | `bun typecheck` | ошибок нет | то же |
+| `loginom-host` | `xvfb-run -a bun test` | 561, 5 fail, 12 skip | 561, 5 fail, 12 skip — те же пять: «umask», три `bundled-ripgrep`, `managed-work-entry` (как в B4.9) |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0, как на базе
+against a6b15d33daf6: 586 divergent upstream files              # база — 586; CAT-13: 25, CAT-09: 39, как на базе
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ oxlint и prettier --check изменённых файлов                    # 0 warnings, чисто
+$ bun run check                                                  # код 0, на 5880cb4880 с этим разделом и CAT-09
+Found 554 warnings and 0 errors.                                 # у файлов задачи предупреждений нет
+@opencode/desktop:typecheck: ✓ No type errors in 3,369 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+### Где решал сам
+
+- **Четвёртый файл — `serviceData()` в `service-identity.ts`, рядом с `serviceFile()`.**
+  - Каталог данных службы Desktop должен считаться так же, как его считает CLI, и в момент вызова.
+  - Тест получает путь переноса от этого же кода и проверяет его настоящим `serve`. Под мутациями M1 и M2 этот тест
+    красный.
+  - Без такого кода вычисление пришлось бы повторить в `credentials.ts`, а тот импортирует `electron` и тестом не
+    загружается.
+- **Два файла, а не один.**
+  - Bun не загружает именованный импорт `electron` (`Export named 'app' not found`, проба).
+  - Поэтому перенос — чистая функция в `credential-migration.ts`. Её параметры — платформа, `safeStorage`, userData и
+    ресурсы, без параметров только для тестов.
+  - `credentials.ts` связывает её с Electron и журналом.
+- **«Один раз» — по наличию записи у службы, а не по сравнению поколений.**
+  - Поколения двух независимых хранилищ — не порядок во времени.
+  - Сравнение «у службы новее» после отказа переноса и настройки в v2 (у службы поколение 1, у 0.4 — 2) затёрло бы
+    настройку пользователя.
+  - Проверка по файлу (`connection.json` или `pending.json`) кодеки не вызывает. Иначе на Windows и macOS каждый старт
+    шёл бы через PowerShell или Keychain.
+- **Номер поколения — больше всех поколений 0.4 и службы.**
+  - `stage` отказывает на существующем файле, а оборванный перенос оставляет поколение без активации.
+  - Новый номер не совпадает ни с одним поколением 0.4, поэтому кеши Host по поколению (`knowledge/<n>`) не
+    пересекаются.
+- **Только активная запись, без `pending.json` 0.4.** Отложенная смена 0.4 сохранялась, пока шёл прогон, и
+  применялась на следующем старте 0.4. Если пользователь вышел до этого, в v2 придёт прежнее подключение.
+- **Правило 0.4.0 для профиля без маркера.**
+  - Задание просит перенести маркер вместе с поколением.
+  - Хранилище службы новое, и его `initialize` сам кладёт `complete` раньше поколения.
+  - У профиля, который 0.4.0 не открывал (0.3), маркера нет, и 0.4.0 удалил бы его запись на стенд не
+    `app.loginom.ai`. Перенос такую запись не переносит (`reset`), запись на `app.loginom.ai` переносит.
+  - Правило — одна строка, она повторяет `foreign` из `connection-store.ts`.
+- **Перенос в любом запуске, не только в упакованном.** Запуск из исходников — канал dev, профиль 0.4 dev. Так же
+  B4.9 ставит службе версию.
+- **Новых кодов ошибок нет.** Для неизвестных причин используются существующие `LOGINOM_STORE_READ_FAILED` и
+  `_WRITE_FAILED`.
+- **Тест службы — настоящий `serve`, а не `ServiceHost.start` в процессе теста.** Каталог данных `serve` находит сам,
+  поэтому тест ловит расхождение путей Desktop и CLI. Это первый тест `desktop`, которому нужен
+  `LOGINOM_AI_AGENT_TEST_NODE`; так же устроены `cli-loginom` и `loginom-host-lease`.
+
+### Найдено, не чинил
+
+- **macOS: в ресурсах Desktop нет Keychain-помощника `bin/loginom-keychain`.**
+  - Его собирает только `stage-resources.ts:177`, и только при `flavor === "cli"`.
+  - Из-за этого на macOS и перенос (шаг `write`), и Host службы с `cliCredentials` отказывают:
+    `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`. Служба Desktop на macOS сейчас не может хранить подключение вообще, не
+    только перенесённое.
+  - Чинить в сборке ресурсов: помощник для `desktop` плюс подпись и `signIgnore` (B4.5b). Блокирует SEC-01 на macOS
+    (B4.14a); файл общий с CLI, вне пяти файлов задания.
+- **Уже запущенная служба.** Службу, пережившую упавшее окно (сторожа нет, В-97 п. 3), подхватывает зонд, и её Host
+  увидит новое поколение только после перезапуска. При обновлении с 0.4 службы v2 ещё нет — по коду.
+- **Первый старт на Windows.** DPAPI через Windows PowerShell идёт в главном процессе до регистрации IPC, срок —
+  до 30 с (`WINDOWS_POWERSHELL_TIMEOUT_MS`). Не мерил; следующие старты кодеков не зовут.
+- **Битая ссылка.** Корневой `AGENTS.md` ссылается на `packages/desktop/src/main/loginom/AGENTS.md`, которого в дереве
+  переноса нет.
+
+### Не проверено
+
+- **Windows и macOS** — B4.14a и B4.14c:
+  - настоящий `safeStorage` Electron 44 на записях Electron 42 того же профиля;
+  - DPAPI из главного процесса Electron;
+  - Keychain (заблокирован находкой выше);
+  - путь `%USERPROFILE%\.local\share\…`.
+  Здесь эти платформы проверены только таблицей с подставным `safeStorage` на Linux.
+- **Другие каналы.** Собранное приложение — только Linux `--linux dir`, канал dev, от root; prod и beta не собирал.
+- **Обрыв переноса.** `kill` между `stage` и `activate` не проверял: оборванный перенос моделирует строка таблицы
+  (поколение без активации).
+- **Экспорт журналов.** Что строка исхода попадает в zip экспорта, известно только по коду `DesktopLogging`.
