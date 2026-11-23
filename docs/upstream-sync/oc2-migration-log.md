@@ -13501,7 +13501,8 @@ Found 558 warnings and 0 errors.
 |---|---|
 | `7c9e1e3acd` `feat(desktop): run its own service with a constant identity and port per channel (B4.9)` | пять файлов кода, тесты |
 | `e0141b968f` `style(desktop): space the service identity module and test as the linter asks (B4.9)` | пустые строки по `require-readable-spacing` и `SAFETY:` у разбора в тесте: у изменённых файлов новых предупреждений `oxlint` нет, в тесте их стало на шесть меньше |
-| следующий | этот раздел; CAT-13 в `catalog.md` |
+| `ea70bc3c1f` `docs(upstream-sync): record Desktop's own service, its ports and environment (B4.9)` | этот раздел; CAT-13 в `catalog.md` |
+| следующий | дополнения раздела: непроверенная ветка службы профиля, навык `unit-tests`, снятое дерево базы |
 
 Файлы кода — пять, предел задания: `desktop/src/main/service/service-identity.ts` (+24 −13),
 `desktop/src/main/service/background-service.ts` (+8 −2, CAT-13), `loginom-agent/src/host.ts` (+6),
@@ -13632,7 +13633,7 @@ left: 0 processes
 База — `<scratchpad>/b49-base` (`f3d9a5a92b`), итог — `7c9e1e3acd` (после него — только пустые строки и комментарий: `service-identity.test.ts` снова 3 pass, `desktop` `bun typecheck` без ошибок); `npm ci` клиента в обоих деревьях,
 `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `loginom-host` — `xvfb-run -a`. Падения сравнивались по именам из JUnit
 (`<scratchpad>/b49-runs/{suites.sh,compare.py}`). `server` — три файла, которые запускают Host через
-`loginom-agent/src/host.ts`.
+`loginom-agent/src/host.ts`. После прогонов дерево базы снято (`git worktree remove`).
 
 | Пакет | Команда | `f3d9a5a92b` | итог |
 |---|---|---|---|
@@ -13678,6 +13679,12 @@ Found 552 warnings and 0 errors.                          # база — 558 (B4
   0x0c0c` главнее; без него служба из исходников займёт порт dev-канала, как установленный Desktop Dev.
 - **Тест занятого порта подменяет только порт**, а не занимает 28290: на машине разработчика порт может держать
   установленный Desktop Dev. Числа портов закреплены таблицей каналов.
+- **Тест занятого порта оставлен вопреки навыку `.opencode/skills/unit-tests`** (прочитал после написания тестов):
+  навык запрещает новые тесты, которые выжидают 15 с поиска владельца порта в `server-process.ts`, а укоротить их
+  нечем — у сервера нет параметра, у Desktop швы для тестов запрещены. Задание же требует тест на этот пункт. Тест
+  стоит ~22 с в наборе `desktop`. Поведение CLI уже покрывает `cli/test/service-lifecycle.test.ts` («an unrelated process
+  on the port gets an actionable error»), путь до окна — прогон собранного приложения ниже. Если оркестратор
+  предпочтёт навык, тест можно убрать без потери остальных проверок.
 
 ### Найдено, не чинил
 
@@ -13702,6 +13709,9 @@ Found 552 warnings and 0 errors.                          # база — 558 (B4
   `%USERPROFILE%\.local\state\loginom-ai-agent[-канал]\service-desktop.json` — B4.14c.
 - Собранное приложение — только Linux `--linux dir`, канал dev, от root, `--no-sandbox`; prod и beta — юнит-тестом.
 - Экран окна при занятом порте глазами не смотрел: ошибка — в `main.log` и `renderer.log`.
+- Ветку `loginom-agent/src/host.ts` «служба профиля CLI не берёт унаследованную версию» не проверяет ничего: ни
+  юнит-тест (модуль не тестируется отдельно), ни собранное приложение (там службы профиля нет). Проверено только, что
+  служба Desktop версию передаёт.
 - Служба, уже запущенная прошлой версией Desktop под `service.json`, после обновления не подхватывается и не
   останавливается: новое окно запустит свою под `service-desktop.json`, старая служба держит `0xc0de` до выхода. До B4.9
   установленных сборок v2 не было — по коду, не проверял.
