@@ -10228,7 +10228,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 | Коммит | Что |
 |---|---|
 | `a86dc051ec` `feat(loginom-agent): the administrator's deny wins on the server; locked kinds are not granted for the conversation (B2.6c)` | `settle`, `refusal`, `policyDenied`, `policyDeniedText`, `refusalMetadata` в `packages/loginom-agent/src/permissions.ts`; проверка правил и RPC `loginom.permission.conversation` — `src/index.ts`; тесты — `test/permissions.test.ts` (+2), `packages/server/test/loginom-permissions.test.ts` (+4, стенд принимает политику системного каталога), `loginom-dock-catalog.test.ts` (+1 случай мастера, стенд принимает политику; заголовок случая B2.6b про чужой запрет уточнён) |
-| следующий | этот раздел, CAT-05 в `catalog.md` |
+| `6006073c5d` `docs(upstream-sync): record B2.6c the administrator's deny through OpenCode's managed policy` | этот раздел (первая версия), CAT-05 в `catalog.md` |
+| `445c8a3af2` `test(server): the conversation grant under the administrator's policy for every kind it covers (B2.6c)` | по ревью советника: случай «в этом разговоре» — на все пять видов, которые разрешение покрывает; проверка, что `policies` проекта загружены |
+| следующий | уточнения этого раздела |
 
 ### `policy.json` в 0.4
 
@@ -10311,7 +10313,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 | умолчания | хук политики после правил | API, каждый вид |
 | настройки (`permissions` конфига) | то же; `allow` всего включает и терминал | API, каждый вид |
 | правила сессии от клиента | то же | API, каждый вид; мастер |
-| «в этом разговоре» | RPC отказывает по виду с замком; разрешение превращает только `ask` | API |
+| «в этом разговоре» | RPC отказывает по виду с замком; разрешение превращает только `ask` | API, пять видов, которые разрешение покрывает |
 | «один раз», `--dangerously-skip-permissions` | запрет не открывает вопроса — отвечать нечего | настоящие инструменты, клиент отвечает `once` на каждый вопрос |
 | мастер (`loginom.runner.start`) | допуск к инструментам — не разрешение | Host по сценарию |
 | сохранённое `always`, расписание (`Unattended`) | те же хуки после правил | по коду |
@@ -10326,7 +10328,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 |---|---|---|
 | «Запрещено» вида действия | `tool.use` `<действие>:<ресурс>` по строкам таблицы B2.6a | покрывает; администратор пишет действия, а не вид |
 | «Спрашивать» или «Разрешено» с замком | эффекты только `allow` и `deny`; `allow` лишь не запрещает и вопроса не снимает | не покрывает |
-| терминал выключен | `tool.use` `shell:*` | покрывает |
+| терминал выключен | `tool.use` `shell:*` | покрывает команды агента; команда пользователя (`!cmd`) разрешений не спрашивает (B2.6a, В-69) |
 | «Свои навыки: выключены» (В-76) | `skill.use` по ID навыка | частично: «свои» по происхождению не отличить, `*` убирает и навыки OpenCode |
 | модели администратора | `provider.use` по провайдеру | частично: не по модели, свою модель политика не добавляет |
 | режим сети, адрес Loginom, источник каталога, обновления (`updates`, `channel`, `feedUrl`) | нет | не покрывает |
@@ -10377,7 +10379,7 @@ none:   browser, loginom-automation, loginom-dashboard, opencode, own-notes, pac
 | Тест | Что проверяет |
 |---|---|
 | каждый вид и режим | политика запрещает каждую строку таблицы, терминал тоже. Режимы: умолчания, правила сессии `* * allow` от клиента, настройки `permissions` `* * allow` (включают и терминал). Запросы — все виды, `read` файла проекта, команда агента. С политикой — всё `deny`, открытых вопросов нет; без политики в тех же режимах — ни одного `deny`, кроме выключенного по умолчанию терминала |
-| «в этом разговоре» | политика запрещает `webfetch:*` и `edit:secret.md`, конфиг проекта пробует вернуть `webfetch:*` своим `policies` `allow`. `webfetch` — `deny`. `websearch` — `ask`, RPC — `not_grantable` с `action: "websearch"`, вопрос остаётся, `once` — 204, следующий снова `ask`. `edit report.md` — RPC даёт `write`, `other.md` — `allow`, `secret.md` — `deny` |
+| «в этом разговоре» | политика запрещает соседнюю строку чтения, сохранения и сайтов (`glob:*`, `dashboard_delete:*`, `webfetch:*`) и по одному ресурсу записи и выгрузок, где строка одна (`edit:secret.md`, `loginom_dock_node_apply:exports.excel`). Конфиг проекта своими `policies` пробует вернуть `webfetch:*` (`allow`) и запрещает `question:*`. `question` и `webfetch` — `deny`: `policies` проекта загружены, но управляемый запрет не снимают. `external_directory`, `loginom_dock_action_run`, `websearch` — `ask`, RPC — `not_grantable` со своим `action`, вопрос остаётся, `once` — 204, следующий снова `ask`. `edit report.md` и `exports.text` — RPC даёт `write` и `export`, соседний ресурс — `allow`, запрещённый — `deny` |
 | настоящие инструменты, ответ `once` на всё | терминал включён конфигом, политика запрещает `edit:denied.md`, `webfetch:*`, `shell:*`, `external_directory:*`. Клиент отвечает `once` на каждый вопрос сессии. Модель: `write allowed.md`, `write denied.md`, `webfetch`, `shell touch`, `read` файла в `<data>/tool-output` (свой каталог, B2.6a2). Вопрос был один — `edit`; первый вызов `completed`, четыре — `LOGINOM_POLICY_DENIED` своих видов, те же тексты в запросе к модели, у всех `permissionRefusal: "policy"`. Файлов `denied.md` и метки нет, шесть ответов без ошибки, последний — `stop` |
 | В-76 | см. выше |
 
@@ -10395,7 +10397,7 @@ Host по сценарию, политика запрещает `loginom_dock_ac
 
 ```text
 $ bun test --rerun-each 10 --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t B2.6c
- 50 pass, 0 fail                                          # 24.8 с
+ 50 pass, 0 fail                                          # 24.8 с на a86dc051ec, 20.5 с на 445c8a3af2
 ```
 
 ### Мутации
@@ -10417,14 +10419,16 @@ B2.6` (`server`, случаи B2.6a2…B2.6c), возврат исходного
 === M8 the lock reads a rule deny too          unit 17/1; server 23/0
 ```
 
+Повтор всех мутаций на `445c8a3af2` (случай «в этом разговоре» на пять видов) — те же числа и те же красные случаи.
 Что политика, а не что-то иное, запрещает в случае «каждый вид и режим», держит пара «с политикой / без политики» в
 самом случае.
 
 ### Приёмка
 
 Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
-сделан в обоих деревьях. Итог — это дерево на `a86dc051ec`, база — отдельное дерево на `6c34ea6ae0` во временном каталоге;
-сначала база, затем итог, в одной очереди (рядом работал другой агент).
+сделан в обоих деревьях. Итог — это дерево на `a86dc051ec`, база — отдельное дерево на `6c34ea6ae0` во временном каталоге
+(после прогонов удалено); сначала база, затем итог, в одной очереди (рядом работал другой агент). `server` повторён на
+`445c8a3af2` — 274 pass, 3 skip, 0 fail; остальные пакеты `445c8a3af2` не меняет (только тест `server`).
 
 | Пакет | База `6c34ea6ae0` | Итог `a86dc051ec` |
 |---|---|---|
@@ -10452,6 +10456,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 @loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 225 files
  Tasks:    39 successful, 39 total                        # 32 из кэша turbo
 ```
+
+Повтор на `445c8a3af2` с уточнениями раздела: `catalog-check.py` код 0, `apply-identity --check` 0 файлов, `bun run check`
+код 0, `Found 558 warnings and 0 errors`, 39/39 задач (36 из кэша turbo).
 
 ### Где решал сам
 
@@ -10504,6 +10511,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (тест — конфиг проекта с `allow`).
 - Если политику изменить, пока вопрос открыт, ответ «один раз» его всё равно разрешит: решение принято при вопросе
   (поведение OpenCode). RPC «в этом разговоре» в этом случае откажет — он проверяет и сам запрос.
+- Замок строки в RPC — удобство, а не граница доверия. Клиент может разрешить незапрещённую соседнюю строку правилом
+  сессии. Если правило сессии само запрещает строку, которую запретил администратор, проверка видит запрет правилом без
+  текста, и замок не срабатывает (по коду). Запрет администратора в обоих случаях держит хук политики.
 - `provider.use` и `skill.use` применяются при сборке списков, а `tool.use` — при каждом вопросе. Запрещённый политикой
   инструмент остаётся предложен модели (`whollyDisabled` смотрит только правила).
 
