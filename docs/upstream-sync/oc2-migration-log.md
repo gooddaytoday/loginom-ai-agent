@@ -12146,3 +12146,229 @@ $ loginom status --format json                             # код 0, generatio
 **Сужение против 0.4:** процессные тесты команд в 0.4 шли на Linux, macOS (с `buildKeychain`) и Windows с конвертом своей
 платформы; здесь — только Linux и конверт `plaintext` (`cliCredentials("linux")`), фикстура не собирает помощник
 Keychain и не кладёт `node.exe`.
+
+## B2.7a4b Хвосты run
+
+23.11.2026. Ветка `b27a4b-run-tails` от `oc2-migration` (`ecf5b8d54b`), рабочее дерево `.claude/worktrees/b27a4b`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код
+0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` и `bun install
+--frozen-lockfile` в `evals` — в этом дереве и в дереве базы `<scratchpad>/b27a4b-base` (`ecf5b8d54b`, detached); хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `loginom-host` (B1.9) не трогал. Эталон — `v0.4.0`
+(`a63462dde1`, В-99): `opencode/src/cli/{standalone-run,cmd/run}.ts`, `opencode/src/session/prompt.ts` (`command`), тесты
+`test/cli/{standalone-preflight,standalone-status}.test.ts`; потребитель — `evals/script/run-node-selection-attempt.ts`.
+Настоящая модель не вызывалась: модель — HTTP-заглушка по сценарию (`cli/test/fixture/product-run.ts`, B2.7a4).
+
+### Коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `d412c56bee` `feat(cli): run --headless, run --command and strict recovery reach the server's Host before the model (B2.7a4b)` | файлы форка `loginom-agent/src/host.ts` (+36 −3: режим браузера и строгий журнал Host, `ServiceHost.preflight`), `loginom-agent/src/index.ts` (+24: RPC `loginom.preflight`), `cli/src/standalone.ts` (+12 −5: `forward`), `cli/src/run/product.ts` (+67: `preflight`, `skills`); правка upstream `cli/src/run/noninteractive.ts` (+4, два крючка); тесты `cli/test/cli-loginom.test.ts` (+3), фикстура `cli/test/fixture/product-run.ts` (`hits`, `productProfile`) | `clean` |
+| `7773855848` `test(cli): the checks of the product run before the model and Ctrl+C in run --command (B2.7a4b)` | `cli/test/run/product.test.ts` (+4, тесты `forward` — со своим окружением), `cli/test/cli-loginom.test.ts` (+1, фаза `cancellation`) | `clean` |
+| `ac8cd08771` `test(cli): run --command with the environment of run-node-selection-attempt grants its profile (B2.7a4b)` | случай `--command` — с окружением потребителя и проверкой выданного профиля (после ревью) | `clean` |
+| следующий | этот раздел | |
+
+Файлов кода — пять (четыре файла форка и `noninteractive.ts`). `noninteractive.ts` уже расходился с upstream (B2.7a4) и
+попадает под маску CAT-12 `packages/**`: `catalog.json` не менялся, `catalog-check.py` — то же число файлов (ниже).
+
+### Пункты задания
+
+| Пункт | Итог |
+|---|---|
+| 1. `--headless` | `run --headless` — Host частного сервера этого `run` получает `headless: true`; без флага и с `--no-headless` — `false`, как в 0.4. Служба профиля свой Host не меняет (B2.7a4) |
+| 2. `run --command <навык>` | навык прикладывается к промпту вложением навыка v2 (`skills: [{id}]` в `session.prompt`, так TUI прикладывает выбранный навык; доступ `loginom-automation` даёт хук `prompt` плагина, B2.2). `loginom-automation` до модели спрашивает Host: нет подключения — `LOGINOM_CONFIG_REQUIRED`, 2; Help не готов — `LOGINOM_CONNECTION_NOT_READY`, 1; браузер не запускается. Неизвестный навык — отказ сервера `Skill not found: <id>`, код 1, модель не спрошена |
+| 3. Строгий журнал | `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` доходит до Host сервера профиля CLI (`ServiceHost`, `strictRecovery`); запись журнала — `LOGINOM_RECOVERY_REQUIRED`, код 4, до модели у любого `run`; запись остаётся до `loginom recover` (B2.7b) |
+| 4. Фазы `standalone-status` 0.4 | `cancellation` перенесена; `permissions`, `outcomes`, `read-offset` — с причиной (ниже) |
+| `run-node-selection-attempt.ts` | его командная строка (`:171-173`) целиком, промпт в stdin и флаги его окружения (`:127-134`): вход v2 её разбирает, прогон с заглушкой модели — код 0, профиль `loginom-automation` выдан (тест ниже). Сам сценарий не запускался: ему нужны docker, план и собранный CLI |
+
+### Как: Host сервера до модели
+
+В 0.4 Host жил в процессе CLI, и `standalone-run.ts` спрашивал его до разбора `run`. На v2 Host — у сервера
+(`ServiceHost`, B2.3), и процессу `run` спросить его было нечем (B2.7a4: «маршрута о его восстановлениях нет»). Канал —
+RPC продуктового плагина рядом с `loginom.runner`:
+
+- `loginom.preflight`, метод `check`, вход `{automation: boolean}`, ответ `{code?}` — только чтение;
+- обработчик — `ServiceHost.preflight` (`loginom-agent/src/host.ts`): ждёт рукопожатия Host, затем `connection.status`:
+  записи журнала → `LOGINOM_RECOVERY_REQUIRED`; для автоматизации нет поколения → `LOGINOM_CONFIG_REQUIRED`, иначе
+  `connection.ready` (каталог Help, без браузера; отказ → `LOGINOM_CONNECTION_NOT_READY`) — порядок 0.4;
+- `run` продукта (`RunProduct.preflight`, крючок в начале `runNonInteractivePrompt`) спрашивает только при `--command
+  loginom-automation` или `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`: обычный `run` Host не ждёт, как и было (B2.7a3);
+- отказ пишется как `failure()` 0.4: событие `error` (`name` и `data.message` — код, рядом поля v2) только с `--format
+  json`, код в stderr всегда; код выхода 2/4/1. Ctrl+C во время проверки — `CLI_CANCELLED`, 130: запрос RPC идёт с
+  сигналом прогона.
+
+Сервер не ждёт загрузки плагинов (`AGENTS.md`, «Plugin Loading»): RPC свежего частного сервера отвечает
+`rpc.unavailable`. Клиент повторяет вызов каждые 100 мс до 60 с, как велит правило для разовых клиентов; без этого все
+три процессных теста падают (мутация M11). Прочий сбой RPC — `CLI_RUN_FAILED`, 1, как общий отказ 0.4.
+
+Режим браузера и навык `run` передаёт `Standalone.forward` (вход продукта, B2.7a4): для `run` он ставит или снимает
+`LOGINOM_AI_AGENT_HEADLESS=1` и `LOGINOM_AI_AGENT_RUN_COMMAND=<навык>`. Другие команды их не трогают: частный сервер — это
+`serve` того же входа и наследует режим от своего `run`. `nodeHost` в `host.ts` читает режим и строгий журнал при запуске
+Host.
+
+### Тесты
+
+Процессные — в `cli/test/cli-loginom.test.ts` (блок B2.7b «with the real Node host», только Linux, нужен
+`LOGINOM_AI_AGENT_TEST_NODE`): вход продукта из исходников; частный сервер `run` поднимает Host из ресурсов стенда B2.7b;
+модель — `scriptedModel` (B2.7a4), теперь он считает и запросы заголовка (`hits`). Фикстура стенда получила продуктовые
+навыки (`copyProductSkillsFixture`, как в тестах `loginom-host`) и выключатель `fail-help`: с ним каталог Help отвечает
+отказом. Модульные — в `cli/test/run/product.test.ts`, RPC подменён, как сервер в соседних случаях.
+
+| Тест | Из 0.4 | Что |
+|---|---|---|
+| run --headless reaches the Host of the run's private server, and strict recovery with its variable | новый (п. 1) | поддельный Node host (`fakeHost` B2.7b) записывает старт: `run --headless` → `headless: true`; без флага и с `--no-headless` → `false`; с `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` → `strictRecovery: true`; все прогоны — код 0, защёлка снята |
+| strict recovery refuses run before the model and keeps its record | `standalone-preflight` «strict recovery still blocks an ordinary request before the model…» | запись строгого журнала; `run --format json` с переменной — код 4, stderr ровно `LOGINOM_RECOVERY_REQUIRED\n`, одно событие `error` с `name`/`data.message`, ни одного запроса к модели, запись на месте, защёлка снята. Без переменной Host снимает запись ушедшего процесса (G4), `run` отвечает, код 0 |
+| run --command loginom-automation checks the connection and Help before the model and attaches the skill | `standalone-status` «actual standalone status…» (часть `run`), `standalone-preflight` «Help preflight stays independent of the browser» (ready, unavailable) | командная строка `run-node-selection-attempt.ts` (`--headless --format json --model --variant default --command loginom-automation --dir --title --file`, промпт в stdin) и флаги его окружения (`:127-134`: `PURE`, `DISABLE_PROJECT_CONFIG`, `DISABLE_CLAUDE_CODE_PROMPT`, `DISABLE_EXTERNAL_SKILLS`, `DISABLE_CLAUDE_CODE_SKILLS`; ресурсы — явные, вместо ресурсов собранного CLI): без подключения — 2 `LOGINOM_CONFIG_REQUIRED`; после `loginom setup` с отказом Help — 1 `LOGINOM_CONNECTION_NOT_READY`; в обоих ни одного запроса к модели. Help готов — код 0, ответ модели; в первом запросе — текст навыка («# Построение сценария Loginom») и промпт из stdin, а среди инструментов нет `subagent`: задача получила профиль `loginom-automation` (`access.ts`); обычный `run` того же профиля `subagent` предлагает. После `setup` ни один `run` не входил в браузер (записи входов заглушки). `--command no-such-skill` — код 1, `Skill not found`, модель не спрошена |
+| Ctrl+C ends run --command while the model answers | `standalone-status`, фаза `cancellation` | `run --command loginom-automation` с готовым Host, модель зависает: SIGINT — код 130, `CLI_CANCELLED`, защёлка снята |
+| run records its browser mode and run --command its skill; other commands leave them | новый | `Standalone.forward`: переменные `run` ставятся и снимаются, `serve` их не трогает, `--command` без значения — `CLI_ARGUMENT_INVALID` |
+| an ordinary run and another skill ask nothing, so they never wait for the Host | новый | без `--command loginom-automation` и строгого журнала RPC не вызывается |
+| the RPC is awaited while the Location's plugins load, and its code refuses the run as 0.4 did | `failure()` `standalone-run.ts` 0.4 | два `rpc.unavailable`, затем `LOGINOM_CONFIG_REQUIRED`: три одинаковых вызова, код 2, JSON и stderr |
+| strict recovery asks without automation, and Ctrl+C while the Host answers cancels the run | `standalone-preflight` «Help preflight…»: `cancel` | вызов с `automation: false`; отмена во время ответа — 130, `CLI_CANCELLED` в JSON и stderr |
+
+Отмена во время проверки Help — модульный тест, а не процессный: снаружи процесса не видно, что `run` уже ждёт ответа
+RPC (каталог Help запрашивается один раз, при старте Host), а SIGINT до проверки идёт другим путём отмены.
+
+Существующие тесты `Standalone.forward` (B2.7a4) теперь передают свой объект окружения: иначе `run --headless` в тесте
+оставил бы `LOGINOM_AI_AGENT_HEADLESS=1` в окружении исполнителя, а дочерние CLI его наследуют (`isolatedEnv`).
+
+**Фазы `standalone-status` 0.4 (п. 4).** B2.7b отложил их из-за `run --command`:
+
+| Фаза | Итог |
+|---|---|
+| `cancellation` | перенесена (тест выше) |
+| `permissions` | не переносил. Её предмет — инструмент Dock `loginom_probe` через Host (`dock_prepare`, каталог среды браузера, приём вложения в `loginom/inputs`) с вопросом разрешения. Фикстуре для этого нужна заглушка среды браузера с каталогом, вызовами и приёмом; путь Dock в плагине v2 покрывает `server/test/loginom-dock-catalog.test.ts` (B2.5d), отказ разрешения, запрет политики и `--dangerously-skip-permissions` в `run` — `cli-run.test.ts` (B2.7a4). Сквозной `run` → Dock через Host — отдельный тест |
+| `outcomes` | перенесена в B2.7a4 по записанным вызовам (`run/product.test.ts`: ошибка `loginom_*` без `CLI_TOOL_FAILED`, исправление тем же `operation_id`, деловой итог, недоступный инструмент); сквозь Host — та же заглушка среды, что у `permissions` |
+| `read-offset` | переносить нечего: `read` v2 за концом файла возвращает пустую страницу без ошибки (B2.7a4) |
+
+### Мутации
+
+`<scratchpad>/b27a4b-runs/mutate.py` (процессные тесты пп. 1–3 на `d412c56bee`: три теста, случая Ctrl+C ещё не было) и
+`mutate2.py` (`run/product.test.ts` на `7773855848`, 48 тестов): одна точная замена, тесты, `git checkout` файла. Без
+мутаций — 3/0 и 48/0. Процессный прогон считал только упавшие тесты, поэтому в его строках — «упало из 3». После прогона
+`git status` чистый.
+
+| Мутация | Тесты | Итог |
+|---|---|---|
+| M1 `nodeHost`: `headless: false` | процессные | **упал 1 из 3**: `--headless` |
+| M2 `forward` не записывает `run --headless` | процессные | **1 из 3**: `--headless` |
+| M3 `nodeHost` не передаёт строгий журнал | процессные | **2 из 3**: `--headless` (запись старта), строгий журнал |
+| M4 нет крючка проверки в `noninteractive.ts` | процессные | **2 из 3**: строгий журнал, `--command` |
+| M5 навык не прикладывается | процессные | **1 из 3**: `--command` (нет текста навыка) |
+| M6 `LOGINOM_CONFIG_REQUIRED` — код 1 | процессные | **1 из 3**: `--command` |
+| M7 `ServiceHost.preflight` не спрашивает `connection.ready` | процессные | **1 из 3**: `--command` (модель спрошена при отказе Help) |
+| M8 `forward` не забирает `--command` | процессные | **1 из 3**: `--command` (ошибка разбора) |
+| M9 записи журнала не проверяются | процессные | **1 из 3**: строгий журнал |
+| M10 строгий журнал без `--command` не спрашивает | процессные | **1 из 3**: строгий журнал |
+| M11 `rpc.unavailable` не ждётся | процессные; модульные | **3 из 3**; **47/1** |
+| M12 `LOGINOM_RECOVERY_REQUIRED` — код 1 | процессные | **1 из 3**: строгий журнал |
+| M13 RPC без сигнала прогона | модульные | **47/1**: Ctrl+C во время проверки |
+| M14 спрашивает каждый `run` | модульные | **46/2**: обычный `run` и подагент B2.7a4 (RPC в нём не подменён) |
+| M15 Ctrl+C во время проверки — код 1 | модульные | **47/1** |
+| M16 отказ без stderr | модульные | **46/2** |
+| M17 `forward` не снимает режим следующего `run` | модульные | **47/1** |
+| M18 `serve` снимает режим своего `run` | модульные | **47/1** |
+| M19 хук `prompt` плагина не выдаёт профиль по вложенному навыку (на `ac8cd08771`, только случай `--command`) | процессный | **0/1**: в первом запросе есть `subagent` |
+
+### Приёмка
+
+Полные прогоны по пакетам (`<scratchpad>/b27a4b-runs/suites.sh`, один за другим): база — `ecf5b8d54b` в
+`<scratchpad>/b27a4b-base`, итог — `7773855848`; `npm ci` клиента `loginom-runtime` в обоих деревьях,
+`LOGINOM_AI_AGENT_TEST_NODE` задан. Падений нет ни там, ни там.
+
+| Пакет | Команда | `ecf5b8d54b` | `7773855848` |
+|---|---|---|---|
+| `loginom-agent` | `bun test --timeout 60000` | 76 pass, 0 fail | 76 pass, 0 fail |
+| `cli` | `bun test --timeout 60000` | 515 pass, 9 skip, 0 fail | 523 pass (+4 `cli-loginom`, +4 `run/product`), 9 skip, 0 fail |
+| `server` | `bun test --timeout 60000` | 274 pass, 3 skip, 0 fail | 274 pass, 3 skip, 0 fail; повтор на `ac8cd08771` — то же (первый прогон шёл, пока на полминуты был внесён M19 в плагин) |
+
+После `ac8cd08771` (только случай `--command` в тесте): `cli-loginom.test.ts` и `run/product.test.ts` — 62 pass, 0 fail.
+
+```text
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,217 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc         # код 0
+$ cd packages/loginom-agent && bun typecheck       # ✓ No type errors in 225 files
+$ cd packages/loginom-agent && bun run typecheck:tsc   # код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 479 divergent upstream files                  # как на ecf5b8d54b, разбивка по записям та же
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0, с этим разделом в дереве
+Found 558 warnings and 0 errors.                    # как на базе (B2.7b)
+ Tasks:    39 successful, 39 total
+```
+
+`prettier`: изменённые файлы форматированы (до правок все проходили `--check`).
+
+### Где решал сам
+
+- **Канал к Host — RPC продуктового плагина, только чтение.** Второй Host в процессе `run` при работающей службе даёт
+  `PROFILE_BUSY` (B2.7b) и запускает Help дважды; частный сервер, выходящий до готовности с кодом, теряет имя ошибки в
+  событии и не покрывает `run` через службу; маршрут сервера — правка upstream и `bun run generate`. RPC рядом с
+  `loginom.runner` — внутренний для продукта и работает и с частным сервером, и со службой. Вопрос владельцу — ниже.
+- **Проверка — в `runNonInteractivePrompt`, после создания сессии**, а не в `run/run.ts` до неё, что было бы ближе к 0.4:
+  иначе шестой файл кода. Следствие: при отказе в базе профиля остаётся пустая сессия (с `--title` — с заголовком), а
+  событие `error` несёт её `sessionID`; 0.4 сессии не создавал. Модель не спрашивается ни при одном отказе — это
+  проверено счётчиком всех запросов к модели, включая запрос заголовка.
+- **Режим и навык передаёт `Standalone.forward` через окружение**, а не `loginom-cli.ts` (тоже шестой файл). У функции
+  третий параметр `env` (по умолчанию `process.env`). Для `run` переменные ставятся или снимаются, так что унаследованное
+  значение не подменяет флаги; прочие команды их не трогают.
+- **`--headless` — только частному серверу `run`.** Служба профиля (`service start`, TUI, `auth`/`models` без
+  `--standalone`) запускает Host один раз для всех клиентов, и `run` через работающую службу идёт с её режимом браузера —
+  как записано в B2.7a4.
+- **Строгий журнал — только у сервера профиля CLI** (`LOGINOM_AI_AGENT_CLI_ROOT` задан): `loginom-host/AGENTS.md` —
+  «возвращает прежний замок только в CLI… Desktop этот флаг не ставит». Служба профиля, запущенная с переменной, тоже
+  строгая — как каждый процесс CLI 0.4.
+- **Без Host** (запуск из исходников без `LOGINOM_AI_AGENT_RESOURCES`; у собранного CLI ресурсы есть всегда, B2.7a2b)
+  `--command loginom-automation` получает `LOGINOM_CONNECTION_NOT_READY` (1), а строгому журналу проверять нечего. 0.4
+  отказывал любому `run` без комплекта (`LOGINOM_BUNDLE_REQUIRED`, 2); v2 обычный `run` без ресурсов выполняет (B2.7a3).
+- **Неизвестный навык** — отказ сервера при приёме промпта (`InvalidRequestError` `Skill not found: <id>`), код 1 через
+  `reportRunError`; в 0.4 — `Command not found: "<id>". Available commands: …`, тоже код 1. Текст — v2.
+- **Другой навык** (`package-docs`, навык профиля) прикладывается без проверок: в 0.4 проверки были только у
+  `loginom-automation`.
+- **Отказ — как `failure()` 0.4**, с кодом в stderr и для отмены во время проверки (отмена во время ответа модели в
+  B2.7a4 пишет JSON без stderr).
+- **`catalog.md` не правил** (задание — только свой раздел журнала). Его запись CAT-12 о крючках `noninteractive.ts`
+  (B2.7a4) стоит дополнить: проверка до модели и вложение навыка.
+
+### Согласовать с владельцем
+
+- **RPC `loginom.preflight`** (`check`, `{automation}` → `{code?}`, только чтение состояния Host) — новый внутренний
+  вызов между CLI продукта и его плагином. Других потребителей нет. Маршрут службы к `connection.*` Host (вопрос B2.7b)
+  он не открывает: ни сохранения, ни восстановления через службу.
+- **`run --headless` при работающей службе профиля** не меняет режим браузера её Host. Если флаг должен действовать
+  всегда, `run` с ним должен идти через частный сервер, а не через службу — это новый контракт `run`.
+- **Строгий журнал и служба профиля.** Служба, запущенная с `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`, даёт `run` код 4, а
+  `loginom recover` — `PROFILE_BUSY` (3), пока её не остановят (B2.7b). В 0.4 службы не было.
+
+### Найдено, не чинил
+
+- **Пустая сессия после отказа проверки** (выше): перенос проверки до `resolveSessionTarget` — крючок в `cli/src/run/run.ts`.
+- **`run-node-selection-attempt.ts` на v2** теперь разбирает флаги и проходит проверки, но целиком не пройдёт:
+  `status.hasApiKey === true` (B2.7b) и `readSelectionSnapshot` по таблицам v1 — B2.7b2.
+- **`--command=` с пустым значением** прикладывает навык с пустым ID: сервер отвечает `Skill not found: `, код 1. В 0.4
+  пустая `--command` давала обычный промпт.
+- **Порядок проверок не как в 0.4: сообщение и `--file` v2 проверяет раньше Host** (`run/run.ts`). Проба
+  `<scratchpad>/b27a4b-runs/probe-order.ts`, вход из исходников, свежий профиль без ресурсов:
+
+  ```text
+  run --format json --command loginom-automation                    # код 1: You must provide a message
+  run … --command loginom-automation --file <нет файла> -- hi       # код 1: File not found: …
+  run … --command loginom-automation -- hi                          # код 1: LOGINOM_CONNECTION_NOT_READY (нет Host)
+  ```
+
+  В 0.4 `--command` без сообщения принимался (`cmd/run.ts:518`), а проверка Host шла до файлов: на ненастроенном профиле
+  отсутствующий `--file` давал 2, а не 1. Потребителей это не задевает: `run-node-selection-attempt.ts` даёт промпт в stdin
+  и существующие файлы. Чинить — в `run/run.ts` (шестой файл).
+- **Режим браузера `host.ts` читает у любого сервера**, Desktop тоже, а строгий журнал — только у профиля CLI.
+  `LOGINOM_AI_AGENT_HEADLESS` ставит лишь вход продукта для `run`, Desktop его не ставит; если нужна симметрия — то же
+  условие `LOGINOM_AI_AGENT_CLI_ROOT`.
+
+### Не проверено
+
+- Собранный CLI (`build-cli.ts`) и Chromium: режим браузера проверен по старту Host, а не по окну браузера; вход в
+  Loginom и сам `--headless` браузера — нет.
+- `run` через работающую службу профиля: проверки до модели через её Host и строгая служба — не запускались.
+- Отмена во время проверки Help сквозь процесс (только модульно, причина выше). Отказ Host до рукопожатия и
+  `CLI_RUN_FAILED` после 60 с ожидания плагинов — не проверялись.
+- Windows и macOS: процессные тесты — только Linux (фикстура B2.7b); Ctrl+C-случай — вне Windows.
+- Сам `run-node-selection-attempt.ts` (docker, план, собранный CLI) — только его командная строка и флаги окружения.
