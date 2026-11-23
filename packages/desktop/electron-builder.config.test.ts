@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { statSync } from "node:fs"
-import { cp, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import os from "node:os"
 import path from "node:path"
@@ -10,6 +10,7 @@ import { Product } from "@loginom-ai-agent/product"
 import { bundledLanguages, lcid } from "app-builder-lib/out/util/langs"
 import release from "../product/loginom-release.json"
 import { getConfig } from "./electron-builder.config"
+import { copyIcons } from "./script/copy-icons"
 import { CLI_BINARIES, nodePtyPackage } from "./script/utils"
 
 const builderRequire = createRequire(import.meta.resolve("electron-builder"))
@@ -176,8 +177,8 @@ test("the installer verifies the installed app, and the uninstaller removes the 
 
 test.each(channels)("macOS bundle for $channel", ({ channel }) => {
   const config = load(channel)
-  expect(config.mac?.icon).toBe(channel === "prod" ? "resources/icons/icon.icon" : "resources/icons/icon.icns")
-  expect(config.dmg?.icon).toBe(channel === "prod" ? "resources/icons/icon.icns" : undefined)
+  expect(config.mac?.icon).toBe("resources/icons/icon.icns")
+  expect(config.dmg?.icon).toBeUndefined()
   // The prod override must keep the rest of the shared macOS settings.
   expect(config.mac?.target).toEqual([
     { target: "dmg", arch: ["arm64"] },
@@ -195,11 +196,31 @@ test.each(channels)("macOS bundle for $channel", ({ channel }) => {
     expect(config.mac?.extendInfo?.[key], key).toMatch(/\S/)
 })
 
-test("the production Icon Composer package references its bundled artwork", async () => {
-  const icon = await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/icon.json")).json()
-  expect(icon["supported-platforms"]).toEqual({ squares: ["macOS"] })
-  const image = icon.groups[0].layers[0]["image-name"]
-  expect(await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/Assets", image)).exists()).toBe(true)
+// Loginom AI Agent (B4.6): every icon the packaging names is in the set script/copy-icons.ts stages.
+test.each(channels)("the $channel packaging icons are in the staged 0.4 icon set", async ({ channel }) => {
+  const config = load(channel)
+  const directory = await mkdtemp(path.join(os.tmpdir(), "loginom-icons-"))
+
+  try {
+    await cp(path.join(import.meta.dirname, "icons", channel), path.join(directory, "icons", channel), {
+      recursive: true,
+    })
+    await copyIcons(channel, directory)
+
+    for (const icon of [
+      config.mac?.icon,
+      config.win?.icon,
+      config.nsis?.installerIcon,
+      config.nsis?.installerHeaderIcon,
+    ])
+      expect(statSync(path.join(directory, String(icon))).isFile(), String(icon)).toBe(true)
+    // electron-builder takes the Linux sizes from the file names in this directory.
+    expect((await readdir(path.join(directory, String(config.linux?.icon)))).sort()).toEqual(
+      [16, 24, 32, 48, 64, 96, 128, 256, 512].map((size) => `${size}x${size}.png`).sort(),
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 // Loginom AI Agent (B4.5b): the 0.4 platform and signing settings, for when electron-builder signs the app itself.
