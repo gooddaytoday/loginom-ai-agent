@@ -120,10 +120,13 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
     )
     const held = yield* Deferred.make<void>()
     const holding: string[] = []
+    // The Location's registered tools, as a plugin lists them.
+    const registry: { list?: PluginContext["tool"]["list"] } = {}
     yield* Context.get(context, SdkPlugins.Service).register(
       define({
         id: "test.loginom-dock",
         effect: Effect.fnUntraced(function* (ctx) {
+          registry.list = ctx.tool.list
           yield* ctx.tool.transform((editor) => {
             editor.add({
               name: "hold",
@@ -159,7 +162,7 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
     const prompt = (sessionID: Session.ID, text: string, files?: { uri: string; name?: string }[]) =>
       sessions.prompt({ sessionID, text, files }).pipe(Effect.andThen(sessions.wait(sessionID)))
     // The wizard's RPC grants one prompt (B2.2). Before a Location's first work its RPC routes are not registered yet.
-    const wizard = (sessionID: Session.ID, text: string, wait = true) =>
+    const wizard = (sessionID: Session.ID, text: string, wait = true, profile = "loginom-automation") =>
       until(() =>
         Effect.promise(() =>
           handler(
@@ -168,7 +171,7 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
               {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ input: { sessionID, profile: "loginom-automation", text } }),
+                body: JSON.stringify({ input: { sessionID, profile, text } }),
               },
             ),
           ),
@@ -205,6 +208,14 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
       calls,
       holding,
       release: Deferred.succeed(held, undefined),
+      registered: Effect.suspend(() => registry.list?.() ?? Effect.succeed([])).pipe(
+        Effect.map((tools) =>
+          tools
+            .map((tool) => tool.id)
+            .filter((id) => id.startsWith("loginom_dock") || id === "loginom_find")
+            .toSorted(),
+        ),
+      ),
     }
   })
 
@@ -248,6 +259,48 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
           scope: { taskMessageID: users[1], profile: "loginom-automation" },
         })
         expect(scopes.every((item) => item.mode === "bind")).toBe(true)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  // 0.4 `profile-tools.test.ts`: each profile's run is bound once to its task, and an overbroad Host catalog is filtered
+  // by the profile (B2.2 gate) before the model sees it.
+  it.live(
+    "each profile's snapshot binds the same task and filters an overbroad Host catalog",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost({
+          catalog: () =>
+            ["find", "dock_diagnostics", "dock_prepare", "dock_action_describe", "browser_click"].map((name) =>
+              dockTool(name),
+            ),
+        })
+        const test = yield* boot(host)
+        const offered = yield* Effect.forEach(["default", "package-docs", "loginom-automation"], (profile) =>
+          Effect.gen(function* () {
+            const id = yield* test.create(profile)
+            if (profile === "default") yield* test.prompt(id, script({ text: "end" }))
+            else yield* test.wizard(id, script({ text: "end" }), true, profile)
+            const task = (yield* test.sessions.messages({ sessionID: id })).find((item) => item.type === "user")?.id
+            expect(
+              host
+                .requests("scope")
+                .filter((input) => (input.scope as { taskMessageID: string }).taskMessageID === task),
+            ).toEqual([expect.objectContaining({ mode: "bind", scope: { taskMessageID: task, profile } })])
+            const [request] = yield* test.requests(id)
+            return request.tools.map((tool) => tool.name)
+          }),
+        )
+        for (const names of offered) {
+          expect(names).toContain("loginom_find")
+          expect(names).toContain("loginom_dock_diagnostics")
+        }
+        expect(offered.map((names) => names.includes("loginom_dock_prepare"))).toEqual([false, false, true])
+        expect(offered.map((names) => names.includes("loginom_browser_click"))).toEqual([false, false, true])
+        for (const name of fileTools) expect(offered.map((names) => names.includes(name))).toEqual([false, false, true])
+        expect(offered.map((names) => names.includes("package_docs_run"))).toEqual([false, true, false])
+        expect(offered.map((names) => names.includes("subagent"))).toEqual([true, false, false])
+        expect(offered.map((names) => names.includes("shell"))).toEqual([true, false, true])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -303,8 +356,10 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
         expect(second.tools.find((tool) => tool.name === "loginom_dock_prepare")?.description).toBe(
           "dock_prepare of generation 2",
         )
-        // Generation 3 arrived during the call; the next step of the same execution offers it.
+        // Generation 3 arrived during the call; the next step of the same execution offers it, and the Location's
+        // registry keeps only the current generation's tools.
         expect(loginom(third)).toEqual(["loginom_dock_node_wait", "loginom_dock_prepare", "loginom_find"])
+        expect(yield* test.registered).toEqual(["loginom_dock_node_wait", "loginom_dock_prepare", "loginom_find"])
         expect(host.requests("call").map((input) => input.name)).toEqual(["dock_inspect"])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,

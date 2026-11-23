@@ -85,12 +85,12 @@ export async function localFiles(
       await plugin.storage.set(carriedKey(event.sessionID, open.id), await attachments(event.sessionID, history))
   })
   // The attachments of the session's context: what its leading compaction carried and what its user messages attach.
+  // The context starts at the latest completed compaction, and only a compaction's message has an entry.
   const attachments = async (sessionID: string, history: Awaited<ReturnType<typeof plugin.session.context>>) => {
     const head = history[0]
-    const carried =
-      head?.type === "compaction" && head.status === "completed"
-        ? Option.getOrElse(decodeCarried(await plugin.storage.get(carriedKey(sessionID, head.id))), () => [])
-        : []
+    const carried = head
+      ? Option.getOrElse(decodeCarried(await plugin.storage.get(carriedKey(sessionID, head.id))), () => [])
+      : []
     return [
       ...carried,
       ...history.flatMap((message) =>

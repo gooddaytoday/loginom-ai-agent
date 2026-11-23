@@ -427,7 +427,9 @@ describe("package_docs_run (B2.5c)", () => {
         summaries.fail = false
         const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
         expect(history.findLast((item) => item.type === "compaction")).toMatchObject({ status: "failed" })
-        const attached = history.find((item) => item.type === "user" && item.files?.length)
+        const attached = (yield* test.sessions.messages({ sessionID: ctx.sessionID })).find(
+          (item) => item.type === "user" && item.files?.length,
+        )
         if (!attached) throw Error("the attachment's message is missing")
         yield* test.sessions.revert.stage({ sessionID: ctx.sessionID, messageID: attached.id })
         yield* test.sessions.revert.commit(ctx.sessionID)
@@ -1225,7 +1227,7 @@ describe("OpenCode hooks the attachment carry relies on (contract)", () => {
         expect(failed.head).toBe(completed.open)
         const later = yield* context()
         expect(later.find((item) => item.id === failed.open)).toMatchObject({ type: "compaction", status: "failed" })
-        expect(later[0].id).toBe(completed.open)
+        expect(later[0]).toMatchObject({ id: completed.open })
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
