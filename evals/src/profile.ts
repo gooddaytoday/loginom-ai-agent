@@ -308,24 +308,27 @@ export function agentConfigJson(config: EvalConfig) {
 export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const observed = await management(command, ["loginom", "status", "--format", "json"])
   const view = parseView(observed.stdout)
-  if (observed.exitCode !== 0 || !view || !["ready", "starting"].includes(view.state) || view.failure || view.recoveries?.length || view.hasApiKey !== true ||
+  // `configured`: a saved connection whose Help this status's own Host has not loaded yet (B2.7b); the built-in knowledge
+  // key left no `hasApiKey` in the status.
+  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
   if (saved?.$schema === "urn:loginom-ai-agent:config") delete saved.$schema
   if (JSON.stringify(saved) !== JSON.stringify(agentConfigJson(config))) throw new EvalFailure("PROFILE_CONFIGURATION_DRIFT", 2)
-  return view.state === "starting" ? checkStarting(command, 2) : observed
+  return view.state === "ready" ? observed : checkStarting(command, 2)
 }
 
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   await mkdir(config.profileDir, { recursive: true, mode: 0o700 })
+  // The CLI opens only an empty directory or its own profile, so the seed below follows its first command.
+  const observed = await management(command, ["loginom", "status", "--format", "json"])
   // Native embeds the product snapshot; source mode has no catalogue without this seed.
   const modelsCache = path.join(config.profileDir, "cache", "models.json")
   if (config.agent.cliMode === "source" && !(await exists(modelsCache))) {
     await mkdir(path.join(config.profileDir, "cache"), { recursive: true, mode: 0o700 })
     await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
   }
-  const observed = await management(command, ["loginom", "status", "--format", "json"])
   if (config.slotsFile && observed.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
   const view = parseView(observed.stdout)
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
@@ -389,16 +392,20 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
     return { generation: value.generation, principal_sha256: value.principal_sha256, refresh_required: value.refresh_required }
   }
   if (config.agent.provider?.id === providerId) return
-  const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
-  const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
-  if (providerId in entries) return
+  // OpenCode 2 keeps provider credentials in the profile's database and imports a 0.4 key file only when it creates the
+  // database (B2.7b). A private server lists them and exits, so no service of the profile outlives the check.
+  const listed = await management(command, ["auth", "list", "--standalone", "--format", "json"])
+  const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
+  if (listed.exitCode !== 0 || !Array.isArray(integrations))
+    throw new EvalFailure(`auth list завершился кодом ${listed.exitCode}:\n${listed.stderr.trim()}`, 2)
+  if (integrations.some((integration) => integration.id === providerId)) return
   const envLine = Object.entries(command.env)
     .filter(([key]) => key.startsWith("LOGINOM_AI_AGENT_CLI_"))
     .map(([key, value]) => `${key}=${value}`)
     .join(" ")
   throw new EvalFailure(
     `Нет авторизации провайдера "${providerId}" в eval-профиле ${config.profileDir}.\n` +
-      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} providers login\n` +
+      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} auth login\n` +
       "или задайте EVAL_AGENT_PROVIDER_* в evals/.env.",
     2,
   )
@@ -415,7 +422,8 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
   const restored = acknowledged ? await status(command, exitCode) : first
   // Each standalone status has its own Help startup. Polling another process
   // cannot finish that startup; an explicit check proves readiness in one host.
-  const checked = restored.state === "starting" && restored.hasApiKey === true && !restored.failure && !restored.recoveries?.length
+  const checked = (restored.state === "configured" || restored.state === "starting" && restored.hasApiKey === true) &&
+    !restored.failure && !restored.recoveries?.length
     ? await checkStarting(command, exitCode) : false
   const view = checked ? restored : await settle(command, restored, exitCode)
   if ((view.state !== "ready" && !checked) || view.recoveries?.length || view.failure)

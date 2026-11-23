@@ -1,6 +1,6 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { appendFile, chmod, mkdir, rename, rm, rmdir } from "node:fs/promises"
+import { appendFile, chmod, mkdir, readdir, rename, rm, rmdir } from "node:fs/promises"
 
 const [command, sub] = Bun.argv.slice(2)
 if (command === "providers" && sub === "status" && process.env.EVAL_FAKE_SHARED_AUTH_RECEIPT) {
@@ -102,6 +102,24 @@ if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
   await Bun.write(process.env.EVAL_FAKE_ORPHAN_PID_FILE, String(child.pid))
 }
 if (process.env.EVAL_FAKE_EXIT_DELAY_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_EXIT_DELAY_MS))
+
+// The product CLI opens only an empty directory or its own profile, and marks a new one (B2.7c).
+if (["loginom", "auth"].includes(command ?? "") && process.env.EVAL_FAKE_ADMIT_PROFILE) {
+  const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
+  const entries = await readdir(profile)
+  if (!entries.includes("cli-profile.json") && entries.some((name) => name !== ".writer")) {
+    process.stderr.write("PROFILE_FORMAT_INVALID\n")
+    process.exit(1)
+  }
+  await mkdir(path.join(profile, "cache"), { recursive: true })
+  await Bun.write(path.join(profile, "cli-profile.json"), JSON.stringify({ format: "loginom-cli", version: 1, channel: "dev" }))
+}
+// `auth list --format json` of OpenCode 2: the integrations that have a connection.
+if (command === "auth" && sub === "list") {
+  const file = process.env.EVAL_FAKE_INTEGRATIONS_FILE
+  process.stdout.write((file ? await Bun.file(file).text() : "[]") + "\n")
+  process.exit(0)
+}
 
 if (command === "loginom") {
   if (process.env.EVAL_FAKE_MANAGEMENT_ENV_FILE)
