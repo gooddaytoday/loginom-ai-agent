@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
 import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
@@ -1313,7 +1314,9 @@ test.describe("pages open before slow data", () => {
     await expect(await skill).toHaveURL(`${consoleUrl}/org_acme/extensions?kind=skills&search=funnel`)
   })
 
-  test("about names the product and asks GitHub for nothing", async ({ page }) => {
+  test("about names the product, credits OpenCode only in the notices and asks GitHub for nothing", async ({
+    page,
+  }) => {
     const { settings } = await open(page)
 
     // Upstream counted contributors from api.github.com when About opened; the product page sends no such request.
@@ -1333,8 +1336,27 @@ test.describe("pages open before slow data", () => {
       "href",
       "https://loginom.ru/",
     )
-    await expect(about).not.toContainText(/opencode/i)
+    await expect(about).not.toContainText(/opencode|anomaly|missouri|london|without you/i)
+    // Only the license badge is left; the Anomaly logo is gone.
+    await expect(about.locator("img")).toHaveCount(1)
     expect(await github).toBe(false)
+
+    await about.getByRole("button", { name: "Third-party notices", exact: true }).click()
+
+    const opencode = page
+      .getByRole("dialog")
+      .locator(".settings-notice")
+      .filter({ has: page.getByRole("link", { name: "OpenCode", exact: true }) })
+
+    await expect(opencode.getByRole("link", { name: "OpenCode", exact: true })).toHaveAttribute(
+      "href",
+      "https://github.com/anomalyco/opencode",
+    )
+    await expect(opencode).toContainText("MIT License")
+    await opencode.getByText("License text", { exact: true }).click()
+    expect(await opencode.locator("pre").textContent()).toBe(
+      await readFile(new URL("../../../../LICENSE", import.meta.url), "utf8"),
+    )
   })
 })
 

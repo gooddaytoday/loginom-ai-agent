@@ -1,3 +1,4 @@
+import { Product } from "@loginom-ai-agent/product"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { useServerActionsController } from "@/servers/registry/controller"
 import { useSettingsCommand } from "@/settings/command"
@@ -101,7 +102,7 @@ export function createHomeProjectsController(home: HomeController) {
     },
     utility: {
       settings: openSettings,
-      help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
+      help: () => platform.openExternal(Product.support),
     },
   }
 }
