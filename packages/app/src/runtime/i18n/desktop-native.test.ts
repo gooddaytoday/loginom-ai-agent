@@ -10,6 +10,8 @@ import {
   formatDesktopNativeMessage,
   parseDesktopNativeBundle,
 } from "./desktop-native"
+import en from "./en"
+import { dict } from "./ru"
 
 describe("desktop native translations", () => {
   test("accepts the exact typed bundle", () => {
@@ -80,5 +82,33 @@ describe("desktop native ICU data", () => {
       expect(() => new Intl.DisplayNames(tag, { type: "language" }), `${locale} names`).not.toThrow()
       expect(() => new Intl.Segmenter(tag), `${locale} segmenter`).not.toThrow()
     }
+  })
+})
+
+describe("desktop product name", () => {
+  // Install CLI still links the `opencode` command (`desktop-cli.ts`); the message names it until the bundled CLI is renamed.
+  const commandNames = ["desktop.cli.installed.message"]
+
+  test("names the product in the en and ru desktop strings", () => {
+    const upstream = [en, dict].flatMap((messages) =>
+      Object.entries(messages).filter(
+        ([key, value]) => key.startsWith("desktop.") && !commandNames.includes(key) && /opencode/i.test(value),
+      ),
+    )
+
+    expect(upstream).toEqual([])
+    expect(DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]).toBe("Loginom AI Agent")
+  })
+
+  test("names the product in the en and ru updater strings", async () => {
+    const catalogs = await Promise.all(
+      ["en", "ru"].map((locale) => import(`../../../../gui-plugins/src/updater/i18n/${locale}`)),
+    )
+
+    const upstream = catalogs.flatMap((module) =>
+      Object.entries<string>(module.default).filter(([, value]) => /opencode/i.test(value)),
+    )
+
+    expect(upstream).toEqual([])
   })
 })

@@ -267,16 +267,16 @@ test("inactive session attention dots share the close control without marking th
 test("the browser title names the open session and resets after leaving it", async ({ page }) => {
   await mockWorkspace(page, { name: "Tabs", sessions: [a, b] })
   await page.goto(sessionHref(a.id))
-  await expect(page).toHaveTitle(`${a.title} · OpenCode`)
+  await expect(page).toHaveTitle(`${a.title} · Loginom AI Agent`)
 
   const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(b.id)}"])`)
   await tabB.locator("[data-titlebar-tab-link]").click()
   await expectPath(page, sessionHref(b.id))
-  await expect(page).toHaveTitle(`${b.title} · OpenCode`)
+  await expect(page).toHaveTitle(`${b.title} · Loginom AI Agent`)
 
   await page.getByRole("button", { name: "Home", exact: true }).click()
   await expectPath(page, "/")
-  await expect(page).toHaveTitle("OpenCode")
+  await expect(page).toHaveTitle("Loginom AI Agent")
 })
 
 for (const [tabLayout, direction, label] of [
@@ -1854,7 +1854,8 @@ test("⌘W in the side panel closes its last New tab with the panel, and only th
 test("the Windows titlebar menu pastes through the desktop edit action", async ({ page }) => {
   await mockWorkspace(page, { name: "WindowsMenu", sessions: [] })
   await page.goto(`/e2e/utils/windows-menu.html?${new URLSearchParams({ server: SERVER })}`)
-  await page.getByRole("button", { name: "OpenCode menu", exact: true }).click()
+  await page.getByRole("button", { name: "Loginom AI Agent menu", exact: true }).click()
+  await expect(page.getByRole("group", { name: "Loginom AI Agent", exact: true })).toBeVisible()
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click()
   const paste = page.getByRole("menuitem", { name: /^Paste/ })
   await expect(paste).toHaveText("PasteCtrl+V")
@@ -1870,7 +1871,7 @@ test("the Windows menu shares the vertical sidebar's icon lane", async ({ page }
   })
   await page.goto(`/e2e/utils/windows-menu.html?${new URLSearchParams({ server: SERVER })}`)
 
-  const menu = page.getByRole("button", { name: "OpenCode menu", exact: true }).locator("svg")
+  const menu = page.getByRole("button", { name: "Loginom AI Agent menu", exact: true }).locator("svg")
 
   const home = page.locator('[data-action="vertical-tabs-home"] svg')
   await expect(home).toBeVisible()

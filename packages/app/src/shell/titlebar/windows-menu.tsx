@@ -16,6 +16,7 @@ import {
 } from "@/shell/commands/desktop-menu"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
+import { DESKTOP_NATIVE_ENGLISH } from "@/runtime/i18n/desktop-native"
 import { useMenubarItems } from "@/runtime/plugin/menubar-items"
 
 const accelerators = DESKTOP_MENU.flatMap((menu) => menu.items ?? []).flatMap((entry) => {
@@ -124,7 +125,9 @@ export function WindowsAppMenu(props: {
       <Menu.Portal>
         <Menu.Content class="desktop-app-menu">
           <Menu.Group>
-            <Menu.GroupLabel class="desktop-app-menu-heading">OpenCode</Menu.GroupLabel>
+            <Menu.GroupLabel class="desktop-app-menu-heading">
+              {DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]}
+            </Menu.GroupLabel>
             <For each={DESKTOP_MENU.filter((menu) => desktopMenuVisible(menu, "windows"))}>
               {(menu) => (
                 <DesktopMenuSubmenu label={language.t(menu.labelKey)}>
