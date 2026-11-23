@@ -640,12 +640,14 @@ function collectStrings(value: unknown, out: string[], depth = 0) {
 }
 
 // The credential values (`credential`) and account tokens of an OpenCode 2 database (core/src/{credential,account}/sql.ts),
-// through a read-only connection: the running CLI keeps writing. Bun only: under Node (Desktop) the import fails and the
-// secrets are reported unavailable.
+// through a query-only connection: the running CLI keeps writing. Not `readonly`, as `openSessions` in diagnostics-cli.ts:
+// the macOS system SQLite fails a read-only connection on a WAL database without -wal and -shm. Bun only: under Node
+// (Desktop) the import fails and the secrets are reported unavailable.
 async function databaseSecrets(file: string) {
   const { Database } = await import("bun:sqlite")
-  const db = new Database(file, { readonly: true })
+  const db = new Database(file, { readwrite: true, create: false })
   try {
+    db.run("PRAGMA query_only = ON")
     db.run("PRAGMA busy_timeout = 5000")
     const secrets: string[] = []
     for (const row of db.query("SELECT value FROM credential").all() as { value: string }[])

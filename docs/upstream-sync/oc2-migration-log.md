@@ -12146,3 +12146,238 @@ $ loginom status --format json                             # код 0, generatio
 **Сужение против 0.4:** процессные тесты команд в 0.4 шли на Linux, macOS (с `buildKeychain`) и Windows с конвертом своей
 платформы; здесь — только Linux и конверт `plaintext` (`cliCredentials("linux")`), фикстура не собирает помощник
 Keychain и не кладёт `node.exe`.
+
+## B1.9 Слияние v0.4.0
+
+23.11.2026. Ветка `b19-v040-sync` от `oc2-migration` (`2bfc9c6243`), рабочее дерево `.claude/worktrees/b19`. Bun 1.4.4
+переносной — первым в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1600
+пакетов, `.husky/_` есть; `npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false` клиента `loginom-runtime` Node 24.19.0;
+`bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. Основание — В-99: эталон 0.4 — выпуск `v0.4.0` (`a63462dde1`),
+то есть `a080f7725c` и пять коммитов исправлений macOS. `packages/cli` и файлы B2.7b не трогал.
+
+**Итог: `v0.4.0` в истории ветки, правки выпуска живут в модулях v2.** Перенесены путь файла в ошибке манифеста выпуска,
+чтение базы диагностикой CLI через соединение `query_only` (оба чтения, не одно), платформенные учётные данные в тесте
+диагностики и помощник Keychain в тесте `node-host`. Версии, конфиг electron-builder и `standalone-status.test.ts`
+оставлены как в v2: это требования к B4.5b и B2.7b, ниже.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `b09f0b093c` `chore(migration): merge v0.4.0 release (В-99)` | слияние, родители `2bfc9c6243` и `a63462dde1`; только правки 0.4.0 |
+| `cc390ebe3c` `fix(loginom-host): read the saved keys of CLI diagnostics through a query-only connection` | `databaseSecrets` тем же способом и тест «соединение не пишет» |
+| `c472cc67cd` `docs(upstream-sync): record the v0.4.0 merge, v0.4.0 as the 0.4 reference (B1.9)` | этот раздел; эталон 0.4 `a080f7725c` → `v0.4.0` в `guarantees.md` и `catalog.md` |
+| следующий | этот раздел: дословный вывод поиска чтений базы (и Desktop), проба контрольной точки, полное имя теста для B4.5b |
+
+### Слияние
+
+```text
+$ git merge-base --all oc2-migration v0.4.0
+a080f7725ccf60b721d571c68b38e81375b806f2
+$ git merge --no-ff --no-commit v0.4.0
+CONFLICT (content): Merge conflict in bun.lock
+CONFLICT (content): Merge conflict in package.json
+CONFLICT (content): Merge conflict in packages/desktop/electron-builder.config.test.ts
+CONFLICT (content): Merge conflict in packages/desktop/electron-builder.config.ts
+CONFLICT (content): Merge conflict in packages/desktop/package.json
+CONFLICT (content): Merge conflict in packages/loginom-host/src/diagnostics-cli.ts
+CONFLICT (modify/delete): packages/opencode/test/cli/standalone-status.test.ts deleted in HEAD and modified in v0.4.0.
+# слились сами: packages/desktop/scripts/release/manifest.ts, packages/loginom-host/test/{diagnostics-cli,node-host}.test.ts
+```
+
+| Файл 0.4.0 | Правка 0.4.0 | Решение |
+|---|---|---|
+| `package.json`, `packages/desktop/package.json`, `bun.lock` | версия 0.3.9 → 0.4.0 | как в v2 (`2.3.0`, `git checkout --ours`): версию задаёт выпуск (B5, G), В-99 |
+| `packages/desktop/electron-builder.config.ts`, `electron-builder.config.test.ts` | `/Contents/Resources/loginom/dashboard/` в `mac.signIgnore` | как в v2 (`--ours`); требование к B4.5b — ниже |
+| `packages/desktop/scripts/release/manifest.ts` | `` throw Error(`RELEASE_RESOURCE_HASH_MISMATCH: ${item.path}`) `` | слилось само: в v2 манифест там же, B4.8b перенёс файл из `a080f7725c` без изменений |
+| `packages/loginom-host/src/diagnostics-cli.ts` | `openSessions`: `{ readwrite: true, create: false }` и `PRAGMA query_only = ON` вместо `{ readonly: true }` | код дословно 0.4.0; конфликт только в комментарии — оставлен комментарий v2 о таблицах OpenCode 2 (`read-only` → `query-only`) и добавлены две строки 0.4.0 о системном SQLite macOS |
+| `packages/loginom-host/test/diagnostics-cli.test.ts` | `platformCredentials` (кодек платформы, на macOS помощник Keychain) вместо `cliCredentials("linux")` в двух местах; `chat: included` в тесте снимка | слилось само, все четыре правки |
+| `packages/loginom-host/test/node-host.test.ts` | `buildKeychain` на macOS в тесте «CLI setup writes the Host cache before saving…» | слилось само: тест уже в v2, файл с `a080f7725c` не менялся, импорт `buildKeychain` есть |
+| `packages/opencode/test/cli/standalone-status.test.ts` | после повтора статус `ready` или `configured` | `git rm`: в v2 теста нет (пакет `opencode` заменён в `39a5ee597b`); запись для B2.7b — ниже |
+
+`sqlite-wal-probe.test.ts` 0.4.0 добавил (`e6431e0346`) и сам же убрал (`d24398a02c`): в дерево не попал.
+
+### Чтения базы диагностикой
+
+После B2.7a3b `diagnostics export` открывает базу профиля дважды, оба раза из Bun:
+
+- `openSessions` (`diagnostics-cli.ts`) — чат; в 0.4.0 было только это чтение, правка пришла слиянием;
+- `databaseSecrets` (`diagnostics-export.ts`, из `profileSecrets`) — сохранённые ключи OpenCode 2 для маскирования
+  (B2.7a3b), открывалось `readonly`. Тот же способ — отдельным коммитом `cc390ebe3c`: `{ readwrite: true, create: false }`,
+  `PRAGMA query_only = ON` первой строкой в `try`, чтобы при ошибке соединение закрылось в `finally`.
+
+Других чтений нет. Desktop открывает только свою базу (`node:sqlite`, `desktop/src/main/storage`: окна, черновики,
+плагины); `profileSecrets` и `buildDiagnosticsArchive` Desktop в v2 не вызывает:
+
+```text
+$ grep -rln "bun:sqlite" packages/loginom-host/src packages/cli/src packages/product/src
+packages/loginom-host/src/diagnostics-export.ts
+packages/loginom-host/src/diagnostics-cli.ts
+$ grep -rlnE "bun:sqlite|node:sqlite|better-sqlite|readonly: true" packages/desktop/src packages/loginom-agent/src
+packages/desktop/src/main/plugin/storage.test.ts
+packages/desktop/src/main/plugin/enable-state.ts
+packages/desktop/src/main/storage/window-snapshot.ts
+packages/desktop/src/main/storage/database.test.ts
+packages/desktop/src/main/storage/database.ts
+packages/desktop/src/main/storage/migration.ts
+packages/desktop/src/main/storage/state.test.ts
+packages/desktop/src/main/storage/drafts.ts
+packages/desktop/src/main/storage/window-snapshot.test.ts
+$ grep -rn "profileSecrets\|buildDiagnosticsArchive\|diagnostics-export" packages/desktop/src --include=*.ts | grep -v test
+# пусто
+```
+
+Причина правки 0.4.0 на Linux не воспроизводится: Bun здесь со своим SQLite, и `readonly` открывает базу WAL без `-wal`
+и `-shm` (проба в scratchpad, `bun probe.ts`):
+
+```text
+after writer close [ "t.db" ]
+readonly { n: 1 }                                         # открылась; оставила t.db-wal и t.db-shm
+readonly write: SQLiteError: attempt to write a readonly database
+qo { n: 1 } { query_only: 1 }
+qo write: SQLiteError: attempt to write a readonly database
+qo insert: SQLiteError: attempt to write a readonly database
+after qo [ "t.db" ]                                       # последнее соединение убрало -wal и -shm
+missing: SQLiteError: unable to open database file        # create: false не создаёт базу
+```
+
+### Тест «соединение не пишет»
+
+`diagnostics-cli.test.ts`, «the export reads the database through query-only connections that cannot write it». База
+переводится в WAL и закрывается — без `-wal` и `-shm`, как её оставляет CLI. Перехват `Database.prototype.query` (тот же
+приём, что в тесте снимка) перед первым запросом каждого нового соединения пробует `CREATE TABLE probe` через это
+соединение. Ожидается: экспорт с `chat: included` и `knownSecrets: ok`, ровно две попытки записи, обе
+`SQLiteError: attempt to write a readonly database`, таблицы `probe` в базе нет.
+
+| Мутация | Результат |
+|---|---|
+| нет | 1 pass |
+| без `PRAGMA query_only` в `openSessions` | **fail**: `["written", "SQLiteError: table probe already exists"]` |
+| без `PRAGMA query_only` в `databaseSecrets` | **fail**: `["SQLiteError: attempt to write a readonly database", "written"]` |
+| `{ readonly: true }` в обоих местах (как на базе) | 1 pass — тест проверяет, что соединение не пишет, а не способ открытия; отказ `readonly` на macOS здесь не проверить |
+
+### Приёмка
+
+```text
+$ git merge-base --is-ancestor v0.4.0 HEAD; echo $?
+0
+```
+
+`loginom-host` и `desktop` — с `npm ci` клиента `loginom-runtime` и `LOGINOM_AI_AGENT_TEST_NODE` (Node 24.19.0):
+
+```text
+# база 2bfc9c6243                                      # итог cc390ebe3c
+$ cd packages/loginom-host && bun test
+ 539 pass  13 skip  5 fail  (557 tests, 66 files)       540 pass  13 skip  5 fail  (558 tests, 66 files)
+#  падения те же пять базовых (guarantees.md): bundled-ripgrep ×3, cli-manifest «umask», managed-work-entry «Expected refusal»
+#  diagnostics-cli 12/0 → 13/0 (новый тест), diagnostics-export 13/0, node-host 24/0,
+#  skills-acceptance 25/0 и skills-acceptance-turns 10/0 — как на базе; скрипт импортирует desktop/scripts/release/manifest.ts,
+#  но случаи desktop останавливаются на отсутствующем release-manifest.json, до verifyResourceTree не доходят
+$ bun run typecheck                                     ✓ No type errors in 174 files
+$ bun run typecheck:tsc                                 # код 0
+$ cd packages/desktop && bun test --timeout 30000
+ 540 pass  4 skip  0 fail  (544 tests, 69 files)        540 pass  4 skip  0 fail  (544 tests, 69 files)
+$ cd packages/cli && bun test --timeout 30000 test/cli-standalone.test.ts -t diagnostics
+                                                        2 pass  0 fail   # экспорт из базы, которую писал сервер v2
+```
+
+Путь в ошибке манифеста тестами v2 не проверяется (`artifact.test.ts` 0.4 не перенесён, B5.2), поэтому разовая проверка
+из scratchpad — ресурс с неверным хешем:
+
+```text
+$ cd packages/desktop && bun <scratchpad>/mf-tool/check.ts $PWD/scripts/release/manifest.ts
+RELEASE_RESOURCE_HASH_MISMATCH: browser
+```
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 479 divergent upstream files       # как на базе: файлов OpenCode не менял
+$ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
+would change: 0 files
+$ bun run secrets range a080f7725c HEAD                                # на cc390ebe3c, код 0
+{"status":"clean","commits":303,"archives":6,"current_files":0,"skipped":[],"upstream_commits":6784,"upstream_findings":606,"upstream_missing":0,…}
+$ bun run check                                                       # код 0, на cc390ebe3c и правках документов
+Found 558 warnings and 0 errors.                          # как на базе (B4.11c); в моих файлах предупреждений нет
+@loginom-ai-agent/loginom-host:typecheck: ✓ No type errors in 174 files
+@opencode/desktop:typecheck: ✓ No type errors in 3,505 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+Сверка с базой — только перенесённые строки, второе чтение базы с тестом и документы:
+
+```text
+$ git diff 2bfc9c6243 HEAD --stat -- . ':!docs/upstream-sync/oc2-migration-log.md'
+ docs/upstream-sync/catalog.md                      |  6 +-
+ docs/upstream-sync/guarantees.md                   |  2 +-
+ packages/desktop/scripts/release/manifest.ts       |  2 +-
+ packages/loginom-host/src/diagnostics-cli.ts       |  7 ++-
+ packages/loginom-host/src/diagnostics-export.ts    |  8 ++-
+ packages/loginom-host/test/diagnostics-cli.test.ts | 69 +++++++++++++++++++++-
+ packages/loginom-host/test/node-host.test.ts       |  1 +
+ 7 files changed, 82 insertions(+), 13 deletions(-)
+```
+
+Версий, `electron-builder*`, `packages/opencode` и `packages/cli` в дифе нет.
+
+### Эталон 0.4 в `guarantees.md` и `catalog.md`
+
+Критерий: SHA как место, где смотреть, что делает 0.4, — заменён на `v0.4.0`; описание того, что измерено или сделано на
+том коммите, — оставлено. Все пять мест указывают на файлы вне диффа `a080f7725c..v0.4.0`: содержимое то же.
+
+| Место | Было | Стало |
+|---|---|---|
+| `guarantees.md:5` | таблица 0.4 «на точке отсечения: `git show a080f7725c:…`» | «в выпуске 0.4.0 (эталон 0.4, В-99): `git show v0.4.0:…`» |
+| `catalog.md:5` | полный текст записей 0.4 «на точке отсечения: `git show a080f7725c:…`» | то же, `v0.4.0` |
+| `catalog.md:93` (две ссылки) | «как в 0.4 (`a080f7725c:packages/core/src/global.ts`)», «(`a080f7725c:packages/opencode/src/config/managed.ts`)» | `v0.4.0:…` |
+| `catalog.md:135` | «сам продукт 0.4 (`a080f7725c:packages/core/src/project.ts`)» | `v0.4.0:…` |
+
+Оставлены как исторические: `guarantees.md:59` («на точке отсечения было 17 ложных падений (B1.1)»), `guarantees.md:68`
+(«с точки отсечения»). `guarantees.md:31` («Таблица мутаций — в версии документа на точке отсечения») — без SHA, не
+менял: задача меняет SHA; документ в `v0.4.0` тот же.
+
+### Для B4.5b
+
+`packages/desktop/electron-builder.config.ts`, `mac.signIgnore` — четвёртый путь `"/Contents/Resources/loginom/dashboard/"`
+с комментарием 0.4.0 `// The dashboard kit's npm packages ship signed esbuild and rollup binaries.`, и та же строка в
+ожидании теста «macOS test packages use explicit ad-hoc arm64 signing without rewriting vendor resources»
+(`electron-builder.config.test.ts`). Источник — `d24398a02c`. В v2 сейчас `signIgnore` нет.
+
+### Для B2.7b
+
+`packages/opencode/test/cli/standalone-status.test.ts` 0.4.0, тест «startup timeout retains the writer through Help close
+and permits a real status retry» (`5798d9f9e0`): после повтора `status` не ждёт Help, поэтому состояние — `ready` или
+`configured`, `generation: 1`; готовность проверяет `loginom check`. В v2 этого теста нет, правку не переносил. На
+ветке B2.7b есть `8a3cadb443` `test(cli): loginom status reports a held Help as a configured connection` — сверить с ним.
+
+### Где решал сам
+
+- **`databaseSecrets` — отдельным коммитом, не в слиянии.** В коммите слияния только правки 0.4.0; второе чтение
+  появилось в v2 (B2.7a3b).
+- **Тест «не пишет» — попытка записи через само соединение диагностики**, а не сравнение файла до и после: сравнение
+  осталось бы зелёным и без `query_only`, код записей не делает.
+- **Ссылки «как в 0.4 (`a080f7725c:путь`)» в `catalog.md:93, 135` заменены:** это сравнение с эталоном, а не запись о
+  сделанном; файлы в `v0.4.0` те же.
+
+### Найдено, не чинил
+
+- Три скрипта приёмки `loginom-host/script/{tui-multichat-acceptance,resume-oracle,cli-permission-acceptance}.ts`
+  открывают базу профиля `readonly: true`. Это не диагностика, на macOS после выхода CLI они упадут так же, как чат 0.3.9.
+- **`query_only` не запрещает контрольную точку.** Если CLI оборвался и оставил `-wal` с кадрами, соединение
+  диагностики, закрываясь последним, переносит WAL в основной файл и удаляет `-wal`. Данные те же; `readonly` файл не
+  трогал. Так и в 0.4.0. Проба (`<scratchpad>/ckpt-tool/ckpt.ts`): писатель в WAL вставил две строки и не закрылся, копии
+  `db`, `-wal`, `-shm` открыты по-разному, sha256 основного файла до и после закрытия:
+
+  ```text
+  readonly {"n":2} main 97e8d54f8a725510 -> 97e8d54f8a725510 wal after close: true
+  query_only {"n":2} main 97e8d54f8a725510 -> cd5c318ecf54148f wal after close: false
+  query_only, writer open {"n":2} main 97e8d54f8a725510 -> 97e8d54f8a725510 wal after close: true
+  ```
+
+  Последняя строка — та же база при открытом писателе, как при работающем CLI: контрольной точки нет.
+
+### Не проверено
+
+- macOS: отказ системного SQLite на `readonly`, помощник Keychain в тестах `diagnostics-cli` и `node-host` — только код
+  и Linux; на Linux ветки `darwin` не исполняются.
+- Тестов манифеста выпуска в v2 нет (`artifact.test.ts` 0.4 — B5.2), `verifyResourceTree` не исполняет ни один тест: путь
+  в тексте ошибки проверен только разовым запуском выше и typecheck `loginom-host` и `desktop`.

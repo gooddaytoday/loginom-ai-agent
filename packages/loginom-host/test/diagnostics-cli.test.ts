@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
+import { buildKeychain } from "../script/build-keychain"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { diagnosticsCommand } from "../src/diagnostics-cli"
@@ -31,6 +32,18 @@ const planted = [
   "fixture-cli-account-access",
 ]
 
+// The CLI reads the store with this platform's codec from the default bundle
+// `<installed>/resources/loginom` (`run` passes `installed: <base>/installed`):
+// plaintext on Linux, DPAPI on Windows, Keychain helper on macOS.
+async function platformCredentials(base: string, root: string) {
+  const resources = join(base, "installed", "resources", "loginom")
+  mkdirSync(root, { recursive: true, mode: 0o700 })
+  // One helper per installed bundle: a second store of the same profile reuses it.
+  if (process.platform === "darwin" && !existsSync(join(resources, "bin", "loginom-keychain")))
+    await buildKeychain(join(resources, "bin"))
+  return cliCredentials(process.platform, { root, resources })
+}
+
 // A CLI profile after one `run`: stores with planted values, the chat database
 // and runtime attempts of two sessions. The database has the OpenCode 2 tables the
 // export reads, with the columns of core/src/{session,credential,account}/sql.ts;
@@ -39,7 +52,7 @@ async function cliProfile() {
   const base = mkdtempSync(join(tmpdir(), "loginom-diagnostics-cli-"))
   roots.push(base)
   const paths = profilePaths(join(base, "profile"))
-  const store = connectionStore(join(paths.loginom, "connection"), cliCredentials("linux"))
+  const store = connectionStore(join(paths.loginom, "connection"), await platformCredentials(base, paths.loginom))
   await store.stage({
     generation: 1,
     revision: 1,
@@ -264,7 +277,8 @@ test("the chat is read as one snapshot: a message written meanwhile is not expor
   } as typeof query
   try {
     const output = join(profile.base, "snapshot.zip")
-    expect((await run(["diagnostics", "export", "--output", output], profile)).code).toBe(0)
+    const result = await run(["diagnostics", "export", "--output", output], profile)
+    expect(result).toMatchObject({ code: 0, stderr: expect.stringContaining("chat: included") })
     const chat = JSON.parse((await unpack(output)).files.get("chat/session.json")!)
     expect(writer.query("SELECT count(*) AS n FROM session_message WHERE id = 'msg_late'").get()).toEqual({ n: 1 })
     expect(chat.messages.map((message: any) => [message.info.id, message.parts.length])).toEqual([
@@ -278,9 +292,58 @@ test("the chat is read as one snapshot: a message written meanwhile is not expor
   }
 })
 
+test("the export reads the database through query-only connections that cannot write it", async () => {
+  const profile = await cliProfile()
+  const file = join(profile.paths.data, "loginom-ai-agent.db")
+  // WAL without -wal and -shm, as the CLI leaves the database on exit: here a `readonly` connection of the macOS
+  // system SQLite fails, so the chat and the saved keys are read through read-write connections with `query_only`.
+  const wal = new Database(file)
+  wal.run("PRAGMA journal_mode = WAL")
+  wal.close()
+  // Before its first statement, every connection the export opens tries to write.
+  const writes: string[] = []
+  const connections = new Set<Database>()
+  const query = Database.prototype.query
+  Database.prototype.query = function (this: Database, sql: string) {
+    if (!connections.has(this)) {
+      connections.add(this)
+      writes.push(tryWrite(this))
+    }
+    return query.call(this, sql)
+  } as typeof query
+  try {
+    const output = join(profile.base, "query-only.zip")
+    const result = await run(["diagnostics", "export", "--output", output], profile)
+    expect(result).toMatchObject({ code: 0, stderr: expect.stringContaining("chat: included") })
+    expect((await unpack(output)).manifest).toMatchObject({ chat: "included", knownSecrets: "ok" })
+  } finally {
+    Database.prototype.query = query
+  }
+  // Two connections: the chat (`openSessions`) and the saved keys (`profileSecrets`).
+  expect(writes).toEqual([
+    "SQLiteError: attempt to write a readonly database",
+    "SQLiteError: attempt to write a readonly database",
+  ])
+  const db = new Database(file)
+  expect(db.query("SELECT name FROM sqlite_master WHERE name = 'probe'").get()).toBeNull()
+  db.close()
+})
+
+function tryWrite(db: Database) {
+  try {
+    db.run("CREATE TABLE probe (id TEXT)")
+    return "written"
+  } catch (error) {
+    return String(error)
+  }
+}
+
 test("credentials of an earlier connection are masked in an older chat after switching accounts", async () => {
   const profile = await cliProfile()
-  const store = connectionStore(join(profile.paths.loginom, "connection"), cliCredentials("linux"))
+  const store = connectionStore(
+    join(profile.paths.loginom, "connection"),
+    await platformCredentials(profile.base, profile.paths.loginom),
+  )
   await store.stage({
     generation: 2,
     revision: 1,
