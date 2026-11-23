@@ -11,3 +11,24 @@ packages/core/src/**/*.txt text eol=lf
 packages/httpapi-codegen/test/generated/*.ts text eol=lf
 # The site tests compare source text and humans.txt byte for byte, so Windows checkouts keep LF.
 services/site/** text=auto eol=lf
+# Loginom AI Agent (0.4, B4.14d): files whose exact bytes are committed as SHA256 keep them on every checkout.
+# packages/desktop/test/loginom/committed-hash-attributes.test.mjs checks these rules.
+packages/desktop/test/loginom/fixtures/standalone-cli/**/*.csv text eol=lf
+# Pinned action catalogs are verified byte-for-byte at runtime.
+packages/loginom-runtime/executor/catalog-releases/** -text
+# Offline Help has a committed manifest of exact page bytes.
+packages/product/help/** -text
+# These normalized build-input hashes are committed in loginom-release.json.
+packages/product/models.json text eol=lf
+packages/loginom-runtime/client/package-lock.json text eol=lf
+# Vendored notices and source companions have committed checksums too.
+packages/loginom-host/licenses/** -text
+# Static fixtures have committed manifest/provenance hashes and byte oracles.
+packages/loginom-host/test/fixtures/skills-cold/** -text
+packages/loginom-host/test/fixtures/package-docs/** -text
+packages/loginom-host/test/fixtures/package-docs-routing/fixtures/** -text
+evals/fixtures/** -text
+docs/node-development/**/fixtures/** -text
+docs/node-development/**/acceptance/**/data/** -text
+# Upstream recordings commit the SHA256 of these audio files.
+packages/ai/test/fixtures/audio/** -text
