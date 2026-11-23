@@ -4,6 +4,7 @@ import { Effect, Layer, Runtime } from "effect"
 import { Plugins } from "./plugin"
 import { Ipc } from "./ipc"
 import { DesktopInitialization } from "./lifecycle/desktop-initialization"
+import { DesktopCredentials } from "./loginom/credentials"
 import { installContextMenu } from "./lifecycle/environment"
 import { ApplicationLifecycle } from "./lifecycle"
 import { DesktopLogging } from "./native/logging"
@@ -54,6 +55,7 @@ const runMain = Runtime.makeRunMain(({ fiber, teardown }) => {
 runIpc().pipe(
   Effect.provide(Ipc.layer),
   Effect.provide(BackgroundService.layer),
+  Effect.provide(DesktopCredentials.layer),
   Effect.provide(DesktopCli.layer),
   Effect.provide(DesktopInitialization.layer),
   Effect.provide(ApplicationLifecycle.layer),
