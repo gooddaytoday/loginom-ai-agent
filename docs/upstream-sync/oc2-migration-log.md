@@ -12905,10 +12905,11 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 Модель — заглушка OpenAI-совместимого API в процессе пробы; стенд — выдуманный стенд B2.7b (`<scratchpad>/b27b-runs/fixture.ts`:
 ресурсы с настоящим Node host, заглушки Help и браузера).
 
-**Нарушение «настоящую модель не вызывать», один запрос.** Первая проба строк базы (`<scratchpad>/b27b2-runs/dump-v2.ts`)
-запускала `run` без `--model`; v2 взял модель по умолчанию `opencode/flint-40b-free` и отправил один запрос в OpenCode.
-Ответ — 429 `FreeUsageLimitError`, ответа модели не было, ключей и данных профиля в запросе нет (свежий профиль, промпт
-«Посчитай сумму qty в input.csv»). Дальше все запуски — с `--model test/test-model` заглушки.
+**Нарушение «настоящую модель не вызывать».** Первая проба строк базы (`<scratchpad>/b27b2-runs/dump-v2.ts`) запускала два
+`run` без `--model`; v2 взял модель по умолчанию `opencode/flint-40b-free` и отправил в OpenCode не меньше двух запросов
+(обе сессии — эта модель, ответ 429 `FreeUsageLimitError` с разными `retryAfterMs`). Ответа модели не было. Тело запросов
+не смотрел: по устройству `run` в них промпт («Посчитай сумму qty в input.csv», «Ещё раз») и системный контекст продукта;
+профиль был свежий, ключей провайдеров в нём не было. Дальше все запуски — с `--model test/test-model` заглушки.
 
 ### Коммиты
 
@@ -12918,7 +12919,9 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 | `a8386e13fb` `fix(evals): refuse shared OAuth on OpenCode 2 before any process (B2.7b2)` | `evals/src/profile.ts` (`assertAuth`, ветка общего OAuth), тесты `profile.test.ts`, `shared-oauth-integration.test.ts` | `clean` |
 | `d459347426` `fix(evals): check the provider key on the database each attempt's run creates (B2.7b2)` | `evals/src/profile.ts` (`assertAuth`), `evals/src/run.ts` (`prepareProfile`), фикстура `evals/fixtures/fake-cli.ts` (`auth list`), тесты `profile.test.ts`, `run.test.ts` | `clean` |
 | `dcf96be1c1` `fix(evals): read the node-selection snapshot from the session tables of OpenCode 2 (B2.7b2)` | `evals/script/run-node-selection-attempt.ts` (`readSelectionSnapshot`, проверка `status`), тесты `evals/test/node-selection-attempt.test.ts` | `clean` |
-| следующий | этот раздел | |
+| `55e6d374b6` `docs(upstream-sync): record evals on the product CLI of OpenCode 2 over consecutive attempts (B2.7b2)` | этот раздел | `clean` |
+| `b93b6af13e` `fix(evals): keep the stderr of a failed auth list out of the key check's message (B2.7b2)` | `evals/src/profile.ts` (`AUTH_LIST_FAILED`), фикстура `fake-cli.ts`, тест в `profile.test.ts` (после ревью) | `clean` |
+| следующий | поправки раздела после ревью | |
 
 Файлов кода — три: `evals/src/profile.ts`, `evals/src/run.ts`, `evals/script/run-node-selection-attempt.ts`; плюс фикстура
 `fake-cli.ts` и тесты. Правок upstream нет: `catalog.json` и `catalog.md` не менялись.
@@ -12927,9 +12930,9 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 
 | Пункт | Итог |
 |---|---|
-| 1. Ключ на каждую попытку | Заводить ключ кодом `evals` не понадобилось: миграция `import_legacy_credentials` (B3.2) переносит `<профиль>/data/auth.json` в каждую новую базу, а `evals` уносит базу в архив после каждой попытки, так что `run` каждой попытки создаёт новую базу и берёт ключ из того же файла, что 0.4. Положить базу заранее и нельзя: допуск `runAgent` в режиме binary требует профиль без истории (`assertProfileClean`, `cli.ts:185`). `assertAuth` теперь спрашивает `auth list --standalone --format json` профиля без базы — CLI создаёт ровно такую базу, какую создаст прогон (импорт `data/auth.json`, ключи окружения), и отвечает, есть ли подключение у провайдера модели. База, оставшаяся в профиле, — отказ `PROFILE_DATABASE_PRESENT` (2) до запуска CLI. `prepareProfile`: архив истории → проверка ключа → архив истории проверки. Ключ из `EVAL_AGENT_PROVIDER_*` — как был (конфиг профиля сохраняется). Секреты не печатаются: подсказка называет файл и переменные, проба ищет ключ в результатах — нет |
+| 1. Ключ на каждую попытку | Заводить ключ кодом `evals` не понадобилось: миграция `import_legacy_credentials` (B3.2) переносит `<профиль>/data/auth.json` в каждую новую базу, а `evals` уносит базу в архив после каждой попытки, так что `run` каждой попытки создаёт новую базу и берёт ключ из того же файла, что 0.4. Положить базу заранее и нельзя: допуск `runAgent` в режиме binary требует профиль без истории (`assertProfileClean`, `cli.ts:185`). `assertAuth` теперь спрашивает `auth list --standalone --format json` профиля без базы — CLI создаёт ровно такую базу, какую создаст прогон (импорт `data/auth.json`, ключи окружения), и отвечает, есть ли подключение у провайдера модели. База, оставшаяся в профиле, — отказ `PROFILE_DATABASE_PRESENT` (2) до запуска CLI. `prepareProfile`: архив истории → проверка ключа → архив истории проверки. Ключ из `EVAL_AGENT_PROVIDER_*` — как был (конфиг профиля сохраняется). Секреты не печатаются: подсказка называет файл и переменные; `auth list` печатает подключение без ключа (`{"type": "credential", "id": "cred_…", "label": "API key", "method": "key"}`); ключа нет ни в результатах попыток, ни в свидетельствах команд управления, которые `run.ts` хранит в `preparation/` (`<scratchpad>/b27b2-runs/auth-evidence.ts`: `cleanupDir` и `cleanupSecrets` — как у `run.ts`, без ключа; 20 файлов, ключа нет); отказ `auth list` — `AUTH_LIST_FAILED` с кодом, без stderr (`b93b6af13e`) |
 | 2. Подключение переживает архив | Терялось в архивации `evals`: `retainedProfileFiles` хранил `connection.json`, но уносил `v040-migration.json`; Host без маркера проводит перенос 0.4.0 (`connection-store.ts`, `migrate`) и удаляет запись не на `app.loginom.ai` — это поведение 0.4.0 по замыслу, Host не правил. Маркер — теперь сохраняемый файл. `generations/` по-прежнему уходит в архив: Host берёт следующее поколение как `max(active, pending, latest)` (`connection-service.ts`), активное — из `connection.json` |
-| 3. Общий OAuth | Равнозначной проверки в v2 нет: `auth list` даёт `id`, `name` и подключения (метка, тип), `auth switch`/`logout` — выбор учётной записи; ни поколения, ни хеша принципала, ни признака обновления. `LOGINOM_AI_AGENT_SHARED_AUTH_DIR` в `packages/` не читает никто (`git grep` — только `evals`). `assertAuth` с `auth.sharedDir` отказывает `SHARED_AUTH_UNSUPPORTED: общий OAuth (auth.sharedDir) не поддерживается CLI продукта на OpenCode 2 — …`, код 2, до любого процесса. Подготовка слота (`environment-preparation.ts`, `prepared-run.ts`) зовёт `assertAuth` до прогонов, так что режим отключён на всех путях |
+| 3. Общий OAuth | Равнозначной проверки в v2 нет: `auth list` даёт `id`, `name` и подключения (метка, тип), `auth switch`/`logout` — выбор учётной записи; ни поколения, ни хеша принципала, ни признака обновления. `LOGINOM_AI_AGENT_SHARED_AUTH_DIR` в `packages/` не читает никто (`git grep` — только `evals`). `assertAuth` с `auth.sharedDir` отказывает `SHARED_AUTH_UNSUPPORTED: общий OAuth (auth.sharedDir) не поддерживается CLI продукта на OpenCode 2 — …`, код 2, сам не запуская CLI. Подготовка слота (`environment-preparation.ts`, `prepared-run.ts`) зовёт `assertAuth` до прогонов агента — до него `environment-preparation.ts` уже сверяет пользователей и зовёт `loginom status`/`setup`, — так что ни одна попытка с общим OAuth не начнётся |
 | 4. `readSelectionSnapshot` | Читает `session_v2`, `session_message` (по `seq`) и содержимое ассистента (строки `session_part`, затем встроенное `content`, как `history.ts`). Соединение — как у диагностики после B1.9: `{ readwrite: true, create: false }`, `PRAGMA query_only = ON`, одна транзакция. Форма снимка — прежняя, для его читателей (ниже). Чтобы дойти до снимка, поправлена и проверка `status` этого же сценария (находка B2.7b): `configured` без `hasApiKey` идёт в `loginom check` |
 | 5. Пустая сессия после отказа `run --command` | Сессии профиля `evals` считает только здесь: `sessions.length !== 1` по событиям и запасной поиск снимка по заголовку и окну времени. Событие `error` отказа несёт `sessionID` пустой сессии — одна сессия; её снимок без сообщений, `selectionModelStarted` — `null` (не «модель стартовала»), итог `SELECTION_DISPATCH_UNCONFIRMED`, код 2 — тот же класс, что в 0.4 (там сессии не было: `SELECTION_SESSION_INCOMPLETE`, код 2). Поиск по заголовку находит ровно её: префикс попытки уникален, повтор запрещает `SELECTION_SLOT_EXISTS`. У `run.ts` такого отказа нет (`runAgent` не передаёт ни `--command`, ни строгий журнал); будь он, `parseEvents` взял бы ID пустой сессии, а база ушла бы в архив с попыткой. Не мешает; тест ниже |
 
@@ -13000,7 +13003,8 @@ blocker: SELECTION_COLLECTION_FAILED                                           #
 
 ### Тесты
 
-По `evals/AGENTS.md`: сначала красный тест на коде базы, затем код.
+По `evals/AGENTS.md` для пп. 1–3: сначала красный тест, затем код. Для п. 4 (снимок и проверка `status`) код написан
+раньше тестов; красноту проверял подстановкой файла сценария из `3236227d4c` (колонка «На базе»).
 
 | Тест | Файл | Что | На базе |
 |---|---|---|---|
@@ -13008,6 +13012,7 @@ blocker: SELECTION_COLLECTION_FAILED                                           #
 | assertAuth: общий OAuth на OpenCode 2 отключён до любого процесса | `profile.test.ts` | `SHARED_AUTH_UNSUPPORTED`, код 2, ни одного вызова CLI, локальный `auth.json` цел и не в сообщении | красный (квитанция заглушки принималась) |
 | assertAuth: ключ — то, что показывает auth list новой базы, а не запись в data/auth.json | `profile.test.ts` | запись, которую база не берёт, — отказ с подсказкой `data/auth.json` (без `providers login`); аргументы `auth list --standalone --format json`; провайдер в списке — ок; ключ из `EVAL_AGENT_PROVIDER_*` — без CLI | красный |
 | assertAuth: база, оставшаяся в профиле, — отказ до auth list | `profile.test.ts` | `PROFILE_DATABASE_PRESENT`, CLI не запускался | красный |
+| assertAuth: отказ auth list не переносит его stderr в сообщение | `profile.test.ts` | сообщение — ровно `AUTH_LIST_FAILED: auth list завершился кодом 1` (`b93b6af13e`) | красный на `55e6d374b6` (stderr в сообщении) |
 | main: ключ провайдера проверяется на новой базе, после архива оставшейся истории | `run.test.ts` | `main()` с фиктивным CLI, без `EVAL_AGENT_PROVIDER_*`: оставшаяся база — в архиве `-initial`, база проверки — в `-auth`, попытка прошла, ключа в `summary.json` нет | красный |
 | a configured connection without hasApiKey reaches the connection check | `node-selection-attempt.test.ts` | `runSelectionAttempt` с поддельным CLI: `status` `configured` без `hasApiKey` проходит, отказывает `check` (`SELECTION_CONNECTION_NOT_READY`) | красный (`SELECTION_CONNECTION_MISMATCH`) |
 | empty stdout recovers only the exact own Session… | то же | прежний тест — на таблицах v2 | красный |
@@ -13048,7 +13053,9 @@ login» заменён третьим из таблицы.
 ### Приёмка пакетов и дерева
 
 Полные прогоны (`<scratchpad>/b27b2-runs/suites.sh`, один за другим): база — `3236227d4c` в `<scratchpad>/b27b2-base`, итог —
-`dcf96be1c1` (после него — только этот раздел); `npm ci` клиента `loginom-runtime` и `bun install` `evals` в обоих деревьях,
+`dcf96be1c1` (после него — этот раздел и `b93b6af13e`: сообщение отказа `auth list`; после `b93b6af13e` — `profile.test.ts` 98
+pass, 2 skip, 0 fail, `bun run typecheck` в `evals` — код 0; один прогон `profile.test.ts` вместе с `run.test.ts` дал 3
+падения `recoverIfNeeded` «Профиль … занят процессами: <pid>» — чужой процесс на машине, повтор — 0 fail); `npm ci` клиента `loginom-runtime` и `bun install` `evals` в обоих деревьях,
 `LOGINOM_AI_AGENT_TEST_NODE` задан. Падения сравнивались по именам.
 
 | Пакет | Команда | `3236227d4c` | `dcf96be1c1` |
@@ -13080,7 +13087,7 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   (`packages/cli/src/profile.ts:48`), проба `auth-memory.ts` — база появилась в профиле.
 - **Отказ при базе в профиле**, а не чтение старой базы: её ключи уходят в архив до прогона.
 - **Общий OAuth отключён в `assertAuth`**, проводка (`cli.ts` — переменная, `sandbox.ts` — привязка каталога, `slots.ts` —
-  поле `auth`) оставлена: отказ стоит до любого процесса на всех путях подготовки.
+  поле `auth`) оставлена: отказ стоит до первого прогона агента на всех путях подготовки.
 - **Снимок сохраняет форму 0.4**, а не отдаёт строки v2 как есть: иначе его читатели (`selectionModelStarted`,
   `readNodeEvents`, `node-selection.ts`, аудит) молча потеряли бы инструменты и модель. Поля — только наблюдённые в базе
   прогона, кроме строк `session_part` (по схеме и `history.ts`).
@@ -13111,6 +13118,11 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 - **Навык в снимке v2 — по коду, не запускал.** `inspectSelectionProvenance` (`node-selection.ts`) ищет часть инструмента
   `skill` с `state.metadata.activation`; `run --command` v2 прикладывает навык к промпту (B2.7a4b), вызова `skill` нет —
   в приёмке выше частей инструментов нет вовсе. Аудит такой попытки, вероятно, даст `SKILL_DIGEST_UNVERIFIED`.
+- **Отказ проверки ключа в подготовке слота оставляет её базу.** `auth list` создаёт базу и при отказе; `run.ts` уносит её
+  архивом `-initial` следующего запуска, а `environment-preparation.ts` и `prepared-run.ts` при отказе не доходят до
+  `cleanupSlotStorage`. Если историю слота не уберёт сверка запуска (`archiveStartupHistory`, не проверял), следующая
+  подготовка ответит `PROFILE_DATABASE_PRESENT` вместо подсказки о ключе. Слоты с `data/auth.json` бывают
+  (`script/campaign-preflight.ts:86`).
 - **Документы о `providers status`:** `evals/AGENTS.md` (абзац об `auth.sharedDir`) и ранбук `standalone-cli.md` описывают
   общий OAuth и `providers login` (как в B2.7b); раздел журнала — единственный документ этой задачи.
 
