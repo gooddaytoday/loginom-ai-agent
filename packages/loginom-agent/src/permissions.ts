@@ -45,8 +45,8 @@ export const table: readonly Entry[] = [
     "loginom_file_scan",
     "loginom_file_sample",
   ].map((action) => ({ action, resource: "*", kind: "read" as const, effect: "allow" as const })),
-  // The kind covers the project only: OpenCode asks `external_directory` before it touches anything outside, and that
-  // question stays (v2 itself allows it).
+  // The kind covers the project only: OpenCode asks `external_directory` before it touches anything outside, and the
+  // product keeps that question (OpenCode's `build` agent allows it without one).
   { action: "external_directory", resource: "*", kind: "read", effect: "ask" },
   // `edit`, `write`, `patch`, image generation and `package_docs_run` all write through the `edit` action.
   { action: "edit", resource: "*", kind: "write", effect: "ask" },
