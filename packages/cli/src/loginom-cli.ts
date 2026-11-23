@@ -6,7 +6,8 @@ import { CliProfile } from "./profile"
 import { Standalone } from "./standalone"
 
 try {
-  // Help, version and `diagnostics export` exit here, before the profile is opened (B2.7a3).
+  // Help, version and `diagnostics export` exit here, before the profile is opened (B2.7a3); the `loginom` commands exit
+  // here too, with the profile open and without the CLI (B2.7b).
   await Standalone.early(process.argv.slice(2))
   // The flags of the product's `run` that OpenCode 2 lacks (B2.7a4); `run` takes its directory from PWD.
   const forwarded = Standalone.forward(process.argv.slice(2), process.env.PWD ?? process.cwd())
