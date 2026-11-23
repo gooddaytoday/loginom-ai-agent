@@ -6956,7 +6956,7 @@ Bun 1.4.4 переносной — первым в `PATH` только для с
 | там же «a server without a managed lifecycle has no stop request» | без `lifecycle` — 404, `shutdown` не открылся |
 | `client/test/promise-service.test.ts` и `service.test.ts`, по три | `soft`: служба выходит с кодом 0, запрос дошёл с паролем, сигнала нет, регистрации нет; `soft-hung`: принял запрос, не вышел за `softStopTimeout` — SIGTERM; `stop-hanging`: не ответил за `requestTimeout` — SIGTERM |
 | `cli/test/service.test.ts` «service stop lets the managed service exit on its own» | настоящая служба из исходников и настоящая команда `service stop`: команда — 0, служба — 0 (сигнал дал бы 143), регистрации нет |
-| `cli/test/shutdown-deadline.test.ts` «a stop without a signal exits when teardown outlives its deadline…» | после `arm` зависший финализатор: отчёт с именем слоя, выход 1; сигналов нет, поэтому тест идёт и на Windows |
+| `cli/test/shutdown-deadline.test.ts` «a stop without a signal exits when teardown outlives its deadline…» | после `arm` зависший финализатор: отчёт с именем слоя, выход 1; сигналов нет, поэтому тест не помечен `posix` (на Windows не запускался) |
 
 Режимы фикстуры клиента — новые; для старых режимов маршрута нет (404), поэтому прежние тесты идут прежним путём без
 ожидания. Ускоренному времени добавлено `softStopTimeout: 1_000`.
@@ -7002,10 +7002,14 @@ $ LOGINOM_AI_AGENT_TARGET=windows-x64-baseline … bun run script/build.ts --ski
 d1fc70491305d5cc…  opencode.exe   windows-x64-baseline, 241 284 608 байт
 ```
 
-Перед сборкой — `npm ci --ignore-scripts --omit=dev` в `packages/loginom-runtime/client`, как в B3.3. Кросс-сборка
-поставила пакеты всех платформ: свободное место упало с 23 до 15 ГБ. После — удалены 39 записей кэша Bun, добавленных
-этой установкой (чужие платформы, 330 МБ), `node_modules` пересобраны `bun install --frozen-lockfile` (11 → 3,0 ГБ);
-`bun.lock` и манифесты не менялись. Это собранный CLI, а не установленный продукт.
+Перед сборкой — `npm ci --ignore-scripts --omit=dev` в `packages/loginom-runtime/client`, как в B3.3; после сборок этот
+`node_modules` удалён. Кросс-сборка поставила пакеты всех платформ: свободное место упало с 23 до 15 ГБ. После — удалены
+568 записей кэша Bun, появившихся за время этой установки: 39 верхнего уровня (среди них рантайм
+`bun-windows-x64-baseline-v1.4.4`) и 529 в каталогах `@scope`, только пакеты чужих платформ (darwin, win32, freebsd,
+android, musl, arm, i686), всего 7,2 ГБ; `@emnapi/runtime` оставлен. `node_modules` пересобраны
+`bun install --frozen-lockfile` (11 → 3,0 ГБ). Свободно снова 23 ГБ. `bun.lock` и манифесты не менялись. Каталоги
+`/tmp/opencode-client-service-*` и `/tmp/opencode-service-soft-stop-*`, оставшиеся от мутаций с тайм-аутом, удалены;
+новых `.bun-*.so` в `/tmp` нет. Это собранный CLI, а не установленный продукт.
 
 ### Linux и Windows
 
@@ -7136,3 +7140,4 @@ $ bun run secrets range 0f9b29f3fe HEAD                               # на 2bf
   Windows (`session-end`).
 - `service restart` и замена версии через `ensure` на настоящей службе — тот же `terminate`, проверены фикстурами.
 - Передача постоянных терминалов (`pty: "handoff"`) при мягкой остановке настоящей службы — только тесты фикстур.
+- Новые автотесты запускались только на Linux; на стенде Windows — только сборка CLI с пробой и сценарий выше.
