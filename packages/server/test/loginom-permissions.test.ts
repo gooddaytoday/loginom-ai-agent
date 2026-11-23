@@ -21,7 +21,7 @@ import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
-import { scheduleRunDenied, table, type Kind } from "../../loginom-agent/src/permissions"
+import { declinedText, deniedText, scheduleRunDenied, table, type Kind } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
@@ -590,6 +590,62 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 })
 
+describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
+  it.live(
+    "«Отклонить» on a write and «Запрещено» for a file and a site: nothing is done, the model is told why, the turn goes on",
+    () =>
+      Effect.gen(function* () {
+        // Rules for one file and one site leave `write` and `webfetch` offered; the save kind, whose rule denies the
+        // whole tool, is the Dock case (`loginom-dock-catalog.test.ts`).
+        const test = yield* boot({
+          permissions: [
+            { action: "edit", resource: "denied.md", effect: "deny" },
+            { action: "webfetch", resource: "https://denied.example/*", effect: "deny" },
+          ],
+        })
+        const id = yield* test.create("built-in refusals")
+        const running = yield* test
+          .prompt(
+            id,
+            script(
+              { tool: "write", input: { path: "declined.md", content: "declined" } },
+              { tool: "write", input: { path: "denied.md", content: "denied" } },
+              { tool: "webfetch", input: { url: "https://denied.example/page" } },
+              { text: "end" },
+            ),
+          )
+          .pipe(Effect.forkScoped)
+        // The user's «Отклонить»: a decline that OpenCode raises past the tool, so it would end the step.
+        const pending = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+        expect([pending.action, pending.resources]).toEqual(["edit", ["declined.md"]])
+        expect(yield* test.reply(id, pending.id, "reject")).toBe(204)
+        yield* Fiber.join(running)
+        const said = [
+          declinedText,
+          deniedText({ action: "edit", kind: "write" }),
+          deniedText({ action: "webfetch", kind: "web" }),
+        ]
+        expect(
+          (yield* test.tools(id)).map((part) => (part.state.status === "error" ? part.state.error.message : "ran")),
+        ).toEqual(said)
+        expect(told((yield* test.requests(id)).at(-1))).toEqual(said)
+        for (const name of ["declined.md", "denied.md"])
+          expect([name, yield* Effect.promise(() => Bun.file(path.join(test.dir, name)).exists())]).toEqual([
+            name,
+            false,
+          ])
+        const answers = (yield* test.sessions.messages({ sessionID: id })).filter((item) => item.type === "assistant")
+        expect(answers.map((item) => (item.type === "assistant" ? [item.finish, item.error] : []))).toEqual([
+          ["stop", undefined],
+          ["tool-calls", undefined],
+          ["tool-calls", undefined],
+          ["tool-calls", undefined],
+        ])
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
 describe("permission.evaluate contract (B2.6a)", () => {
   // A probe plugin without the product's rules: the effects the product relies on beyond B2.5a's `ask` → `allow`.
   it.live(
@@ -674,6 +730,17 @@ function respond(request: LLMRequest) {
   const input = JSON.parse(JSON.stringify(step.input ?? {}).replaceAll('"@listed"', JSON.stringify(listed ?? "")))
   return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, input)
 }
+
+// The failed calls' results, as the model read them in a request (`toSessionError`).
+function told(request: LLMRequest | undefined) {
+  return (request?.messages ?? [])
+    .flatMap((message) => (message.role === "tool" ? message.content : []))
+    .flatMap((part) =>
+      part.type === "tool-result" && part.result.type === "error" ? [failure(part.result.value).error.message] : [],
+    )
+}
+
+const failure = Schema.decodeUnknownSync(Schema.Struct({ error: Schema.Struct({ message: Schema.String }) }))
 
 function text(message: LLMRequest["messages"][number]) {
   return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")

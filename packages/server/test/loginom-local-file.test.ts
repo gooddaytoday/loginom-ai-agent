@@ -707,7 +707,7 @@ describe("loginom local file admission (B2.5a)", () => {
   )
 
   it.live(
-    "a rejection with feedback fails with the file and the next step; a plain rejection stays the decline that ends the step",
+    "a rejection with feedback fails with the file and the next step; a plain rejection stays OpenCode's decline",
     () =>
       Effect.gen(function* () {
         const test = yield* boot

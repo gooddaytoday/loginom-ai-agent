@@ -7,7 +7,9 @@
 //   and a configured deny still wins before any hook;
 // - the `permission.evaluate` hook (`settle`) handles what rules cannot express: the conversation grant, a terminal
 //   command of the agent that always asks (В-31), a schedule's `run` check that never runs, subagents, whose own rules
-//   may not loosen the product's defaults, and reading the product's own directories outside the project.
+//   may not loosen the product's defaults, and reading the product's own directories outside the project;
+// - a refused call does not end the turn (B2.6b, В-75): the user's «Отклонить» and a rule's deny reach the model as text
+//   (`refusal`, applied in the plugin's `execute.after` and `execute.before`).
 import type { Permission } from "@opencode/schema/permission"
 
 export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
@@ -122,6 +124,41 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
   return { effect }
 }
 
+/**
+ * What the model reads instead of a refused call's error (B2.6b, В-75), so that it explains and the turn goes on: the
+ * user's «Отклонить» (`Permission.DeclinedError`, which would end the step) and a rule that denies a kind (OpenCode's bare
+ * `Permission denied: <action>`). A deny with its own reason (a hook's: a subagent's terminal, a schedule check, nobody
+ * present) and a rejection with the user's words (`Permission.CorrectedError`) keep their text.
+ */
+export function refusal(failure: { readonly message: string; readonly error?: unknown }) {
+  if (isDecline(failure.error)) return declinedText
+  const blocked = blockedError(failure.error)
+  if (blocked?.reason !== undefined) return
+  // A built-in tool that maps the deny itself keeps only its text: the `BlockedError` message without a reason.
+  const action = blocked
+    ? blocked.permission
+    : failure.error === undefined
+      ? /^Permission denied: (\S+)$/.exec(failure.message)?.[1]
+      : undefined
+  if (action === undefined) return
+  const entry = classify(action, blocked?.resources ?? [])
+  return entry && deniedText(entry)
+}
+
+/** OpenCode's plain decline: the user's «Отклонить», or an open question of a Location that shuts down. */
+export const isDecline = (value: unknown) =>
+  value instanceof Object && "_tag" in value && value._tag === "Permission.DeclinedError"
+
+export const declinedText =
+  "LOGINOM_PERMISSION_DECLINED: пользователь отклонил это действие, оно не выполнено. Не повторяйте его и не обходите " +
+  "другим инструментом. Скажите пользователю, что не сделали, и продолжайте задачу без этого действия или спросите, " +
+  "как поступить."
+
+export const deniedText = (entry: Pick<Entry, "action" | "kind">) =>
+  `LOGINOM_PERMISSION_DENIED: «${kinds[entry.kind]}» (${entry.action}) запрещено правилами разрешений, действие не ` +
+  "выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему; " +
+  "разрешить это пользователь может в «Настройки → Разрешения»."
+
 export const terminalDenied = "LOGINOM_TERMINAL_DENIED: subagents do not run terminal commands in Loginom AI Agent"
 export const scheduleRunDenied =
   "LOGINOM_SCHEDULE_RUN_DENIED: schedule checks do not run terminal commands in Loginom AI Agent; use a code check"
@@ -153,3 +190,13 @@ const slash = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "")
 // Entry resources are `*`, a literal or a `prefix*`.
 const within = (resource: string, pattern: string) =>
   pattern === "*" || resource === pattern || (pattern.endsWith("*") && resource.startsWith(pattern.slice(0, -1)))
+
+// The fields of a `Permission.BlockedError` that a refusal names; Core's error classes stay out of the plugin.
+function blockedError(value: unknown) {
+  if (!(value instanceof Object) || !("_tag" in value) || value._tag !== "Permission.BlockedError") return
+  return {
+    permission: "permission" in value ? String(value.permission) : "",
+    resources: "resources" in value && Array.isArray(value.resources) ? value.resources.map(String) : [],
+    reason: "reason" in value && typeof value.reason === "string" ? value.reason : undefined,
+  }
+}

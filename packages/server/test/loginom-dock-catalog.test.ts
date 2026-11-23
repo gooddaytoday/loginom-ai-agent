@@ -20,6 +20,7 @@ import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServiceHost } from "../../loginom-agent/src/host"
+import { declinedText, deniedText, table } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
@@ -40,8 +41,21 @@ const fileTools = ["loginom_file_admit", "loginom_file_profile", "loginom_file_s
 
 type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 type Host = ReturnType<typeof scriptedHost>
+// A Dock tool of the Host catalog with its own input properties.
+const tool = (name: string, properties: Record<string, unknown>) => ({
+  name,
+  description: `${name} tool`,
+  inputSchema: { type: "object", properties: { host_context_token: { type: "string" }, ...properties } },
+})
+// The value of a failed call's result as the model reads it (`toSessionError`).
+const failure = Schema.decodeUnknownSync(Schema.Struct({ error: Schema.Struct({ message: Schema.String }) }))
 
-const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void) =>
+// `config` is the product config as the settings write it (B2.6b: «Разрешения» as `permissions` rules).
+const boot = (
+  host: Host,
+  extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
+  config?: Record<string, unknown>,
+) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-dock-")).path
     const data = path.join(dir, "data")
@@ -93,7 +107,7 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
         {
           app: { channel: "dev", version: "test" },
           database: { path: ":memory:" },
-          config: { project: false, claude: false },
+          config: { project: false, claude: false, ...(config ? { content: JSON.stringify(config) } : {}) },
           models: { fetch: false, snapshot: false },
           fs: { filewatcher: false, fff: false },
         },
@@ -178,6 +192,20 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
           ),
         ).pipe(Effect.map((response) => (response.status === 200 ? true : undefined))),
       ).pipe(Effect.andThen(wait ? sessions.wait(sessionID) : Effect.void))
+    // The server's HTTP API of the Location: permission questions and replies, a reload.
+    const call = (route: string, body?: unknown) =>
+      Effect.promise(async () => {
+        const at = `location[directory]=${encodeURIComponent(dir)}`
+        const response = await handler(
+          new Request(`http://opencode.local${route}${route.includes("?") ? "&" : "?"}${at}`, {
+            method: body === undefined ? "GET" : "POST",
+            headers: { "content-type": "application/json" },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          }),
+        )
+        const text = await response.text()
+        return { status: response.status, body: text ? JSON.parse(text) : undefined }
+      })
     const requests = (sessionID: Session.ID) =>
       llm
         .requests()
@@ -199,9 +227,51 @@ const boot = (host: Host, extra: (ctx: PluginContext) => Effect.Effect<void, nev
               ),
           ),
         )
+    // B2.6b: the session's first open permission question; the failed calls' results as the model read them in the
+    // session's last request; and its answers (assistant messages) in order.
+    const question = (sessionID: Session.ID) =>
+      until(() =>
+        call(`/api/session/${sessionID}/permission`).pipe(
+          Effect.map((response) => (response.body.data as { id: string; action: string }[])[0]),
+        ),
+      )
+    const told = (sessionID: Session.ID) =>
+      requests(sessionID).pipe(
+        Effect.map((all) =>
+          (all.at(-1)?.messages ?? [])
+            .flatMap((message) => (message.role === "tool" ? message.content : []))
+            .flatMap((part) =>
+              part.type === "tool-result" && part.result.type === "error"
+                ? [failure(part.result.value).error.message]
+                : [],
+            ),
+        ),
+      )
+    const answers = (sessionID: Session.ID) =>
+      sessions.messages({ sessionID }).pipe(
+        Effect.map((messages) =>
+          messages
+            .toSorted((a, b) => a.id.localeCompare(b.id))
+            .flatMap((message) =>
+              message.type === "assistant"
+                ? [
+                    {
+                      text: message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""),
+                      finish: message.finish,
+                      ...(message.error ? { error: message.error.message } : {}),
+                    },
+                  ]
+                : [],
+            ),
+        ),
+      )
     return {
       dir,
       sessions,
+      call,
+      question,
+      told,
+      answers,
       create,
       prompt,
       wizard,
@@ -687,11 +757,6 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
     "a Dock call names what it acts on, so the product's permission kinds tell a save and an export apart (B2.6a)",
     () =>
       Effect.gen(function* () {
-        const tool = (name: string, properties: Record<string, unknown>) => ({
-          name,
-          description: `${name} tool`,
-          inputSchema: { type: "object", properties: { host_context_token: { type: "string" }, ...properties } },
-        })
         const host = scriptedHost({
           catalog: () => [
             tool("dock_prepare", { intent: { type: "string" } }),
@@ -729,6 +794,162 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
           { action: "loginom_dock_prepare", resources: ["local_package"] },
           { action: "loginom_dock_prepare", resources: ["*"] },
         ])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () => {
+  // The save kind of «Разрешения» in the product's Dock profile: `dock_action_run` saves, `dock_prepare` with a local
+  // package uploads a copy into Loginom.
+  const saving = () =>
+    scriptedHost({
+      catalog: () => [
+        tool("dock_action_run", { action_key: { type: "string" } }),
+        tool("dock_prepare", { intent: { type: "string" } }),
+      ],
+    })
+  const save = { tool: "loginom_dock_action_run", input: { action_key: "package.save_as" } }
+  const upload = { tool: "loginom_dock_prepare", input: { intent: "open_package", local_package_path: "Демо.lgp" } }
+
+  it.live(
+    "«Запрещено» for «Сохранять пакеты в Loginom»: nothing reaches Loginom, the model is told why and the turn goes on",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        // The settings' «Запрещено» for the kind: a deny rule for each of its table entries.
+        const test = yield* boot(host, undefined, {
+          permissions: table
+            .filter((entry) => entry.kind === "save")
+            .map((entry) => ({ action: entry.action, resource: entry.resource, effect: "deny" })),
+        })
+        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "Демо.lgp"), "LGP package bytes"))
+        const id = yield* test.create("save denied", true)
+        yield* test.wizard(id, script(save, upload, { text: "end" }))
+        // OpenCode does not offer the save, whose rule denies it outright; a call by name (the bundled skill names it) is
+        // told why. The upload is offered: its rule denies one resource of `dock_prepare`.
+        const offered = loginom((yield* test.requests(id))[0])
+        expect(offered).not.toContain("loginom_dock_action_run")
+        expect(offered).toContain("loginom_dock_prepare")
+        const said = [
+          deniedText({ action: "loginom_dock_action_run", kind: "save" }),
+          deniedText({ action: "loginom_dock_prepare", kind: "save" }),
+        ]
+        expect(
+          (yield* test.calls(id)).map((part) => (part.state.status === "error" ? part.state.error : part.state.status)),
+        ).toEqual(said.map((message) => ({ type: "tool.execution", message })))
+        expect(host.requests("call")).toEqual([])
+        expect(yield* test.told(id)).toEqual(said)
+        expect(yield* test.answers(id)).toEqual([
+          { text: "", finish: "tool-calls" },
+          { text: "", finish: "tool-calls" },
+          { text: "end", finish: "stop" },
+        ])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "«Отклонить» in the question: nothing reaches Loginom, the model is told the user declined and the turn goes on",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        const test = yield* boot(host)
+        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "Демо.lgp"), "LGP package bytes"))
+        // Every action asks, so a check the product makes of the rules would show up here as a third question.
+        const id = yield* test.create("save declined", true)
+        yield* test.sessions.setPermissions({
+          sessionID: id,
+          permissions: [{ action: "*", resource: "*", effect: "ask" }],
+        })
+        yield* test.wizard(id, script(save, upload, { text: "end" }), false)
+        for (const action of ["loginom_dock_action_run", "loginom_dock_prepare"]) {
+          const pending = yield* test.question(id)
+          expect(pending.action).toBe(action)
+          expect(
+            (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, { decision: "reject" })).status,
+          ).toBe(204)
+        }
+        yield* test.sessions.wait(id)
+        expect(
+          (yield* test.calls(id)).map((part) => (part.state.status === "error" ? part.state.error : part.state.status)),
+        ).toEqual([declinedText, declinedText].map((message) => ({ type: "tool.execution", message })))
+        expect(host.requests("call")).toEqual([])
+        expect(yield* test.told(id)).toEqual([declinedText, declinedText])
+        expect(yield* test.answers(id)).toEqual([
+          { text: "", finish: "tool-calls" },
+          { text: "", finish: "tool-calls" },
+          { text: "end", finish: "stop" },
+        ])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "«сказать иначе» (В-22): the user's words reach the model as the call's result, and the turn goes on",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        const test = yield* boot(host)
+        const id = yield* test.create("save corrected", true)
+        yield* test.wizard(id, script(save, { text: "end" }), false)
+        const pending = yield* test.question(id)
+        const words = "Не сохраняй, сначала покажи итог"
+        expect(
+          (yield* test.call(`/api/session/${id}/permission/${pending.id}/reply`, {
+            decision: "reject",
+            message: words,
+          })).status,
+        ).toBe(204)
+        yield* test.sessions.wait(id)
+        expect(host.requests("call")).toEqual([])
+        expect(yield* test.told(id)).toEqual([words])
+        expect((yield* test.answers(id)).at(-1)).toEqual({ text: "end", finish: "stop" })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a deny that is not the user's keeps its own text, as the administrator's will (B2.6c)",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        const reason = "LOGINOM_PROBE_DENIED: the stand denies saving"
+        const test = yield* boot(host, (ctx) =>
+          ctx.permission.hook("evaluate", (event) =>
+            Effect.sync(() => {
+              if (event.action !== "loginom_dock_action_run") return
+              event.effect = "deny"
+              event.message = reason
+            }),
+          ),
+        )
+        const id = yield* test.create("save denied by a hook", true)
+        yield* test.wizard(id, script(save, { text: "end" }))
+        expect(host.requests("call")).toEqual([])
+        expect(yield* test.told(id)).toEqual([reason])
+        expect((yield* test.answers(id)).at(-1)).toEqual({ text: "end", finish: "stop" })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a reload cancels an open question as OpenCode does, not as the user's refusal",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        const test = yield* boot(host)
+        const id = yield* test.create("save cancelled", true)
+        yield* test.wizard(id, script(save, { text: "end" }), false)
+        yield* test.question(id)
+        expect((yield* test.call("/api/location/reload", {})).status).toBe(204)
+        const failed = yield* until(() =>
+          test.calls(id).pipe(Effect.map((parts) => parts.find((part) => part.state.status === "error"))),
+        )
+        expect(failed.state.status === "error" ? failed.state.error.message : undefined).toBe(
+          "Interaction cancelled because the location shut down",
+        )
+        expect(host.requests("call")).toEqual([])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
