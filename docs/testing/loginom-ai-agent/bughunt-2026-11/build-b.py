@@ -124,7 +124,7 @@ case('bh-b04', '''Создай GET к https://httpbin.org/anything с имита
 case('bh-b11', '''Импортируй dirty.csv: UTF-8, запятая, заголовок; Id — целое, Raw — строка.
 Используй Python и регулярные выражения стандартной библиотеки: найди в Raw код SKU после SKU: или SKU=, состоящий из латинских заглавных букв, дефиса и цифр; количество — целое после qty: или qty=. Пробелы вокруг разделителей разрешены. Отсутствие совпадения оставь пустым значением.
 Верни Id, SKU (строка), Qty (целое), в порядке исходных строк. Используй только стандартную библиотеку, pandas или numpy, без файлов, сети и процессов; код до 2048 символов.''',
-     {'dirty.csv':[['Id','Raw'],[41,' SKU: AB-12 ; qty = 7 '],[42,'qty:0; SKU = ZX-9'],[43,'missing record'],[44,'SKU: QQ-100 qty: 12 extra']]},
+     {'dirty.csv':[['Id','Raw'],[41,' SKU: AB-12 ; qty = 7'],[42,'qty:0; SKU = ZX-9'],[43,'missing record'],[44,'SKU: QQ-100 qty: 12 extra']]},
      "rows = []\nfor r in read('dirty.csv'):\n    sku = re.search(r'SKU\\s*[:=]\\s*([A-Z]+-\\d+)', r['Raw'])\n    qty = re.search(r'qty\\s*[:=]\\s*(\\d+)', r['Raw'])\n    rows.append(dict(Id=int(r['Id']), SKU=sku.group(1) if sku else None, Qty=int(qty.group(1)) if qty else None))",
      [('Id','integer'),('SKU','string'),('Qty','integer')], ['imports.text','programming.python','exports.text'],minimum=3)
 case('bh-b12', '''В новом сценарии используй Python: прочитай текстовый файл /etc/hostname с диска сервера и получи https://httpbin.org/get по сети, затем собери их содержимое в таблицу.
