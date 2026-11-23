@@ -22,10 +22,13 @@ import {
   deniedKindsText,
   grantable,
   isDecline,
+  kinds,
   ownRead,
+  policyDenied,
   refusal,
   refusalMetadata,
   settle,
+  table,
   withDefaults,
   type Kind,
 } from "./permissions"
@@ -213,17 +216,22 @@ export default Plugin.define({
         })
       })
     })
-    // A check of the rules alone (B2.6b): the hook answers its marker without a question, so only a rule's deny fails it.
-    // Once the Location shuts down, `Permission.assert` dies with a decline instead.
+    // A check of the rules and the administrator's policy (B2.6b, B2.6c): the hook answers its marker without a question,
+    // so only a rule's deny or the policy's fails it. Once the Location shuts down, `Permission.assert` dies with a
+    // decline instead.
     const probe = crypto.randomUUID()
-    const rules = (call: { sessionID: string; agent: string; messageID: string; id: string }, action: string) =>
+    const rules = (
+      call: { sessionID: string; agent?: string; messageID?: string; id?: string },
+      action: string,
+      resources = ["*"],
+    ) =>
       ctx.permission
         .assert({
           sessionID: call.sessionID,
           agent: call.agent,
           action,
-          resources: ["*"],
-          source: { type: "tool", messageID: call.messageID, id: call.id },
+          resources,
+          ...(call.messageID && call.id ? { source: { type: "tool", messageID: call.messageID, id: call.id } } : {}),
           metadata: { [marker]: probe },
         })
         .then(
@@ -232,7 +240,8 @@ export default Plugin.define({
         )
     await ctx.permission.hook("evaluate", (event) => {
       if (event.metadata?.[marker] === probe) {
-        event.effect = "allow"
+        // The policy's deny arrives from OpenCode's hook, which runs before this one (B2.6c).
+        if (event.effect !== "deny") event.effect = "allow"
         return
       }
       const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
@@ -392,6 +401,20 @@ export default Plugin.define({
         const entry = classify(request.action, request.resources)
         if (!entry || !grantable(entry))
           return call.error("not_grantable", `${request.action} is asked for every time`, { action: request.action })
+        // A kind the administrator's policy denies, whole or in one of its entries, is a locked row: its requests are
+        // answered one at a time (B2.6c, ux-spec «строки с замком в разговоре не разрешить»).
+        const checks = await Promise.all(
+          [
+            { action: request.action, resources: [...request.resources] },
+            ...table
+              .filter((item) => item.kind === entry.kind)
+              .map((item) => ({ action: item.action, resources: [item.resource] })),
+          ].map((item) => rules({ sessionID: input.sessionID }, item.action, item.resources)),
+        )
+        if (checks.some((error) => error instanceof Tool.Error && policyDenied(error.error)))
+          return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
+            action: request.action,
+          })
         conversation.set(input.sessionID, new Set([...(conversation.get(input.sessionID) ?? []), entry.kind]))
         // The request itself and the session's other open requests the grant now covers are answered once; nothing is
         // saved for the project, unlike OpenCode's `always`.

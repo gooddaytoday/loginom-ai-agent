@@ -9,6 +9,8 @@ import {
   isDecline,
   kinds,
   ownRead,
+  policyDenied,
+  policyDeniedText,
   refusal,
   refusalMetadata,
   rules,
@@ -258,6 +260,75 @@ describe("refusals (B2.6b)", () => {
       undefined,
     ])
       expect([cause, refusal(cause)]).toEqual([cause, undefined])
+  })
+})
+
+describe("the administrator's deny (B2.6c, В-69)", () => {
+  // OpenCode's managed policy denies in its `permission.evaluate` hook, which runs before the product's, with one of
+  // these reasons (`core/src/managed-policy.ts`).
+  const reasons = [
+    "Blocked by configuration policy",
+    "Blocked by Acme's policy",
+    "Blocked by your organization's policy",
+  ]
+  const blocked = (permission: string, resources: string[], reason?: string) => ({
+    _tag: "Permission.BlockedError",
+    rules: [],
+    permission,
+    resources,
+    ...(reason === undefined ? {} : { reason }),
+  })
+  const source = { type: "tool", messageID: "msg", id: "call" }
+
+  test("nothing the product allows lifts a deny that reaches its hook, and the deny keeps its text", () => {
+    const all = new Set(everyKind())
+    for (const [request, subagent, own] of [
+      [{ action: "edit", resources: ["a"], effect: "deny" }, false, false],
+      // The conversation grant, the product's own directories, a subagent.
+      [{ action: "webfetch", resources: ["u"], effect: "deny" }, false, false],
+      [{ action: "external_directory", resources: ["/data/tool-output/*"], effect: "deny" }, false, true],
+      [{ action: "webfetch", resources: ["u"], effect: "deny" }, true, false],
+      // The terminal: an agent command, a schedule check, a subagent's command.
+      [{ action: "shell", resources: ["ls"], source, effect: "deny" }, false, false],
+      [{ action: "shell", resources: ["ls"], effect: "deny" }, false, false],
+      [{ action: "shell", resources: ["ls"], source, effect: "deny" }, true, false],
+      [{ action: "question", resources: ["*"], effect: "deny" }, false, false],
+    ] as const)
+      expect([request, settle(request, subagent, all, own)]).toEqual([request, { effect: "deny" }])
+  })
+
+  test("the policy's deny of a kind is told as the administrator's; anything else keeps its text", () => {
+    for (const reason of reasons) {
+      for (const [action, resources, kind] of [
+        ["loginom_dock_action_run", ["*"], "save"],
+        ["loginom_dock_node_apply", ["exports.excel"], "export"],
+        ["edit", ["a.md"], "write"],
+        ["read", ["a.md"], "read"],
+        ["webfetch", ["https://example.com"], "web"],
+        ["shell", ["ls"], "terminal"],
+      ] as const) {
+        expect(refusal(blocked(action, [...resources], reason))).toBe(policyDeniedText({ action, kind }))
+        expect(policyDenied(blocked(action, [...resources], reason))).toBe(true)
+      }
+      // An action of no kind keeps OpenCode's text.
+      expect(refusal(blocked("github_create_issue", ["*"], reason))).toBeUndefined()
+    }
+    expect(policyDeniedText({ action: "webfetch", kind: "web" })).toStartWith(
+      "LOGINOM_POLICY_DENIED: «Открывать сайты» (webfetch) запрещено политикой администратора",
+    )
+    for (const cause of [
+      blocked("webfetch", ["u"]),
+      blocked("webfetch", ["u"], "admin says no"),
+      blocked("webfetch", ["u"], terminalDenied),
+      blocked("webfetch", ["u"], "Permission webfetch needs approval, and nobody is present to give it"),
+      { _tag: "Permission.DeclinedError" },
+      undefined,
+    ])
+      expect([cause, policyDenied(cause)]).toEqual([cause, false])
+    expect(refusalMetadata(policyDeniedText({ action: "edit", kind: "write" }))).toEqual({
+      permissionDenied: true,
+      permissionRefusal: "policy",
+    })
   })
 })
 

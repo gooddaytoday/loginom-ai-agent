@@ -10558,3 +10558,319 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 - Настоящий Host и Loginom: коды 2 и 4 и ошибки `loginom_*` — по записанным вызовам, не сквозь процесс; `--headless`.
 - `denied` у `--file` — тесты шли под root. Windows и macOS.
 - `evals` в режиме binary с bubblewrap и его `main()` (подготовка профиля — выше); строка 208 `run-node-selection-attempt.ts`.
+
+## B2.6c Запрет администратора
+
+22.11.2026. Ветка `b26c-admin-policy` от `oc2-migration` (`6c34ea6ae0`: B2.6a…B2.6b2), рабочее дерево
+`.claude/worktrees/b26c`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; клиент `packages/loginom-runtime/client` — `npm ci
+--ignore-scripts` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Основа: В-69,
+В-30, В-31, В-75, В-76, В-33, решение 8 (`decisions.md`, ветка `prototype-source`), ux-spec «Разрешения», «Политика
+администратора», «По умолчанию в Разрешениях», прототип (`settings.js`: демо-политика запирает «Открывать сайты» и
+терминал), план B2.6c, 0.4 `a080f7725c`, B1.3b.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `a86dc051ec` `feat(loginom-agent): the administrator's deny wins on the server; locked kinds are not granted for the conversation (B2.6c)` | `settle`, `refusal`, `policyDenied`, `policyDeniedText`, `refusalMetadata` в `packages/loginom-agent/src/permissions.ts`; проверка правил и RPC `loginom.permission.conversation` — `src/index.ts`; тесты — `test/permissions.test.ts` (+2), `packages/server/test/loginom-permissions.test.ts` (+4, стенд принимает политику системного каталога), `loginom-dock-catalog.test.ts` (+1 случай мастера, стенд принимает политику; заголовок случая B2.6b про чужой запрет уточнён) |
+| `6006073c5d` `docs(upstream-sync): record B2.6c the administrator's deny through OpenCode's managed policy` | этот раздел (первая версия), CAT-05 в `catalog.md` |
+| `445c8a3af2` `test(server): the conversation grant under the administrator's policy for every kind it covers (B2.6c)` | по ревью советника: случай «в этом разговоре» — на все пять видов, которые разрешение покрывает; проверка, что `policies` проекта загружены |
+| следующий | уточнения этого раздела |
+
+### `policy.json` в 0.4
+
+- **Что знает.** Только обновления: `updates: "on" | "off"`, `channel: "stable" | "unstable"`, `feedUrl` (https, без
+  учётных данных, запроса и якоря). Разрешений, моделей, режима сети, адреса Loginom и каталога в 0.4 нет — ux-spec
+  относит их к этапу F.
+- **Где лежит.** `/etc/loginom-ai-agent/policy.json`, `%ProgramData%\Loginom AI Agent\policy.json`,
+  `/Library/Application Support/Loginom AI Agent/policy.json` (`updatePolicyPath`).
+- **Кто читает.** Desktop — `packages/desktop/src/main/update-policy.ts`: `parseUpdateAdminPolicy` проверяет три ключа,
+  остальные не отклоняет; `updateSettings` — политика главнее выбора пользователя (`channel`, `feedUrl`), `updates: "off"`
+  выключает обновления, `managed: Object.keys(policy).length > 0`, `channelLocked`. CLI — `opencode/src/cli/update-notifier.ts`:
+  `updates: "off"` и `channel`.
+- **Тесты.** `desktop/src/main/update-policy.test.ts` («stable and unstable are feed folders … policy precedence»,
+  «administrator policy has platform-specific system locations») и `opencode/test/cli/update-notifier.test.ts`.
+
+### Где запрет администратора и как читается
+
+Запрет администратора — управляемая политика OpenCode v2.3.0, без своего файла и без правок upstream:
+
+- **Файл.** Системный каталог конфига продукта (B1.3b): `loginom-ai-agent.json` или `.jsonc` в `/etc/loginom-ai-agent`,
+  `%ProgramData%\loginom-ai-agent`, `/Library/Application Support/loginom-ai-agent`, на macOS ещё MDM
+  `com.loginom.aiagent.managed`. Поле `policies` — список `{ action, resource, effect }`, `effect` — `allow` или `deny`.
+  Каталог OpenCode (`/etc/opencode`) продукт не читает (B1.3b).
+- **Порядок.** `Config.load` (`core/src/config.ts`) отделяет политики управляемых документов и загружает их первыми;
+  `ManagedPolicy.statements` переворачивает документы, и из совпавших утверждений решает самое раннее. Поэтому `policies`
+  конфига пользователя, проекта и OpenCode Console управляемый запрет не снимают, только добавляют свои. Правила сессии и
+  настройки — это `permissions`, а не `policies`: клиент их меняет, политику — нет.
+- **Кто применяет.** Встроенный плагин `opencode.config.policy` (`core/src/config/plugin/policy.ts`): `tool.use` —
+  хук `permission.evaluate`, ресурс `<действие>:<ресурс запроса>`, совпавший `deny` даёт запрет с текстом `Blocked by
+  configuration policy` (у документа организации — `Blocked by <организация>'s policy`). Конфиг не может его выключить
+  (`guarded` в `core/src/plugin/internal.ts`). Хуки идут после правил: любое «разрешено» — умолчание, настройка, правило
+  сессии, сохранённое `always`, `Unattended` расписания — до него доходит. Порядок хуков: плагины SDK (`pre`), затем
+  политика, затем продукт (последний в `post`).
+- **Чтение на лету.** Системный каталог входит в наблюдение конфига (`core/src/config/watch.ts`) — по коду, не проверял.
+
+Пример: «Сохранять пакеты в Loginom» — «Запрещено» администратором, по строкам таблицы B2.6a.
+
+```json
+{
+  "policies": [
+    { "action": "tool.use", "resource": "loginom_dock_action_run:*", "effect": "deny" },
+    { "action": "tool.use", "resource": "loginom_dock_prepare:local_package", "effect": "deny" },
+    { "action": "tool.use", "resource": "dashboard_publish:*", "effect": "deny" },
+    { "action": "tool.use", "resource": "dashboard_delete:*", "effect": "deny" }
+  ]
+}
+```
+
+«Открывать сайты» — `webfetch:*` и `websearch:*`, терминал — `shell:*`, остальные виды — так же по таблице.
+
+### Что делает продукт
+
+`packages/loginom-agent/src/{permissions,index}.ts`:
+
+- **Не снимает запрет.** До хука продукта запрет доходит только от более раннего хука, то есть от политики: запрет
+  правилом ядро решает раньше всех хуков. `settle` оставляет такой запрет без своего текста. Раньше его снимали или
+  переписывали три места:
+  - чтение своих каталогов вне проекта (`ownRead`, B2.6a2) — `allow`;
+  - команда подагента — `LOGINOM_TERMINAL_DENIED`;
+  - проверка расписания — `LOGINOM_SCHEDULE_RUN_DENIED`.
+
+  Разрешение «в этом разговоре» превращает в `allow` только `ask` и запрета не касается.
+- **Проверка правил видит политику.** Метка проверки (B2.6b) больше не превращает в `allow` пришедший запрет. Проверка
+  скрытого инструмента в `execute.before` и RPC ниже падают и на запрете политики.
+- **«В этом разговоре» для строки с замком — отказ.** RPC `loginom.permission.conversation` до разрешения проверяет сам
+  запрос и каждую строку таблицы его вида (действие и ресурс строки). Если хоть одну из них запрещает политика, ответ —
+  объявленная ошибка `not_grantable` с `action` запроса и текстом `the administrator's policy sets «<вид>»`. Вопрос
+  остаётся открытым: ответить на него можно «один раз». Запрет одного ресурса внутри строки (один сайт, один файл)
+  строку не запирает: разрешение вида даётся, а сам запрещённый ресурс остаётся запрещён.
+- **Текст для модели.** Вызов, который запретила политика, получает в `execute.after` (через `refusal`, B2.6b)
+  текст `LOGINOM_POLICY_DENIED: «<вид>» (<действие>) запрещено политикой администратора, действие не выполнено. Не
+  повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему; изменить это может
+  только администратор.` В метаданных — `permissionDenied: true`, `permissionRefusal: "policy"`: так отказ
+  администратора отличается и от отказа пользователя (`declined`), и от запрета настройкой (`denied`). Запрет — типизированная
+  ошибка `Permission.BlockedError`, ход продолжается. Действие вне видов и запрет хука с другим текстом остаются как
+  есть.
+
+| Режим | Почему запрет побеждает | Тест |
+|---|---|---|
+| умолчания | хук политики после правил | API, каждый вид |
+| настройки (`permissions` конфига) | то же; `allow` всего включает и терминал | API, каждый вид |
+| правила сессии от клиента | то же | API, каждый вид; мастер |
+| «в этом разговоре» | RPC отказывает по виду с замком; разрешение превращает только `ask` | API, пять видов, которые разрешение покрывает |
+| «один раз», `--dangerously-skip-permissions` | запрет не открывает вопроса — отвечать нечего | настоящие инструменты, клиент отвечает `once` на каждый вопрос |
+| мастер (`loginom.runner.start`) | допуск к инструментам — не разрешение | Host по сценарию |
+| сохранённое `always`, расписание (`Unattended`) | те же хуки после правил | по коду |
+
+Флаг `--dangerously-skip-permissions` (и `--yolo`, `--auto`) по коду только отвечает `once` на каждый вопрос своей
+сессии (`cli/src/run/noninteractive.ts`, `replyPermission`), а TUI с ним не показывает вопросы (`autoaccept`). Тест
+повторяет этот ответ через API. Сам CLI не запускал: `run` в `packages/cli` сейчас правит B2.7a4.
+
+### `ManagedPolicy` v2.3.0 и поля продукта
+
+| Поле продукта (ux-spec, прототип) | `ManagedPolicy` | Итог |
+|---|---|---|
+| «Запрещено» вида действия | `tool.use` `<действие>:<ресурс>` по строкам таблицы B2.6a | покрывает; администратор пишет действия, а не вид |
+| «Спрашивать» или «Разрешено» с замком | эффекты только `allow` и `deny`; `allow` лишь не запрещает и вопроса не снимает | не покрывает |
+| терминал выключен | `tool.use` `shell:*` | покрывает команды агента; команда пользователя (`!cmd`) разрешений не спрашивает (B2.6a, В-69) |
+| «Свои навыки: выключены» (В-76) | `skill.use` по ID навыка | частично: «свои» по происхождению не отличить, `*` убирает и навыки OpenCode |
+| модели администратора | `provider.use` по провайдеру | частично: не по модели, свою модель политика не добавляет |
+| режим сети, адрес Loginom, источник каталога, обновления (`updates`, `channel`, `feedUrl`) | нет | не покрывает |
+| навыки «Сообщество» и из файла в закрытом контуре (В-50, В-62) | нет: `skill.use` не знает происхождения | не покрывает |
+| ошибка в файле политики (В-33) | разобрать файл не удалось — предупреждение в журнале, документ пропущен (`parseInfo`, по коду) | не покрывает: политика пропадает целиком |
+
+**Решение.** Запрет администратора по видам в B — `ManagedPolicy` `tool.use` в системном конфиге продукта. Правок
+upstream нет, своего чтения файла у плагина нет. Плагину остаются отказ «в этом разговоре», текст и признак отказа. Замки
+«Спрашивать» и «Разрешено», вид как единица, режим сети, адрес, модели, каталог и В-33 — этап F, полная схема
+политики. Там же решать, остаётся ли `policy.json` отдельным файлом или продукт переводит его в `policies`.
+
+### `update-policy`
+
+`update-policy.ts` в дереве переноса нет. В Desktop v2.3.0 обновлятор — GUI-плагин `gui-plugins/src/updater`, а
+`policy.json` и источники обновлений перенесены в этап C (В-97, п. 5; B4.1, вопрос 5). Запрет администратора лежит в
+`loginom-ai-agent.json`, а не в `policy.json`, так что ключи разрешений в режим обновлений не попадают. Desktop не менял.
+Для переноса в этапе C: `managed` должен считать только `updates`, `channel` и `feedUrl`, а не `Object.keys(policy)`.
+
+### Свои навыки (В-76)
+
+План (строка 75) относит выключатель В-76 к этапу F; задание — «если не сделано в B2.4». В B2.4 не сделано. Выбрал
+меньшее: кода нет, `ManagedPolicy` `skill.use` уже это умеет, и тест это закрепляет. Список `GET /api/skill`
+при `{ "action": "skill.use", "resource": "*", "effect": "deny" }` и без политики:
+
+```text
+policy: loginom-automation, loginom-dashboard, package-docs
+none:   browser, loginom-automation, loginom-dashboard, opencode, own-notes, package-docs, report
+```
+
+Встроенные навыки продукта остаются: преобразование навыков продукта идёт после политики и добавляет проверенный
+каталог заново. Вместе со своими уходят навыки OpenCode `opencode`, `report`, `browser`. Hub (этап E) продукт тоже
+добавит после политики.
+
+### Тесты
+
+`packages/loginom-agent/test/permissions.test.ts`, `describe("the administrator's deny (B2.6c, В-69)")`, 2 теста:
+
+- `settle` оставляет пришедший запрет без текста: правка, разрешённый вид, свой каталог, подагент, команда агента,
+  проверка расписания, команда подагента, действие вне видов;
+- `refusal` для трёх текстов политики и каждого вида — `policyDeniedText`, `policyDenied` — `true`; действие вне видов —
+  без изменений; запрет без текста, с чужим текстом, `LOGINOM_TERMINAL_DENIED`, `Unattended`, отказ — не политика;
+  метаданные — `policy`.
+
+`packages/server/test/loginom-permissions.test.ts`, `describe("loginom.product the administrator's deny (B2.6c,
+В-69)")`. Настоящий сервер; политика лежит в `loginom-ai-agent.json` системного каталога случая, стенд подменяет
+`Config.configured({ system })`, как `core/test/config/product-system.test.ts`.
+
+| Тест | Что проверяет |
+|---|---|
+| каждый вид и режим | политика запрещает каждую строку таблицы, терминал тоже. Режимы: умолчания, правила сессии `* * allow` от клиента, настройки `permissions` `* * allow` (включают и терминал). Запросы — все виды, `read` файла проекта, команда агента. С политикой — всё `deny`, открытых вопросов нет; без политики в тех же режимах — ни одного `deny`, кроме выключенного по умолчанию терминала |
+| «в этом разговоре» | политика запрещает соседнюю строку чтения, сохранения и сайтов (`glob:*`, `dashboard_delete:*`, `webfetch:*`) и по одному ресурсу записи и выгрузок, где строка одна (`edit:secret.md`, `loginom_dock_node_apply:exports.excel`). Конфиг проекта своими `policies` пробует вернуть `webfetch:*` (`allow`) и запрещает `question:*`. `question` и `webfetch` — `deny`: `policies` проекта загружены, но управляемый запрет не снимают. `external_directory`, `loginom_dock_action_run`, `websearch` — `ask`, RPC — `not_grantable` со своим `action`, вопрос остаётся, `once` — 204, следующий снова `ask`. `edit report.md` и `exports.text` — RPC даёт `write` и `export`, соседний ресурс — `allow`, запрещённый — `deny` |
+| настоящие инструменты, ответ `once` на всё | терминал включён конфигом, политика запрещает `edit:denied.md`, `webfetch:*`, `shell:*`, `external_directory:*`. Клиент отвечает `once` на каждый вопрос сессии. Модель: `write allowed.md`, `write denied.md`, `webfetch`, `shell touch`, `read` файла в `<data>/tool-output` (свой каталог, B2.6a2). Вопрос был один — `edit`; первый вызов `completed`, четыре — `LOGINOM_POLICY_DENIED` своих видов, те же тексты в запросе к модели, у всех `permissionRefusal: "policy"`. Файлов `denied.md` и метки нет, шесть ответов без ошибки, последний — `stop` |
+| В-76 | см. выше |
+
+`packages/server/test/loginom-dock-catalog.test.ts`, случай «the administrator's deny of saving wins in the wizard…»:
+Host по сценарию, политика запрещает `loginom_dock_action_run:*` и `loginom_dock_prepare:local_package`, правило сессии
+`* * allow`, мастер `loginom.runner.start` с `loginom-automation`. Сохранение предложено модели (политика ничего не
+прячет). Оба вызова — `LOGINOM_POLICY_DENIED`, Host не получил ни одного вызова, признак `policy`, третий ответ — `end`
+и `stop`.
+
+Изменённое: заголовок случая B2.6b «a deny that is not the user's keeps its own text, as the administrator's will
+(B2.6c)» → «a deny of another hook that is not the user's keeps its own text». У администратора теперь свой текст, сам
+случай не менялся.
+
+Устойчивость:
+
+```text
+$ bun test --rerun-each 10 --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t B2.6c
+ 50 pass, 0 fail                                          # 24.8 с на a86dc051ec, 20.5 с на 445c8a3af2
+```
+
+### Мутации
+
+Скрипт во временном каталоге: замена строки в файле дерева, прогоны `bun test test/permissions.test.ts`
+(`loginom-agent`) и `bun test --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t
+B2.6` (`server`, случаи B2.6a2…B2.6c), возврат исходного текста. После последней мутации оба файла побайтно совпадают с
+копиями до прогона.
+
+```text
+=== M0 none                                    unit 18/0; server 23/0
+=== M1 settle lifts an incoming deny           unit 17/1; server 22/1: настоящие инструменты (свой каталог)
+=== M2 the probe allows a policy deny          unit 18/0; server 22/1: «в этом разговоре»
+=== M3 no lock check in the RPC                unit 18/0; server 22/1: «в этом разговоре»
+=== M4 the lock checks the request only        unit 18/0; server 22/1: «в этом разговоре»
+=== M5 a policy deny keeps upstream text       unit 17/1; server 21/2: настоящие инструменты, мастер
+=== M6 configuration policy text unknown       unit 17/1; server 20/3: «в этом разговоре», настоящие инструменты, мастер
+=== M7 policy metadata is denied               unit 17/1; server 21/2: настоящие инструменты, мастер
+=== M8 the lock reads a rule deny too          unit 17/1; server 23/0
+```
+
+Повтор всех мутаций на `445c8a3af2` (случай «в этом разговоре» на пять видов) — те же числа и те же красные случаи.
+Что политика, а не что-то иное, запрещает в случае «каждый вид и режим», держит пара «с политикой / без политики» в
+самом случае.
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `a86dc051ec`, база — отдельное дерево на `6c34ea6ae0` во временном каталоге
+(после прогонов удалено); сначала база, затем итог, в одной очереди (рядом работал другой агент). `server` повторён на
+`445c8a3af2` — 274 pass, 3 skip, 0 fail; остальные пакеты `445c8a3af2` не меняет (только тест `server`).
+
+| Пакет | База `6c34ea6ae0` | Итог `a86dc051ec` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 74 pass, 0 fail | 76 pass (+2: запрет администратора), 0 fail |
+| `server` (`bun test`) | 269 pass, 3 skip, 0 fail | 274 pass (+5: четыре случая B2.6c и мастер), 3 skip, 0 fail |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 451 pass, 9 skip, 0 fail | 451 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | 40 pass, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 455 divergent upstream files       # код 0, как в базе: файлов upstream не менял
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 225 files                             # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck
+✓ No type errors in 1,638 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.6b2; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 225 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+Повтор на `445c8a3af2` с уточнениями раздела: `catalog-check.py` код 0, `apply-identity --check` 0 файлов, `bun run check`
+код 0, `Found 558 warnings and 0 errors`, 39/39 задач (36 из кэша turbo).
+
+### Где решал сам
+
+- **`ManagedPolicy`, а не свой `policy.json`.** Запрет на сервере даёт upstream: хук после правил, плагин защищён от
+  конфига, управляемые утверждения главнее остальных. Свой файл потребовал бы в плагине путей по платформам, разбора,
+  перечитывания и своего хука — это больше кода форка. Цена: администратор пишет действия таблицы, а не виды, и файл
+  называется не `policy.json` (см. «Согласовать»).
+- **Отличаю запрет политики по тексту upstream** (`Blocked by configuration policy`, `Blocked by …'s policy`), а не по
+  месту хука: хуки плагинов SDK стоят раньше политики, и их запрет с собственным текстом (случай B2.6b) остаётся как
+  есть. Если upstream сменит текст, тексты продукта пропадут, но запрет останется — это ловят мутация M6 и серверные
+  случаи с настоящей политикой.
+- **Замок строки — запрет политикой самого запроса или любой строки его вида** с ресурсом строки. Это строже
+  `deniedKinds` (там нужен запрет каждой строки). Запрет одного ресурса внутри строки (`webfetch:https://…/*`,
+  `edit:secret.md`) строку не запирает. Тогда разрешение вида даётся, но запрещённый ресурс остаётся запрещён: хук
+  политики стоит раньше, а разрешение меняет только `ask`.
+- **Ошибка RPC — прежняя `not_grantable`**, без нового кода: объявленные ошибки RPC — контракт этапа C, а клиенту
+  достаточно знать, что разрешить нельзя. Текст называет администратора.
+- **Новое значение признака `permissionRefusal: "policy"`** — по пункту 5 задания (отказ администратора — не отказ
+  пользователя). Без него строка ленты «кто запретил» (ux-spec: настройка, администратор, закрытый контур) не отличила
+  бы администратора от настройки.
+- **В-76 — тест без кода** (см. «Свои навыки»).
+- **Флаг CLI — тест через API**, без файлов `packages/cli`: их правит B2.7a4.
+- **Строку модели о видах, которые запретил администратор, не добавлял.** Политика инструменты не прячет: модель их видит,
+  вызывает и получает текст `LOGINOM_POLICY_DENIED`, ход идёт дальше. Задание такой строки не просит.
+
+### Согласовать с владельцем
+
+- **Файл политики администратора в B — `loginom-ai-agent.json` системного каталога (`policies`), а не `policy.json`.**
+  ux-spec и прототип называют `policy.json` (`C:\ProgramData\Loginom AI Agent\policy.json`). На Windows и macOS
+  различаются и каталоги: `loginom-ai-agent` (B1.3b) и `Loginom AI Agent` (0.4). Схема — действия таблицы B2.6a, а не
+  виды. Решить в этапе F вместе с полной схемой.
+- **Ошибка в файле политики (В-33) не обработана: политика пропадает молча.** Конфиг, который не разобрался, ядро
+  пропускает с предупреждением в журнале службы (`parseInfo`, по коду): служба работает, но без запретов
+  администратора. В-33 велит работать в режиме «Только этот компьютер» — это режим сети, этап F.
+- **Новые контракты:** значение `permissionRefusal: "policy"`; отказ RPC «в этом разговоре» для вида с замком —
+  `not_grantable`; текст `LOGINOM_POLICY_DENIED` для модели (проверить на настоящей модели, этап F).
+- **Замки «Спрашивать» и «Разрешено»** (строка с замком не на «Запрещено») `ManagedPolicy` не выражает — этап F.
+- **В-76 через `skill.use` `*`** выключает и навыки OpenCode `opencode`, `report`, `browser`. Отличить «свои» по
+  происхождению политика не умеет.
+- **`pending` CAT-05** — B2.6 можно снять, если владелец примет B2.6c; оставил как было.
+
+### Найдено, не чинил
+
+- `skill.use` с `deny` на встроенный навык продукта не действует: преобразование навыков продукта идёт после политики и
+  добавляет проверенный каталог заново (по коду; тест В-76 видит это для `*`).
+- Строка модели `LOGINOM_PERMISSIONS_DENIED` (B2.6b2) читает только правила и видов, запрещённых администратором, не
+  называет.
+- `policies` конфига пользователя или проекта с `deny` дают тот же текст `Blocked by configuration policy`, и продукт
+  скажет «запрещено политикой администратора». Они только добавляют запреты; снять управляемый запрет не могут
+  (тест — конфиг проекта с `allow`).
+- Если политику изменить, пока вопрос открыт, ответ «один раз» его всё равно разрешит: решение принято при вопросе
+  (поведение OpenCode). RPC «в этом разговоре» в этом случае откажет — он проверяет и сам запрос.
+- Замок строки в RPC — удобство, а не граница доверия. Клиент может разрешить незапрещённую соседнюю строку правилом
+  сессии. Если правило сессии само запрещает строку, которую запретил администратор, проверка видит запрет правилом без
+  текста, и замок не срабатывает (по коду). Запрет администратора в обоих случаях держит хук политики.
+- `provider.use` и `skill.use` применяются при сборке списков, а `tool.use` — при каждом вопросе. Запрещённый политикой
+  инструмент остаётся предложен модели (`whollyDisabled` смотрит только правила).
+
+### Не проверено
+
+- **CLI с `--dangerously-skip-permissions`** не запускал: тест повторяет через API его ответ `once` на каждый вопрос.
+  Прогон самого флага — B2.7 (`run` сейчас правит B2.7a4).
+- Сохранённое `always` и расписание под политикой — по коду, тестом не проверены.
+- Изменение файла политики на работающей службе (наблюдение системного каталога) и MDM на macOS — по коду.
+- Настоящая модель: объясняет ли она отказ по тексту `LOGINOM_POLICY_DENIED`.
+- Кнопки и замки в окне (этап C), Desktop, установленная сборка, настоящий системный каталог `/etc/loginom-ai-agent`
+  (в тестах — каталог случая), Windows и macOS.
+- `dashboard_publish`, `dashboard_delete` (B2.9) и выгрузки под политикой — только через API; инструменты MCP — не
+  проверял.

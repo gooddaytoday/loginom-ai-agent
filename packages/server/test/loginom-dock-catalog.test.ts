@@ -3,6 +3,7 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Config } from "@opencode/core/config"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
@@ -20,7 +21,7 @@ import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServiceHost } from "../../loginom-agent/src/host"
-import { declinedText, deniedKindsText, deniedText, table } from "../../loginom-agent/src/permissions"
+import { declinedText, deniedKindsText, deniedText, policyDeniedText, table } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
@@ -50,11 +51,13 @@ const tool = (name: string, properties: Record<string, unknown>) => ({
 // The value of a failed call's result as the model reads it (`toSessionError`).
 const failure = Schema.decodeUnknownSync(Schema.Struct({ error: Schema.Struct({ message: Schema.String }) }))
 
-// `config` is the product config as the settings write it (B2.6b: «Разрешения» as `permissions` rules).
+// `config` is the product config as the settings write it (B2.6b: «Разрешения» as `permissions` rules); `policies` are
+// the administrator's managed policy in the product's system config directory (B2.6c), here a directory of the case.
 const boot = (
   host: Host,
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
   config?: Record<string, unknown>,
+  policies?: readonly Record<string, unknown>[],
 ) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-dock-")).path
@@ -74,6 +77,7 @@ const boot = (
         path.join(resources, "resource-manifest.json"),
         JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
       )
+      if (policies) await Bun.write(path.join(global, "system", "loginom-ai-agent.json"), JSON.stringify({ policies }))
     })
     yield* Effect.acquireRelease(
       Effect.sync(() => {
@@ -129,6 +133,18 @@ const boot = (
           SessionRunnerModel.node.replace(
             Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
           ),
+          ...(policies
+            ? [
+                Config.node.replace(
+                  Config.configured({
+                    project: false,
+                    claude: false,
+                    ...(config ? { content: JSON.stringify(config) } : {}),
+                    system: path.join(global, "system"),
+                  }),
+                ),
+              ]
+            : []),
         ],
       ).pipe(Layer.provide(HttpServer.layerServices)),
     )
@@ -926,7 +942,7 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
   )
 
   it.live(
-    "a deny that is not the user's keeps its own text, as the administrator's will (B2.6c)",
+    "a deny of another hook that is not the user's keeps its own text",
     () =>
       Effect.gen(function* () {
         const host = saving()
@@ -950,6 +966,48 @@ describe("loginom.product refusals that do not end the turn (B2.6b, В-75)", () 
           ),
         ).toEqual([undefined])
         expect((yield* test.answers(id)).at(-1)).toEqual({ text: "end", finish: "stop" })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the administrator's deny of saving wins in the wizard over the client's session rules; the model is told who denied it and the turn goes on (B2.6c)",
+    () =>
+      Effect.gen(function* () {
+        const host = saving()
+        // The managed policy denies both entries the wizard's model calls; the client's rules allow everything.
+        const test = yield* boot(host, undefined, undefined, [
+          { action: "tool.use", resource: "loginom_dock_action_run:*", effect: "deny" },
+          { action: "tool.use", resource: "loginom_dock_prepare:local_package", effect: "deny" },
+        ])
+        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "Демо.lgp"), "LGP package bytes"))
+        const id = yield* test.create("save denied by the administrator", true)
+        yield* test.sessions.setPermissions({
+          sessionID: id,
+          permissions: [{ action: "*", resource: "*", effect: "allow" }],
+        })
+        yield* test.wizard(id, script(save, upload, { text: "end" }))
+        // The policy hides nothing: the model is offered the save and calls it.
+        expect(loginom((yield* test.requests(id))[0])).toContain("loginom_dock_action_run")
+        const said = [
+          policyDeniedText({ action: "loginom_dock_action_run", kind: "save" }),
+          policyDeniedText({ action: "loginom_dock_prepare", kind: "save" }),
+        ]
+        expect(
+          (yield* test.calls(id)).map((part) => (part.state.status === "error" ? part.state.error : part.state.status)),
+        ).toEqual(said.map((message) => ({ type: "tool.execution", message })))
+        expect(host.requests("call")).toEqual([])
+        expect(yield* test.told(id)).toEqual(said)
+        expect(
+          (yield* test.calls(id)).map((part) =>
+            refusalOf(part.state.status === "error" ? part.state.metadata : undefined),
+          ),
+        ).toEqual(["policy", "policy"])
+        expect(yield* test.answers(id)).toEqual([
+          { text: "", finish: "tool-calls" },
+          { text: "", finish: "tool-calls" },
+          { text: "end", finish: "stop" },
+        ])
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
