@@ -174,8 +174,9 @@ test("a 0.4 CLI profile works in place: its service brings the sessions and the 
     "---\nname: sales-summary\ndescription: Summarize the monthly sales report.\n---\n\nGroup the rows by region.\n",
   )
   await connectionStore(path.join(loginom, "connection"))
-  // The inherited config directory and database of isolatedEnv do not apply: the profile replaces them.
-  const env = isolatedEnv(root, { LOGINOM_AI_AGENT_CLI_PROFILE: profile })
+  // Nothing names the profile, as for a user who upgrades: the CLI finds the default one of its channel. The inherited
+  // config directory and database of isolatedEnv do not apply: the profile replaces them.
+  const env = isolatedEnv(root, { XDG_CONFIG_HOME: path.join(root, "config") })
   // The profile's service port is pinned in its service config; the derived one is fixed per root.
   const applied: NodeJS.ProcessEnv = { ...env }
   CliProfile.apply(applied)

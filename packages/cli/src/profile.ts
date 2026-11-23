@@ -35,7 +35,7 @@ const decodeOwner = Schema.decodeUnknownOption(
  * or the default profile of the channel. Fails with a `PROFILE_*` code when the root cannot be a profile.
  */
 export function apply(env: NodeJS.ProcessEnv = process.env) {
-  const paths = open(cliProfile({ channel, root: env.LOGINOM_AI_AGENT_CLI_PROFILE }).root)
+  const paths = open(cliProfile({ channel, root: env.LOGINOM_AI_AGENT_CLI_PROFILE, env }).root)
   const service = cliProfileService(paths.root, channel)
   // A CLI started from a Desktop terminal or a service's tool inherits their settings (B1.3a). Each one is replaced, not
   // kept when present, so it can neither redirect the profile's writes, nor supply its configuration, nor pick its service.
