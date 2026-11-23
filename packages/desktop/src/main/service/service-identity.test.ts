@@ -9,7 +9,9 @@ import path from "node:path"
 // channel writes under that identity, and hands the service the identity, the port and the application version. The
 // module reads its build constant, so each case runs in a fresh process; without a build constant the channel is dev.
 const version = "2.3.0-test"
+
 const cli = path.resolve(import.meta.dir, "../../../../cli")
+
 const cleanup: Array<() => Promise<unknown>> = []
 
 afterEach(async () => {
@@ -21,6 +23,7 @@ describe("service-identity", () => {
   // channel is `latest`. The development window (`script/dev.ts`, channel local) runs the CLI from source.
   test("each channel has its own port, and the CLI under Desktop's environment uses Desktop's file and port", async () => {
     const root = await temporary("desktop-service-channel-")
+
     const channels = [
       { desktop: "prod", cli: "latest", port: 28288, directory: "loginom-ai-agent" },
       { desktop: "beta", cli: "beta", port: 28289, directory: "loginom-ai-agent-beta" },
@@ -34,6 +37,7 @@ describe("service-identity", () => {
           LOGINOM_AI_AGENT_CHANNEL: channel.desktop,
           XDG_STATE_HOME: path.join(root, "state"),
         })
+
         return { own, cli: await cliService(root, channel.cli, own.env) }
       }),
     )
@@ -41,6 +45,7 @@ describe("service-identity", () => {
     expect(found).toEqual(
       channels.map((channel) => {
         const file = path.join(root, "state", channel.directory, "service-desktop.json")
+
         return {
           own: {
             file,
@@ -62,6 +67,7 @@ describe("service-identity", () => {
   test("finds only its own channel's service, never another live registration with the same version", async () => {
     const root = await temporary("desktop-service-foreign-")
     const directories = ["loginom-ai-agent", "loginom-ai-agent-beta", "loginom-ai-agent-dev"]
+
     const foreign = [
       // OpenCode on the same machine, a product service without an identity, a CLI profile's service.
       path.join("opencode", "service.json"),
@@ -70,6 +76,7 @@ describe("service-identity", () => {
         path.join(directory, "service-cli-0123abcd.json"),
       ]),
     ]
+
     const own = directories.map((directory) => path.join(directory, "service-desktop.json"))
     const services = new Map([...foreign, ...own].map((file, index) => [file, fakeService(1000 + index)]))
     await Promise.all(
@@ -78,11 +85,13 @@ describe("service-identity", () => {
         await fs.writeFile(path.join(root, file), JSON.stringify(service))
       }),
     )
+
     const files = await Promise.all(
       ["prod", "beta", "dev"].map(
         async (channel) => (await desktop({ LOGINOM_AI_AGENT_CHANNEL: channel, XDG_STATE_HOME: root })).file,
       ),
     )
+
     const discover = () => Promise.all(files.map(async (file) => (await Service.discover({ version, file }))?.url))
 
     // Every planted registration answers with a matching version: whatever file a channel looked at, it would adopt.
@@ -118,15 +127,18 @@ describe("service-identity", () => {
 async function temporary(prefix: string) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
   cleanup.push(() => fs.rm(root, { recursive: true, force: true }))
+
   return root
 }
 
 async function desktop(env: Record<string, string>) {
   const home = await temporary("desktop-service-identity-home-")
+
   const script = `
     const { serviceEnvironment, serviceFile } = await import("./service-identity")
     console.log(JSON.stringify({ file: serviceFile(), env: serviceEnvironment(${JSON.stringify(version)}) }))
   `
+
   const stdout = await output([process.execPath, "-e", script], import.meta.dir, {
     PATH: process.env.PATH,
     HOME: home,
@@ -134,6 +146,7 @@ async function desktop(env: Record<string, string>) {
     ...env,
   })
 
+  // SAFETY: the script above prints exactly this shape.
   return JSON.parse(stdout) as { file: string; env: Record<string, string> }
 }
 
@@ -216,6 +229,8 @@ function fakeService(pid: number) {
         ? Response.json({ version, pid })
         : new Response("not found", { status: 404 }),
   })
+
   cleanup.push(() => server.stop(true))
+
   return { id: `service-${pid}`, version, url: server.url.origin, pid, password: `secret-${pid}` }
 }

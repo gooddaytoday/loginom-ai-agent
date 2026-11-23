@@ -15,6 +15,7 @@ export const directory = productSlug(channel)
 // an identity, outside the CLI profiles' 0x6000-0x6bff (`cliProfileService` in packages/product) and outside every port
 // IANA or common software lists (journal B4.9). A foreign program on the port stops the service with the CLI's error.
 const identity = "desktop"
+
 const port = { prod: 0x6e80, beta: 0x6e81, dev: 0x6e82 }[channel]
 
 // Read at call time: the isolated development server moves XDG_STATE_HOME before it asks.
