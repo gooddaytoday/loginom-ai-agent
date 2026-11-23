@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { OpenCode, type EventSubscribeOutput } from "@opencode/client/promise"
+import { runNonInteractivePrompt } from "../../src/run/noninteractive"
 import { RunProduct } from "../../src/run/product"
 import { Standalone } from "../../src/standalone"
 
@@ -368,5 +370,119 @@ describe("flags of the product run", () => {
     expect(Standalone.forward(["session", "list", "--dir", "x"], "/w")).toEqual({
       args: ["session", "list", "--dir", "x"],
     })
+  })
+})
+
+// A subagent's question is this run's too (0.4 followed the run's child sessions). Its tool calls are not in this
+// stream, so the declined request itself fails the run. The server is replaced, as in `noninteractive.test.ts`.
+describe("the run of the product", () => {
+  afterEach(() => {
+    mock.restore()
+    delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
+    process.exitCode = 0
+  })
+
+  test("a subagent's permission request the run declines ends it with CLI_PERMISSION_REJECTED", async () => {
+    process.env.LOGINOM_AI_AGENT_CLI_ROOT = "/profile"
+    const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const values: EventSubscribeOutput[] = [{ id: "evt_connected", type: "server.connected", data: {} }]
+    const settled = Promise.withResolvers<void>()
+    const pushed = { wake: () => {} }
+    const stream = (async function* () {
+      while (true) {
+        const value = values.shift()
+        if (!value) {
+          await new Promise<void>((resolve) => (pushed.wake = resolve))
+          continue
+        }
+        if (value.type === "session.execution.succeeded") setTimeout(settled.resolve, 0)
+        yield value
+      }
+    })()
+    const replies: string[] = []
+    spyOn(sdk.event, "subscribe").mockImplementation((() => stream) as typeof sdk.event.subscribe)
+    spyOn(sdk.permission, "list").mockImplementation(() => Promise.resolve([]) as never)
+    spyOn(sdk.session.form, "list").mockImplementation(() => Promise.resolve([]) as never)
+    spyOn(sdk.permission, "reply").mockImplementation((request) => {
+      replies.push(`${request.sessionID} ${request.decision}`)
+      return Promise.resolve(undefined) as never
+    })
+    spyOn(sdk.session, "get").mockImplementation(
+      ({ sessionID }) =>
+        Promise.resolve({ id: sessionID, parentID: sessionID === "ses_child" ? "ses_1" : undefined }) as never,
+    )
+    spyOn(sdk.experimental.session, "wait").mockImplementation(() => settled.promise)
+    spyOn(sdk.experimental.job, "list").mockImplementation((async () => []) as never)
+    spyOn(sdk.session.inbox, "list").mockImplementation((async () => []) as never)
+    spyOn(sdk.session, "active").mockImplementation((async () => ({})) as never)
+    const prompted = { id: "msg_prompt" }
+    spyOn(sdk.message, "list").mockImplementation(
+      () =>
+        Promise.resolve({
+          data: [
+            { id: "msg_idle", type: "idle", outcome: "succeeded", time: { created: 5 } },
+            { id: prompted.id, type: "user", text: "hello", time: { created: 1 } },
+          ],
+          cursor: {},
+        }) as never,
+    )
+    spyOn(sdk.session, "prompt").mockImplementation((request) => {
+      prompted.id = request.id ?? prompted.id
+      values.push(
+        {
+          id: "evt_delivered",
+          created: 0,
+          type: "session.inbox.delivered",
+          durable: { aggregateID: "ses_1", seq: 0, version: 1 },
+          data: { sessionID: "ses_1", inboxID: prompted.id },
+        },
+        {
+          id: "evt_asked",
+          created: 1,
+          type: "permission.asked",
+          data: { id: "per_1", sessionID: "ses_child", action: "edit", resources: ["a.txt"] },
+        },
+        {
+          id: "evt_succeeded",
+          created: 2,
+          type: "session.execution.succeeded",
+          durable: { aggregateID: "ses_1", seq: 1, version: 1 },
+          data: { sessionID: "ses_1" },
+        },
+      )
+      pushed.wake()
+      return Promise.resolve({ id: prompted.id, sessionID: "ses_1", time: { created: 1 } }) as never
+    })
+    const stdout: string[] = []
+    spyOn(process.stdout, "write").mockImplementation((chunk) => stdout.push(String(chunk)) > 0)
+    spyOn(process.stderr, "write").mockImplementation(() => true)
+    await runNonInteractivePrompt({
+      client: sdk,
+      sessionID: "ses_1",
+      location: { directory: "/work" },
+      message: "hello",
+      files: [],
+      thinking: false,
+      format: "json",
+      auto: false,
+      standalone: false,
+      signal: new AbortController().signal,
+      renderTool: () => Promise.resolve(),
+      renderToolError: () => Promise.resolve(),
+    })
+    const events = stdout
+      .join("")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    const exit = process.exitCode
+    mock.restore()
+    expect(replies).toEqual(["ses_child reject"])
+    expect(events.map((event) => event.status?.type ?? event.error?.name)).toEqual([
+      "busy",
+      "idle",
+      "CLI_PERMISSION_REJECTED",
+    ])
+    expect(exit).toBe(1)
   })
 })
