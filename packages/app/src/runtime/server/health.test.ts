@@ -42,7 +42,7 @@ describe("checkServerHealth", () => {
 
     expect(await checkServerHealth({ ...server, password }, fetch)).toEqual({ type: "healthy", version: "2.0.0" })
     expect(requests).toEqual([
-      { path: "/api/info", authorization: password ? `Basic ${btoa(`opencode:${password}`)}` : null },
+      { path: "/api/info", authorization: password ? `Basic ${btoa(`loginom-ai-agent:${password}`)}` : null },
     ])
   })
 

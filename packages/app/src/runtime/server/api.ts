@@ -1,9 +1,10 @@
 import { OpenCode, withMediaRefs, type MediaRequestOptions } from "@opencode/client/promise"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { decode64 } from "@/runtime/persistence/base64"
+import { ServerUsername } from "@opencode/schema/server-username"
 
 export function authTokenFromCredentials(input: { password: string }) {
-  return btoa(`opencode:${input.password}`)
+  return btoa(`${ServerUsername.fallback}:${input.password}`)
 }
 
 export function authFromToken(token: string | null) {

@@ -15,6 +15,7 @@ import {
   Scope,
   Stream,
 } from "effect"
+import { ServerUsername } from "@opencode/schema/server-username"
 import { HttpClient } from "effect/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { SshConfig, SshHttp, SshStart, SshState } from "./contract"
@@ -335,7 +336,9 @@ const checkHealth = Effect.fn("Ssh.checkHealth")(function* (http: SshHttp) {
 
   return yield* client
     .get(`${http.url}/api/info`, {
-      headers: { authorization: `Basic ${Buffer.from(`opencode:${http.password}`).toString("base64")}` },
+      headers: {
+        authorization: `Basic ${Buffer.from(`${ServerUsername.fallback}:${http.password}`).toString("base64")}`,
+      },
     })
     .pipe(
       Effect.timeout(2000),

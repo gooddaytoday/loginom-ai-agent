@@ -13,7 +13,7 @@ test.each([
 
 test("authTokenFromCredentials ignores usernames in legacy saved credentials", () => {
   const credentials = { username: "legacy", password: "secret" }
-  expect(authTokenFromCredentials(credentials)).toBe(btoa("opencode:secret"))
+  expect(authTokenFromCredentials(credentials)).toBe(btoa("loginom-ai-agent:secret"))
 })
 
 test("fileStreamUrl never puts a credential in a media URL", () => {
@@ -53,11 +53,11 @@ test("only message and inbox reads ask for media refs, so other cross-origin req
       request.headers.get("authorization"),
     ]),
   ).toEqual([
-    ["/api/session/ses_1/message", "experimental-media-uri", `Basic ${btoa("opencode:secret")}`],
-    ["/api/session/ses_1/message", null, `Basic ${btoa("opencode:secret")}`],
-    ["/api/session/ses_1/message/msg_1", "experimental-media-uri", `Basic ${btoa("opencode:secret")}`],
-    ["/api/session/ses_1/inbox", "experimental-media-uri", `Basic ${btoa("opencode:secret")}`],
-    ["/api/session", null, `Basic ${btoa("opencode:secret")}`],
+    ["/api/session/ses_1/message", "experimental-media-uri", `Basic ${btoa("loginom-ai-agent:secret")}`],
+    ["/api/session/ses_1/message", null, `Basic ${btoa("loginom-ai-agent:secret")}`],
+    ["/api/session/ses_1/message/msg_1", "experimental-media-uri", `Basic ${btoa("loginom-ai-agent:secret")}`],
+    ["/api/session/ses_1/inbox", "experimental-media-uri", `Basic ${btoa("loginom-ai-agent:secret")}`],
+    ["/api/session", null, `Basic ${btoa("loginom-ai-agent:secret")}`],
   ])
   expect(requests[1].headers.get("x-trace")).toBe("1")
   expect(requests[3].headers.get("x-trace")).toBe("1")
