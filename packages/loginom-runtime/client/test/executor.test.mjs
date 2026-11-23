@@ -1159,16 +1159,44 @@ test('REST reference Save normalizes once after reopen: '+action+' '+modified,as
  validateActionParameters(actions.get(action).output_schema,outcome.output);
 });
 
-test('REST normalization waits until the operation deadline without another Save or reopen',async()=>{
- const page=await restSavePage([true,true]);
- const deadline=page.clock+1000;
+for(const budget of [60000,7000,1000])
+test('REST normalization bounds dirty-state polling and reserves continuation time: '+budget,async()=>{
+ const page=await restSavePage([true,true]),deadline=page.clock+budget;
+ const evaluate=page.evaluate.bind(page);let started;
+ page.evaluate=async(fn,arg)=>{if(arg?.cleanDeadline!==undefined)started=page.clock;return evaluate(fn,arg);};
  const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
- assert.equal(page.clock,deadline);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.ok(page.clock-started<=5000,'dirty-state polling must stop within five seconds');
+ assert.ok(page.clock<=Math.max(started,deadline-5000),'polling must leave the continuation reserve intact');
  assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
  assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
- assert.equal(page.saveWrites,2);assert.ok(page.modifiedReads>2);
+ assert.equal(page.saveWrites,2);
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
- assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+ assert.equal(event.modified_after,true);
+});
+
+test('REST normalization keeps continuations when the last allowed clean read completes at its cutoff',async()=>{
+ const page=await restSavePage([true,true]),deadline=page.clock+20000;
+ const evaluate=page.evaluate.bind(page);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ page.evaluate=async(fn,arg)=>{
+  if(arg?.cleanDeadline!==undefined){
+   session.IsPackageModified=async()=>{
+    page.modifiedReads++;
+    if(page.clock<arg.cleanDeadline-100)return true;
+    // A server reply may arrive at the exact end of the polling window.
+    await page.waitForTimeout(arg.cleanDeadline-page.clock);return false;
+   };
+  }
+  return evaluate(fn,arg);
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.ok(deadline-page.clock>=5000,'confirmed Save must leave time for continuation binding');
+ assert.equal(outcome.output.workflow_continuations.length,1);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,false);
+ assert.equal(page.saveWrites,2);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
 });
 
 test('REST normalization stops if the native session changes between modified-state reads',async()=>{

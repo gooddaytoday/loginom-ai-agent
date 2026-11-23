@@ -1908,7 +1908,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await waitForNoMask(60000);
         transientDialog = false;
         ensureDeadline();
-        modifiedAfter = await read(deadline);
+        // Bound the transient modified-flag race and keep five seconds for
+        // verified continuation binding after a confirmed Save.
+        modifiedAfter = await read(Math.min(deadline - 5000, Date.now() + 5000));
       }
       if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
       ensureDeadline();
