@@ -12,7 +12,7 @@
 
 ## Общие ограничения
 
-- Ветка: `recovery-port`, база `ae89c43b57b98decde1ef287e01dc501d0da495f`; донор `1ab348a91d7c8ae180744293ff746f859d49145a`.
+- База `recovery-port` — `c5e652bfa3da10afbb6850b4adafdbde696a8c5c`. Донор — `1ab348a91d7c8ae180744293ff746f859d49145a`.
 - Оцениваемый агент: `openai/gpt-6.1-terra`, reasoning `high`.
 - На каждую версию: **146 кейсов × 3 раунда = 438 измерений**; вместе **876**.
 - Судья: `gpt-6-sol/xhigh`; порог 70; judge timeout 300000 мс. Узловые code-oracle проверки сохраняются.
@@ -256,7 +256,7 @@ LOGINOM_AI_AGENT_CHANNEL=prod LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 bun script/bui
 - [ ] Получить авторитетный сохранённый корпус и original pins из материалов LAB-901/LAB-1747. Исторический source SHA `29ea34e27b8f96ed27b744f639c9f48933f52443` — provenance, локального Git object сейчас нет; он не заменяет доступ к файлам. Материализовать snapshot внутри clean H в ignored `evals/.bundle/lab901-corpus/tasks`, потому что campaign-preflight требует corpus внутри harnessRoot. Effective pins меняют только пути групп; hashes prompts/inputs/references/rubrics/oracle и timeouts сверяются с originals до freeze. При отсутствии архива остановить этот шаг, не подменять корпус текущим HEAD.
 - [ ] Сверить состав: 3 ordinary, 65 analytic, 33 detailed, 33 business, 10 node, 2 local-path. В каждом раунде порядок этих групп и отсортированных ID одинаков; сохранить оригинальные task timeouts, включая 1800000 мс для 66 detailed/business. Разделить product source SHA, harness SHA и corpus source SHA: `experimentPins.sourceSha` в текущем campaign-preflight используется для корпуса, а не для CLI; продуктовую ревизию подтверждает CLI manifest.
 - [ ] Установить проверенный model catalog с Terra; сохранить hash, реально применённые `EVAL_AGENT_MODEL=openai/gpt-6.1-terra`, `EVAL_AGENT_VARIANT=high`, judge и одинаковый service tier. Не подменять отсутствующую модель похожей. По архивной истории сверить фактические model/variant.
-- [ ] Провести по одному модельному построению каждого сценария ниже на B и C. Порядок и инъекция одинаковы, каждому — отдельный чистый профиль/назначенный endpoint. Доступы — из Bitwarden через настроенный `scripts/codex/with-access.py` основного checkout; в замороженной базе этого файла ещё нет. До live проверить доступность обёртки, private карты и unlocked vault. Не читать корневой `local.env`, не делать fallback на env и не передавать эти доступы оцениваемому агенту/судье.
+- [ ] Провести по одному модельному построению каждого сценария ниже на B и C. Порядок и инъекция одинаковы, каждому — отдельный чистый профиль/назначенный endpoint. Получить доступы из Bitwarden через проектную обёртку `scripts/codex/with-access.py` в checkout с настройкой из `2247c34164`. В новой базе этого файла нет. До live проверить доступность обёртки, private карты и unlocked vault. Не читать корневой `local.env`, не делать fallback на env и не передавать эти доступы оцениваемому агенту/судье.
 
 | Проба | Сбой / наблюдаемый результат |
 | --- | --- |
@@ -348,5 +348,7 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 - `recovery-port` создана от `ae89c43b57`; согласованная спецификация прошла независимое ревью.
 - План прошёл независимое ревью runtime/agent и evals; устранены пробелы producer metadata, общих acceptance-точек и получения frozen corpus.
 - 2026-11-17: уточнены pre-truncation evidence, независимые оси исходов и target/graph регрессии по переданному исследованию; независимое ревью — GO. 11 этапов, 12 предварительных попыток и 876 основных измерений сохранены.
+- 2026-11-23: три коммита документации перенесены с `46dc320c47` на `loginom@c5e652bfa3` после `v0.4.0`. `range-diff` подтвердил сохранность правок.
+- Перед реализацией S0–S6 заново проверить применимость решений к новой базе. Изменились executor, определение целевого узла и экспорт. Исторические наблюдения относятся к указанным в них ревизиям.
 - S0–S10 ещё не выполнялись. Продуктовый код и eval-результаты этой работой не изменены.
 - Следующий шаг: по поручению создать карточку S0 с SHA итогового коммита этого плана и владельцем записи в ветку.
