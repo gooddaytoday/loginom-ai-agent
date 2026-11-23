@@ -56,7 +56,9 @@
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",
-        "packages/cli/test/shutdown-deadline.test.ts", "packages/cli/test/fixture/shutdown-hang.ts"
+        "packages/cli/test/shutdown-deadline.test.ts", "packages/cli/test/fixture/shutdown-hang.ts",
+        "packages/desktop/src/main/service/background-service-machine.ts",
+        "packages/desktop/src/main/service/background-service-machine.test.ts"
       ]
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },

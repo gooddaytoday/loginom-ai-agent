@@ -12,6 +12,10 @@ const version = "2.3.0-test"
 
 const cli = path.resolve(import.meta.dir, "../../../../cli")
 
+// The client tests' service: `soft` registers itself, records a stop request in `<file>.soft-stop` and a signal in
+// `<file>.signal`, and exits on either.
+const fixture = path.resolve(import.meta.dir, "../../../../client/test/fixture/service.ts")
+
 const cleanup: Array<() => Promise<unknown>> = []
 
 afterEach(async () => {
@@ -101,6 +105,44 @@ describe("service-identity", () => {
     expect(await discover()).toEqual([undefined, undefined, undefined])
   })
 
+  // B4.10, decision В-87: the app stops its own service when it quits, with the stop request of B2.3b, which is the only
+  // way the service closes its plugins and Loginom runtimes on Windows. Every other registration and process stays.
+  test("a quit stops only its own channel's service, by request and not by signal", async () => {
+    const root = await temporary("desktop-service-stop-")
+
+    const files = [
+      path.join("loginom-ai-agent-dev", "service-desktop.json"),
+      path.join("opencode", "service.json"),
+      // The client's `fallback()`, used when a caller names no file.
+      path.join("loginom-ai-agent", "service.json"),
+      path.join("loginom-ai-agent-dev", "service.json"),
+      path.join("loginom-ai-agent-dev", "service-cli-0123abcd.json"),
+      path.join("loginom-ai-agent", "service-desktop.json"),
+      path.join("loginom-ai-agent-beta", "service-desktop.json"),
+    ].map((file) => path.join(root, file))
+
+    const services = await Promise.all(files.map(liveService))
+    const registrations = await Promise.all(files.map((file) => fs.readFile(file, "utf8")))
+
+    await desktop({ LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: root }, true)
+
+    const [own, ...foreign] = await Promise.all(
+      services.map(async (service, index) => ({
+        exit: service.exitCode === null ? "running" : { code: await service.exited, signal: service.signalCode },
+        stopRequest: await Bun.file(files[index] + ".soft-stop").exists(),
+        signal: await Bun.file(files[index] + ".signal").exists(),
+        registration: await fs.readFile(files[index], "utf8").catch(() => undefined),
+      })),
+    )
+
+    expect(own).toEqual({ exit: { code: 0, signal: null }, stopRequest: true, signal: false, registration: undefined })
+    expect(foreign).toEqual(
+      registrations
+        .slice(1)
+        .map((registration) => ({ exit: "running", stopRequest: false, signal: false, registration })),
+    )
+  })
+
   // A window started from a CLI profile's terminal or tool inherits what the profile's entry set for its processes
   // (`cli/src/profile.ts`, `cli/src/standalone.ts`). The client starts the service with `{ ...process.env, ...env }`.
   test("a window started from a CLI profile gives its service Desktop's own directories and database", async () => {
@@ -143,12 +185,14 @@ async function temporary(prefix: string) {
   return root
 }
 
-async function desktop(env: Record<string, string>) {
+async function desktop(env: Record<string, string>, quit = false) {
   const home = await temporary("desktop-service-identity-home-")
 
   // `inherited`: this product's variables the window keeps once the module is loaded, which the service inherits.
+  // `quit`: the window first stops its service, as the app does when it quits.
   const script = `
-    const { serviceEnvironment, serviceFile } = await import("./service-identity")
+    const { serviceEnvironment, serviceFile, stopService } = await import("./service-identity")
+    if (${quit}) await stopService()
     const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("LOGINOM_AI_AGENT_")))
     console.log(JSON.stringify({ file: serviceFile(), env: serviceEnvironment(${JSON.stringify(version)}), inherited }))
   `
@@ -239,6 +283,25 @@ async function output(cmd: string[], cwd: string, env: Record<string, string | u
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
 
   return stdout.trim()
+}
+
+async function liveService(file: string) {
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  const service = Bun.spawn([process.execPath, fixture, file, "soft"], { stdout: "ignore", stderr: "ignore" })
+
+  cleanup.push(async () => {
+    service.kill("SIGKILL")
+    await service.exited
+  })
+
+  const deadline = Date.now() + 10_000
+
+  while (!(await Bun.file(file).exists())) {
+    if (service.exitCode !== null || Date.now() > deadline) throw new Error(`The service for ${file} did not register`)
+    await Bun.sleep(10)
+  }
+
+  return service
 }
 
 function fakeService(pid: number) {

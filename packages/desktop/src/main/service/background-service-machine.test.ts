@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Deferred, Effect, Fiber } from "effect"
+import { Shutdown } from "../lifecycle/shutdown"
 import { BackgroundServiceMachine } from "./background-service-machine"
 
 const A = { url: "http://127.0.0.1:4100", password: "a" }
@@ -276,6 +277,55 @@ describe("background service connection", () => {
       r3,
     ])
   })
+
+  // Loginom AI Agent (B4.10): the service stops before the app quits or hands off to an update.
+  test("a stop turns every caller away and drops the attempt in flight; a resume connects again", () => {
+    const [reconnect, opened, again, reloaded] = [reply(), reply(), reply(), reply()]
+    const reconnecting = replay([{ type: "reconnect.requested", reply: reconnect }], readyA).state
+
+    const stopped = replay(
+      [
+        { type: "connection.requested", reply: opened },
+        { type: "stop.requested" },
+        // A window whose event stream the stop broke, and a window that reloads, start no service.
+        { type: "reconnect.requested", reply: again },
+        { type: "connection.requested", reply: reloaded },
+        { type: "connect.succeeded", attempt: 2, data: B },
+        { type: "stop.requested" },
+      ],
+      reconnecting,
+    )
+
+    expect(stopped.commands).toEqual([
+      [],
+      [{ type: "reject", replies: [reconnect, opened], error: expect.any(Error) }],
+      [{ type: "reject", replies: [again], error: expect.any(Error) }],
+      [{ type: "reject", replies: [reloaded], error: expect.any(Error) }],
+      [],
+      [],
+    ])
+    expect(stopped.state).toEqual({ status: "stopped", attempt: 2, last: A })
+
+    const resumed = replay(
+      [
+        { type: "resume.requested" },
+        { type: "connect.succeeded", attempt: 2, data: C },
+        { type: "connect.succeeded", attempt: 3, data: B },
+      ],
+      stopped.state,
+    )
+
+    expect(resumed.commands).toEqual([
+      [{ type: "connect", attempt: 3, mode: "reconnect" }],
+      [],
+      [{ type: "publish", data: B }],
+    ])
+
+    // Before any service was reached, the resume is a first connect.
+    const early = replay([{ type: "stop.requested" }, { type: "resume.requested" }])
+
+    expect(early.commands.at(-1)).toEqual([{ type: "connect", attempt: 2, mode: "initial" }])
+  })
 })
 
 describe("background service driver", () => {
@@ -298,7 +348,7 @@ describe("background service driver", () => {
 
           return yield* Fiber.join(consumer)
         }),
-      ),
+      ).pipe(Effect.provide(Shutdown.layer)),
     )
 
     expect(result).toEqual(A)
@@ -330,7 +380,7 @@ describe("background service driver", () => {
 
           return { first: first._tag, second: yield* machine.connection, attempts }
         }),
-      ),
+      ).pipe(Effect.provide(Shutdown.layer)),
     )
 
     expect(result).toEqual({ first: "Failure", second: A, attempts: ["initial", "initial"] })
@@ -366,7 +416,7 @@ describe("background service driver", () => {
 
           return { replies: yield* Fiber.joinAll(fibers), attempts, published }
         }),
-      ),
+      ).pipe(Effect.provide(Shutdown.layer)),
     )
 
     expect(result).toEqual({
@@ -400,9 +450,99 @@ describe("background service driver", () => {
 
           return { first, next: yield* machine.connection, published }
         }),
-      ),
+      ).pipe(Effect.provide(Shutdown.layer)),
     )
 
     expect(result).toEqual({ first: A, next: B, published: [A.url, B.url] })
+  })
+
+  // Loginom AI Agent (B4.10): the machine is the app's `Shutdown` participant for its service.
+  test("a quit stops the service once the attempt in flight settles, and no window starts it again", async () => {
+    const result = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const shutdown = yield* Shutdown.Service
+          const gate = yield* Deferred.make<void>()
+          const steps: string[] = []
+          const published: string[] = []
+
+          const machine = yield* BackgroundServiceMachine.make({
+            probe: Effect.succeed(undefined),
+            ensure: (mode) =>
+              Effect.sync(() => steps.push(`ensure ${mode}`)).pipe(
+                Effect.andThen(Deferred.await(gate)),
+                Effect.andThen(Effect.sync(() => steps.push(`settled ${mode}`))),
+                Effect.as(A),
+              ),
+            publish: (data) => published.push(data.url),
+            stop: Effect.sync(() => steps.push("stop")),
+          })
+
+          // The first window waits for a service that is still starting when the app quits. The quit breaks the
+          // window's event stream, and the window asks to reconnect.
+          const opened = yield* Effect.forkChild(machine.connection.pipe(Effect.exit), { startImmediately: true })
+          const quit = yield* Effect.forkChild(shutdown.stop, { startImmediately: true })
+          const reconnect = yield* Effect.forkChild(machine.reconnect.pipe(Effect.exit), { startImmediately: true })
+          yield* Effect.yieldNow
+          const beforeStart = [...steps]
+          yield* Deferred.succeed(gate, undefined)
+          yield* Fiber.join(quit)
+
+          return {
+            opened: (yield* Fiber.join(opened))._tag,
+            reconnect: (yield* Fiber.join(reconnect))._tag,
+            beforeStart,
+            steps,
+            published,
+          }
+        }),
+      ).pipe(Effect.provide(Shutdown.layer)),
+    )
+
+    expect(result).toEqual({
+      opened: "Failure",
+      reconnect: "Failure",
+      beforeStart: ["ensure initial"],
+      steps: ["ensure initial", "settled initial", "stop"],
+      published: [],
+    })
+  })
+
+  test("a failed update handoff starts the service again and moves every window to it", async () => {
+    const result = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const shutdown = yield* Shutdown.Service
+          const moved = yield* Deferred.make<void>()
+          const steps: string[] = []
+          const published: string[] = []
+
+          const machine = yield* BackgroundServiceMachine.make({
+            probe: Effect.succeed(undefined),
+            ensure: (mode) =>
+              Effect.sync(() => steps.push(`ensure ${mode}`)).pipe(Effect.as(mode === "initial" ? A : B)),
+            publish: (data) => {
+              published.push(data.url)
+
+              if (data.url === B.url) Deferred.doneUnsafe(moved, Effect.void)
+            },
+            stop: Effect.sync(() => steps.push("stop")),
+          })
+
+          yield* machine.connection
+          yield* shutdown.stop
+          yield* shutdown.resume
+          yield* Deferred.await(moved)
+
+          return { next: yield* machine.connection, steps, published }
+        }),
+      ).pipe(Effect.provide(Shutdown.layer)),
+    )
+
+    expect(result).toEqual({
+      next: B,
+      steps: ["ensure initial", "stop", "ensure reconnect"],
+      published: [A.url, B.url],
+    })
   })
 })
