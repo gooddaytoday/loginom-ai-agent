@@ -14838,12 +14838,13 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 | Коммит | Что |
 |---|---|
 | `241d45cab9` `feat(server): use loginom-ai-agent as the Basic user of the server and its clients (B2.7a11)` | код, тесты, CAT-12, CAT-13, CAT-09, CAT-02 |
-| следующий | этот раздел; в CAT-12 — копия в `client` (ниже) |
+| `9393f38c54` `docs(upstream-sync): record the server's Basic user loginom-ai-agent (B2.7a11)` | этот раздел; в CAT-12 — копия в `client` (ниже) |
+| следующий | случай пустой переменной — отдельным тестом сервера (один запуск сервера на тест); уточнения раздела |
 
 Файлы кода — восемь: `schema/src/server-username.ts` (+17, файл форка), по строке в upstream — `server/src/auth.ts`,
 `server/src/process.ts`, `client/src/service-probe.ts` (+ копия, 8 строк), `client/src/pty-handoff.ts`,
 `cli/src/services/server-connection.ts`, `cli/src/services/standalone.ts`, `desktop/src/main/service/sidecar-credentials.ts`.
-Тесты и скрипты проверки: три файла форка, 26 тестов upstream, `cli/script/service-smoke.ts`, `scripts/live-profiles/live.mjs`.
+Тесты и скрипты проверки: три новых файла форка, 20 тестов upstream и 6 тестов форка, `cli/script/service-smoke.ts`, `scripts/live-profiles/live.mjs`.
 
 ### Было и стало
 
@@ -14891,7 +14892,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
    закрепление потребовало бы девятого файла (`service-identity.ts`, `serviceEnvironment`).
 5. **Пустое значение — как не заданное** (`||`, не `??`): пустое имя бессмысленно; в 0.4 пустая переменная давала
    пустое имя. Тест — `server/test/basic-user.test.ts`, мутация M12.
-6. **Тесты upstream — на настоящий пользователь, а не через переменную.** 26 файлов тестов upstream шлют настоящему
+6. **Тесты — на настоящий пользователь, а не через переменную.** 26 файлов тестов (20 upstream, 6 форка) шлют настоящему
    серверу или фикстуре `opencode:`; заменил на `loginom-ai-agent:` только в контексте учётных данных (`btoa(`,
    `Buffer.from(`, `username:`). Подстановка `LOGINOM_AI_AGENT_SERVER_USERNAME=opencode` в preload пакетов оставила бы
    upstream нетронутым, но тогда пропущенный клиент со старым литералом проходил бы все тесты. Не менялись:
@@ -14906,7 +14907,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 | Тест | Что проверяет |
 |---|---|
-| `server/test/basic-user.test.ts` «accepts loginom-ai-agent and refuses OpenCode's opencode by default» | `ServerProcess.start` с паролем, запросы `/api/info` по HTTP: без переменной `loginom-ai-agent` — 200, `opencode` — 401; пустая переменная — 200 для `loginom-ai-agent`. Запрос проходит обе проверки: `dispatch` и `ServerAuth.Config` |
+| `server/test/basic-user.test.ts` «accepts loginom-ai-agent and refuses OpenCode's opencode by default» | `ServerProcess.start` с паролем, запросы `/api/info` по HTTP: без переменной `loginom-ai-agent` — 200, `opencode` — 401. Запрос проходит обе проверки: `dispatch` и `ServerAuth.Config` |
+| там же «treats an empty LOGINOM_AI_AGENT_SERVER_USERNAME as unset» | пустая переменная — 200 для `loginom-ai-agent` |
 | там же «takes the user from LOGINOM_AI_AGENT_SERVER_USERNAME» | `alice` — 200, `loginom-ai-agent` и `opencode` — 401 |
 | `cli/test/basic-user.test.ts` «serve and the CLI client use loginom-ai-agent; opencode is refused» | процессы: `src/index.ts serve --port 0` (`isolatedEnv`, пароль, без переменной), `/api/info` с `opencode` — 401, с `loginom-ai-agent` — 200; клиент CLI `session list --format json --server <url>` — код 0, stderr пуст, `[]` |
 | там же «LOGINOM_AI_AGENT_SERVER_USERNAME moves the server and the client that shares it» | `serve` и клиент с `alice`: `alice` — 200, `loginom-ai-agent` — 401, клиент — код 0, `[]` |
@@ -14922,22 +14924,22 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 ### Мутации
 
 `<scratchpad>/b27a11-mutate.sh`: одна замена `perl` в файле кода, тесты пакета, возврат исходного текста из копии;
-после всех прогонов `git status` — только `catalog.md` (правка раздела). Все мутации краснят.
+после всех прогонов `git status` — только `catalog.md` (правка раздела). Все мутации краснят. Серверные (M0–M3, M10, M12) повторены после разделения теста сервера на три.
 
 ```text
-M0  без мутации (контроль)                                        server basic-user: 2 pass / 0 fail
-M1  schema: fallback = "opencode"                                 server basic-user: 1 / 1; cli basic-user: 1 / 1
-M2  server/auth.ts configLayer: username "opencode"               server basic-user: 0 / 2   # dispatch пропустил, API отказал
-M3  server/process.ts dispatch: username "opencode"               server basic-user: 0 / 2
+M0  без мутации (контроль)                                        server basic-user: 3 pass / 0 fail
+M1  schema: fallback = "opencode"                                 server basic-user: 1 / 2; cli basic-user: 1 / 1
+M2  server/auth.ts configLayer: username "opencode"               server basic-user: 0 / 3   # dispatch пропустил, API отказал
+M3  server/process.ts dispatch: username "opencode"               server basic-user: 0 / 3
 M4  client service-probe endpointOf: "opencode"                   client: 266 / 6     # stop … (promise и effect, по 3)
 M5  client pty-handoff: "opencode"                                client: 271 / 1     # passes the prepared handoff to the replacement server
 M6  client копия: "opencode" по умолчанию                         client: 262 / 10    # server-username 3, handoff 1, stop 6
 M7  cli server-connection (--server): "opencode"                  cli basic-user: 0 / 2
 M8  cli standalone: "opencode"                                    cli standalone + cli-standalone: 4 / 5
 M9  desktop sidecar-credentials: "opencode"                       desktop sidecar-credentials.test: 1 / 1
-M10 schema: переменная не читается                                server basic-user: 1 / 1; cli basic-user + standalone: 2 / 1
+M10 schema: переменная не читается                                server basic-user: 2 / 1; cli basic-user + standalone: 2 / 1
 M11 client копия: переменная не читается                          client server-username: 3 / 1
-M12 schema: `??` вместо `||` (пустая переменная — пустое имя)     server basic-user: 1 / 1
+M12 schema: `??` вместо `||` (пустая переменная — пустое имя)     server basic-user: 2 / 1
 ```
 
 M10 в `cli/test/standalone.test.ts` не краснеет и не должен: частный сервер и его владелец оба читают `schema`, и при
@@ -14957,6 +14959,9 @@ M10 в `cli/test/standalone.test.ts` не краснеет и не должен:
 | `desktop` | 577 pass, 4 skip, 0 fail | 577 pass, 4 skip, 0 fail | — |
 | `cli/test/cli-loginom.test.ts` с `LOGINOM_AI_AGENT_TEST_NODE` (Node 24.19.0) и `npm ci --ignore-scripts` клиента `loginom-runtime/client` в обоих деревьях | 14 pass, 0 fail | 14 pass, 0 fail | — |
 
+После разделения теста сервера (следующий коммит) `server/test/basic-user.test.ts` — 3 pass, 0 fail. Охранные тесты
+`packages/product` (`bun test`): база и ветка — 60 pass, 3 fail, те же три в `repo-paths.test.ts` (B5.1, B2.7a).
+
 `bun typecheck` в `schema`, `server`, `client`, `cli`, `desktop` — ошибок нет. `bun run generate` в `packages/client` —
 код 0, сгенерированные файлы не изменились (HttpApi не менялся).
 
@@ -14965,7 +14970,7 @@ $ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
 against a6b15d33daf6: 560 divergent upstream files               # CAT-12: 195, CAT-13: 25, CAT-09: 38, CAT-02: 56
 $ python3 -I scripts/upstream-sync/apply-identity.py --check
 would change: 0 files                                            # код 0
-$ bun run check                                                  # код 0, 52 с; на 241d45cab9 с правкой CAT-12 и этим разделом
+$ bun run check                                                  # код 0; на дереве последнего коммита раздела (код и тесты — как в нём)
 Found 554 warnings and 0 errors.                                 # oxlint на базе — тоже 554
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total
@@ -14985,6 +14990,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   зона B4.11d. Сделать одной задачей после B4.11d: `app` и `gui-plugins` уже зависят от `schema` и могут взять
   `ServerUsername.fallback`; в 0.4 `authTokenFromCredentials` брал имя из токена или `loginom-ai-agent`. Тесты `app`
   (`runtime/server/{api,client,image,health}.test.ts`, `e2e/utils/mock-server.ts`) ждут `opencode:` — их менять вместе.
+- `services/site/src/docs/content/cli/web.mdx:145` — `curl -u opencode:…` в документации сайта upstream; продукт её не
+  поставляет, не менял.
 - `packages/loginom-host/script/skills-acceptance/desktop.mjs:155` строит заголовок из `backend.username`, которого
   `awaitInitialization` на v2 не отдаёт (`SidecarCredentials.ready` — только адрес): прогон 0.4, на v2 не переносился.
 
@@ -14997,5 +15004,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Windows и macOS; WSL и SSH (там ожидается 401 до правки группы выше).
 - Выход в сеть из `serve` в процессном тесте не перехватывал: модель не вызывается (промпта нет), загрузка каталога
   моделей выключена `isolatedEnv` (`LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH`); настоящую модель не вызывал.
+- Служба, которую запустила прежняя сборка `oc2-migration` и которая ещё работает, ответит новой пробе 401. Что тогда
+  делает `ensure` (ответ без версии проба считает молчанием) на занятом постоянном порту, не проверял; после выхода
+  старой службы новая запускается как обычно.
 - Профиль CLI и служба Desktop между собой не соединяются (отдельные регистрации и порты, B4.9), поэтому их общего
   прогона нет.

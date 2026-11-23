@@ -11,6 +11,11 @@ import { ServerProcess } from "../src/process"
 it.live("accepts loginom-ai-agent and refuses OpenCode's opencode by default", () =>
   Effect.gen(function* () {
     expect(yield* statuses(undefined, ["loginom-ai-agent", "opencode"])).toEqual([200, 401])
+  }),
+)
+
+it.live("treats an empty LOGINOM_AI_AGENT_SERVER_USERNAME as unset", () =>
+  Effect.gen(function* () {
     expect(yield* statuses("", ["loginom-ai-agent"])).toEqual([200])
   }),
 )
