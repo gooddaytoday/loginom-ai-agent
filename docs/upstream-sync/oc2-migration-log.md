@@ -15705,7 +15705,9 @@ B2.7b; 0.4 — `loginom-host/src/connection/credentials.ts`, `desktop/src/main/l
 | Коммит | Что |
 |---|---|
 | `5880cb4880` `feat(desktop): move the 0.4 Loginom connection into the service's store before it starts (B4.13)` | четыре файла кода, тест |
-| следующий | этот раздел; CAT-09 в `catalog.md` |
+| `e6564019fe` `docs(upstream-sync): record moving Desktop's 0.4 Loginom connection to its service (B4.13)` | этот раздел; CAT-09 в `catalog.md` |
+| `00b0585f2e` `test(desktop): skip the two credential rows a Windows runner cannot fail (B4.13)` | две строки таблицы не идут на раннере Windows (ниже, «Тесты») |
+| следующий | поправки раздела |
 
 Файлы кода — четыре: `desktop/src/main/loginom/credential-migration.ts` (+103, новый файл форка: перенос),
 `loginom/credentials.ts` (+28, новый файл форка: слой Electron), `desktop.ts` (+2, upstream, CAT-09),
@@ -15813,6 +15815,10 @@ B2.7b; 0.4 — `loginom-host/src/connection/credentials.ts`, `desktop/src/main/l
 | win32 и darwin: `safeStorage` недоступен | `failed` `read` `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` |
 | win32 и darwin: расшифровано «`<пароль>` is not JSON» | `failed` `read` `LOGINOM_STORE_READ_FAILED` |
 | win32 и darwin: DPAPI и Keychain на этом раннере нет | `failed` `write` `LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE` |
+
+Две строки опираются на возможности ОС раннера. На раннере Windows они пропускаются (поле `skip` строки): там у
+хранилища нет проверки прав POSIX, и DPAPI есть. Строка darwin про Keychain идёт везде: в ресурсах фикстуры помощника
+нет. Пропуск добавлен в `00b0585f2e` после мутаций; на Linux набор строк тот же (15 pass, 0 fail).
 
 **«Host службы видит подключение»** — тест в духе B2.7b, только Linux, нужен `LOGINOM_AI_AGENT_TEST_NODE`.
 
@@ -15931,7 +15937,7 @@ against a6b15d33daf6: 586 divergent upstream files              # база — 5
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                            # код 0
 $ oxlint и prettier --check изменённых файлов                    # 0 warnings, чисто
-$ bun run check                                                  # код 0, на 5880cb4880 с этим разделом и CAT-09
+$ bun run check                                                  # код 0, на 5880cb4880 с CAT-09, до этого раздела
 Found 554 warnings and 0 errors.                                 # у файлов задачи предупреждений нет
 @opencode/desktop:typecheck: ✓ No type errors in 3,369 files across 2 projects
  Tasks:    39 successful, 39 total
@@ -15948,7 +15954,8 @@ Found 554 warnings and 0 errors.                                 # у файло
 - **Два файла, а не один.**
   - Bun не загружает именованный импорт `electron` (`Export named 'app' not found`, проба).
   - Поэтому перенос — чистая функция в `credential-migration.ts`. Её параметры — платформа, `safeStorage`, userData и
-    ресурсы, без параметров только для тестов.
+    ресурсы. Платформа — намеренный шов по образцу фабрик кодеков (`credentials(platform, …)`,
+    `cliCredentials(platform, …)`): в производстве это всегда `process.platform`, а таблица подставляет win32 и darwin.
   - `credentials.ts` связывает её с Electron и журналом.
 - **«Один раз» — по наличию записи у службы, а не по сравнению поколений.**
   - Поколения двух независимых хранилищ — не порядок во времени.
