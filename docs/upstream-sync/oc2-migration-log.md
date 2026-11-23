@@ -11676,9 +11676,13 @@ $ grep -n 'opencode\.ai' src/runtime/i18n/en.ts src/runtime/i18n/ru.ts
 |---|---|
 | `components-lab/dialog-story-runtime.tsx:478` | подставной ответ сервера для историй (`*.standalone.stories.tsx`), в приложение не входит |
 | `providers/connect/dialog.tsx:1179`, `settings/providers/console-extensions.ts:6` | OpenCode Console — кабинет провайдера OpenCode, который пользователь подключает сам; судьба провайдера OpenCode в продукте — этап C |
-| `session/composer/free-limit-panel.tsx:13`, `go-limit-tray.tsx:34`, `session/usage-exceeded-dialogs.tsx:19` | подписка OpenCode Go: показывается только при лимитах моделей провайдера OpenCode; этап C |
+| `session/composer/free-limit-panel.tsx:13`, `go-limit-tray.tsx:34`, `session/usage-exceeded-dialogs.tsx:19` | подписка OpenCode Go при лимитах моделей провайдера OpenCode. **Вопрос для B:** то же предложение в TUI форк убрал в B1.4 (CAT-11: «Предложение подписки OpenCode Go при бесплатном лимите не показывается», тест `free usage limit restores the prompt and explains the limit without offering OpenCode Go`); в `app` 0.4 ссылок на Go не было |
 | `settings/appearance/appearance.tsx:116`, `settings/providers/extensions.tsx:277`, `settings/workspaces/project-extensions.tsx:513` | документация тем и навыков OpenCode; своей документации тем и навыков у продукта нет, настройки — этап C |
-| `runtime/platform/web.ts:31` | значок уведомления веб-платформы грузится с opencode.ai. Только веб-версия в браузере: Desktop шлёт уведомления своей платформой. Это обращение к серверу OpenCode при каждом уведомлении в вебе — предлагаю отдельной задачей вместе со значками (B4.6) |
+| `runtime/platform/web.ts:31` | значок уведомления веб-платформы грузится с opencode.ai. Только веб-версия: `createWebPlatform` импортирует один `app/src/entry.tsx`, Desktop шлёт уведомления через `createDesktopNotify` (`desktop/src/renderer/platform/notifications.ts`). В 0.4 значок был свой — `icon: "/loginom-icon.png"` (`a080f7725c:packages/app/src/entry.tsx:73`), но файла `loginom-icon.png` в `app/public` v2 нет (там `favicon*` OpenCode). Нужна задача вместе со значками (B4.6, CAT-03) |
+
+`app` 0.4 (`git grep -n -F 'opencode.ai' a080f7725c -- packages/app/src ':!packages/app/src/i18n'`, без импортов
+`@opencode-ai/…`) оставлял пять ссылок на opencode.ai: OpenCode Zen в подключении провайдера (две), документацию
+своего провайдера и тем (три). Ссылок на OpenCode Go в `app` 0.4 не было.
 
 ### Тесты
 
@@ -11703,8 +11707,8 @@ $ PLAYWRIGHT_BROWSERS_PATH=<scratch> PLAYWRIGHT_PORT=3413 bunx playwright test e
 ```
 
 Холодный старт dev-сервера: первый тест падает на ожидании `settings-screen` (30 с), а в журнале сервера — «Failed to
-run dependency scan … PARSE_ERROR Unexpected JSX expression» в `ui/src/components/file-icon.tsx:20`. Это есть и без
-правки (B4.11b, оба холодных прогона); повтор на тёплом сервере проходит.
+run dependency scan … PARSE_ERROR Unexpected JSX expression» в `ui/src/components/file-icon.tsx:20`. Этот файл задача
+не трогала; на базе журнал холодного старта не снимал. Повтор на тёплом сервере проходит.
 
 ### Мутации
 
@@ -11769,7 +11773,9 @@ e2e-теста и его проверки.
 ### Где решал сам
 
 - **Текст лицензии — импорт корневого `LICENSE`, не копия.** Копия в `notices/` могла бы разойтись с файлом. Импорт
-  `?raw` вне пакета проверен typecheck (`*?raw` из `vite/client`), dev-сервером и сборкой.
+  `?raw` вне пакета проверен typecheck (`*?raw` из `vite/client`), dev-сервером и сборкой. `server.fs.allow`/`fs.strict`
+  не сужены ни в `app/vite.config.ts`, ни в `desktop/electron.vite.config.ts` (`grep` — только `allowedHosts`), так что
+  dev-сервер отдаёт файл из корня рабочего пространства.
 - **Пояснение к записи — без имени OpenCode** («Loginom AI Agent is built on it.»), чтобы тест словаря About из B4.11b
   остался без нового исключения.
 - **Ссылка записи — `github.com/anomalyco/opencode`:** исходный проект, сведения в лицензиях допустимы; на opencode.ai
@@ -11791,6 +11797,9 @@ e2e-теста и его проверки.
   OpenCode-Team» на странице ошибки.
 
 ### Не проверено
+
+- Расхождение лицензии из B4.11b остаётся: страница пишет «Released under the MIT License», у Desktop 0.4 —
+  `MIT AND AGPL-3.0-only`.
 
 - Страница на `ru` в браузере: e2e идёт на `en`; описание `ru` — из B4.11b, тест словаря.
 - Кнопки Help на главной и «сообщить» на странице ошибки в браузере не нажимались — только `grep` и typecheck.
