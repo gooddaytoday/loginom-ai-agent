@@ -18049,7 +18049,9 @@ CAT-12, абзац «подпись входа и ошибки ACP»: спосо
 `.claude/worktrees/b27a10b`. Эталон 0.4 — `v0.4.0` (`a63462dde1`). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
 `PATH` только для своих команд; `bun install --frozen-lockfile` — код 0, `.husky/_` появился. `npm ci --ignore-scripts
 --offline` клиента `packages/loginom-runtime/client` — в этом дереве и в дереве базы `<scratchpad>/b27a10b/base`
-(`490facc2be`, detached). Тесты — с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE`
+(`490facc2be`, detached; после приёмки удалено). Настоящий `HOME` читали только установки: `bun install` — кэш Bun
+(в этом дереве без `unshare`, пакеты из кэша за 1 с; в базе — под `unshare -n`), `npm ci --offline` — кэш `/root/.npm`
+(`--logs-dir` в scratchpad). Тесты — с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE`
 задан, `LOGINOM_AI_AGENT_RIPGREP_CACHE` — копия архива ripgrep 15.1.0 в scratchpad (SHA256 совпал с пином), и под
 `unshare -n` (поднят только `lo`): сети у тестов нет. Модель не вызывалась: `serve` поднимается без сессий и промптов.
 `packages/desktop/test/loginom/*` (B4.14c) не трогал.
@@ -18069,7 +18071,9 @@ filesystem/search.ts}`, `loginom-host/{src/bundled-ripgrep.ts,script/stage-resou
 |---|---|
 | `9e1528b21b` `fix(cli): put the bundled ripgrep of the resources on PATH (B2.7a10b)` | `cli/src/server-process.ts` (+4); тест `cli/test/bundled-ripgrep.test.ts` |
 | `a0ffe520ce` `fix(node-acceptance): stop on the v2 agent packages (B2.7a10b)` | `scripts/node-acceptance/required-checks.py` (+3 −1); тест `required-checks.test.mjs` |
-| следующий | этот раздел; CAT-07 в `catalog.md` |
+| `c54d432223` `docs(upstream-sync): record bundled ripgrep and required-checks (B2.7a10b)` | этот раздел; CAT-07 в `catalog.md` |
+| `89efe9f9bf` `test(cli): skip the bundled ripgrep test where no rg is pinned (B2.7a10b)` | пропуск на архитектуре без пина, как в тесте `loginom-host` |
+| следующий | уточнения этого раздела |
 
 Файлов кода два (предел — пять); остальное — тесты и документы.
 
@@ -18089,8 +18093,11 @@ filesystem/search.ts}`, `loginom-host/{src/bundled-ripgrep.ts,script/stage-resou
 
 ### Часть 1. v2
 
-В v2 ядро работает в одном процессе — сервере `serve` (`cli/src/server-process.ts`, единственный, кто запускает
-`@opencode/server/process`). Корень ресурсов приходит туда как `LOGINOM_AI_AGENT_RESOURCES`:
+Во входах продукта ядро v2 работает только в сервере `serve`: в `packages/cli` его запускает лишь
+`cli/src/server-process.ts` (`@opencode/server/process`), Desktop, TUI, `run` и `mini` обращаются к службе или к
+дочернему `serve --stdio` (`cli/src/services/standalone.ts`). Сервер
+встраивает ещё SDK (`sdk/src/internal/host.ts`), но его не импортирует ни один пакет продукта. Корень ресурсов приходит
+в `serve` как `LOGINOM_AI_AGENT_RESOURCES`:
 
 | Вход v2 | Откуда переменная |
 |---|---|
@@ -18119,7 +18126,11 @@ filesystem/search.ts}`, `loginom-host/{src/bundled-ripgrep.ts,script/stage-resou
 каталог (в тесте `Bun.which("rg", { PATH })` — `null`), `LOGINOM_AI_AGENT_DISABLE_FFF=1` (иначе поиск файлов API идёт
 через fff, а не ripgrep), все `*_PROXY` — на подставной TCP-сервер, который записывает первую строку каждого соединения и
 закрывает его. Проект с `src/table.csv`, запрос `GET /api/fs/find?query=table`. `rg` — выпуск по пину, разложенный
-`stageRipgrep` из кэша сборки.
+`stageRipgrep` из кэша сборки. Новое условие набора `cli`: архив ripgrep в кэше (`LOGINOM_AI_AGENT_RIPGREP_CACHE` или
+`~/.cache/loginom-bootstrap/ripgrep`), иначе `beforeAll` скачает его с GitHub — как тест `loginom-host` B2.7a10; на базе
+набору `cli` архив не был нужен. Только Linux с пином (`linux-x64`); иначе файл пропускается. Дочерних `serve` — три:
+третий, контрольный, показывает, что подставной сервер действительно видит скачивание, иначе первые два могли бы
+пройти впустую.
 
 | Тест | Ожидание |
 |---|---|
@@ -18155,9 +18166,18 @@ $ git diff -M30% -l0 --diff-filter=R --name-status v0.4.0 490facc2be -- packages
 | `tool/loginom-file-*`, `session/{loginom-result,browser-recovery}.ts`, `util/file-snapshot.ts` | `loginom-agent/src/…` | 5 |
 | `server/**` (57 маршрутов) | `server` — переписан, переименований нет | 0 |
 
-В `util`, `ai`, `plugin`, `plugins`, `app`, `ui`, `desktop`, `codemode`, `simulation` переименований из
-`packages/opencode/src` нет и при 30 %. Остальной код upstream переписал без следа переименований; `server` взят по
-заданию (маршруты HTTP 0.4 — `server/routes/**`).
+В `util`, `ai`, `plugin`, `plugins`, `app`, `ui`, `desktop`, `codemode`, `simulation`, а вторым прогоном — в
+`dashboard`, `loginom-host`, `loginom-runtime`, `sdk`, `session-ui`, `gui-plugins`, `data`, `plugin-browser`,
+`process-daemon` переименований из `packages/opencode/src` нет и при 30 %. Остальной код upstream переписал без следа
+переименований; `server` взят по заданию (маршруты HTTP 0.4 — `server/routes/**`).
+
+Ноль переименований — слабый довод, поэтому файлы продукта 0.4 без пары проверены по экспортам (`git grep -w` по
+`packages`, без тестов): `toolPolicy`, `turnLifecycle` → `loginom-agent/src/dock.ts`, `index.ts`, `local-file.ts`;
+`skillSource` → `loginom-agent/src/skills.ts`; `installationNode` → `cli/src/services/product-updater.ts` — все в
+правиле. `attachmentResolver`, `toolContributor`, `pluginDependency`, `dashboardRules`/`dashboardRoot`/
+`isDashboardWork`/`dashboardPathError` (`product/dashboard-session.ts`), `Dashboard*Tool` (`tool/dashboard.ts`),
+`dashboardFlag` (`cli/standalone-dashboard.ts`) в v2 нет — не перенесены. Логика черновика дашборда
+(`dashboard/src/agent/*`) и в 0.4 жила в `packages/dashboard` (от `v0.4.0` — одна строка), а не в `packages/opencode`.
 
 Правило теперь: `packages/core/**`, `packages/server/**`, `packages/cli/**`, `packages/loginom-agent/**`,
 `packages/tui/src/mini/**` (вместо `packages/opencode/**`), остальное как было (`protocol`, `schema`, `client/src/generated*`,
@@ -18219,6 +18239,10 @@ Found 905 warnings and 0 errors.                    # предупреждени
 
 `prettier --check` `bundled-ripgrep.test.ts` проходит; `server-process.ts` не проходил и на базе (строки `apply-identity`),
 свои строки — в форме prettier. `oxlint` двух файлов `cli` — 0 предупреждений.
+
+После `89efe9f9bf` (только условие пропуска теста): `bun typecheck` `cli` — 0 ошибок, `bundled-ripgrep` — 3 pass,
+M1–M3 снова красные (2, 1, 1 fail). На `c54d432223` повторно: `catalog-check.py` — код 0, 609 файлов;
+`apply-identity --check` — 0 файлов.
 
 ### Каталог
 
