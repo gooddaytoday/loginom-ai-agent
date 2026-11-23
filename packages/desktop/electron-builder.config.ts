@@ -1,14 +1,38 @@
+import { execFile } from "node:child_process"
 import { copyFile, readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 
 import { Arch, type Configuration } from "electron-builder"
 import { Product, productName, productSlug } from "@loginom-ai-agent/product"
 import { NativeArch } from "../../script/native-arch"
 import { DESKTOP_NATIVE_ENGLISH } from "@opencode/app/i18n/desktop-native"
+import release from "../product/loginom-release.json"
+import { linuxPermissions } from "./scripts/linux-permissions"
 import { CLI_BINARIES, getCurrentCli, nodePtyPackage } from "./script/utils"
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
+
+// Loginom AI Agent (B4.5b): Electron and the bundled Chromium both link these libraries on all supported distributions.
+const debDepends = [
+  "libgtk-3-0",
+  "libnotify4",
+  "libnss3",
+  "libxss1",
+  "libxtst6",
+  "xdg-utils",
+  "libatspi2.0-0",
+  "libuuid1",
+  "libsecret-1-0",
+  "libgbm1",
+  // Ubuntu 24's unversioned libasound2 virtual package can select the incomplete OSS shim.
+  "libasound2t64 | libasound2 (>= 1.0.16)",
+  "ca-certificates",
+  "fonts-liberation",
+  "libcurl4 | libcurl4t64 | libcurl3-gnutls",
+  "libvulkan1",
+]
 
 // rpmbuild adds /usr/lib/.build-id links for every ELF file. The bundled Electron
 // binaries are byte-identical across apps on the same Electron version, so those
@@ -99,6 +123,9 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       },
       { from: "resources/loginom", to: "loginom" },
     ],
+    // Loginom AI Agent (B4.5b): the service and the Host run in the bundled CLI and Node. Main-process native
+    // dependencies are N-API platform packages that the lockfile already selected, so nothing is rebuilt for Electron.
+    npmRebuild: false,
     afterPack: async (context) => {
       const arch = Arch[context.arch]
 
@@ -121,6 +148,18 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       // fallback. That one tops out at 256px and draws a light ring around the squircle, so ship ours instead.
       if (context.electronPlatformName === "darwin")
         await copyFile(path.join(packageDir, "resources/icons/icon.icns"), path.join(resources, "icon.icns"))
+
+      // Loginom AI Agent (B4.5b): installed Linux payloads are root-owned and must stay readable by every user, so
+      // every mode is opened first. That leaves chrome-sandbox 0755, but Chromium's setuid sandbox needs 4755 once
+      // the package makes it root-owned. /bin/chmod sets the bit whatever runtime loads this config (Bun 1.3.14's
+      // fs.chmod cleared it).
+      if (context.electronPlatformName === "linux") {
+        await linuxPermissions(context.appOutDir)
+        await promisify(execFile)("/bin/chmod", [
+          "4755",
+          path.join(resources, `loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`),
+        ])
+      }
 
       if (context.electronPlatformName !== "win32") return
 
@@ -161,7 +200,23 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
         NSRemovableVolumesUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.removableVolumesUsage"],
         NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
       },
-      target: ["dmg", "zip"],
+      // Loginom AI Agent (B4.5b): the 0.4 signing settings. They apply when electron-builder signs the app itself.
+      hardenedRuntime: true,
+      entitlements: "resources/entitlements.plist",
+      entitlementsInherit: "resources/entitlements.plist",
+      // Preserve upstream signatures and the staged resource-manifest hashes.
+      signIgnore: [
+        "/Contents/Resources/loginom/bin/",
+        "/Contents/Resources/loginom/browsers/",
+        "/Contents/Resources/loginom/ripgrep/",
+        // The dashboard kit's npm packages ship signed esbuild and rollup binaries.
+        "/Contents/Resources/loginom/dashboard/",
+      ],
+      // macOS packages are arm64, as in 0.4. pack.ts's --dir builds take their architecture from the CLI target.
+      target: [
+        { target: "dmg", arch: ["arm64"] },
+        { target: "zip", arch: ["arm64"] },
+      ],
     },
     protocols: { name: Product.name, schemes: [Product.scheme] },
     win: {
@@ -222,7 +277,7 @@ export function getConfig() {
     case "dev": {
       return {
         ...base,
-        deb: { packageName, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        deb: { packageName, depends: debDepends, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
           packageName,
           fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
@@ -233,7 +288,7 @@ export function getConfig() {
     case "beta": {
       return {
         ...base,
-        deb: { packageName, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
+        deb: { packageName, depends: debDepends, fpm: [...previewCompressionFpm("deb"), metainfoFpm(appId)] },
         rpm: {
           packageName,
           fpm: [rpmNoBuildIdLinksFpm, ...previewCompressionFpm("rpm"), metainfoFpm(appId)],
@@ -249,7 +304,7 @@ export function getConfig() {
         mac: { ...base.mac, icon: "resources/icons/icon.icon" },
         // The DMG volume icon would otherwise use the same actool-generated ICNS.
         dmg: { icon: "resources/icons/icon.icns" },
-        deb: { packageName, fpm: [metainfoFpm(appId)] },
+        deb: { packageName, depends: debDepends, fpm: [metainfoFpm(appId)] },
         rpm: { packageName, fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId)] },
       }
     }
