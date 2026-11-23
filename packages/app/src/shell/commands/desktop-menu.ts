@@ -88,8 +88,8 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     labelKey: "desktop.menu.app",
     platforms: ["macos"],
     items: [
+      // No Install CLI, as in 0.4: the product CLI is the standalone loginom-ai-agent-cli with its own profile (B4.7b).
       { type: "item", role: "about" },
-      { type: "item", labelKey: "desktop.menu.installCli", action: "app.installCli" },
       { type: "item", labelKey: "desktop.menu.settings", command: "settings.open", accelerator: { macos: "Cmd+," } },
       { type: "item", labelKey: "desktop.menu.reloadWebview", action: "view.reload" },
       { type: "item", labelKey: "desktop.menu.restart", action: "app.relaunch" },

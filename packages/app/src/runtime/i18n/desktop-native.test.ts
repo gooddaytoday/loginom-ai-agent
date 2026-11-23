@@ -88,14 +88,9 @@ describe("desktop native ICU data", () => {
 })
 
 describe("desktop product name", () => {
-  // Install CLI still links the `opencode` command (`desktop-cli.ts`); the message names it until the bundled CLI is renamed.
-  const commandNames = ["desktop.cli.installed.message"]
-
   test("names the product in the en and ru desktop strings", () => {
     const upstream = [en, dict].flatMap((messages) =>
-      Object.entries(messages).filter(
-        ([key, value]) => key.startsWith("desktop.") && !commandNames.includes(key) && /opencode/i.test(value),
-      ),
+      Object.entries(messages).filter(([key, value]) => key.startsWith("desktop.") && /opencode/i.test(value)),
     )
 
     expect(upstream).toEqual([])

@@ -290,7 +290,8 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.menu.ariaLabel": "Loginom AI Agent menu",
 
   "desktop.cli.installed.title": "CLI Installed",
-  "desktop.cli.installed.message": "CLI installed to {{path}}\n\nRestart your terminal to use the 'opencode' command.",
+  "desktop.cli.installed.message":
+    "CLI installed to {{path}}\n\nRestart your terminal to use the 'loginom-ai-agent' command.",
   "desktop.cli.failed.title": "Installation Failed",
   "desktop.cli.failed.message": "Failed to install CLI: {{error}}",
 

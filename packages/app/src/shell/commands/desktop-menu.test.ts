@@ -28,6 +28,26 @@ test("every desktop menu command is one its owner registers", () => {
   expect(commands.filter((command) => !registered.has(command))).toEqual([])
 })
 
+// Contract (B4.7b): the macOS app menu is 0.4's. Its update check now comes from the updater plugin
+// (`gui-plugins/src/updater/main.ts`). Install CLI would put Desktop's bundled CLI on PATH, working in Desktop's data.
+test("the macOS app menu holds the 0.4 items", () => {
+  const app = DESKTOP_MENU.find((menu) => menu.id === "app")?.items ?? []
+
+  expect(app.map((entry) => (entry.type === "separator" ? "-" : (entry.labelKey ?? entry.role)))).toEqual([
+    "about",
+    "desktop.menu.settings",
+    "desktop.menu.reloadWebview",
+    "desktop.menu.restart",
+    "desktop.menu.exportLogs",
+    "-",
+    "hide",
+    "hideOthers",
+    "unhide",
+    "-",
+    "quit",
+  ])
+})
+
 test.each([
   { factor: 1, direction: "in", level: 1.1 },
   { factor: 1.25, direction: "out", level: 1.1 },
