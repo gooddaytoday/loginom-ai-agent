@@ -15123,9 +15123,11 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 Прочитано: журнал B4.11d (пп. 6 и 7, «Найдено»); В-74; план этапа B (вопрос владельцу о WSL, SSH и сопряжении);
 `AGENTS.md` пакетов `gui-plugins`, `app`, `desktop`; эталон `v0.4.0`: `app/src/pages/layout/helpers.ts:87-94`.
 
-**Отступление от приёмки.** Плагины сопряжения, SSH и WSL не загружает окно продукта (`gui-plugins/src/renderer.ts`) —
-интерфейса у них нет. Главный процесс Desktop (`gui-plugins/src/main.ts`, не менялся) по-прежнему регистрирует все три.
-Убрать их и оттуда — вторая нарезка: шестой файл и решение о node-pty (ниже).
+**Отступление от приёмки (принято оркестратором).** Плагины сопряжения, SSH и WSL не загружает окно продукта
+(`gui-plugins/src/renderer.ts`) — интерфейса у них нет. Главный процесс Desktop (`gui-plugins/src/main.ts`, не менялся)
+по-прежнему регистрирует все три; без своей части в окне они ничего не запускают (ниже). **Остаток:** убрать их и из
+главного процесса — вместе с решением владельца о WSL и SSH (вопрос checkpoint B2): правка `main.ts`,
+`desktop/electron.vite.config.test.ts` и решение о node-pty.
 
 ### Коммиты
 
@@ -15135,11 +15137,14 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 | `f849352fa5` `fix(gui-plugins): the product window loads no pairing, SSH or WSL (B4.11e)` | первая попытка: оба списка без сопряжения и SSH, окно без WSL |
 | `5899e33350` `docs(upstream-sync): B4.11e avatar and hidden remote work` | первая версия раздела |
 | `573ded0f4d` `fix(gui-plugins): hide pairing, SSH and WSL in the window only (B4.11e)` | `main.ts` возвращён к upstream; заглушка историй SSH; тест списков |
+| `d423db5764`, `06c062d184` `docs(upstream-sync): …` | раздел под этот вариант; прогон `plugin-host` |
+| `b3d72dd64c` `test(app): settings-wsl checks that the product offers no WSL, SSH or pairing (B4.11e)` | e2e переведён на поведение продукта (шестой файл, разрешил оркестратор) |
 | следующий | этот раздел, `catalog.md` |
 
-Файлов кода пять — предел задания (`git diff --stat b8f1dd8091 -- packages`, без README):
+Файлов кода шесть (`git diff --stat b8f1dd8091 -- packages`, без README): пять в пределе задания —
 `ui/src/data-display/project-avatar/project-avatar.{tsx,test.ts}`, `gui-plugins/src/renderer.ts`,
-`stories/mocks/gui-plugins/ssh.tsx`, новый `app/test-browser/builtin-plugins.test.ts`. Документ —
+`stories/mocks/gui-plugins/ssh.tsx`, новый `app/test-browser/builtin-plugins.test.ts` — и шестой по решению
+оркестратора: `app/e2e/regression/settings-wsl.spec.ts`. Документ —
 `gui-plugins/README.md`: `script/sdk-docs.ts` сверяет его блок `src/renderer.ts#builtins` с кодом байт в байт (без правки
 `bun run check` красный).
 
@@ -15244,24 +15249,36 @@ Dev-сервер Vite, Chromium 1248 через ссылки `<scratchpad>/pw-br
 
 ```text
 $ PLAYWRIGHT_BROWSERS_PATH=<scratch>/pw-browsers PLAYWRIGHT_PORT=3427 bunx playwright test e2e/regression/settings-wsl.spec.ts
-  12 failed                                                   # итог (список окна тот же с f849352fa5)
-  12 passed (1.4m)                                            # база b8f1dd8091
+  12 failed                                                   # spec upstream на 573ded0f4d (список окна тот же с f849352fa5)
+  12 passed (1.4m)                                            # spec upstream на базе b8f1dd8091
   5 × waiting for getByTestId('settings-screen').getByRole('tab', { name: 'Servers', exact: true })
   3 × waiting for getByTestId('settings-screen').getByRole('button', { name: /^Server / })
   4 × waiting for getByRole('heading', { name: 'WSL tabs session' | 'SSH offer session' | 'SSH session' | 'SSH incompatible session' })
-$ … home.spec.ts review.spec.ts whats-new.spec.ts -g "<три теста на том же стенде>"
-  3 passed (26.9s)
+$ … settings-wsl.spec.ts home.spec.ts review.spec.ts whats-new.spec.ts -g "<новый тест и три соседа на том же стенде>"
+  4 passed (26.1s)                                            # на b3d72dd64c: settings-wsl — 0 падений
 $ PLAYWRIGHT_STORIES_PORT=3394 bunx playwright test --config playwright.components.config.ts plugin-graph pairing ssh-reconnect
   9 passed (19.2s)                                            # на 573ded0f4d; на f849352fa5 — 2 passed, 7 failed (ssh-reconnect)
 $ … --config playwright.components.config.ts plugin-host
   39 passed (56.1s)                                           # на 573ded0f4d: настоящий хост окна
 ```
 
-- **`settings-wsl.spec.ts` — красный, записан, не правлен.** Все 12 тестов проверяют вклад плагинов WSL и SSH в окно
-  Desktop (стенд `e2e/utils/settings-wsl.html` монтирует настоящий `AppInterface` со списком `renderer.ts`). Без плагинов
-  серверов WSL и SSH нет, у настроек один сервер — вкладки «Servers» нет. Перевести на «страницы нет» — шестой файл кода.
-  Решение — вместе со второй нарезкой: вернуть плагины (тогда spec снова нужен) или заменить его проверкой «пунктов WSL и
-  SSH нет».
+- **`settings-wsl.spec.ts` — на поведение продукта (`b3d72dd64c`).** Upstream-spec из 12 тестов вёл строки и диалоги
+  WSL и SSH в окне Desktop (стенд `e2e/utils/settings-wsl.html` монтирует настоящий `AppInterface` со списком
+  `renderer.ts`) — в продукте 12 из 12 красные. Теперь один тест «desktop settings offer no WSL, SSH or pairing» на том
+  же стенде, где главный процесс держит WSL-сервер Ubuntu и сохранённый SSH-сервер box: в настройках вкладка «Server»
+  (один сервер, нет «Servers»), нет «Pairing», нет областей Ubuntu и box, «Add server» открывает собственный диалог `app`
+  без меню (нет `menuitem`). Стенд не менялся — на нём же три соседа.
+  - Проверки живые: со списком окна с базы (`git checkout b8f1dd8091 -- gui-plugins/src/renderer.ts`, возвращён) новый
+    тест падает (`tab 'Server'` не найден), а проба с обратными `expect.soft` — вкладки «Servers» и «Pairing», области
+    Ubuntu и box, `menuitem` «Add WSL server» и «Add SSH server» видны — 1 passed. Мутация «в окно вернули только
+    сопряжение» — красный: `tab 'Pairing'` Expected 0, Received 1.
+  - Где теперь проверки upstream-spec: поведение плагинов — их юнит-тесты в `gui-plugins` (`wsl/*.test.ts`:
+    `dialog-machine`, `add-machine`, `probe-machine`, `machine`, `servers`, `runtime`; `ssh/*.test.ts`: `add-machine`,
+    `dialog-machine`, `window-machine`, `main-machine`, `askpass`, `bootstrap`, `command`) и компонентные
+    `ssh-reconnect.spec.ts` (диалог SSH: вход, ключ, несовместимый сервер, переподключение). Вид окна с ними (раскладка
+    радиокнопок WSL, строки серверов WSL, вкладки сессий после ухода плагина, перенос сессии к новому SSH-контроллеру) в
+    продукте не проверяется — интерфейса нет; spec upstream вернуть вместе с плагинами
+    (`git show b8f1dd8091:packages/app/e2e/regression/settings-wsl.spec.ts`).
 - **Тесты самих плагинов зелёные:** `gui-plugins` `bun test` (1 129 pass), компонентные `pairing.spec.ts` и
   `ssh-reconnect.spec.ts` (истории монтируют плагин сами) и граф встроенных `plugin-graph.spec.ts` (каждый встроенный
   без каждого другого, по списку окна).
@@ -15307,7 +15324,7 @@ github.com/anomalyco/opencode            → renderer/assets/dialog-*.js   # {na
 
 ### Приёмка
 
-База `b8f1dd8091` (`<scratchpad>/b411e-base`), итог `573ded0f4d`; `<scratchpad>/b411e/suites.sh`.
+База `b8f1dd8091` (`<scratchpad>/b411e-base`), итог `573ded0f4d` и снова `b3d72dd64c` (те же числа); `<scratchpad>/b411e/suites.sh`.
 
 | Команда | `b8f1dd8091` | итог |
 |---|---|---|
@@ -15321,15 +15338,15 @@ github.com/anomalyco/opencode            → renderer/assets/dialog-*.js   # {na
 | `gui-plugins`: `bun typecheck` | 1 422 файла, ошибок нет | то же: папки плагинов на месте |
 | `gui-plugins`: `bun test` | 1 129 pass, 1 skip, 0 fail | то же |
 
-`bun script/lint-changed.ts b8f1dd8091` — `0 problem(s) in 0 of 4 changed files` (`stories` в его область не входит;
+`bun script/lint-changed.ts b8f1dd8091` — `0 problem(s) in 0 of 5 changed files` (`stories` в его область не входит;
 одно замечание `require-readable-spacing` в тесте аватара исправлено до первого коммита). `prettier --check` по файлам
 задачи — чисто, кроме `project-avatar.tsx:192` (`<Show when={generated()} …>`): так на базе, строка не моя.
 
 ```text
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
-against a6b15d33daf6: 565 divergent upstream files       # база 562: +3
+against a6b15d33daf6: 566 divergent upstream files       # база 562: +4
   CAT-03: 96                                              # то же: gui-plugins/README.md уже расходился (B1.4a)
-  CAT-10: 90                                              # база 89: project-avatar.test.ts
+  CAT-10: 91                                              # база 89: project-avatar.test.ts, settings-wsl.spec.ts
   CAT-12: 189                                             # база 187: gui-plugins/src/renderer.ts, stories/mocks/gui-plugins/ssh.tsx
 $ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
 would change: 0 files
@@ -15341,7 +15358,7 @@ would change: 0 files
 `ssh-reconnect.spec.ts`.
 
 ```text
-$ bun run check                                                       # код 0, на 573ded0f4d
+$ bun run check                                                       # код 0, на 573ded0f4d и на b3d72dd64c
 Found 554 warnings and 0 errors.                          # как на B4.11d (dec3226113); в файлах задачи — 0
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
 @opencode/app:typecheck: ✓ No type errors in 2,233 files across 1 project
@@ -15352,9 +15369,10 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Каталог
 
-`catalog.json` не менялся: `gui-plugins/src/renderer.ts` и `stories/mocks/gui-plugins/ssh.tsx` — CAT-12, `ui/**` —
-CAT-10, `gui-plugins/README.md` — CAT-03, новый тест `app/test-browser` — файл форка. В `catalog.md`: CAT-03 — блок
-README; CAT-10 — аватар и его проверка; CAT-12 — пункт «Встроенные плагины GUI (B4.11e)».
+`catalog.json` не менялся: `gui-plugins/src/renderer.ts` и `stories/mocks/gui-plugins/ssh.tsx` — CAT-12, `ui/**` и
+`app/e2e/regression/settings-wsl.spec.ts` — CAT-10, `gui-plugins/README.md` — CAT-03, новый тест `app/test-browser` —
+файл форка. В `catalog.md`: CAT-03 — блок README; CAT-10 — аватар, его проверка и e2e; CAT-12 — пункт «Встроенные
+плагины GUI (B4.11e)».
 
 ### Где решал сам
 
@@ -15364,7 +15382,8 @@ README; CAT-10 — аватар и его проверка; CAT-12 — пунк�
   «Add SSH server» ведёт к установке OpenCode на удалённую машину.
 - **Сопряжение спрятано целиком** — Desktop оно для своей службы не нужно; «Remote access» и «Keep screen active» ушли с
   ним, как в 0.4.
-- **`settings-wsl.spec.ts` записан, не правлен** — шестой файл; задание допускает запись с причиной.
+- **`settings-wsl.spec.ts`** сначала записан красным (предел в пять файлов), затем по решению оркестратора переведён на
+  поведение продукта; стенд и имя файла прежние, чтобы три соседа и обновление upstream шли по тому же пути.
 - **Аватар — импорт ассета, не `/loginom-icon.svg`**: такого файла в `app/public` v2 нет. Набор id не менял.
 - **Строки и папки плагинов не трогал**; `gui-plugins/AGENTS.md` («Every plugin here ships») не правил — постоянная
   инструкция upstream, правка не в задании.
