@@ -134,10 +134,12 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     }
     const binary = path.join(plan.pins.payload, "bin/loginom-ai-agent-cli")
     const status = await management(binary, "status", evidence, env)
+    // `loginom status` reports a saved connection whose Help its own Host has not loaded yet as `configured`, and has no
+    // `hasApiKey` since the built-in knowledge key (B2.7b); `loginom check` below proves readiness either way.
     if (!record(status) || status.url !== plan.pins.connection.url || status.username !== plan.pins.connection.username ||
-      status.folder !== plan.pins.connection.folder || status.hasApiKey !== true || status.failure ||
+      status.folder !== plan.pins.connection.folder || status.failure ||
       (Array.isArray(status.recoveries) && status.recoveries.length) ||
-      !["ready", "starting"].includes(String(status.state))) throw Error("SELECTION_CONNECTION_MISMATCH")
+      !["ready", "starting", "configured"].includes(String(status.state))) throw Error("SELECTION_CONNECTION_MISMATCH")
     // A restored host may report starting before Help/browser readiness. Check explicitly.
     const checked = await management(binary, "check", evidence, env)
     if (!record(checked) || checked.ok !== true || !record(checked.help) || checked.help.state !== "ready" ||
@@ -347,26 +349,50 @@ export function selectionModelStarted(snapshot: ReturnType<typeof readSelectionS
   return false
 }
 
+// The session tables of OpenCode 2, read as diagnostics read them since B1.9: an existing file, a connection that cannot
+// write, one transaction. Rows keep the snapshot's 0.4 shape for its readers (B2.7b2): a message's role is its type and
+// its model gives providerID/modelID/variant; an assistant's content (session_part rows, then inline, as history.ts
+// reads it) gives the parts, and a tool there gives `tool`, `state.output`/`state.error` text and `state.time` as the
+// run's tool_use events do.
 export function readSelectionSnapshot(filename: string, sessionID: string,
   fallback?: { title: string; startedAt: number; finishedAt: number }) {
-  const database = new Database(filename, { readonly: true, strict: true })
+  const database = new Database(filename, { readwrite: true, create: false, strict: true })
   try {
-    database.exec("PRAGMA query_only=ON; BEGIN")
+    database.run("PRAGMA query_only = ON")
+    database.run("BEGIN")
     const matches = !sessionID && fallback ? database.query<{ id: string }, [string, number, number]>(
-      "SELECT id FROM session WHERE title = ? AND parent_id IS NULL AND time_created >= ? AND time_created <= ?")
+      "SELECT id FROM session_v2 WHERE title = ? AND parent_id IS NULL AND time_created >= ? AND time_created <= ?")
       .all(fallback.title, fallback.startedAt, fallback.finishedAt) : []
     if (!sessionID && matches.length !== 1) throw Error("SELECTION_SESSION_INCOMPLETE")
     const ownID = sessionID || matches[0]!.id
-    const session = database.query<{ id: string; parent_id: string | null }, [string]>("SELECT id, parent_id FROM session WHERE id = ?").get(ownID)
+    const session = database.query<{ id: string; parent_id: string | null }, [string]>("SELECT id, parent_id FROM session_v2 WHERE id = ?").get(ownID)
     if (!session) throw Error("SELECTION_SESSION_MISSING")
-    const children = database.query<{ id: string }, [string]>("SELECT id FROM session WHERE parent_id = ?").all(ownID)
-    const messages = database.query<{ id: string; session_id: string; data: string }, [string]>(
-      "SELECT id, session_id, data FROM message WHERE session_id = ? ORDER BY time_created, id").all(ownID)
-    const parts = database.query<{ id: string; message_id: string; session_id: string; data: string }, [string]>(
-      "SELECT id, message_id, session_id, data FROM part WHERE session_id = ? ORDER BY time_created, id").all(ownID)
+    const children = database.query<{ id: string }, [string]>("SELECT id FROM session_v2 WHERE parent_id = ?").all(ownID)
+    const messages = database.query<{ id: string; type: string; data: string }, [string]>(
+      "SELECT id, type, data FROM session_message WHERE session_id = ? ORDER BY seq").all(ownID)
+    const stored = database.query<{ message_id: string; data: string }, [string]>(
+      "SELECT message_id, data FROM session_part WHERE session_id = ? ORDER BY message_id, ordinal").all(ownID)
+    const rows = messages.map((row) => ({ row, data: jsonRecord(row.data) }))
     return { sessionID: ownID, parentID: session.parent_id, childSessionIDs: children.map((child) => child.id),
-      messages: messages.map((row): Record<string, unknown> => ({ ...jsonRecord(row.data), id: row.id, sessionID: row.session_id })),
-      parts: parts.map((row): Record<string, unknown> => ({ ...jsonRecord(row.data), id: row.id, messageID: row.message_id, sessionID: row.session_id })),
+      messages: rows.map(({ row, data }): Record<string, unknown> => {
+        const model = record(data.model) ? data.model : undefined
+        return { ...data, content: undefined, id: row.id, sessionID: ownID, role: row.type,
+          ...(model ? { providerID: model.providerID, modelID: model.id, variant: model.variant } : {}) }
+      }),
+      parts: rows.filter(({ row }) => row.type === "assistant").flatMap(({ row, data }) => [
+        ...stored.filter((part) => part.message_id === row.id).map((part) => jsonRecord(part.data)),
+        ...(Array.isArray(data.content) ? data.content.filter(record) : []),
+      ].map((item, index): Record<string, unknown> => {
+        const own = { messageID: row.id, sessionID: ownID }
+        if (item.type !== "tool" || !record(item.state) || !record(item.time)) return { ...item, id: `${row.id}/${index}`, ...own }
+        const state = item.state
+        const text = Array.isArray(state.content) ? state.content.flatMap((content: unknown) =>
+          record(content) && content.type === "text" && typeof content.text === "string" ? [content.text] : []).join("\n") : undefined
+        return { ...item, ...own, callID: item.id, tool: item.name, state: { ...state,
+          ...(state.status === "completed" ? { output: text } : {}),
+          ...(record(state.error) ? { error: state.error.message } : {}),
+          time: { start: item.time.ran ?? item.time.created, end: item.time.completed } } }
+      })),
     }
   } finally { database.close() }
 }

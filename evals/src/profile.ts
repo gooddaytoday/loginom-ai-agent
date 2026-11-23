@@ -12,9 +12,11 @@ import { writeLeaseReceipt } from "./lease"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
+// Without its 0.4.0 migration marker the next Host removes a connection to any stand but app.loginom.ai.
 const retainedProfileFiles = new Set([
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
-  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "cache/models.json", "state/model.json",
+  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "loginom/connection/v040-migration.json",
+  "cache/models.json", "state/model.json",
 ])
 
 // Retain exact settings files, never whole data/cache/loginom directories.
@@ -372,37 +374,31 @@ export async function setupProfile(config: EvalConfig, command: AgentCommand) {
 
 export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   const providerId = config.agent.model.split("/")[0] ?? ""
-  if (config.auth) {
-    if (command.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR !== config.auth.sharedDir ||
-      command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== "false")
-      throw new EvalFailure("SHARED_AUTH_ENV_MISMATCH", 2)
-    const result = await management(command, ["providers", "status", "--provider", providerId, "--format", "json"])
-    const value = await new Response(result.stdout).json().catch(() => null) as {
-      format?: unknown; provider?: unknown; status?: unknown; code?: unknown
-      generation?: unknown; principal_sha256?: unknown; refresh_required?: unknown
-    } | null
-    if (value?.format !== "shared-oauth-status-v1" || value.provider !== providerId)
-      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
-    if (result.exitCode === 2 && value.status === "not_ready" && typeof value.code === "string" && /^SHARED_AUTH_[A-Z_]+$/.test(value.code))
-      throw new EvalFailure(value.code, 2)
-    if (result.exitCode !== 0 || value.status !== "ready" || typeof value.generation !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.generation) ||
-      typeof value.principal_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.principal_sha256) || typeof value.refresh_required !== "boolean")
-      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
-    return { generation: value.generation, principal_sha256: value.principal_sha256, refresh_required: value.refresh_required }
-  }
+  // The product CLI on OpenCode 2 has neither a shared OAuth store nor `providers status` with its receipt
+  // (`shared-oauth-status-v1`): no command reports a login's generation, principal or refresh state (B2.7b2).
+  if (config.auth)
+    throw new EvalFailure("SHARED_AUTH_UNSUPPORTED: общий OAuth (auth.sharedDir) не поддерживается CLI продукта на OpenCode 2 — " +
+      "уберите auth из файла слотов; ключ провайдера — в <профиль>/data/auth.json или EVAL_AGENT_PROVIDER_*", 2)
   if (config.agent.provider?.id === providerId) return
-  const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
-  const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
-  if (providerId in entries) return
-  const envLine = Object.entries(command.env)
-    .filter(([key]) => key.startsWith("LOGINOM_AI_AGENT_CLI_"))
-    .map(([key, value]) => `${key}=${value}`)
-    .join(" ")
+  // OpenCode 2 keeps provider keys in the profile's database, and the archive takes it after every attempt: each run
+  // creates a new one, which imports data/auth.json (B2.7b2). `auth list` creates and lists such a database here; a
+  // database left in the profile would answer instead, with keys that go to the archive before the run.
+  const data = await readdir(path.join(config.profileDir, "data")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  if (data.some((name) => name.endsWith(".db")))
+    throw new EvalFailure("PROFILE_DATABASE_PRESENT: ключ провайдера проверяется на новой базе профиля — перенесите историю профиля в архив", 2)
+  const listed = await management(command, ["auth", "list", "--standalone", "--format", "json"])
+  const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
+  if (listed.exitCode !== 0 || !Array.isArray(integrations))
+    // Not its stderr: no redaction knows the keys of data/auth.json; the output stays in the management evidence.
+    throw new EvalFailure(`AUTH_LIST_FAILED: auth list завершился кодом ${listed.exitCode}`, 2)
+  if (integrations.some((integration) => integration.id === providerId)) return
   throw new EvalFailure(
-    `Нет авторизации провайдера "${providerId}" в eval-профиле ${config.profileDir}.\n` +
-      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} providers login\n` +
-      "или задайте EVAL_AGENT_PROVIDER_* в evals/.env.",
+    `Нет ключа провайдера "${providerId}" для прогона в eval-профиле ${config.profileDir}: новая база его не получает.\n` +
+      `Запишите ключ в ${path.join(config.profileDir, "data", "auth.json")} (формат 0.4: каждая новая база берёт ключи оттуда) ` +
+      "или задайте EVAL_AGENT_PROVIDER_* в evals/.env; `auth login` хранит ключ только в базе, а она уходит в архив после попытки.",
     2,
   )
 }

@@ -115,6 +115,23 @@ if (command === "loginom" && process.env.EVAL_FAKE_ADMIT_PROFILE) {
   await Bun.write(path.join(profile, "cli-profile.json"), JSON.stringify({ format: "loginom-cli", version: 1, channel: "dev" }))
 }
 
+// `auth list --format json` of OpenCode 2: the integrations with a connection. A database it does not find it creates,
+// importing data/auth.json; the integrations file stands in for what that import keeps.
+if (command === "auth" && sub === "list") {
+  const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
+  const database = Bun.file(path.join(profile, "data/loginom-ai-agent.db"))
+  if (!(await database.exists())) await Bun.write(database, "fake auth list database")
+  const keys = Bun.file(path.join(profile, "data/auth.json"))
+  const imported = (await keys.exists()) ? Object.keys(await keys.json()).map((id) => ({ id, name: id, connections: [{ type: "credential" }] })) : []
+  if (process.env.EVAL_FAKE_AUTH_LIST_STDERR) {
+    process.stderr.write(process.env.EVAL_FAKE_AUTH_LIST_STDERR + "\n")
+    process.exit(1)
+  }
+  const file = process.env.EVAL_FAKE_INTEGRATIONS_FILE
+  process.stdout.write((file ? await Bun.file(file).text() : JSON.stringify(imported)) + "\n")
+  process.exit(0)
+}
+
 if (command === "loginom") {
   if (process.env.EVAL_FAKE_MANAGEMENT_ENV_FILE)
     await appendFile(process.env.EVAL_FAKE_MANAGEMENT_ENV_FILE, JSON.stringify({ sub,

@@ -97,56 +97,21 @@ test("writerIdentity: observes an owner published during initial guard creation"
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("assertAuth: shared mode refuses local auth and exposes only the provider status code", async () => {
+// The product CLI on OpenCode 2 has no shared OAuth store and no `providers status` receipt (B2.7b2).
+test("assertAuth: общий OAuth на OpenCode 2 отключён до любого процесса", async () => {
   const input = await sharedAuthFixture()
   try {
     const local = path.join(input.config.profileDir, "data/auth.json")
     await writeFile(local, '{"openai":{"type":"oauth","refresh":"local-canary"}}', { mode: 0o600 })
-    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "not_ready", code: "SHARED_AUTH_OAUTH_REQUIRED" }))
-    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } })).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
-    expect(JSON.parse((await Bun.file(input.calls).text()).trim())).toEqual({ args: ["providers", "status", "--provider", "openai", "--format", "json"],
-      sharedDir: input.config.auth.sharedDir, httpOnly: "false" })
-    expect(await Bun.file(local).text()).toContain("local-canary")
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-})
-
-test("assertAuth: shared mode admits only the public verified receipt without a local auth file", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
-      principal_sha256: "a".repeat(64), refresh_required: true }
-    await Bun.write(input.receipt, JSON.stringify(ready))
-    expect(await assertAuth(input.config, input.command)).toEqual({ generation: ready.generation,
-      principal_sha256: ready.principal_sha256, refresh_required: true })
-    expect(await Bun.file(path.join(input.config.profileDir, "data/auth.json")).exists()).toBe(false)
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-})
-
-test("assertAuth: shared receipt tampering cannot admit a slot or expose raw provider output", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
-      principal_sha256: "a".repeat(64), refresh_required: false }
-    for (const value of ["private-canary", { ...ready, provider: "other" }, { ...ready, generation: "private-canary" },
-      { ...ready, principal_sha256: "private-canary" }, { ...ready, refresh_required: "yes" },
-      { ...ready, status: "not_ready", code: "private-canary" }]) {
-      await Bun.write(input.receipt, JSON.stringify(value))
-      await expect(assertAuth(input.config, input.command)).rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
-    }
-    await Bun.write(input.receipt, JSON.stringify(ready))
-    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } }))
-      .rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-}, 20_000)
-
-test("assertAuth: shared grant and HTTP switch must match before any management process", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    for (const env of [{ ...input.command.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(input.root, "ungranted") },
-      { ...input.command.env, LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" }])
-      await expect(assertAuth(input.config, { ...input.command, env })).rejects.toThrow("SHARED_AUTH_ENV_MISMATCH")
-    expect(await Bun.file(input.receipt).exists()).toBe(false)
+    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "ready",
+      generation: crypto.randomUUID(), principal_sha256: "a".repeat(64), refresh_required: false }))
+    const refusal = await assertAuth(input.config, input.command).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toStartWith("SHARED_AUTH_UNSUPPORTED")
+    expect((refusal as EvalFailure).exitCode).toBe(2)
+    expect((refusal as EvalFailure).message).not.toContain("local-canary")
     expect(await Bun.file(input.calls).exists()).toBe(false)
+    expect(await Bun.file(local).text()).toContain("local-canary")
   } finally { await rm(input.root, { recursive: true, force: true }) }
 })
 
@@ -208,6 +173,27 @@ test("archiveProfileHistory: explicit slot history root receives evidence while 
     expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).exists()).toBe(false)
     expect(await Bun.file(path.join(profile, "cli-profile.json")).text()).toBe("settings")
     expect(await Bun.file(`${profile}.history`).exists()).toBe(false)
+    await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+// A Host that finds no marker migrates the profile as one older than 0.4.0 and removes every connection to a stand
+// other than app.loginom.ai (loginom-host `connection-store.ts`), so the stand must survive together with its marker.
+test("archiveProfileHistory: подключение к стенду остаётся вместе с маркером переноса 0.4.0", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-connection-"))
+  const profile = path.join(dir, "profile")
+  const connection = JSON.stringify({ generation: 1, revision: 1, url: "https://loginom.example.test/app/", username: "eval-a",
+    secrets: { format: "loginom-cli-secrets-v1", protection: "plaintext", payload: "fixture" } })
+  try {
+    await Bun.write(path.join(profile, "loginom/connection/connection.json"), connection)
+    await Bun.write(path.join(profile, "loginom/connection/v040-migration.json"), '{"state":"complete"}')
+    await Bun.write(path.join(profile, "loginom/connection/generations/1.json"), connection)
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "history-bytes")
+    const archive = await archiveProfileHistory(profile, "stand")
+    expect(await Bun.file(path.join(profile, "loginom/connection/connection.json")).text()).toBe(connection)
+    expect(await Bun.file(path.join(profile, "loginom/connection/v040-migration.json")).text()).toBe('{"state":"complete"}')
+    expect(await Bun.file(path.join(archive, "loginom/connection/generations/1.json")).text()).toBe(connection)
+    expect(await Bun.file(path.join(archive, "data/loginom-ai-agent.db")).text()).toBe("history-bytes")
     await assertProfileClean(profile)
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
@@ -819,15 +805,63 @@ test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой rese
   await expect(recoverIfNeeded(command, 1)).rejects.toThrow("LOGINOM_DOCK_API_KEY")
 })
 
-test("assertAuth: без auth.json — EvalFailure с командой providers login; с записью провайдера — ок", async () => {
+// OpenCode 2 keeps provider keys in the profile's database, which goes to the archive after every attempt; each
+// attempt's run creates a new database that imports data/auth.json. The check is what such a database lists (B2.7b2).
+test("assertAuth: ключ — то, что показывает auth list новой базы, а не запись в data/auth.json", async () => {
+  const { config, command, profileDir } = await fakeProfile()
+  // Outside the profile: the archive takes everything in it but the settings files.
+  const scratch = await mkdtemp(path.join(os.tmpdir(), "evals-auth-list-"))
+  const args = path.join(scratch, "args.json"), integrations = path.join(scratch, "integrations.json")
+  const listed = { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args, EVAL_FAKE_INTEGRATIONS_FILE: integrations } }
+  const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
+  try {
+    await mkdir(path.join(profileDir, "data"), { recursive: true })
+    // A record the new database does not import: the run would have no key.
+    await writeFile(path.join(profileDir, "data", "auth.json"), JSON.stringify({ openai: { type: "oauth" } }))
+    await writeFile(integrations, JSON.stringify([{ id: "anthropic", name: "Anthropic", connections: [{ type: "credential" }] }]))
+    const refusal = await assertAuth(openai, listed).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toContain("data/auth.json")
+    expect((refusal as EvalFailure).message).not.toContain("providers login")
+    expect(await Bun.file(args).json()).toEqual(["auth", "list", "--standalone", "--format", "json"])
+    await archiveProfileHistory(profileDir, "auth-check")
+    await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
+    await assertAuth(openai, listed)
+    await archiveProfileHistory(profileDir, "auth-check")
+    await rm(args)
+    const viaProvider = { ...config, agent: { ...config.agent, model: "xiaomi/mimo", provider: { id: "xiaomi", baseUrl: "u", apiKey: "k", modelId: "mimo" } } }
+    await assertAuth(viaProvider, listed)
+    expect(await Bun.file(args).exists()).toBe(false)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(`${profileDir}.history`, { recursive: true, force: true })
+    await rm(scratch, { recursive: true, force: true })
+  }
+})
+
+test("assertAuth: отказ auth list не переносит его stderr в сообщение", async () => {
   const { config, command, profileDir } = await fakeProfile()
   const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
-  await expect(assertAuth(openai, command)).rejects.toThrow("providers login")
-  await mkdir(path.join(profileDir, "data"), { recursive: true })
-  await writeFile(path.join(profileDir, "data", "auth.json"), JSON.stringify({ openai: { type: "oauth" } }))
-  await assertAuth(openai, command)
-  const viaProvider = { ...config, agent: { ...config.agent, model: "xiaomi/mimo", provider: { id: "xiaomi", baseUrl: "u", apiKey: "k", modelId: "mimo" } } }
-  await assertAuth(viaProvider, command)
+  const failing = { ...command, env: { ...command.env, EVAL_FAKE_AUTH_LIST_STDERR: "auth-list-stderr-canary" } }
+  try {
+    const refusal = await assertAuth(openai, failing).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toBe("AUTH_LIST_FAILED: auth list завершился кодом 1")
+  } finally { await rm(profileDir, { recursive: true, force: true }) }
+})
+
+test("assertAuth: база, оставшаяся в профиле, — отказ до auth list", async () => {
+  const { config, command, profileDir } = await fakeProfile()
+  const args = path.join(profileDir, "args.json"), integrations = path.join(profileDir, "integrations.json")
+  const listed = { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args, EVAL_FAKE_INTEGRATIONS_FILE: integrations } }
+  const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
+  try {
+    // A key only in this database (`auth login`) would pass the check and go to the archive before the attempt.
+    await Bun.write(path.join(profileDir, "data", "loginom-ai-agent.db"), "database with its own keys")
+    await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
+    await expect(assertAuth(openai, listed)).rejects.toThrow("PROFILE_DATABASE_PRESENT")
+    expect(await Bun.file(args).exists()).toBe(false)
+  } finally { await rm(profileDir, { recursive: true, force: true }) }
 })
 
 test("recoverIfNeeded: непустые recoveries → acknowledge → ready", async () => {

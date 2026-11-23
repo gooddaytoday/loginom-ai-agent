@@ -1,8 +1,11 @@
 import { expect, test } from "bun:test"
 import { Database } from "bun:sqlite"
-import { mkdtemp, rm } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { chmod, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { evalsRoot } from "../src/config"
+import { loadTasks } from "../src/task"
 import { copySelectionToolOutputs, readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
@@ -94,29 +97,140 @@ test("failed payload preflight preserves an incident and does not consume the mo
   }
 })
 
-test("empty stdout recovers only the exact own Session created during the CLI lifetime", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-test-"))
-  const filename = path.join(root, "snapshot.db")
-  const database = new Database(filename)
+// `loginom status` of 0.4 and of the product CLI on OpenCode 2 reports a saved connection whose Help its own Host has not
+// loaded yet as `configured`, without `hasApiKey` (B2.7b); `loginom check` decides readiness.
+test("a configured connection without hasApiKey reaches the connection check", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-status-test-"))
   try {
-    database.exec("CREATE TABLE session (id TEXT, parent_id TEXT, title TEXT, time_created INTEGER); " +
-      "CREATE TABLE message (id TEXT, session_id TEXT, data TEXT, time_created INTEGER); " +
-      "CREATE TABLE part (id TEXT, message_id TEXT, session_id TEXT, data TEXT, time_created INTEGER)")
-    database.run("INSERT INTO session VALUES (?, NULL, ?, ?)", [refreshIncident.sessionID, "own-exact-title", 1791885819700])
-    for (const message of refreshIncident.messages) database.run("INSERT INTO message VALUES (?, ?, ?, ?)",
-      [message.id, refreshIncident.sessionID, JSON.stringify(message), message.time.created])
-    for (const part of refreshIncident.parts) database.run("INSERT INTO part VALUES (?, ?, ?, ?, ?)",
-      [part.id, part.messageID, refreshIncident.sessionID, JSON.stringify(part), 1791885819742])
-    database.close()
-    const window = { title: "own-exact-title", startedAt: 1791885807486, finishedAt: 1791885821184 }
-    expect(readSelectionSnapshot(filename, "", window).sessionID).toBe(refreshIncident.sessionID)
-    expect(() => readSelectionSnapshot(filename, "", { ...window, title: "own-exact" })).toThrow("SELECTION_SESSION_INCOMPLETE")
-    expect(() => readSelectionSnapshot(filename, "", { ...window, startedAt: 1791885822000 })).toThrow("SELECTION_SESSION_INCOMPLETE")
+    const tasks = path.join(evalsRoot, "fixtures/node-selection")
+    const task = (await loadTasks(tasks, ["explicit-js"]))[0]!
+    const payload = path.join(root, "payload")
+    await Bun.write(path.join(payload, "cli-manifest.json"), "{}")
+    await Bun.write(path.join(root, "models.json"), "{}")
+    const binary = path.join(payload, "bin/loginom-ai-agent-cli")
+    await Bun.write(binary, `#!/bin/sh
+if [ "$2" = status ]; then echo '{"state":"configured","generation":1,"url":"http://localhost/","username":"user","folder":"/user"}'; fi
+if [ "$2" = check ]; then echo '{"ok":false,"code":"LOGINOM_KNOWLEDGE_UNAVAILABLE"}'; fi
+`)
+    await chmod(binary, 0o755)
+    const value = { ...pins(), resultsRoot: path.join(root, "results"), workspaceRoot: path.join(root, "inputs"), payload,
+      profile: path.join(root, "profile"), manifestSha256: sha256("{}"), frozenModelsPath: path.join(root, "models.json"), frozenModelsSha256: sha256("{}"),
+      tasks: { "explicit-js": { directory: path.join(tasks, "explicit-js"), mode: "explicit-js", attempts: [1], promptSha256: sha256(task.prompt),
+        inputHashes: Object.fromEntries(await Promise.all(task.inputs.map(async (input) => [input, sha256(await Bun.file(path.join(task.dir, input)).bytes())]))),
+        oracleSha256: sha256(await Bun.file(path.join(task.dir, "oracle.csv")).bytes()) } } }
+    const file = path.join(root, "pins.json")
+    await Bun.write(file, JSON.stringify(value))
+    const result = await runSelectionAttempt(file, "explicit-js", 1)
+    expect(result.blocker).toBe("SELECTION_CONNECTION_NOT_READY")
+    expect(result.modelStarted).toBe(false)
   } finally {
-    database.close()
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test("empty stdout recovers only the exact own Session created during the CLI lifetime", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-test-"))
+  const filename = path.join(root, "snapshot.db")
+  try {
+    writeV2Run(filename)
+    const window = { title: "own-exact-title", startedAt: 1795431136000, finishedAt: 1795431138000 }
+    expect(readSelectionSnapshot(filename, "", window).sessionID).toBe(v2Run.session.id)
+    expect(() => readSelectionSnapshot(filename, "", { ...window, title: "own-exact" })).toThrow("SELECTION_SESSION_INCOMPLETE")
+    expect(() => readSelectionSnapshot(filename, "", { ...window, startedAt: 1795431137000 })).toThrow("SELECTION_SESSION_INCOMPLETE")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("a session of OpenCode 2 reads in the snapshot shape that model start, receipts and audit read", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-v2-"))
+  const filename = path.join(root, "snapshot.db")
+  try {
+    writeV2Run(filename)
+    const snapshot = readSelectionSnapshot(filename, v2Run.session.id)
+    expect(snapshot).toMatchObject({ sessionID: v2Run.session.id, parentID: null, childSessionIDs: [] })
+    expect(snapshot.messages.map((message) => [message.id, message.role])).toEqual([
+      ["msg_user", "user"], ["msg_tools", "assistant"], ["msg_text", "assistant"], ["msg_idle", "idle"]])
+    expect(snapshot.messages[1]).toMatchObject({ sessionID: v2Run.session.id, providerID: "test", modelID: "test-model", variant: "default",
+      tokens: { input: 10, output: 2, reasoning: 0, cache: { read: 0, write: 0 } } })
+    expect(snapshot.messages[1]!.content).toBeUndefined()
+    // session_part rows of a message come before its inline content, as history.ts reads them.
+    expect(snapshot.parts.map((part) => [part.id, part.messageID, part.type, part.tool])).toEqual([
+      ["call_0_0", "msg_tools", "tool", "loginom_dock_node_wait"], ["call_1_0", "msg_tools", "tool", "loginom_dock_node_wait"],
+      ["call_2_0", "msg_tools", "tool", "read"], ["msg_text/0", "msg_text", "text", undefined]])
+    expect(snapshot.parts[1]).toMatchObject({ callID: "call_1_0", sessionID: v2Run.session.id, state: { status: "completed",
+      input: { operation_id: "op-1" }, output: receipt, metadata: { truncated: false }, time: { start: 1795431137369, end: 1795431137391 } } })
+    expect(snapshot.parts[2]).toMatchObject({ state: { status: "error", error: "File not found: missing.csv",
+      time: { start: 1795431137643, end: 1795431137654 } } })
+    expect(selectionModelStarted(snapshot, 0)).toBe(true)
+    const receipts = readSelectionAttemptReceipts(snapshot.parts)
+    expect(receipts.failures).toEqual([])
+    expect(receipts.calls.map((call) => [call.tool, call.start, call.end, call.output.status])).toEqual([
+      ["loginom_dock_node_wait", 1795431137300, 1795431137330, "SUCCEEDED"], ["loginom_dock_node_wait", 1795431137369, 1795431137391, "SUCCEEDED"]])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+// B2.7a4b: a run --command refused before the model leaves an empty session, and its error event carries that ID.
+test("the empty session of a run refused before the model is no model start", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-empty-"))
+  const filename = path.join(root, "snapshot.db")
+  try {
+    writeV2Run(filename)
+    const database = new Database(filename)
+    database.run("INSERT INTO session_v2 VALUES (?, NULL, ?, ?)", ["ses_refused", "refused-title", 1795431140000])
+    database.close()
+    const snapshot = readSelectionSnapshot(filename, "ses_refused")
+    expect(snapshot).toEqual({ sessionID: "ses_refused", parentID: null, childSessionIDs: [], messages: [], parts: [] })
+    for (const code of [1, 2, 4]) expect(selectionModelStarted(snapshot, code)).toBe(null)
+    expect(readSelectionSnapshot(filename, "", { title: "refused-title", startedAt: 1795431139000, finishedAt: 1795431141000 }).sessionID)
+      .toBe("ses_refused")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+// Rows a product run on OpenCode 2 left with a scripted model (B2.7b2: a tool, a failed tool, then text), sanitized; the
+// tools are named as Dock's, and one more tool sits in a session_part row, as OpenCode 2 splits content of a message.
+const receipt = JSON.stringify({ operation_id: "op-1", state: "settled", status: "SUCCEEDED", cleanup_complete: true })
+const model = { id: "test-model", providerID: "test", variant: "default" }
+const tokens = { input: 10, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }
+const v2Run = {
+  session: { id: "ses_v2", title: "own-exact-title", time: 1795431136848 },
+  messages: [
+    { id: "msg_user", type: "user", seq: 5, data: { time: { created: 1795431137231 }, text: "Посчитай сумму qty", files: [] } },
+    { id: "msg_tools", type: "assistant", seq: 6, data: { time: { created: 1795431137284, completed: 1795431137397 }, agent: "build", model,
+      content: [
+        { type: "tool", id: "call_1_0", name: "loginom_dock_node_wait", executed: false, state: { status: "completed", input: { operation_id: "op-1" },
+          content: [{ type: "text", text: receipt }], metadata: { truncated: false } }, time: { created: 1795431137354, ran: 1795431137369, completed: 1795431137391 } },
+        { type: "tool", id: "call_2_0", name: "read", executed: false, state: { status: "error", input: { path: "missing.csv" },
+          error: { type: "tool.execution", message: "File not found: missing.csv" } }, time: { created: 1795431137634, ran: 1795431137643, completed: 1795431137654 } },
+      ], finish: "tool-calls", rawFinish: "tool_calls", cost: 0, tokens } },
+    { id: "msg_text", type: "assistant", seq: 14, data: { time: { created: 1795431137420, completed: 1795431137441 }, agent: "build", model,
+      content: [{ type: "text", text: "Сумма qty: 3." }], finish: "stop", rawFinish: "stop", cost: 0, tokens } },
+    { id: "msg_idle", type: "idle", seq: 20, data: { time: { created: 1795431137452 }, outcome: "succeeded" } },
+  ],
+  parts: [{ message_id: "msg_tools", ordinal: 0, data: { type: "tool", id: "call_0_0", name: "loginom_dock_node_wait", executed: false,
+    state: { status: "completed", input: { operation_id: "op-0" }, content: [{ type: "text", text: receipt }] },
+    time: { created: 1795431137290, ran: 1795431137300, completed: 1795431137330 } } }],
+}
+
+// The columns of OpenCode 2's session tables the snapshot reads (core/src/session/sql.ts).
+function writeV2Run(filename: string) {
+  const database = new Database(filename)
+  database.exec("CREATE TABLE session_v2 (id TEXT PRIMARY KEY, parent_id TEXT, title TEXT, time_created INTEGER); " +
+    "CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT, seq INTEGER, time_created INTEGER, data TEXT); " +
+    "CREATE TABLE session_part (message_id TEXT, session_id TEXT, ordinal INTEGER, type TEXT, call_id TEXT, time_created INTEGER, data TEXT)")
+  database.run("INSERT INTO session_v2 VALUES (?, NULL, ?, ?)", [v2Run.session.id, v2Run.session.title, v2Run.session.time])
+  // Inserted out of seq order: the snapshot orders them.
+  for (const message of [...v2Run.messages].reverse()) database.run("INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?)",
+    [message.id, v2Run.session.id, message.type, message.seq, message.data.time.created, JSON.stringify(message.data)])
+  for (const part of v2Run.parts) database.run("INSERT INTO session_part VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [part.message_id, v2Run.session.id, part.ordinal, part.data.type, part.data.id, part.data.time.created, JSON.stringify(part.data)])
+  database.exec("PRAGMA journal_mode = WAL")
+  database.close()
+}
 
 // Sanitized shape of the 2026-10-13 pilot: no private paths, prompt, attachments or credentials.
 const refreshIncident = {
@@ -224,4 +338,8 @@ function pins() {
       promptSha256: "e".repeat(64), inputHashes: { "data/dataset.csv": "f".repeat(64) }, oracleSha256: "0".repeat(64),
     } },
   }
+}
+
+function sha256(value: string | Uint8Array) {
+  return createHash("sha256").update(value).digest("hex")
 }
