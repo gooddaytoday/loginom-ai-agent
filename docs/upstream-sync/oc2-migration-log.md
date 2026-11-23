@@ -7108,3 +7108,281 @@ Found 517 warnings and 0 errors.
 - Напоминание G4 читает `session.context` — сообщения от последнего сжатия; 0.4 читал всю историю. Сжатие посреди попытки
   может потерять её `start` или напоминание.
 - Напоминание G4 с настоящими инструментами браузера — после B2.5d.
+
+## B2.5d Каталог Dock и вложения
+
+22.11.2026. Ветка `b25d-dock-catalog` от `oc2-migration` (`39092e33a1`: B2.1…B2.5c, B2.3, B3, B4), рабочее дерево
+`.claude/worktrees/b25d`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите.
+Основа — 0.4 `a080f7725c`: `packages/opencode/src/product/{tool-contributor,attachment-resolver,turn-lifecycle}.ts`,
+`src/session/{tools,loginom-result}.ts`, `src/tool/loginom-local-file.ts` (квитанции вложений), их тесты
+(`test/product/{tool-contributor,attachment-resolver}.test.ts`, `test/session/{profile-tools,loginom-result,loginom-truncation}.test.ts`,
+`test/tool/loginom-local-file.test.ts`); `loginom-host/src/{task-scope,host-port,adapter,attachment-receipt}.ts`. Задача вышла
+больше M; сделаны обе части плана резки: B2.5d1 (каталог Dock и привязка к Host) и B2.5d2 (вложения, сжатие, квитанции),
+кроме функций `attachmentResolver`, которые меняли сам промпт (раздел «Вынесено»).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `98c53f9425` `feat(loginom-agent): Dock catalog by connection generation and Host task binding (B2.5d)` | `packages/loginom-agent/src/{dock,loginom-result}.ts` (новые), каталог, привязка и подсказки в `src/index.ts`, `ServiceHost.acquire` сообщает причину отказа (`src/host.ts`), экспорт набора локальной справки (`src/access.ts`); тесты `packages/loginom-agent/test/loginom-result.test.ts`, `packages/server/test/loginom-dock-catalog.test.ts` и `test/fixture/loginom-dock-host.ts` (новые файлы форка), правки `loginom-local-file.test.ts` и `loginom-host-lease.test.ts` |
+| `c81efbe42e` `feat(loginom-agent): attachment receipts and attachments carried through compaction (B2.5d)` | хуки `prompt` и `compaction` в `src/local-file.ts`; случаи `changed`/`stable` в `loginom-local-file.test.ts`; сжатие, откат и контракт хука `compaction` в `loginom-package-docs.test.ts` |
+| `ede9ca4dbc` `test(server): a failed catalog hides Dock tools another session registered` | случай отказа каталога ловит мутацию `hide` |
+| `869c527329` `test(server): port the profile snapshot case and check the registry keeps one generation` | случай 0.4 `profile-tools` для трёх профилей, проверка реестра Location при смене поколения; поиск перенесённых вложений без лишнего условия; ID сообщений ядра в тестах сжатия |
+| следующий | этот раздел, `guarantees.md`, `catalog.md` |
+
+### Что сделано
+
+1. **Каталог Dock по поколению подключения** (`toolContributor.contribute` 0.4) — `src/dock.ts`. В 0.4 инструменты сессии
+   строились на каждом ходе. В v2 снимок инструментов шага берётся в `SessionContext.select` до хуков шага, а хук не может
+   добавить инструмент, которого нет в реестре (`model-request.ts`: «Entries matching neither were invented by a hook and are
+   dropped»). Поэтому:
+   - реестр плагина (`ctx.tool.transform` + `ctx.tool.reload()`) держит инструменты Host **текущего поколения** как
+     `loginom_<имя>` (схема без `host_context_token`, у `dock_prepare` — `local_package_path`, `codemode: false`); новое
+     поколение заменяет их целиком;
+   - каждая сессия видит только то, что предлагает **её прогон Host** (`hide` в хуках `context`, `compaction`, `generate`);
+     по профилю по-прежнему решает шлюз B2.2 (`permits`);
+   - каталог читается через аренду исполнения на каждой границе шага (хук `context`, как 0.4 на каждом ходе) и заранее —
+     при приёме промпта (хук `prompt`), после выданного навыком допуска и после каждого вызова Dock (`execute.after`), чтобы
+     снимок следующего шага уже имел новые имена;
+   - файловые инструменты B2.5a/b (`loginom_file_admit/profile/scan/sample`) — только рядом с подготовленным Dock (в
+     каталоге есть `dock_action_describe`), как в 0.4; скриншот браузера — только модели с вводом изображений;
+   - вызов Dock (`execute` 0.4): вопрос `loginom_<имя>`, `local_package_path` для `dock_prepare` (снимок `.lgp`, путь ОС в Host
+     не уходит), квитанция точного прохода для `dock_node_apply`, встроенные вложения (`data:`) как допуск к прогону, кроме
+     справки и диагностики, состояние ответа (`loginom-result.ts`: провал — ошибка вызова, `running` — `loginomPending`),
+     `outputFiles` — в `metadata`, изображения — файлами результата; ответ больше лимита OpenCode со сводкой управления —
+     сводка, полный текст — в `<data>/tool-output`.
+2. **Вложения** (`attachmentResolver` 0.4) через хуки `prompt` и `compaction` — `src/local-file.ts`. **Сжатие сохраняет
+   вложение:** хук `compaction` записывает вложения сообщений, которые сжатие сворачивает, под ID открытого сообщения сжатия
+   (хранилище плагина); пока это сжатие возглавляет контекст сессии, вложения разрешают свой файл без вопроса. Тест
+   обратного поведения B2.5c перевёрнут: `a completed compaction preserves the visible original attachment's read authorization`.
+3. **Привязка задачи к Host и подсказки модели** (хвост B2.3). Прогон Host привязывается к задаче до чтения каталога:
+   первый раз — сразу с профилем задачи (как 0.4 привязывал профиль из истории), новая задача того же прогона — `bind`
+   `default`, затем `request` и `apply` допуска (как 0.4 для команды или загруженного навыка); неизменная привязка Host не
+   спрашивает. Подсказки 0.4 `turnLifecycle.system` — в системной части запроса: «Loginom is available…» при аренде,
+   «Loginom tools are currently unavailable (acquire|scope|catalog: …)» при отказе. `loginom_file_admit` больше не получает
+   `LOGINOM_SCOPE_DENIED` от Host из-за непривязанной задачи: на настоящем Host под допуском виден `loginom_dock_prepare`,
+   его вызов доходит до подготовки подключения (`LOGINOM_CONFIG_REQUIRED`).
+4. **Квитанции вложений** (хвост B2.5a). Хук `prompt` модуля снимает идентичность (`inspectReferenceFile`) каждого файла,
+   приложенного по пути, и хранит её с сообщением. Вложение разрешает файл, только пока тот не изменился (`changed` →
+   `LOGINOM_FILE_CHANGED`), и квитанция проверяется ещё раз перед приёмом (`stable`: изменение после авторизации →
+   `LOGINOM_FILE_CHANGED` из `verifyAttachment`).
+
+### Правки файлов upstream
+
+Нет. Новые файлы форка: `packages/loginom-agent/src/{dock,loginom-result}.ts`,
+`packages/loginom-agent/test/loginom-result.test.ts`, `packages/server/test/loginom-dock-catalog.test.ts`,
+`packages/server/test/fixture/loginom-dock-host.ts`; изменены файлы форка `packages/loginom-agent/src/{index,host,access,local-file}.ts`
+и тесты форка `packages/server/test/{loginom-local-file,loginom-package-docs,loginom-host-lease}.test.ts`. Без Host каталог
+пуст, поэтому тест upstream `core/test/location-layer.test.ts` не менялся. `catalog.json` не менялся (CAT-05 `pending` —
+B2.5, B2.6, B2.9: от B2.5 остались вложения, меняющие промпт); в `catalog.md` записано, что сделано.
+
+### Что поменялось против 0.4 и почему
+
+- **Реестр поколения вместо инструментов хода** — см. п. 1. Имена, описания и схемы — из каталога Host, как в 0.4;
+  `ProviderTransform.schema` 0.4 не нужен: схему под провайдера переводит ядро v2.
+- **Аренда берётся уже при приёме промпта.** Хук `prompt` читает каталог заранее, и для этого берёт аренду исполнения
+  (`hold`, B2.3): иначе первый шаг после смены поколения или в новом экземпляре плагина шёл бы без инструментов Dock (снимок
+  раньше любого хука, событие `session.execution.started` асинхронно). Steer-промпт во время исполнения получает ту же
+  аренду и прогон не перепривязывает: это сделает граница шага. Тест B2.3 «S2 interruption» ждёт теперь вызова модели, а не
+  аренды (аренда появляется раньше начала исполнения).
+- **Отказ Host в привязке не снимает допуск плагина.** Допуски B2.2 от Host не зависят (`package_docs_run` работает без
+  Host). Отказ `scope` скрывает инструменты Dock сессии и сообщает модели причину; 0.4 при отказе `bind` завершал ход ошибкой.
+- **`ServiceHost.acquire` отклоняется с причиной Host** (раньше — `undefined`): подсказка 0.4 называет отказ
+  (`acquire: LOGINOM_RECOVERY_REQUIRED`). Без Host (`start` не вызывался или Node host не поднялся) — по-прежнему `undefined`,
+  без подсказки, как 0.4 без аренды.
+- **Скриншот.** Хук `context` знает только `Model.Ref`; возможности модели — из `ctx.model.list()`. Модель не найдена — скриншот
+  не предлагается.
+- **Урезание ответа.** 0.4 урезал ответ Dock сам (`Truncate`) и при урезании отдавал сводку управления. Плагину сервис
+  урезания ядра недоступен: ответ больше лимитов OpenCode по умолчанию (2000 строк, 50 КиБ — константы `core/src/tool-output.ts`
+  продублированы) со сводкой отдаётся сводкой с `truncated: true` и `outputPath` в каталоге `tool-output` ядра (его хранение
+  7 дней чистит и этот файл); без сводки `truncated` не ставится, и урезает ядро.
+- **Встроенные вложения как допуск к прогону.** 0.4 передавал в вызов Dock файлы `data:` из сообщений пользователя (в CLI
+  0.4 так становились все вложения). В v2 у каждого вложения есть байты; взято узкое прочтение: только вложения с
+  источником `inline` (вставленные `data:`) и именем, кроме `.lgp`. Файл по пути — через `loginom_file_admit`, как Desktop 0.4;
+  паритет CLI `--file` — B2.7a.
+- **Квитанции — в хранилище плагина**, а не в `loginom-host/src/attachment-receipt.ts`: тот пишет в `~/.local/state` под
+  настоящим `homedir()` (тесты писали бы в каталог машины), а его поле `source.text` у вложения v2 отсутствует. Ключ —
+  сессия, сообщение и URI; владелец задан ключом (0.4: файл `.owner`). Квитанцию снимает каждый экземпляр `localFiles`
+  (продукт и стенды тестов) в своём хуке `prompt`.
+- **Сжатие.** 0.4 повторял промпт с вложением; v2 держит хвост рядом со сводкой только текстом. Перенос привязан к ID
+  сообщения сжатия, открытого в момент хука: проваленное сжатие контекст не возглавляет, откат за сжатие убирает его из
+  контекста. Контракт проверен тестом (ниже).
+
+### Тесты
+
+`packages/server/test/loginom-dock-catalog.test.ts` — настоящий сервер (`createEmbeddedRoutes`), модель `TestLLM` по сценарию,
+Host по сценарию (`fixture/loginom-dock-host.ts`: порт `node-client`, правила привязки `host-port.ts`, поколение в каждом
+ответе, каталог и ответы вызовов задаёт тест) через `ServiceHost.start({ connect })`; навыки продукта — проверенный каталог
+ресурсов, как в B2.2.
+
+| Случай 0.4 | На v2 |
+|---|---|
+| `tool-contributor`: `the default profile receives only the read-only local tools`, `automation receives the whole catalog under the loginom_ prefix without the host token` | проходят (один тест): `default` — `loginom_find`; `loginom-automation` — `dock_prepare, dock_run, find`, схемы без токена, у `dock_prepare` — `local_package_path`; каждый прогон привязан один раз к своей задаче |
+| `a local file can be registered only by automation, and only when the catalog describes dock actions` | проходит |
+| `a screenshot tool is offered only to a model that accepts images` | половина текстовой модели проходит; модель с изображениями не проверена: модель стенда подменена (`SessionRunnerModel`), в `model.list` её нет |
+| `a failed catalog request adds nothing and records the failure` | проходит, с текстом подсказки; плюс отказ аренды (`acquire: LOGINOM_RECOVERY_REQUIRED`) |
+| `a turn without a task gets no Loginom tools` | переписан: в v2 у каждого промпта есть задача; без аренды Host инструментов Dock и подсказки нет — тесты B2.2, B2.5a…c идут без Host |
+| `host outputFiles are private metadata while model-facing output stays byte-identical` | проходит (история сессии: `metadata.outputFiles`, содержимое байт в байт) |
+| `profile-tools`: `${profile} snapshot binds the same task and filters an overbroad Host catalog` ×3 | проходит (один тест на три профиля) |
+| `local package prepare snapshots bytes into its private input and strips the OS path`, `…rejects invalid source combinations before Host dispatch` | проходят (один тест; плюс отказ не-`.lgp`) |
+| `browser recovery publishes the screenshot tool only to an image model` ×2 | текстовая половина — в первом тесте; модель с изображениями — как выше |
+| `Dock calls exclude local reference attachments from repeated byte admission` | переписан под v2: файл по пути в допуск вызова не идёт, вставленный — идёт; у справки допуска нет |
+| `loginom-result` (3), `loginom-truncation` (2) | проходят в `packages/loginom-agent/test/loginom-result.test.ts`; урезание через сам инструмент — в тесте ответов ниже |
+| `loginom-local-file`: `attachment receipt authorization: changed`, повторная проверка в `stable` | проходят (`loginom-local-file.test.ts`) |
+| `package-docs`: `a compaction replay preserves the visible original attachment's read authorization` | проходит в виде «завершённое сжатие сохраняет вложение» (тест обратного поведения B2.5c перевёрнут) |
+| `attachment-resolver` (5): `mentionMime`, `packageParts`, `subtaskText`, `snapshot` (два) | не перенесены — раздел «Вынесено» |
+
+Новые случаи `loginom-dock-catalog.test.ts`: смена поколения между исполнениями (первый шаг следующего исполнения — уже
+новое поколение: старый инструмент ушёл, изменённое описание изменилось) и внутри одного (поколение сменилось во время
+вызова — следующий шаг его предлагает; реестр Location держит только текущее поколение); самодопуск навыком (`bind`
+`default`, затем `request`/`apply` на том же прогоне) и steer-промпт мастера в идущее исполнение (новая задача: `bind`
+`default`, `request`, `apply` на границе шага); ответы Dock (провал квитанции — ошибка вызова, большой ответ — сводка и
+сохранённый оригинал, допуск вставленного вложения); контракт ядра: перезагрузка реестра в хуке `prompt` видна первому шагу,
+в `execute.after` — следующему, в `context` — только следующему; `context` пишет в системную часть.
+
+`loginom-package-docs.test.ts`: перевёрнутый случай сжатия; `a failed compaction carries nothing past a revert of the
+attachment` (сжатие, вложение, проваленное сжатие, откат сообщения с вложением — снова вопрос `read`); контракт хука
+`compaction`: при хуке сообщение сжатия открыто (`running`) и после завершения возглавляет контекст под тем же ID;
+проваленное сжатие сохраняет своё сообщение, контекст не возглавляет.
+
+`loginom-local-file.test.ts`: случаи `changed` и повторная проверка `stable`; тесты шлюза B2.5a и B2.5b1 идут с Host по
+сценарию, чей каталог описывает действия Dock: без него файловые инструменты по условию 0.4 не предлагаются. Тест шлюза
+`loginom_file_admit` доходит до приёма файла в Host (`artifact-1`, вопросы `loginom_file_admit`, `read`).
+
+`loginom-host-lease.test.ts`: случай «`loginom_file_admit` доходит до Host…» заменён случаем привязки на настоящем Node host
+(без допуска — `loginom_dock_diagnostics`; под допуском мастера — плюс `loginom_dock_prepare`; вызов — `LOGINOM_CONFIG_REQUIRED`,
+не `LOGINOM_SCOPE_DENIED`): по `loginom_file_admit` её не проверить — без runtime Host отказывает в приёме и после `apply`.
+
+### Мутации
+
+Скрипты во временном каталоге: мутация — замена строки Python, затем `bun test --timeout 30000
+test/loginom-dock-catalog.test.ts` из `packages/server` (M2 — ещё случай настоящего Host в `loginom-host-lease.test.ts`;
+D — `loginom-local-file.test.ts` и `loginom-package-docs.test.ts` без 60-секундного случая), файл возвращается
+`git checkout`; после последней — `git status` без изменений кода. M1–M18 — на `ede9ca4dbc` (9 тестов), M1, M2, M7, M19 —
+повторно на `869c527329` (10 тестов), D — на `c81efbe42e`, D3 и D4 повторно на `869c527329`.
+
+```text
+=== M0  none                                        dock-catalog 9/0; на 869c527329 — 10/0
+=== M1  hide keeps tools the run does not offer     9/1 (869c527329): a failed catalog request…
+=== M2  no task binding                             7/3 (869c527329): default/automation, each profile's snapshot, self grant;
+                                                    host-lease (настоящий Host) 1/0 → 0/1
+=== M3  a later task binds its grant directly       8/1: self grant / steer
+=== M4  no registry reload                          1/8
+=== M5  no refresh on an admitted prompt            2/7
+=== M6  no refresh after a grant or Dock call       8/1: generations (внутри исполнения)
+=== M7  file tools without Dock actions             6/4 (869c527329)
+=== M8  screenshot for a text model                 8/1
+=== M9  host token kept                             8/1
+=== M10 no model hint                               7/2
+=== M11 refused lease not reported                  8/1
+=== M12 help calls carry attachments                8/1
+=== M13 files on disk admitted eagerly              8/1
+=== M14 no control summary                          8/1
+=== M15 failed receipt completes                    8/1
+=== M16 outputFiles dropped                         8/1
+=== M17 local_package_path combinations unchecked   8/1
+=== M18 non-lgp package accepted                    8/1
+=== M19 generation change keeps old tools           9/0 на ede9ca4dbc — не поймана; 9/1 на 869c527329 (проверка реестра)
+=== D0  none                                        local-file 41/0; package-docs 41/0
+=== D1  no receipt taken                            local-file 39/2: attachment authorization: stable, changed
+=== D2  receipt not checked again                   local-file 39/2: stable, changed
+=== D3  compaction carries nothing                  package-docs 40/1: a completed compaction preserves…
+=== D4  carry kept per session, not per compaction  package-docs 40/1: a failed compaction carries nothing…
+```
+
+M19 до `869c527329` не ловилась: видимость держит `hide`, очистка реестра только убирает инструменты старого поколения из
+списка Location. Мутация «перенос считается без ведущего сжатия» на `c81efbe42e` (41/0, не поймана) показала лишнее
+условие: записи есть только под ID сообщений сжатия, и контекст начинается с последнего завершённого; условие убрано в
+`869c527329`.
+
+### Приёмка
+
+Полные прогоны по одному пакету, `bun test` из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci`
+клиента сделан; `loginom-host` — под `xvfb-run -a`. База — числа задания для `39092e33a1`.
+
+| Пакет | База `39092e33a1` | Итог |
+|---|---|---|
+| `loginom-agent` | 53 pass, 0 fail | на `869c527329`: 58 pass (+5: `loginom-result.test.ts`), 0 fail |
+| `server` | 234 pass, 3 skip, 0 fail | на `869c527329`: 247 pass (+13: `loginom-dock-catalog` 10, `changed` в `loginom-local-file` 1, сжатие с откатом и контракт `compaction` в `loginom-package-docs` 2), 3 skip, 0 fail |
+| `loginom-host` | 538 pass, 13 skip, 5 fail | на `98c53f9425`: 539 pass, 12 skip, 5 fail — те же базовые (`cli-manifest` umask, три `bundled-ripgrep`, `managed-work-entry` под root); пакет не менялся (`git diff 39092e33a1 HEAD -- packages/loginom-host` пуст) и от `loginom-agent` не зависит, пропуск зависит от окружения, как в B2.2 |
+| `core` (`test/plugin/product.test.ts`, `test/location-layer.test.ts`) | — | 29 pass, 2 skip, 0 fail (без Host реестр Dock пуст, список инструментов location прежний) |
+| `cli` (`test/loginom-host.test.ts`, `ServiceHost.acquire` изменён) | 1 / 0 (B2.3) | 1 pass, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0; файлов upstream не менял
+against a6b15d33daf6: 441 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                             # код 0
+$ bun install --frozen-lockfile
+Checked 1687 installs across 2060 packages (no changes)
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 222 files                                     # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 1,633 files across 2 projects                 # tsc -b — код 0
+$ bun run check                                                   # на 869c527329, код 0
+Found 558 warnings and 0 errors.                                  # у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+Сканер секретов на каждом коммите — `{"status":"clean",…}`. Паролей и ключей в тестах нет: Host по сценарию, подключение
+настоящего Node host — `unconfigured`.
+
+### Где решал сам
+
+- **Обе части в одной задаче.** План резки B2.5d1/B2.5d2 допускал вынести вторую с оценкой; сжатие и квитанции оказались
+  меньше привязки и каталога (около 90 строк в `local-file.ts`), сделаны здесь. Не сделано то, что меняет промпт (ниже).
+- **Аренда при приёме промпта** — ради снимка первого шага (см. «Что поменялось»). Цена: промпт, после которого исполнения
+  нет (`resume: false`, отказ после хука `prompt`), держит аренду до конца следующего исполнения сессии или выгрузки
+  плагина; запись аренды на диске после убийства находит `ServiceHost.start`.
+- **Каталог читается дважды на первом шаге** (хук `prompt` и `context`) и после каждого вызова Dock: лишние запросы
+  `tools` к Host. Это цена того, что снимок шага берётся раньше хуков; иначе новый инструмент появлялся бы на шаг позже.
+- **Привязка — только на границе шага**, раньше — только для свежего прогона и для того же task: `host-port.ts` отказывает
+  в `bind` при идущем вызове, а хук `prompt` срабатывает при приёме, когда вызов может идти.
+- **Отказ привязки не отменяет допуск** (см. выше); подсказка называет фазу (`scope: LOGINOM_SCOPE_DENIED`).
+- **Узкое прочтение допуска вложений к вызову Dock** и **квитанции в хранилище плагина** — см. «Что поменялось».
+- **Перенос через сжатие хранится под ID сообщения сжатия**, а не в памяти и не «последний для сессии»: проваленное сжатие
+  и откат проверены тестом и мутацией D4.
+- **Host по сценарию в тестах**, а не настоящий Node host: поколение подключения без настоящего Loginom не меняется.
+  Настоящий Node host проверяет только то, что ему доступно без подключения: привязку (`dock_prepare` в каталоге) и вызов.
+- **Тесты шлюза B2.5a/b перенесены на Host по сценарию**, тест B2.3 про `loginom_file_admit` заменён случаем привязки: с
+  условием 0.4 файловые инструменты без каталога Dock не предлагаются.
+
+### Найдено, не чинил
+
+- Квитанции и перенесённые сжатием вложения в хранилище плагина ничем не удаляются (как хранилище квитанций 0.4 и
+  `file-profiles`).
+- После сжатия квитанция выборки `loginom_file_sample` по-прежнему уходит из контекста: файл выборки снова спрашивает
+  `read` (задача называет только вложения).
+- Фоновая сводка (`compaction.precompute`, по умолчанию выключена) вызывает хук `compaction` без открытого сообщения
+  сжатия: при её подстановке вложения не переносятся, вызов снова спрашивает `read` (в безопасную сторону).
+- Реестр Dock — память экземпляра плагина: после перезапуска службы первый шаг первого исполнения получает инструменты
+  через хук `prompt`; исполнение, возобновлённое `SessionRestart` без промпта, получает их со второго шага.
+- Смена поколения посреди шага: запрос шага уже собран со старыми инструментами, вызов старого инструмента Host отклоняет
+  сам (`run.catalog`).
+
+### Вынесено (с оценкой)
+
+Функции `attachmentResolver` 0.4, которые меняли промпт, и их случаи `attachment-resolver.test.ts`:
+
+- `packageParts` (пакет `.lgp` — путь текстом вместо байтов) и `referenceParts` (файл больше 16 МиБ — ссылка с квитанцией;
+  v2 отклоняет вложение больше 20 МиБ при приёме). Хук `prompt` выполняется до чтения вложения
+  (`core/src/session/prompt.ts`: `hooks.trigger("session", "prompt")`, затем `materializeAttachment`) и может заменить
+  вложение `data:`-текстом с `source: { type: "uri", uri: <файл> }`: модель получит путь, а `source` вложения по-прежнему
+  разрешит файл (`package_docs_run`, `loginom_file_*`). Оценка — S, полдня с тестами (B2.5c `extract` по вложению, предел
+  20 МиБ).
+- `subtaskText` (путь пакета подзадаче): подсессия v2 получает только текст (B2.2); вместе с `packageParts`, XS.
+- `snapshot` (байты вложения CLI как `data:`) и `mentionMime`: в v2 байты читает ядро, тип определяет `Mime.detect`;
+  паритет CLI `--file` — B2.7a, упоминания в TUI и приложении — этап C.
+- `retainCompacted` (`data:`-ссылки сжатых сообщений): в v2 вложения хранятся блобами сессии (`media:`), переносить нечего.
+
+### Не проверено
+
+- Настоящий Loginom и браузерный runtime: инструменты браузера после `dock_prepare`, `dock_action_describe` от настоящего
+  Host, смена поколения при переподключении — только Host по сценарию.
+- Скриншот для модели с изображениями, настоящая модель, Desktop, CLI, установленная сборка, Windows и macOS.
+- Хуки `compaction`/`generate` с каталогом сессии вне исполнения (после окончания исполнения каталог сессии забывается) —
+  по коду.
