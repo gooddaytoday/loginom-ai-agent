@@ -4,9 +4,9 @@ import {createNativeVariantReader} from './variant-native-read.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {adaptCell} from './variant-native-values.mjs';
 import {collectNativeRuntime} from './collapse-native-runtime.mjs';
-import {nativeRuntimePins,nativeVariablePins,nativeTreePins} from './collapse-native-runtime-pins.mjs';
+import {nativeRuntimePins,nativeVariablePins,nativeTreePins,nativeDataSourcePins} from './collapse-native-runtime-pins.mjs';
 const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,treePins:nativeTreePins,
- variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins};
+ variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins,sourcePins:nativeDataSourcePins};
 
 export function makeNodeVariableOutputCode(binding,options){
  validatePreparedNodeContext(binding);
@@ -455,7 +455,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
    // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
    const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
-   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,directSource:sourceBaseline.interfaceId===71,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins,undefined,variant.sourcePins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const direct=sourceBaseline.interfaceId===71;
    const batch=direct&&requested>0?await (async()=>{

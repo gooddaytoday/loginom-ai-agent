@@ -82,3 +82,8 @@ export const nativeTreePins=Object.freeze({
  get_reader:'ca82cebf714d2854aeb1adc60dfc0678e7d19844348760303937e4a6d41cd730',
  get_as_variant:'29323b4c72312231cd0781a87aafba588ada0fa952f84770fc376617f37db36e',
 });
+
+// LAB-1943, Loginom 7.4.2: direct DataSource71 AsVariant166 (row, column).
+export const nativeDataSourcePins=Object.freeze({
+ as_variant:'cbad2c6d75a8fa3b54bc73acc3002172622c8ac329b5be6f505e4440294f855a',
+});

@@ -646,6 +646,21 @@ const observedCapability=tag=>({read:`async(source,options,decode)=>({pending:0,
  const frame=[...${JSON.stringify(collapseObserved[tag][0])},...Array(${48-collapseObserved[tag][0].length}).fill(0)],d=decode(frame,60);
  return {row,column,tag:d.tag,payload:frame.slice(0,d.consumed_bytes),frame_size:60,...(d.tag===7?{civilTime:{value:'2026-11-07T12:00:00.000',timezone:'America/New_York'}}:{})};}})`,
  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}});
+test('typed interface71 output selects its own exact source reader and retains the native subtype',async()=>{
+ const f=fixture({rows:[[false]],types:[6],batch:async(_source,_offset,_count,...out)=>{
+  [ [[false]],[],[],[],[],[],[[false]] ].forEach((value,index)=>{out[index].value=value;});
+ }}),variant=observedCapability(11);
+ variant.read=`async(source,options,decode,collect,pins,treePins,sourcePins)=>{
+  if(source.$.$I!==71||options.directSource!==true||sourcePins?.as_variant!=='test-pin')throw Error('wrong direct source binding');
+  return (${variant.read})(source,options,decode);
+ }`;
+ variant.sourcePins={as_variant:'test-pin'};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.equal(result.output.sample[0][0].cell_type,'boolean');assert.equal(result.output.sample[0][0].value,true);
+ assert.deepEqual(f.rpcCalls,[]);assert.ok(f.disposed.includes('dataSource'));
+});
 for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value with subtype for observed native tag '+tag,async()=>{
  const options={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},rows=[[1,tag===1?null:'shown']];
  if(tag!==1){

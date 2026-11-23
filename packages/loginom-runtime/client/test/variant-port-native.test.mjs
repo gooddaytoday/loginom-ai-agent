@@ -46,9 +46,9 @@ test('civil datetime is additive; the legacy scalar envelope remains unchanged',
  for(const bad of [{...cell,timezone:''},{...cell,value:'2026-01-02'}, {...cell,native:{...cell.native,civil_time_verified:false}}])assert.equal(validate(bad).valid,false);
 });
 
-function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false,treeValue=false}={}){
+function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false,treeValue=false,directSource=false}={}){
  const environment={crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,DataView,setTimeout,clearTimeout,decode:decodeVariantFrame,
-  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue,treeValue};
+  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue,treeValue,directSource};
  const context=vm.createContext(environment);
  // Exact observed frontend implementations, pinned by the production reader.
  vm.runInContext(`Date.FromOADate=function (d) {
@@ -64,8 +64,8 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
         return result;
     };
  var counters={requests:0,releasedRequests:0,releasedResponses:0},next;
- var source={$:{$I:treeValue?166:variableValue?427:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
-  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(size!==(variableValue?20:32))throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(treeValue?7230:variableValue?1141:321)||flag!==0)throw Error('wrong method');},
+ var source={$:{$I:treeValue?166:variableValue?427:directSource?71:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
+  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(size!==(variableValue?20:32))throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(treeValue?7230:variableValue?1141:directSource?166:321)||flag!==0)throw Error('wrong method');},
    WriteParameter(offset,row){if(offset!==(treeValue?4:0))throw Error('row offset');this.row=row;},WriteParameter$a(offset,column){if(offset!==(treeValue?0:8))throw Error('column offset');this.column=column;},get_MessageID(){return 101;},Release(){counters.releasedRequests++;}};
  }},DispatchMessageAsync(request,exceptions){
   if(exceptions!==false)throw Error('exception unmarshalling');
@@ -75,17 +75,44 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
    if(deferred)next=complete;else complete();
   }};
  }}};
- var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}}}};
+ var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}},TIBGDataSource_Proxy:{prototype:{AsVariant:function(row,column){}}}}};
  source.$FHelper={FBaseProxy:source};
  var treePins={get_as_variant:''};
+ var sourcePins={as_variant:''};
  var collect=session=>({functions:{send:session.DispatchMessageAsync},constants:{},objects:[session,session.$M]});
  var stable=()=>{if(changed&&counters.requests)throw Error('binding changed');};
  var make=${createNativeVariantReader.toString()};`,context);
  environment.pins={constants:{},functions:{send:createHash('sha256').update(vm.runInContext('source.$S.DispatchMessageAsync.toString()',context)).digest('hex')}};
  vm.runInContext('treePins.get_as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant.toString()',context)).digest('hex')),context);
+ vm.runInContext('sourcePins.as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant.toString()',context)).digest('hex')),context);
  if(unpinned)environment.pins.functions.send='bad';
- return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue},decode,collect,pins,treePins)`,context)};
+ return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue,directSource},decode,collect,pins,treePins,sourcePins)`,context)};
 }
+
+test('direct interface71 uses its observed method166 and preserves every native Variant subtype',async()=>{
+ const f=transportFixture({directSource:true}),reader=await f.run();
+ for(let row=0;row<observedRows.length;row++){
+  const raw=await reader.read(row,2);
+  assert.equal(raw.tag,observedRows[row].tag);
+  assert.deepEqual(Array.from(raw.payload),observedRows[row].payload);
+ }
+ assert.equal(reader.unsettled,false);
+ assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context)),{requests:8,releasedRequests:8,releasedResponses:8});
+});
+for(const fault of ['wrong-interface','wrong-mode','implementation','replacement','foreign','changed','unpinned'])test('direct source retains exact interface, getter and transport guards: '+fault,async()=>{
+ const f=transportFixture({directSource:true,[fault]:true});
+ if(fault==='wrong-interface')vm.runInContext('source.$.$I=116',f.context);
+ if(fault==='wrong-mode')f.environment.directSource=false;
+ if(fault==='implementation')vm.runInContext("sourcePins.as_variant='bad'",f.context);
+ await assert.rejects(async()=>{
+  const reader=await f.run();
+  if(fault==='replacement')vm.runInContext('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant=function(){}',f.context);
+  await reader.read(0,2);
+ });
+ const counts=JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context));
+ assert.equal(counts.releasedRequests,counts.requests);
+ if(['wrong-interface','wrong-mode','implementation','replacement','unpinned'].includes(fault))assert.equal(counts.requests,0);
+});
 
 test('observed W1 interface427/method1141 uses no row/column parameters and retains int32 subtype',async()=>{
  const f=transportFixture({variableValue:true});
