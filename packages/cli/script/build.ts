@@ -15,9 +15,13 @@ import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
 import { resolveOpencodePty } from "./opencode-pty"
 import { NativeArch } from "../../../script/native-arch"
 import { bundledModelsSnapshot, modelsSnapshotPlugin } from "../../core/script/models-snapshot"
+import { Product } from "@loginom-ai-agent/product"
 
 const dir = path.resolve(import.meta.dirname, "..")
-const binary = "opencode"
+// Loginom AI Agent (B2.7a): `--standalone` builds the product CLI from its entry, which applies the CLI profile, as 0.4 did
+// (`a080f7725c:packages/opencode/script/build.ts`). The default build stays the CLI that Desktop bundles.
+const standalone = process.argv.includes("--standalone")
+const binary = standalone ? Product.cliExecutable : "opencode"
 const outdir = path.resolve(
   dir,
   process.argv.find((arg) => arg.startsWith("--outdir="))?.slice("--outdir=".length) ?? "dist",
@@ -109,7 +113,7 @@ const pluginRuntimePlugin: BunPlugin = {
     }))
     build.onLoad({ filter: /[/\\]internal[/\\]httpApi(?:Scalar|Swagger)\.js$/ }, () => ({
       contents:
-        'export const css = ""; export const javascript = \'document.body.textContent = "Scalar/Swagger UI assets are not bundled in OpenCode"\'',
+        'export const css = ""; export const javascript = \'document.body.textContent = "Scalar/Swagger UI assets are not bundled in this build"\'',
       loader: "js",
     }))
   },
@@ -170,7 +174,8 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
   const executablePath = await compileExecutable(item)
   console.log(`building ${name}`)
   const result = await Bun.build({
-    entrypoints: ["./src/index.ts", "./src/photon-worker.ts"],
+    entrypoints: [standalone ? "./src/loginom-cli.ts" : "./src/index.ts", "./src/photon-worker.ts"],
+    metafile: standalone,
     tsconfig: "./tsconfig.json",
     plugins: [
       appAssetsPlugin,
@@ -198,7 +203,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       outfile: path.join(outdir, name, "bin", binary),
       execArgv: [
         "--smol",
-        `--user-agent=opencode/${Script.channel}/${Script.version}/cli`,
+        `--user-agent=${standalone ? Product.slug : "opencode"}/${Script.channel}/${Script.version}/cli`,
         "--use-system-ca",
         "--no-warnings",
         "--",
@@ -207,7 +212,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     },
     define: {
       LOGINOM_AI_AGENT_VERSION: `'${Script.version}'`,
-      LOGINOM_AI_AGENT_CLI_NAME: "'opencode'",
+      LOGINOM_AI_AGENT_CLI_NAME: JSON.stringify(binary),
       LOGINOM_AI_AGENT_CHANNEL: `'${Script.channel}'`,
       LOGINOM_AI_AGENT_ARTIFACT: `'cli'`,
       ...(highlights ? { LOGINOM_AI_AGENT_RELEASE_HIGHLIGHTS: JSON.stringify(highlights) } : {}),
@@ -228,19 +233,24 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
   await Bun.write(
     path.join(outdir, name, "package.json"),
     JSON.stringify(
-      {
-        name: `@opencode/${name}`,
-        version: Script.version,
-        license: "MIT",
-        repository: { type: "git", url: "git+https://github.com/anomalyco/opencode.git" },
-        os: [item.os],
-        cpu: [item.arch],
-      },
+      standalone
+        ? { name: target, version: Script.version, os: [item.os], cpu: [item.arch] }
+        : {
+            name: `@opencode/${name}`,
+            version: Script.version,
+            license: "MIT",
+            repository: { type: "git", url: "git+https://github.com/anomalyco/opencode.git" },
+            os: [item.os],
+            cpu: [item.arch],
+          },
       null,
       2,
     ),
   )
   await verifyArtifact(path.join(outdir, name))
+  // The inputs of the executable, for the notices of the product CLI artifact (`loginom-host/script/build-cli.ts`).
+  if (result.metafile)
+    await Bun.write(path.join(outdir, name, "build-inputs.json"), JSON.stringify(result.metafile, null, 2))
 }
 
 async function compileExecutable(item: (typeof allTargets)[number]) {
