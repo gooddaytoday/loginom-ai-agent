@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "type": "imports.lgd",
+      "label_any": true
+    },
+    {
+      "type": "exports.lgd",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a13-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Amount2",
+          "label": "Amount2",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Amount2": 2469.13578
+        },
+        {
+          "Id": 2,
+          "Amount2": 0.0
+        },
+        {
+          "Id": 3,
+          "Amount2": null
+        },
+        {
+          "Id": 4,
+          "Amount2": -5.0
+        },
+        {
+          "Id": 5,
+          "Amount2": 20.0
+        }
+      ]
+    }
+  ]
+}

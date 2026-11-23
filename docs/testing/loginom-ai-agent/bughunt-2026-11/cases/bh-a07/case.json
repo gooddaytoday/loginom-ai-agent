@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 5,
+    "max_nodes": 7,
+    "forbid": [
+      "sqlite3",
+      "pandas",
+      "to_csv(",
+      "python3",
+      "openpyxl",
+      "xlrd"
+    ]
+  },
+  "notes": "Минимум узлов с CSV-экспортом: 4. "
+}

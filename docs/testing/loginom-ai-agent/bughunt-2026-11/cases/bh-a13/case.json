@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 5,
+    "max_nodes": 8,
+    "forbid": [
+      "sqlite3",
+      "pandas",
+      "to_csv(",
+      "python3",
+      "openpyxl",
+      "xlrd"
+    ]
+  },
+  "notes": "Минимум узлов с CSV-экспортом: 5. Неизменённый квалифицированный бинарный fixture imports-lgd/source.lgd, SHA256 проверяется; независимый CSV-spec приватен и не прикладывается. Наличие exports.lgd проверяется; содержимое скачанного LGD stock --cases не валидирует."
+}

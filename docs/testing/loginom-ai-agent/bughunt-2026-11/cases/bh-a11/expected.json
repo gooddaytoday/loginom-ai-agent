@@ -1,0 +1,53 @@
+{
+  "nodes": [],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a11-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Branch",
+          "label": "Branch",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Total",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Branch": "B01",
+          "Total": 3874.95
+        },
+        {
+          "Branch": "B02",
+          "Total": 5415.61
+        },
+        {
+          "Branch": "B03",
+          "Total": 7208.98
+        },
+        {
+          "Branch": "B04",
+          "Total": 9255.06
+        },
+        {
+          "Branch": "B05",
+          "Total": 11553.85
+        },
+        {
+          "Branch": "B06",
+          "Total": 14105.35
+        },
+        {
+          "Branch": "B07",
+          "Total": 16909.56
+        }
+      ]
+    }
+  ]
+}

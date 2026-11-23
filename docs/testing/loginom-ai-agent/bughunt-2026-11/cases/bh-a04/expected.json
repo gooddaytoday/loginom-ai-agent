@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a04-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Total",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "North",
+          "Total": 149.85
+        },
+        {
+          "Region": "South",
+          "Total": 148.98
+        }
+      ]
+    }
+  ]
+}

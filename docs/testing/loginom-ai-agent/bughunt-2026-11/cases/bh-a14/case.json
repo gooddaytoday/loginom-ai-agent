@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 2,
+    "max_nodes": 0,
+    "forbid": [
+      "python",
+      "bash",
+      "sqlite",
+      "convert",
+      "to_csv",
+      "storage_upload",
+      "file_write"
+    ]
+  },
+  "notes": "Минимум узлов с CSV-экспортом: 0. По назначению XML не имеет нативного импорта. Никаких производных CSV/SQLite и конверсий."
+}
