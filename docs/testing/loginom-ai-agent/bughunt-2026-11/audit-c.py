@@ -65,7 +65,9 @@ def audit(path, cases):
     # receipts, rather than counting attempted new-node requests as creations.
     creation_receipts = [call for call in loginom if call in creates
                          or call['input'].get('operation_id') in creation_operations]
-    nodes = {item['node_id'] for call in creation_receipts for item in objects(call['reply']) if item.get('node_id')}
+    nodes = {call['reply']['node']['node_id'] for call in creation_receipts
+             if isinstance(call['reply'], dict) and isinstance(call['reply'].get('node'), dict)
+             and call['reply']['node'].get('node_id')}
     case = path.parent.name
     config = cases / case / 'case.json'
     budget = json.loads(config.read_text())['budget'] if config.is_file() else {}
