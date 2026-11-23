@@ -61,37 +61,39 @@
 5. Независимый reviewer проверяет корректность, совместимость и необходимость каждого нового механизма. Исполнитель устраняет технические замечания; предпочтения reviewer не становятся новыми критериями.
 6. Подготовить только свои файлы, выполнить `bun run secrets staged`, затем conventional commit. Перед первым коммитом в checkout проверить hooks и закреплённый Gitleaks по [инструкции](../../security/secret-protection.md).
 
-Команды ниже выполняются из указанного каталога. `LOGINOM_AI_AGENT_TEST_NODE` — закреплённый Node из принятого product release; на исходной базе 24.19.0. `TMPDIR` указывает на закрытый рабочий каталог. Модель в unit-тестах и тестах судьи не вызывается.
+Команды ниже выполняются из указанного каталога. `LOGINOM_AI_AGENT_TEST_NODE` указывает на закреплённый Node (24.19.0 на текущей базе), `LOGINOM_DOCK_TEST_BROWSER` — на Chromium из той же поставки. Для runtime установлены зависимости `client/package-lock.json`. `TMPDIR` указывает на закрытый рабочий каталог. Модель в unit-тестах и тестах судьи не вызывается.
 
 ## S0. Общая диагностика и условия контрольной серии
 
-**Область:** `evals/src/{cli,process-supervisor,profile,profile-archive,diagnostics,analytics-measurements,report}.ts`; при доказанном пробеле — `packages/opencode/src/{cli/cmd/run,session/processor,session/message-v2,session/llm}.ts`, `packages/loginom-runtime/client/lib/{execution-journal,browser-recovery}.mjs`. Подготовка управляемых сбоев — существующий private acceptance путь runtime/Host и его tests. Не менять recovery-поведение обычного запуска.
+**Область:** `evals/src/{config,preflight,cli,process-supervisor,profile,profile-archive,diagnostics,analytics-measurements,report}.ts`; при доказанном пробеле — `packages/opencode/src/{cli/cmd/run,session/processor,session/message-v2,session/llm}.ts`, `packages/loginom-runtime/client/lib/{execution-journal,browser-recovery}.mjs`. Подготовка управляемых сбоев использует существующий private acceptance путь runtime/Host. Обычный запуск сохраняет своё recovery-поведение.
 
 Цепочка private control: `packages/loginom-host/src/host.ts` → `supervisor.ts` → `packages/loginom-runtime/src/start-input.mjs` (`validateStartInput`) → `managed-entry.mjs` → `client/lib/bridge.mjs` → `executor.mjs` → `node-apply.mjs`. Нужен узкий private test launcher/Host input для текущего CLI: одни поля supervisor через продуктовый путь сейчас не проходят. Модель не управляет этой настройкой.
 
 **Вход/выход:** текущие events, DB/history, tool-output и native journal → индекс измерений и recovery-эпизодов по спецификации. B — принятый SHA после общей продуктовой диагностики. Если продуктовых изменений не потребовалось, это исходное поведение `loginom` с документацией.
 
-- [ ] Составить карту «нужный факт → существующий файл/поле → связь». Проверить обычный успех, обычный отказ, start без действий, recovery с действиями, unknown/stop и незавершённую попытку. Не использовать сокращённый `run.json` как единственную историю.
+- [ ] Для установленного CLI этой базы исправить binary preflight. Сейчас он ещё требует `LOGINOM_DOCK_API_KEY`, вызывает удалённые `/health` и Skills API, хотя продукт использует локальные Help и `loginom-automation`. До запуска проверить manifest и digest установленных ресурсов без отдельного вызова `dock_prepare`. В аудите сверить `source: bundled` и `skillRevision` по фактическому `dock_prepare` попытки, опираясь на существующую проверку в `evals/src/node-selection.ts`. Если инструмент не вызван, указать `not_observed`. Проверить работу без удалённого ключа и отказ при несовпадающем digest. Сохранить проверки Loginom, storage, isolation и model preflight, а также режимы judge-only и dry-run.
+- [ ] Обновить проверку профиля в `evals/src/profile.ts`. Пустой прежний `apiKey` для локальных ресурсов допустим и не повод вызывать `loginom setup` повторно. Сохранить проверки явного URL, пользователя, состояния пароля и незавершённого recovery. `View.state` описывает готовность Help, а проверка входа в браузер имеет отдельный результат. Проверить отказ браузера и повторное использование корректно настроенного профиля без ключа.
+- [ ] Составить карту «нужный факт → существующий файл/поле → связь». Проверить обычный успех, обычный отказ, start без действий, recovery с действиями, unknown/stop и незавершённую попытку. Новый `diagnostics export` ограничивает файлы, размер и число попыток. Полная история берётся из архивов профиля и runtime, включая данные, которых нет в сокращённом `run.json`.
 - [ ] Через тест существующего parser/audit воспроизвести потерю конкретного нужного факта. Для полного browser output проверить ответ с суммарным текстом **больше 46000 байт**: `browserCall` уже вызывает `boundText` внутри runtime, а `describeContent` пишет в журнал только тип/размер текста. Сначала найти пригодный существующий источник полного ответа; если его нет, сохранять его в существующий закрытый архив до runtime-обрезки с действующим redaction. Проверить сохранность хвоста, отсутствие секретов и прежний лимит модельного ответа. Позднего `tool-output` после contributor недостаточно.
 - [ ] Для изображения проверить связь tool attachment с исходящим model request по ID/hash. Учитывать, что `describeContent.sha256` — hash base64-строки, а `bytes` — длина декодированных байтов; не сравнивать первый напрямую с hash PNG. Тест должен отличать разные представления одного изображения от реально отсутствующей доставки.
 - [ ] Адаптировать `recoveryToolsCovered` / `auditMeasurement` для обычного corpus campaign, не переносить ограничения специализированного analytics runner. Индексировать все попытки, включая error до первого assistant message. Знаменатель — 876 measurement keys; retries вложены в соответствующий ключ.
 - [ ] Проверить анализатор на fixtures: обычное построение без recovery; отказ start до browser phase; start без действий; подтверждённое восстановление; полностью записанные unknown/transport failure/`retained_uncertain`; реальная потеря журнала/изображения; `continuable` при незавершённой исходной операции. `recoveryToolsCovered` отвергает часть полных неуспешных цепочек — его boolean нельзя использовать как общую полноту evidence. Gaps определяются по отсутствующим обязательным фактам достигнутой фазы, а не по неуспеху операции.
 - [ ] Сохранить раздельно `requested`, `started`, `browser_used`, фактический verification status (`continuable/completed/unresolved`), состояние исходной операции, качество артефакта, CLI status/exit и cleanup. Если нужен агрегат `verified`, явно определить, какие status он включает; `continuable` не считать завершением исходной операции. Fixture `exit=1` + пригодный `score=100/pass=true` сохраняет обе оси без изменения judge/CLI policy. Счётчик донора «успех после start» получать из индекса, без второго источника истины.
-- [ ] До фиксации B адаптировать донорские private `phase_stop`/`release_refusal` для P1–P4 через эту цепочку. `phase_stop` срабатывает после фактического действия до durable phase receipt: configure/open, execute, exports.text. Для P5 нужна отдельная узкая точка «Save выполнен, подтверждение потеряно» перед receipt/ACK; node hooks её не покрывают. Привязать control к назначенной acceptance попытке, операции/фазе и ограниченному счётчику; журналировать каждое срабатывание. Не создавать общий fault framework, не публиковать настройку модели и не менять обычные повторы. В штатном запуске без private acceptance настройки поведение полностью прежнее. Сбой release/close в операторе не глотать.
-- [ ] Проверить fixtures всю проводку CLI → Host → managed runtime, срабатывание ровно в назначенной фазе, неверное назначение и отключение по умолчанию. До B живые/model пробы не нужны; они остаются в S7. Owning tests: Host `browser-recovery-capability`, `managed-work-entry`, при IPC-изменениях `node-host`; runtime `start-input`; client `node-apply`, `node-apply-runtime`, `browser-recovery-save-bridge`.
+- [ ] До фиксации B адаптировать private `phase_stop`/`release_refusal` для P1–P4 там, где они воспроизводят нужную границу. `phase_stop` срабатывает после действия до записи квитанции фазы. В P4 проверка скачивания должна отказать после подтверждённого экспорта. Для browser T4 в P5 отдельная узкая точка должна сорвать чтение saved state после подтверждённой квитанции Save. Поведение при reconnect проверяют существующие fixtures S3. Привязать control к назначенному chat, операции, фазе и ограниченному счётчику. Журналировать срабатывание и сбои release/close.
+- [ ] Проверить проводку CLI → Host → managed runtime в fixtures, включая отказ на чужой операции и отсутствие инъекций в validation/dashboard и в обычном чате. Сохранить `validationHttpCache`, идентичность resource manifest/cache и сроки запуска. Проверить сверку ACK с `journalCopy(event)`. Живые пробы остаются в S7.
 - [ ] Выполнить проверки ниже. Провести review, зафиксировать B и версию формата отчёта. Уточнить disk estimate после S7, до допуска к 876.
 
 Из `evals/`:
 
 ```sh
-bun --no-env-file test --isolate --timeout 30000 test/output-redaction.test.ts test/cli.test.ts test/diagnostics.test.ts test/profile.test.ts test/profile-archive.test.ts test/analytics-measurements.test.ts test/report.test.ts
+bun --no-env-file test --isolate --timeout 30000 test/config.test.ts test/preflight.test.ts test/output-redaction.test.ts test/cli.test.ts test/diagnostics.test.ts test/profile.test.ts test/profile-archive.test.ts test/analytics-measurements.test.ts test/report.test.ts
 bun typecheck
 ```
 
 Для private control: из `packages/loginom-runtime/`, затем из `packages/loginom-host/` соответственно:
 
 ```sh
-"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/start-input.test.mjs client/test/node-apply.test.mjs client/test/node-apply-runtime.test.mjs client/test/browser-recovery.test.mjs client/test/browser-recovery-save-bridge.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/start-input.test.mjs client/test/node-apply.test.mjs client/test/node-apply-runtime.test.mjs client/test/ack-diagnostic.test.mjs client/test/browser-recovery.test.mjs client/test/browser-recovery-save-bridge.test.mjs
 ```
 
 ```sh
@@ -105,19 +107,19 @@ bun typecheck
 
 ## S1. Свежие UI refs экспорта
 
-**Файлы:** `packages/loginom-runtime/client/lib/text-export-procedure.mjs`; тест `client/test/text-export-lifecycle.test.mjs`. Ориентир донора: `fdd8c5613d`.
+**Файлы:** `packages/loginom-runtime/client/lib/text-export-procedure.mjs`. Тесты `client/test/text-export-lifecycle.test.mjs` и `workspace-ui-export-combo.integration.test.mjs`. Ориентир донора — `fdd8c5613d`.
 
 **Интерфейс:** существующая процедура настройки Export text, те же входные параметры, receipts, deadline и форма ответа.
 
-- [ ] Добавить тест: открытие dropdown меняет ref option; допустим только ref из наблюдения после открытия. Старый ref должен привести к RED на базе.
-- [ ] Адаптировать получение option ref из свежего snapshot. Не добавлять второй клик по уже выполненному действию или бесконечное обновление snapshot.
-- [ ] Проверить отсутствие нужного пункта, отмену и истечение deadline перед жестом; проверить существующие переходы Next и overwrite.
+- [ ] Воспроизвести перевыпуск ref уже открытого списка при повторном наблюдении перед выбором. Сейчас `channel.perform` замыкает `choice.ref` из первого наблюдения. Тест должен отвергнуть этот устаревший ref и проверить выбор через ref текущего списка того же поля.
+- [ ] Разрешать пункт в `resolve(s)` по наблюдению, которое использует `channel.perform`. Сохранять привязку к полю, label и префиксу `boundlist`, единственность пункта и запрет повтора уже выполненного жеста.
+- [ ] Проверить отсутствие пункта, отмену, deadline, переходы Next и overwrite. Сохранить новые режимы fixed width, UTF-16 с native BOM, filename variable и ввод пользовательской маски времени.
 - [ ] Пройти тест, независимое ревью и commit `fix(runtime): refresh export option refs`.
 
 Из `packages/loginom-runtime/client/`:
 
 ```sh
-"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/text-export-lifecycle.test.mjs test/text-export-next.integration.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/text-export-lifecycle.test.mjs test/text-export-next.integration.test.mjs test/text-export-modes.test.mjs test/text-export-file-variable.test.mjs test/text-export-header-mask.test.mjs test/workspace-ui-export-combo.integration.test.mjs
 ```
 
 **Готово:** обновление refs воспроизведено тестом, повторного эффекта нет, контракт не изменён.
@@ -128,9 +130,9 @@ bun typecheck
 
 **Интерфейс:** существующий поиск/скачивание Export output с привязкой к исходным папке, документу, workflow и вкладке.
 
-- [ ] RED: FileStore уже открыт, но native строки ещё не отрисованы; текущий поиск преждевременно сообщает отсутствие файла. GREEN: дождаться связанного rendered window в пределах исходного deadline.
-- [ ] Следующий цикл: окно с непригодным/пустым scroll anchor. Продолжать только по пригодным anchors, сохраняя предел 40 прокруток; отсутствие прогресса/конец окна не превращать в бесконечный поиск.
-- [ ] Следующий цикл: файл найден, но запись диагностики падает. Сохранить подтверждённый результат, отдельно сообщить диагностическую ошибку. При реальном отказе оставить whitelisted причину и точную проверку таблицы/имени, без приватных данных.
+- [ ] RED: FileStore уже `observed`, но строки ещё не отрисованы и `findNativeStorageRow` сообщает `no_scroll_owner`. Дождаться готовности связанной таблицы в рамках `searchGuard`. Отличить пустую папку от ещё не отрисованного окна и проверить смену владельца во время ожидания.
+- [ ] Сохранить уже работающие hit-testable anchors, наблюдение из собственной квитанции scroll и проход в обе стороны при отсутствии файла. Текущий бюджет зависит от `scroll.max_top` (общий потолок 964 жеста), у поиска есть запас до 60 секунд на возврат к графу. Проверить большой каталог, отсутствие продвижения и сохранность запаса времени. Фиксированный лимит 40 из старого плана больше не подходит.
+- [ ] У базы уже есть точный lookup и очищаемая причина отказа перед восстановлением графа. Дополнить только отсутствующий факт в диагностике. Проверить отказ вспомогательной записи отдельно от обязательных записей `export_file_bytes_verified` и `export_file_read_completed`. Сбой обязательной записи сохраняет неопределённость до сверки с квитанцией, а сбой вспомогательной записи не стирает подтверждённый результат.
 - [ ] Проверить смену папки/вкладки и отмену во время ожидания; затем review и commit `fix(runtime): await export storage readiness`.
 
 Из `packages/loginom-runtime/client/`:
@@ -147,7 +149,8 @@ bun typecheck
 
 **Интерфейс:** сохранить текущий `browserRecoveryBasis(operationId)` и ответ `dock_browser_recovery`. Донорские `state`, `attempt_id`, `finish.report` не становятся новым публичным API автоматически.
 
-- [ ] По одному воспроизвести: одинаковый отказ той же фазы/узла после завершённого обычного восстановления; execution unknown после подтверждённого release; неоднозначный Save после inspect. Уточнять основание по настоящим receipts, не только тексту ошибки.
+- [ ] Воспроизвести два пробела донора: одинаковый отказ той же фазы/узла после завершённого обычного восстановления и execution unknown при подтверждённом release. База уже распознаёт повтор после browser recovery, отказ release, исчерпание Dock-вариантов и подтверждённый экспорт с неподтверждённым скачиванием. Расширять допуск только по квитанциям конкретной фазы и узла.
+- [ ] Сохранить `releasePendingPhases`/`recoveryReleasePending`, особый terminal configure для Excel и отказ `exports.text/input_mapping` без живого продолжения. Для Save проверить существующий `SAVE_STATE_UNCONFIRMED` после подтверждённой квитанции и отказа чтения состояния. Не добавлять общий допуск для Save, который ещё восстанавливается штатным inspect после разрыва.
 - [ ] Минимально адаптировать классификацию и историю в executor. Не добавлять отдельный хранитель состояния поверх executor/runtime.
 - [ ] Отрицательные тесты: user cancel, неизвестный transport, upload, уже settled effect, новая pending-операция и поздний ответ старой. Предложение recovery не должно переживать смену целевой операции.
 - [ ] Сохранить все текущие page/tab guards и пару проверок «подтверждённый no-effect refusal → свежее наблюдение → допустимое продолжение» / «неизвестный эффект → запрет слепого повтора». Исторический пример — E3 ниже; `Ref not found` и `page.ok` сами по себе не доказывают no-effect. Review и commit `fix(runtime): qualify recovery from operation evidence`.
@@ -155,42 +158,46 @@ bun typecheck
 Из `packages/loginom-runtime/client/`:
 
 ```sh
-"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/browser-recovery-executor.test.mjs test/node-pending-release.test.mjs test/node-early-release.test.mjs test/browser-recovery.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/browser-recovery-executor.test.mjs test/node-pending-release.test.mjs test/node-early-release.test.mjs test/browser-recovery.test.mjs test/recover-resume-guidance.test.mjs test/connection-recovery.test.mjs test/browser-recovery-save-bridge.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-name-pattern='[Ss]ave|[Rr]econnect' test/executor.test.mjs
 ```
 
 Если выделен новый classifier, его тест добавляется к этой команде. **Готово:** положительные и отрицательные основания различаются по evidence, старые отказы не открывают browser tools.
 
 ## S4. Проверка результата и NO_BASELINE
 
-**Файлы:** `client/lib/executor.mjs`, `node-execution-procedure.mjs`, `node-procedure.mjs`, `node-read-contract.mjs`, `collapse-native-output.mjs`, Save-адаптер в `bridge.mjs`; дополнительно проверить границы `node-target.mjs`, не менять его без обнаруженной необходимости. Тесты `browser-recovery-executor.test.mjs`, `node-read.test.mjs`, `owned-native-preview.test.mjs`, `browser-recovery-bridge.test.mjs`, `browser-recovery-save-bridge.test.mjs`, `node-target.test.mjs`, `node-early-release.test.mjs`. Пути внутри `packages/loginom-runtime`.
+**Файлы:** `client/lib/executor.mjs`, `node-execution-procedure.mjs`, `node-execution-evidence.mjs`, `node-procedure.mjs`, `node-read-contract.mjs`, `collapse-native-output.mjs`, Save-адаптер в `bridge.mjs`. Границы `node-target.mjs` проверяются соседними регрессиями. Пути внутри `packages/loginom-runtime`.
 
 **Интерфейс:** текущий `verifyBrowserRecovery` и публичный finish; проверка остаётся операцией runtime с receipt/ACK. Настройки, сообщённые моделью, не подменяют подтверждённое исполнение или правильность значений.
 
-- [ ] RED/GREEN: старый execution group не завершает новую попытку; для каждого запрошенного output port нужна подтверждённая схема. Сохранить native index и уникальность tree path, проверить исходный узел и тихий граф.
-- [ ] RED/GREEN для NO_BASELINE: configure/open отказал до baseline, агент исправил существующий узел. Проверка сначала устанавливает ownership и отсутствие незавершённого жеста; затем получает свежую исходную точку перед собственной проверочной execution, без повторного configure. Если нельзя исключить прошлый неизвестный Execute или привязать узел к заданию, оставить неподтверждённый результат и явный следующий безопасный шаг.
-- [ ] Отдельный тест доказывает, что этот путь не возвращает агента к сломанному configure и не выполняет второй неизвестный Execute. Не обещать отсутствие будущего свежего запуска в `dock_node_read`: его текущий контракт требует исполнения.
+- [ ] RED/GREEN: старый execution group не завершает новую попытку. При завершении исполнения подтвердить схемы запрошенных output ports. Сохранить native index, уникальность tree path, variable outputs и отдельные file-only процедуры, включая `exports.lgd`. Проверить исходный узел и тихий граф.
+- [ ] RED/GREEN для NO_BASELINE: configure/open отказал до baseline, агент исправил существующий узел. Сначала подтвердить выбранный узел, владение и отсутствие незавершённого эффекта. Если можно доказать свежесть существующего активного результата, использовать текущий `dock_node_read` без Execute. Если требуется новое исполнение и оно безопасно, получить исходную точку перед проверочным запуском. Не возвращаться к сломанному configure. При неизвестном прошлом Execute или неподтверждённой цели сохранить `unresolved` либо подтверждённое частичное продолжение в рамках текущего контракта.
+- [ ] Исправить подсказку для читаемого T3, если она обещает новое исполнение через `dock_node_read` без `execution:"execute"`. Проверить обе политики текущего контракта. Без аргумента read ждёт уже запущенный процесс и читает активный результат с подтверждением свежести. Явный Execute разрешается только для проверенного владельца и после исключения незавершённого эффекта.
 - [ ] Проверочная операция сохраняет свой receipt до освобождения. Тестировать сбой записи receipt, поздний ответ и точный durable ACK; отсутствие/несовпадение ACK оставляет ownership неопределённым.
-- [ ] Отдельно от NO_BASELINE проверить ранний target effect: `Original target effect remains unresolved` и `Node target journal acknowledgement differs` из E4. Тихий видимый граф не заменяет receipt/ACK. Fixtures `node-target` / `node-early-release` проверяют exact ACK, pending guard, владение и сопоставление частичного узла. Не исправлять это повторным созданием или ослаблением проверки; если донор не решает случай, записать предел переноса.
+- [ ] Отдельно от NO_BASELINE проверить ранний target effect из E4. В базе ACK уже сравнивается с `journalCopy(event)`, а не с исходным объектом до маскирования и JSON-преобразований. Сохранить это сравнение, pending guard и сопоставление частичного узла. Тихий граф без нужной квитанции не разрешает повторное создание. Если донор не решает остаточный случай, записать предел переноса.
 - [ ] Проверить соседнюю регрессию E5: допустимое продолжение после release использует нужный существующий узел, сохраняет связи и не создаёт второй export, когда задача требует один выход. Это проверка продолжения, а не основание переделывать все node handlers или приписывать исторические FAIL browser recovery.
-- [ ] Сохранить идентичность исходного export/Save, включая защиту от подмены существующего файла. Схему/настройки/значения результата отражать отдельными доказательствами.
+- [ ] Сохранить идентичность исходного export/Save, а также защиту от подмены существующего файла. Для Save сохранять штатную сверку исходного receipt после reconnect и разделение pending reconnect, подтверждённого Save и неподтверждённого состояния пакета. Для Save As сохранить действующую проверку пути, dirty state и навигации после восстановления. Схему, настройки и значения результата отражать отдельными доказательствами.
 - [ ] Если принятому пути нужен новый общий контракт, сначала доказать ограничение текущего и согласовать изменение по правилам проекта; не вводить донорский протокол целиком. Review и commit `feat(runtime): verify recovered execution`.
 
 Из `packages/loginom-runtime/client/`:
 
 ```sh
 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/browser-recovery-executor.test.mjs test/node-read.test.mjs test/owned-native-preview.test.mjs test/browser-recovery-bridge.test.mjs test/browser-recovery-save-bridge.test.mjs test/browser-recovery.test.mjs test/node-target.test.mjs test/node-early-release.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/node-target-move.test.mjs test/execution-journal.test.mjs test/node-output-json-journal.test.mjs
 ```
 
-**Готово:** успех подтверждается новым собственным исполнением и нужными схемами; NO_BASELINE не создаёт цикл; uncertain не превращается в completed.
+**Готово:** требуемый эффект подтверждён доказанно свежим исполнением и нужными схемами. NO_BASELINE не возвращает к сломанному configure. Неопределённые исходы остаются явными.
 
 ## S5. Metadata и контекст текущей задачи
 
 **Файлы:** producer — `packages/loginom-runtime/client/lib/browser-recovery.mjs` и `bridge.mjs`, их `client/test/browser-recovery.test.mjs` и `browser-recovery-bridge.test.mjs`; consumers — `packages/opencode/src/product/tool-contributor.ts`, `product/turn-lifecycle.ts`, `session/browser-recovery.ts`; owning tests `test/product/tool-contributor.test.ts`, `product/turn-lifecycle.test.ts`, `session/browser-recovery.test.ts`, `session/tools.test.ts`, `session/prompt.test.ts`.
 
-**Интерфейс:** в базе runtime ещё не публикует `_meta`, а reminder читает phase из текста. Добавить минимальную совместимую metadata для связи состояния с попыткой/задачей, сохранив действующий text/structuredContent и публичный API. Policy одного напоминания сохраняется; донорский формат целиком не обязателен.
+**Интерфейс:** runtime ещё не публикует recovery `_meta`, а reminder читает phase из текста. Добавить минимальную metadata для связи состояния с попыткой и задачей. Сохранить публичные text/structuredContent, существующий `_meta.outputFiles` и одно напоминание на попытку.
 
 - [ ] RED/GREEN: настоящий recovery reply из runtime проходит через contributor до task state/reminder. Producer добавляет необходимые metadata, consumer сохраняет их у успешного и ошибочного ответа независимо от text truncation; ошибочный вызов не становится успешным из-за metadata. Тест с искусственно вставленным `_meta` без проверки producer недостаточен.
+- [ ] Проверить сочетание recovery metadata с `_meta.outputFiles`. Сохранить приватные сведения о файлах в tool metadata и прежний вид квитанции экспорта для модели.
 - [ ] Следующие циклы: новая пользовательская задача, compaction/replay, revert и поздний ответ предыдущей задачи. Старое напоминание не должно оживать или привязываться к новой задаче.
+- [ ] Учитывать действующий профиль сессии из `sessions.getForExecution` / `DashboardSession.profile` в `TaskScope.derive`. Проверить, что следы прежней automation-задачи не выдают dashboard-чату recovery tools или reminder и что обычный dashboard-ход не захватывает Loginom Host.
 - [ ] Проверить продолжение текущей попытки и одно напоминание на неё. Сверить публичные tool schemas/permissions; не перестраивать session core.
 - [ ] Пройти проверки, review и commit `fix(opencode): scope recovery metadata to active task`.
 
@@ -198,6 +205,7 @@ bun typecheck
 
 ```sh
 bun test --timeout 30000 test/product/tool-contributor.test.ts test/product/turn-lifecycle.test.ts test/session/browser-recovery.test.ts test/session/tools.test.ts test/session/prompt.test.ts
+bun test --timeout 30000 test/session/task-scope.test.ts test/session/message-v2.test.ts test/product/tool-policy.test.ts test/product/dashboard-session.test.ts
 bun typecheck
 ```
 
@@ -211,15 +219,16 @@ bun typecheck
 
 ## S6. Освобождение runtime, очереди и лимиты
 
-**Файлы:** `packages/loginom-runtime/client/lib/browser-recovery.mjs`, `bridge.mjs`, `src/managed-entry.mjs`; `packages/loginom-host/src/host-port.ts`; инструкция `packages/product/skills/loginom-automation/SKILL.md`. Тесты runtime: `browser-recovery.test.mjs`, `browser-recovery-matrix.test.mjs`, `browser-recovery-bridge.test.mjs`; Host: `browser-recovery-capability.test.ts`, `managed-work-entry.test.ts`, новый `browser-recovery-release.test.ts` при переносе release notification.
+**Файлы:** `packages/loginom-runtime/client/lib/browser-recovery.mjs`, `bridge.mjs`, `src/managed-entry.mjs`; `packages/loginom-host/src/host-port.ts`; `packages/product/skills/loginom-automation/SKILL.md` и `references/browser.md`. Тесты runtime: `browser-recovery.test.mjs`, `browser-recovery-matrix.test.mjs`, `browser-recovery-bridge.test.mjs`; Host: `browser-recovery-capability.test.ts`, `managed-work-entry.test.ts`, новый `browser-recovery-release.test.ts` при переносе release notification.
 
 **Интерфейс:** освобождение через существующий private IPC; источник состояния — runtime, Host получает факт и не запускает второй публичный stop.
 
 - [ ] RED/GREEN: release во время handoff, browser call и verification; поздний ответ не возвращает tools/lease. Уведомление release само по себе не доказывает cleanup.
+- [ ] Привязать private `run-released` к существующему владельцу recovery и поколению runtime. Проверить изоляцию отдельной dashboard-операции, отсутствие запуска нового runtime и повторного публичного `stop`. Сохранить текущий порядок shutdown, `workState`, правила reuse и подтверждение фактического выхода процесса.
 - [ ] Следующий цикл: queued invocation старой попытки после release или нового start отклоняется. Привязать admission к попытке и generation, используя существующее владение.
 - [ ] Следующий цикл: finish входит в общий бюджет шагов. Сохранить 30 вызовов и действующий временной предел `loginom`; timeout verification не должен продлевать lease. Не переносить незаметно донорские «10 минут только browser + отдельные 4 минуты verification» как больший общий бюджет.
 - [ ] Обязательные тесты порядка: неверная страница отсекается до handoff/первого жеста; закрытая подготовленная вкладка отсекается даже при том же аккаунте и DOM; no-effect refusal требует наблюдения и сохраняет допустимое продолжение (E3), unknown gesture не повторяется. Любой `isError` не становится автоматически terminal.
-- [ ] Согласовать bundled skill с фактическим API: после execution unknown сначала проверка/finish, не новый эффект. Проверить inventory/digest по `packages/product/AGENTS.md`, без внешнего skill fallback.
+- [ ] Согласовать bundled `references/browser.md` с фактическим API. Сохранить подсказки про ненастроенное подключение и штатный inspect исходного Save после разрыва. Для execution unknown использовать проверку/finish после исчерпания предложенных штатных действий. Проверить inventory и digest собранного skill по `packages/product/AGENTS.md`.
 - [ ] Проверить весь затронутый набор, review и commit `fix(runtime): own recovery release and budgets`. Зафиксировать C.
 
 Из `packages/loginom-runtime/client/`:
@@ -231,9 +240,11 @@ bun typecheck
 Из `packages/loginom-host/`:
 
 ```sh
-bun test test/browser-recovery-capability.test.ts test/managed-work-entry.test.ts test/host-port.test.ts
+bun test test/browser-recovery-capability.test.ts test/managed-work-entry.test.ts test/host-port.test.ts test/dashboard.test.ts test/parallel-calls.test.ts test/work-state.test.ts test/bundled-skills.test.ts
 bun typecheck
 ```
+
+Из `packages/loginom-runtime/` проверить `test/managed-entry-close.test.mjs` и `test/managed-resources-close.test.mjs` закреплённым Node. Из `packages/opencode/` запустить `bun test --timeout 30000 test/skill/bundled-skills.test.ts test/product/skill-source.test.ts`.
 
 Новый release test добавить к команде, если создан. **Готово:** нет оживления закрытой попытки, дубликата состояния Host или ложного cleanup; старые safety guards сохранены.
 
@@ -244,7 +255,7 @@ bun typecheck
 **Выход:** pins обеих сборок, общего H и корпуса; результаты 12 плановых модельных попыток предварительной серии; проверенный manifest для каждой основной кампании. Это не часть 876.
 
 - [ ] Выполнить итоговые source checks затронутых runtime/Host/opencode/evals. Из runtime package запустить `bun run test:upstream` с закреплённым Node в PATH; из TypeScript-пакетов — `bun typecheck`. Известный ранее сигнал ENOENT в fake harness тесте сохранения generation перед delayed judge (`evals/test/run.test.ts`) классифицировать на принятом H: он проверяет harness, а не продуктовые B/C. Старые числа PASS не считать проверкой новых сборок.
-- [ ] Собирать B и C в новых каталогах по [standalone runbook](../../testing/loginom-ai-agent/standalone-cli.md), с одинаковыми pinned Node/Chromium/Bun и каналом. Команда из `packages/loginom-host/`:
+- [ ] Собирать B и C в новых каталогах по [standalone runbook](../../testing/loginom-ai-agent/standalone-cli.md), с одинаковыми pins Node/Chromium/Bun, runtime lock и action catalog из текущей базы. Для Linux x64 сохранить стандартную baseline-сборку Bun. Проверить одинаковые установленные Help и флаг browser recovery. Канал `prod` сам флаг не включает. Команда из `packages/loginom-host/`:
 
 ```sh
 LOGINOM_AI_AGENT_CHANNEL=prod LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 bun script/build-cli.ts "$recovery_artifact_dir"
@@ -256,7 +267,7 @@ LOGINOM_AI_AGENT_CHANNEL=prod LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 bun script/bui
 - [ ] Получить авторитетный сохранённый корпус и original pins из материалов LAB-901/LAB-1747. Исторический source SHA `29ea34e27b8f96ed27b744f639c9f48933f52443` — provenance, локального Git object сейчас нет; он не заменяет доступ к файлам. Материализовать snapshot внутри clean H в ignored `evals/.bundle/lab901-corpus/tasks`, потому что campaign-preflight требует corpus внутри harnessRoot. Effective pins меняют только пути групп; hashes prompts/inputs/references/rubrics/oracle и timeouts сверяются с originals до freeze. При отсутствии архива остановить этот шаг, не подменять корпус текущим HEAD.
 - [ ] Сверить состав: 3 ordinary, 65 analytic, 33 detailed, 33 business, 10 node, 2 local-path. В каждом раунде порядок этих групп и отсортированных ID одинаков; сохранить оригинальные task timeouts, включая 1800000 мс для 66 detailed/business. Разделить product source SHA, harness SHA и corpus source SHA: `experimentPins.sourceSha` в текущем campaign-preflight используется для корпуса, а не для CLI; продуктовую ревизию подтверждает CLI manifest.
 - [ ] Установить проверенный model catalog с Terra; сохранить hash, реально применённые `EVAL_AGENT_MODEL=openai/gpt-6.1-terra`, `EVAL_AGENT_VARIANT=high`, judge и одинаковый service tier. Не подменять отсутствующую модель похожей. По архивной истории сверить фактические model/variant.
-- [ ] Провести по одному модельному построению каждого сценария ниже на B и C. Порядок и инъекция одинаковы, каждому — отдельный чистый профиль/назначенный endpoint. Получить доступы из Bitwarden через проектную обёртку `scripts/codex/with-access.py` в checkout с настройкой из `2247c34164`. В новой базе этого файла нет. До live проверить доступность обёртки, private карты и unlocked vault. Не читать корневой `local.env`, не делать fallback на env и не передавать эти доступы оцениваемому агенту/судье.
+- [ ] Провести по одному модельному построению каждого сценария ниже на B и C, в одинаковом порядке и с одинаковой инъекцией. Для каждой попытки использовать чистый профиль. Локальный endpoint сохранять явной настройкой текущей CLI после инициализации. Первый запуск v0.4.0 сбрасывает унаследованное локальное подключение из старого профиля. Получить доступы из Bitwarden через проектную обёртку `scripts/codex/with-access.py` в checkout с настройкой из `2247c34164`. До live проверить доступность обёртки, private карты и unlocked vault. Не читать корневой `local.env`, не делать fallback на env и не передавать эти доступы оцениваемому агенту/судье.
 
 | Проба | Сбой / наблюдаемый результат |
 | --- | --- |
@@ -265,7 +276,7 @@ LOGINOM_AI_AGENT_CHANNEL=prod LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 bun script/bui
 | P2 | Повтор одинакового отказа после штатного восстановления: правильный допуск, действия и продолжение сценария |
 | P3 | Неоднозначное исполнение: сначала inspect/finish, без слепого повторного эффекта; completed либо честный unknown по фактам |
 | P4 | Задержка готовности FileStore/отказ сценарного экспорта: bounded ожидание или recovery с продолжением до требуемого файла/сохранённого результата; один `finish=continuable` не завершает пробу |
-| P5 | Неоднозначный Save: исходная цель, собственный receipt и проверка сохранённого пакета |
+| P5 | После подтверждённого Save управляемый отказ чтения состояния ведёт к browser T4 и проверке того же пакета с исходным `operation_id`. Если прервалось соединение, действует штатный inspect исходной операции |
 
 - [ ] Инъецировать отказ существующим acceptance механизмом в конкретный шаг, записать точку/тип в журнал и проверить отключение вне этой серии. Для каждого browser episode восстановить всю цепочку из спецификации. Различия B/C могут быть результатом переноса; отказ B не маскировать требованием «все пробы PASS».
 - [ ] В P1/P2 использовать реальный DOM выбранного мастера; объёмный Preview полезен, если подходит к сценарию, без расширения серии. Искусственная роль `button` не доказывает пригодность реального generic-контрола. В P4 проверить также нужные узлы/связи и отсутствие лишнего выхода. Если выбранная существующая приёмка включает cold readback, сохранить его отдельный исход и cleanup (E2); новый cold-прогон для всех 876 не вводить.
@@ -349,6 +360,6 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 - План прошёл независимое ревью runtime/agent и evals; устранены пробелы producer metadata, общих acceptance-точек и получения frozen corpus.
 - 2026-11-17: уточнены pre-truncation evidence, независимые оси исходов и target/graph регрессии по переданному исследованию; независимое ревью — GO. 11 этапов, 12 предварительных попыток и 876 основных измерений сохранены.
 - 2026-11-23: три коммита документации перенесены с `46dc320c47` на `loginom@c5e652bfa3` после `v0.4.0`. `range-diff` подтвердил сохранность правок.
-- Перед реализацией S0–S6 заново проверить применимость решений к новой базе. Изменились executor, определение целевого узла и экспорт. Исторические наблюдения относятся к указанным в них ревизиям.
+- 2026-11-23: S0–S10 сверены с `c5e652bfa3`. План учитывает локальные ресурсы CLI, бюджет поиска файла, чтение без Execute, восстановление исходного Save и границы dashboard. Исторические наблюдения относятся к указанным в них ревизиям.
 - S0–S10 ещё не выполнялись. Продуктовый код и eval-результаты этой работой не изменены.
 - Следующий шаг: по поручению создать карточку S0 с SHA итогового коммита этого плана и владельцем записи в ветку.
