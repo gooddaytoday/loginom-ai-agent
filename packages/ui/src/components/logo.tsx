@@ -1,4 +1,5 @@
 import { type ComponentProps } from "solid-js"
+import icon from "../assets/loginom/loginom-icon.svg"
 
 export const Mark = (props: { class?: string }) => {
   return (
@@ -21,12 +22,12 @@ export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
       ref={props.ref}
       data-component="logo-splash"
       classList={{ [props.class ?? ""]: !!props.class }}
-      viewBox="0 0 80 100"
+      viewBox="0 0 1024 1024"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M60 80H20V40H60V80Z" fill="var(--icon-base)" />
-      <path d="M60 20H20V80H60V20ZM80 100H0V0H80V100Z" fill="var(--icon-strong-base)" />
+      {/* Loginom AI Agent (B4.6b): the product mark of the startup splash, as in 0.4. */}
+      <image href={icon} width="1024" height="1024" />
     </svg>
   )
 }
