@@ -469,7 +469,7 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
       record.reason = "unreadable-or-not-redactable"
     }
   }
-  for (const source of sources.slice(limits.files)) files.push({ name: "omitted", status: "omitted", reason: "file-count" })
+  files.push(...sources.slice(limits.files).map(() => ({ name: "omitted", status: "omitted", reason: "file-count" })))
 
   let total = 0
   // Learn credentials across all selected sources before exporting earlier echoes.
