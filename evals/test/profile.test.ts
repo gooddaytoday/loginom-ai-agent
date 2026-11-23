@@ -839,6 +839,17 @@ test("assertAuth: ключ — то, что показывает auth list но�
   }
 })
 
+test("assertAuth: отказ auth list не переносит его stderr в сообщение", async () => {
+  const { config, command, profileDir } = await fakeProfile()
+  const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
+  const failing = { ...command, env: { ...command.env, EVAL_FAKE_AUTH_LIST_STDERR: "auth-list-stderr-canary" } }
+  try {
+    const refusal = await assertAuth(openai, failing).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toBe("AUTH_LIST_FAILED: auth list завершился кодом 1")
+  } finally { await rm(profileDir, { recursive: true, force: true }) }
+})
+
 test("assertAuth: база, оставшаяся в профиле, — отказ до auth list", async () => {
   const { config, command, profileDir } = await fakeProfile()
   const args = path.join(profileDir, "args.json"), integrations = path.join(profileDir, "integrations.json")

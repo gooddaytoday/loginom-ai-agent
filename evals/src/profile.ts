@@ -392,7 +392,8 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   const listed = await management(command, ["auth", "list", "--standalone", "--format", "json"])
   const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
   if (listed.exitCode !== 0 || !Array.isArray(integrations))
-    throw new EvalFailure(`auth list завершился кодом ${listed.exitCode}:\n${listed.stderr.trim()}`, 2)
+    // Not its stderr: no redaction knows the keys of data/auth.json; the output stays in the management evidence.
+    throw new EvalFailure(`AUTH_LIST_FAILED: auth list завершился кодом ${listed.exitCode}`, 2)
   if (integrations.some((integration) => integration.id === providerId)) return
   throw new EvalFailure(
     `Нет ключа провайдера "${providerId}" для прогона в eval-профиле ${config.profileDir}: новая база его не получает.\n` +

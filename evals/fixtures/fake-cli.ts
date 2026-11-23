@@ -123,6 +123,10 @@ if (command === "auth" && sub === "list") {
   if (!(await database.exists())) await Bun.write(database, "fake auth list database")
   const keys = Bun.file(path.join(profile, "data/auth.json"))
   const imported = (await keys.exists()) ? Object.keys(await keys.json()).map((id) => ({ id, name: id, connections: [{ type: "credential" }] })) : []
+  if (process.env.EVAL_FAKE_AUTH_LIST_STDERR) {
+    process.stderr.write(process.env.EVAL_FAKE_AUTH_LIST_STDERR + "\n")
+    process.exit(1)
+  }
   const file = process.env.EVAL_FAKE_INTEGRATIONS_FILE
   process.stdout.write((file ? await Bun.file(file).text() : JSON.stringify(imported)) + "\n")
   process.exit(0)
