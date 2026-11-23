@@ -14509,7 +14509,8 @@ Found 554 warnings and 0 errors.                                      # в фа�
 | `20a5b5fd65` `fix(gui-plugins): WSL setup names the product (B4.11d)` | строки WSL о приложении; тест снова под именем B4.6b `logo-splash.test.ts` (в `a4d5eea4e9` назывался `product-brand.test.ts`, git видел удаление и новый файл) |
 | `38d9e207a1` `docs(upstream-sync): B4.11d section after review: test name, WSL, reasons` | этот раздел целиком; `catalog.md` |
 | `b1bfcafb2c` `test(app): the brand test checks the page links, not removed files (B4.11d)` | без проверки «файла нет» в `app/public` (`packages/desktop/AGENTS.md`: «No source-grep or tombstone tests») |
-| следующий | этот раздел: аватар, тест, «Найдено»; CAT-09, CAT-10 |
+| `dec3226113` `docs(upstream-sync): B4.11d avatar ids, link test, other-locale license` | этот раздел: аватар, тест, «Найдено»; CAT-09, CAT-10 |
+| следующий | итог последнего `bun run check` |
 
 Файлов кода шесть — предел задания (`git diff -M --stat 612aba774c HEAD -- packages`):
 `desktop/src/renderer/startup/splash.tsx`, `ui/src/components/logo.tsx`, `app/src/shell/errors/error.tsx`,
@@ -14685,7 +14686,7 @@ would change: 0 files
 ```
 
 ```text
-$ bun run check                                                       # код 0, на 20a5b5fd65 с этим разделом
+$ bun run check                                                       # код 0, на 20a5b5fd65 и снова на dec3226113
 Found 554 warnings and 0 errors.                          # в файлах задачи — 0; на 59fd4453ee было 565: 11 в тесте, исправлены в 0378f251d7
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
 @opencode/app:typecheck: ✓ No type errors in 2,391 files across 1 project
