@@ -12,9 +12,11 @@ import { writeLeaseReceipt } from "./lease"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
+// Without its 0.4.0 migration marker the next Host removes a connection to any stand but app.loginom.ai.
 const retainedProfileFiles = new Set([
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
-  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "cache/models.json", "state/model.json",
+  "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "loginom/connection/v040-migration.json",
+  "cache/models.json", "state/model.json",
 ])
 
 // Retain exact settings files, never whole data/cache/loginom directories.

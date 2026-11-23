@@ -212,6 +212,27 @@ test("archiveProfileHistory: explicit slot history root receives evidence while 
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
+// A Host that finds no marker migrates the profile as one older than 0.4.0 and removes every connection to a stand
+// other than app.loginom.ai (loginom-host `connection-store.ts`), so the stand must survive together with its marker.
+test("archiveProfileHistory: подключение к стенду остаётся вместе с маркером переноса 0.4.0", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-connection-"))
+  const profile = path.join(dir, "profile")
+  const connection = JSON.stringify({ generation: 1, revision: 1, url: "https://loginom.example.test/app/", username: "eval-a",
+    secrets: { format: "loginom-cli-secrets-v1", protection: "plaintext", payload: "fixture" } })
+  try {
+    await Bun.write(path.join(profile, "loginom/connection/connection.json"), connection)
+    await Bun.write(path.join(profile, "loginom/connection/v040-migration.json"), '{"state":"complete"}')
+    await Bun.write(path.join(profile, "loginom/connection/generations/1.json"), connection)
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "history-bytes")
+    const archive = await archiveProfileHistory(profile, "stand")
+    expect(await Bun.file(path.join(profile, "loginom/connection/connection.json")).text()).toBe(connection)
+    expect(await Bun.file(path.join(profile, "loginom/connection/v040-migration.json")).text()).toBe('{"state":"complete"}')
+    expect(await Bun.file(path.join(archive, "loginom/connection/generations/1.json")).text()).toBe(connection)
+    expect(await Bun.file(path.join(archive, "data/loginom-ai-agent.db")).text()).toBe("history-bytes")
+    await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
 test.each(["same", "inside", "ancestor"] as const)("archiveProfileHistory: %s root refuses before moving history", async kind => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-overlap-"))
   const profile = path.join(dir, "profile")
