@@ -15123,25 +15123,32 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 Прочитано: журнал B4.11d (пп. 6 и 7, «Найдено»); В-74; план этапа B (вопрос владельцу о WSL, SSH и сопряжении);
 `AGENTS.md` пакетов `gui-plugins`, `app`, `desktop`; эталон `v0.4.0`: `app/src/pages/layout/helpers.ts:87-94`.
 
+**Отступление от приёмки.** Плагины сопряжения, SSH и WSL не загружает окно продукта (`gui-plugins/src/renderer.ts`) —
+интерфейса у них нет. Главный процесс Desktop (`gui-plugins/src/main.ts`, не менялся) по-прежнему регистрирует все три.
+Убрать их и оттуда — вторая нарезка: шестой файл и решение о node-pty (ниже).
+
 ### Коммиты
 
 | Коммит | Что |
 |---|---|
 | `f9af63c1ee` `fix(ui): the project avatar draws the product mark from the bundle (B4.11e)` | п. 1: аватар и его тест |
-| `f849352fa5` `fix(gui-plugins): the product window loads no pairing, SSH or WSL (B4.11e)` | п. 2: два списка встроенных плагинов, тест, блоки README |
+| `f849352fa5` `fix(gui-plugins): the product window loads no pairing, SSH or WSL (B4.11e)` | первая попытка: оба списка без сопряжения и SSH, окно без WSL |
+| `5899e33350` `docs(upstream-sync): B4.11e avatar and hidden remote work` | первая версия раздела |
+| `573ded0f4d` `fix(gui-plugins): hide pairing, SSH and WSL in the window only (B4.11e)` | `main.ts` возвращён к upstream; заглушка историй SSH; тест списков |
 | следующий | этот раздел, `catalog.md` |
 
-Файлов кода пять — предел задания (`git diff --stat b8f1dd8091 -- packages`): `ui/src/data-display/project-avatar/
-project-avatar.{tsx,test.ts}`, `gui-plugins/src/{main,renderer}.ts`, новый `app/test-browser/builtin-plugins.test.ts`.
-Документ — `gui-plugins/README.md`: `script/sdk-docs.ts` сверяет его блоки `src/main.ts#builtins` и
-`src/renderer.ts#builtins` с кодом байт в байт (без правки `bun run check` красный).
+Файлов кода пять — предел задания (`git diff --stat b8f1dd8091 -- packages`, без README):
+`ui/src/data-display/project-avatar/project-avatar.{tsx,test.ts}`, `gui-plugins/src/renderer.ts`,
+`stories/mocks/gui-plugins/ssh.tsx`, новый `app/test-browser/builtin-plugins.test.ts`. Документ —
+`gui-plugins/README.md`: `script/sdk-docs.ts` сверяет его блок `src/renderer.ts#builtins` с кодом байт в байт (без правки
+`bun run check` красный).
 
 ### 1. Аватар проекта
 
 `getProjectAvatarSource` для трёх id проекта продукта отдавал `https://opencode.ai/favicon.svg`. Теперь — знак продукта
-из сборки: `import productMark from "../../assets/loginom/loginom-icon.svg"` (как `Mark` в `logo.tsx`, B4.11d). Vite
-встраивает файл 1 699 байт в `data:`, Bun в тестах отдаёт путь к файлу; запроса к сети нет. Порядок v2 (своя картинка,
-затем цвет) и набор из трёх id upstream не менял.
+из сборки: `import productMark from "../../assets/loginom/loginom-icon.svg"` (как `Mark` в `logo.tsx`, B4.11d) — ассет
+сборки окна, в тестах Bun отдаёт путь к файлу; запроса к сети нет. Порядок v2 (своя картинка, затем цвет) и набор из
+трёх id upstream не менял.
 
 - **Не `/loginom-icon.svg` дословно.** В 0.4 файл лежал в `app/public`; в v2 там `favicon.svg`, `loginom-icon.png` и нет
   `loginom-icon.svg` (B4.11d) — адрес отдал бы 404. Импорт ассета не зависит от `publicDir` окна Desktop.
@@ -15167,14 +15174,14 @@ project-avatar.{tsx,test.ts}`, `gui-plugins/src/{main,renderer}.ts`, новый 
 
 | Плагин | Окно (`renderer.ts`) | Главный процесс Desktop (`main.ts`) | Что пропало из интерфейса |
 |---|---|---|---|
-| `pairing` | убран | убран | страница настроек «Pairing», команда «Pair device» |
-| `ssh` | убран | убран | пункт «добавить сервер по SSH», строки SSH-серверов, установка CLI на удалённую машину |
-| `wsl` | убран | **остался** | пункт «добавить WSL», строки WSL-серверов, установка CLI в дистрибутив (только Windows) |
+| `pairing` | убран | как upstream | страница настроек «Pairing», команда «Pair device» |
+| `ssh` | убран | как upstream | «Add SSH server», строки SSH-серверов, установка CLI на удалённую машину |
+| `wsl` | убран | как upstream (только Windows) | «Add WSL server», строки WSL-серверов, установка CLI в дистрибутив |
 
-Папки плагинов, их тесты, словари и истории не тронуты: upstream их держит, вернуть — вернуть строки списков.
+Папки плагинов, их тесты, словари и истории не тронуты: upstream их держит; вернуть — вернуть строки списка окна.
 
-**Почему `wsl` остался в главном процессе — вторая нарезка.** Первая версия убирала `wsl` из обоих списков. Тогда
-`desktop` `bun test` краснеет:
+**Первая попытка (`f849352fa5`) и почему от неё отказался.** Она убирала сопряжение и SSH из обоих списков, WSL — из
+окна. Убрать и WSL из главного процесса — `desktop` `bun test` краснеет:
 
 ```text
 electron.vite.config.test.ts:122  expect(imports).toContain(crossNodePty)
@@ -15185,24 +15192,35 @@ Expected to contain: "@lydell/node-pty-win32-arm64"
 
 Главный вход WSL (`wsl/runtime.ts:152`, `import("@lydell/node-pty")`) — единственный импорт node-pty в главном процессе
 Desktop (`git grep '@lydell/node-pty"'`: ещё `core/src/pty/pty.node.ts` — служба, и скрипт `loginom-host`). Без него
-тест сборки теряет предмет, а плагин `opencode:node-pty-narrower` в `electron.vite.config.ts` и шесть
-`optionalDependencies` `@lydell/node-pty-*` в `desktop/package.json` остаются мёртвыми. Это шестой файл и отдельное
-решение о node-pty — вторая нарезка. Сейчас WSL в главном процессе без интерфейса:
+тест сборки теряет предмет, а `opencode:node-pty-narrower` в `electron.vite.config.ts` и шесть `optionalDependencies`
+`@lydell/node-pty-*` в `desktop/package.json` остаются мёртвыми. Убрать SSH из окна — краснеют 7 компонентных тестов
+самого плагина: заглушка историй `stories/mocks/gui-plugins/ssh.tsx:44` брала `ssh` из списка `renderer.ts`
+(`builtins.find(…)!`), и история не монтируется (`waiting for locator('#story-root')`; на базе — 7 passed). Заглушку
+править нужно в любом случае; с ней и правкой `main.ts` файлов шесть. Поэтому `main.ts` возвращён к upstream: одно
+правило для всех трёх — окно их не загружает; id остаются зарезервированными, `desktop` совпадает с базой.
 
-- окно его не загружает — ни строк серверов, ни пункта «добавить», ни диалога установки: всё это вклад `wsl/renderer.tsx`;
-- `wsl/main.ts` при старте только запускает сохранённые серверы (`controller.startConfiguredServers()` идёт по
-  `servers`); хранилище читает `wslServers` настроек — продукт его не писал, список пуст;
-- «Расширения › Плагины» прячет встроенные, пока они не упали (`extension-plugins.tsx`: строки только для `!item.builtin`,
-  упавшие — по определениям окна);
-- `os: ["windows"]`: на Linux и macOS не запускается вовсе;
-- вызвать установку (`installOpencode`) может только окно; сторонний плагин вызывает только свой главный вход.
+**Без входа окна у плагинов главного процесса нет интерфейса и работы:**
 
-Решение ждёт ответа владельца на вопрос checkpoint B2 (нужны ли WSL и SSH продукту позже).
+- окно их не ждёт: стартовый шлюз держат только определения окна с `windowEntry` (`app/src/runtime/plugin/host.tsx`,
+  `createStartupGate`), а список главного процесса окно читает лишь для «Расширений» и ошибок главного входа. Проба: мост
+  стенда `settings-wsl.fixture.tsx` отдаёт `manager.list` = `pairing`, `ssh`, `wsl` с `builtin: true`, как `installed()`
+  Desktop на Windows, — три теста на этом стенде 3 passed (29.7s); стенд возвращён без изменений;
+- «Расширения › Плагины» прячет встроенные, пока они не упали (`extension-plugins.tsx`: строки только для
+  `!item.builtin`, упавшие — по определениям окна);
+- пунктов нативного меню у трёх главных входов нет (`MenubarItem`, `ctx.add` в `{pairing,ssh,wsl}/main.ts` не
+  встречаются);
+- `ssh/main.ts` и `createSshController` при старте ничего не подключают — только хранилище `servers` и Ipc; `wsl/main.ts`
+  запускает лишь сохранённые серверы (`startConfiguredServers()`, конструктор `createWslServersController` процессов не
+  запускает), их хранилища читают `ssh.servers` и `wslServers` настроек, которых продукт не писал; `pairing/main.ts`
+  держит экран только при сохранённом `keepScreenActive` (ниже, «Найдено»);
+- вызвать подключение или установку (`start`, `installOpencode`) может только вход окна; сторонний плагин вызывает
+  только свой главный вход.
 
-**Тест** `app/test-browser/builtin-plugins.test.ts`: id списка окна (`@/runtime/plugin/builtins`, его подключает `app`)
-и списка главного процесса (`@opencode/gui-plugins/main`, его подключает `desktop/src/main/plugin/host.ts:2`) — точные
-списки: в окне 12 встроенных, в главном процессе те же и `wsl` после `updater`. Не «файла нет», а состав, который грузит
-продукт.
+Решение о главном процессе ждёт ответа владельца на вопрос checkpoint B2 (нужны ли WSL и SSH продукту позже).
+
+**Тест** `app/test-browser/builtin-plugins.test.ts`: список окна (`@/runtime/plugin/builtins`, его подключает `app`) —
+ровно 12 встроенных без `pairing`, `ssh`, `wsl`; список главного процесса (`@opencode/gui-plugins/main`, его подключает
+`desktop/src/main/plugin/host.ts:2`) — те же и эти три. Не «файла нет», а состав, который грузит продукт.
 
 Мутации (`<scratchpad>/b411e/mutate.py`: одна правка, прогон теста, возврат байтов; `git status` после — как до):
 
@@ -15212,40 +15230,44 @@ Desktop (`git grep '@lydell/node-pty"'`: ещё `core/src/pty/pty.node.ts` — �
 === M1 window list from base: pairing, ssh, wsl back: 0 pass / 1 fail
 === M2 window list gets wsl back: 0 pass / 1 fail
 === M3 window list loses goal: 0 pass / 1 fail
-=== M4 main list from base: pairing, ssh back: 0 pass / 1 fail
-=== M5 main list loses wsl (whole removal): 0 pass / 1 fail   # тест держит нынешнюю нарезку
+=== M4 main list loses pairing and ssh: 0 pass / 1 fail      # вариант f849352fa5
+=== M5 main list loses wsl: 0 pass / 1 fail
 === M6 main list loses terminal: 0 pass / 1 fail
 === M7 avatar from base: opencode.ai favicon: 1 pass / 1 fail
 === M8 avatar returns the 0.4 path /loginom-icon.svg: 1 pass / 1 fail
 === M9 avatar set loses the 0.4 root commit: 1 pass / 1 fail
 ```
 
-### e2e
+### e2e и компонентные тесты
 
-Dev-сервер Vite, Chromium 1248 через ссылки `<scratchpad>/pw-browsers` (как B4.11c), порт 3427.
+Dev-сервер Vite, Chromium 1248 через ссылки `<scratchpad>/pw-browsers` (как B4.11c).
 
 ```text
 $ PLAYWRIGHT_BROWSERS_PATH=<scratch>/pw-browsers PLAYWRIGHT_PORT=3427 bunx playwright test e2e/regression/settings-wsl.spec.ts
-  12 failed                                                   # на f849352fa5
-  12 passed (1.4m)                                            # то же на базе b8f1dd8091
+  12 failed                                                   # итог (список окна тот же с f849352fa5)
+  12 passed (1.4m)                                            # база b8f1dd8091
   5 × waiting for getByTestId('settings-screen').getByRole('tab', { name: 'Servers', exact: true })
   3 × waiting for getByTestId('settings-screen').getByRole('button', { name: /^Server / })
   4 × waiting for getByRole('heading', { name: 'WSL tabs session' | 'SSH offer session' | 'SSH session' | 'SSH incompatible session' })
 $ … home.spec.ts review.spec.ts whats-new.spec.ts -g "<три теста на том же стенде>"
-  3 passed (26.9s)                                            # на f849352fa5
+  3 passed (26.9s)
+$ PLAYWRIGHT_STORIES_PORT=3394 bunx playwright test --config playwright.components.config.ts plugin-graph pairing ssh-reconnect
+  9 passed (19.2s)                                            # на 573ded0f4d; на f849352fa5 — 2 passed, 7 failed (ssh-reconnect)
 ```
 
 - **`settings-wsl.spec.ts` — красный, записан, не правлен.** Все 12 тестов проверяют вклад плагинов WSL и SSH в окно
   Desktop (стенд `e2e/utils/settings-wsl.html` монтирует настоящий `AppInterface` со списком `renderer.ts`). Без плагинов
-  серверов WSL и SSH нет, у настроек один сервер — вкладки «Servers» нет. Перевести на «страницы нет» — шестой файл кода;
-  тесты самих плагинов (`gui-plugins` `bun test`, истории `component-tests/{pairing,ssh-reconnect}.spec.ts`, которые
-  монтируют истории, а не список) не затронуты. Решение — вместе со второй нарезкой: вернуть плагины (тогда spec снова
-  нужен) или заменить spec проверкой «пунктов WSL и SSH нет».
+  серверов WSL и SSH нет, у настроек один сервер — вкладки «Servers» нет. Перевести на «страницы нет» — шестой файл кода.
+  Решение — вместе со второй нарезкой: вернуть плагины (тогда spec снова нужен) или заменить его проверкой «пунктов WSL и
+  SSH нет».
+- **Тесты самих плагинов зелёные:** `gui-plugins` `bun test` (1 129 pass), компонентные `pairing.spec.ts` и
+  `ssh-reconnect.spec.ts` (истории монтируют плагин сами) и граф встроенных `plugin-graph.spec.ts` (каждый встроенный
+  без каждого другого, по списку окна).
 - **Три теста на том же стенде** («Home keeps a restored remote selection…», «desktop review waits for the session's
   stored mode…», «a rejected update check shows one failure title…») WSL не используют — зелёные. Первый прогон шёл
   вместе с девятью наборами тестов, и `whats-new` упал на обоих деревьях в разных местах (итог — строка 119, база — 121);
   на свободной машине `--repeat-each=2` — 2 passed и на итоге, и на базе: падение от нагрузки.
-- Сопряжение в e2e продукта не открывается: `settings.spec.ts` про «Pairing link» — это диалог «Добавить сервер» самого
+- Сопряжение в e2e продукта не открывается: `settings.spec.ts` про «Pairing link» — диалог «Добавить сервер» самого
   `app`, не плагин (ниже).
 
 ### 3. Адреса установки OpenCode
@@ -15255,21 +15277,24 @@ $ … home.spec.ts review.spec.ts whats-new.spec.ts -g "<три теста на 
 
 | Место | Что | Достижимо из интерфейса продукта |
 |---|---|---|
-| `gui-plugins/src/ssh/remote-cli.ts:79` | `registry.npmjs.org/@opencode/cli-<target>/-/cli-<target>-<версия>.tgz` | нет: SSH не зарегистрирован ни в окне, ни в главном процессе |
+| `gui-plugins/src/ssh/remote-cli.ts:79` | `registry.npmjs.org/@opencode/cli-<target>/-/cli-<target>-<версия>.tgz` | нет: код главного процесса SSH, вызвать его может только вход окна SSH, а его нет |
 | `gui-plugins/src/ssh/remote-cli.ts:91` | `curl … raw.githubusercontent.com/anomalyco/opencode/v2/install \| bash` | нет, то же |
 | `gui-plugins/src/ssh/remote-cli.ts:129,133` | `registry.npmjs.org/@opencode%2fcli/beta` | нет, то же |
-| `gui-plugins/src/wsl/remote-cli.ts:46` | `curl … raw.githubusercontent.com/anomalyco/opencode/v2/install \| bash` | нет: код в главном процессе Desktop, вызвать его может только вход окна WSL, а его нет |
+| `gui-plugins/src/wsl/remote-cli.ts:46` | `curl … raw.githubusercontent.com/anomalyco/opencode/v2/install \| bash` | нет: то же для WSL |
 | `app/src/settings/about/notices/notices.ts:16` | `https://github.com/anomalyco/opencode` | да, ссылка на исходники в сведениях о лицензиях («О программе»): запись OpenCode, MIT. Не установка; LEGAL (B4.11c) |
 
-Сборка Desktop (`bunx electron-vite build` в `packages/desktop`, код 0, `out/` удалён после проверки):
+Сборка Desktop (`bunx electron-vite build` в `packages/desktop`, код 0, `out/` удалён после проверки), на `573ded0f4d`:
 
 ```text
-$ grep -rlF <строка> out/
-raw.githubusercontent.com/anomalyco  → main/main-*.js            # сценарий установки WSL: …curl -fsSL https://raw.githubusercontent.com/anomalyco/opencode/v2/install | bash…
-@opencode/cli-, @opencode%2fcli      → нет                       # SSH ушёл из главного процесса
-github.com/anomalyco/opencode        → renderer/assets/dialog-*.js   # {name:`OpenCode`,…,url:`https://github.com/anomalyco/opencode`,license:`MIT License`} — сведения о лицензиях
-opencode.ai/favicon.svg, «Pair device», «Add SSH» → нет
+$ grep -rlF <строка> out/ (без .map)
+raw.githubusercontent.com/anomalyco      → main/main-*.js (2)   # сценарии установки SSH и WSL, главный процесс
+@opencode/cli-, @opencode%2fcli          → main/main-*.js       # SSH, главный процесс
+github.com/anomalyco/opencode            → renderer/assets/dialog-*.js   # {name:`OpenCode`,…,url:`https://github.com/anomalyco/opencode`,license:`MIT License`}
+"Add WSL server", "Add SSH server", "Pair device" → только main/host-*.js   # словари главных входов
+"pair device qr phone remote" (renderer.tsx сопряжения), opencode.ai/favicon.svg → нет
 ```
+
+В окне (`renderer/`) нет ни кода, ни строк трёх плагинов; адреса установки — только в главном процессе, без вызывающего.
 
 Вне этих масок (не установка OpenCode, на заметку): `gui-plugins/src/updater/whats-new.tsx:8` загружает
 `https://opencode.ai/changelog.json` для «Что нового»; `app/src/settings/about/contributors.ts:16` —
@@ -15277,55 +15302,61 @@ opencode.ai/favicon.svg, «Pair device», «Add SSH» → нет
 
 ### Приёмка
 
-База `b8f1dd8091` (`<scratchpad>/b411e-base`), итог `f849352fa5`; `<scratchpad>/b411e/suites.sh`.
+База `b8f1dd8091` (`<scratchpad>/b411e-base`), итог `573ded0f4d`; `<scratchpad>/b411e/suites.sh`.
 
 | Команда | `b8f1dd8091` | итог |
 |---|---|---|
-| `app`: `bun typecheck` | 2 391 файл, ошибок нет | 2 233: плагины сопряжения, SSH и WSL вышли из графа окна |
+| `app`: `bun typecheck` | 2 391 файл, ошибок нет | 2 233: окна плагинов вышли из графа окна |
 | `app`: `bun run test:unit` | 2 719 pass, 0 fail (275 файлов) | то же |
 | `app`: `bun run test:browser` | 367 pass, 0 fail (59 файлов) | 368 pass, 0 fail (60): +1 `builtin-plugins.test.ts` |
 | `ui`: `bun typecheck` | 264 файла, ошибок нет | то же |
 | `ui`: `bun test src` | 620 pass, 0 fail | то же (тест аватара переписан, не добавлен) |
-| `desktop`: `bun typecheck` | 3 518 файлов, ошибок нет | 3 282: то же, граф окна и главного процесса |
+| `desktop`: `bun typecheck` | 3 518 файлов, ошибок нет | 3 360: граф окна, главный процесс тот же |
 | `desktop`: `bun test --timeout 30000` | 577 pass, 4 skip, 0 fail | то же |
 | `gui-plugins`: `bun typecheck` | 1 422 файла, ошибок нет | то же: папки плагинов на месте |
 | `gui-plugins`: `bun test` | 1 129 pass, 1 skip, 0 fail | то же |
 
-`bun script/lint-changed.ts b8f1dd8091` — `0 problem(s) in 0 of 5 changed files` (одно замечание
-`require-readable-spacing` в тесте аватара исправлено до коммита). `prettier --check` по файлам задачи — чисто, кроме
-`project-avatar.tsx:192` (`<Show when={generated()} …>`): так на базе, строка не моя.
+`bun script/lint-changed.ts b8f1dd8091` — `0 problem(s) in 0 of 4 changed files` (`stories` в его область не входит;
+одно замечание `require-readable-spacing` в тесте аватара исправлено до первого коммита). `prettier --check` по файлам
+задачи — чисто, кроме `project-avatar.tsx:192` (`<Show when={generated()} …>`): так на базе, строка не моя.
 
 ```text
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
 against a6b15d33daf6: 565 divergent upstream files       # база 562: +3
   CAT-03: 96                                              # то же: gui-plugins/README.md уже расходился (B1.4a)
   CAT-10: 90                                              # база 89: project-avatar.test.ts
-  CAT-12: 189                                             # база 187: gui-plugins/src/{main,renderer}.ts
+  CAT-12: 189                                             # база 187: gui-plugins/src/renderer.ts, stories/mocks/gui-plugins/ssh.tsx
 $ python3 -I scripts/upstream-sync/apply-identity.py --check           # код 0
 would change: 0 files
-$ bun script/sdk-docs.ts
-sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
 ```
 
+`packages/stories` своего typecheck в `bun run check` не имеет; `bun check --no-script` в нём красный и на базе (173
+ошибки в 44 файлах; итог — 114 в 23: заглушка больше не тянет весь список окна). В `mocks/gui-plugins/ssh.tsx` — 14
+ошибок и там, и там (алиасы `@/…`, `TS2550` цели), на строках правки — ни одной; заглушку проверяет прогон
+`ssh-reconnect.spec.ts`.
+
 ```text
-$ bun run check                                                       # код 0, на f849352fa5 и рабочем дереве с этим разделом
+$ bun run check                                                       # код 0, на 573ded0f4d
 Found 554 warnings and 0 errors.                          # как на B4.11d (dec3226113); в файлах задачи — 0
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
 @opencode/app:typecheck: ✓ No type errors in 2,233 files across 1 project
-@opencode/desktop:typecheck: ✓ No type errors in 3,282 files across 2 projects
+@opencode/desktop:typecheck: ✓ No type errors in 3,360 files across 2 projects
+@opencode/gui-plugins:typecheck: ✓ No type errors in 1,422 files across 1 project
  Tasks:    39 successful, 39 total
 ```
 
 ### Каталог
 
-`catalog.json` не менялся: `gui-plugins/src/*` — CAT-12, `ui/**` — CAT-10, `gui-plugins/README.md` — CAT-03, новый тест
-`app/test-browser` — файл форка. В `catalog.md`: CAT-03 — блоки README; CAT-10 — аватар и его проверка; CAT-12 — новый
-пункт «Встроенные плагины GUI (B4.11e)»: что убрано из какого списка, почему `wsl` в главном процессе, тест.
+`catalog.json` не менялся: `gui-plugins/src/renderer.ts` и `stories/mocks/gui-plugins/ssh.tsx` — CAT-12, `ui/**` —
+CAT-10, `gui-plugins/README.md` — CAT-03, новый тест `app/test-browser` — файл форка. В `catalog.md`: CAT-03 — блок
+README; CAT-10 — аватар и его проверка; CAT-12 — пункт «Встроенные плагины GUI (B4.11e)».
 
 ### Где решал сам
 
-- **`wsl` остался в главном процессе — вторая нарезка** (выше): иначе шестой файл (`electron.vite.config.test.ts`) и
-  решение о node-pty.
+- **Скрыто только в окне, `main.ts` — upstream** (выше): убрать из главного процесса — шестой файл
+  (`electron.vite.config.test.ts`) и решение о node-pty; вторая нарезка.
+- **Заглушка историй SSH исправлена, а не `ssh` оставлен в окне**: тесты плагина должны остаться зелёными, а пункт
+  «Add SSH server» ведёт к установке OpenCode на удалённую машину.
 - **Сопряжение спрятано целиком** — Desktop оно для своей службы не нужно; «Remote access» и «Keep screen active» ушли с
   ним, как в 0.4.
 - **`settings-wsl.spec.ts` записан, не правлен** — шестой файл; задание допускает запись с причиной.
@@ -15340,15 +15371,19 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   `opencode pair`. Ничего не ставит, это не плагин; подсказка `server.connect.link.description` («…or from Settings →
   Pairing on the server's computer») ссылается на страницу, которой в продукте теперь нет. Задача словарей (B4.11d,
   класс REMOTE) или решение о сопряжении вообще.
-- **node-pty в Desktop**: после второй нарезки (WSL из главного процесса) `@lydell/node-pty-*` в `optionalDependencies`
-  Desktop и `opencode:node-pty-narrower` не нужны — решить вместе с ней.
+- **«Keep screen active» без переключателя.** Главный вход сопряжения при сохранённом `keepScreenActive`
+  (`plugin.pairing` или прежний `loginom-ai-agent.settings`) держит экран (`powerSaveBlocker`), а выключить негде.
+  Продукт этот ключ не писал — у пользователя его нет; уйдёт со второй нарезкой.
+- **node-pty в Desktop** нужен только главному входу WSL — решить во второй нарезке вместе с `optionalDependencies` и
+  `opencode:node-pty-narrower`.
 - **«Что нового»** загружает журнал изменений с `opencode.ai/changelog.json` (`updater/whats-new.tsx:8`) — B4.12 или
   CAT-04.
-- **`gui-plugins/README.md`** ведёт автора по сопряжению как по примеру, а сопряжения в списках продукта нет: блоки кода
-  и фраза шага 5 приведены к спискам, остальной текст руководства — upstream.
+- **`gui-plugins/README.md`** ведёт автора по сопряжению как по примеру, а в окне продукта сопряжения нет: блок кода
+  окна и фраза перед ним приведены к списку, остальной текст руководства — upstream.
 
 ### Не проверено
 
-- Windows: что `wsl/main.ts` в главном процессе без входа окна ничего не запускает — по коду; окно Desktop на Windows не
+- Windows: что `wsl/main.ts` без входа окна ничего не запускает — по коду и пробой стенда; окно Desktop на Windows не
   открывал. Окно Desktop на Linux тоже не запускал: проверены тесты, e2e на dev-сервере Vite и сборка `electron-vite`.
-- Аватар в окне: в тесте Bun отдаёт путь к файлу, Vite — `data:`; сам рендер `<img>` в окне не смотрел.
+- Страницу «Расширения › Плагины» с тремя встроенными только главного процесса не открывал — по коду.
+- Аватар в окне: в тесте Bun отдаёт путь к файлу; рендер `<img>` в окне не смотрел.
