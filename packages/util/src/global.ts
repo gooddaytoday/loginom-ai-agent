@@ -7,6 +7,7 @@ import { Context, Effect, Layer } from "effect"
 // native-module stubs, so no runtime sniffing happens here.
 import { roots } from "#global-roots"
 import { productChannel, productSlug } from "@loginom-ai-agent/product"
+import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
 import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
 
@@ -18,7 +19,10 @@ declare const LOGINOM_AI_AGENT_CHANNEL: string
 // and a source run are dev. Desktop looks for the registration in the directory of its own channel.
 const build = typeof LOGINOM_AI_AGENT_CHANNEL === "string" ? LOGINOM_AI_AGENT_CHANNEL : undefined
 const app = productSlug(productChannel(build === "latest" ? "prod" : build))
-const { data, cache, config, state, tmp } = roots(app)
+// Fork (B2.7c): a profile of the product CLI keeps its data, config, state and cache inside its root, as in 0.4. Only the
+// product CLI entry sets the root (`cli/src/profile.ts`); the service it starts inherits it.
+const profile = process.env.LOGINOM_AI_AGENT_CLI_ROOT ? profilePaths(process.env.LOGINOM_AI_AGENT_CLI_ROOT) : undefined
+const { data, cache, config, state, tmp } = profile ?? roots(app)
 
 const paths = {
   get home() {
