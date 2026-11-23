@@ -546,7 +546,7 @@ export const dict = {
   "error.page.action.checkUpdates": "Check for updates",
   "error.page.action.updateTo": "Update to {{version}}",
   "error.page.circular": "[Circular]",
-  "error.page.report.prefix": "Please report this error to the OpenCode team",
+  "error.page.report.prefix": "Please report this error to the Loginom AI Agent team",
   "error.page.report.discord": "on Discord",
   "error.page.version": "Version: {{version}}",
 
@@ -965,6 +965,7 @@ export const dict = {
   "settings.about.notices.fonts.description":
     "Each family is distributed under the SIL Open Font License 1.1, with the copyright lines below.",
   "settings.about.notices.eigenpal": "Portions of BetterOffice derive from it.",
+  "settings.about.notices.opencode": "Loginom AI Agent is built on it.",
   "settings.about.notices.loadFailed": "Could not load the third-party notices",
   "settings.about.notices.crates.title": "Rust crates in the Office engines",
   "settings.about.notices.crates.description":

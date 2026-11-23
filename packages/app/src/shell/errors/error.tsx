@@ -1,3 +1,4 @@
+import { Product } from "@loginom-ai-agent/product"
 import { TextField } from "@opencode/ui/text-field"
 import type { captureException } from "@sentry/solid"
 import { Logo } from "@opencode/ui/logo"
@@ -497,7 +498,7 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
             <button
               type="button"
               class="flex items-center text-text-interactive-base gap-1"
-              onClick={() => platform.openExternal("https://opencode.ai/desktop-feedback")}
+              onClick={() => platform.openExternal(Product.support)}
             >
               <div>{language.t("error.page.report.discord")}</div>
               <Icon name="discord" class="text-text-interactive-base" />

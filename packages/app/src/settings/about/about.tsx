@@ -8,7 +8,6 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { showToast } from "@/shell/notifications/toast"
 import legal from "./legal.svg"
-import anomalyBrush from "./anomaly-brush.svg"
 import {
   INITIAL_ABOUT_COPY_STATE,
   selectAboutCopyView,
@@ -108,11 +107,6 @@ export function SettingsAbout(props: { active: boolean }) {
         {DESKTOP_NATIVE_ENGLISH["desktop.menu.app"]}
       </p>
 
-      <div class="settings-about-publication">
-        <p>{language.t("settings.about.firstPublished")}</p>
-        <p>{language.t("settings.about.firstIllustrated")}</p>
-      </div>
-
       <p class="settings-about-faint">
         <ExternalLink href="https://loginom.ru/">
           <bdi dir="ltr">{language.t("settings.about.website")}</bdi>
@@ -129,12 +123,7 @@ export function SettingsAbout(props: { active: boolean }) {
         </p>
       </div>
 
-      <p>{language.t("settings.about.tagline")}</p>
       <img class="settings-about-legal" src={legal} alt="" />
-      <div class="settings-about-copyright">
-        <p>{language.t("settings.about.copyright")}</p>
-        <img class="settings-about-anomaly-brush" src={anomalyBrush} alt="" />
-      </div>
     </div>
   )
 }
