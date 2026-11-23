@@ -13160,7 +13160,9 @@ Found 558 warnings and 0 errors.                                      # как �
 | Коммит | Что |
 |---|---|
 | `b522c0523a` `feat(desktop): package Linux and macOS with the 0.4 settings (B4.5b)` | три файла кода, тесты |
-| следующий | этот раздел; CAT-02 в `catalog.md` |
+| `755570b849` `docs(upstream-sync): record the Linux and macOS packaging of Desktop (B4.5b)` | этот раздел; CAT-02 в `catalog.md` |
+| `af1fd703c9` `feat(desktop): keep Linux package files public and target macOS 14 (B4.5b)` | доработка по решению оркестратора (ниже): umask, режимы значков и metainfo, `minimumSystemVersion` |
+| следующий | раздел «Доработка»; CAT-02 |
 
 Файлы кода — три: `electron-builder.config.ts` (+59 −4), `scripts/linux-permissions.ts` и `resources/entitlements.plist`
 (новые, файлы 0.4; в первом только пустые строки для `require-readable-spacing`). Тесты — `electron-builder.config.test.ts`
@@ -13196,10 +13198,9 @@ Found 558 warnings and 0 errors.                                      # как �
 ### Отличия от 0.4 вне списка задачи (не трогал)
 
 - macOS: ad-hoc подпись самим electron-builder (`identity: "-"`, `CSC_IDENTITY_AUTO_DISCOVERY=false` на darwin),
-  `notarize: false`, `dmg.sign: false`, `minimumSystemVersion: "14.0"`. В v2 подпись — работа выпуска: тест upstream
-  «shared packaging defaults» держит `mac.sign` и `mac.notarize` неопределёнными, `pack.ts` собирает с `-c.mac.identity=null`.
-- `process.umask(0o022)` в начале конфига на Linux (0.4, тот же коммит `a7d812e4a9`, что `linuxPermissions`): файлы,
-  которые electron-builder пишет после `afterPack`. Как это видно в deb — ниже, «Сборка».
+  `notarize: false`, `dmg.sign: false`. В v2 подпись — работа выпуска (B5.1, В-98): тест upstream «shared packaging
+  defaults» держит `mac.sign` и `mac.notarize` неопределёнными, `pack.ts` собирает с `-c.mac.identity=null`.
+  (`minimumSystemVersion` и `process.umask(0o022)` сначала тоже были здесь; перенесены доработкой, ниже.)
 - Внешняя карта блоков AppImage (`afterAllArtifactBuild`) — для обновлений, B4.12.
 - Категории (`Office` и `public.app-category.productivity` в 0.4, `Development` и `developer-tools` в v2), значки Linux
   (`resources/icons/linux`) — B4.6; `files` в 0.4 уже (`out/**/*`, `resources/icons/**/*`).
@@ -13350,11 +13351,10 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - **arm64 — закреплён у macOS, как в 0.4.** v2 уже собирала arm64 по `--arm64`, но тест конфига этого не видит; закрепление
   проверяемо и сборки `pack.ts` (`--dir`) не меняет (выше). x64 macOS по `electron-builder --mac` без `--dir` больше не
   собирается — как в 0.4; ресурсов Loginom для `darwin-x64` и так нет (`stage-resources.ts`). Linux и Windows arm64 у v2 по флагам остались: «arm64 там, где был в 0.4» их не касается.
-- **Подпись macOS — только ключи из списка.** `identity: "-"`, `notarize: false`, `dmg.sign: false`, `minimumSystemVersion`
-  в списке задачи нет, а `notarize: false` противоречит тесту upstream «shared packaging defaults». Ключи действуют, когда
+- **Подпись macOS — только ключи из списка.** `identity: "-"`, `notarize: false`, `dmg.sign: false` в списке задачи нет, а `notarize: false` противоречит тесту upstream «shared packaging defaults». Ключи действуют, когда
   подписывает сам electron-builder (найденная в связке ключей личность или `-c.mac.identity=-`).
-- **`process.umask(0o022)` не перенёс**: его нет в списке; строка при загрузке конфига меняет umask всего процесса
-  `bun test`. Последствие видно в deb (ниже).
+- **`process.umask(0o022)` сначала не перенёс** (нет в списке; строка при загрузке конфига меняет umask всего процесса
+  `bun test`) — перенесён доработкой, ниже.
 - **Тест ключей `entitlements.plist` — не поиск по исходникам** (`packages/desktop/AGENTS.md`): он читает файл, который
   конфиг отдаёт `codesign`, и проверяет наличие ключей, а не отсутствие кода.
 - **Заметки об упаковке из `v0.4.0:packages/desktop/AGENTS.md`** (B4.5a отложил их «к B4.5b или B6.3») не переносил:
@@ -13370,7 +13370,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Найдено, не чинил
 
-- **deb, собранный под umask 077, ставит закрытые файлы** (девять записей выше): ярлык `.desktop`, значки и metainfo
+- **deb, собранный под umask 077, ставит закрытые файлы** (девять записей выше; **исправлено доработкой**, ниже): ярлык `.desktop`, значки и metainfo
   `0600` от root — по режимам, обычный пользователь ярлык не прочитает (deb не устанавливал); `resources/package-type`
   `0600` — его читает electron-updater (`electron-updater/out/main.js:53-57`), чтобы выбрать формат обновления. Ярлык и
   `package-type` electron-builder пишет после `afterPack` с umask процесса — это и закрывала строка 0.4
@@ -13385,7 +13385,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Путь `chrome-sandbox` — `chrome-linux64`, как в 0.4. Ресурсы Loginom `stage-resources.ts` собирает только для
   `linux-x64`, `win32-x64` и `darwin-arm64`, так что сборки Desktop Linux и Windows arm64, которые v2 допускает по флагам,
   падают раньше, на `bundle-loginom.ts` (`LOGINOM_NATIVE_RESOURCES_UNAVAILABLE`), — по коду, не запускал.
-- Корень архива deb `./` — `drwx------` (временный каталог fpm); что dpkg делает с ним при установке, не проверял.
+- Корень архива deb `./` — `drwx------` под umask 077; после доработки — `drwxr-xr-x`.
 
 ### Не проверено
 
@@ -13394,3 +13394,94 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - deb не устанавливался (`dpkg -i`, владелец `root` у `chrome-sandbox` после установки, запуск без `--no-sandbox`) — B4.14b;
   AppImage и rpm не собирались.
 - Сборка — от root; режимы под обычным пользователем и umask 022 не смотрел.
+
+### Доработка: umask, значки и metainfo, macOS 14
+
+Решение оркестратора после приёмки (по паритету с `v0.4.0`, не новые критерии): строка 0.4 `process.umask(0o022)` на
+Linux с её комментарием (`v0.4.0:electron-builder.config.ts:26-27`); если значки и metainfo в deb останутся `0600` —
+малая правка в `afterPack`; `minimumSystemVersion: "14.0"`, как в 0.4. Ad-hoc подпись, `notarize`, `dmg.sign` — как
+записано выше (B5.1, В-98).
+
+Правка `af1fd703c9` (+15 строк конфига):
+
+- в начале конфига — `if (process.platform === "linux") process.umask(0o022)` с комментарием 0.4;
+- в `afterPack` Linux, после `linuxPermissions(appOutDir)`: `linuxPermissions` для `<buildResourcesDir>/icons` и
+  `<buildResourcesDir>/<appId>.metainfo.xml`, если файл есть. fpm берёт их прямо из `resources/` с режимом, который дала
+  сборка (`linux.icon` и `metainfoFpm`); metainfo канала до B4.6 может не быть (`--linux dir`), поэтому проверка наличия;
+- `mac.minimumSystemVersion: "14.0"`.
+
+Сборки (`<scratchpad>/b45b-runs/build2.sh`, канал `dev`, `umask 0077`, заглушка metainfo, `--linux deb`, 237–243 с, код 0):
+
+```text
+# а) только строка umask (CLI и Desktop собраны заново, 18 + 39 с)
+fpm inputs: 700 resources/icons, 600 resources/icons/*.png, 600 metainfo
+-rw-r--r-- 0/0   262 ./usr/share/applications/com.loginom.aiagent.dev.desktop
+-rw-r--r-- 0/0     3 ./opt/loginom-ai-agent-dev/resources/package-type
+-rw-r--r-- 0/0   277 ./opt/loginom-ai-agent-dev/resources/apparmor-profile
+drwxr-xr-x 0/0       ./
+entries without o+r: 4 of 13606
+-rw------- 0/0  1085 2026-11-23 03:37 ./usr/share/metainfo/com.loginom.aiagent.dev.metainfo.xml
+-rw------- 0/0  1973 2026-11-23 03:36 ./usr/share/icons/hicolor/32x32/apps/loginom-ai-agent-dev.png
+-rw------- 0/0 16568 2026-11-23 03:36 ./usr/share/icons/hicolor/128x128/apps/loginom-ai-agent-dev.png
+-rw------- 0/0  5469 2026-11-23 03:36 ./usr/share/icons/hicolor/64x64/apps/loginom-ai-agent-dev.png
+# б) строка umask и режимы входов fpm в afterPack (только electron-builder, входы снова 0600)
+-rw-r--r-- 0/0  1085 2026-11-23 03:37 ./usr/share/metainfo/com.loginom.aiagent.dev.metainfo.xml
+-rw-r--r-- 0/0   262 2026-11-23 03:42 ./usr/share/applications/com.loginom.aiagent.dev.desktop
+-rw-r--r-- 0/0  1973 2026-11-23 03:36 ./usr/share/icons/hicolor/32x32/apps/loginom-ai-agent-dev.png
+-rw-r--r-- 0/0 16568 2026-11-23 03:36 ./usr/share/icons/hicolor/128x128/apps/loginom-ai-agent-dev.png
+-rw-r--r-- 0/0  5469 2026-11-23 03:36 ./usr/share/icons/hicolor/64x64/apps/loginom-ai-agent-dev.png
+-rw-r--r-- 0/0     3 ./opt/loginom-ai-agent-dev/resources/package-type
+-rwsr-xr-x 0/0 15232 ./opt/loginom-ai-agent-dev/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
+entries without o+r: 0 of 13606
+Depends: libgtk-3-0, libnotify4, libnss3, … (список 0.4, без изменений)
+```
+
+Время в именах значков и metainfo — время файлов в `resources/` (03:36–03:37, сборка «а»): fpm кладёт источник, поэтому
+строка umask их не открывает, а правка в `afterPack` — открывает. После сборки «б» источники в `resources/` — `0644`.
+
+Тесты:
+
+- «Linux packaging resets a private build umask» (новый, только Linux): umask процесса `0o077`, свежий импорт конфига
+  (`?umask=<время>`), umask — `0o022`; в `finally` прежний umask возвращается.
+- «Linux afterPack opens the payload and packaging input modes and restores the pinned Chromium sandbox mode»
+  (расширен): `appOutDir` и `buildResourcesDir` — разные каталоги; `icons/` `0700` с файлом `0600` и metainfo канала
+  `0600` после хука — `0755` и `0644`.
+- «macOS $channel packages target arm64 macOS 14 and sign with the 0.4 entitlements without rewriting vendor resources»
+  (переименован, ×3): плюс `minimumSystemVersion` — `14.0`.
+
+Мутации (тот же `mutate.py`, восстанавливает файл из копии; M0–M17 — как выше, тот же результат, счёт на 1 тест больше):
+
+```text
+=== M0 none: 26 pass / 0 fail
+=== M18 no umask line: 25 pass / 1 fail                       # umask
+=== M19 no minimumSystemVersion: 23 pass / 3 fail             # macOS ×3
+=== M20 packaging inputs keep the build modes: 25 pass / 1 fail  # afterPack
+=== M21 metainfo keeps the build mode: 25 pass / 1 fail       # afterPack
+=== M22 icons keep the build mode: 25 pass / 1 fail           # afterPack
+```
+
+Приёмка на `af1fd703c9` (`packages/desktop`, база — `4bc6438b34`, как выше):
+
+| Команда | Итог |
+|---|---|
+| `bun typecheck` | 3 519 файлов, ошибок нет |
+| `bun run typecheck:tsc` | код 0 |
+| `bun test --timeout 30000` | 567 pass, 4 skip, 0 fail (571 тест, 72 файла): +1 umask к 566 |
+| `tsc` конфига и тестов (временный `tsconfig`) | те же две ошибки базы, в новом коде нет |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary         # код 0
+against a6b15d33daf6: 483 divergent upstream files
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check  # код 0
+would change: 0 files
+$ bun run check                                                        # код 0, на af1fd703c9 с этой записью
+Found 558 warnings and 0 errors.
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+Сборки и `out/`, `resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`,
+`packages/dashboard/dist` удалены.
+
+Что меняет строка umask: на Linux загрузка конфига ставит umask `022` всему процессу — electron-builder, `pack.ts`
+(импортирует `getConfig`) и процессу `bun test` после импорта конфига; полный прогон `desktop` — без новых падений.
