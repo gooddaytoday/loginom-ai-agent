@@ -9,7 +9,7 @@ Tools of the OpenCode update procedure. Read [docs/upstream-sync/procedure.md](.
 | `conflict-classes.py` | Before/after table of conflict classes; unknown paths are `unclassified` and fail the run |
 | `verify-accepted.py` | The acceptance gate: compares the merge commit with the oracle byte for byte; every conflicted or deviating path needs a decision record committed with the merge |
 | `merge_oracle.py` | The oracle: Git's mechanical merge of the fork and an upstream commit (merge-tree, settings of `prepare`) plus apply-identity; `--print-tree` gives its tree id |
-| `apply-identity.py` | Gives new upstream code the fork's external names (`LOGINOM_AI_AGENT_*`, `.loginom-ai-agent`, `loginom-ai-agent.json`) |
+| `apply-identity.py` | Gives new upstream code the fork's external names (`LOGINOM_AI_AGENT_*`, `.loginom-ai-agent`, `loginom-ai-agent.json`) and the product command `loginom-ai-agent-cli` in CLI, TUI and server messages |
 | `compat-snapshot.ts`, `compat-compare.ts` | External-compatibility snapshot of a checkout and its comparison (identity, packaging, env names, CI triggers, resources) |
 | `acceptance_cells.py` | The closed case space of `verify-accepted.py` and `catalog-check.py` as data: an independent model (`git merge --no-commit`), generator of Git merges (one per cell), contract tables (`--markdown`); `--tools DIR` measures any version of the tools |
 | `test_acceptance.py` | Every cell of [acceptance-contract.md](../../docs/upstream-sync/acceptance-contract.md) as a test (exit code and verdict of each), mutations of the gate, and the check that the document embeds the generated tables |

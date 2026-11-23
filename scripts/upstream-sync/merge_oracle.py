@@ -147,8 +147,8 @@ def apply_identity(repo, entries, fork_entries):
             text = blobs[sha].decode("utf-8")
         except UnicodeDecodeError:
             continue
-        if _identity.transform(text) != text:
-            mapped[path] = (mode, _identity.transform(text))
+        if _identity.transform(text, path) != text:
+            mapped[path] = (mode, _identity.transform(text, path))
     out = dict(entries)
     if mapped:
         with tempfile.TemporaryDirectory(prefix="oracle-blobs.") as tmp:
