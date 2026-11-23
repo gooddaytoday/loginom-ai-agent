@@ -97,56 +97,21 @@ test("writerIdentity: observes an owner published during initial guard creation"
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("assertAuth: shared mode refuses local auth and exposes only the provider status code", async () => {
+// The product CLI on OpenCode 2 has no shared OAuth store and no `providers status` receipt (B2.7b2).
+test("assertAuth: общий OAuth на OpenCode 2 отключён до любого процесса", async () => {
   const input = await sharedAuthFixture()
   try {
     const local = path.join(input.config.profileDir, "data/auth.json")
     await writeFile(local, '{"openai":{"type":"oauth","refresh":"local-canary"}}', { mode: 0o600 })
-    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "not_ready", code: "SHARED_AUTH_OAUTH_REQUIRED" }))
-    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } })).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
-    expect(JSON.parse((await Bun.file(input.calls).text()).trim())).toEqual({ args: ["providers", "status", "--provider", "openai", "--format", "json"],
-      sharedDir: input.config.auth.sharedDir, httpOnly: "false" })
-    expect(await Bun.file(local).text()).toContain("local-canary")
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-})
-
-test("assertAuth: shared mode admits only the public verified receipt without a local auth file", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
-      principal_sha256: "a".repeat(64), refresh_required: true }
-    await Bun.write(input.receipt, JSON.stringify(ready))
-    expect(await assertAuth(input.config, input.command)).toEqual({ generation: ready.generation,
-      principal_sha256: ready.principal_sha256, refresh_required: true })
-    expect(await Bun.file(path.join(input.config.profileDir, "data/auth.json")).exists()).toBe(false)
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-})
-
-test("assertAuth: shared receipt tampering cannot admit a slot or expose raw provider output", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
-      principal_sha256: "a".repeat(64), refresh_required: false }
-    for (const value of ["private-canary", { ...ready, provider: "other" }, { ...ready, generation: "private-canary" },
-      { ...ready, principal_sha256: "private-canary" }, { ...ready, refresh_required: "yes" },
-      { ...ready, status: "not_ready", code: "private-canary" }]) {
-      await Bun.write(input.receipt, JSON.stringify(value))
-      await expect(assertAuth(input.config, input.command)).rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
-    }
-    await Bun.write(input.receipt, JSON.stringify(ready))
-    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } }))
-      .rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
-  } finally { await rm(input.root, { recursive: true, force: true }) }
-}, 20_000)
-
-test("assertAuth: shared grant and HTTP switch must match before any management process", async () => {
-  const input = await sharedAuthFixture()
-  try {
-    for (const env of [{ ...input.command.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(input.root, "ungranted") },
-      { ...input.command.env, LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" }])
-      await expect(assertAuth(input.config, { ...input.command, env })).rejects.toThrow("SHARED_AUTH_ENV_MISMATCH")
-    expect(await Bun.file(input.receipt).exists()).toBe(false)
+    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "ready",
+      generation: crypto.randomUUID(), principal_sha256: "a".repeat(64), refresh_required: false }))
+    const refusal = await assertAuth(input.config, input.command).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(EvalFailure)
+    expect((refusal as EvalFailure).message).toStartWith("SHARED_AUTH_UNSUPPORTED")
+    expect((refusal as EvalFailure).exitCode).toBe(2)
+    expect((refusal as EvalFailure).message).not.toContain("local-canary")
     expect(await Bun.file(input.calls).exists()).toBe(false)
+    expect(await Bun.file(local).text()).toContain("local-canary")
   } finally { await rm(input.root, { recursive: true, force: true }) }
 })
 
