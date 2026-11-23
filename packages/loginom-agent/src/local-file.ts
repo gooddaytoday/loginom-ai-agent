@@ -24,6 +24,15 @@ import { fileSnapshot } from "./file-snapshot"
 const sampleReceipt = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ path: Schema.String, manifest: Schema.Struct({ sha256: Schema.String }) })),
 )
+// Plugin storage (B2.5d): the identity of a file the user attached, kept with its message (0.4 attachment receipt), and
+// the attachments a compaction carried past its summary.
+const receiptKey = (sessionID: string, messageID: string, uri: string) =>
+  `attachment-receipt:${sessionID}:${messageID}:${uri}`
+const carriedKey = (sessionID: string, compactionID: string) => `compacted-attachments:${sessionID}:${compactionID}`
+const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ canonical_path: Schema.String }))
+const decodeCarried = Schema.decodeUnknownOption(
+  Schema.Array(Schema.Struct({ message: Schema.String, uri: Schema.String })),
+)
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
 // Metadata key of a rules-only check (0.4 `checkDeny`): this module's `permission.evaluate` hook settles it without
@@ -47,13 +56,52 @@ const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: 
 
 /** Local file admission for one plugin instance; `profiles` holds `file-profiles/<session>` of the file tools. */
 export async function localFiles(
-  plugin: Pick<Plugin.Context, "location" | "permission" | "session">,
+  plugin: Pick<Plugin.Context, "location" | "permission" | "session" | "storage">,
   profiles: string,
 ) {
   const token = randomUUID()
   await plugin.permission.hook("evaluate", (event) => {
     if (event.metadata?.[check] === token && event.effect === "ask") event.effect = "allow"
   })
+  // Attachment receipts (0.4 `createAttachmentReceipt`, B2.5d): the identity of each file the user attached by its path,
+  // taken when the prompt is admitted and kept with its message. The attachment then authorizes that file only while it
+  // is unchanged, and is checked again before the file is admitted.
+  await plugin.session.hook("prompt", async (event) => {
+    await Promise.all(
+      (event.prompt.files ?? []).map(async (file) => {
+        const path = attachedPath(file.uri)
+        const identity = path && (await inspectReferenceFile(path).catch(() => undefined))
+        if (identity) await plugin.storage.set(receiptKey(event.sessionID, event.messageID, file.uri), identity)
+      }),
+    )
+  })
+  // A compaction keeps the attachments of the messages it summarizes, as 0.4 replayed their prompt (B2.5d). The hook runs
+  // while the compaction is open, before its summary is written; once completed, its message heads the session's
+  // context, and only then do the attachments it carried count. A failed or reverted compaction never heads it.
+  await plugin.session.hook("compaction", async (event) => {
+    const history = await plugin.session.context({ sessionID: event.sessionID })
+    const open = history.findLast((message) => message.type === "compaction" && message.status === "running")
+    if (open)
+      await plugin.storage.set(carriedKey(event.sessionID, open.id), await attachments(event.sessionID, history))
+  })
+  // The attachments of the session's context: what its leading compaction carried and what its user messages attach.
+  // The context starts at the latest completed compaction, and only a compaction's message has an entry.
+  const attachments = async (sessionID: string, history: Awaited<ReturnType<typeof plugin.session.context>>) => {
+    const head = history[0]
+    const carried = head
+      ? Option.getOrElse(decodeCarried(await plugin.storage.get(carriedKey(sessionID, head.id))), () => [])
+      : []
+    return [
+      ...carried,
+      ...history.flatMap((message) =>
+        message.type !== "user"
+          ? []
+          : (message.files ?? []).flatMap((file) =>
+              file.source.type === "uri" ? [{ message: message.id, uri: file.source.uri }] : [],
+            ),
+      ),
+    ]
+  }
   const ask = (
     call: ToolContext,
     input: { action: string; resources: string[]; save?: string[]; metadata?: Record<string, unknown> },
@@ -214,19 +262,32 @@ export async function localFiles(
         () => false,
       )
     })()
-    // A file the user attached by its path. OpenCode 2 stores the original URI as the attachment's source; it has no
-    // field for 0.4's attachment receipt, so a receipt-bound attachment (0.4 `verifyAttachmentReceipt`) is B2.5d.
+    // A file the user attached by its path, in the context or carried by its compaction. With a receipt, the attachment
+    // names the file it named when the prompt was admitted, and only while that file is unchanged (0.4
+    // `verifyAttachmentReceipt`); without one (attached before B2.5d, or unreadable then), the file its path resolves to.
     const attached = await Promise.all(
-      history
-        .flatMap((message) => (message.type === "user" ? (message.files ?? []) : []))
-        .map(async (file) => {
-          if (file.source.type !== "uri") return
-          const url = URL.parse(file.source.uri)
-          if (!url || url.protocol !== "file:" || url.search || url.hash) return
-          return (await realpath(fileURLToPath(url)).catch(() => undefined)) === canonicalPath
+      (await attachments(call.sessionID, history)).map(async (file) => {
+        const path = attachedPath(file.uri)
+        if (!path) return
+        const receipt = await plugin.storage.get(receiptKey(call.sessionID, file.message, file.uri))
+        const identity = Option.getOrUndefined(decodeReceipt(receipt))
+        if (!identity)
+          return (await realpath(path).catch(() => undefined)) === canonicalPath
             ? { verify: async () => {} }
             : undefined
-        }),
+        if (path !== sourcePath && identity.canonical_path !== canonicalPath) return
+        await checkDeny(path)
+        await checkDeny(identity.canonical_path)
+        return {
+          verify: async () => {
+            const current = await inspectReferenceFile(path).catch((error) => {
+              throw Error(hostErrorText(fileError(error)) + " Путь: " + path)
+            })
+            if (JSON.stringify(current) !== JSON.stringify(receipt))
+              throw Error(hostErrorText("LOGINOM_FILE_CHANGED") + " Путь: " + path)
+          },
+        }
+      }),
     )
     const verifyAttachment = () => Promise.all(attached.map((entry) => entry?.verify()))
     await verifyAttachment()
@@ -300,6 +361,13 @@ export function permissionFailure(path: string, error: unknown) {
       metadata: { permissionDenied: true },
     })
   return error
+}
+
+// The local path of a file attachment, or nothing for another source or a line range (`?`) or fragment (`#`) of a file.
+function attachedPath(uri: string) {
+  const url = URL.parse(uri)
+  if (!url || url.protocol !== "file:" || url.search || url.hash) return
+  return fileURLToPath(url)
 }
 
 function deniedText(error: Tool.Error, path: string) {

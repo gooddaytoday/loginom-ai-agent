@@ -286,6 +286,27 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     timeout,
   )
 
+  // A prompt takes the lease when it is admitted (B2.5d); an execution that starts without one — a synthetic message, a
+  // resume after a restart — takes it when it starts.
+  it.live(
+    "S2 synthetic wake: an execution without a prompt leases when it starts and releases the lease when it succeeds",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const id = yield* test.create("synthetic")
+        yield* test.sessions.synthetic({ sessionID: id, text: script({ tool: "hold" }, { text: "end" }) })
+        yield* until(() => Effect.succeed(test.holding.includes(id) || undefined))
+        // Taken on `session.execution.started` once the Host's handshake is done, which may come after the tool starts.
+        yield* until(() => test.leased.pipe(Effect.map((sessions) => (sessions.includes(id) ? true : undefined))))
+        expect(yield* test.leased).toEqual([id])
+        yield* test.release
+        yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 0 || undefined)))
+        yield* until(() => Effect.succeed(test.ended(id).length > 0 || undefined))
+        expect(test.ended(id)).toEqual(["succeeded"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "S2 provider error: the lease taken for the execution is released when it fails",
     () =>
@@ -310,7 +331,9 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
         const test = yield* boot()
         const model = yield* test.create("interrupted model")
         const answering = yield* test.prompt(model, script({ hang: true }))
-        yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 1 || undefined)))
+        // The lease is taken when the prompt is admitted (B2.5d), before the execution starts: wait for the model's call.
+        yield* until(() => test.requests(model).pipe(Effect.map((requests) => requests.length > 0 || undefined)))
+        expect(yield* test.leased).toEqual([model])
         yield* test.sessions.interrupt(model)
         yield* Fiber.join(answering)
         yield* until(() => test.leased.pipe(Effect.map((sessions) => sessions.length === 0 || undefined)))
@@ -347,23 +370,44 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
     timeout,
   )
 
+  // B2.5d binds the run to the task before reading its catalog (0.4 `session/tools.ts`). The real Host offers
+  // `dock_prepare` only to a run bound to `loginom-automation`, and refuses a browser call of an unbound run with
+  // LOGINOM_SCOPE_DENIED; this Host has no connection, so a bound call stops at connection preparation instead. Without
+  // a browser runtime its catalog describes no Dock actions, so `loginom_file_admit` is not offered (0.4).
   it.live(
-    "loginom_file_admit reaches the Host through the execution's lease instead of answering LOGINOM_HOST_NOT_READY",
+    "the execution's Host run is bound to the task: the real Host offers loginom_dock_prepare under the grant and its call reaches connection preparation",
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
-        yield* Effect.promise(() => fs.writeFile(path.join(test.dir, "input.csv"), "amount\n10\n"))
-        const id = yield* test.create("admit")
-        yield* test.sessions.setPermissions({
-          sessionID: id,
-          permissions: [{ action: "*", resource: "*", effect: "allow" }],
-        })
-        yield* test.wizard(id, script({ tool: "loginom_file_admit", input: { path: "input.csv" } }, { text: "end" }))
-        const [, answer] = yield* test.requests(id)
+        // Until its handshake the Host holds up no session, and a session has no Dock tools (B2.5d).
+        yield* until(() => Effect.succeed(ServiceHost.connected() || undefined))
+        const plain = yield* test.create("default")
+        const grant = (id: Session.ID) =>
+          test.sessions.setPermissions({
+            sessionID: id,
+            permissions: [{ action: "*", resource: "*", effect: "allow" }],
+          })
+        yield* grant(plain)
+        yield* Fiber.join(yield* test.prompt(plain, script({ text: "end" })))
+        const [ordinary] = yield* test.requests(plain)
+        const loginom = (request: LLMRequest) =>
+          request.tools
+            .map((tool) => tool.name)
+            .filter((name) => name.startsWith("loginom_") && name !== "loginom_dock_browser_recovery")
+            .toSorted()
+        expect(loginom(ordinary)).toEqual(["loginom_dock_diagnostics"])
+
+        const id = yield* test.create("bound")
+        yield* grant(id)
+        yield* test.wizard(
+          id,
+          script({ tool: "loginom_dock_prepare", input: { intent: "new_draft" } }, { text: "end" }),
+        )
+        const [first, answer] = yield* test.requests(id)
+        expect(loginom(first)).toEqual(["loginom_dock_diagnostics", "loginom_dock_prepare"])
         const result = JSON.stringify(answer.messages)
-        // The Host admits a file only into a task scope it applied (B2.5d), so its own refusal is the answer.
-        expect(result).toContain("LOGINOM_SCOPE_DENIED")
-        expect(result).not.toContain("is not available in this task")
+        expect(result).toContain("LOGINOM_CONFIG_REQUIRED")
+        expect(result).not.toContain("LOGINOM_SCOPE_DENIED")
         expect(result).not.toContain("LOGINOM_HOST_NOT_READY")
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,

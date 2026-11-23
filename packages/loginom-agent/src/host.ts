@@ -19,6 +19,7 @@ export type Connection = { port: Port; close(): Promise<void> }
 type Started = {
   readonly directory: string
   ready: Promise<Connection | undefined>
+  connected?: boolean
   held: Map<Lease, string>
   closing?: Promise<void>
 }
@@ -62,12 +63,18 @@ export async function start(input: { data: string; resources?: string; connect?:
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
       if (connection) LoginomHost.connect(connection.port)
+      current.connected = !!connection
       return connection
     },
     () => undefined,
   )
   state.current = current
   return { recovered, close }
+}
+
+/** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
+export function connected() {
+  return !!state.current?.connected && !state.current.closing
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
@@ -83,7 +90,10 @@ export function close() {
   return current.closing
 }
 
-/** A Host run for one execution of `session`, recorded until `release`; `undefined` without a ready Host. */
+/**
+ * A Host run for one execution of `session`, recorded until `release`; `undefined` without a ready Host. A Host that
+ * refuses the run rejects with its reason (for example `LOGINOM_RECOVERY_REQUIRED`), which the model is told (B2.5d).
+ */
 export async function acquire(session: string) {
   const current = state.current
   if (!current || current.closing) return undefined
@@ -92,7 +102,10 @@ export async function acquire(session: string) {
   const file = join(current.directory, randomUUID() + ".json")
   await writeFile(file + ".tmp", JSON.stringify({ session, pid: process.pid }), { mode: 0o600 })
   await rename(file + ".tmp", file)
-  const lease = await LoginomHost.acquire(session).catch(() => undefined)
+  const lease = await LoginomHost.acquire(session).catch(async (error) => {
+    await rm(file, { force: true })
+    throw error
+  })
   if (!lease) {
     await rm(file, { force: true })
     return undefined

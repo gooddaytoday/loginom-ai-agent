@@ -129,6 +129,8 @@ const boot = Effect.gen(function* () {
   )
   const asked: { sessionID: string; action: string; resources: readonly string[] }[] = []
   const hooks: { ask?: (action: string) => Promise<void> } = {}
+  // What the session's context showed when the `compaction` hook ran (contract test below).
+  const compactions: { sessionID: string; open?: string; head?: string }[] = []
   const ready = Promise.withResolvers<{ plugin: Plugin.Context; tool: Info<typeof Parameters> }>()
   yield* Context.get(context, SdkPlugins.Service).register(
     PluginPromise.fromPromise(
@@ -140,6 +142,14 @@ const boot = Effect.gen(function* () {
             if (event.metadata?.[check] !== undefined) return
             asked.push({ sessionID: event.sessionID, action: event.action, resources: event.resources })
             await hooks.ask?.(event.action)
+          })
+          await ctx.session.hook("compaction", async (event) => {
+            const history = await ctx.session.context({ sessionID: event.sessionID })
+            compactions.push({
+              sessionID: event.sessionID,
+              open: history.findLast((item) => item.type === "compaction" && item.status === "running")?.id,
+              head: history[0]?.id,
+            })
           })
           const files = await localFiles(ctx, profiles)
           ready.resolve({ plugin: ctx, tool: packageDocs(files, ctx.location.directory, resources) })
@@ -221,6 +231,7 @@ const boot = Effect.gen(function* () {
     plugin: harness.plugin,
     tool: harness.tool,
     hooks,
+    compactions: (sessionID: string) => compactions.filter((item) => item.sessionID === sessionID),
     create,
     prompt,
     prepare,
@@ -365,11 +376,11 @@ describe("package_docs_run (B2.5c)", () => {
   )
 
   // 0.4 replayed the compacted prompt with its attachment, which kept authorizing the file. OpenCode 2 keeps the recent
-  // tail beside the summary as text only (`metadata.keepID`), so after a completed compaction the session's context
-  // starts at the summary and the attachment no longer authorizes: the call asks again. Restoring 0.4 is B2.5d
-  // (attachments through the `compaction` hook).
+  // tail beside the summary as text only (`metadata.keepID`), so the session's context starts at the summary; the
+  // module's `compaction` hook carries the attachments past it (B2.5d), and the call asks nothing. A second compaction
+  // carries what the first one carried.
   it.live(
-    "after a completed compaction the attachment must request fresh read permission (0.4 kept it through a replay)",
+    "a completed compaction preserves the visible original attachment's read authorization",
     () =>
       Effect.gen(function* () {
         const test = yield* boot
@@ -383,9 +394,53 @@ describe("package_docs_run (B2.5c)", () => {
         })
         yield* test.sessions.compact({ sessionID: ctx.sessionID })
         yield* test.sessions.wait(ctx.sessionID)
+        yield* test.prompt(ctx.sessionID, script({ text: "between" }))
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
         const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
         expect(history[0]).toMatchObject({ type: "compaction", status: "completed" })
+        expect(test.compactions(ctx.sessionID)).toHaveLength(2)
+        expect(history[0].id).not.toBe(test.compactions(ctx.sessionID)[0].open)
         expect(history.some((item) => item.type === "user")).toBe(false)
+        const output = yield* test.execute({ operation: "extract", lgp: fixture }, ctx)
+        expect(yield* exists(output.structure)).toBe(true)
+        expect(actions(test.asked(ctx.sessionID))).toEqual(["edit"])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  // What a compaction carries counts only while that compaction leads the context: a failed one leads nothing, and a
+  // revert of the attachment's message removes the attachment even when an earlier compaction stays.
+  it.live(
+    "a failed compaction carries nothing past a revert of the attachment",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const ctx = yield* test.prepare({
+          permissions: [
+            { action: "external_directory", resource: "*", effect: "allow" },
+            { action: "read", resource: "*", effect: "ask" },
+            { action: "edit", resource: "*", effect: "allow" },
+          ],
+        })
+        yield* test.prompt(ctx.sessionID, script({ text: "before" }))
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
+        yield* test.prompt(ctx.sessionID, script({ text: "attached" }), [{ uri: pathToFileURL(fixture).href }])
+        summaries.fail = true
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
+        summaries.fail = false
+        const history = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
+        expect(history.findLast((item) => item.type === "compaction")).toMatchObject({ status: "failed" })
+        const attached = (yield* test.sessions.messages({ sessionID: ctx.sessionID })).find(
+          (item) => item.type === "user" && item.files?.length,
+        )
+        if (!attached) throw Error("the attachment's message is missing")
+        yield* test.sessions.revert.stage({ sessionID: ctx.sessionID, messageID: attached.id })
+        yield* test.sessions.revert.commit(ctx.sessionID)
+        const reverted = yield* Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
+        expect(reverted[0]).toMatchObject({ type: "compaction", status: "completed" })
         const fiber = yield* test.run({ operation: "extract", lgp: fixture }, ctx).pipe(Effect.forkScoped)
         const request = yield* test.reply(ctx.sessionID, "reject")
         expect(request.action).toBe("read")
@@ -1153,10 +1208,46 @@ describe("package_docs_run (B2.5c)", () => {
   )
 })
 
+describe("OpenCode hooks the attachment carry relies on (contract)", () => {
+  it.live(
+    "the compaction hook runs while its compaction message is open; completed, that message leads the context",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot
+        const ctx = yield* test.prepare({ attachment: pathToFileURL(fixture).href })
+        const context = () => Effect.promise(() => test.plugin.session.context({ sessionID: ctx.sessionID }))
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
+        const [completed] = test.compactions(ctx.sessionID)
+        expect(completed.open).toBeDefined()
+        const after = yield* context()
+        expect(after[0]).toMatchObject({ id: completed.open, type: "compaction", status: "completed" })
+
+        // A failed compaction keeps its own message, which never leads the context.
+        yield* test.prompt(ctx.sessionID, script({ text: "again" }))
+        summaries.fail = true
+        yield* test.sessions.compact({ sessionID: ctx.sessionID })
+        yield* test.sessions.wait(ctx.sessionID)
+        summaries.fail = false
+        const failed = test.compactions(ctx.sessionID)[1]
+        expect(failed.head).toBe(completed.open)
+        const later = yield* context()
+        expect(later.find((item) => item.id === failed.open)).toMatchObject({ type: "compaction", status: "failed" })
+        expect(later[0]).toMatchObject({ id: completed.open })
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+// A compaction completes only with a summary in its template; `fail` answers without it, so the compaction fails.
+const summaries = { fail: false }
+
 function respond(request: LLMRequest) {
-  // A compaction completes only with a summary in its template.
-  if (request.messages.some((message) => text(message).includes("You MUST summarize the conversation above")))
-    return TestLLM.text("## Objective\n- Document the attached package.", "text_summary")
+  // The first summary and an update of a checkpoint share this line of the summary prompt.
+  if (request.messages.some((message) => text(message).includes("Do not continue the task or call tools.")))
+    return summaries.fail
+      ? TestLLM.text("No summary.", `text_${randomUUID()}`)
+      : TestLLM.text("## Objective\n- Document the attached package.", "text_summary")
   // Titles and other tool-less requests get plain text.
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))
   if (user < 0 || request.tools.length === 0) return TestLLM.text("ok", "text_ok")
