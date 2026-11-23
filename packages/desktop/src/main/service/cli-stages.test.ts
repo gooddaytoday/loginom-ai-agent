@@ -8,6 +8,9 @@ import { Effect, Layer } from "effect"
 import { cleanStages } from "./cli-stages"
 import { stageDirectory } from "./cli-version"
 
+// The file name of the CLI that Desktop 0.4 ran its service from (v0.4.0:packages/desktop/src/main/background-cli.ts).
+const bundledCli = "loginom-ai-agent-cli"
+
 describe("cleanStages", () => {
   test.each([
     { name: "upgrade", staged: ["2.0.18-x64", "2.0.19-x64", "2.0.20-x64"], current: "2.0.20-x64" },
@@ -25,18 +28,18 @@ describe("cleanStages", () => {
     try {
       input.staged.forEach((version) => {
         mkdirSync(path.join(root, version))
-        writeFileSync(path.join(root, version, "opencode-cli"), version)
+        writeFileSync(path.join(root, version, bundledCli), version)
       })
       writeFileSync(path.join(root, "unrelated"), "")
 
       await Effect.runPromise(
-        cleanStages(path.join(root, input.current, "opencode-cli"), { keep: input.keep }).pipe(
+        cleanStages(path.join(root, input.current, bundledCli), { keep: input.keep }).pipe(
           Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
         ),
       )
 
       expect(readdirSync(root).sort()).toEqual([input.current, ...(input.keep ?? []), "unrelated"].sort())
-      expect(readdirSync(path.join(root, input.current))).toEqual(["opencode-cli"])
+      expect(readdirSync(path.join(root, input.current))).toEqual([bundledCli])
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -56,7 +59,7 @@ describe("staged CLIs beside the CLI 0.4 profile", () => {
       ;["2.2.0-x64", "2.3.0-arm64", "2.3.0-x64"].forEach((stage) => writeStage(path.join(root, stage)))
       mkdirSync(path.join(root, "notes"))
 
-      await clean(path.join(root, "2.3.0-x64", "opencode-cli"))
+      await clean(path.join(root, "2.3.0-x64", bundledCli))
 
       expect(readdirSync(root).sort()).toEqual(["2.3.0-x64", "notes", "profiles"])
       expect(readFileSync(connection, "utf8")).toBe(profileText)
@@ -78,10 +81,34 @@ describe("staged CLIs beside the CLI 0.4 profile", () => {
       )
       writeStage(current)
 
-      await clean(path.join(current, "opencode-cli"))
+      await clean(path.join(current, bundledCli))
 
       expect(path.relative(path.join(userData, "cli"), current).startsWith("..")).toBe(true)
       expect(readdirSync(path.dirname(current))).toEqual([path.basename(current)])
+      expect(readdirSync(path.join(userData, "cli"))).toEqual(["profiles"])
+      expect(readFileSync(connection, "utf8")).toBe(profileText)
+    } finally {
+      rmSync(userData, { recursive: true, force: true })
+    }
+  })
+
+  // B4.7: earlier v2 builds of the product staged the CLI under its upstream name. Stages of other versions go as
+  // usual; a stage of the same version keeps that file, and the launch copies the new one beside it.
+  test("stages of earlier builds with the upstream CLI name go, and a same-version one keeps the new copy", async () => {
+    const userData = mkdtempSync(path.join(tmpdir(), "opencode-cli-stages-userdata-"))
+
+    try {
+      const current = stageDirectory(userData, "2.3.0")
+
+      const connection = writeProfile(path.join(userData, "cli", "profiles", "default"))
+
+      ;["2.2.0", "2.3.0"].forEach((version) => writeStage(stageDirectory(userData, version), "opencode-cli"))
+      writeFileSync(path.join(current, bundledCli), "2.3.0")
+
+      await clean(path.join(current, bundledCli))
+
+      expect(readdirSync(path.dirname(current))).toEqual([path.basename(current)])
+      expect(readdirSync(current).sort()).toEqual([bundledCli, "opencode-cli"])
       expect(readdirSync(path.join(userData, "cli"))).toEqual(["profiles"])
       expect(readFileSync(connection, "utf8")).toBe(profileText)
     } finally {
@@ -101,9 +128,9 @@ function writeProfile(root: string) {
   return path.join(root, "loginom", "connection", "connection.json")
 }
 
-function writeStage(directory: string) {
+function writeStage(directory: string, name = bundledCli) {
   mkdirSync(directory, { recursive: true })
-  writeFileSync(path.join(directory, "opencode-cli"), path.basename(directory))
+  writeFileSync(path.join(directory, name), path.basename(directory))
 }
 
 function clean(binary: string) {

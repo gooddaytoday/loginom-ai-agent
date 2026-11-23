@@ -2,6 +2,7 @@ import { $ } from "bun"
 import { constants, setPriority } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { Product } from "@loginom-ai-agent/product"
 import { prepareDevElectron } from "./dev-electron"
 import { downloadCliToResources, windowsify } from "./utils"
 
@@ -50,14 +51,18 @@ function selectOptions(): DevOptions {
 }
 
 async function prepareServer(source: ServerSource) {
+  // Loginom AI Agent (B4.7): development copies of the CLI are named like the bundled one.
   if (source.type === "download")
-    return downloadCliToResources(source.version, windowsify("resources/opencode-cli-dev"))
+    return downloadCliToResources(source.version, windowsify(`resources/${Product.cliExecutable}-dev`))
   buildWebUi()
   process.env.LOGINOM_AI_AGENT_DESKTOP_CLI_DEV = join(import.meta.dirname, "../../cli")
 
   if (process.platform !== "win32") return
   process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_BUILD = join(import.meta.dirname, "../../cli/script/build.ts")
-  process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT = join(import.meta.dirname, "../resources/opencode-cli-wsl")
+  process.env.LOGINOM_AI_AGENT_DESKTOP_WSL_CLI_OUTPUT = join(
+    import.meta.dirname,
+    `../resources/${Product.cliExecutable}-wsl`,
+  )
 }
 
 // The source CLI serves packages/app/dist only to paired devices, and nothing on the way to the

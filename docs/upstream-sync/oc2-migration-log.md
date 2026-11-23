@@ -15684,3 +15684,273 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   открывал. Окно Desktop на Linux тоже не запускал: проверены тесты, e2e на dev-сервере Vite и сборка `electron-vite`.
 - Страницу «Расширения › Плагины» с тремя встроенными только главного процесса не открывал — по коду.
 - Аватар в окне: в тесте Bun отдаёт путь к файлу; рендер `<img>` в окне не смотрел.
+
+## B4.7 Встроенный CLI под именем продукта
+
+23.11.2026. Ветка `b47-desktop-cli-name` от `oc2-migration` (`2d56f11994`), рабочее дерево `.claude/worktrees/b47`.
+Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install
+--frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; `bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. Эталон 0.4 —
+`v0.4.0`. `gui-plugins` (B4.11e) не трогал. Модель: прогоны не отправляли ни одной подсказки, `run` и `serve` вручную не
+запускались — служба поднималась только окном Desktop; журнал службы на запросы к модели не просматривал.
+
+Прочитано: этот журнал — B4.1 (п. 9 «Бренд», строка B4.7), B2.7a1, B4.2, B4.5a (п. 6), B4.5b, B4.8a, B4.9 и B4.10
+(сценарии сборки и приёмки); план этапа B, раздел B4 (переименования Install CLI в нём нет); `decisions.md` — записей о
+встроенном CLI, Install CLI и B4.7 нет; `.opencode/skills/unit-tests`, раздел Tests в `packages/{app,desktop}/AGENTS.md`;
+корневой `install` (`--binary`); 0.4 — `v0.4.0:packages/desktop/src/main/background-cli.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `9034c2a5bd` `feat(desktop): name the bundled CLI after the product, as in 0.4 (B4.7)` | пять файлов кода, `.gitignore` пакета, тесты конфига и ступеней |
+| следующий | этот раздел; CAT-02, CAT-09, CAT-13 в `catalog.md` |
+
+Файлы кода — пять: `script/utils.ts` (+8 −3), `script/dev.ts` (+7 −2), `electron-builder.config.ts` (+10 −5),
+`src/main/service/desktop-cli.ts` (+5 −3), `src/main/service/sidecar-probe.ts` (+3 −1), все в `packages/desktop`.
+`script/build.ts` из строки задания не менялся: он зовёт `copyBuiltCliToResources` и `downloadCliToResources` с
+назначением по умолчанию, а имя — в `utils.ts`. Его место занял `script/dev.ts` (п. 2). `.gitignore` пакета (не код):
+`resources/loginom-ai-agent-cli*` вместо `resources/opencode-cli*`. Тесты: `electron-builder.config.test.ts`,
+`src/main/service/cli-stages.test.ts`.
+
+### Что это в 0.4
+
+Desktop 0.4 запускал backend v2 (`LOGINOM_AI_AGENT_SIDECAR_V2=1`) из `<resources>/loginom-ai-agent-cli(.exe)`, литерал в
+`executableName()` (`v0.4.0:packages/desktop/src/main/background-cli.ts:129`), и копировал его в
+`<userData>/cli/<версия>/` под тем же именем. Файла версии в 0.4 не было: версию давал запуск `--version`. Файл
+`opencode-cli.version` — оптимизация v2.3.0, она сохранена под именем продукта.
+
+### Пункты задания
+
+| № | Было (`2d56f11994`) | Стало |
+|---|---|---|
+| 1. Имя | `resources/opencode-cli(.exe)` и `opencode-cli.version`; служба — `<userData>/cli-stages/<версия>-<арх>/opencode-cli` | `loginom-ai-agent-cli(.exe)` и `loginom-ai-agent-cli.version` рядом. Имя — `Product.cliExecutable` из `packages/product`, литерала в коде нет: `.exe`, `.version`, `-dev`, маска `resources/<имя>*` собираются из него на месте. Пишет `utils.ts` (`copyBuiltCliToResources`, `downloadCliToResources`, `versionFile`), читают `desktop-cli.ts` (`executableName`, файл версии) и `sidecar-probe.ts` (файл версии), упаковка — `electron-builder.config.ts`. Ступень и процесс службы — `<userData>/cli-stages/<версия>-<арх>/loginom-ai-agent-cli`; в `ps` колонка `comm` — `loginom-ai-agen`: Linux хранит в имени процесса 15 байт, `args` и `/proc/<pid>/exe` — полное имя (ниже) |
+| 2. Разработка | `script/dev.ts --download-server` кладёт `resources/opencode-cli-dev(.exe)`, `desktop-cli.ts` с `LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER` берёт его; сборка CLI для WSL (только Windows) — `resources/opencode-cli-wsl` | `loginom-ai-agent-cli-dev(.exe)` в обоих файлах; выход сборки WSL — `loginom-ai-agent-cli-wsl` (только `dev.ts`, путь читает `gui-plugins/src/wsl` из переменной, плагин не менял). Файл версии копии разработки — тот же `loginom-ai-agent-cli.version` рядом, как было: одно имя на каталог. Сборка `dev.ts --build-server` бинарника не берёт — служба идёт через `bun run src/index.ts` |
+| 3. Ступени прежних сборок | — | **удаляются как устаревшие, кода не потребовалось** (ниже) |
+| 4. `afterPack` и `--verify-resources` | `afterPack` проверял `opencode-cli(.exe)` и `opencode-cli.version` | `afterPack` ищет `Product.cliExecutable(.exe)` и файл версии через `versionFile` из `utils.ts` — того же, что его пишет; `extraResources` отдаёт три имени, `files` исключает `resources/loginom-ai-agent-cli*`. `--verify-resources` (B4.8a) встроенный CLI не читает — только `resources/loginom`; на сборке ниже код 0 |
+
+**Ступени прежних сборок v2 продукта.** `cleanStages` отбирает по имени каталога ступени (`isStageName`, B4.2), а не по
+имени файла в нём, поэтому ступени других версий со старым `opencode-cli` удаляются как любые старые. Ступень той же
+версии (пересборка `local` или dev) остаётся: `installCli` ищет в ней `loginom-ai-agent-cli`, не находит и копирует его
+рядом со старым файлом; старый лежит до смены версии и удаляется вместе со ступенью. Запуск это не ломает (сборка ниже).
+Удалять старый файл в текущей ступени не стал: это новый код в `desktop-cli.ts` или `cli-stages.ts`, старый литерал
+вернулся бы в главный бандл, а на Windows файл ещё работающей старой службы удалить нельзя. Профиль CLI 0.4
+`<userData>/cli/profiles/default` не трогается — тесты B4.2 на новом имени и сборка ниже.
+
+Крайний случай: если служба той же версии от прежней сборки ещё работает (окно убито, B4.10 её не остановил), окно её
+примет пробой и она доработает под старым именем до закрытия окна (по коду, не воспроизводилось).
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `electron-builder.config.test.ts` «the $channel packaging names nothing of OpenCode» (было «… but the bundled CLI») | ни один ключ и ни одно значение конфига трёх каналов не называет `opencode` — список исключений пуст |
+| там же «Linux afterPack opens the payload …» | фикстура — `loginom-ai-agent-cli` и `loginom-ai-agent-cli.version` (литерал 0.4), настоящий `afterPack` их находит и открывает права |
+| там же «shared packaging defaults» | `files` содержит `!resources/loginom-ai-agent-cli*`; `extraResources` отдаёт `loginom-ai-agent-cli`, `.exe`, `.version`; по `FileMatcher` electron-builder ни бинарник, ни файл версии, ни копии `-dev` и `-wsl` в `app.asar` не попадают |
+| `cli-stages.test.ts`, таблица upstream и два теста B4.2 | имя файла ступени — `loginom-ai-agent-cli` |
+| там же «stages of earlier builds with the upstream CLI name go, and a same-version one keeps the new copy» (новый) | userData с профилем CLI 0.4 и ступенями `2.2.0-x64/opencode-cli`, `2.3.0-x64/opencode-cli`; в `2.3.0-x64` — новый файл. После `cleanStages` остаётся только `2.3.0-x64` с обоими файлами, `cli/` — только `profiles`, `connection.json` цел |
+
+Новый тест ступеней характеризует выбор п. 3: `cleanStages` и `stageDirectory` коммит не менял, так что тест зелёный и
+на базе. Его регрессия — отбор ступеней по имени текущего файла (MU7): тогда ступени прежних сборок со старым именем не
+удалялись бы никогда, а таблица upstream этого не видит — у неё во всех ступенях одно имя. Имя 0.4 в тестах —
+литерал, поэтому подмена `Product.cliExecutable` их краснит (MU6).
+
+`desktop-cli.ts` и `sidecar-probe.ts` импортируют `electron`, и `bun test` их не загружает (как `host.ts` в B2.7a11);
+подмены Electron и экспорты только для тестов `packages/desktop/AGENTS.md` запрещает. Их проверяет собранное приложение:
+имя процесса службы, строка журнала `v2 CLI version bundled` (а не запуск `--version`) и `probed: true` при втором запуске.
+Ошибка в имени файла версии не роняет запуск, а молча замедляет его: `desktop-cli` спрашивает `--version`, проба
+пропускается.
+
+### Мутации
+
+Юнит (`<scratchpad>/b47/mutate-unit.py`: одна замена, тесты файла, `git checkout`; после — `git status` чистый):
+
+```text
+$ bun test electron-builder.config.test.ts src/main/service/cli-stages.test.ts      # без мутации
+ 34 pass
+ 0 fail
+=== MU1 afterPack looks for the upstream executable: 26 pass / 1 fail                       # Linux afterPack
+=== MU2 the version file keeps the upstream name (utils versionFile): 26 pass / 1 fail      # Linux afterPack
+=== MU3 extraResources ships the upstream names: 23 pass / 4 fail                           # defaults, names ×3
+=== MU4 app.asar excludes only the upstream names: 23 pass / 4 fail                         # defaults, names ×3
+=== MU5 app.asar excludes the executable but not its version file or development copies: 26 pass / 1 fail  # defaults
+=== MU6 the product names its CLI opencode-cli (packages/product): 22 pass / 5 fail         # afterPack, defaults, names ×3
+=== MU7 cleanStages keeps stages that lack the current executable: 6 pass / 1 fail          # новый тест ступеней
+=== MU8 cleanStages also removes the current stage when it holds another file: 6 pass / 1 fail  # новый тест ступеней
+```
+
+Собранное приложение (`<scratchpad>/b47/mutate-built.sh`: замена, `electron-vite build` и `--linux dir`, возврат файла,
+сценарий приёмки ниже):
+
+```text
+=== MB1 desktop-cli.ts: executableName() снова "opencode-cli"
+out/main opencode-cli hits: out/main/desktop-Dii1fKHP.js
+  1473481 opencode-cli    <run>/desktop/cli-stages/0.0.0-dev-202611231531-x64/opencode-cli serve --service
+service process names with opencode: [opencode-cli]
+  (main) v2 CLI staged executable reused {          # служба поднялась из файла прежней сборки в ступени той же версии
+=== MB2 desktop-cli.ts: файл версии снова "opencode-cli.version"
+out/main opencode-cli hits: out/main/desktop-COX5vex3.js
+  (main) v2 CLI command started {                   # вместо "v2 CLI version bundled": запуск --version
+=== MB3 sidecar-probe.ts: файл версии снова "opencode-cli.version"
+out/main opencode-cli hits: out/main/index.js
+main.log run 2, service lines:                      # нет "probed: true": проба пропущена
+  (main)    v2 CLI background service ready { runningVersion: '0.0.0-dev-202611231531', probed: false
+```
+
+MB1 показал: старый файл в ступени той же версии скрыл бы мутацию от проверки «служба запустилась» — краснеет проверка
+имени процесса. Строки журнала Desktop здесь и ниже сокращены: без времени, многострочный объект — в одну строку.
+
+### Сборка `--linux dir` и приёмка на ней
+
+Сборка — `<scratchpad>/b47/build.sh`, как у B4.10: встроенный CLI `LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun
+script/build.ts --skip-install --skip-web-ui` в `packages/cli`; `bun run build` в `packages/desktop` с
+`LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node` и `LOGINOM_AI_AGENT_BROWSER_SOURCE=/root/.cache/loginom-wave2-browsers`
+(B4.8a); `bunx electron-builder --linux dir --x64 --publish never --config electron-builder.config.ts
+-c.directories.output=<scratchpad>/… -c.npmRebuild=false`. Канал `dev`, 18 + 33 + 26 с, все три — код 0,
+`Bundled Loginom linux-x64 runtime: 12378 verified resource files`.
+
+```text
+$ ls <build>/linux-unpacked/resources
+app-update.yml app.asar app.asar.unpacked icons loginom loginom-ai-agent-cli loginom-ai-agent-cli.version
+$ cat resources/loginom-ai-agent-cli.version
+0.0.0-dev-202611231545
+$ find <build> -name "*opencode-cli*" | wc -l
+0
+$ grep -rl opencode-cli packages/desktop/out/main | wc -l
+0
+$ asar list app.asar: entries / opencode-cli / loginom-ai-agent-cli
+12763 / 0 / 0
+$ grep -rl opencode-cli <app.asar распакован> <app.asar.unpacked> app-update.yml icons | wc -l
+0
+```
+
+Строки внутри самого бинарника CLI не проверял: это сборка CLI по умолчанию (B2.7a1), её строки — не предмет задачи.
+
+Сценарий — `<scratchpad>/b47/accept.sh`: root, `xvfb-run -a`, `--no-sandbox`, свой `LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и
+`HOME`. До запуска userData (`<run>/desktop`) получает профиль CLI 0.4 и ступени прежней сборки со старым именем — другой
+версии и текущей (жёсткие ссылки на настоящий бинарник). Запуск 1 — служба, её процесс, ступени, журнал; затем SIGKILL
+окна, служба остаётся. Запуск 2 — окно находит её пробой, затем закрытие окна через CDP, как пользователь (B4.10).
+Процессы — только по pid из файлов прогона и путям сборки и прогона.
+
+```text
+bundled version: 0.0.0-dev-202611231545
+seeded stages: ./0.0.0-dev-202611010000-x64/opencode-cli ./0.0.0-dev-202611231545-x64/opencode-cli
+== run 1
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 1480948, http://127.0.0.1:28290
+host: pid 1480962: <build>/resources/loginom/bin/node --use-system-ca <build>/resources/loginom/host/node-host.mjs
+ps -o pid,comm,args -p <service>:
+      PID COMMAND         COMMAND
+  1480948 loginom-ai-agen <run>/desktop/cli-stages/0.0.0-dev-202611231545-x64/loginom-ai-agent-cli serve --service
+/proc/<service>/comm: loginom-ai-agen
+/proc/<service>/exe: <run>/desktop/cli-stages/0.0.0-dev-202611231545-x64/loginom-ai-agent-cli
+service process names with opencode: []
+stages after the start: ./0.0.0-dev-202611231545-x64/loginom-ai-agent-cli ./0.0.0-dev-202611231545-x64/opencode-cli
+CLI 0.4 profile: {"url":"https://loginom.example","username":"user"}
+main.log, CLI lines:
+  (main) v2 CLI executable resolved {
+  (main) v2 CLI version bundled { version: '0.0.0-dev-202611231545' }
+  (main)       v2 CLI executable staged {
+after SIGKILL of run 1: service alive: [1480948]
+== run 2
+main.log run 2, service lines:
+  (main) starting v2 background service
+  (main)    v2 CLI background service ready { runningVersion: '0.0.0-dev-202611231545', probed: true
+  (main)    starting v2 background service
+  (main)    v2 CLI background service ready { runningVersion: '0.0.0-dev-202611231545', probed: false
+service pid in registration: 1480948 (run 1: 1480948)
+closed 1 page(s): oc://renderer/index.html
+app exit: code 0 after .3372 s
+5 s later: service alive: [], host and children alive: []
+registration exists: no
+main.log run 2, stop lines:
+  (main)    stopping v2 CLI background service
+  (main)    v2 CLI background service stopped
+left (by this build or run path): []
+$ loginom-ai-agent-dev --no-sandbox --verify-resources          # свой test root, xvfb-run
+--verify-resources: exit=0 after 4.077 s; "phase":"resources.verify","scope":"installation","status":"ready","hashedFiles":12378
+```
+
+Второй `ready { probed: false }` — проверка принятой службы автоматом (`ensure("initial")`), как в B4.8a.
+Сборка, прогоны, `out/`, `resources/{loginom,icons,loginom-ai-agent-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`,
+`packages/dashboard/dist` удалены; `git status --ignored` — только `.husky/_` и `node_modules`.
+
+### Приёмка
+
+`packages/desktop`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0, `npm ci` клиента `loginom-runtime/client`; падения
+сравнивались по именам из JUnit.
+
+| Команда | `2d56f11994` | `9034c2a5bd` |
+|---|---|---|
+| `bun typecheck` | 3 520 файлов, ошибок нет | 3 520 файлов, ошибок нет |
+| `bun run typecheck:tsc` | — | код 0 |
+| `bun test --timeout 30000` | 578 pass, 4 skip, 0 fail (582 теста, 74 файла) | 579 pass, 4 skip, 0 fail (583, 74): +1 тест ступеней; три теста конфига переименованы |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0, на коммите этого раздела
+against a6b15d33daf6: 582 divergent upstream files                    # как на базе: все пять файлов уже расходились
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check # на коммите этого раздела
+would change: 0 files                                                 # код 0
+$ bun run check                                                       # код 0, на 9034c2a5bd с правкой catalog.md (после — только markdown)
+Found 554 warnings and 0 errors.                                      # как на базе; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,520 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` по изменённым TS-файлам — чисто.
+
+### Каталог
+
+`catalog.json` не менялся: `script/{utils,dev}.ts` и `electron-builder.config.ts` — CAT-02, `desktop-cli.ts` и `.gitignore`
+пакета — CAT-09 (маска), `sidecar-probe.ts` — CAT-13 (явный список). В `catalog.md`: CAT-02 — встроенный CLI и копии
+разработки вместо «`opencode-cli` до B4.7», проверка конфига без исключений, из «не перенесено» убрано «имя встроенного
+CLI — B4.7»; CAT-09 — имя в `desktop-cli.ts`, ступени прежних сборок, `.gitignore`, проверка собранным приложением,
+политика `fork-owned` для имени; CAT-13 — файл версии, который читает `sidecar-probe.ts`.
+
+### Где решал сам
+
+- **`script/dev.ts` вместо `script/build.ts`.** Задание называет `build.ts`, но в нём имени нет; копия разработки
+  `opencode-cli-dev` записывается в `dev.ts`. Пять файлов кода — тот же предел.
+- **Имя — из `Product.cliExecutable` на месте, без общего помощника.** Помощник (`cli-version.ts` или `packages/product`)
+  — шестой файл кода, а юнит-теста `desktop-cli.ts` и `sidecar-probe.ts` он бы не дал: проверялся бы помощник, а не
+  вызов. Суффиксы `.exe`, `.version`, `-dev` собираются в каждом файле, как раньше литералы; `afterPack` берёт файл
+  версии у `versionFile` из `utils.ts`.
+- **То же имя, что у автономного CLI** (`loginom-ai-agent-cli`, B2.7a): так было в 0.4, и задание требует имя 0.4.
+  Различаются каталогом: встроенный лежит в `resources/` и ступенях userData. Исходник — по-прежнему сборка CLI по
+  умолчанию (`bin/opencode`, вход `src/index.ts`, B2.7c), а не `--standalone`: меняется только имя назначения.
+- **Выход сборки WSL переименован заодно** (`dev.ts`, только Windows): иначе маски `.gitignore` и `files` пришлось бы
+  держать и для старого имени, а копия WSL без маски `files` попала бы в `app.asar` локальной сборки.
+- **Маска `.gitignore` заменена, а не дополнена.** Старые `resources/opencode-cli*` в рабочих деревьях от сборок до B4.7
+  станут видны в `git status` — их нужно удалить: маска `files` их больше не исключает, и локальная упаковка унесла бы
+  200 МБ в `app.asar`. Сборка из чистого дерева (CI) не затронута.
+- **Ступени — «удаляются», без кода** (выше); старый файл в ступени той же версии оставлен.
+- **Временный каталог загрузки** `opencode-cli-*` в `utils.ts` (`mkdtemp`) не переименован: он живёт секунды на машине
+  сборки и в продукт не попадает.
+
+### Найдено, не чинил
+
+- `.github/release/sign-desktop-macos.sh:50` подписывает `$app/Contents/Resources/opencode-cli` отдельно — путь выпуска
+  macOS upstream (B5.1).
+- `perf/startup.bench.ts:182` ищет `opencode-cli(.exe)` в ресурсах — замер не найдёт CLI (шестой файл, вне задачи).
+- `nix/desktop.nix:102` — комментарий о `opencode-cli.version`.
+- **Install CLI без задачи.** Install CLI (только macOS, `desktop-cli.ts` `install`) по-прежнему ставит
+  `~/.loginom-ai-agent/bin/opencode`: корневой `install --binary` копирует файл под `$APP` (`install:3`, `:337-341`,
+  `APP=opencode`), а не под именем источника, поэтому путь, который возвращает `desktop-cli.ts`, после переименования
+  верен. Строка `desktop.cli.installed.message` называет команду `opencode`. B4.11 (журнал, раздел B4.11), CAT-10
+  `catalog.md` («переименовывается с встроенным CLI (B4.7)») и исключение `commandNames` в
+  `app/src/runtime/i18n/desktop-native.test.ts:92` передают её B4.7, но в четыре пункта задания и в раздел B4 плана она не
+  входит; это правка `install` (B2.7a8) и словарей `app`. Ссылки на B4.7 в CAT-10 и тесте не правил (CAT-10 правит
+  B4.11e) — задача и срок за владельцем.
+- `packages/product/AGENTS.md:8` называет `Product.cliExecutable` именем «independent `loginom-ai-agent-cli`»; теперь им же
+  назван встроенный CLI Desktop, как в 0.4. Документ продукта не правил.
+- `evals/src/process-supervisor.ts` считает своими процессы с `loginom-ai-agent-cli` в аргументах; служба Desktop теперь
+  под этим же именем — как в 0.4.
+- `desktop-cli-state.test.ts:5` — фикстура `opencode-cli` (только строка в данных, имя не проверяет).
+
+### Не проверено
+
+- Windows (`.exe`, имя в диспетчере задач, `afterPack` Windows с node-pty) и macOS: собиралась только `--linux dir`, от
+  root, с `--no-sandbox`; deb, rpm, AppImage не собирались.
+- Ступени прежней сборки в прогоне — жёсткие ссылки на новый бинарник под старым именем, а не настоящая прежняя сборка v2.
+- Режим разработки (`dev.ts --download-server`, WSL) не запускался: имена проверены кодом и тестом маски `files`.
+- Настоящий Loginom и Chromium: Host `unconfigured`, браузер не запускался.
