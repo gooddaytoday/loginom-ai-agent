@@ -1,20 +1,24 @@
 import {createHash} from 'node:crypto';
 import {nativeRuntimePins} from './collapse-native-runtime-pins.mjs';
 // Only reflects the actually used objects. Never dispatches a native message.
-export function collectNativeRuntime(session) {
+export function collectNativeRuntime(session,directSource=false) {
  const need=(x,m)=>{if(!x)throw Error('Loaded native runtime: '+m);};
  const functions={},message=rpc.TBGMessageDynamicData.prototype,klass=rpc.TBGMessageDynamicData;
- const add=(o,prefix,names)=>{for(const k of names){need(typeof o?.[k]==='function','missing '+prefix+k);functions[prefix+k]=o[k];}};
- add(session,'session.',['DispatchMessageAsync','$DoDispatchMessageAsync','$GetNextMessageID','get_TransportStatus']);
+ const add=(o,prefix,names)=>{for(const entry of names){const [key,slot]=Array.isArray(entry)?entry:[entry,entry];need(typeof o?.[slot]==='function','missing '+prefix+key);functions[prefix+key]=o[slot];}};
+ add(session,'session.',directSource?['DispatchMessageAsync',['$DoDispatchMessageAsync','$2'],['$GetNextMessageID','$8'],'get_TransportStatus']:['DispatchMessageAsync','$DoDispatchMessageAsync','$GetNextMessageID','get_TransportStatus']);
  add(session.$M,'manager.',['GetDynamicData']);
- add(message,'message.',['get_$ParametersOffset','InitializeMethodCallMessage','Release','set_StaticDataSize','$DoSetDataSize','$GrowData','get_MessageType','get_MessageID','set_MessageID','set_Signature','set_MessageType','set_ObjectOwnerID','set_ObjectID','set_MethodID','WriteParameter','WriteParameter$a','CheckSignature','IsSignatureValid','get_Signature','get_MessageFormatVersion']);
+ add(message,'message.',[directSource?['get_$ParametersOffset','$6']:'get_$ParametersOffset','InitializeMethodCallMessage','Release','set_StaticDataSize',directSource?['$DoSetDataSize','$1']:'$DoSetDataSize',directSource?['$GrowData','$3']:'$GrowData','get_MessageType','get_MessageID','set_MessageID','set_Signature','set_MessageType','set_ObjectOwnerID','set_ObjectID','set_MethodID','WriteParameter','WriteParameter$a','CheckSignature','IsSignatureValid','get_Signature','get_MessageFormatVersion']);
  add(klass,'class.',['Acquire']);
- add(session.$T,'transport.',['SendReceive','$SendMessage','Send','InternalSend','DoReceive','DoReceiveMessage','$InvalidateResponseAwaiters','$CancelResponseAwaiters']);
+ add(session.$T,'transport.',['SendReceive',directSource?['$SendMessage','$4']:'$SendMessage','Send','InternalSend','DoReceive','DoReceiveMessage',directSource?['$InvalidateResponseAwaiters','$1']:'$InvalidateResponseAwaiters',directSource?['$CancelResponseAwaiters','$0']:'$CancelResponseAwaiters']);
  add(BitConverter,'bit.',['FromInt8','FromUInt8','FromInt16','FromUInt16','FromInt32','FromUInt32','FromBigInt','FromInt64','FromUInt64','ToInt8','ToUInt8','ToInt16','ToUInt16','ToInt32','ToUInt32']);
  add(ss.Task.prototype,'task.',['continueWith','getAwaitedResult']);
  add(ss.TaskCompletionSource.prototype,'completion.',['setResult','setException']);
- const constants=Object.fromEntries(['BGRemoteMessageSignature','$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'].map(k=>{need(Number.isInteger(klass[k]),'missing constant '+k);return [k,klass[k]];}));
- return {functions,constants,objects:[session,session.$M,session.$T,session.$T.$FSocket,klass,message,BitConverter,ss.Task.prototype,ss.TaskCompletionSource.prototype]};
+ // Direct DataSource71 is served by the observed compact 7.4.2 RPC runtime.
+ // Keep canonical evidence keys, but bind only its exact observed slots.
+ const offsets=directSource?['$m','$f','$d','$e','$i','$h','$g']:['$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'];
+ const keys=['BGRemoteMessageSignature','$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'];
+ const constants=Object.fromEntries(['BGRemoteMessageSignature',...offsets].map((slot,i)=>{need(Number.isInteger(klass[slot]),'missing constant '+keys[i]);return [keys[i],klass[slot]];}));
+ return {functions,constants,objects:[session,session.$M,session.$T,directSource?session.$T.$a:session.$T.$FSocket,klass,message,BitConverter,ss.Task.prototype,ss.TaskCompletionSource.prototype]};
 }
 export async function bindLoadedNativeRuntime(page,args,collect=collectNativeRuntime) {
  return page.evaluate(({a,code})=>{

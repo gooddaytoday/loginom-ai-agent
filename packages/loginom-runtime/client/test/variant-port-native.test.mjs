@@ -71,12 +71,13 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
   if(exceptions!==false)throw Error('exception unmarshalling');
   return {continueWith(callback){
    const payload=frames[request.row].payload,bytes=new Uint8Array(60);bytes.set(payload,12);
-   const complete=()=>callback({getAwaitedResult(){return {$FData:bytes,$FDataSize:60,get_MessageType(){return 1;},get_MessageID(){return foreign?999:101;},set_StaticDataSize(){},Release(){counters.releasedResponses++;}};}});
+   const complete=()=>callback({getAwaitedResult(){return {...(directSource?{$7:bytes,$8:60}:{$FData:bytes,$FDataSize:60}),get_MessageType(){return 1;},get_MessageID(){return foreign?999:101;},set_StaticDataSize(){},Release(){counters.releasedResponses++;}};}});
    if(deferred)next=complete;else complete();
   }};
  }}};
  var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}},TIBGDataSource_Proxy:{prototype:{AsVariant:function(row,column){}}}}};
  source.$FHelper={FBaseProxy:source};
+ if(directSource){Object.assign(source.$S,{$r:false,$y:false,$F:0});source.$S.$T.$a={readyState:1};}
  var treePins={get_as_variant:''};
  var sourcePins={as_variant:''};
  var collect=session=>({functions:{send:session.DispatchMessageAsync},constants:{},objects:[session,session.$M]});
@@ -85,6 +86,7 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
  environment.pins={constants:{},functions:{send:createHash('sha256').update(vm.runInContext('source.$S.DispatchMessageAsync.toString()',context)).digest('hex')}};
  vm.runInContext('treePins.get_as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant.toString()',context)).digest('hex')),context);
  vm.runInContext('sourcePins.as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant.toString()',context)).digest('hex')),context);
+ for(const [key,name] of [['from_oadate','FromOADate'],['add_bias','AddBias']])vm.runInContext('sourcePins.'+key+'='+JSON.stringify(createHash('sha256').update(vm.runInContext('Date.'+name+'.toString()',context)).digest('hex')),context);
  if(unpinned)environment.pins.functions.send='bad';
  return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue,directSource},decode,collect,pins,treePins,sourcePins)`,context)};
 }
@@ -98,6 +100,12 @@ test('direct interface71 uses its observed method166 and preserves every native 
  }
  assert.equal(reader.unsettled,false);
  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context)),{requests:8,releasedRequests:8,releasedResponses:8});
+});
+for(const mutation of ['source.$S.$r=true','source.$S.$y=true','source.$S.$F=1','source.$S.$T.$a.readyState=3'])test('direct source refuses compact runtime transport state: '+mutation,async()=>{
+ const f=transportFixture({directSource:true}),reader=await f.run();
+ vm.runInContext(mutation,f.context);
+ await assert.rejects(reader.read(0,2),/session transport not live/);
+ assert.equal(vm.runInContext('counters.requests',f.context),0);
 });
 for(const fault of ['wrong-interface','wrong-mode','implementation','replacement','foreign','changed','unpinned'])test('direct source retains exact interface, getter and transport guards: '+fault,async()=>{
  const f=transportFixture({directSource:true,[fault]:true});

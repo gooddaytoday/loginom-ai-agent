@@ -28,3 +28,21 @@ test('document guard binds actual session, socket, functions and message methods
  f.s.$T.$FSocket.readyState=3;assert.throws(()=>g.check(f.s),/transport/);f.s.$T.$FSocket.readyState=1;
  f.s.$T.$FSocket={readyState:1};assert.throws(()=>g.check(f.s),/objects/);
 });
+
+test('compact DataSource71 runtime binds all 53 canonical functions, constants and the actual socket without legacy slots',()=>{
+ const f=fixture();f.ctx.session=f.s;
+ const read=direct=>vm.runInContext('('+collectNativeRuntime.toString()+')(session,'+direct+')',f.ctx);
+ const before=read(false),move=(object,key,slot)=>{object[slot]=object[key];delete object[key];};
+ move(f.s,'$DoDispatchMessageAsync','$2');move(f.s,'$GetNextMessageID','$8');
+ move(f.message,'get_$ParametersOffset','$6');move(f.message,'$DoSetDataSize','$1');move(f.message,'$GrowData','$3');
+ move(f.s.$T,'$SendMessage','$4');move(f.s.$T,'$InvalidateResponseAwaiters','$1');move(f.s.$T,'$CancelResponseAwaiters','$0');
+ move(f.s.$T,'$FSocket','$a');
+ const klass=f.ctx.rpc.TBGMessageDynamicData;
+ for(const [key,slot] of [['$FSignatureOffset','$m'],['$FMessageTypeOffset','$f'],['$FMessageFormatVersionOffset','$d'],['$FMessageIDOffset','$e'],['$FObjectOwnerIDOffset','$i'],['$FObjectIDOffset','$h'],['$FMethodIDOffset','$g']])move(klass,key,slot);
+ const observed=read(true);
+ assert.equal(Object.keys(observed.functions).length,53);
+ for(const [key,fn] of Object.entries(before.functions))assert.equal(observed.functions[key],fn,key);
+ assert.deepEqual(observed.constants,before.constants);assert.equal(observed.objects[3],f.s.$T.$a);
+ assert.throws(()=>read(false),/missing session\.\$DoDispatchMessageAsync/);
+ delete f.s.$T.$4;assert.throws(()=>read(true),/missing transport\.\$SendMessage/);
+});
