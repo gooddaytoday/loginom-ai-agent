@@ -7,9 +7,9 @@ import {
   type DeepLinkState,
 } from "./machine"
 
-const oauth = "opencode://console/authorized?window=a"
+const oauth = "loginom-ai-agent://console/authorized?window=a"
 
-const oauthB = "opencode://console/authorized?window=b"
+const oauthB = "loginom-ai-agent://console/authorized?window=b"
 
 const project = "opencode://open?project=/repo"
 

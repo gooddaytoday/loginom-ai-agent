@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { app, BrowserWindow, screen, shell } from "electron"
+import { APP_NAME } from "../constants"
 import { resolveExternalURL } from "../files/external-url"
 import { windowArguments } from "./bootstrap"
 import { WINDOW_IDS_KEY } from "../storage/keys"
@@ -95,7 +96,7 @@ export function createEarlyWindow() {
     height: state.height,
     show: !deferReveal,
     autoHideMenuBar: true,
-    title: "OpenCode",
+    title: APP_NAME,
     icon: path.join(icons, `icon.${process.platform === "win32" ? "ico" : "png"}`),
     backgroundColor: storedBackgroundColor(),
     ...platformFrame(tone(), zoom),

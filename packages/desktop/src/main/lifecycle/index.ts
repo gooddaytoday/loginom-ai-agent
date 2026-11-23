@@ -9,6 +9,7 @@ import { DesktopStorage } from "../storage"
 import { safeWebContentsURL } from "../windows/state"
 import { getLastFocusedWindow, mainWindows } from "../windows"
 import type { Scope } from "@opencode/plugin/gui/host"
+import { protocolUrls } from "./deep-link"
 import { marks } from "./marks"
 import {
   createDriver,
@@ -103,7 +104,7 @@ const runtime = Layer.effect(
     const deepLinks = yield* DeepLinks.make(focusWindow)
 
     const secondInstance = (_event: Event, argv: string[]) => {
-      const urls = argv.filter((arg) => arg.startsWith("opencode://"))
+      const urls = protocolUrls(argv)
 
       if (urls.length) {
         runFork(Effect.logInfo("deep link received via second-instance", { urls }))

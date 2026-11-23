@@ -1,5 +1,6 @@
 import http from "node:http"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
+import { Product } from "@loginom-ai-agent/product"
 import { app } from "electron"
 import { Effect, Path } from "effect"
 import { DesktopPaths } from "../paths"
@@ -60,7 +61,7 @@ export const prepareDesktop = Effect.gen(function* () {
   const paths = yield* DesktopPaths.resolve
 
   if (app.isPackaged || process.env.LOGINOM_AI_AGENT_DESKTOP_DISABLE_PROTOCOL_REGISTRATION !== "1")
-    app.setAsDefaultProtocolClient("opencode")
+    app.setAsDefaultProtocolClient(Product.scheme)
   const runFork = Effect.runForkWith(yield* Effect.context())
   setProtocolReporter((level, message, data) =>
     runFork(scoped("protocol", level === "error" ? Effect.logError(message, data) : Effect.logWarning(message, data))),
