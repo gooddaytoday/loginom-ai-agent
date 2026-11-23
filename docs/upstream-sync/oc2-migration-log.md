@@ -9660,3 +9660,143 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   с рантаймом `<профиль>/loginom/runtime` не проверялась.
 - Выгрузка из установленного CLI (`install.sh`) и не от root; TUI собранного бинарника.
 - Отмена (`SIGINT`) у `diagnostics` и у справки — не нужна по смыслу, не проверялась.
+
+## B2.7a3b Экспорт диагностики
+
+22.11.2026. Ветка `b27a3b-diagnostics` от `oc2-migration` (`2762bcbe86`), то же рабочее дерево `.claude/worktrees/b27a3`.
+Окружение — как в B2.7a3: Bun 1.4.4 и Node 24.19.0 первыми в `PATH` только для своих команд, `bun install
+--frozen-lockfile` — без изменений, `npm ci --ignore-scripts` клиента `loginom-runtime` в этом дереве и в дереве базы
+`<scratchpad>/b27a3b-base` (`2762bcbe86`, detached). Задача — три находки B2.7a3 о `diagnostics export`: выгрузку
+отправляют в поддержку.
+
+### B2.7a3b: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `7bf1a9a8ea` `fix(loginom-host): keep saved keys and command lines out of the diagnostics archive, read the chat of OpenCode 2 (B2.7a3b)` | `loginom-host/src/diagnostics-export.ts` (+41 −4), `loginom-host/src/diagnostics-cli.ts` (+8 −8); тесты `loginom-host/test/diagnostics-cli.test.ts`, `cli/test/cli-standalone.test.ts` | `clean` |
+| следующий | этот раздел | |
+
+Оба файла кода — файлы форка (`loginom-host`), правок upstream нет, `catalog.json` не менялся. `bun run secrets range
+2762bcbe86 HEAD` — `clean`, 1 коммит: фикстуры — выдуманные значения `fixture-…`.
+
+### B2.7a3b: что было и что стало
+
+| Находка B2.7a3 | Было | Стало |
+|---|---|---|
+| 1. Ключи v2 не в списке секретов | `profileSecrets` учил секреты из подключения Loginom (конверт `cliCredentials`), `<data>/auth.json`, `mcp-auth.json` и Dock — хранилищ 0.4. Ключ, сохранённый в v2, не заменялся, манифест писал `knownSecrets: ok` | плюс база профиля `<data>/loginom-ai-agent.db` (`Product.database`), только на чтение: `credential.value` — поля `key`, `access`, `refresh` и др. и `client_secret` клиента OAuth сервера MCP в `metadata` (`core/src/mcp/oauth.ts`); `access_token` и `refresh_token` таблиц `account` и `control_account`. База есть, но не читается (мусор, нет таблиц) — `knownSecrets: unavailable` |
+| 2. Командные строки в журнале CLI | журнал v2 пишет `cli starting … args=[…]` каждой команды (`cli/src/index.ts`): текст промпта `run`, `auth login --answer key=<значение>` — в архиве как есть | в текстовых файлах архива значение `args=` — `args=[redacted]`, целиком |
+| 3. Чат всегда `unavailable` | запросы к таблицам 0.4 `session`/`message`/`part`; в базе v2 их нет | `session_v2`, `session_message` (по `seq`), `session_part` (по `ordinal`), одна транзакция чтения, форма 0.4 `{ info, messages: [{ info, parts }] }` |
+
+**Конверт `cliCredentials`.** В v2 значения учётных данных лежат в `credential.value` открытым JSON (`{"type":"key",
+"key":…}`, схема `schema/src/credential.ts`), конверта у них нет; конверт `cliCredentials` — у подключения Loginom
+(`loginom/connection`), его выгрузка читала и раньше.
+
+**Текст промпта — как в 0.4.** Журнал CLI 0.4 командных строк не писал: вход `opencode/src/standalone.ts` не шёл через
+`index.ts`, а вызовы `Effect.log*` 0.4 не пишут ни командной строки CLI, ни текста промпта (`git grep` по `opencode/src`
+и `core/src` на `a080f7725c`: в `session/prompt.ts` — `session.id`, шаг, mime файла; единственный `args` — аргументы
+команды терминала в `core/src/pty.ts`; маска архива снимает и такие). Поэтому в журнале архива промпта нет, а в
+`chat/session.json` он есть, как в 0.4: чат выгружается по умолчанию, `--no-chat` его не берёт.
+
+Настоящий архив (`<scratchpad>/b27a3-runs/diag-probe.ts`: профиль из исходников, `serve`, ключ через
+`POST /api/integration/stub/connect/key`, затем `run --format json "marker: is <ключ> right?"`, затем `diagnostics
+export`):
+
+```text
+diag exit 0 included 2 files, omitted 0; session: selected; chat: included
+     1009  chat/session.json
+    13965  cli/loginom-ai-agent-local.log
+     2134  manifest.json
+# chat/session.json: info {id ses_…, slug, title, version, model, time}; messages:
+#   user      {"text":"marker: is [redacted] right?","files":[],…}
+#   assistant {agent build, model stub/stub-model, content [{type text, text "Answer"}], finish stop, tokens …}, parts []
+#   idle      {outcome succeeded}
+# cli/…log: message="cli starting" … args=[redacted] role=cli — три строки (serve, run, его частный сервер)
+password in raw log: false in archive: false      # пароль сервера (LOGINOM_AI_AGENT_PASSWORD) не пишется
+key in log raw file: true                          # в журнале на диске ключ есть (args), в архиве — нет
+```
+
+У простого ответа текст лежит в `content` сообщения, `session_part` пуст. Поле `firstToken` в `time` ассистента
+заменяется на `[redacted]` общим правилом редактора (ключ с `token`) — потеря одной отметки времени, не правил.
+
+### B2.7a3b: тесты
+
+| Тест | Что |
+|---|---|
+| `cli/test/cli-standalone.test.ts` «diagnostics export carries the chat of the profile, and none of its saved keys or command lines» (новый) | **база, которую написал сам сервер v2**: профиль, `serve` входа продукта, ключ `fixture-saved-provider-value` через `integration.connect.key` (как B2.1), `run` с промптом, где ключ и метка; провайдер получил `Bearer <ключ>`. Архив: `knownSecrets: ok`, `chat: included`, чат — той сессии, с меткой и ответом; в журнале CLI `args=[redacted]` и нет метки; ключа нет ни в одном файле архива |
+| `loginom-host/test/diagnostics-cli.test.ts` (фикстура) | база фикстуры — таблицы v2 с колонками `core/src/{session,credential,account}/sql.ts`: две сессии (сообщение пользователя, ответ с частью), ключ провайдера, OAuth MCP с `client_secret`, токен учётной записи; в журнале — три командные строки. `planted` пополнен четырьмя значениями v2 |
+| там же, «the CLI log keeps no command line: neither flag values nor the prompt» (новый) | три `args=[redacted] role=cli`; нет `--answer`, значения ответа и текста промпта; остальной журнал на месте |
+| там же, «an unreadable chat database…» | плюс `knownSecrets: unavailable` у мусорной базы и базы без таблиц |
+| там же, снимок и смена учётной записи | запросы и вставки — в `session_message`/`session_part` |
+
+### B2.7a3b: мутации
+
+`<scratchpad>/b27a3-runs/mutate-b.py`: одна точная замена, `diagnostics-{cli,export}.test.ts` пакета `loginom-host` и
+новый случай `cli-standalone.test.ts`, `git checkout` файла; на `7bf1a9a8ea`. После — `git status` чистый.
+
+| Мутация | `loginom-host` | `cli` (новый случай) |
+|---|---|---|
+| M0 нет | 25/0 | 1/0 |
+| M1 ключи базы v2 не читаются (поведение до задачи) | **23/2**: planted v2 в архиве; у нечитаемой базы `ok` | **0/1**: ключ в чате |
+| M2 нечитаемая база оставляет `knownSecrets: ok` | **24/1** | 1/0 |
+| M3 токены `account`/`control_account` не читаются | **24/1**: токен в архиве | 1/0 |
+| M4 `client_secret` клиента MCP не учится | **24/1**: секрет клиента в архиве | 1/0 |
+| M5 командные строки журнала не маскируются | **24/1** | **0/1**: метка промпта в журнале |
+| M6 чат из таблиц 0.4 | **22/3**: последняя сессия, ожидание блокировки, снимок | **0/1** |
+
+M1 краснит утечкой, а не манифестом: без чтения базы проверка ничем не кончается неудачей, и `ok` честно значит «всё,
+что читал, прочитал». «Не `ok`, если ключи v2 не прочитаны» — M2: база есть, но не читается.
+
+### B2.7a3b: приёмка
+
+Полные прогоны (`<scratchpad>/b27a3-runs/pkg-tests-b.sh`): база — `2762bcbe86` в `<scratchpad>/b27a3b-base`, итог —
+`7bf1a9a8ea`; `npm ci` клиента в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан, `loginom-host` — под `xvfb-run -a`.
+Падения сравнивались по именам и совпали.
+
+| Пакет | Команда | `2762bcbe86` | `7bf1a9a8ea` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 450 pass, 9 skip, 0 fail | 451 pass, 9 skip, 0 fail (+1, новый случай) |
+| `loginom-host` | `xvfb-run -a bun test` | 539 pass, 12 skip, 5 fail | 540 pass, 12 skip, 5 fail (+1 «the CLI log keeps no command line»): те же «umask», 3 `bundled-ripgrep`, `managed-work-entry` |
+
+```text
+$ cd packages/loginom-host && bun test test/diagnostics-cli.test.ts test/diagnostics-export.test.ts
+ 25 pass
+ 0 fail
+$ cd packages/cli && bun test --timeout 120000 test/cli-standalone.test.ts
+ 8 pass
+ 0 fail                                            # 31 с
+$ cd packages/loginom-host && bun typecheck        # ✓ No type errors in 174 files; bun run typecheck:tsc — код 0
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,209 files across 2 projects; typecheck:tsc — код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 454 divergent upstream files                  # как на 2762bcbe86
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun run secrets range 2762bcbe86 HEAD                             # {"status":"clean","commits":1,…}
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0, с этим разделом в дереве
+Found 558 warnings and 0 errors.                    # у файлов задачи предупреждений нет
+ Tasks:    39 successful, 39 total
+```
+
+### B2.7a3b: где решал сам
+
+- **`args` маскируется целиком, а не только значения-секреты.** Задание разрешало оба. Значения флагов и позиционные
+  аргументы не отличить без дерева команд (`run <промпт>`, `auth login <id> --answer k=v`), а журнал 0.4 командных строк
+  не имел вовсе. Цена — в архиве не видно, какая команда шла; это видно по соседним строкам журнала.
+- **Маска — в выгрузке, а не в журнале.** Журнал пишет `cli/src/index.ts` upstream; задание — правки в `loginom-host`.
+  На диске журнал профиля по-прежнему держит командные строки («Найдено»).
+- **Фикстура `loginom-host` — подмножество таблиц v2 с их настоящими колонками**: у `loginom-host` нет зависимости от
+  `core` и его миграций. Базу, написанную самим сервером v2, проверяет новый случай `cli-standalone.test.ts`.
+- **Имя базы — `Product.database`** в `diagnostics-export.ts`; `diagnostics-cli.ts` по-прежнему пишет то же имя строкой.
+
+### B2.7a3b: найдено, не чинил
+
+- Журнал CLI на диске (`<профиль>/data/log/loginom-ai-agent*.log`) хранит командные строки, в том числе значения
+  `--answer` и текст промптов (`cli/src/index.ts`, upstream). Профиль — каталог `0700` своего пользователя; в архив они
+  больше не попадают. Не писать их в журнал — правка upstream, решение владельца.
+- Поле `firstToken` в чате заменяется на `[redacted]` (выше).
+
+### B2.7a3b: не проверено
+
+- Windows и macOS: тесты не ограничены платформой, запускались на Linux; `cliCredentials` на macOS (Keychain) — по коду.
+- Собранный CLI для этой задачи не пересобирался: проверено из исходников (случай `cli-standalone.test.ts` и проба).
+- Настоящее подключение Loginom и рантайм `<профиль>/loginom/runtime` в выгрузке v2 — только фикстурами `loginom-host`.
