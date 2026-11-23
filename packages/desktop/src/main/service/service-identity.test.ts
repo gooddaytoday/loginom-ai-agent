@@ -126,9 +126,16 @@ describe("service-identity", () => {
 
     await desktop({ LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: root }, true)
 
+    // `stopService` returns once the pid is gone, but on Windows this process may record the exit a moment later.
+    const exit = (service: (typeof services)[number], wait: number) =>
+      Promise.race([
+        service.exited.then((code) => ({ code, signal: service.signalCode })),
+        Bun.sleep(wait).then(() => "running"),
+      ])
+
     const [own, ...foreign] = await Promise.all(
       services.map(async (service, index) => ({
-        exit: service.exitCode === null ? "running" : { code: await service.exited, signal: service.signalCode },
+        exit: await exit(service, index === 0 ? 10_000 : 0),
         stopRequest: await Bun.file(files[index] + ".soft-stop").exists(),
         signal: await Bun.file(files[index] + ".signal").exists(),
         registration: await fs.readFile(files[index], "utf8").catch(() => undefined),
