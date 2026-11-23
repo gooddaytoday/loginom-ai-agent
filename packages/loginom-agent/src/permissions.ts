@@ -10,7 +10,11 @@
 //   may not loosen the product's defaults, and reading the product's own directories outside the project;
 // - a refused call does not end the turn (B2.6b, В-75): the user's «Отклонить» and a rule's deny reach the model as text
 //   (`refusal`, applied in the plugin's `execute.after` and `execute.before`), and the call's metadata says which;
-// - the kinds the settings deny are named to the model before it tries them (`deniedKinds`, B2.6b2).
+// - the kinds the settings deny are named to the model before it tries them (`deniedKinds`, B2.6b2);
+// - the administrator's deny (B2.6c, В-69) is OpenCode's managed policy: `tool.use` statements of the product's system
+//   config (`/etc/loginom-ai-agent`, `%ProgramData%\loginom-ai-agent`, MDM), which OpenCode's guarded policy plugin
+//   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
+//   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
 import type { Permission } from "@opencode/schema/permission"
 
 export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
@@ -108,6 +112,9 @@ type Request = {
  * directories (`ownRead`).
  */
 export function settle(request: Request, subagent: boolean, granted: ReadonlySet<Kind>, own = false) {
+  // A deny reaches this hook only from an earlier one: the administrator's policy (B2.6c). Nothing the product allows
+  // lifts it, and its text stays.
+  if (request.effect === "deny") return { effect: "deny" as const }
   if (own) return { effect: "allow" as const }
   const entry = classify(request.action, request.resources)
   if (!entry) return { effect: request.effect }
@@ -128,17 +135,30 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
 /**
  * What the model reads instead of a refused call's error (B2.6b, В-75), so that it explains and the turn goes on: the
  * user's «Отклонить» (`Permission.DeclinedError`, which would end the step) and a rule that denies a kind
- * (`Permission.BlockedError` without a reason), by the cause inside the call's `Tool.Error`. A deny with its own reason
- * (a hook's: a subagent's terminal, a schedule check, nobody present) and a rejection with the user's words
- * (`Permission.CorrectedError`) keep their text.
+ * (`Permission.BlockedError` without a reason), by the cause inside the call's `Tool.Error`; the administrator's policy
+ * that denies a kind (B2.6c) is told as such. Any other deny with its own reason (a hook's: a subagent's terminal, a
+ * schedule check, nobody present) and a rejection with the user's words (`Permission.CorrectedError`) keep their text.
  */
 export function refusal(cause: unknown) {
   if (isDecline(cause)) return declinedText
   const blocked = blockedError(cause)
-  if (!blocked || blocked.reason !== undefined) return
+  if (!blocked) return
   const entry = classify(blocked.permission, blocked.resources)
-  return entry && deniedText(entry)
+  if (!entry) return
+  if (blocked.reason === undefined) return deniedText(entry)
+  if (policy(blocked.reason)) return policyDeniedText(entry)
 }
+
+/** Whether a check failed on the administrator's policy (B2.6c): a `Permission.BlockedError` with its reason. */
+export function policyDenied(cause: unknown) {
+  const reason = blockedError(cause)?.reason
+  return reason !== undefined && policy(reason)
+}
+
+// The reasons of OpenCode's managed policy (`core/src/managed-policy.ts`, `statements`): a config document's, or an
+// organization's that came with an integration. Statements of user and project config documents carry the first text
+// too, and only ever add denies; the managed ones are loaded first and win.
+const policy = (reason: string) => /^Blocked by (configuration policy|.+'s policy)$/s.test(reason)
 
 /** OpenCode's plain decline: the user's «Отклонить», or an open question of a Location that shuts down. */
 export const isDecline = (value: unknown) =>
@@ -153,6 +173,11 @@ export const deniedText = (entry: Pick<Entry, "action" | "kind">) =>
   `LOGINOM_PERMISSION_DENIED: «${kinds[entry.kind]}» (${entry.action}) запрещено правилами разрешений, действие не ` +
   "выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему; " +
   "разрешить это пользователь может в «Настройки → Разрешения»."
+
+export const policyDeniedText = (entry: Pick<Entry, "action" | "kind">) =>
+  `LOGINOM_POLICY_DENIED: «${kinds[entry.kind]}» (${entry.action}) запрещено политикой администратора, действие не ` +
+  "выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему; " +
+  "изменить это может только администратор."
 
 /**
  * The kinds whose every table entry the rules deny, as the settings' «Запрещено» writes them (B2.6b2). OpenCode then
@@ -180,10 +205,18 @@ export const deniedKindsText = (denied: readonly Kind[]) =>
   "Не пытайтесь делать эти действия и не обходите их другими инструментами. Если задача их требует, скажите " +
   "пользователю, что это запрещено в «Разрешениях» и разрешить может только он сам, и продолжайте без них."
 
-/** The call metadata of a refusal, for clients (0.4 `permissionDenied`): `declined` by the user, `denied` by a rule. */
+/**
+ * The call metadata of a refusal, for clients (0.4 `permissionDenied`): `declined` by the user, `denied` by a rule,
+ * `policy` by the administrator (B2.6c).
+ */
 export const refusalMetadata = (text: string) => ({
   permissionDenied: true,
-  permissionRefusal: text === declinedText ? ("declined" as const) : ("denied" as const),
+  permissionRefusal:
+    text === declinedText
+      ? ("declined" as const)
+      : text.startsWith("LOGINOM_POLICY_DENIED:")
+        ? ("policy" as const)
+        : ("denied" as const),
 })
 
 export const terminalDenied = "LOGINOM_TERMINAL_DENIED: subagents do not run terminal commands in Loginom AI Agent"

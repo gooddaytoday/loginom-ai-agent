@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Config } from "@opencode/core/config"
 import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
@@ -25,6 +26,7 @@ import {
   declinedText,
   deniedKindsText,
   deniedText,
+  policyDeniedText,
   scheduleRunDenied,
   table,
   type Kind,
@@ -60,18 +62,23 @@ const asked: { kind: Kind; action: string; resources: string[] }[] = [
 
 type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 
+// `policies` are the administrator's (B2.6c): the managed policy of the product's system config directory
+// (`/etc/loginom-ai-agent` in an installation), here a directory of the case.
 const boot = (
   config: Record<string, unknown> = {},
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
+  policies?: readonly Record<string, unknown>[],
 ) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-permissions-")).path
     const global = path.join(dir, "global")
+    const system = path.join(global, "system")
     const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
     yield* Effect.promise(async () => {
       await fs.mkdir(path.join(global, "config"), { recursive: true })
       await Bun.write(path.join(dir, "loginom-ai-agent.json"), JSON.stringify(config))
       await Bun.write(path.join(dir, "inside.txt"), "inside\n")
+      if (policies) await Bun.write(path.join(system, "loginom-ai-agent.json"), JSON.stringify({ policies }))
     })
     const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
     yield* llm.serve(respond)
@@ -111,6 +118,7 @@ const boot = (
           SessionRunnerModel.node.replace(
             Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
           ),
+          ...(policies ? [Config.node.replace(Config.configured({ claude: false, system }))] : []),
         ],
       ).pipe(Layer.provide(HttpServer.layerServices)),
     )
@@ -688,6 +696,224 @@ describe("loginom.product refusals of built-in tools (B2.6b, В-75)", () => {
           ),
         ).toEqual(["denied"])
         expect(yield* Effect.promise(() => Bun.file(path.join(test.dir, "hidden.md")).exists())).toBe(false)
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+describe("loginom.product the administrator's deny (B2.6c, В-69)", () => {
+  // The administrator's deny is OpenCode's managed policy: `tool.use` statements on `<action>:<resource>`, which its
+  // guarded policy plugin applies in `permission.evaluate` after the rules and before the product's hook.
+  const deny = (action: string, resource: string) => ({
+    action: "tool.use",
+    resource: `${action}:${resource}`,
+    effect: "deny",
+  })
+  const allowAll = [{ action: "*", resource: "*", effect: "allow" as const }]
+
+  it.live(
+    "a deny of every kind wins over the defaults, the user's settings and the client's session rules; nothing is asked",
+    () =>
+      Effect.gen(function* () {
+        // Every entry of every kind, the terminal's too. The settings allow everything and so turn the terminal on.
+        const everything = table.map((entry) => deny(entry.action, entry.resource))
+        const requests = [
+          ...asked,
+          { kind: "read", action: "read", resources: ["inside.txt"] },
+          { kind: "terminal", action: "shell", resources: ["ls"], source },
+        ]
+        for (const policies of [everything, undefined]) {
+          const plain = yield* boot({}, undefined, policies)
+          const defaults = yield* plain.create("defaults")
+          const client = yield* plain.create("client")
+          yield* plain.sessions.setPermissions({ sessionID: client, permissions: allowAll })
+          const configured = yield* boot({ permissions: allowAll }, undefined, policies)
+          const settings = yield* configured.create("settings")
+          for (const [mode, test, id] of [
+            ["defaults", plain, defaults],
+            ["client", plain, client],
+            ["settings", configured, settings],
+          ] as const) {
+            for (const request of requests) {
+              const denied = (yield* test.ask(id, request)).effect === "deny"
+              // Without the policy nothing here is denied but the terminal, off by default.
+              const expected = policies !== undefined || (mode === "defaults" && request.kind === "terminal")
+              expect([policies !== undefined, mode, request.action, denied]).toEqual([
+                policies !== undefined,
+                mode,
+                request.action,
+                expected,
+              ])
+            }
+            if (policies) expect([mode, yield* test.open(id)]).toEqual([mode, []])
+          }
+        }
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a kind the policy touches is not allowed for the conversation; a grant does not lift the policy's deny",
+    () =>
+      Effect.gen(function* () {
+        // The administrator denies fetching pages (one entry of «Открывать сайты») and one file. The project's own
+        // `policies` cannot allow back what the administrator denies.
+        const test = yield* boot(
+          { policies: [{ action: "tool.use", resource: "webfetch:*", effect: "allow" }] },
+          undefined,
+          [deny("webfetch", "*"), deny("edit", "secret.md")],
+        )
+        const id = yield* test.create("locked")
+        expect((yield* test.ask(id, { action: "webfetch", resources: ["https://example.com"] })).effect).toBe("deny")
+        // A search is not denied, but its row is locked: the grant is refused, the question stays for «один раз».
+        const search = yield* test.ask(id, { action: "websearch", resources: ["loginom"] })
+        expect(search.effect).toBe("ask")
+        const refused = yield* test.conversation(id, search.id)
+        expect(refused.status).not.toBe(200)
+        expect(refused.body).toMatchObject({ type: "not_grantable", data: { action: "websearch" } })
+        expect((yield* test.open(id)).map((item) => item.id)).toEqual([search.id])
+        expect(yield* test.reply(id, search.id, "once")).toBe(204)
+        const again = yield* test.ask(id, { action: "websearch", resources: ["loginom"] })
+        expect(again.effect).toBe("ask")
+        expect(yield* test.reply(id, again.id, "reject")).toBe(204)
+        // A deny of one file does not lock its row: the grant answers, and that file stays denied.
+        const edit = yield* test.ask(id, { action: "edit", resources: ["report.md"] })
+        const granted = yield* test.conversation(id, edit.id)
+        expect([granted.status, granted.body]).toEqual([200, { output: { kind: "write" } }])
+        expect((yield* test.ask(id, { action: "edit", resources: ["other.md"] })).effect).toBe("allow")
+        expect((yield* test.ask(id, { action: "edit", resources: ["secret.md"] })).effect).toBe("deny")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "real tools under a client that answers every question once: what the policy denies is never asked, the model is told the administrator denied it, the turn goes on",
+    () =>
+      Effect.gen(function* () {
+        // The terminal is on; the policy denies it, one file, pages and reading outside the project.
+        const test = yield* boot({ permissions: [{ action: "shell", resource: "*", effect: "allow" }] }, undefined, [
+          deny("edit", "denied.md"),
+          deny("webfetch", "*"),
+          deny("shell", "*"),
+          deny("external_directory", "*"),
+        ])
+        const marker = path.join(test.dir, "terminal-ran")
+        // A large tool result in the machine's data directory, which the product reads without the «outside the
+        // project» question (B2.6a2); the case removes it.
+        const result = path.join(Global.Path.data, "tool-output", `b26c-${crypto.randomUUID()}.txt`)
+        yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(result, { force: true })))
+        yield* Effect.promise(() =>
+          fs.mkdir(path.dirname(result), { recursive: true }).then(() => Bun.write(result, "x\n")),
+        )
+        const id = yield* test.create("policy tools")
+        // `run --dangerously-skip-permissions` answers `once` to every question of its session
+        // (`cli/src/run/noninteractive.ts`, `replyPermission`).
+        const answered: string[] = []
+        yield* test.open(id).pipe(
+          Effect.flatMap((items) =>
+            Effect.forEach(items, (item) =>
+              test.reply(id, item.id, "once").pipe(Effect.tap(() => Effect.sync(() => answered.push(item.action)))),
+            ),
+          ),
+          Effect.andThen(Effect.sleep("50 millis")),
+          Effect.forever,
+          Effect.forkScoped,
+        )
+        yield* test.prompt(
+          id,
+          script(
+            { tool: "write", input: { path: "allowed.md", content: "allowed" } },
+            { tool: "write", input: { path: "denied.md", content: "denied" } },
+            { tool: "webfetch", input: { url: "https://denied.example/page" } },
+            { tool: "shell", input: { command: `touch ${marker}` } },
+            { tool: "read", input: { path: result } },
+            { text: "end" },
+          ),
+        )
+        expect(answered).toEqual(["edit"])
+        const said = [
+          policyDeniedText({ action: "edit", kind: "write" }),
+          policyDeniedText({ action: "webfetch", kind: "web" }),
+          policyDeniedText({ action: "shell", kind: "terminal" }),
+          policyDeniedText({ action: "external_directory", kind: "read" }),
+        ]
+        expect(
+          (yield* test.tools(id)).map((part) =>
+            part.state.status === "error" ? part.state.error.message : part.state.status,
+          ),
+        ).toEqual(["completed", ...said])
+        expect(told((yield* test.requests(id)).at(-1))).toEqual(said)
+        expect(
+          (yield* test.tools(id)).map((part) =>
+            part.state.status === "error"
+              ? [part.state.metadata?.permissionDenied, part.state.metadata?.permissionRefusal]
+              : [],
+          ),
+        ).toEqual([[], ...Array(4).fill([true, "policy"])])
+        for (const [name, exists] of [
+          ["allowed.md", true],
+          ["denied.md", false],
+          ["terminal-ran", false],
+        ] as const)
+          expect([name, yield* Effect.promise(() => Bun.file(path.join(test.dir, name)).exists())]).toEqual([
+            name,
+            exists,
+          ])
+        const answers = (yield* test.sessions.messages({ sessionID: id })).filter((item) => item.type === "assistant")
+        expect(answers.map((item) => (item.type === "assistant" ? [item.finish, item.error] : []))).toEqual([
+          ["stop", undefined],
+          ...Array(5).fill(["tool-calls", undefined]),
+        ])
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "«Свои навыки: выключены» (В-76) is the policy's `skill.use`: the user's own skills go, the bundled ones stay",
+    () =>
+      Effect.gen(function* () {
+        // The verified bundled catalog of B2.4 and an own skill of the user, listed in the config's `skills`.
+        const outside = (yield* tmpdirScoped("loginom-permissions-skills-")).path
+        const resources = path.join(outside, "resources")
+        yield* environment("LOGINOM_AI_AGENT_RESOURCES", resources)
+        const bundled = ["loginom-automation", "package-docs", "loginom-dashboard"]
+        yield* Effect.promise(async () => {
+          for (const [directory, name] of [
+            ...bundled.map((name) => [path.join(resources, "skills", name), name]),
+            [path.join(outside, "own", "own-notes"), "own-notes"],
+          ])
+            await fs
+              .mkdir(directory, { recursive: true })
+              .then(() =>
+                Bun.write(
+                  path.join(directory, "SKILL.md"),
+                  `---\nname: ${name}\ndescription: ${name}.\n---\n\n${name}\n`,
+                ),
+              )
+          await Bun.write(
+            path.join(resources, "resource-manifest.json"),
+            JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
+          )
+        })
+        const listed: Record<string, string[]> = {}
+        for (const [name, policies] of [
+          ["policy", [{ action: "skill.use", resource: "*", effect: "deny" }]],
+          ["none", undefined],
+        ] as const) {
+          const test = yield* boot({ skills: [path.join(outside, "own")] }, undefined, policies)
+          listed[name] = (
+            (yield* test.call(`/api/skill?location[directory]=${encodeURIComponent(test.dir)}`)).body.data as {
+              id: string
+            }[]
+          )
+            .map((skill) => skill.id)
+            .toSorted()
+        }
+        // OpenCode's own `opencode`, `report` and `browser` skills go with the user's: `*` is every skill ID.
+        expect(listed.none).toContain("own-notes")
+        expect(listed.policy).not.toContain("own-notes")
+        for (const name of bundled)
+          expect([name, listed.none.includes(name), listed.policy.includes(name)]).toEqual([name, true, true])
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
