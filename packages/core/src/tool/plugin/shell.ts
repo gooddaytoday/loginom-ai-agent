@@ -301,13 +301,16 @@ export const Plugin = {
         }),
       )
       yield* access.authorizeExternal([target, ...directories], context)
-      if (parsed.commands.length > 0)
-        yield* permission.assert({
-          action: name,
-          resources: parsed.commands.map((command) => command.resource),
-          save: parsed.commands.map((command) => command.save),
-          ...Permission.invocation(context),
-        })
+      // Fork (B2.6a3, CAT-07): a command that names no program (`cd src > out`, `[[ -e f ]]`) still runs in a shell, so
+      // it asks with its whole text.
+      const commands =
+        parsed.commands.length > 0 ? parsed.commands : [{ resource: invocation.command, save: invocation.command }]
+      yield* permission.assert({
+        action: name,
+        resources: commands.map((command) => command.resource),
+        save: commands.map((command) => command.save),
+        ...Permission.invocation(context),
+      })
       // Approval can outlive the directory, so validate immediately before spawning.
       const workdir = yield* Environment.typeFollowing(environment.files, target.absolute).pipe(
         Effect.catchTag("Environment.NotFound", () =>

@@ -393,6 +393,49 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
+    "the terminal on asks for a command that names no program too, and without an answer it does not run (B2.6a3)",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot({ permissions: [{ action: "shell", resource: "*", effect: "ask" }] })
+        const file = (name: string) => path.join(test.dir, name)
+        // `ShellParse` finds no program in the last four: before B2.6a3 they ran without a question.
+        const commands = [
+          `> ${JSON.stringify(file("redirected"))}`,
+          `cd . > ${JSON.stringify(file("cd-redirected"))}`,
+          "[[ -e inside.txt ]]",
+          "X=1",
+          "export X=1",
+        ]
+        for (const command of commands) {
+          const id = yield* test.create(command)
+          const running = yield* test
+            .prompt(id, script({ tool: "shell", input: { command } }, { text: "end" }))
+            .pipe(Effect.forkScoped)
+          const pending = yield* until(() => test.open(id).pipe(Effect.map((items) => items[0])))
+          expect([command, pending.action, pending.resources]).toEqual([command, "shell", [command]])
+          expect(yield* test.reply(id, pending.id, "reject")).toBe(204)
+          yield* Fiber.join(running).pipe(Effect.ignore)
+          expect((yield* test.tools(id)).map((part) => part.state.status)).toEqual(["error"])
+        }
+        for (const name of ["redirected", "cd-redirected"])
+          expect([name, yield* Effect.promise(() => Bun.file(file(name)).exists())]).toEqual([name, false])
+
+        // A command with a program asks as before, and runs once answered.
+        const ordinary = yield* test.create("ordinary")
+        const touch = `touch ${JSON.stringify(file("touched"))}`
+        const running = yield* test
+          .prompt(ordinary, script({ tool: "shell", input: { command: touch } }, { text: "end" }))
+          .pipe(Effect.forkScoped)
+        const pending = yield* until(() => test.open(ordinary).pipe(Effect.map((items) => items[0])))
+        expect([pending.action, pending.resources]).toEqual(["shell", [touch]])
+        expect(yield* test.reply(ordinary, pending.id, "once")).toBe(204)
+        yield* Fiber.join(running)
+        expect(yield* Effect.promise(() => Bun.file(file("touched")).exists())).toBe(true)
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "a subagent's own rules loosen nothing: explore asks for sites and outside reads and runs no command",
     () =>
       Effect.gen(function* () {
