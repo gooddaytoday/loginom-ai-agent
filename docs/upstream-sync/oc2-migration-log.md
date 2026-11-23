@@ -14863,7 +14863,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Где решал сам
 
-1. **Объём — восемь файлов, без входа в чужой сервер.** Нарезка называет около 14 файлов, задание — до восьми и
+1. **Объём — восемь файлов, без входа в чужой сервер** (так в первых трёх коммитах; оркестратор потом поручил и эту
+   группу — раздел «Доработка» ниже). Нарезка называет около 14 файлов, задание — до восьми и
    запрещает `app`. Сделано то, что задание перечисляет: сервер и клиенты, которые идут к своей службе или к серверу CLI,
    плюс одно место значения. Не сделан вход паролем к серверу, который не служба своего окна: веб-приложение
    (`app/src/runtime/server/api.ts:6`, `authTokenFromCredentials`), Desktop для таких серверов
@@ -14983,13 +14984,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 ### Найдено, не чинил
 
-- **Вход паролем к серверу, который не служба своего окна, шлёт `opencode`** (пункт 1 «Где решал сам»):
-  `app/src/runtime/server/api.ts:6`, `desktop/src/main/plugin/host.ts:326`, `gui-plugins/src/wsl/sidecar.ts:131`,
-  `gui-plugins/src/ssh/controller.ts:338`. Сервер этой сборки ответит им 401: WSL и SSH не дождутся здоровья службы,
-  сервер, добавленный с паролем, и веб-интерфейс `serve` при входе паролем не откроются. Четыре файла кода, из них `app` —
-  зона B4.11d. Сделать одной задачей после B4.11d: `app` и `gui-plugins` уже зависят от `schema` и могут взять
-  `ServerUsername.fallback`; в 0.4 `authTokenFromCredentials` брал имя из токена или `loginom-ai-agent`. Тесты `app`
-  (`runtime/server/{api,client,image,health}.test.ts`, `e2e/utils/mock-server.ts`) ждут `opencode:` — их менять вместе.
+- Вход паролем к серверу, который не служба своего окна, слал `opencode` (пункт 1 «Где решал сам») — исправлено в
+  доработке ниже.
 - `services/site/src/docs/content/cli/web.mdx:145` — `curl -u opencode:…` в документации сайта upstream; продукт её не
   поставляет, не менял.
 - `packages/loginom-host/script/skills-acceptance/desktop.mjs:155` строит заголовок из `backend.username`, которого
@@ -15001,7 +14997,7 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   `scripts/live-profiles/live.mjs` — только с установленными сборками (B3.3).
 - Собранный Desktop со своей службой: путь проверен по частям — проба и `Service.ensure` клиента (тесты `client`,
   `cli`), заголовок главного процесса (`sidecar-credentials.test.ts`), — но приложение не собирал и не запускал.
-- Windows и macOS; WSL и SSH (там ожидается 401 до правки группы выше).
+- Windows и macOS; WSL и SSH — проверка здоровья исправлена в доработке, запуском не проверена.
 - Выход в сеть из `serve` в процессном тесте не перехватывал: модель не вызывается (промпта нет), загрузка каталога
   моделей выключена `isolatedEnv` (`LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH`); настоящую модель не вызывал.
 - Служба, которую запустила прежняя сборка `oc2-migration` и которая ещё работает, ответит новой пробе 401. Что тогда
@@ -15009,3 +15005,91 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   старой службы новая запускается как обычно.
 - Профиль CLI и служба Desktop между собой не соединяются (отдельные регистрации и порты, B4.9), поэтому их общего
   прогона нет.
+
+### Доработка: вход в чужой сервер
+
+По решению оркестратора та же ветка закрывает группу из пункта 1 «Где решал сам»: без неё слияние даёт 401 у сервера
+этой сборки в WSL и по SSH, у сервера, добавленного с паролем, и у входа паролем в веб-интерфейс `serve`. WSL, SSH и
+сопряжение параллельно скрывает B4.11e (только регистрация плагинов); `wsl/sidecar.ts` и `ssh/controller.ts` поправлены,
+чтобы работали при возврате.
+
+| Коммит | Что |
+|---|---|
+| `922346e667` `fix(app): sign in to other servers of this build as loginom-ai-agent (B2.7a11)` | четыре места, `SidecarCredentials.remote`, тесты `app` и Desktop |
+| следующий | этот подраздел; CAT-12, CAT-10, CAT-09 в `catalog.md` |
+
+| Место | Было | Стало |
+|---|---|---|
+| `app/src/runtime/server/api.ts` (`authTokenFromCredentials`: веб-приложение, renderer Desktop для серверов, кроме своей службы, загрузка вложений, проверка здоровья) | `btoa("opencode:" + пароль)` | `ServerUsername.fallback` |
+| `desktop/src/main/plugin/host.ts`, ветка `endpoint.password` (запросы плагинов к таким серверам) | литерал `opencode` | `SidecarCredentials.remote(password)` — новая функция в `sidecar-credentials.ts`, `ServerUsername.fallback` |
+| `gui-plugins/src/wsl/sidecar.ts` (`checkHealth`) | `opencode` | `ServerUsername.fallback` |
+| `gui-plugins/src/ssh/controller.ts` (`checkHealth`) | `opencode` | `ServerUsername.fallback` |
+
+Файлы кода — пять правленых, новых нет. Копий нет: `app` и `gui-plugins` уже зависят от `schema` (`new-session/machine.ts`,
+`goal/machine.ts`, `browser/pane.ts`), проверок границ импорта, как у Promise-службы клиента, у них нет.
+
+**Почему `fallback`, а не `current()`.** Такой сервер живёт не в окружении Desktop: в WSL переменные Windows
+попадают только через `WSLENV`, а скрипт запуска эту переменную не экспортирует; сервер по SSH и добавленный
+пользователем — со своим окружением; renderer и браузер переменных не читают. Значит, у них имя по умолчанию, и главный
+процесс шлёт то же, что renderer. Своя служба Desktop наследует окружение окна и по-прежнему идёт через
+`SidecarCredentials.authorization` (`current()`). В 0.4 веб-приложение брало имя из токена `auth_token`; в v2
+`authFromToken` берёт только пароль, поэтому `serve` с `LOGINOM_AI_AGENT_SERVER_USERNAME` веб-приложение паролем не
+откроет — только ссылкой `pair` (cookie без имени). Это сужение относительно 0.4; менять `authFromToken` и хранение
+подключений `app` — отдельная задача.
+
+**Тесты.** `app`: ожидания `api.test.ts` (`authTokenFromCredentials`, заголовки запросов), `client.test.ts`,
+`image.test.ts`, `health.test.ts` и e2e-заглушка `e2e/utils/mock-server.ts` — `loginom-ai-agent:`; строка таблицы
+`authFromToken` с `opencode:secret` осталась (разбор токена имя отбрасывает). Desktop:
+`sidecar-credentials.test.ts` «signs the own service in with Desktop's user and any other server with the default» —
+при `LOGINOM_AI_AGENT_SERVER_USERNAME=alice` своя служба получает `alice`, `remote` — `loginom-ai-agent`.
+
+**Мутации** (`<scratchpad>/b27a11-mutate.sh`):
+
+```text
+N0 без мутации (контроль)                         app src/runtime/server: 210 pass / 0 fail
+N1 app api.ts: снова "opencode"                   app src/runtime/server: 197 / 13     # api, client, health, image
+N2 Desktop remote: current() вместо fallback      desktop sidecar-credentials: 2 / 1
+N3 Desktop remote: "opencode"                     desktop sidecar-credentials: 2 / 1
+N4 host.ts: снова литерал "opencode" в вызове     desktop src/main: 443 / 0            # не краснеет, ниже
+```
+
+N4 и правки WSL и SSH тестами не покрыты: `host.ts` импортирует `electron` и без его подмены не загружается, а
+`packages/desktop/AGENTS.md` и `packages/app/AGENTS.md` запрещают подмены Electron и экспорты только для тестов; `checkHealth`
+WSL и SSH — внутренние функции главного процесса плагинов, им нужны настоящие `wsl` и `ssh`. Покрыта функция, которую
+вызывает `host.ts`; сами вызовы проверены `bun typecheck` и поиском ниже.
+
+```text
+$ git grep -nE '(btoa|Buffer\.from)\(.opencode:|username: *.opencode.|-u opencode|opencode:\$' -- ':!docs/upstream-sync'
+```
+
+Остались только: строка `authFromToken` в `app/.../api.test.ts`, `server/test/auth.test.ts` (конфиг в тесте), два
+запроса `opencode:wrong`, фикстуры компонентных тестов `session-ui` (сами шлют и сами проверяют, сервера нет),
+документация сайта upstream (`services/site/.../web.mdx`); и совпадения не о входе — ключ проверки в
+`gui-plugins/src/wsl/model.ts:331`, тег образа в `.github/release/publish-docker.sh`.
+
+**Приёмка доработки** — окружение оркестратора: `npm ci --ignore-scripts` клиента `loginom-runtime/client` и
+`LOGINOM_AI_AGENT_TEST_NODE` (Node 24.19.0) в обоих деревьях; `<scratchpad>/b27a11-suites2.sh`, база — заново созданное
+дерево `<scratchpad>/b27a11-base` (`9ef3c65f7c`). `app` — оба шага `bun run test` (`test:unit` по `./src`, `test:browser`
+по `./test-browser`). Падения прежних прогонов выше (`server` 8, `cli` 2) — от окружения: без `npm ci` и Node.
+
+| Пакет | `9ef3c65f7c` | `922346e667` |
+|---|---|---|
+| `app` `test:unit` | 2719 pass, 0 fail | 2719 pass, 0 fail |
+| `app` `test:browser` | 361 pass, 0 fail | 361 pass, 0 fail |
+| `gui-plugins` | 1129 pass, 1 skip, 0 fail | 1129 pass, 1 skip, 0 fail |
+| `desktop` | 577 pass, 4 skip, 0 fail | 578 pass, 4 skip, 0 fail |
+| `client` | 268 pass, 0 fail | 272 pass, 0 fail |
+| `server` | 274 pass, 3 skip, 0 fail | 277 pass, 3 skip, 0 fail |
+| `cli` | 523 pass, 9 skip, 0 fail | 525 pass, 9 skip, 0 fail |
+
+`bun typecheck` в `app`, `desktop`, `gui-plugins` — ошибок нет.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 567 divergent upstream files               # +7 к 560: CAT-10 +6 (api.ts и тесты), CAT-12 +1, CAT-09 0
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0; на дереве коммита этого подраздела
+Found 554 warnings and 0 errors.                                 # как на базе; два предупреждения anti-slop в новом тесте Desktop исправлены
+ Tasks:    39 successful, 39 total
+```

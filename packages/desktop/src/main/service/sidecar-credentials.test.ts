@@ -10,8 +10,10 @@ const username = process.env.LOGINOM_AI_AGENT_SERVER_USERNAME
 afterEach(() => {
   if (username !== undefined) {
     process.env.LOGINOM_AI_AGENT_SERVER_USERNAME = username
+
     return
   }
+
   delete process.env.LOGINOM_AI_AGENT_SERVER_USERNAME
 })
 
