@@ -249,7 +249,8 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       shortcutName: productName(channel),
     },
     linux: {
-      icon: `resources/icons`,
+      // Loginom AI Agent (B4.6): the 0.4 Linux sizes, which script/copy-icons.ts stages in linux/.
+      icon: `resources/icons/linux`,
       category: "Development",
       // libappimage finds the AppImage's desktop entry by globbing `*.desktop`, so the executable must never
       // end in `.desktop` (anomalyco/opencode#51867). The slug does not.
@@ -314,11 +315,7 @@ export function getConfig() {
     case "prod": {
       return {
         ...base,
-        // An Icon Composer package compiles to Assets.car, which macOS 26 and later draw the app icon from
-        // (Dock, Finder, system dialogs and the system icon styles). Older macOS keeps using the ICNS.
-        mac: { ...base.mac, icon: "resources/icons/icon.icon" },
-        // The DMG volume icon would otherwise use the same actool-generated ICNS.
-        dmg: { icon: "resources/icons/icon.icns" },
+        // Loginom AI Agent (B4.6): the 0.4 icons have no Icon Composer package, so prod keeps the shared ICNS.
         deb: { packageName, depends: debDepends, fpm: [metainfoFpm(appId)] },
         rpm: { packageName, fpm: [rpmNoBuildIdLinksFpm, metainfoFpm(appId)] },
       }

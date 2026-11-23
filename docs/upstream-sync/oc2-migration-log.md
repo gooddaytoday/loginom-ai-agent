@@ -14049,3 +14049,290 @@ Found 552 warnings and 0 errors.                                 # как до �
 Не проверено после доработки: режим теста онбординга (`LOGINOM_AI_AGENT_TEST_ONBOARDING=1`) не запускал — что его
 `:memory:` сохраняется, известно только по порядку импорта. Пользователь, который сам задал окну `LOGINOM_AI_AGENT_DB` или
 `_CONFIG_DIR` (переменные upstream), теперь до службы их не донесёт — это следствие решения оркестратора.
+
+## B4.6 Значки и метаданные
+
+23.11.2026. Ветка `b46-desktop-icons` от `oc2-migration` (`150d7533fb`), рабочее дерево `.claude/worktrees/b46`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, 1600 пакетов, `.husky/_` есть. База тестов снята в этом же дереве до первой правки. `bun run secrets staged` и
+хук `pre-commit` — `clean` на каждом коммите, в том числе на коммите со 123 изменёнными файлами `icons/`. Эталон 0.4 — `v0.4.0`:
+`packages/desktop/icons/**`, `scripts/{copy-icons,copy-metainfo,generate-icons}.ts`, `scripts/{icons,copy-icons}.test.ts`,
+`app/public/loginom-icon.png` и `app/src/entry.tsx:73`. `packages/desktop/src/main/service/*` (B4.9) не трогал.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `4ae9a7a3d7` `feat(desktop): stage the 0.4 product icons and metainfo (B4.6)` | значки 0.4, скрипты, тесты, конфиг упаковки, `sharp`, значок уведомлений в `app/public` |
+| `66ffb0461b` `fix(app): show the product icon in web notifications (B4.6)` | `app/src/runtime/platform/web.ts` |
+| следующий | этот раздел; `catalog.md` (CAT-01, CAT-02, CAT-03, CAT-10) |
+
+### Пункты задания
+
+| № | 0.4 (`v0.4.0`) | v2 (`150d7533fb`) | Стало |
+|---|---|---|---|
+| 1. Значки по каналам | `icons/**` — 226 файлов: `prod`, `beta`, `dev` (одинаковый рисунок), `masters/*.svg`, `preview/`, `source.png`, README; `copy-icons.ts` кладёт в `resources/icons` только `linux/`, `icon.png`, `icon.ico`, `icon.icns`, `dock.png`; `linux.icon` — `resources/icons/linux` | 162 файла OpenCode, у prod ещё пакет Icon Composer `icon.icon`; `copy-icons.ts` копирует весь каталог канала (Android, iOS, Store и `icon.icon` уходили в `app.asar` по маске `resources/**/*`); `linux.icon` — `resources/icons`; prod macOS — `icon.icon`, DMG — ICNS | `icons/**` — зеркало `v0.4.0`: `git diff v0.4.0 -- packages/desktop/icons` пуст, `icon.icon` удалён; `copy-icons.ts` — файл 0.4; `linux.icon` — `resources/icons/linux`; prod macOS — общий ICNS, переопределение DMG снято |
+| 2. metainfo | файла в репозитории нет: `scripts/copy-metainfo.ts` пишет `resources/<appId>.metainfo.xml` из `Product` (имя канала, `MIT AND AGPL-3.0-only`, тексты 0.4) | `copy-metainfo.ts` пишет `ai.opencode.desktop*.metainfo.xml` (OpenCode, Anomaly, opencode.ai, снимок экрана); deb в B4.5b собирался с ручной копией под `appId` | `copy-metainfo.ts` — файл 0.4 (три пустые строки для `require-readable-spacing`); deb собран без копии, ниже |
+| 3. Значок веб-уведомлений | `entry.tsx:73` — `icon: "/loginom-icon.png"`, файл в `app/public` | `runtime/platform/web.ts:31` — `https://opencode.ai/favicon-96x96-v3.png`, файла нет | `app/public/loginom-icon.png` (файл 0.4: тот же байт в байт, что `icons/*/linux/128x128.png` и `apps/loginom-site/assets/loginom-icon.png`), `web.ts` — `/loginom-icon.png` |
+
+`resources/*.metainfo.xml` в задании названы набором ресурсов 0.4 для копии как есть, но в `v0.4.0` таких файлов нет
+(`git ls-tree -r v0.4.0 | grep -i metainfo` — только скрипт): metainfo 0.4 генерируется. Взял меньшее — скрипт 0.4,
+файлов metainfo в git нет, как в 0.4 и v2 (`resources/*.metainfo.xml` в `.gitignore` пакета).
+
+### Файлы сверх пяти
+
+Задача называет пять файлов кода и набор ресурсов. Ещё понадобились:
+
+- **`app/src/runtime/platform/web.ts`** — шестой файл, разрешён заданием (п. 3).
+- **`electron-builder.config.ts` (+3 −6) и `electron-builder.config.test.ts` (+29 −8).** Набор 0.4 без `icon.icon`, а prod
+  macOS в v2 указывал на него: без правки prod macOS не собрался бы. `copy-icons.ts` 0.4 не кладёт в корень
+  `resources/icons` файлов `NxN.png`, а electron-builder берёт размеры Linux по именам файлов каталога `linux.icon`
+  (в B4.5b deb получил 32, 64 и 128 из корня): без `resources/icons/linux` Linux потерял бы набор 0.4. Обе правки — как в
+  0.4 (`645da9ebfd`); B4.5b оставил `linux.icon` этой задаче. Тест upstream на пакет Icon Composer удалён, ожидания
+  «macOS bundle» — ICNS у всех каналов.
+- **`desktop/package.json` и `bun.lock`.** `icons.test.ts` и генератор импортируют `sharp`, а из `packages/desktop` он не
+  разрешался. Версия — пин 0.4 `0.33.5`: генератор 0.4 на дереве `v0.4.0` с `sharp@0.33.5` — `Verified 135 icon assets`,
+  с `0.34.5` из блокировки upstream — `Stale generated icon` (проба во временных каталогах scratchpad, удалены). В `bun.lock` только
+  добавления: `sharp@0.33.5`, его `@img/*` и `color`, `color-string`, `simple-swizzle`, `is-arrayish`; `@opencode/site` и
+  `wrangler/miniflare` по-прежнему разрешают `sharp@0.34.5` (вложенные ключи); `bun install --frozen-lockfile` — без
+  изменений.
+
+### Генератор и тесты 0.4 на v2
+
+В v2 нет каталогов, куда генератор 0.4 писал веб-набор: `packages/ui/src/assets/loginom`, `packages/app/public-static`,
+значков и манифеста `loginom-*` в `app/public` (`app/index.html` v2 берёт значки из `desktop/icons/<канал>` через
+`app/vite.icons.ts`). `scripts/generate-icons.ts` пишет то, что в v2 есть: значки каналов и `preview/`, весь веб-набор и
+манифест лендинга `apps/loginom-site/assets` (там файлы 0.4 без изменений) и в `app/public` только `loginom-icon.png`.
+Генерирует 97 файлов вместо 135.
+
+```text
+$ cd packages/desktop && bun scripts/generate-icons.ts --check            # код 0
+Verified 97 icon assets
+$ bun scripts/generate-icons.ts --check --preview                         # код 0
+Verified 32 icon assets
+$ bun scripts/generate-icons.ts && git status --short                     # перезапись не добавила изменений в дереве
+Generated 97 icon assets
+```
+
+`scripts/icons.test.ts`: три теста 0.4 о значках Desktop (кадры ICO, слоты ICNS, одинаковые наборы каналов) — как есть.
+Тест 0.4 «web copies match, manifests have separate any/maskable icons and all links resolve» сравнивал копии из
+`ui/src/assets/loginom` в `app/public` и `app/public-static` и проверял пять ссылок и манифест `app/index.html` и лендинга;
+вместо него два:
+
+- «the web notification icon of the app is the 128 px Linux icon» — `app/public/loginom-icon.png` равен
+  `icons/prod/linux/128x128.png`;
+- «the landing page manifest has separate any/maskable icons and all links resolve» — половина теста 0.4 о лендинге.
+
+Тест маскируемых значков читает их из `apps/loginom-site/assets` вместо `ui/src/assets/loginom` (те же файлы).
+`scripts/copy-icons.test.ts` — тест 0.4, путь импорта `../script/copy-icons`.
+
+В `electron-builder.config.test.ts` новый тест «the $channel packaging icons are in the staged 0.4 icon set» (×3):
+настоящий `copyIcons` канала во временный каталог, затем `mac.icon`, `win.icon`, `nsis.installerIcon` и
+`installerHeaderIcon` конфига — файлы в нём, а каталог `linux.icon` — ровно девять `NxN.png` 0.4. Так связаны раскладка
+`copy-icons.ts` и пути конфига: по отдельности каждый тест прошёл бы и при рассогласовании.
+
+```text
+$ cd packages/desktop && bun test scripts/icons.test.ts scripts/copy-icons.test.ts electron-builder.config.test.ts
+ 34 pass
+ 0 fail
+ 644 expect() calls
+Ran 34 tests across 3 files.
+```
+
+### Мутации
+
+Скрипт `<scratchpad>/b46/mut/mutate.py` на `66ffb0461b`: одна мутация, `bun test scripts/icons.test.ts
+scripts/copy-icons.test.ts electron-builder.config.test.ts`, `git checkout HEAD` изменённых файлов; после всех —
+`git status` пуст. Значки OpenCode — файлы `150d7533fb`.
+
+```text
+=== M0 none: 34 pass / 0 fail
+=== M1 prod ICO is the OpenCode ICO: 32 pass / 2 fail                     # ICO; одинаковые каналы
+=== M2 beta ICNS is the OpenCode ICNS: 33 pass / 1 fail                   # одинаковые каналы
+=== M3 prod dock.png is not the 1024 ICNS frame: 32 pass / 2 fail         # ICNS; одинаковые каналы
+=== M4 dev Linux 32 px is the 64 px image: 33 pass / 1 fail               # одинаковые каналы
+=== M5 prod Linux 16 px uses the full mark: 33 pass / 1 fail              # одинаковые каналы
+=== M6 app notification icon is the OpenCode favicon: 33 pass / 1 fail    # значок уведомлений
+=== M7 app notification icon missing: 33 pass / 1 fail                    # значок уведомлений
+=== M8 landing manifest without maskable: 33 pass / 1 fail                # лендинг
+=== M9 landing page drops the apple touch link: 33 pass / 1 fail          # лендинг
+=== M10 maskable 512 is the tile image: 33 pass / 1 fail                  # маскируемые
+=== M11 copy-icons stages the whole channel (v2): 33 pass / 1 fail        # copy-icons
+=== M12 copy-icons keeps stale staging: 33 pass / 1 fail                  # copy-icons
+=== M13 copy-icons without linux/: 30 pass / 4 fail                       # copy-icons; значки упаковки ×3
+=== M14 copy-icons without icon.ico: 30 pass / 4 fail                     # copy-icons; значки упаковки ×3
+=== M15 Linux icon is the staging root (v2): 31 pass / 3 fail             # значки упаковки ×3
+=== M16 prod macOS icon is the Icon Composer package (v2): 32 pass / 2 fail  # macOS bundle prod; значки упаковки prod
+=== M17 Windows icon is not staged: 31 pass / 3 fail                      # значки упаковки ×3
+```
+
+Не покрыты `bun test` (как в 0.4): `copy-metainfo.ts` — проверен сборкой ниже; строка `web.ts` — `grep` (в `app/src`
+ссылок на `opencode.ai/favicon` больше нет); генератор — его `--check`.
+
+### Сборка `--linux deb dir`
+
+`<scratchpad>/b46/build.sh` на `66ffb0461b`, канал `dev`, umask оболочки `0077`, источники Node и Chromium — как в B4.8a:
+`npm ci --ignore-scripts --omit=dev` клиента `loginom-runtime` (2 с); встроенный CLI —
+`LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun script/build.ts --skip-install --skip-web-ui` в `packages/cli` (17 с);
+`bun run build` в `packages/desktop` с `LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node` и
+`LOGINOM_AI_AGENT_BROWSER_SOURCE=<каталог с chromium-1246>` (35 с, `Bundled Loginom linux-x64 runtime: 12378 verified
+resource files`); затем `bunx electron-builder --linux deb dir --x64 --publish never --config electron-builder.config.ts
+-c.directories.output=<scratchpad>/b46/build/out` (240 с). **Копии metainfo нет**: `copy-metainfo.ts` сам пишет файл под
+`appId`. Все шаги — код 0. Осмотр — `<scratchpad>/b46/inspect.sh`.
+
+```text
+== staged resources/icons
+ /dock.png /icon.icns /icon.ico /icon.png /linux /linux/{16,24,32,48,64,96,128,256,512}x….png
+== resources/ after the build
+com.loginom.aiagent.dev.metainfo.xml entitlements.plist icons loginom opencode-cli opencode-cli.version windows
+== deb loginom-ai-agent-linux-amd64.deb, 540021924 bytes
+Package: loginom-ai-agent-dev
+entries: 13624                                   # B4.5b: 13 606; +6 размеров hicolor с каталогами
+-rw-r--r-- ./usr/share/metainfo/com.loginom.aiagent.dev.metainfo.xml
+-rw-r--r-- ./usr/share/applications/com.loginom.aiagent.dev.desktop
+-rw-r--r-- ./usr/share/icons/hicolor/{16x16,24x24,32x32,48x48,64x64,96x96,128x128,256x256,512x512}/apps/loginom-ai-agent-dev.png
+== metainfo in the deb
+  <id>com.loginom.aiagent.dev</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT AND AGPL-3.0-only</project_license>
+  <name>Loginom AI Agent Dev</name>
+  <summary>AI assistant for Loginom workflows</summary>
+  <description><p>Create, execute and verify Loginom workflows with an AI assistant.</p></description>
+  <launchable type="desktop-id">com.loginom.aiagent.dev.desktop</launchable>
+== desktop entry
+Name=Loginom AI Agent Dev
+Icon=loginom-ai-agent-dev
+StartupWMClass=com.loginom.aiagent.dev
+Categories=Development;
+== hicolor sizes vs icons/dev/linux                # cmp: все девять равны файлам 0.4
+128x128 = icons/dev/linux/128x128.png  …  96x96 = icons/dev/linux/96x96.png
+== linux-unpacked: resources/icons next to app.asar
+ls: cannot access '…/linux-unpacked/resources/icons': No such file or directory
+== app.asar resources/
+resources/com.loginom.aiagent.dev.metainfo.xml resources/entitlements.plist resources/icons/{dock.png,icon.icns,icon.ico,icon.png,linux}
+resources/windows/installer.nsh
+== text grep: opencode|ai.opencode|anomaly in /usr/share of the deb, resources/icons, resources/*.metainfo.xml
+none
+```
+
+Значки OpenCode искал не по именам (0.4 оставил прежние имена файлов), а по хешам: блобы всех 2 241 изображения дерева
+upstream `a6b15d33da` против 62 изображений `linux-unpacked`, распакованного `app.asar` и распакованного deb.
+
+```text
+hits: 17, все в app.asar/out/renderer (publicDir renderer — app/public):
+  apple-touch-icon{,-v3}.png favicon{,-96x96,-96x96-v3}.png favicon{,-v3}.ico favicon{,-v3}.svg
+  social-share{,-zen}.png web-app-manifest-{192x192,512x512}.png             # бренд OpenCode, 12
+  assets/{android-studio,antigravity,vscode}-*.svg assets/sprite-*.svg       # значки внешних приложений и провайдеров UI
+  assets/custom-managed-provider-*.svg
+в resources/icons, /usr/share/icons, ICNS, ICO и dock.png — ни одного
+```
+
+В `resources/icons`, metainfo и ярлыке значков и имён OpenCode нет. Двенадцать файлов бренда OpenCode в `out/renderer` —
+те же блобы, что в `app/public` `v0.4.0`, — см. «Найдено». `resources/icons` рядом с `app.asar` нет: значок окна в
+установленной сборке не найдётся (там же).
+
+Сборка, распаковки, `out/`, `resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`,
+`packages/dashboard/dist` удалены; `git status --ignored` — только `.husky/_` и `node_modules`. Списки deb и совпадений
+сохранены в `<scratchpad>/b46/{deb-list,opencode-hits,staged-icons}.txt`.
+
+### Приёмка
+
+`packages/desktop` и `packages/app`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0; база снята в этом дереве на `150d7533fb`
+до правок (`<scratchpad>/b46/run-base.sh`), итог — на `66ffb0461b`.
+
+| Команда | `150d7533fb` | `66ffb0461b` |
+|---|---|---|
+| `desktop`: `bun typecheck` | 3 519 файлов, ошибок нет | 3 519 файлов, ошибок нет |
+| `desktop`: `bun test --timeout 30000` | 567 pass, 4 skip, 0 fail (571 тест, 72 файла) | 576 pass, 4 skip, 0 fail (580, 74): +6 `icons.test.ts`, +1 `copy-icons.test.ts`, +3 и −1 в тесте конфига |
+| `app`: `bun typecheck` | 2 391 файл, ошибок нет | 2 391 файл, ошибок нет |
+| `app`: `bun run test` | unit 2 719 pass, 0 fail (275 файлов); browser 360 pass, 0 fail (58) | то же |
+| `app`: `bun test ./vite.icons.test.ts` (вне `bun run test`) | 7 pass | 7 pass |
+
+`scripts/` и конфиг вне `include` пакета, `bun typecheck` их не видит. Временный `tsconfig` с пятью файлами задачи,
+конфигом и его тестом (`tsc --noEmit`, удалён): те же две ошибки, что записал B4.5b на базе (`publish` в `load` теста,
+TS2322; `script/native-arch.ts` вне `rootDir`, TS6059), в новых файлах ошибок нет. `prettier --check` по восьми
+изменённым TS-файлам — чисто; `oxlint` — два предупреждения `prefer-effect-match` в шаблоне предпросмотра генератора
+(«Где решал сам»).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary         # код 0
+against a6b15d33daf6: 543 divergent upstream files                    # база 483: +57 значков upstream, copy-icons.ts,
+  CAT-01: 10                                                          #   copy-metainfo.ts, web.ts
+  CAT-02: 56
+  CAT-03: 85
+  CAT-10: 88
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+```
+
+```text
+$ bun run check                                                       # код 0, на 66ffb0461b с этим разделом
+Found 560 warnings and 0 errors.                                      # в файлах B4.6 — два prefer-effect-match генератора,
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects     # остальные 558 — вне файлов задачи
+ Tasks:    39 successful, 39 total
+```
+
+### Каталог
+
+`catalog.json` не менялся: `bun.lock` и `package.json` — CAT-01, `packages/*/script/**`, `packages/*/scripts/**` и
+`electron*.ts` — CAT-02, `packages/desktop/icons/**` и `packages/app/public/**` — CAT-03, `packages/app/**` — CAT-10. В
+`catalog.md`: CAT-01 — `sharp` 0.33.5 и вложенные 0.34.5 в `bun.lock`; CAT-02 — `copy-icons.ts`, `copy-metainfo.ts`,
+генератор, `linux.icon` и ICNS prod macOS, проверка значков; CAT-03 — набор 0.4 в компонентах, проверка генератором,
+политика `fork-owned` для `icons/**`; CAT-10 — значок веб-уведомлений.
+
+### Где решал сам
+
+- **metainfo — скрипт, а не файлы.** В `v0.4.0` нет `resources/*.metainfo.xml` (выше); тексты 0.4 живут в
+  `copy-metainfo.ts`, его и перенёс.
+- **Набор `icons/**` — зеркало `v0.4.0`, включая `preview/`, `masters/` и прежние Android, iOS и Store.** Android и iOS —
+  рисунок upstream (те же блобы, что в `150d7533fb`), как и в 0.4; в пакет Desktop они не попадают (`copy-icons.ts`),
+  но см. «Найдено» о веб-версии.
+- **Генератор без отсутствующих в v2 каталогов.** Альтернатива — завести `ui/src/assets/loginom`, `app/public-static` и
+  14 файлов в `app/public` — добавила бы неиспользуемые файлы и задачу веб-бренда; взял меньшее.
+- **Конфиг упаковки — две правки 0.4** (п. «Файлы сверх пяти»). `afterPack` для macOS по-прежнему копирует
+  `resources/icons/icon.icns` в `Resources/icon.icns`; с ICNS в `mac.icon` electron-builder кладёт туда тот же файл сам, так
+  что копия теперь лишняя, но безвредна, а её комментарий о пакете Icon Composer устарел. Код upstream не трогал.
+- **`sharp` 0.33.5, а не 0.34.5** — только он воспроизводит значки 0.4.
+- **`category` (`Development` и `developer-tools` в v2, `Office` и `productivity` в 0.4) не менял.** B4.5b отдал её B4.6
+  вместе со значками Linux, но в пунктах задания её нет.
+- **Предупреждения `require-readable-spacing`** в файлах 0.4 сняты `oxlint --fix` (только пустые строки; `--check`
+  генератора после этого — 97 файлов без расхождений). Остались два `prefer-effect-match` в шаблоне HTML предпросмотра
+  `generate-icons.ts` (тернарник 0.4 в строке шаблона) — не трогал.
+
+### Найдено, не чинил
+
+- **Значки OpenCode в `out/renderer`.** `publicDir` renderer Desktop — `app/public`, поэтому `favicon*`,
+  `apple-touch-icon*`, `web-app-manifest-*` и `social-share*` upstream лежат в `app.asar` (список — в «Сборке» выше). В 0.4 так же:
+  эти файлы `app/public` в `v0.4.0` те же блобы. Но `renderer/index.html` v2 ссылается на них (`favicon-96x96-v3.png`,
+  `favicon-v3.svg`, `favicon-v3.ico`, `apple-touch-icon-v3.png`, `social-share.png`), а 0.4 ссылался на
+  `loginom-favicon-32-v1.png` и `loginom-favicon-v1.svg` (`645da9ebfd`). В окне Electron значок страницы не виден. Файл
+  — B4.3; исправление требует веб-набора в `app/public` — владельцу или этапу C.
+- **Desktop шлёт уведомления со значком с opencode.ai**: `desktop/src/renderer/platform/notifications.ts:18` — строка
+  B4.12 таблицы B4.1.
+- **Аватар проекта OpenCode** — `ui/src/data-display/project-avatar/project-avatar.tsx:83` возвращает
+  `https://opencode.ai/favicon.svg` для трёх id репозитория OpenCode; в 0.4 — `/loginom-icon.svg`
+  (`pages/layout/helpers.ts:90`). Сеть к opencode.ai при открытии этого репозитория. Не в пунктах задания.
+- **Веб-версия `app` берёт значки из `desktop/icons/<канал>`** (`app/vite.icons.ts`): после B4.6 `favicon.ico` и
+  `web-app-manifest-512x512.png` — значки продукта, а `apple-touch-icon.png` (`ios/AppIcon-60x60@3x.png`) и
+  `web-app-manifest-192x192.png` (`android/mipmap-xxxhdpi/ic_launcher.png`) — рисунок upstream из набора 0.4.
+  `vite.icons.test.ts` (вне `bun run test`, запускал отдельно) — 7 pass и до, и после.
+- **Значок окна в установленной сборке.** `windows/appearance.ts:152` и `windows/early.ts:86` берут
+  `process.resourcesPath/icons/icon.png`, `setDockIcon` — `dock.png` оттуда же; 0.4 клал туда `resources/icons`
+  (`extraResources`), v2 — нет (сборка выше). 0.4 к тому же ставил `dock.png` только в разработке.
+- **Знаки OpenCode встроенным SVG.** `ui/src/components/logo.tsx` рисует `Mark`, `Splash` и `Logo` путями SVG в коде:
+  заставка запуска Desktop (`desktop/src/renderer/startup/splash.tsx:60`) показывает `Splash`,
+  `app/src/runtime/plugin/side-region.tsx:444` — `Mark`, страница ошибки — `Logo` (B4.11d). 0.4 заменил `Mark` и `Splash` картинкой `loginom-icon.svg` (`645da9ebfd`);
+  в v2 нет ни этой правки, ни `ui/src/assets/loginom`. Поиск по хешам файлов такие знаки не видит. Не в пунктах задания.
+- **`icons/README.md` — текст 0.4 как есть** и описывает раскладку 0.4: `ui/src/assets/loginom`, обе публичные папки
+  `app`, `scripts/copy-icons.ts`. Не правил: пустой `git diff v0.4.0 -- packages/desktop/icons` — доказательство копии.
+
+### Не проверено
+
+- deb не устанавливался: вид значка в меню и панели, кэш hicolor, AppStream (`appstreamcli validate`) — B4.14b. AppImage,
+  rpm, каналы `beta` и `prod` не собирались; prod отличается только именами и, на macOS, снятым `icon.icon`.
+- macOS и Windows не собирались: ICNS, ICO, значок установщика NSIS и DMG — по конфигу, тесту значков упаковки и
+  тестам кадров 0.4. Вид значков на этих ОС, как и в 0.4, требует проверки на самих системах.
+- Поиск значков OpenCode — по файлам: SVG в коде компонентов и ресурсы, встроенные Vite как `data:`, он не видит
+  (знаки `logo.tsx` — в «Найдено»).
+- Значок веб-уведомлений в браузере не смотрел: строка `web.ts`, файл в `app/public` и тест его байтов.

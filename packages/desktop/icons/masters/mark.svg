@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="mark-red" x1="298" y1="276" x2="800" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4514D"/><stop offset="1" stop-color="#E53A38"/>
+    </linearGradient>
+    <linearGradient id="mark-fold" x1="338" y1="883" x2="811" y2="811" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#AB242A"/><stop offset="1" stop-color="#E33C3A"/>
+    </linearGradient>
+    <linearGradient id="mark-ink" x1="607" y1="465" x2="977" y2="745" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35383E"/><stop offset="1" stop-color="#414349"/>
+    </linearGradient>
+  </defs>
+  <g id="mark" transform="translate(-16 7) scale(.84)">
+    <path fill="url(#mark-red)" d="M450 347C450 301 424 268 379 268C316 268 262 331 262 399V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C468 805 450 783 450 738Z"/>
+    <path fill="url(#mark-fold)" d="M262 641V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C374 805 282 753 262 641Z"/>
+    <path fill="url(#mark-ink)" d="M577 752C556 746 543 727 554 702L657 481C666 460 687 445 712 445C740 445 763 461 773 485L873 701C884 725 874 748 852 754C829 762 811 750 801 727L735 562C727 541 702 541 694 562L624 727C615 750 596 762 577 752Z"/>
+    <path fill="none" stroke="url(#mark-ink)" stroke-width="80" stroke-linecap="round" d="M957 482V719"/>
+    <circle cx="714" cy="643" r="32" fill="#EB3F3D"/>
+  </g>
+</svg>

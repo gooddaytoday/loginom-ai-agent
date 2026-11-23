@@ -1,16 +1,22 @@
-import { $ } from "bun"
+import { cp, rm } from "node:fs/promises"
+import { resolve } from "node:path"
 import { resolveChannel } from "./utils"
 
-const arg = process.argv[2]
+export async function copyIcons(channel = resolveChannel(), packageDirectory = resolve(import.meta.dir, "..")) {
+  const source = resolve(packageDirectory, "icons", channel)
+  const destination = resolve(packageDirectory, "resources/icons")
 
-const channel = arg === "dev" || arg === "beta" || arg === "prod" ? arg : resolveChannel()
+  await rm(destination, { recursive: true, force: true })
+  // Do not stage historical Android/iOS/Store images or mixed-platform PNGs.
+  await Promise.all(
+    ["linux", "icon.png", "icon.ico", "icon.icns", "dock.png"].map((name) =>
+      cp(resolve(source, name), resolve(destination, name), { recursive: true }),
+    ),
+  )
+  console.log(`Copied ${channel} icons from ${source} to ${destination}`)
+}
 
-const src = `./icons/${channel}`
-
-const dest = "resources/icons"
-
-await $`rm -rf ${dest}`
-
-await $`cp -R ${src} ${dest}`
-
-console.log(`Copied ${channel} icons from ${src} to ${dest}`)
+if (import.meta.main) {
+  const value = process.argv[2]
+  await copyIcons(value === "dev" || value === "beta" || value === "prod" ? value : resolveChannel())
+}
