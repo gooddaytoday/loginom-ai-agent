@@ -79,6 +79,8 @@ def audit(journal, config):
     for key, count in [('max_tool_calls', len(calls)), ('max_errors', len(errors)), ('max_nodes', len(created))]:
         if count > budget[key]:
             violations.append(f'{key}: {count}>{budget[key]}')
+    if forbidden:
+        violations.append('forbid: ' + ', '.join(sorted({match for item in forbidden for match in item['matches']})))
     return dict(loginom_calls=loginom, all_calls=len(calls), errors=errors,
                 repeated_calls=repeats, recovery=recovery, non_loginom=foreign,
                 forbidden=forbidden, created_nodes=sorted(created), deleted_nodes=sorted(deleted),
