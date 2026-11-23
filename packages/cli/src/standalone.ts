@@ -42,18 +42,25 @@ export async function early(args: string[]) {
 
 /**
  * The arguments for the CLI and the project directory of a `run`, from the flags of the product CLI that OpenCode 2 lacks
- * (B2.7a4). The headless flags are accepted and dropped: OpenCode 2's server starts the Host (`loginom-agent`), so the
- * browser mode is not passed on yet. `run --dir` sets the directory OpenCode 2 takes from `PWD`, and `run --variant`
- * joins `--model` as `provider/model#variant`, the way `evals` and `run-check.py` pass them to 0.4. Fails with
- * `CLI_ARGUMENT_INVALID` (exit code 2).
+ * (B2.7a4). `run --dir` sets the directory OpenCode 2 takes from `PWD`, and `run --variant` joins `--model` as
+ * `provider/model#variant`, the way `evals` and `run-check.py` pass them to 0.4. The headless flags are dropped; a `run`
+ * records its browser mode and `run --command <skill>` in `env` (B2.7a4b): OpenCode 2's server starts the Host
+ * (`loginom-agent/src/host.ts`), and the private server of the run inherits the mode, while the run attaches the skill to
+ * its prompt (`run/product.ts`). Another command, such as that server's own `serve`, leaves both as it found them. Fails
+ * with `CLI_ARGUMENT_INVALID` (exit code 2).
  */
-export function forward(args: string[], cwd: string) {
+export function forward(args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env) {
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
   const options = args.slice(0, boundary)
   if (headless.every((flag) => options.includes(flag)))
     throw new Error("CLI_ARGUMENT_INVALID: --headless and --no-headless exclude each other")
   const rest = options.filter((value) => !headless.includes(value))
   if (rest[0] !== "run") return { args: [...rest, ...args.slice(boundary)] }
+  if (options.includes("--headless")) env.LOGINOM_AI_AGENT_HEADLESS = "1"
+  else delete env.LOGINOM_AI_AGENT_HEADLESS
+  const command = take(rest, "--command")
+  if (command === undefined) delete env.LOGINOM_AI_AGENT_RUN_COMMAND
+  else env.LOGINOM_AI_AGENT_RUN_COMMAND = command
   const dir = take(rest, "--dir")
   // `default` is the model's own setting, as OpenCode 2 reads a `#default` variant.
   const variant = take(rest, "--variant")

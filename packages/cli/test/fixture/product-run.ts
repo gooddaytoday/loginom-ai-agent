@@ -25,6 +25,8 @@ export const receipt = { operation_id: "fixture-operation", status: "SUCCEEDED" 
  */
 export function scriptedModel(steps: Step[]) {
   const requests: { tools?: unknown; messages?: unknown }[] = []
+  // Every request, the session title's too.
+  const hits = { count: 0 }
   const requested = Promise.withResolvers<void>()
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -34,6 +36,7 @@ export function scriptedModel(steps: Step[]) {
       if (!new URL(request.url).pathname.endsWith("/chat/completions"))
         return new Response("not found", { status: 404 })
       const body = (await request.json()) as { tools?: unknown[]; messages?: unknown }
+      hits.count++
       const title = !body.tools?.length
       if (!title) requests.push(body)
       if (!title) requested.resolve()
@@ -67,7 +70,7 @@ export function scriptedModel(steps: Step[]) {
       )
     },
   })
-  return { server, requests, requested: requested.promise, url: `http://127.0.0.1:${server.port}/v1` }
+  return { server, requests, hits, requested: requested.promise, url: `http://127.0.0.1:${server.port}/v1` }
 }
 
 /** A root with a CLI profile whose config names the model `test/test-model` at `url`, and a project directory. */
@@ -75,7 +78,13 @@ export async function productRoot(url: string, config: Record<string, unknown> =
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "loginom-cli-run-")))
   const project = path.join(root, "project")
   await fs.mkdir(project)
-  const profile = CliProfile.apply({ LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile") })
+  const profile = await productProfile(path.join(root, "profile"), url, config)
+  return { root, project, profile }
+}
+
+/** Opens the CLI profile at `root` and names the model `test/test-model` at `url` in its config. */
+export async function productProfile(root: string, url: string, config: Record<string, unknown> = {}) {
+  const profile = CliProfile.apply({ LOGINOM_AI_AGENT_CLI_PROFILE: root })
   await Bun.write(
     path.join(profile.config, "loginom-ai-agent.json"),
     JSON.stringify({
@@ -94,7 +103,7 @@ export async function productRoot(url: string, config: Record<string, unknown> =
       ...config,
     }),
   )
-  return { root, project, profile }
+  return profile
 }
 
 /** Starts the product CLI entry; the caller reads its output and exit. */

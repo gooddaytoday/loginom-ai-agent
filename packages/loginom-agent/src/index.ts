@@ -55,6 +55,24 @@ const runner = {
   events: {},
 } as const
 
+// The checks 0.4's product CLI made before the model (B2.7a4b): its `run` asks them of this server's Host before it
+// prompts (`ServiceHost.preflight`). The answer is a product code, or none when the run may go on.
+const preflight = {
+  id: "loginom.preflight",
+  methods: {
+    check: {
+      input: {
+        type: "object",
+        properties: { automation: { type: "boolean" } },
+        required: ["automation"],
+        additionalProperties: false,
+      },
+      output: { type: "object", properties: { code: { type: "string" } }, additionalProperties: false },
+    },
+  },
+  events: {},
+} as const
+
 // Prompt metadata key that carries the wizard's one-time token to the `prompt` hook; the hook removes it.
 const token = "loginom.runner"
 // Permission request metadata key of the product's own check of the rules (B2.6b).
@@ -392,6 +410,12 @@ export default Plugin.define({
           .prompt({ sessionID: input.sessionID, text: input.text, metadata: { [token]: key } })
           .finally(() => pending.delete(key))
         return { granted: true }
+      },
+    })
+    await ctx.rpc.register(preflight, {
+      check: async (value) => {
+        const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
+        return code ? { code } : {}
       },
     })
     await ctx.rpc.register(permission, {
