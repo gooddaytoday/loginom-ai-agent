@@ -14495,7 +14495,7 @@ Found 554 warnings and 0 errors.                                      # в фа�
 вызывалась. База для сравнения — отдельное дерево `<scratchpad>/b411d-base` на `612aba774c`, удалено после приёмки.
 
 Прочитано: журнал B4.11, B4.11b, B4.11c, B4.5a, B4.6, B4.6b (списки «осталось»); BRAND-01; В-97 п. 8;
-`packages/{app,ui,desktop}/AGENTS.md`; эталон `v0.4.0`: `ui/src/components/logo.{tsx,css}`, `app/src/pages/error.tsx`,
+`AGENTS.md` пакетов `app`, `ui`, `desktop`; эталон `v0.4.0`: `ui/src/components/logo.{tsx,css}`, `app/src/pages/error.tsx`,
 `app/src/pages/layout/helpers.ts`, `desktop/src/renderer/index.html`, `desktop/package.json`, `app/src/i18n/{en,ru}.ts`.
 
 ### Коммиты
@@ -14507,7 +14507,9 @@ Found 554 warnings and 0 errors.                                      # в фа�
 | `0378f251d7` `test(app): typed platforms and readable spacing in the brand test (B4.11d)` | 11 предупреждений `bun run check` в тесте: `as unknown as Platform` и пустые строки |
 | `e72b1645d3` `docs(upstream-sync): B4.11d check result` | итог `bun run check` в разделе |
 | `20a5b5fd65` `fix(gui-plugins): WSL setup names the product (B4.11d)` | строки WSL о приложении; тест снова под именем B4.6b `logo-splash.test.ts` (в `a4d5eea4e9` назывался `product-brand.test.ts`, git видел удаление и новый файл) |
-| следующий | этот раздел целиком; CAT-03, CAT-09, CAT-10, CAT-12 в `catalog.md` |
+| `38d9e207a1` `docs(upstream-sync): B4.11d section after review: test name, WSL, reasons` | этот раздел целиком; `catalog.md` |
+| `b1bfcafb2c` `test(app): the brand test checks the page links, not removed files (B4.11d)` | без проверки «файла нет» в `app/public` (`packages/desktop/AGENTS.md`: «No source-grep or tombstone tests») |
+| следующий | этот раздел: аватар, тест, «Найдено»; CAT-09, CAT-10 |
 
 Файлов кода шесть — предел задания (`git diff -M --stat 612aba774c HEAD -- packages`):
 `desktop/src/renderer/startup/splash.tsx`, `ui/src/components/logo.tsx`, `app/src/shell/errors/error.tsx`,
@@ -14527,9 +14529,10 @@ Found 554 warnings and 0 errors.                                      # в фа�
 Взял пп. 1–5 и 7: пп. 1–4 требуют тестов. П. 6 — вторая нарезка, два файла. Аватар грузится с opencode.ai для трёх id
 проекта: два — remote `github.com/anomalyco/opencode` и `github.com/sst/opencode`, третий `4b0ea68d…` — корневой коммит,
 общий у OpenCode и этого репозитория; это id проекта продукта в 0.4 (`pages/layout/helpers.ts:90` давал ему
-`/loginom-icon.svg`). Проект с таким id V1 (каталог, открытый ещё в 0.4) — например, сам репозиторий продукта — пока
-показывает знак OpenCode и ходит на opencode.ai. Адрес `/loginom-icon.svg` в v2 сейчас отдал бы 404: в `app/public` есть
-`loginom-icon.png` и `favicon.svg` (теперь знак продукта).
+`/loginom-icon.svg`). По коду v2 (`core/src/project.ts:364-367`) id — от адреса `origin`, затем кэш `.git/opencode`,
+затем корневой коммит; `4b0ea68d…` достаётся клону OpenCode или этого репозитория без `origin`. Репозиторий продукта с
+`origin` на свой адрес под правило не попадает. Не проверял на живом проекте. Адрес `/loginom-icon.svg` в v2 сейчас
+отдал бы 404: в `app/public` есть `loginom-icon.png` и `favicon.svg` (теперь знак продукта).
 
 ### Пункты
 
@@ -14615,11 +14618,12 @@ dist: _headers favicon.svg icons/ index.html loginom-icon.png oc-theme-preload.j
   нажатие «on Discord» открывает `Product.support`.
 - `settings.about.license` в `en` и `ru` содержит `MIT AND AGPL-3.0-only`.
 - `en` сопряжения, две строки WSL о приложении в `en`/`ru` и пять ключей 0.4 в `en`/`ru` — без `opencode`.
-- Страница Desktop ссылается хотя бы на один файл, каждый существует в `app/public` и не ведёт в `ui/src/assets/favicon`;
-  в `app/public` нет ссылок туда же.
+- Страница Desktop ссылается хотя бы на один файл, каждый существует в `app/public` и не ведёт в `ui/src/assets/favicon`.
+  Проверки «файла нет в `app/public`» в тесте нет: `packages/desktop/AGENTS.md` запрещает такие тесты, отсутствие
+  значков OpenCode держит `grep` приёмки.
 
 Мутации (`<scratchpad>/b411d/mut/mutate.py`: одна правка или файл с базы, прогон теста, возврат байтов; `git status`
-после — как до). Прогон на `20a5b5fd65`:
+после — как до). Прогон на `b1bfcafb2c`:
 
 ```text
 === M0 none: 7 pass / 0 fail
@@ -14630,9 +14634,7 @@ dist: _headers favicon.svg icons/ index.html loginom-icon.png oc-theme-preload.j
 === M5 error page reports to opencode.ai: 6 pass / 1 fail; the error page …
 === M6 en license MIT: 6 pass / 1 fail; About states the license of Desktop 0.4 in en and ru
 === M7 ru license MIT: 6 pass / 1 fail; About states the license …
-=== M8 Desktop page links the OpenCode favicons (v2 index.html): 6 pass / 1 fail; the Desktop page and the public folder carry no OpenCode favicons
-=== M9 OpenCode favicon back in app/public: 6 pass / 1 fail; the Desktop page and the public folder …
-=== M10 favicon.svg is the OpenCode favicon again: 6 pass / 1 fail; the Desktop page and the public folder …
+=== M8 Desktop page links the OpenCode favicons (v2 index.html): 6 pass / 1 fail; the Desktop page links only product icons that ship
 === M11 pairing en says OpenCode server: 6 pass / 1 fail; pairing, the WSL setup and the settings rows that 0.4 named the product do not say OpenCode
 === M13 WSL ru restart hint says OpenCode: 6 pass / 1 fail; pairing, the WSL setup …
 === M12 ru theme row says OpenCode: 6 pass / 1 fail; pairing, the WSL setup …
@@ -14653,8 +14655,8 @@ $ PLAYWRIGHT_BROWSERS_PATH=<scratch>/pw-browsers PLAYWRIGHT_PORT=3417 bunx playw
 
 ### Приёмка
 
-База `612aba774c` (`<scratchpad>/b411d-base`), итог — `a4d5eea4e9` для всех пакетов и `20a5b5fd65` для `app`
-`test:browser` и `gui-plugins`; `<scratchpad>/b411d/suites.sh`.
+База `612aba774c` (`<scratchpad>/b411d-base`), итог — `a4d5eea4e9` для всех пакетов, `b1bfcafb2c` для `app`
+`test:browser` и `20a5b5fd65` для `gui-plugins`; `<scratchpad>/b411d/suites.sh`.
 
 | Команда | `612aba774c` | итог |
 |---|---|---|
@@ -14758,6 +14760,9 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   `https://opencode.ai/web-app-manifest-512x512.png`; пакет `core`, вне области задачи.
 - **Тема «OpenCode»** в «Оформлении», подсказки браузера OpenCode и Hex Anomaly, голосовые инструкции — таблица выше.
 - **Подпись «on Discord»** со значком Discord ведёт на GitHub issues продукта — как в 0.4.
+- **Лицензия на других 57 языках** — «MIT» без AGPL (`settings.about.license`); это сведения о лицензии, `grep` по
+  `opencode` их не видит. Рядом со строкой — значок `settings/about/legal.svg` с буквами MIT (B4.11c оставил его как
+  значок лицензии); AGPL на нём нет.
 - **`desktop/package.json` `license` — `MIT`**, у 0.4 — `MIT AND AGPL-3.0-only`. Не менял: строка About теперь как 0.4,
   поле пакета — не в задании (`copy-metainfo.ts` уже пишет `MIT AND AGPL-3.0-only`).
 - **Веб-страница `app/index.html`**: `<title>OpenCode</title>`, `og:image` `/social-share.png` (картинка OpenCode). Её
