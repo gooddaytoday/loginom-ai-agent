@@ -25,7 +25,9 @@ RULES = (
     (('packages/loginom-runtime/src/**',), ('host-unit',), ()),
     (('packages/loginom-runtime/client/**',), ('client-full',), ()),
     (('scripts/node-acceptance/**',), ('acceptance-tests',), ()),
-    (('packages/opencode/**', 'packages/protocol/**', 'packages/schema/**',
+    # The v2 packages that took the code of the 0.4 `opencode` package (B2.7a10b).
+    (('packages/core/**', 'packages/server/**', 'packages/cli/**', 'packages/loginom-agent/**',
+      'packages/tui/src/mini/**', 'packages/protocol/**', 'packages/schema/**',
       'packages/loginom-host/src/host-port.ts', 'packages/loginom-runtime/executor/schemas/**',
       'packages/client/src/generated*/**', C + 'node-contracts.*', C + 'effect-contracts.mjs',
       C + 'node-read-contract.mjs', C + 'node-result-schema.mjs'), ('main-chat-approval',), ()),

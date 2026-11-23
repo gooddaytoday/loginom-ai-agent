@@ -40,12 +40,21 @@ for(const [path,id,command] of [
  if(id==='client-full')assert.match(text,/LOGINOM_DOCK_TEST_BROWSER=.*chromium-1246\/chrome-linux64\/chrome/);
 });
 
+// The agent of the 0.4 `opencode` package lives in these v2 packages (B2.7a10b); one path per glob.
 for(const path of ['packages/protocol/src/index.ts',
+ 'packages/core/src/ripgrep/binary.ts','packages/server/src/handlers/fs.ts','packages/cli/src/server-process.ts',
+ 'packages/loginom-agent/src/index.ts','packages/tui/src/mini/runtime.ts',
  'packages/loginom-host/src/host-port.ts','packages/loginom-runtime/executor/schemas/action-catalog.schema.json',
  'packages/loginom-runtime/client/lib/node-contracts.mjs']) test(`public/agent stop: ${path}`,t=>{
  const r=repo(t);r.commit(path);const row=rows(r.list()).find(x=>x.includes('main-chat-approval'));
  assert.ok(row);assert.match(row,/стоп: нужно разрешение основного чата/);
  assert.equal(row.split('|')[2].trim(),'—');
+});
+
+// Interfaces whose code was not in the 0.4 `opencode` package stay outside the stop.
+for(const path of ['packages/tui/src/app.tsx','packages/app/src/app.tsx','packages/ui/src/actions/button/button.tsx',
+ 'packages/desktop/src/main/index.ts','packages/client/src/effect/client.ts']) test(`no agent stop: ${path}`,t=>{
+ const r=repo(t);r.commit(path);assert.ok(!ids(r.list()).includes('main-chat-approval'));
 });
 
 for(const [path,scenario] of [
