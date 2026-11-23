@@ -1,0 +1,79 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {assnRulesOutputColumns,alignAssnRulesOutput,readAssnRulesOutputs} from '../lib/assn-rules-output.mjs';
+const configuration=item=>({fields:[{name:'Transaction',usage_type:6},{name:item,label:'Товар',usage_type:7}],roles:{transaction:6,item:7}});
+test('configured lengths bind the complete native item column inventory',()=>{
+ const c={...configuration('Item'),max_items:3,max_consequents:2};
+ assert.deepEqual(assnRulesOutputColumns(c,0).map(f=>f.name),['ItemsetID','Width','Support','Item_0','Item_1','Item_2']);
+ assert.deepEqual(assnRulesOutputColumns(c,1).map(f=>f.name),['RuleID','Support','Confidence','Lift','Item_0_A','Item_0_C','Item_1_A','Item_1_C']);
+ const schema=assnRulesOutputColumns(c,1);
+ assert.throws(()=>alignAssnRulesOutput(schema.filter(f=>f.name!=='Item_1_C'),schema),/field.*types/);
+});
+test('missing item role refuses an invented output schema',()=>{
+ const input=configuration('Category');input.fields[1].usage_type=0;
+ assert.throws(()=>assnRulesOutputColumns(input,0),/configured item field missing/);
+});
+test('FP-Growth rejects missing, duplicate, unknown or mistyped native fields on both ports',()=>{
+ for(const port of [0,1]){
+  const expected=assnRulesOutputColumns(configuration('Item'),port);
+  assert.equal(alignAssnRulesOutput(expected,expected),expected);
+  for(const columns of [expected.slice(1),[expected[0],...expected.slice(0,-1)],
+   expected.map((f,i)=>i===0?{...f,name:'Unknown'}:f),expected.map((f,i)=>i===0?{...f,type:'real'}:f)])
+   assert.throws(()=>alignAssnRulesOutput(columns,expected),/field.*types/);
+ }
+ assert.deepEqual(assnRulesOutputColumns(configuration('Item'),0).map(f=>f.name),['ItemsetID','Width','Support','Item_0','Item_1']);
+ assert.deepEqual(assnRulesOutputColumns(configuration('Item'),1).map(f=>f.name),['RuleID','Support','Confidence','Lift','Item_0_A','Item_0_C']);
+});
+for(const itemOrder of [['Item_0_A','Item_1_A','Item_0_C','Item_1_C'],['Item_0_A','Item_0_C','Item_1_A','Item_1_C']]){
+ test('reader preserves native schema and row order: '+itemOrder.join(','),async()=>{
+  const configuration3={...configuration('Item'),max_items:3,max_consequents:2};
+  const expected=assnRulesOutputColumns(configuration3,1);
+  const names=['RuleID','Support','Confidence','Lift',...itemOrder];
+  const values={RuleID:12,Support:.75,Confidence:.75,Lift:1,Item_0_A:'A',Item_1_A:null,Item_0_C:'B',Item_1_C:'C'};
+  const native={port:1,port_guid:'native-rules',schema:names.map((name,index)=>({...expected.find(f=>f.name===name),index})),sample:[names.map(name=>values[name])],sample_complete:true};
+  const channel={async readOutputPort(){return {output:native};}};
+  const ctx={portExecution:{execution_id:'fresh'},execution:{execution_id:'fresh'},receipt_id:'read'};
+  const result=await readAssnRulesOutputs(channel,{ports:[1],sample_rows:100,require_exact_numbers:true},ctx,{ports:[{port:1,schema:expected}]});
+  assert.equal(result.ports[0],native);
+  assert.deepEqual(result.ports[0].schema.map(f=>f.name),names);
+  assert.deepEqual(Object.fromEntries(result.ports[0].schema.map((f,i)=>[f.name,result.ports[0].sample[0][i]])),values);
+ });
+}
+for(const item of ['Item','Category','Товар категории']){
+ test('native output names and types follow the observed item role: '+item,()=>{
+  assert.deepEqual(assnRulesOutputColumns(configuration(item),0),[
+   {name:'ItemsetID',type:'integer'},{name:'Width',type:'integer'},{name:'Support',type:'real'},
+   {name:item+'_0',type:'string'},{name:item+'_1',type:'string'},
+  ]);
+  assert.deepEqual(assnRulesOutputColumns(configuration(item),1),[
+   {name:'RuleID',type:'integer'},{name:'Support',type:'real'},{name:'Confidence',type:'real'},{name:'Lift',type:'real'},
+   {name:item+'_0_A',type:'string'},{name:item+'_0_C',type:'string'},
+  ]);
+ });
+test('both outputs retain native precision, NULL padding and completed execution binding: '+item,async()=>{
+ const calls=[],ctx={portExecution:{execution_id:'apply'},execution:{execution_id:'apply'},receipt_id:'read'};
+ const channel={async readOutputPort(options){calls.push(options);return {output:{port:options.port,port_guid:'port'+options.port,schema:assnRulesOutputColumns(configuration(item),options.port),sample_complete:true,sample:options.port===0?[[1,1,0.75,'A',null]]:[[1,0.5,2/3,8/9,'A','B']]}};}};
+ const mapped={ports:[0,1].map(port=>({port,schema:assnRulesOutputColumns(configuration(item),port)}))};
+ const result=await readAssnRulesOutputs(channel,{ports:[0,1],sample_rows:100,require_exact_numbers:true},ctx,mapped);
+ assert.equal(result.ports[0].sample[0][4],null);assert.equal(result.ports[1].sample[0][2],2/3);
+ assert.ok(calls.every(c=>c.execution===ctx.portExecution&&c.requireExactNumbers===true));
+ await assert.rejects(readAssnRulesOutputs(channel,{ports:[3]},ctx,mapped),/unsupported output port/);
+});
+}
+
+test('recommendation reader binds the native transaction role and full typed schema',async()=>{
+ const config={fields:[{name:'Basket',usage_type:6},{name:'Product',usage_type:7}],roles:{transaction:6,item:7},max_items:2,max_consequents:1};
+ const schema=[{name:'Basket',type:'string'},{name:'RuleID',type:'integer'},...['Support','Confidence','Lift'].map(name=>({name,type:'real'})),
+  ...['Product_0_A','Product_0_C'].map(name=>({name,type:'string'}))];
+ assert.deepEqual(assnRulesOutputColumns(config,2),schema);
+ const sample=[['T4',1,.75,.75,1,'A','B']],native={port:2,port_guid:'recommendations',schema,sample,sample_complete:true};
+ const ctx={portExecution:{execution_id:'fresh'},execution:{execution_id:'fresh'},receipt_id:'receipt'};
+ const channel={async readOutputPort(options){assert.equal(options.port,2);assert.equal(options.execution,ctx.portExecution);assert.equal(options.requireExactNumbers,true);return {output:native};}};
+ const result=await readAssnRulesOutputs(channel,{ports:[2],sample_rows:100,require_exact_numbers:true},ctx,{ports:[{port:2,schema}]});
+ assert.equal(result.ports[0],native);
+ assert.deepEqual(result.ports[0].sample,sample);
+ for(const columns of [schema.slice(1),schema.map(f=>f.name==='Basket'?{...f,type:'integer'}:f)])
+  assert.throws(()=>alignAssnRulesOutput(columns,schema),/field.*types/);
+ assert.throws(()=>assnRulesOutputColumns({...config,fields:config.fields.slice(1)},2),/transaction field missing/);
+ assert.throws(()=>assnRulesOutputColumns(config,3),/unsupported output port/);
+});

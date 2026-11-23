@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {openPreparedOutputPort} from '../lib/node-port-open.mjs';
+import {makePreparedInputPortOpenCode,openPreparedOutputPort} from '../lib/node-port-open.mjs';
 
 for(const direction of ['input','output'])for(const fault of ['none','mf','foreign-store','foreign-node','no-owned-node','running','duplicate','foreign-close','disabled','covered-close','foreign-window','mask','changed-port','persistent','lost-reply','deadline','changed-before-close'])test(direction+' port recovers only its native completed graph console: '+fault,async()=>{
  const f=fixture(direction);await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
@@ -107,6 +107,24 @@ test('port opening binds menu and wizard native identities and replays without a
  const again=await f.run();assert.equal(again.status,'SUCCEEDED',again.error);assert.equal(again.replayed,true);assert.equal(f.gestures.length,2);
 });
 
+for(const fault of ['none','nonempty','foreign-type','foreign-column'])test('empty JS input admits only its disabled native delete header '+fault,async()=>{
+ const f=fixture('input'),base='MF;TF;WizrdMCF;TuneDataSourceMappingWizard;';
+ f.node.FIconCls=fault==='foreign-type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-javascript';
+ const root=f.wizard.FView.el.dom,column=f.el(base+'colTargetDelete');column.parent=root;
+ f.nativeControls.set(column.id,{el:{dom:fault==='foreign-column'?{}:column},disabled:true});
+ for(const key of ['grdSourceColumns;tbl','grdTargetColumns;tbl']){
+  const el=f.el(base+key);el.parent=root;
+  const items=fault==='nonempty'?[{}]:[];
+  f.nativeControls.set(el.id,{el:{dom:el},getStore:()=>({$className:'Ext.data.Store',
+   isLoading:()=>false,getCount:()=>items.length,getTotalCount:()=>items.length,getData:()=>({items})})});
+ }
+ const mask=f.el(null);mask.parentElement=column;mask.textContent='';
+ mask.getAttribute=name=>name==='role'?null:null;
+ mask.classList={contains:name=>name==='x-mask'};
+ f.flags.finishMasks=[mask];f.task.deadline=Date.now()+150;
+ const result=await f.run();assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
+});
+
 function groupingBusy(f){
  const root=f.graph.FDiagram.FmxGraph.container,panel=f.el('MF;TF;ModelForm');
  panel.tagName='DIV';panel.getAttribute=key=>key==='data-tid'?panel.tid:key==='class'?'x-panel bg-mask-message':null;
@@ -116,17 +134,131 @@ function groupingBusy(f){
  f.flags.graphMasks=[panel];return panel;
 }
 
-for(const stage of ['begin','menu_issued','open_issued'])test('Grouping waits for its bound graph mask at '+stage,async()=>{
+function calculatorBusy(){
+ const f=fixture('input'),panel=groupingBusy(f);
+ f.node.FIconCls='bg-vendor-icon-calcdata';
+ const ref=f.task.binding.workflow_ref,prepared=[...f.prep.receipts.values()][0];
+ ref.tab_tid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';prepared.tab.tid=ref.tab_tid;
+ const crumb=f.el(ref.prefix+';cnrNaviMode;b.s_Workflow');crumb.textContent='Workflow';
+ ref.navigation_path=[{tid:crumb.tid,label:crumb.textContent}];
+ f.page.evaluate(()=>{
+  const a=bg.app,p=[...__loginomDockPreparationV1.receipts.values()][0];
+  a.WorkFlowTreeNode=class WorkFlowTreeNode{};a.PackageTreeNode=class PackageTreeNode{};
+  Object.setPrototypeOf(p.nodeTargetWorkflowNode,a.WorkFlowTreeNode.prototype);
+  Object.setPrototypeOf(p.packageNode,a.PackageTreeNode.prototype);
+  p.nodeTargetWorkflowNode.ParentNode=p.packageNode;
+  globalThis.getComputedStyle=()=>({visibility:'visible'});
+ },null);
+ f.run=()=>{
+  const {binding,direction,...options}=f.task;
+  return vm.runInNewContext('('+makePreparedInputPortOpenCode(binding,options)+')',{Date})(f.page);
+ };
+ return {f,panel};
+}
+
+for(const stage of ['begin','menu_issued','open_issued'])test('calculator input adapter waits read-only for ModelForm at '+stage,async()=>{
+ const {f,panel}=calculatorBusy();let waits=0;
+ if(stage!=='begin')f.flags.graphMasks=[];
+ if(stage==='menu_issued'){
+  const evaluate=f.page.evaluate;let reads=0;
+  f.page.evaluate=(fn,arg)=>{const result=evaluate(fn,arg);if(!arg.mode&&arg.document_id==='doc'&&++reads===2)f.flags.graphMasks=[panel];return result;};
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)f.flags.graphMasks=[panel];};return l;
+  };
+ }
+ f.page.waitForTimeout=async()=>{
+  if(!f.flags.graphMasks.length)return;
+  assert.equal(f.gestures.length,stage==='open_issued'?1:0);
+  if(++waits===3)f.flags.graphMasks=[];
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(waits,3);assert.equal(f.gestures.length,2);
+ assert.ok(result.trace.some(x=>x.event==='input_port_graph_busy'&&x.mode===stage&&x.samples===3));
+});
+
+for(const fault of ['persistent','deadline','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','changed-owner'])test('calculator input adapter refuses ModelForm '+fault,async t=>{
+ if(fault==='deadline')t.mock.timers.enable({apis:['Date'],now:10000});
+ const {f,panel}=calculatorBusy();
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
+ let waits=0;f.page.waitForTimeout=async()=>{
+  waits++;assert.deepEqual(f.gestures,[]);
+  if(fault==='deadline')t.mock.timers.tick(20001);
+  if(fault==='changed-owner')f.graph.FView.el.dom={};
+  if(waits>150)throw Error('Test wait bound exceeded');
+ };
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED',result.error);
+ assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.gestures,[]);assert.equal(f.prep.inputPortOpenReceipts.size,0);
+ assert.equal(waits,fault==='persistent'?150:['deadline','changed-owner'].includes(fault)?1:0);
+});
+
+function userBusy(f){
+ const panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-modelvariables';
+ f.task.kind='variables';f.task.port=4;f.task.operation_id='values:readback:port';
+ f.portDom.tid=f.portDom.tid.replace('Output_Data-0','Output_Var-4');
+ f.portDom.getAttribute=key=>key==='data-tid'?f.portDom.tid:null;
+ Object.assign(f.port,{FPortIndex:4,FType:1,FSubType:3});f.portTree.FIndex=4;
+ f.wizard.FModelSocket=f.wizard.FModelEnginePort;
+ const prepared=[...f.prep.receipts.values()][0];
+ prepared.nodeTargetPortIdentities=new Map([[f.port,{graph:f.graph.FDiagram.FmxGraph,node:f.node,cell:f.port.FCell,guid:f.port.FGuid,data:f.port.data,tid:f.portDom.tid}]]);
+ f.page.evaluate(()=>{
+  const a=bg.app;a.ModelUnitItemTreeNode=class ModelUnitItemTreeNode{};a.ModelServiceNodeTreeNode=a.ModelNodeTreeNode;
+  [...__loginomDockPreparationV1.receipts.values()][0].nodeTargetWorkflowNode.ParentNode=new a.ModelUnitItemTreeNode();
+ },null);
+ return panel;
+}
+
+test('user independent readback after Done waits for its own ModelForm mask before opening output four',async()=>{
+ const f=fixture();userBusy(f);let waits=0;
+ f.page.waitForTimeout=async()=>{
+  if(!f.flags.graphMasks.length)return;
+  waits++;assert.deepEqual(f.gestures,[]);f.flags.graphMasks=[];
+ };
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(waits,1);assert.equal(f.gestures.length,2);
+ assert.ok(result.trace.some(x=>x.event==='output_port_graph_busy'&&x.mode==='begin'));
+});
+
+for(const fault of ['foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','non-root','locked','persistent','changed-owner'])test('user readback mask refuses '+fault,async()=>{
+ const f=fixture(),panel=userBusy(f);
+ if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const attr=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':attr(k);}
+ if(fault==='non-root')[...f.prep.receipts.values()][0].nodeTargetWorkflowNode.ParentNode={};
+ if(fault==='locked')f.node.FLocked=true;
+ let waits=0;f.page.waitForTimeout=async()=>{
+  waits++;
+  if(fault==='persistent')f.task.deadline=Date.now()-1;
+  if(fault==='changed-owner')f.graph.FView.el.dom={};
+ };
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED',result.error);
+ assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);assert.deepEqual(f.gestures,[]);
+ assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
+});
+
+for(const icon of ['groupdata','quality'])for(const stage of ['begin','menu_issued','open_issued'])test(icon+' waits for its bound graph mask at '+stage,async()=>{
  const f=fixture('input');let waits=0;
- if(stage==='begin')groupingBusy(f);
+ const busy=()=>{groupingBusy(f);f.node.FIconCls='bg-vendor-icon-'+icon;};
+ if(stage==='begin')busy();
  if(stage==='menu_issued'){
   const read=f.readNode;let reads=0;
-  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)groupingBusy(f);return result;};
+  const runRead=async(...args)=>{const result=await read(...args);if(++reads===2)busy();return result;};
   f.run=()=>openPreparedOutputPort(f.page,f.task,runRead);
  }
  if(stage==='open_issued'){
   const locator=f.page.locator;f.page.locator=s=>{
-   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)groupingBusy(f);};return l;
+   const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)busy();};return l;
   };
  }
  f.page.waitForTimeout=async()=>{
@@ -236,6 +368,47 @@ test('active port opening confirms its bound question once and replay performs n
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
+for(const direction of ['input','output'])for(const [condition,change] of Object.entries({
+ one_dialog:f=>{const query=f.document.querySelectorAll,extra=f.el('foreign-dialog');f.document.querySelectorAll=q=>q==='[role="dialog"],.x-message-box'?[f.dialog,extra]:query(q);},
+ native_dialog:f=>{f.nativeControls.get(f.dialog.id).el.dom={};},
+ question:f=>{f.dialog.innerText='PRIVATE_UI_TEXT_SECRET'.repeat(1000);},
+ graph:f=>{f.card.Controller.FController={constructor:{name:'OtherController'}};},
+ port:f=>{f.graph.FCurrentPortMenu={};},
+ unlocked:f=>{f.node.FLocked=true;},
+ workflow:f=>{f.card.Controller.Node.data.node={};},
+}))test(direction+' port refusal diagnoses '+condition+' without confirming the dialog',async()=>{
+ const f=fixture(direction);f.flags.deactivation=true;f.flags.beforeConfirm=()=>change(f);
+ const result=await f.run(),prefix='Port deactivation question owner changed: ';
+ assert.equal(result.status,'AMBIGUOUS');assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);
+ assert.equal(f.gestures.length,2);assert.equal(f.prep[direction+'PortOpenReceipts'].get('open').phase,'open_issued');
+ assert.ok(result.error.startsWith(prefix),result.error);
+ const diagnostic=JSON.parse(result.error.slice(prefix.length));
+ assert.deepEqual(diagnostic.checks,{one_dialog:condition!=='one_dialog',native_dialog:condition!=='native_dialog',question:condition!=='question',
+  graph:condition!=='graph',port:condition!=='port',unlocked:condition!=='unlocked',workflow:condition!=='workflow'});
+ assert.equal(diagnostic.controller,condition==='graph'?'OtherController':'ModelForm');
+ assert.equal(diagnostic.wizard_visible,false);
+ assert.ok(Buffer.byteLength(result.error)<=500);assert.ok(!result.error.includes('PRIVATE_UI_TEXT_SECRET'));
+});
+
+test('port refusal bounds the controller class and never includes the rejected UI text',async()=>{
+ const f=fixture('input');f.flags.deactivation=true;f.flags.beforeConfirm=()=>{
+  f.graph.constructor={name:'C'.repeat(1000)};f.dialog.innerText='PRIVATE_UI_TEXT_SECRET'.repeat(1000);f.wizard.FView.el.dom.visible=true;
+ };
+ const result=await f.run(),prefix='Port deactivation question owner changed: ';
+ assert.ok(result.error.startsWith(prefix),result.error);
+ const diagnostic=JSON.parse(result.error.slice(prefix.length));
+ assert.equal(diagnostic.controller,'C'.repeat(64));assert.equal(diagnostic.checks.question,false);assert.equal(diagnostic.wizard_visible,true);
+ assert.ok(Buffer.byteLength(result.error)<=500);assert.ok(!result.error.includes('PRIVATE_UI_TEXT_SECRET'));
+ assert.equal(f.gestures.length,2);
+});
+
+for(const direction of ['input','output'])test(direction+' successful port opening does not emit refusal diagnostics',async()=>{
+ const f=fixture(direction);f.flags.deactivation=true;const result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(f.gestures.length,3);
+ for(const key of ['checks','controller','wizard_visible'])assert.ok(!JSON.stringify(result).includes('"'+key+'"'));
+ assert.equal(result.error,undefined);
+});
+
 test('deactivation ignores hidden controls retained by an earlier dialog',async()=>{
  for(const direction of ['input','output'])for(const name of ['yes','no','cancel']){
   const f=fixture(direction);f.flags.deactivation=true;
@@ -306,10 +479,10 @@ for (const direction of ['input', 'output']) test(`${direction} port ignores hid
  assert.equal((await g.run()).status,'AMBIGUOUS');assert.equal(g.gestures.length,1);
 });
 
-test('Union dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
- const f=fixture('input');f.node.FIconCls='bg-vendor-icon-uniondata';f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+for(const icon of ['bg-vendor-icon-uniondata','bg-vendor-icon-coluniondata'])test(icon+' dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
+ const f=fixture('input');f.node.FIconCls=icon;f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.port,0);assert.equal(r.port_guid,'port');
- const bad=fixture('input');bad.node.FIconCls='bg-vendor-icon-uniondata';bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
+ const bad=fixture('input');bad.node.FIconCls=icon;bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
 });
 
 test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async()=>{
@@ -319,6 +492,31 @@ test('Union third port keeps logical 2, SVG 3 and native tree 2 distinct',async(
  f.portDom.getBoundingClientRect=()=>({x:60,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(...ports.map(x=>x.p));
  f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?ports[0].p.FCell:x<60?ports[1].p.FCell:f.port.FCell;
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
+});
+
+test('Enrich dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.port,0);assert.equal(r.port_guid,'port');
+ const bad=fixture('input');bad.node.FIconCls='bg-vendor-icon-enrichdata';bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
+});
+
+test('Enrich third port keeps logical 2, SVG 3 and native tree 2 distinct',async()=>{
+ const f=fixture('input');f.node.FIconCls='bg-vendor-icon-enrichdata';f.task.port=2;f.port.FPortIndex=2;f.portTree.FIndex=2;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
+ const ports=[0,1].map(i=>{const p={FGuid:'prior-'+i,FCell:{},FPortIndex:i,data:{},parent:f.node};const dom=f.el('MF;TF;Graph;Node;Input_Data-'+i);dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:i*30,y:0,width:20,height:20});return {p,dom};});
+ f.portDom.getBoundingClientRect=()=>({x:60,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(...ports.map(x=>x.p));
+ f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?ports[0].p.FCell:x<60?ports[1].p.FCell:f.port.FCell;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
+});
+
+for(const icon of ['bg-vendor-icon-coluniondata','bg-vendor-icon-replacecolumns'])test(icon+' attached input keeps logical/native 1 while its SVG index is 2',async()=>{
+ const f=fixture('input');f.node.FIconCls=icon;f.task.port=1;f.port.FPortIndex=1;f.portTree.FIndex=1;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Data-2';f.portDom.getAttribute=()=>f.portDom.tid;
+ const prior={FGuid:'main',FCell:{},FPortIndex:0,data:{},parent:f.node};
+ const dom=f.el('MF;TF;Graph;Node;Input_Data-0');dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:0,y:0,width:20,height:20});
+ f.portDom.getBoundingClientRect=()=>({x:30,y:0,width:20,height:20});f.node.FPorts[0].FCollection.unshift(prior);
+ f.graph.FDiagram.FmxGraph.getCellAt=x=>x<30?prior.FCell:f.port.FCell;
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,1);assert.equal(r.native_index,1);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-2');
 });
 
 test('covered port refuses opening before any mouse gesture',async()=>{const f=fixture();f.flags.foreignHit=true;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);assert.deepEqual(f.gestures,[]);});
@@ -474,4 +672,40 @@ for(const direction of ['input','output'])for(const fault of ['own','foreign','w
    assert.ok(r.trace.some(t=>t.event===direction+'_port_console_closed'));assert.match(r.error,/fixture ends/);
   }else{assert.equal(r.status,'NOT_APPLIED',r.error);assert.deepEqual(clicks,[]);}
  }finally{await browser.close();}
+});
+
+function importVariablesBusy(){
+ const f=fixture('input'),panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-importtextfile';
+ f.task.kind='variables';f.port.FType=0;f.port.FSubType=3;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Var-0';f.portDom.getAttribute=()=>f.portDom.tid;
+ return {f,panel};
+}
+for(const stage of ['begin','menu_issued','open_issued'])test('Import variables input waits for its exact native graph mask at '+stage,async()=>{
+ const {f,panel}=importVariablesBusy();let waits=0;
+ if(stage!=='begin')f.flags.graphMasks=[];
+ if(stage==='menu_issued'){
+  let reads=0;const read=f.readNode;
+  f.run=()=>openPreparedOutputPort(f.page,f.task,async(...args)=>{const s=await read(...args);if(++reads===2)f.flags.graphMasks=[panel];return s;});
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)f.flags.graphMasks=[panel];};return l;};
+ }
+ f.page.waitForTimeout=async()=>{if(!f.flags.graphMasks.length)return;assert.equal(f.gestures.length,stage==='open_issued'?1:0);if(++waits===3)f.flags.graphMasks=[];};
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(waits,3);assert.equal(f.gestures.length,2);
+ assert.ok(r.trace.some(t=>t.event==='input_port_graph_busy'&&t.mode===stage&&t.samples===3));
+});
+for(const fault of ['data-input','control-input','foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner'])test('Import variable graph wait refuses '+fault,async()=>{
+ const {f,panel}=importVariablesBusy();
+ if(fault==='data-input')delete f.task.kind;
+ if(fault==='control-input')f.task.kind='control';
+ if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const get=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':get(k);}
+ let waits=0;f.page.waitForTimeout=async()=>{waits++;if(fault==='persistent')f.task.deadline=Date.now()-1;if(fault==='changed-owner')f.graph.FView.el.dom={};};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.equal(f.gestures.length,0);
+ assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
 });

@@ -1,0 +1,3 @@
+Case,RequestContentType,Body
+plain,text/plain,plain & + / я
+xml,application/xml,"<order amount=""17"">Привет</order>"

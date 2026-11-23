@@ -1,0 +1,16 @@
+{
+  "base_sha": "4b202757f6d0021160dd4dfc104ee788ae33cbec",
+  "base_card_bytes": 3073,
+  "proposed_card_bytes": 9426,
+  "card_limit": 12000,
+  "full_input_schema_bytes": 63280,
+  "proposed_full_input_schema_bytes": 69841,
+  "model_tool_bytes": 14539,
+  "proposed_model_tool_bytes": 14576,
+  "apply_limit": 20000,
+  "skill_bytes": 39954,
+  "skill_limit": 40000,
+  "routing_proposal_bytes": 133,
+  "node_reference_proposal_bytes": 5727,
+  "node_reference_limit": 6000
+}

@@ -12,6 +12,8 @@
     "./performance/unit/visual-stability.test.ts",
     "./reproduction/timeline-suspense/**/*.ts",
     "./reproduction/timeline-suspense/**/*.tsx",
+    "./updater/settings-updates.spec.ts",
+    "./updater/playwright.config.ts",
     "../src/pages/session/timeline/observe-element-offset.ts",
     "./regression/new-session-panel-corner.spec.ts",
     "./regression/session-timeline-context-resize.spec.ts",

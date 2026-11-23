@@ -13,6 +13,8 @@ import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
 import { showToast } from "@/utils/toast"
 import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from "@/utils/session-export"
+import { publishDiagnosticsSession } from "@/utils/diagnostics"
+import { createEffect, onCleanup } from "solid-js"
 import { findLast } from "@opencode-ai/core/util/array"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { extractPromptFromParts } from "@/utils/prompt"
@@ -77,6 +79,19 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     return sync().session.get(id)
   }
   const hasReview = () => !!params.id
+  // «Собрать диагностику» attaches the chat that is open here.
+  createEffect(() => {
+    const sessionID = params.id
+    if (!sessionID) return
+    const client = sdk().client
+    onCleanup(
+      publishDiagnosticsSession({
+        sessionID,
+        title: info()?.title,
+        chat: () => fetchSessionExport({ sessionID, client }),
+      }),
+    )
+  })
   const normalizeTab = (tab: string) => {
     if (!tab.startsWith("file://")) return tab
     return file.tab(tab)

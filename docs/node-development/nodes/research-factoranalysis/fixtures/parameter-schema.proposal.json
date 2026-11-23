@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "Parameters for research.factor_analysis / pca_fixed. Do not pass fields belonging to another node type.",
+  "properties": {
+    "factor_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PCA of complete finite continuous numeric features, fixed count, no rotation. New nodes require features, factors and rotation; existing omission preserves supported settings. Execute trains/retrains current input, then executes and reads both ports. NULL training, constants and rank-deficient inputs are outside this slice.",
+      "properties": {
+        "features": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Exact technical name of a continuous Integer/Real input field; never its display label."
+          },
+          "description": "Complete selected feature set in input-field order. Row identifiers and pass-through text must not be selected. On existing nodes the supplied list replaces all feature roles."
+        },
+        "factors": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "description": "Fixed number of factors, at most the selected feature count and observed rank. Automatic significance selection and a separate output-factor cap are unsupported."
+        },
+        "rotation": {
+          "type": "string",
+          "enum": [
+            "none"
+          ],
+          "description": "Explicitly select no rotation. Native default is Varimax; do not preserve it on a new node. Varimax and Quartimax are outside this proposed first slice."
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

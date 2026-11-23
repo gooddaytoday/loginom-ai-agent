@@ -1,0 +1,23 @@
+{
+  "base_sha": "4b202757f6d0021160dd4dfc104ee788ae33cbec",
+  "measurement": "UTF-8; card=compact JSON, reference=raw file",
+  "model_tool_bytes": 14539,
+  "model_tool_limit": 20000,
+  "full_input_schema_bytes": 63280,
+  "full_input_schema_limit": null,
+  "base_card_bytes": 7390,
+  "proposed_card_bytes": 11240,
+  "card_limit": 12000,
+  "skill_current_bytes": 39954,
+  "skill_after_bytes": 39954,
+  "skill_limit": 40000,
+  "routing_line_bytes": 104,
+  "routing_line_after_bytes": 104,
+  "reference_current_bytes": 4756,
+  "reference_proposed_bytes": 9540,
+  "reference_limit": 6000,
+  "production_files_changed": false,
+  "projected_model_tool_bytes": 14539,
+  "projection_basis": "Detailed parameters remain in the node card under current userNodeTool projection; must rerun production budget test after implementation.",
+  "proposal_hash_placeholder_overhead_bytes": 24
+}

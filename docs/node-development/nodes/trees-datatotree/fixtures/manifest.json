@@ -1,0 +1,68 @@
+{
+  "status": "proposal_before_execution",
+  "encoding": "UTF-8",
+  "line_ending": "LF",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "text_qualifier": "\"",
+  "null_marker": "?",
+  "columns": [
+    {
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "OrderID",
+      "label": "OrderID",
+      "type": "integer"
+    },
+    {
+      "name": "ExternalID",
+      "label": "ExternalID",
+      "type": "integer"
+    },
+    {
+      "name": "SKU",
+      "label": "SKU",
+      "type": "string"
+    },
+    {
+      "name": "Qty",
+      "label": "Qty",
+      "type": "integer"
+    },
+    {
+      "name": "Price",
+      "label": "Price",
+      "type": "real"
+    },
+    {
+      "name": "Active",
+      "label": "Active",
+      "type": "boolean"
+    },
+    {
+      "name": "Note",
+      "label": "Note",
+      "type": "string"
+    }
+  ],
+  "model_inputs": [
+    "orders.csv"
+  ],
+  "private_inputs": [
+    "structure.json"
+  ],
+  "source_identity": "Fresh owned package; one imports.text output 0, all 8 fields explicitly typed and read before conversion. No prepared package in this PR.",
+  "files": {
+    "orders.csv": {
+      "bytes": 213,
+      "sha256": "446e8f2bbacf675abdb1b3fea783f8b983ed125b35aa04d951270adbd37d3d8d"
+    },
+    "structure.json": {
+      "bytes": 1931,
+      "sha256": "be5da7b022400594be8d271492a727799e06ea36eade97c1db123b2919e7792a"
+    }
+  }
+}

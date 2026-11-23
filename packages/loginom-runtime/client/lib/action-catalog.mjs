@@ -23,10 +23,11 @@ export const actionDescribeTool = {
     type: 'object',
     properties: { action_key: { type: 'string', enum: [...ACTION_KEYS], description: 'Single action only. Omit action_keys and node_types; for a combined request use action_keys instead.' },
       action_keys: { type: 'array', items: { type: 'string', enum: [...ACTION_KEYS] }, description: 'Batch actions, optionally with node_types. Omit action_key, even for one action: ["package.save_checkpoint"].' },
-      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) }, description: 'Selected node schemas, optionally with action_keys. Never combine with action_key.' } },
+      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) }, description: 'Selected node schemas and guidance from the prepared skill. Never combine with action_key.' },
+      modes:{type:'array',minItems:1,uniqueItems:true,items:{type:'string'},description:'With node_types: include rules for these modes. Omit for common guidance and the mode index.'} },
     allOf: [{ oneOf: [
       { type:'object', properties:{action_key:{type:'string'}}, required:['action_key'], additionalProperties:false },
-      { type:'object', properties:{action_keys:{type:'array',items:{type:'string'}},node_types:{type:'array',items:{type:'string'}}}, additionalProperties:false },
+      { type:'object', properties:{action_keys:{type:'array',items:{type:'string'}},node_types:{type:'array',items:{type:'string'}},modes:{type:'array',items:{type:'string'}}}, additionalProperties:false },
     ] }],
     additionalProperties: false,
   },
@@ -35,7 +36,7 @@ export const actionDescribeTool = {
 
 export const actionRunTool = {
   name: 'dock_action_run',
-  description: 'Run a pinned action (node.add, link.create, package.save_as, package.save_checkpoint or node.configure_text_import); call dock_action_describe first for its exact parameters. node.configure_text_import configures one already-open text-import wizard from a verified session upload, saves with Done and checks settings after reopening; it does not execute the node or save the package. package.save_checkpoint uses the awaited Save As flow with explicit conflict policy and preserves the open workflow; persisted content is checked separately during final reopen acceptance. Other UI tasks use dock_ui_action after observation. Invalid arguments are task feedback, not a connection failure.',
+  description: 'Run a pinned action; call dock_action_describe for exact parameters. node.configure_text_import configures an open wizard, commits Done and rereads settings; it does not execute or save the package. package.save_checkpoint awaits Save As with explicit conflict policy. REST connection references additionally require Close/Open and at most one normalization Save; use the returned fresh workspace for further work. Other packages keep the open workflow. Persisted calculations need separate acceptance. Other UI tasks use dock_ui_action. Invalid arguments are task feedback, not a connection failure.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -183,7 +184,7 @@ function validateActions(catalog, manifest, allowedStatuses) {
 function validateSelectors(catalog, manifest) {
   if (!isObject(catalog)) fail('selectors.json must be an object');
   // Native Save's optional bundled selector is not a remotely granted action.
-  exactKeys(catalog, new Set(['schema_version', 'catalog_version', 'e2e_commit', 'selectors', 'native_save_arrangement']), 'selectors.json');
+  exactKeys(catalog, new Set(['schema_version', 'catalog_version', 'e2e_commit', 'selectors', 'native_save_arrangement', 'native_rest_save']), 'selectors.json');
   if (catalog.schema_version !== 1 || catalog.catalog_version !== manifest.catalog_version || catalog.e2e_commit !== manifest.e2e_commit) {
     fail('selectors.json identity does not match manifest');
   }

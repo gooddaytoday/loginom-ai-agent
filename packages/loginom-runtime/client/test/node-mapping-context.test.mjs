@@ -2,15 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
-function fixture({grouped=false,input=false,socket=false}={}) {
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
+// The import wizard's hidden format page keeps «Автоопределение столбцов».
+function importPage(f,wizard,mode='Все'){
+ const page=f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+ const owner=f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard;cbbAutoDetectColumnsMode;ValueControl','',page);
+ const input=f.el(null,'',owner);input.input=true;input.value=mode;return page;
+}
+function fixture({grouped=false,input=false,socket=false,names=['A','B'],sameNames=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
  const el=(tid,text='',parent=null)=>{const e={tid,textContent:text,parent,id:'e'+all.length,attrs:{},checkVisibility:()=>true,
   getAttribute(k){return k==='data-tid'?this.tid:this.attrs[k]??null;},contains(other){return other===this||!!other.parent&&this.contains(other.parent);},
-  querySelectorAll(q){return all.filter(x=>x!==this&&this.contains(x)&&q==='table.x-grid-item'&&x.row);},classList:{contains:()=>false}};all.push(e);return e;};
+  querySelectorAll(q){return all.filter(x=>x!==this&&this.contains(x)&&(q==='table.x-grid-item'&&x.row||q.startsWith('input')&&x.input));},classList:{contains:()=>false}};all.push(e);return e;};
  const root=el(base.slice(0,-1)),grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>el(base+s,'',root));
- const source=['A','B'].map((name,i)=>({isModel:true,internalId:'s'+i,data:{ID:i,Index:i,Name:name,DisplayName:'Same',DataType:5,Broken:false,Required:false}}));
- const target=source.map((s,i)=>{const t={isModel:true,internalId:'t'+i,data:{...s.data,Name:'Out'+i,DataKind:2,ConnectedRecord:s,SourceDisplayName:'Same',SourceDataType:5}};s.data.ConnectedRecord=t;return t;});
+ const source=names.map((name,i)=>({isModel:true,internalId:'s'+i,data:{ID:i,Index:i,Name:name,DisplayName:'Same',DataType:5,Broken:false,Required:false}}));
+ const target=source.map((s,i)=>{const t={isModel:true,internalId:'t'+i,data:{...s.data,Name:sameNames?s.data.Name:'Out'+i,DataKind:2,ConnectedRecord:s,SourceDisplayName:'Same',SourceDataType:5}};s.data.ConnectedRecord=t;return t;});
  if(input)for(const t of target)Object.assign(t.data,{UsageType:3,DefaultUsageType:0,OriginType:0,ReverseBroken:false,IsDerived:false});
  if(grouped){for(const s of source)s.data.GroupField='';for(const t of target)Object.assign(t.data,{GroupField:'',IsDerived:false});}
  const stores=[source,target].map(items=>({$className:'Ext.data.Store',isLoading:()=>false,getCount:()=>items.length,getTotalCount:()=>items.length,getData:()=>({items,getSource:()=>({items})})}));
@@ -25,6 +32,20 @@ function fixture({grouped=false,input=false,socket=false}={}) {
 test('cached mapping ties duplicate labels to distinct source identities',()=>{
  const r=fixture().read();assert.equal(r.verified,true);assert.equal(r.inventory_complete,true);
  assert.deepEqual(Array.from(r.target_fields,t=>t.source.name),['A','B']);assert.equal(r.settings_applied,false);
+});
+test('secondary PCA mapping requires its unique owned factor wizard and both native cards',()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const f=fixture({grouped:true}),root=f.el('MF;TF;WizrdMCF');f.root.parent=root;
+  for(const e of f.all)if(e.tid?.includes('DerivedDataSourceOutputSocketWizard'))e.tid=e.tid.replace('DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard-1');
+  f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',root);
+  if(fault!=='missing')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',fault==='foreign'?null:root);
+  if(fault==='duplicate')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',root);
+  if(fault==='third')f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',root);
+  // Hidden primary card remains in the native inventory.
+  f.all.find(e=>e.tid==='MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard').checkVisibility=()=>false;
+  const r=f.read();assert.equal(r.verified,!fault,String(fault));
+  if(!fault)assert.equal(r.mapping_wizard,'DerivedDataSourceMappingEngineOutputPortWizard-1');
+ }
 });
 test('cached mapping refuses foreign connections, filtered stores and inconsistent rendered rows',()=>{
  const changes=[f=>{f.target[0].data.ConnectedRecord={...f.source[0]};},f=>{f.source[0].data.ConnectedRecord=f.target[1];},
@@ -45,6 +66,7 @@ test('node mapping brackets its read with the same prepared wizard identity',asy
 
  test('native mapping refuses a plain reconnect mask even while cached grids remain',()=>{
  const f=fixture();f.all.push({mask:true,getAttribute:()=>null,checkVisibility:()=>true});assert.equal(f.read().reason,'mapping_mask');
+ assert.ok(Array.isArray(f.read().mask_detail),'a refused mask names what was observed');
  });
 
 function excludedFixture() {
@@ -142,6 +164,37 @@ for(const [name,change] of Object.entries({wrong_total:f=>f.stores[1].getTotalCo
 test('input mapping retains usage and rejects a broken reverse connection',()=>{
  const f=fixture({input:true}),r=f.read();assert.equal(r.verified,true);assert.equal(r.mapping_wizard,'TuneDataSourceMappingWizard');assert.equal(r.target_fields[0].usage_type,3);
  f.target[0].data.ReverseBroken=true;assert.equal(f.read().verified,false);
+});
+
+test('retrain reads saved Transaction/Item roles on the owned association-rules input',async()=>{
+ const f=fixture({input:true});f.target[0].data.UsageType=8;f.target[1].data.UsageType=9;
+ const owner={verified:true,surface:'wizard',node_id:'association',input_port:{direction:'input',port:0,node_icon_class:'bg-vendor-icon-assnrules'}};
+ const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+ const read=()=>readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>owner);
+ const result=await read();assert.equal(result.verified,true);
+ assert.deepEqual(Array.from(result.target_fields,x=>x.usage_type),[8,9]);
+ f.target[0].data.UsageType=10;assert.equal((await read()).reason,'mapping_input_usage');
+ f.target[0].data.UsageType=8;f.target[0].data.ReverseBroken=true;
+ assert.equal((await read()).reason,'mapping_input_usage');
+});
+
+test('Transaction/Item remain refused for every other node type and unbound input owners',async()=>{
+ for(const icon of [...Object.values(NODE_TYPES).filter(t=>t.type!=='datamining.assn_rules').map(t=>t.icon_class),undefined,'bg-vendor-icon-unknown']) {
+  // Seasonal ungroup totals input 0 keeps its order role 8 (test below).
+  for(const role of icon==='bg-vendor-icon-ungroupdata'?[9]:[8,9]) {
+   const f=fixture({input:true});f.target[0].data.UsageType=role;
+   const owner={verified:true,surface:'wizard',input_port:{direction:'input',port:0,node_icon_class:icon}};
+   const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+   assert.equal((await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>owner)).reason,'mapping_input_usage',String(icon));
+  }
+ }
+ const f=fixture({input:true});f.target[0].data.UsageType=8;
+ assert.equal(f.read().reason,'mapping_input_usage');
+ for(const input_port of [undefined,{direction:'output',port:0,node_icon_class:'bg-vendor-icon-assnrules'},
+  {direction:'input',port:1,node_icon_class:'bg-vendor-icon-assnrules'}]) {
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  assert.equal((await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port}))).reason,'mapping_input_usage');
+ }
 });
 
 test('conditional calculator mapping keeps the same strict excluded-record proof',()=>{
@@ -321,6 +374,20 @@ test('mapping read admits only its native disabled output delete-column mask',()
  }
 });
 
+test('only an empty JS input admits the native disabled delete header',()=>{
+ for(const fault of ['none','nonempty','unbound-type','foreign-column']){
+  const f=fixture({input:true,names:fault==='nonempty'?['A']:[]}),wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:fault==='foreign-column'?{}:column},disabled:true};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  mask.classList.contains=name=>name==='x-mask';
+  const request={prefix:'MF;TF',...(fault==='unbound-type'?{}:{node_type:'programming.javascript'})};
+  const result=vm.runInNewContext('('+readMappingBrowser.toString()+')('+JSON.stringify(request)+')',f.context);
+  assert.equal(result.verified,fault==='none',fault+': '+result.reason);
+ }
+});
+
 function inputEditorFixture() {
  const f=fixture({input:true}),wizard=f.el('MF;TF;WizrdMCF'),body=f.el('MF');f.root.parent=wizard;
  const form=f.el('EditTuneColumnDefForm'),mask=f.el(null,'',body);mask.mask=true;mask.parentElement=body;mask.attrs.role='presentation';
@@ -414,5 +481,82 @@ test('empty output socket mapping reports actual empty inventories without inven
    assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.rendered_indices.length,0);
    assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
   }
+ }
+});
+
+test('auto-detected text import output mapping admits its native disabled delete-column mask only inside the import wizard',()=>{
+ for(const variant of ['import','other','enabled','duplicate-mask','new','none']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant!=='other')importPage(f,wizard,{new:'Только новые',none:'Нет'}[variant]);
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:variant!=='enabled'};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  const result=f.read();
+  assert.equal(result.verified,variant==='import',variant+': '+result.reason);
+  if(variant!=='import')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
+
+test('text import output mapping may be empty before execution only for the import wizard (auto-detect all)',()=>{
+ for(const variant of ['import','other','new','none','unobserved']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant==='unobserved')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  else if(variant!=='other')importPage(f,wizard,{new:'Только новые',none:'Нет'}[variant]);
+  f.source.length=0;f.target.length=0;for(const row of f.rows)row.row=false;
+  const r=f.read();
+  assert.equal(r.verified,variant==='import',variant+': '+r.reason);
+  if(variant==='import'){assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.source_identity_verified,true);}
+  else assert.equal(r.reason,'mapping_render_bound');
+ }
+});
+
+// LAB-1096 weights-1 execution-events:657,812,828,893: Execute retains
+// Group/Item/Weight roles 6/4/9. The repeat fails in the reader, before the
+// ungroup schema comparison. Test the production reader on both native ports.
+for(const [mode,value,type] of [['computed','Weight',4],['shares','Share',3]])test('empty '+mode+' apply can inspect both saved ungroup inputs after Execute',async()=>{
+ const totals=fixture({input:true,names:['Group','Total'],sameNames:true});
+ const support=fixture({input:true,names:['Group','Item',value],sameNames:true});
+ for(const [f,index,dataType] of [[totals,1,type],[support,2,type]]){
+  f.source[index].data.DataType=dataType;
+  Object.assign(f.target[index].data,{DataType:dataType,SourceDataType:dataType,DataKind:0});
+ }
+ const owner=port=>({verified:true,surface:'wizard',node_id:'ungroup',input_port:{direction:'input',port,node_icon_class:'bg-vendor-icon-ungroupdata'}});
+ const read=(f,port)=>readNodeMapping({evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)},
+  {workflow_ref:{prefix:'MF;TF'}},async()=>owner(port));
+ for(const t of support.target)t.data.UsageType=0;
+ assert.equal((await read(support,1)).verified,true,'initial support mapping');
+ totals.target.forEach((t,i)=>t.data.UsageType=[6,7][i]);
+ support.target.forEach((t,i)=>t.data.UsageType=[6,4,9][i]);
+ const result=[];
+ for(const [port,f] of [totals,support].entries())result.push(await read(f,port));
+ assert.ok(result.every(r=>r.verified),JSON.stringify(result.map(r=>r.reason)));
+ assert.deepEqual(Array.from(result[1].target_fields,f=>[f.name,f.type,f.usage_type]),[['Group','string',6],['Item','string',4],[value,type===4?'integer':'real',9]]);
+ assert.deepEqual(Array.from(result[1].source_fields,f=>f.name),['Group','Item',value]);
+ support.target[2].data.ReverseBroken=true;assert.equal((await read(support,1)).reason,'mapping_input_usage');
+});
+
+test('saved ungroup share role is bound only to its native support input',async()=>{
+ for(const [direction,port,icon,role] of [['input',0,'bg-vendor-icon-ungroupdata',9],['input',2,'bg-vendor-icon-ungroupdata',9],
+  ['output',1,'bg-vendor-icon-ungroupdata',9],['input',1,'bg-vendor-icon-calculator',9],['input',0,'bg-vendor-icon-calculator',8],['input',0,'bg-vendor-icon-ungroupdata',10],['input',1,'bg-vendor-icon-ungroupdata',10]]){
+  const f=fixture({input:true});f.target[0].data.UsageType=role;
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction,port,node_icon_class:icon}}));
+  assert.equal(result.reason,'mapping_input_usage',JSON.stringify({direction,port,icon,role}));
+ }
+});
+
+// LAB-1314 seasonal-read-corrected execution-events:989-1018: the saved
+// seasonal order field keeps usage 8 on totals input 0 (and on support 1).
+test('saved seasonal ungroup order role is admitted on both native inputs only',async()=>{
+ for(const port of [0,1]){
+  const f=fixture({input:true});f.target[0].data.UsageType=8;
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction:'input',port,node_icon_class:'bg-vendor-icon-ungroupdata'}}));
+  assert.equal(result.verified,true,JSON.stringify({port,reason:result.reason}));
  }
 });

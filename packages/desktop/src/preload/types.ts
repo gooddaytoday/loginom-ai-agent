@@ -5,6 +5,7 @@ import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import type { DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
+import type { DiagnosticsApi } from "@opencode-ai/app/diagnostics"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -30,6 +31,7 @@ export type UpdaterAPI = {
   subscribe: (cb: (state: UpdaterState) => void) => Promise<() => void>
   check: () => Promise<UpdaterState>
   install: () => Promise<void>
+  setChannel: (channel: "stable" | "unstable") => Promise<UpdaterState>
 }
 
 export type LinuxDisplayBackend = "wayland" | "auto"
@@ -45,6 +47,8 @@ export type FatalRendererError = {
   os?: string
 }
 
+export type PendingDeepLinks = { urls: string[]; coldDashboard?: string }
+
 export type ElectronAPI = {
   loginom: Loginom.API
   killSidecar: () => Promise<void>
@@ -54,7 +58,12 @@ export type ElectronAPI = {
   onSystemProxyStatus: (callback: (status: SystemProxyStatus) => void) => () => void
   wslServers: WslServersAPI
   updater: UpdaterAPI
-  consumeInitialDeepLinks: () => Promise<string[]>
+  consumeDeepLinks: () => Promise<PendingDeepLinks>
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
+  isDashboardWork: (directory: string) => Promise<boolean>
   getDefaultServerUrl: () => Promise<string | null>
   setDefaultServerUrl: (url: string | null) => Promise<void>
   isFirstLaunchOnboardingPending: () => Promise<boolean>
@@ -78,7 +87,7 @@ export type ElectronAPI = {
 
   getWindowID: () => Promise<string>
   onMenuCommand: (cb: (id: string) => void) => () => void
-  onDeepLink: (cb: (urls: string[]) => void) => () => void
+  onDeepLink: (cb: () => void) => () => void
 
   openDirectoryPicker: (opts?: {
     multiple?: boolean
@@ -108,7 +117,7 @@ export type ElectronAPI = {
   openExternal: (url: string) => void
   openLocalFile: (url: string) => void
   openPath: (path: string, app?: string) => Promise<void>
-  revealPath: (path: string) => Promise<boolean>
+  revealPath: (path: string, options?: { checkOnly?: boolean }) => Promise<boolean>
   readClipboardImage: () => Promise<{ buffer: ArrayBuffer; width: number; height: number } | null>
   getWindowFocused: () => Promise<boolean>
   getWindowFullscreen: () => Promise<boolean>
@@ -126,6 +135,7 @@ export type ElectronAPI = {
   runDesktopMenuAction: (action: DesktopMenuAction) => Promise<void>
   setBackgroundColor: (color: string) => Promise<void>
   exportDebugLogs: () => Promise<string>
+  diagnostics: DiagnosticsApi
   setForceFocus: (enabled: boolean) => Promise<void>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setNativeTranslations: (bundle: DesktopNativeBundle) => Promise<void>

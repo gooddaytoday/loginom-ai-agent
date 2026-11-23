@@ -1,0 +1,56 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.user"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "limit",
+            "type": "integer",
+            "value": 3
+          },
+          {
+            "name": "skip",
+            "type": "integer",
+            "value": 2
+          },
+          {
+            "name": "sentinel",
+            "type": "string",
+            "value": "keep"
+          },
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "empty",
+            "type": "string",
+            "value": ""
+          },
+          {
+            "name": "missing",
+            "type": "integer",
+            "value": null
+          },
+          {
+            "name": "zero",
+            "type": "integer",
+            "value": 0
+          }
+        ]
+      }
+    ]
+  }
+}

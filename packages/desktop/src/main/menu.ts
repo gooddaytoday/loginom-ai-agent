@@ -15,6 +15,7 @@ import { nativeT } from "./native-translations"
 type Deps = {
   trigger: (id: string) => void
   checkForUpdates: () => void
+  updaterEnabled?: () => boolean
   relaunch: () => void
 }
 
@@ -41,7 +42,7 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
   const item: MenuItemConstructorOptions = {
     label: entry.labelKey ? nativeT(entry.labelKey) : undefined,
     accelerator: entry.accelerator?.macos,
-    enabled: entry.enabled === "updater" ? UPDATER_ENABLED : undefined,
+    enabled: entry.enabled === "updater" ? (deps.updaterEnabled?.() ?? UPDATER_ENABLED) : undefined,
   }
 
   if (entry.command) {

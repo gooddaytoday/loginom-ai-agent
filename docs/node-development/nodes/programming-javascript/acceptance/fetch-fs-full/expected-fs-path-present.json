@@ -1,0 +1,35 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Exists",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Exists": true,
+          "Text": "LAB1549_SIDE"
+        }
+      ]
+    }
+  ]
+}

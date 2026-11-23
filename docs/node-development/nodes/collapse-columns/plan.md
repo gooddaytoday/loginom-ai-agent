@@ -160,3 +160,54 @@ PASS исполнителя: CLI, независимая сверка по ра�
 - **Исполнитель:** `acceptance/` → адресные тесты → CLI и независимая сверка → исправления принятого объёма.
 - **Ловец:** независимо принять опубликованный SHA и заявленные ограничения; старые FAIL сохранить.
 - **Следующая карточка:** расширение этапа 1 и далее — по решению владельца.
+
+## 7. LAB-1015: Variant, пустота и mappings (07.11.2026)
+
+База `origin/v040@c317bf8999a9fb6825dad12c6c6d0dca80d2c039`, mas2,
+назначенная пара LAB-85, Loginom 7.4.2. Только
+`https://app.loginom.ai/app/?testable=true`, действия по data-tid.
+Это этап 0 с неутверждёнными критериями, без правки runtime/сборки CLI.
+
+Живой `MF;TF-1;WizrdMCF;ColumnFlippingWizard`:
+`colDisplayName_RowID` → `frmMoveButtons;btnMove0` (информационное),
+`colDisplayName_A` и `colDisplayName_S` → `btnMove1` (транспонируемые).
+Один табличный вход/выход 0. После Execute получены RowID, Names,
+DisplayNames, Values, DataTypes и 6 строк: 10/alpha/20/beta/30/gamma.
+`ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt;DataTypes_N`
+содержал 4/5 для этих integer/string полей.
+
+На выход первой свёртки подключена вторая. Мастер второй показал
+`colDisplayName_Values` («Значения»); RowID назначен информационным,
+Values — транспонируемым. Next и Execute приняты. Все 6 значений сохранились,
+Names=Values, DisplayNames=Значения, **DataTypes=6 во всех строках**.
+DataTypes кодирует тип входного поля Variant, не subtype конкретной ячейки.
+DOM-text не является доказательством точных native type tags/bytes.
+Нового выбора режима не требуется: это тот же unpivot с новым типом входа.
+
+[Комплект](acceptance/v040/README.md): mixed из пяти scalar-типов, all-null,
+header-only; оба ignore_empty, полный входной и выходной mapping, отдельная
+цепочка Variant→Collapse. Независимый CSV oracle даёт 15/10 строк mixed,
+10/0 all-null, 0/0 header-only и 15 для Variant. typed Cell проверяется
+отдельно от Kind=6, NULL/пустая строка/false/0 различаются.
+Все JSON — предложения, не результат живой приёмки этих fixtures.
+Попытка переключения исследовательского импорта на null-fixture не дала
+доказанного свежего результата: preview оставался прежним. Ей не присваивается
+PASS/FAIL узла. All-null/header-only и полные mappings на новом комплекте
+остаются not_checked; исходные ожидания не подгоняются по preview.
+
+Этап 1 затронет `collapse-parameters.mjs`, `collapse-procedure.mjs`,
+`collapse-output-sources.mjs`, `collapse-readback.mjs` и tests.
+Чтение Variant уже есть, но `collapse-native-source.mjs` допускает только
+доказанный источник. Новая цепочка не проходит автоматически от удаления
+scalar-guard; расширение lineage затрагивает путь, используемый также
+Кросс-таблицей. **Нужен ответ владельца до общей правки**, без нового
+декодера, отключения provenance или увеличения 50×8/1 МиБ.
+Оценка после решения о точном чтении: 2–3 цикла (вход/роли/mappings,
+пустота/точный Variant, persistence и бизнес-прогоны).
+
+Инертная карточка типа 2771 → **3173 Б**, маршрут навыка **142 Б**,
+узловой файл **1794 Б**; все hash-поля карточки нулевые.
+SKILL.md остаётся 28178 Б, маршрутизация уже есть.
+На базе сжатый apply 14539 Б, полная inputSchema 64170 Б (без предела).
+Схема параметров unpivot не расширяется: меняется допустимый эффективный
+тип входа. Изменять общий сжатый контракт не предлагается.

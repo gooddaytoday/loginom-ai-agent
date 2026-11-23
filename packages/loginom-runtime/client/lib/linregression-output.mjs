@@ -1,9 +1,14 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Linear regression output: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function linRegressionOutputColumns(configuration,port){
  const target=configuration.fields.find(f=>f.usage_type===4);need(target,'one configured target required');
+ // Full native statistics: only Name/coefficient labels are observed, so
+ // port 1 is checked by native order, names and types (as logistic regression).
+ if(port===1&&configuration.statistics==='full')return [...['Name','DisplayName','UniqueValues'].map(name=>({name,type:'string'})),
+  ...['coefficients','stdError','TStat','PValue','lowerBound','upperBound'].map(suffix=>({name:target.name+'_'+suffix,type:'real'}))];
  return port===0?[{name:target.name+'_rergession',label:target.label+'|Регрессия',type:'real'},...configuration.fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}))]
   :[{name:'Name',label:'Имена входных полей',type:'string'},{name:target.name+'_coefficients',label:target.label+'|Коэффициенты',type:'real'}];
 }
@@ -12,6 +17,26 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  // Inactive intrinsic outputs may expose only exclusions. Preserve them;
  // verify the actual prediction/coefficient schemas after native Execute.
  if(configuration.mode==='apply')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
+  ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)})),saved_full_schema:linRegressionOutputColumns({...configuration,statistics:'full'},1)};
+ // Native autosync regenerates pass-through fields in role order after cold
+ // activation. Pin the approved regularized/holdout layout before training.
+ if(['lasso','elastic'].includes(configuration.mode)||configuration.partition?.method==='sequential'||configuration.indicators?.length){
+  await channel.openOutputPort(0);
+  const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
+  let state=await observe('complete LASSO prediction mapping');const expected=linRegressionOutputColumns(configuration,0);
+  need(state.node_mapping.target_fields.length===expected.length&&expected.every(e=>state.node_mapping.target_fields.filter(f=>!f.excluded&&['name','label','type'].every(k=>f[k]===e[k])).length===1),'prediction mapping differs from configured fields');
+  await configureOutputAutosync(channel,false);
+  state=await observe('LASSO prediction mapping before ordering');
+  if(state.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
+   await reorderOutputFields(channel,expected.map(e=>state.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
+  state=await observe('stable LASSO prediction layout');
+  need(state.node_mapping.autosync===false&&state.node_mapping.target_fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'prediction order was not retained');
+  const definition=await readOutputDefinitionPages(channel,{expectedCount:expected.length});
+  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'rendered prediction order differs');
+  await finishWizard('done',true,definition);
+ }
+ // A fresh Enter node exposes all nine native coefficient columns; keep them.
+ if(configuration.statistics==='full')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
   ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  await channel.openOutputPort(1);
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
@@ -59,10 +84,14 @@ export async function readLinRegressionOutputs(channel,read,ctx,mapped){
  const ports=[];
  for(const port of read.ports){
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
-  const expected=mapped.ports.find(p=>p.port===port)?.schema;
-  need(expected&&output.schema.length===expected.length&&new Set(output.schema.map(c=>c.name)).size===output.schema.length,'unexpected coefficient or prediction fields');
-  const aligned=alignReadSchema(output.schema,expected);
-  output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  // Apply preserves the saved coefficient selection: two columns or all nine.
+  const expected=port===1&&mapped.saved_full_schema?.length===output.schema.length?mapped.saved_full_schema:mapped.ports.find(p=>p.port===port)?.schema;
+  need(expected&&output.schema.length===expected.length&&new Set(output.schema.map(c=>c.name)).size===output.schema.length,'unexpected coefficient or prediction fields'+(port===1&&expected?.length===9?'; statistics:"full" needs all nine native columns, which an earlier coefficients-only setup of this node excluded':''));
+  if(port===1&&expected.length===9)need(output.schema.every((field,index)=>field.index===index&&field.name===expected[index].name&&field.type===expected[index].type),'full coefficient field names, types or order differ');
+  else{
+   const aligned=alignReadSchema(output.schema,expected);
+   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  }
   ports.push(output);
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'regression outputs must have distinct native ports');

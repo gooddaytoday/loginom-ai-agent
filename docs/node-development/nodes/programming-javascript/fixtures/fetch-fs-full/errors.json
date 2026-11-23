@@ -1,0 +1,7 @@
+[
+  {"case":"missing","path":"/missing","status":404,"outcome":"http_error"},
+  {"case":"failure","path":"/failure","status":500,"outcome":"http_error"},
+  {"case":"malformed","path":"/malformed","status":200,"outcome":"invalid_json"},
+  {"case":"slow","path":"/slow?ms=3000","status":null,"outcome":"aborted"},
+  {"case":"tls","path":"/tls","status":null,"outcome":"tls_error"}
+]

@@ -1,0 +1,24 @@
+{
+  "writer": {
+    "product": "Loginom",
+    "version": "7.4.2",
+    "bitness": 64,
+    "compression": "LZ4",
+    "checksum": "Сжатых данных"
+  },
+  "provenance": "Native LGD export wizard; variable-b source is the same scalar table with RecordId+10, explicitly replacing RecordId and retaining label Идентификатор.",
+  "known_values": "../properties-values.csv",
+  "known_schema": "../properties-schema.json",
+  "files": [
+    {
+      "name": "variable-a.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13"
+    },
+    {
+      "name": "variable-b.lgd",
+      "bytes": 359,
+      "sha256": "2d8c92359169c9ca1fc82d1e20f0d3c8ab211de76c3bbddda447263dcf7905f3"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "JSON",
+          "name_any": true,
+          "label_any": true,
+          "type": "string",
+          "comparison": "json_ast"
+        }
+      ],
+      "rows": [
+        {
+          "JSON": "{\"roots\":[{\"id\":\"B\",\"parent_id\":null,\"name\":\"Филиал\",\"children\":[{\"id\":\"B1\",\"parent_id\":\"B\",\"name\":\"Команда филиала\",\"children\":[]}]},{\"id\":\"A\",\"parent_id\":null,\"name\":\"Штаб\",\"children\":[{\"id\":\"A2\",\"parent_id\":\"A\",\"name\":\"Второй отдел\",\"children\":[]},{\"id\":\"A1\",\"parent_id\":\"A\",\"name\":\"Первый отдел\",\"children\":[]}]}]}"
+        }
+      ]
+    }
+  ]
+}

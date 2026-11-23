@@ -3,8 +3,72 @@ import assert from 'node:assert/strict';
 import {validateRestRequestParameters,restRequestParametersSchema} from '../lib/rest-request-parameters.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('C10 validates the optional error descriptions flag and attests its observed value',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ const node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const readbackValidator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ for(const produce_error_descriptions of [false,true]){
+  const p={...parameters(),produce_error_descriptions};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+  const phases=[{phase:'configure',status:'verified',receipt_id:'c10:configure',value:{configuration:{verified:true,node_context:node,query_parameters:[],produce_error_descriptions}}},
+   {phase:'node_finish',status:'verified',receipt_id:'c10:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+  const readback=restRequestReadback({node,phases,operation_id:'c10'});
+  assert.equal(readback.produce_error_descriptions,produce_error_descriptions);
+  assert.equal(readbackValidator(readback).valid,true);
+ }
+ for(const produce_error_descriptions of [null,0,1,'false',{},[]]){
+  const p={...parameters(),produce_error_descriptions};
+  assert.equal(validate(p).valid,false);
+  assert.throws(()=>validateRestRequestParameters(p,'request',request),/produce_error_descriptions/);
+ }
+});
+test('C8 validates simulation paths and disabling before mutation',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ for(const simulation of [{enabled:true,file_path:'/own/response.json'},{enabled:false}]){
+  const p={connection:{name:'Offline'},query_parameters:[],simulation};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',{...request,inputs:[]}));
+ }
+ for(const simulation of [{},{enabled:'true'},{enabled:true},{enabled:true,file_path:'relative.json'},
+  {enabled:true,file_path:'/own/../other.json'},{enabled:true,file_path:'/own/a\n.json'},
+  {enabled:true,file_path:'/own/a.json',extra:true}])
+  assert.throws(()=>validateRestRequestParameters({connection:{name:'Offline'},query_parameters:[],simulation},'request',{...request,inputs:[]}),/simulation/);
+});
+test('C8 readback retains the observed simulation on the same committed node',()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'},simulation={enabled:true,file_path:'/own/response.json'};
+ const phases=[{phase:'configure',status:'verified',receipt_id:'c8:configure',value:{configuration:{verified:true,node_context:node,query_parameters:[],simulation}}},
+  {phase:'node_finish',status:'verified',receipt_id:'c8:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+ assert.deepEqual(restRequestReadback({node,phases,operation_id:'c8'}).simulation,simulation);
+});
+test('C4 accepts a header bound to a string variable through native variables input 0',()=>{
+ const p={...parameters(),headers:[{name:'X-Lab-Cycle',value:{variable:'Cycle'}}]};
+ const r={...request,variable_inputs:[{kind:'variables',input:0}]};
+ assert.equal(new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema)(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',r));
+ for(const value of [{variable:''},{variable:'Cycle',value:'first'},{variable:12}])
+  assert.throws(()=>validateRestRequestParameters({...p,headers:[{name:'X-Test',value}]},'request',r));
+ assert.throws(()=>validateRestRequestParameters(p,'request',request),/variable input/);
+ assert.throws(()=>validateRestRequestParameters(p,'request',{...r,variable_inputs:[{kind:'control',input:0}]}),/variable input/);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',{...request,target:{kind:'existing'}}));
+});
+for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 validates '+method+' and its body before mutation',()=>{
+ const p={...parameters(),connection:{...parameters().connection,method,...(method==='DELETE'?{}:{request_content_type:'application/json'})},...(method==='DELETE'?{}:{body_field:'Body'})};
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ assert.equal(validate(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ assert.throws(()=>validateRestRequestParameters(p,'request',{...request,inputs:[]}),/table input/);
+ for(const body_field of [null,'',42])assert.throws(()=>validateRestRequestParameters({...p,body_field},'request',request));
+ if(method!=='DELETE'){
+  const missing=structuredClone(p);delete missing.body_field;
+  assert.throws(()=>validateRestRequestParameters(missing,'request',request),/body_field/);
+  assert.throws(()=>validateRestRequestParameters({...p,body_field:'Key'},'request',request),/body.*query|query.*body/);
+ }
+ if(method==='DELETE')assert.throws(()=>validateRestRequestParameters({...p,body_field:'Body'},'request',request),/body/);
+});
 test('plain GET accepts an empty query list and no table input through schema and runtime validation',()=>{
  const p={connection:{name:'Plain',base_url:'https://httpbin.org/status/200',response_content_type:'text/html'},query_parameters:[]};
  const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
@@ -16,13 +80,13 @@ test('plain GET accepts an empty query list and no table input through schema an
  assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,inputs:[]}),/one table input/);
 });
 test('REST response Content-Type is an explicit optional connection setting',()=>{
- for(const response_content_type of ['application/json','text/html']){
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
   const p=parameters();p.connection.response_content_type=response_content_type;
   assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
   delete p.connection.base_url;
   assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
  }
- for(const response_content_type of [null,true,1,'','text/plain','text/html; charset=utf-8','*/*']){
+ for(const response_content_type of [null,true,1,'','application/xml','text/html; charset=utf-8','text/*']){
   const p=parameters();p.connection.response_content_type=response_content_type;
   assert.throws(()=>validateRestRequestParameters(p,'request',request),/response_content_type/);
  }
@@ -54,10 +118,55 @@ test('REST refuses credentials, unsupported settings and invalid bindings before
  for(const url of ['file:///tmp/request','https://user:secret@example.org/','https://example.org/?token=secret','https://example.org/#fragment','not a URL']){
   const p=parameters();p.connection.base_url=url;assert.throws(()=>validateRestRequestParameters(p,'request',request),/base_url/);
  }
- for(const patch of [{method:'POST'},{authentication:'Basic'},{verify_certificate:false},{headers:[]},{body:'data'}])
+ for(const patch of [{method:'POST'},{authentication:'Basic'},{verify_certificate:false},{body:'data'}])
   assert.throws(()=>validateRestRequestParameters({...parameters(),...patch},'request',request),/stage 1/);
  const duplicate=parameters();duplicate.query_parameters.push({name:'Key',field:'Other'});
  assert.throws(()=>validateRestRequestParameters(duplicate,'request',request),/unique/);
  assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,inputs:[{input:2}]}),/input 0/);
  assert.throws(()=>validateRestRequestParameters({},'request',request),/requires/);
+});
+test('C2 literal headers replace explicitly, preserve on omission and validate before mutation',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ for(const headers of [[],[{name:'X-Lab-Cycle',value:'first'}],[{name:'X-Empty',value:''}]]){
+  const p={...parameters(),headers};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ }
+ for(const headers of [null,{},Array(33).fill({name:'X-Test',value:'a'}),
+  [{name:'Bad Name',value:'x'}],[{name:'X-Test',value:'a\r\nb'}],
+  [{name:'X-Test',value:{variable:'Cycle'}}],[{name:'Authorization',value:'secret'}],
+  [{name:'X-Test',value:'a'},{name:'x-test',value:'b'}],
+  [{name:'X-Test',value:'a',extra:true}]]){
+  assert.throws(()=>validateRestRequestParameters({...parameters(),headers},'request',request),/header/i);
+ }
+});
+for(const name of ['X-Api-Key','api-key','X-Auth-Token','x-access-token','X-CSRF-Token','Token','X-Secret','X-Password','X-Auth','Service-ApiKey-Id','AUTHORIZATION','Cookie','proxy-authorization','Set-Cookie'])
+test('C2 refuses credential header before mutation: '+name,()=>{
+ assert.throws(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'private'}]},'request',request),/credential headers/);
+});
+for(const name of ['Content-Type','content-length','HOST'])test('C2 refuses native transport header before mutation: '+name,()=>{
+ assert.throws(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'override'}]},'request',request),/transport headers/);
+});
+test('C2 accepts harmless header names containing partial credential words',()=>{
+ for(const name of ['X-Lab-Cycle','X-Author','X-Tokenizer','X-Secretariat'])assert.doesNotThrow(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'public'}]},'request',request));
+});
+
+for(const method of ['POST','PUT','PATCH'])test('C5 validates raw XML bodies for '+method,()=>{
+ const p={connection:{name:'XML',method,request_content_type:'application/xml'},query_parameters:[],body_field:'Body'};
+ assert.equal(new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema)(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ for(const request_content_type of ['text/xml','*/*','application/xml; charset=UTF-8'])
+  assert.throws(()=>validateRestRequestParameters({...p,connection:{...p.connection,request_content_type}},'request',request),/request_content_type/);
+});
+test('C5 public readback accepts observed MIME values with simulation and variable headers',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
+  const node={document_id:'d',workflow_id:'w',node_id:'n'};
+  const connection={name:'XML',base_url:'https://httpbin.org/anything',method:'POST',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:[],reference_node_id:'ref',request_content_type:'application/xml',response_content_type};
+  const phases=[{phase:'configure',status:'verified',receipt_id:'c5:configure',value:{configuration:{verified:true,node_context:node,method:'POST',body_field:'Body',query_parameters:[],connection,simulation:{enabled:false,file_path:''},headers:[{name:'X-Cycle',value:{variable:'Cycle'}}]}}},
+   {phase:'node_finish',status:'verified',receipt_id:'c5:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+  const readback=restRequestReadback({node,phases,operation_id:'c5'});
+  assert.deepEqual(readback.connection,connection);
+  assert.equal(validate(readback).valid,true,JSON.stringify(validate(readback).errors));
+ }
 });

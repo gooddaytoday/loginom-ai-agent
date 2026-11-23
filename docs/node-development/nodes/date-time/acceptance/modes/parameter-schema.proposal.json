@@ -1,0 +1,104 @@
+{
+  "type": "object",
+  "properties": {
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "input_field"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                "description": "ASCII name; title=label."
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "transformations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "year",
+                    "quarter",
+                    "month",
+                    "day_of_month",
+                    "hour",
+                    "minute",
+                    "second",
+                    "year_start",
+                    "year_end",
+                    "quarter_start",
+                    "quarter_end",
+                    "month_start",
+                    "month_end",
+                    "date",
+                    "iso_year",
+                    "iso_week",
+                    "iso_week_start",
+                    "day_of_week",
+                    "string_year",
+                    "string_date",
+                    "string_time",
+                    "string_custom"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "format": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Required only for string_custom: observed numeric markers %Y %Q %m %d %H %i %s %u; civil time, no parsing/timezone conversion. Other operations use their native format."
+                }
+              },
+              "required": [
+                "operation",
+                "name",
+                "label"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 12,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "field",
+          "transformations"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 128,
+      "minItems": 0
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

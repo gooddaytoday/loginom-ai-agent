@@ -1,7 +1,7 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {autoCorrelationParametersSchema} from './node-api.mjs';
 import {validateAutoCorrelationParameters,resolveAutoCorrelationField} from './auto-correlation-parameters.mjs';
-import {preflightTabularSource} from './sorting-preflight.mjs';
+import {preflightAutoCorrelationSource} from './auto-correlation-preflight.mjs';
 import {configureAutoCorrelation} from './auto-correlation-procedure.mjs';
 import {autoCorrelationConfigurationReadback} from './auto-correlation-readback.mjs';
 import {readAutoCorrelationOutputs} from './auto-correlation-output.mjs';
@@ -9,7 +9,7 @@ export function createAutoCorrelationNodeSupport(config){return createTabularTra
  type:'research.auto_correlation',mode:'time_domain',revision:'auto-correlation-v1-internal-1',parameterSchema:autoCorrelationParametersSchema,
  validate:validateAutoCorrelationParameters,readback:autoCorrelationConfigurationReadback,
  validateInput:(p,resolved,native)=>{if(p.autocorrelation?.field!==undefined)resolveAutoCorrelationField(p,resolved.fields??native.target_fields);},
- preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.autocorrelation?.field!==undefined,resolve:resolveAutoCorrelationField,label:'auto_correlation'}),
+ preflight:preflightAutoCorrelationSource,
  configurationObservation:{condition:'autocorrelation input roles',readAutoCorrelation:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_auto_correlation?.verified===true},
  async configure(channel,p,context){
   if(context.request.finish==='close'){

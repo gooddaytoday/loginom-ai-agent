@@ -8,7 +8,7 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlace
 
 // LAB-636 :2567 / LAB-656 DOM: the collapsed workarea splitter starts at
 // y=794, while the requested grid origin projects to y=793.9779209731565.
-for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog'])test('minimum-scale placement under '+cover,{
+for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog','beyond_canvas'])test('minimum-scale placement under '+cover,{
  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:20000,
 },async()=>{
  const {chromium}=await import('playwright-core');
@@ -48,19 +48,36 @@ for(const cover of ['owned_splitter','splitter_child','foreign_splitter','dialog
     globalThis.testGraph.nodes.push({ref:{document_id:'doc',workflow_id:'flow',node_id:'created'},type:'transform.calculator',label:'Calculator',dom_epoch:2,position:{x,y},locked:false,inputs:[0],outputs:[0]});
    });
   },{cover,graph});
-  const root=page.locator('#graph'),position={x:2400,y:1800};
+  const root=page.locator('#graph'),position=cover==='beyond_canvas'?{x:2560,y:400}:{x:2400,y:1800};
   const initial=nodePlacementPoint(await root.evaluate(nodePlacementViewport),position);
   assert.equal(await root.evaluate((e,p)=>e.contains(document.elementFromPoint(p.x,p.y)),initial),false);
   const read=()=>page.evaluate(()=>globalThis.testGraph);
   const result=await mutateGraph(page,{deadline:Date.now()+15000,request:{document_id:'doc',workflow_ref},
    types:{'transform.calculator':{title:'Calculator',palette_group:'Data'}},effect:{id:'create',kind:'create',parameters:{type:'transform.calculator',position},before:graph}},
-   read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph);
+   read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph,nodePlacementOverflow,nodePlacementGap);
   const owned=cover==='owned_splitter'||cover==='splitter_child';
   assert.equal(result.status,owned?'SUCCEEDED':'NOT_APPLIED',result.error);
   assert.equal(result.cleanup_complete,true);
   const drops=await page.evaluate(()=>globalThis.drops);
   assert.equal(drops.length,owned?1:0);
   assert.equal(await page.locator('#outline').isVisible(),false);
+  if(cover==='beyond_canvas'){
+   assert.match(result.error,/position \(2560,400\).*outside.*canvas.*zoom.*scroll/i);
+   assert.match(result.error,/38\.55%/);
+   assert.equal(result.effect_possible,false);
+   assert.deepEqual(await read(),graph);
+   assert.deepEqual(result.placement_refusal.requested_position,position);
+   const suggested=result.placement_refusal.suggested_position;
+   assert.ok(suggested,'a reachable model position is supplied before any drag');
+   assert.match(result.error,/repeat.*position.*operation/i);
+   assert.ok(suggested.x<position.x);
+   const retry=await mutateGraph(page,{deadline:Date.now()+15000,request:{document_id:'doc',workflow_ref},
+    types:{'transform.calculator':{title:'Calculator',palette_group:'Data'}},effect:{id:'create-retry',kind:'create',parameters:{type:'transform.calculator',position:suggested},before:await read()}},
+    read,null,nodePlacementViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph,nodePlacementOverflow,nodePlacementGap);
+   assert.equal(retry.status,'SUCCEEDED',retry.error);
+   assert.deepEqual(retry.after.nodes[0].position,suggested);
+   assert.equal((await page.evaluate(()=>globalThis.drops)).length,1);
+  }
   if(owned){
    assert.equal(drops[0].inside,true);
    assert.deepEqual(result.after.nodes[0].position,position);
@@ -207,7 +224,7 @@ test('crowded automatic placement chooses a bounded row beyond all observed draw
  assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
  assert.ok(f.state().clicks>0);assert.equal(f.state().open,false);
 });
-test('browser automatic placement retains overflow coordinates in its serialized evaluator',async()=>{
+test('browser automatic placement offers a collision-checked overflow row beyond the occupied viewport',async()=>{
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'imports.text'},inputs:[]};
  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
  const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
@@ -215,7 +232,65 @@ test('browser automatic placement retains overflow coordinates in its serialized
  const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
  const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
- assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+ const position=await adapter.choosePosition(request,graph,Date.now()+10000);
+ assert.ok(position.y>box.bottom);
+ assert.equal(nodePlacementGap({scale:1},position,[box]),true);
+});
+test('automatic placement reveals free native canvas below the crowded viewport before zooming',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:20000,
+},async()=>{
+ const {chromium}=await import('playwright-core');
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
+  await page.setContent(`<style>body{margin:0}#canvas{position:absolute;left:324px;top:100px;width:800px;height:600px;overflow:auto}
+   #occupied{position:absolute;left:0;top:0;width:780px;height:600px}</style>
+   <div id="canvas" data-tid="MF;TF;ModelForm;cmpDiagram"><div style="width:780px;height:1600px"></div>
+   <div id="occupied" data-tid="MF;TF;Graph;existing"></div></div>`);
+  await page.evaluate(()=>{
+   const canvas=document.querySelector('#canvas');
+   globalThis.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}}})}}}}}}};
+  });
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'exports.text'},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>code.includes('async function readGraph')?graph:Function('return ('+code+')')()(page)});
+  const position=await adapter.choosePosition(request,graph,Date.now()+15000);
+  assert.ok(position.y>600,'the new row must be outside the initially occupied viewport');
+  const root=page.locator('#canvas');
+  const navigation=await revealNodePlacement({page,root,position,prefix:'MF;TF',remaining:()=>10000,scrollNode:true,
+   readViewport:nodePlacementViewport,project:nodePlacementPoint,guard:async()=>{
+    assert.equal(await page.locator('[data-tid*=";Graph;"]').count(),1);
+   }});
+  assert.equal(navigation.fully_visible,true);
+  assert.equal(navigation.zoom_steps,0);
+  assert.ok(navigation.navigation_steps.some(s=>s.action==='scroll'));
+  const occupied=await page.locator('#occupied').evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};});
+  assert.equal(nodePlacementGap(navigation.view,navigation.point,[occupied]),true);
+  assert.deepEqual(request.target,{kind:'new',type:'exports.text'});
+ }finally{await browser.close();}
+});
+for(const cover of ['canvas','foreign','dialog'])test('LAB-1693 final4 automatic fallback stays reachable under '+cover,async()=>{
+ const recorded=JSON.parse(await readFile(new URL('./fixtures/auto-place-final4.json',import.meta.url),'utf8'));
+ const v=recorded.view,box={...v,right:v.x+v.width,bottom:v.y+v.height};
+ const occupied=recorded.rects.map(([x,y,width,height])=>({x,y,width,height,left:x,top:y,right:x+width,bottom:y+height}));
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(b=>({getBoundingClientRect:()=>b})),scrollLeft:v.scroll.x,scrollTop:v.scroll.y,contains:element=>cover==='dialog'&&element===hit,closest:()=>null};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:v.scale,translate:v.translate}}}}};
+ const hit=cover==='canvas'?canvas:{closest:()=>cover==='dialog'?{}:null};
+ const context={innerWidth:v.viewportWidth,innerHeight:v.viewportHeight,document:{elementFromPoint:(x,y)=>x>=v.x&&x<box.right&&y>=v.y&&y<box.bottom?hit:null},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ assert.deepEqual(nodePlacementPoint(v,recorded.refused),recorded.screen_point);
+ assert.deepEqual(nodePlacementOverflow(v,occupied,64,10000),recorded.refused);
+ for(const type of ['transform.union_data','exports.text']){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>code.includes('async function readGraph')?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+  const result=adapter.choosePosition(request,graph,Date.now()+10000);
+  if(cover!=='canvas'){await assert.rejects(result,/no free visible canvas position/);continue;}
+  const position=structuredClone(await result),point=nodePlacementPoint(v,position);
+  assert.deepEqual(position,recorded.suggested);
+  assert.ok(point.x>=v.x+8&&point.x<=box.right-8&&point.y>=v.y+8&&point.y<=box.bottom-8);
+  assert.equal(nodePlacementGap(v,point,occupied),true);
+  assert.equal(request.target.position,undefined);
+ }
 });
 test('overflow remains beyond occupied drawings under zoom, translation and scroll',()=>{
  for(const scale of [.5,1,2]){

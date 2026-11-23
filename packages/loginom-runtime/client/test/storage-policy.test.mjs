@@ -47,3 +47,77 @@ test('storage binding records observed account independently of the selected dir
   assert.ok(Object.isFrozen(binding) && Object.isFrozen(binding.directories));
   assert.throws(() => createStorageBinding({ sessionId: 's', origin: 'http://loginom.local/path', build: '7.4.2', documentId: 'd', account: 'a', directories }));
 });
+
+test('folder listing scrolls virtual Files rows to the native count and reports truncation honestly',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const prefix='MF;TF-1',dir='/in/Silent Talk/customers',names=Array.from({length:6},(_,i)=>'part'+i+'.csv');
+ const make=(native)=>{
+  let top=0;const acts=[];
+  const state=()=>{const first=Math.floor(top/100);return {observation_id:'obs-'+top,workflow_ref:{prefix},file_storage:{status:'observed',directory:dir},
+   ui:{elements:names.slice(first,first+2).map((name,i)=>({bounding_box:{x:0,y:i*100,width:100,height:100},tid:prefix+';FileStorageForm;colName_'+name,label:name,allowed_actions:['scroll'],
+    interaction:{state:'point_observed'},scroll:{ref:'grid',top,max_top:400},storage_entry:{kind:'file',path:dir+'/'+name,bytes:1,mtime:'t',
+     server_source_ref:'storage-'+name,...(native?{directory_entries:native}:{})}}))}};};
+  return {acts,options:{destination:dir,pattern:'*.csv',guard:()=>{},ready:async probe=>probe(),
+   roots:async()=>({observation_id:'roots',workflow_ref:{prefix},ui:{elements:[{tid:prefix+';FileStorageForm;pnlFileStorage;tbl',ref:'ui-table'}]}}),
+   read:async()=>state(),act:async(s,e,verb,extra)=>{acts.push([verb,extra.delta_y]);top+=extra.delta_y;}}};
+ };
+ let f=make(6),out=await listStorageDirectory(f.options);
+ assert.deepEqual(out.entries.map(e=>e.name),names);assert.equal(out.complete,true);assert.equal(out.files_matched,6);
+ assert.deepEqual(f.acts,[['scroll',100],['scroll',100],['scroll',100],['scroll',100]]);
+ // Without a native count, only the scroll end proves completeness.
+ f=make(null);out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,null);assert.equal(out.entries.length,6);
+ // A larger native count than the rows reachable is never reported complete.
+ f=make(9);out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,false);assert.equal(out.entries.length,6);
+});
+
+test('folder listing bounds the serialized response in UTF-8 bytes for Cyrillic names (LAB-1468 P2)',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const prefix='MF;TF-1',dir='/вход/Сайлент Ток/транзакции_клиентов',names=Array.from({length:65},(_,i)=>'Выгрузка_операций_клиентов_за_период_'+String(i).padStart(2,'0')+'.csv');
+ const state={observation_id:'obs',workflow_ref:{prefix},file_storage:{status:'observed',directory:dir},
+  ui:{elements:names.map(name=>({tid:prefix+';FileStorageForm;colName_'+name,label:name,allowed_actions:[],
+   storage_entry:{kind:'file',path:dir+'/'+name,bytes:1048576,mtime:'2026-11-12T22:34:51.000Z',server_source_ref:'storage-00000000-0000-4000-8000-'+String(names.indexOf(name)).padStart(12,'0'),directory_entries:65}}))}};
+ const out=await listStorageDirectory({destination:dir,pattern:'*.csv',guard:()=>{},ready:async probe=>probe(),
+  roots:async()=>({observation_id:'roots',workflow_ref:{prefix},ui:{elements:[{tid:prefix+';FileStorageForm;pnlFileStorage;tbl',ref:'ui-table'}]}}),
+  read:async()=>structuredClone(state),act:async()=>assert.fail('no scroll')});
+ // The executor envelope around output, with the longest allowed operation_id.
+ const reply={result_version:'user-v1',operation_id:'x'.repeat(128),status:'SUCCEEDED',action_key:'storage.list',cleanup_complete:true,effect_possible:true,output:out};
+ assert.ok(Buffer.byteLength(JSON.stringify(reply))<=24000,'reply '+Buffer.byteLength(JSON.stringify(reply))+' B');
+ assert.equal(out.truncated,true);assert.equal(out.complete,true);assert.equal(out.files_matched,65);
+ assert.ok(out.entries.length>0&&out.entries.length<65);
+ assert.deepEqual(out.entries.map(e=>e.name),names.slice(0,out.entries.length));
+});
+
+// LAB-1843 (lab1823-r08 main :292): a 1343-entry pair folder was listed in
+// 200 px steps and never finished in 90 s. Rows are 24 px, 58 rendered.
+const grown=(count,{rendered=58,skip=0}={})=>{
+ const prefix='MF;TF-1',dir='/pair',names=Array.from({length:count},(_,i)=>'f'+String(i).padStart(5,'0')+'.csv');
+ const height=24,max_top=count*height-671;let top=0;const acts=[];
+ const state=()=>{const first=Math.max(0,Math.floor(top/height)-8);return {observation_id:'obs-'+top,workflow_ref:{prefix},file_storage:{status:'observed',directory:dir},
+  ui:{elements:names.slice(first,first+rendered).map((name,i)=>({bounding_box:{x:0,y:(first+i)*height-top,width:400,height:23},tid:prefix+';FileStorageForm;colName_'+name,label:name,
+   allowed_actions:['scroll'],interaction:{state:(first+i)*height>=top?'point_observed':'outside_viewport'},scroll:{ref:'grid',top,max_top},
+   storage_entry:{kind:'file',path:dir+'/'+name,bytes:1,mtime:'t',server_source_ref:'storage-'+name,directory_entries:count}}))}};};
+ return {acts,names,options:{destination:dir,guard:()=>{},ready:async probe=>probe(),
+  roots:async()=>({observation_id:'roots',workflow_ref:{prefix},ui:{elements:[{tid:prefix+';FileStorageForm;pnlFileStorage;tbl',ref:'ui-table'}]}}),
+  read:async()=>state(),act:async(s,e,verb,extra)=>{acts.push(extra.delta_y);top=Math.min(max_top,top+extra.delta_y+skip);}}};
+};
+test('a 1000-entry folder is listed with gesture-bounded strides from the rendered row span',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1000),out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,1000);assert.equal(out.files_matched,1000);
+ assert.ok(f.acts.every(d=>d>0&&d<=1000));assert.equal(f.acts[0],1000);assert.ok(f.acts.length<=24,String(f.acts.length));
+});
+// Live 95ae7a09 (text-file-info main :114): 1012 native entries stopped at
+// 1005 seen by the old 1000-entry cap, before the sorted-last sales_* files.
+test('a 1300-entry folder is complete through its last sorted files',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1300),out=await listStorageDirectory({...f.options,pattern:'f0129*'});
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,1300);assert.equal(out.files_matched,10);
+ assert.deepEqual(out.entries.map(e=>e.name).slice(0,2),['f01290.csv','f01291.csv']);assert.ok(f.acts.length<=32,String(f.acts.length));
+});
+test('a listing scroll that renders no previously read row is refused, not silently skipped',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const f=grown(1000,{skip:2000});
+ await assert.rejects(listStorageDirectory(f.options),/skipped rows/);assert.equal(f.acts.length,1);
+});

@@ -1,0 +1,71 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "export_destination": "type.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 2,
+          "Value": "text"
+        }
+      ]
+    }
+  ],
+  "excel_auto": {
+    "mode": "Все",
+    "initial": "types-a.xlsx",
+    "file": "types-b.xlsx",
+    "initial_output": {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Value",
+          "label": "Value",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Value": 10
+        }
+      ]
+    }
+  }
+}

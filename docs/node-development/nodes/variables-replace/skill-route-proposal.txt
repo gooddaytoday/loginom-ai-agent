@@ -1,0 +1,1 @@
+- `variables.replace`: точная замена переменных — [узел](references/nodes/variables.replace.md).

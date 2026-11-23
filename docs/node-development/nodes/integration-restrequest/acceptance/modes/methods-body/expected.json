@@ -1,0 +1,91 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "methods-body.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Method",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Response",
+          "type": "string",
+          "label_any": true,
+          "comparison": "rest_echo"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 0,
+          "Method": "POST",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"POST\", \"data\": \"{\\\"amount\\\":10,\\\"note\\\":\\\"Привет & + /\\\"}\"}"
+        },
+        {
+          "RowID": 1,
+          "Method": "POST",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"POST\", \"data\": \"{\\\"amount\\\":20,\\\"note\\\":\\\"second\\\"}\"}"
+        },
+        {
+          "RowID": 0,
+          "Method": "PUT",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"PUT\", \"data\": \"{\\\"amount\\\":10,\\\"note\\\":\\\"Привет & + /\\\"}\"}"
+        },
+        {
+          "RowID": 1,
+          "Method": "PUT",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"PUT\", \"data\": \"{\\\"amount\\\":20,\\\"note\\\":\\\"second\\\"}\"}"
+        },
+        {
+          "RowID": 0,
+          "Method": "PATCH",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"PATCH\", \"data\": \"{\\\"amount\\\":10,\\\"note\\\":\\\"Привет & + /\\\"}\"}"
+        },
+        {
+          "RowID": 1,
+          "Method": "PATCH",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"PATCH\", \"data\": \"{\\\"amount\\\":20,\\\"note\\\":\\\"second\\\"}\"}"
+        },
+        {
+          "RowID": 0,
+          "Method": "DELETE",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"DELETE\", \"data\": \"\"}"
+        },
+        {
+          "RowID": 1,
+          "Method": "DELETE",
+          "HttpStatusCode": 200,
+          "Response": "{\"method\": \"DELETE\", \"data\": \"\"}"
+        }
+      ]
+    }
+  ]
+}

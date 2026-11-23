@@ -10,7 +10,7 @@ const partition=groups=>groups.map(g=>[...g].sort((a,b)=>a-b)).sort((a,b)=>a[0]-
 // The stock matcher still owns exact typed source values and sample-SD distances.
 export function checkClusteringRound(expected,records,{raw=false}={}){
  const c=expected.clustering_normalized;
- need(c?.version===1&&c.normalization==='standardize'&&c.clusters===3&&c.seed===42&&same(c.features,['X','Y']),'CONTRACT');
+ need([1,2].includes(c?.version)&&['standardize','scale_minus_one_one','scale_zero_one','absolute_scale'].includes(c.normalization)&&c.clusters===3&&c.seed===42&&same(c.features,['X','Y']),'CONTRACT');
  need(records.length===2&&new Set(records.map(r=>r.output_port)).size===2,'BOTH_PORTS');
  const tables=records.map(record=>{
   const data=record.data,want=expected.outputs.find(o=>o.output_port===record.output_port);
@@ -37,7 +37,7 @@ export function checkClusteringRound(expected,records,{raw=false}={}){
  need(new Set(centers.map(r=>r.Cluster)).size===c.clusters,'CLUSTER_COUNT');
  const groups=centers.map(center=>{
   const rows=assigned.filter(r=>r.Cluster===center.Cluster);need(rows.length>0,'EMPTY_CLUSTER');
-  need(c.features.every(k=>Math.abs(center[k]-rows.reduce((n,r)=>n+r[k],0)/rows.length)<=1e-6),'ORIGINAL_UNIT_MEAN');
+  need(c.features.every(k=>Math.abs(center[k]-rows.reduce((n,r)=>n+r[k],0)/rows.length)<=(c.version===2?Math.max(1e-8,Math.abs(center[k])*1e-10):1e-6)),'ORIGINAL_UNIT_MEAN');
   return rows.map(r=>r.RowID);
  });
  need(same(partition(groups),partition(raw?c.raw_groups:c.groups)),'SCALE_PARTITION');
@@ -64,8 +64,8 @@ export function checkClusteringMain(expected,replies){
   rounds.set(id,{node:reply.node.node_id,normalization:config.normalization,
    values:checkClusteringRound(expected,records,{raw:config.normalization==='none'})});
  }
- const values=[...rounds.values()],normalized=values.filter(r=>r.normalization==='standardize'),raw=values.filter(r=>r.normalization==='none');
- need(new Set(values.map(r=>r.node)).size===1&&normalized.length>=2&&raw.length>=1,'SAME_NODE_RAW_AND_TWO_NORMALIZED');
+ const values=[...rounds.values()],normalized=values.filter(r=>r.normalization===c.normalization),raw=values.filter(r=>r.normalization==='none');
+ need(new Set(values.map(r=>r.node)).size===1&&normalized.length>=(c.version===2?1:2)&&raw.length>=(c.version===2?0:1)&&values.every(r=>r.normalization===c.normalization||r.normalization==='none'),'SAME_NODE_RAW_AND_TWO_NORMALIZED');
  need(normalized.every(r=>same(r.values,normalized[0].values)),'SEED_REPEAT');
  need(!same(partition(c.raw_groups),partition(c.groups)),'DISTINCT_PARTITIONS');
  return {node_id:normalized[0].node,ports:normalized[0].values,execution_ids:[...rounds.keys()]};
@@ -88,12 +88,12 @@ export async function observeClusteringSavedSettings({load,channel,expected}){
   await next('input_mapping');
   const norm=await channel.observe({condition:'cold clustering saved normalization',readClustering:true,
    ready:s=>s.wizard?.stage==='normalization'&&s.node_clustering?.verified===true&&s.node_clustering.fields.length===c.features.length});
-  need(same(norm.node_clustering.fields.map(f=>f.name),c.features)&&norm.node_clustering.fields.every(f=>f.norm_type===5),'SAVED_NORMALIZATION');
+  need(same(norm.node_clustering.fields.map(f=>f.name),c.features)&&norm.node_clustering.fields.every(f=>f.norm_type===({standardize:5,scale_minus_one_one:2,scale_zero_one:3,absolute_scale:4}[c.normalization])),'SAVED_NORMALIZATION');
   await next('normalization');
   const params=await channel.observe({condition:'cold clustering saved seed and count',readClustering:true,
    ready:s=>s.wizard?.stage==='clustering'&&s.node_clustering?.verified===true});
   need(params.node_clustering.auto===false&&params.node_clustering.clusters===c.clusters&&params.node_clustering.seed===c.seed,'SAVED_PARAMETERS');
-  return {normalization:'standardize',features:c.features,seed:c.seed,clusters:c.clusters,settings_applied:false};
+  return {normalization:c.normalization,features:c.features,seed:c.seed,clusters:c.clusters,settings_applied:false};
  }finally{
   const closed=await closePreparedWizard(channel);
   need(closed.verified&&closed.cleanup_complete&&closed.settings_applied===false,'CANCEL');

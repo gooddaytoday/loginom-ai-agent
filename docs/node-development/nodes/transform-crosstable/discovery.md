@@ -127,3 +127,80 @@ Native запись `bg.filedialog.FileStore`, привязанная к тек�
 - При заполненной видимой области автоматическое размещение нового узла отказывает; выручает свободный ряд ниже и штатное уменьшение масштаба.
 - Поле ниже видимой области списка мастера выбирается прокруткой единственного view.
 - Быстрые fill/Tab при смене источника импорта иногда оставляли прежний путь; между ними нужно наблюдение.
+
+## LAB-1120: агрегаты, Required и пустые ячейки (8 ноября 2026)
+
+Свежая ручная проверка только `https://app.loginom.ai/app/?testable=true`,
+Loginom 7.4.2, mas2, назначенный worker. Использован новый собственный черновик;
+другие пакеты не открывались. Локальная опора — `v040@ecb11c0e`.
+Это UI-исследование этапа 0; модель, CLI и cold-check не запускались.
+За время исследования разрывов сессии и переподключений не было.
+
+Палитра: `ModelForm;colVendors_Компоненты>Трансформация>Кросс-таблица;TreeText`.
+Поля выбираются по `WizrdMCF;CrossTabWizard;colDisplayName_<метка>`, функции —
+через запись `colUsedFields_<метка>` в `grdUsedFields`, двойной клик и
+`WizrdMCF;FactorEditDialog;grpFactors;chb`/`chb-1`…`chb-10`.
+При совпадении tid со строкой итога выбиралась настоящая `tr.x-grid-row`.
+Изменяются маска GroupFunctions и производные поля, а не порты: вход 0,
+выход 0 остаются табличными. Пустое измерение колонок также принято UI.
+
+| Тип факта | Доступная маска | Недоступные checkbox из 11 |
+|---|---:|---|
+| integer / real | 2047 | нет |
+| string / Boolean / Variant | 1934 | sum, avg, stddev, sum_squares |
+| DateTime | 1982 | sum, sum_squares |
+
+Все шесть типов проверены в своём FactorEditDialog, включая disabled-состояния
+контролов, и приняты Next/Execute. В полном списке ровно 11 функций из таблицы
+выше; медианы, моды, «Единственного» нет: **ограничение платформы 7.4.2**,
+а не недостающая кнопка handler. Источник Variant создан штатной Сверткой
+из `acceptance/data/variant-source.csv`, Key — информационное поле, остальные
+четыре — транспонируемые; «Пропускать пустые» выключено.
+
+На `fixtures/aggregate-values.csv` выполнены все 45 скалярных агрегатов:
+11 Amount + 11 Units + 7 Text + 7 Flag + 9 When, ключ Region. Выход — 2×46.
+Схема прочитана из привязанного к data-tid Preview ColumnInfos, без изменения JS.
+Сумма integer имеет тип real; Count/UniqueCount/NullCount — integer;
+Min/Max/First/Last сохраняют скалярный тип; Avg дат — DateTime, StdDev дат — real.
+Это подтверждение объявленных типов и UI-значений, не точных native-байтов.
+Видимый формат числа — два знака, поэтому точность binary64/миллисекунд
+доказывается стандартной приёмкой этапа 1, а не этим просмотром.
+
+North: Amount/Units = [1,3,5,NULL] → Sum=9, Count=4, Min=1, Max=5,
+Avg=3, StdDev отображается 2, SumSq=35, UniqueCount=3, NullCount=1,
+First=1, Last=NULL. Text = [z,a,z,NULL] → Count=4, Min=a, Max=z,
+UniqueCount=2, NullCount=1, First=z, Last=NULL. Flag даёт Min=false,
+Max=true, First=true, Last=NULL. When даёт Min/First=01.01.2026,
+Max=05.01.2026, Avg=03.01.2026, StdDev отображается 2 дня, Last=NULL.
+Для единственной all-NULL записи с NULL-Region счётчики дают 1/0/1,
+прочие агрегаты NULL. Формулировка «all-null — NULL» относится к значениям,
+но не к трём счётчикам.
+
+Отдельная CrossTable: Region × Category, Amount Sum/Count/NullCount, 2×7.
+По `ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt;C_1_Amount_Count_0`
+и `C_2_Amount_Count_1` присутствует `.bg-cell-null-value`: пересечений нет,
+Count и NullCount тоже NULL. В существующей группе (NULL-Region, B)
+Sum=NULL, Count=1, NullCount=1. Отсутствие наблюдений не равно одному NULL.
+Все источники и их порядок остались прежними.
+
+Variant дал 5×8, схема Min/Max/First/Last — variant, три счётчика — integer.
+В all_null Count=4, UniqueCount=0, NullCount=4. В каждой непустой типовой
+группе Count=8, UniqueCount=2, NullCount=6; Min=NULL, Max=2.75/z/true/03.01.2026
+для numeric/text/boolean/datetime. Это дополнительно подтверждает отличие
+Variant Min от скалярного Min. Точный subtype по байтам здесь не декодировался;
+для него остаётся прежний независимый native oracle этапа 2.
+
+Выходной порт: `mn;mniConfigurePort` → `DerivedDataSourceOutputSocketWizard`.
+Полный локальный source-store всех 46 полей имеет Required=true.
+В контекстном меню `colName_Amount_Sum` отсутствует команда исключения.
+Удаление выбранного сопоставления и `WizrdMCF;btnDone` не закрывает мастер;
+`WizrdMCF;btnError` показывает: «Обязательному входному столбцу Amount|Сумма
+не сопоставлен выходной». Draft порта отменён, настройка не сохранена.
+Исключение обязательного источника — **ограничение платформы**, для отдельной
+проекции остаётся принятый downstream «Параметры полей».
+
+50×8/1 MiB — cap client `variant-native-values.mjs`/`variant-native-schema.mjs`,
+не предел движка. Живой выход 2×46 непосредственно опровергает предел 8 полей
+для самого Loginom. Пределы движка по строкам/байтам этим опытом не измерялись.
+Расчёт практических случаев и предложенная приёмка — в дополнении LAB-1120
+подплана и `acceptance/modes/README.md`. Сырые DOM/native-снимки в Git не включены.

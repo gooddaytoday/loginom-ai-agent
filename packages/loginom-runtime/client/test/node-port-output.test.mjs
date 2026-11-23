@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/node-port-output.mjs';
+import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
+import {adaptCell} from '../lib/variant-native-values.mjs';
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
-function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false}={}) {
+function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock,treeOutput=false,batch}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const rpcCalls=[],uiCalls=[],disposed=[],elements=new Map();
  const el=tid=>{const e={id:tid,getAttribute:k=>k==='data-tid'?tid:null,classList:{contains:k=>k==='x-tab-active'},getBoundingClientRect:()=>({width:100,height:100}),contains:x=>e===x||e.children?.includes(x)};elements.set(tid,e);return e;};
@@ -20,6 +22,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const integerColumn=columnItems[0],columns=proxy('columns',{get_Count:async()=>types.length,getItem:async i=>columnItems[i]});
  const dataSource=proxy('dataSource',{$S:session,$:{$OW:0,$O:10,$I:116},$FHelper:helper,get_RowCount:async()=>rows.length,get_Columns:async()=>columns,
   AsVariant:async(row,col)=>{rpcCalls.push([row,col]);helper.$FCacheInitialized=true;helper.$FData??={};return rows[row][col];}});helper.FBaseProxy=dataSource;
+ if(batch)dataSource.$.$I=71;
  if(treeOutput){
   dataSource.$.$I=141;
   const scalar=proxy('leaf',{get_Name:async()=> 'flag',get_DisplayName:async()=> 'Flag',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>1});
@@ -41,7 +44,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{}},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -63,6 +66,18 @@ test('tree_io native schema RPC failure retains server text privately behind its
  assert.deepEqual(result.read_diagnostic,{stage:'schema_name',parameters:{},native_response:{name:'Error',message:'private server text'}});
  assert.deepEqual(f.disposed.sort(),['dataSource','output','treeRoot']);
 });
+test('serialized tree reader admits scalar arrays with owned source cleanup',async()=>{
+ const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
+ f.dataSource.get_RootNodeDef=async()=>{const root=await get(),children=await root.get_SubNodes(),leaf=await children.getItem(0);
+  leaf.get_IsArray=async()=>true;return root;};
+ f.dataSource.GetReader=async()=>({GetRowCount:async()=>1,
+  GetRowRange:async(index,parent,start,size)=>{assert.equal(index,1);assert.equal(parent,0);start.$=7;size.$=2;},
+  AsVariant:async(index,row)=>{assert.equal(index,1);return row===7?false:true;},dispose:async()=>f.disposed.push('treeReader')});
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.output.tree.instances.slice(2).map(n=>n.value),[false,true]);
+ assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
+});
 test('tree_io bounds Saltarelle native exception messages in the private diagnostic',async()=>{
  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
  f.dataSource.get_RootNodeDef=async()=>{const root=await get();root.get_Name=async()=>{throw {constructor:{__typeName:'rpc.NativeException'},get_message:()=> 'x'.repeat(2000)};};return root;};
@@ -82,6 +97,28 @@ test('tree_io rejects a foreign completed process before acquiring the tree sour
  assert.equal((await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true})).verified,false);
  assert.deepEqual(f.disposed,[]);
 });
+test('reads a completed interface 71 table in one server batch at the requested offset',async()=>{
+ const integer={constructor:{name:'Int64'},toString:()=> '9007199254740993'};
+ const f=fixture({rows:[[],[],[]],types:[5,3,4,5,1],batch:async(source,offset,count,...out)=>{
+  assert.equal(source,f.dataSource);assert.equal(offset,1);assert.equal(count,2);
+  const values=[[[false,true],[false,false],[false,false],[false,false],[false,true]],[[true,false]],[],[[-0,1.2345678901234567]],[[integer,0]],[['one',''],['two','three']],[]];
+  out.forEach((result,index)=>{result.value=values[index];});
+ }});
+ const result=await f.run({port:0,execution,rowOffset:1,sampleRows:2,requireExactNumbers:true});
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.output.sample.map(row=>row.map(cell=>cell.value??null)),[['one',-0,'9007199254740993','two',true],[null,1.2345678901234567,'0','three',null]]);
+ assert.equal(result.output.sample[0][1].decimal,'-0');assert.deepEqual(f.rpcCalls,[]);
+});
+
+test('does not return a fresh table when the server batch omits a null flag',async()=>{
+ const f=fixture({rows:[[]],types:[5],batch:async(_source,_offset,_count,...out)=>{
+  const values=[[Array(1)],[],[],[],[],[['visible']],[]];
+  out.forEach((result,index)=>{result.value=values[index];});
+ }});
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.deepEqual(result,{verified:false,cleanup_complete:true,reason:'source_batch_shape'});
+});
+
 test('reads_bound_port_without_table',async()=>{
  const f=fixture(),result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
  assert.equal(result.verified,true);
@@ -248,6 +285,33 @@ test('an already initialized cache cannot be replaced while metadata is read',as
 });
 
 
+for(const nativeNull of [true,false])test('Calculator cached NULL requires the current native NULL, nativeNull='+nativeNull,async()=>{
+ const f=fixture({rows:[[null,0,false,'']],types:[4,4,1,5]});
+ f.node.FIconCls='bg-vendor-icon-calcdata';
+ f.dataSource.nativeNull=nativeNull;f.dataSource.nullChecks=[];
+ const capability={read:(async function(source,{stable}){
+  return {unsettled:false,async read(row,column){stable();source.nullChecks.push([row,column]);return {tag:source.nativeNull?1:20};}};
+ }).toString()};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,capability);
+ assert.equal(result.verified,nativeNull,JSON.stringify(result));
+ assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.dataSource.nullChecks.map(row=>Array.from(row)),[[0,0]]);
+ if(nativeNull)assert.deepEqual(result.output.sample[0].map(c=>c.value),[null,'0',false,'']);
+ else {assert.match(result.reason,/calculator_output_cache_not_current/);assert.equal(result.output,undefined);}
+ assert.ok(f.disposed.includes('dataSource'));assert.ok(f.disposed.includes('output'));
+ assert.deepEqual(f.uiCalls,[]);
+});
+
+test('Calculator native NULL verification retains an unsettled getter and its proxies',async()=>{
+ const f=fixture({rows:[[null]],types:[4]});f.node.FIconCls='bg-vendor-icon-calcdata';
+ const capability={read:(async function(){return {unsettled:true,async read(){throw Error('native pending');}};}).toString()};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,capability);
+ assert.equal(result.verified,false);assert.equal(result.cleanup_complete,false);
+ assert.equal(result.reason,'variant_native_pending');assert.deepEqual(f.disposed,[]);
+});
+
 test('preserves_native_scalar_values',()=>{
  for(const type of ['integer','real','string','boolean','datetime','variant'])for(const raw of [null,undefined]){
   assert.deepEqual(decodePortCell(raw,type),{cell:{type,is_null:true,value:null,precision:'exact_null'},limitations:[]});
@@ -276,10 +340,11 @@ test('preserves_native_scalar_values',()=>{
 });
 
 
-test('marks_variant_and_nonfinite_unverified',async()=>{
+test('marks_variant_unverified_and_nonfinite_exact',async()=>{
+ // v040-nan-exact: non-finite binary64 is exact with an explicit marker.
  for(const raw of [NaN,Infinity,-Infinity]){
   const decoded=decodePortCell(raw,'real');
-  assert.deepEqual(decoded,{cell:{type:'real',is_null:false,display_text:String(raw),representation:'formatted_display',precision:'unverified'},limitations:['numeric_display_precision']});
+  assert.deepEqual(decoded,{cell:{type:'real',is_null:false,value:null,non_finite:String(raw),representation:'binary64_non_finite',precision:'exact_non_finite'},limitations:[]});
  }
  for(const [raw,text] of [[1,'1'],[-0,'-0'],['',''],[' \u00a0\r\n',' \u00a0\r\n'],[true,'true'],[false,'false'],[{constructor:{name:'UInt64'},toString:()=> '18446744073709551615'},'18446744073709551615']]){
   assert.deepEqual(decodePortCell(raw,'variant'),{cell:{type:'variant',is_null:false,display_text:text,representation:'formatted_display',precision:'unverified'},limitations:['variant_display_precision']});
@@ -289,10 +354,10 @@ test('marks_variant_and_nonfinite_unverified',async()=>{
  const rows=[[NaN,Infinity,-Infinity,1,unknown,null]],types=[3,3,3,6,6,6];
  const f=fixture({rows,types}),result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
  assert.equal(result.verified,true);assert.equal(result.output.precision.numbers_verified,false);
- assert.deepEqual(result.output.precision.limitations,['numeric_display_precision','variant_display_precision']);
+ assert.deepEqual(result.output.precision.limitations,['variant_display_precision']);
  assert.equal(result.output.precision.strings,'data source text; existing secret redaction applies; original byte encoding is not attested');
  assert.doesNotMatch(JSON.stringify(result),/must not leak/);
- for(const [raw,type] of [[NaN,3],[Infinity,3],[-Infinity,3],[1,6],[unknown,6]]){
+ for(const [raw,type] of [[1,6],[unknown,6]]){
   const strict=await fixture({rows:[[raw]],types:[type]}).run({port:0,execution,sampleRows:1,requireExactNumbers:true});
   assert.equal(strict.verified,false);assert.equal(strict.output,undefined);assert.equal(strict.cleanup_complete,true);
  }
@@ -500,4 +565,87 @@ test('shared ordinary output refuses reordered fields and cells even when every 
  f.output.sample=f.output.sample.map(row=>row.toReversed());
  await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),
   /Output field order differs from the configured output/);
+});
+
+test('typedVariants read failure names its real cause while ordinary reads keep the generic reason',async()=>{
+ const rows=[['x']],typed=fixture({rows,types:[6]}),plain=fixture({rows,types:[6]});
+ const bad=await typed.run({port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true});
+ assert.equal(bad.verified,false);assert.match(bad.reason,/^read_failed: \w+: .+/);assert.ok(bad.reason.length<=480);
+ const ordinary=await plain.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
+ assert.equal(ordinary.verified,true);
+});
+test('typedVariants refusal lists every unreadable Variant cell with its ordinary value kind',async()=>{
+ const rows=[['a'],[null],['c']],f=fixture({rows,types:[6]});
+ const variant={read:'async(source,options,decode)=>({pending:0,unsettled:false,read:async row=>{if(row===1)decode([0],60);return {tag:8};}})',
+  decode:'()=>{throw Error("unknown/interface tag 0 frame 60");}',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,false);assert.equal(result.cleanup_complete,true);
+ assert.match(result.reason,/variant_cells r1c0 null unknown\/interface tag 0 frame 60$/);
+});
+
+function emptyVariantCapability(){
+ // Real decoder and adapter; only the transport is faked: row 1 is a VT_EMPTY frame, the others Boolean true.
+ return {read:'async(source,options,decode)=>({pending:0,unsettled:false,read:async(row,column)=>{const payload=Array(48).fill(0);if(row===1){payload[0]=0;payload.fill(7,2,10);}else{payload[0]=11;payload[2]=1;}const d=decode(payload,60);return {row,column,tag:d.tag,payload:payload.slice(0,d.consumed_bytes),frame_size:60};}})',
+  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}};
+}
+const emptyRequest=extra=>({port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true,...extra});
+const readEmpty=(f,extra)=>readNodePortOutput(f.page,f.binding,emptyRequest(extra),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,emptyVariantCapability());
+test('Replacement option reads VT_EMPTY as NULL; other typedVariants paths still refuse it',async()=>{
+ const f=fixture({rows:[['a'],[null],['c']],types:[6]});
+ const refused=await readEmpty(f);
+ assert.equal(refused.verified,false);assert.match(refused.reason,/variant_cells r1c0 null unknown\/interface tag 0/);
+ const read=await readEmpty(fixture({rows:[['a'],[null],['c']],types:[6]}),{variantEmptyIsNull:true});
+ assert.equal(read.verified,true,JSON.stringify(read));
+ assert.deepEqual(read.output.sample.map(r=>[r[0].cell_type,r[0].value]),[['boolean',true],['null',null],['boolean',true]]);
+ assert.equal(read.output.sample[1][0].is_null,true);assert.equal(read.output.sample[1][0].precision,'exact_native');
+ assert.throws(()=>makeNodePortOutputCode(f.binding,emptyRequest({typedVariants:false,variantEmptyIsNull:true}),{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000}),/Exact bounded/);
+});
+test('typedVariants guard or transport failure stops at once with its Variant read cause and no diagnostic RPC',async()=>{
+ for(const [message,unsettled] of [['Variant read: session transport not live',false],['Variant read: deadline; native cancellation unproven',false],['socket reset',true],['socket reset',false]]){
+  const f=fixture({rows:[['a'],['b'],['c']],types:[6]});
+  const variant={read:`async()=>{const r={pending:0,unsettled:false,read:async row=>{if(row===1){r.unsettled=${unsettled};throw Error(${JSON.stringify(message)});}return {tag:8};}};return r;}`,
+   decode:'()=>({})',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+  const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+  assert.equal(result.verified,false);assert.deepEqual(f.rpcCalls,[],message);
+  if(message.startsWith('Variant read:'))assert.equal(result.reason,message);else assert.doesNotMatch(result.reason,/variant_cells/);
+ }
+});
+
+// Logical payloads observed on the completed Collapse port (variant-reader plan.md, Values 0..14).
+const collapseObserved={
+ 20:[[20,0,10,0,0,0,0,0,0,0],'integer','10'],
+ 5:[[5,0,0,0,0,0,0,0,244,63],'real','1.25'],
+ 8:[[8,0,0,0,0,0,0,0,0,0,0,0,0,0],'string',''],
+ 11:[[11,0,1,0,0,0,0,0,0,0],'boolean',true],
+ 7:[[7,0,0,0,0,0,176,159,230,64],'datetime','2026-11-07T12:00:00.000'],
+ 1:[[1,0,0,0,0,0,0,0,0,0],'null',null],
+};
+const observedCapability=tag=>({read:`async(source,options,decode)=>({pending:0,unsettled:false,read:async(row,column)=>{
+ const frame=[...${JSON.stringify(collapseObserved[tag][0])},...Array(${48-collapseObserved[tag][0].length}).fill(0)],d=decode(frame,60);
+ return {row,column,tag:d.tag,payload:frame.slice(0,d.consumed_bytes),frame_size:60,...(d.tag===7?{civilTime:{value:'2026-11-07T12:00:00.000',timezone:'America/New_York'}}:{})};}})`,
+ decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}});
+for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value with subtype for observed native tag '+tag,async()=>{
+ const options={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},rows=[[1,tag===1?null:'shown']];
+ if(tag!==1){
+  const plain=await readNodePortOutput(fixture({rows,types:[4,6]}).page,fixture().binding,{port:0,execution,sampleRows:1,requireExactNumbers:true},options);
+  assert.equal(plain.verified,false);assert.equal(plain.reason,'unverified_precision');
+ }
+ const f=fixture({rows,types:[4,6]});
+ const read=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true},options,undefined,undefined,undefined,undefined,null,observedCapability(tag));
+ assert.equal(read.verified,true,JSON.stringify(read));
+ const cell=read.output.sample[0][1],[,cellType,value]=collapseObserved[tag];
+ assert.deepEqual([cell.type,cell.cell_type,cell.value,cell.is_null,cell.precision,cell.native.tag],['variant',cellType,value,tag===1,'exact_native',tag]);
+ assert.deepEqual(read.output.sample[0][0].value,'1');assert.deepEqual(read.output.precision.limitations,[]);
+});
+
+// v040-nan-exact (LAB-1314 seasonal UngroupQuality, execution-events:944,2212):
+// a native non-finite Real is an exact marked value, never NULL nor display text.
+test('exact read returns native Real NaN and infinities as marked exact cells, distinct from NULL',async()=>{
+ const f=fixture({rows:[[NaN],[Infinity],[-Infinity],[null],[1.5]],types:[3]});
+ const result=await f.run({port:0,execution,sampleRows:5,requireExactNumbers:true});
+ assert.equal(result.verified,true,result.reason);assert.equal(result.output.precision.numbers_verified,true);assert.deepEqual(result.output.precision.limitations,[]);
+ assert.deepEqual(result.output.sample.map(r=>[r[0].is_null,r[0].value,r[0].non_finite??null,r[0].precision]),
+  [[false,null,'NaN','exact_non_finite'],[false,null,'Infinity','exact_non_finite'],[false,null,'-Infinity','exact_non_finite'],[true,null,null,'exact_null'],[false,1.5,null,'17_significant_digits']]);
+ assert.equal(JSON.stringify(result.output.sample).includes('null,"non_finite":"NaN"'),true);
+ assert.deepEqual(decodePortCell(NaN,'variant').cell.non_finite,'NaN');assert.deepEqual(decodePortCell(2.5,'real').limitations,[]);
 });

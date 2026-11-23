@@ -945,6 +945,69 @@ test('oversized broad observations return paged read-only roots and journal the 
   }
 });
 
+test('graph scope without an observed active graph delivers roots, never a complete empty graph',async()=>{
+  // LAB-1284: after artifact delivery the Files tab is active (MF;TF-2), the
+  // workflow graph lives on TF-1 and the broad read reports graph_identity unobserved.
+  for(const [mode,scope] of [['files','graph'],['files','all'],['graph','graph']]) {
+    const page=linkPage(),evaluate=page.evaluate,records=[],reads=[];
+    page.evaluate=async function(fn,arg) {
+      const result=await evaluate.call(this,fn,arg);
+      if(!result?.ui)return result;
+      reads.push(arg?.discoverRoots===true);
+      result.ui.truncated={elements:false,nodes:false,links:false,ports:false,dialogs:false,messages:false,masks:false,table_cells:true};
+      if(mode==='files') {
+        result.workflow_ref={tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-2',prefix:'MF;TF-2'};
+        result.graph_identity={status:'unobserved'};result.nodes=[];result.links=[];result.ui.elements=[];
+        result.file_storage={status:'observed',directory:'/worker',display_path:'/Файлы/worker',navigation_root:'Файлы',
+          navigation_identity:{anchor_tid:'MF;TF-2;NavigationBar;NavigationPanel',path:[]},source:'visible_breadcrumbs',listing_complete:false};
+      }
+      if(arg?.discoverRoots) {
+        result.observation_kind='roots';result.nodes=[];result.links=[];
+        result.ui.elements=[{ref:'ui-region-files',tid:'MF;TF-2;FileStorageForm;pnlFileStorage;tbl',
+          identity:{anchor_tid:'MF;TF-2;FileStorageForm;pnlFileStorage;tbl',path:[]},kind:'region',scope:'workflow',label:'Files',allowed_actions:[]}];
+        result.ui.truncated.nodes=true;result.ui.truncated.links=true;
+      }
+      return result;
+    };
+    const engine=runtime(page,{onRecord:async r=>records.push(r)}),out=await engine.observe({scope});
+    assert.equal(out.status,'SUCCEEDED');assert.equal(records.length,1);
+    if(mode==='files'&&scope==='graph') {
+      assert.equal(out.output.ui.truncated.nodes,true);assert.equal(out.output.ui.truncated.links,true);
+      assert.equal(out.output.page.scope,'roots');assert.equal(out.output.observation_kind,'roots');
+      assert.deepEqual(reads,[false,true]);
+      assert.deepEqual(records[0].outcome.trace.at(-1),{event:'observation_scope_fallback',requested_scope:'graph',delivered_scope:'roots',reason:'graph_unobserved'});
+    } else {
+      // A broad read keeps the Files tab context; an observed graph keeps its scope and completeness.
+      assert.deepEqual(reads,[false]);assert.equal(out.output.page.scope,scope);
+      assert.equal(records[0].outcome.trace.some(t=>t.event==='observation_scope_fallback'),false);
+      if(mode==='graph'){assert.equal(out.output.graph_identity.status,'observed');assert.equal(out.output.ui.truncated.nodes,false);assert.ok(out.output.nodes.length);}
+      else assert.equal(out.output.file_storage.status,'observed');
+    }
+  }
+});
+
+test('graph scope scan-limit fallback reads roots once and keeps the UI_SCAN_LIMIT reason',async()=>{
+  // Real roots reads leave graph_identity unobserved; that must not trigger a second roots read.
+  const page=linkPage(),evaluate=page.evaluate,records=[];let broad=0,roots=0;
+  page.evaluate=async function(fn,arg) {
+    if(arg && 'discoverRoots' in arg && !arg.discoverRoots) {
+      broad++;const error=new Error('oversized document');error.code='UI_SCAN_LIMIT';throw error;
+    }
+    const result=await evaluate.call(this,fn,arg);
+    if(result?.ui && arg?.discoverRoots) {
+      roots++;result.observation_kind='roots';result.graph_identity={status:'unobserved'};result.nodes=[];result.links=[];
+      result.ui.elements=[{ref:'ui-region-0',tid:'Region-0',identity:{anchor_tid:'Region-0',path:[]},kind:'region',scope:'workflow',label:'Region 0',allowed_actions:[]}];
+      result.ui.truncated.nodes=true;result.ui.truncated.links=true;
+    }
+    return result;
+  };
+  const engine=runtime(page,{onRecord:async r=>records.push(r)}),out=await engine.observe({scope:'graph'});
+  assert.equal(out.status,'SUCCEEDED');assert.equal(out.output.page.scope,'roots');
+  assert.equal(broad,1);assert.equal(roots,1);assert.equal(records.length,1);
+  const fallbacks=records[0].outcome.trace.filter(t=>t.event==='observation_scope_fallback');
+  assert.deepEqual(fallbacks,[{event:'observation_scope_fallback',requested_scope:'graph',delivered_scope:'roots',reason:'UI_SCAN_LIMIT'}]);
+});
+
 test('root discovery failures never trigger recursive scan retries',async()=>{
   const page=linkPage(),evaluate=page.evaluate;let attempts=0;
   page.evaluate=async function(fn,arg){

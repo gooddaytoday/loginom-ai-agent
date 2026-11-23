@@ -1,0 +1,12 @@
+{
+  "description":"Proposed manual tree structure, no XSD. Root is object; rows is an object array.",
+  "nodes":[
+    {"path":"","name":"Root","label":"Root","type":"object","is_array":false},
+    {"path":"/rows","name":"rows","label":"Строки","type":"object","is_array":true},
+    {"path":"/rows/id","name":"id","label":"Номер","type":"integer","is_array":false},
+    {"path":"/rows/code","name":"code","label":"Код","type":"string","is_array":false}
+  ],
+  "valid":{"rows":[{"id":9007199254740993,"code":"x"},{"id":0,"code":""}]},
+  "mismatch":{"rows":[{"id":"not-an-integer","code":"x"}]},
+  "strict_false_probe":{"rows":[{"id":0,"code":"x","extra":"discard-me"}]}
+}

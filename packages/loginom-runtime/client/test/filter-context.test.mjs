@@ -12,6 +12,13 @@ function fixture(){
  const context={document:{querySelectorAll:()=>[root]},Ext:{getCmp:()=>grid},Date};
  return {data,rows,inputs,rs,grid,controller,context,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readFilterBrowser.toString()+')("WF")',context)))};
 }
+for(const [type,value] of [[3,0.5],[2,new Date(2024,1,29)],[3,null]])test('native typed variable identity '+type+' '+value,()=>{
+ const f=fixture();f.inputs[0].data.DataType=type;
+ Object.assign(f.data,{DataType:type,UseVariables:1,RelationType:3,CompareValue:'Threshold'});
+ f.controller.FVariablesData={FVariables:[{Index:0,DisplayName:'Threshold',DataType:type,Value:value,ValueAsString:'native display',IsNull:value===null}]};
+ const r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.rows[0].value,{kind:'variable',name:'Threshold'});
+ if(type===2)assert.equal(r.control_variables[0].value,'2024-02-29T00:00:00.000');
+});
 test('filter reads the complete ordered local condition inventory and preserves exact values',()=>{
  const f=fixture();f.rows.push({isModel:true,internalId:'or',data:{IsOperatorRecord:true}});
  f.rows.push({isModel:true,internalId:'row',data:{...f.data,Name:'',RowNumberer:1,RelationType:8,CompareValueLowerBound:2,CompareValueUpperBound:4}});
@@ -119,4 +126,24 @@ test('filter input data kind comes from the bound native column metadata',()=>{
  const f=fixture();f.inputs[0].data.DataKind=1;assert.equal(f.read().input_fields[0].data_kind,'Непрерывный');
  f.inputs[0].data.DataKind=2;assert.equal(f.read().input_fields[0].data_kind,'Дискретный');
  delete f.inputs[0].data.DataKind;assert.equal(f.read().input_fields[0].data_kind,null);
+});
+
+test('filter variable binding matches complete cached identity without stripping display suffixes',()=>{
+ for(const [flag,operator,key,nativeKey,name,type,value] of [[1,3,'value','CompareValue','limit',4,15],[128,10,'values','CompareValueListAsString','codes',5,'C ( x )']]){
+  const f=fixture();Object.assign(f.data,{UseVariables:flag,RelationType:operator,[nativeKey]:`${name} ( ${value} )`});
+  f.controller.FVariablesData={FVariables:[{Index:2,DisplayName:name,DataType:type,Value:value,ValueAsString:String(value),IsNull:false}]};
+  assert.deepEqual(f.read().rows[0]?.[key],{kind:'variable',name});
+  f.data[nativeKey]=name;assert.deepEqual(f.read().rows[0]?.[key],{kind:'variable',name});
+  f.data[nativeKey]=name+' ( forged )';assert.equal(f.read().verified,false);
+  f.data[nativeKey]=name;f.controller.FVariablesData.FVariables.push({...f.controller.FVariablesData.FVariables[0],Index:3});assert.equal(f.read().verified,false);
+ }
+});
+
+test('native row-number scalar binding survives formatted saved readback',()=>{
+ const f=fixture();Object.assign(f.data,{Name:'',RowNumberer:1,UseVariables:1,RelationType:1,CompareValue:'TopN ( 3 )'});
+ f.controller.FVariablesData={FVariables:[{Index:0,DisplayName:'TopN',DataType:4,Value:3,ValueAsString:'3',IsNull:false}]};
+ const r=f.read();assert.equal(r.verified,true);
+ assert.deepEqual(r.rows[0].field,{kind:'row_number'});assert.deepEqual(r.rows[0].value,{kind:'variable',name:'TopN'});
+ Object.assign(f.data,{UseVariables:128,RelationType:10,CompareValueListAsString:'TopN'});
+ assert.equal(f.read().verified,false,'row-number list bindings remain unsupported');
 });

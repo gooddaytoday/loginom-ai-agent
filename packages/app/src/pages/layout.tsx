@@ -1,3 +1,4 @@
+import { useUpdaterAction } from "@/components/updater-action"
 import { Product } from "@loginom-ai-agent/product"
 import {
   createEffect,
@@ -71,9 +72,8 @@ import {
 import {
   collectNewSessionDeepLinks,
   collectOpenProjectDeepLinks,
-  deepLinkEvent,
-  drainPendingDeepLinks,
 } from "./layout/deep-links"
+import { useDashboardDeepLinks } from "./layout/dashboard-links"
 import { createInlineEditorController } from "./layout/inline-editor"
 import {
   LocalWorkspace,
@@ -147,7 +147,7 @@ export default function LegacyLayout(props: ParentProps) {
   const currentDir = createMemo(() => route().dir)
 
   const [state, setState] = createStore({
-    autoselect: !initialDirectory,
+    autoselect: !initialDirectory && !window.__LOGINOM_AI_AGENT__?.coldDashboard,
     busyWorkspaces: {} as Record<string, boolean>,
     hoverProject: undefined as string | undefined,
     scrollSessionKey: undefined as string | undefined,
@@ -159,16 +159,22 @@ export default function LegacyLayout(props: ParentProps) {
     debugTools: true,
   })
 
+  const updater = useUpdaterAction()
+  const availableUpdate = () => {
+    const state = platform.updater?.state()
+    return state?.status === "available" ? state : undefined
+  }
   const updateVersion = () => {
     const state = platform.updater?.state()
-    if (state?.status !== "ready") return
+    if (state?.status !== "ready" && state?.status !== "available") return
     return state.version
   }
-  const installUpdate = () => void platform.updater?.install()
+  const installUpdate = () => void updater.run()
   const titlebarUpdate: TitlebarUpdate = {
     version: updateVersion,
     installing: () => platform.updater?.state().status === "installing",
     install: installUpdate,
+    actionLabel: () => language.t(updater.action().label),
   }
 
   const editor = createInlineEditorController()
@@ -1270,17 +1276,7 @@ export default function LegacyLayout(props: ParentProps) {
     }
   }
 
-  onMount(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ urls: string[] }>).detail
-      const urls = detail?.urls ?? []
-      if (urls.length === 0) return
-      handleDeepLinks(urls)
-    }
-
-    handleDeepLinks(drainPendingDeepLinks(window))
-    makeEventListener(window, deepLinkEvent, handler as EventListener)
-  })
+  useDashboardDeepLinks(handleDeepLinks)
 
   async function renameProject(project: LocalProject, next: string) {
     const current = displayName(project)
@@ -2257,8 +2253,42 @@ export default function LegacyLayout(props: ParentProps) {
             : undefined
         }
       />
-      <Show when={updateVersion() !== undefined}>
-        <UpdateAvailableToast version={updateVersion() ?? ""} install={installUpdate} language={language} />
+      <Show
+        when={
+          platform.updater?.state().unsupported || availableUpdate() || platform.updater?.state().status === "ready"
+        }
+      >
+        <div
+          data-tid="update-notice"
+          role="status"
+          class="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border-base"
+        >
+          <div class="flex-1 min-w-0">
+            <Show when={platform.updater?.state().unsupported}>
+              <p role="alert" data-tid="update-unsupported">
+                {language.t("settings.updates.unsupported")}
+              </p>
+            </Show>
+            <Show when={availableUpdate()}>
+              {(update) => (
+                <>
+                  <p>{language.t("settings.updates.available", { version: update().version })}</p>
+                  <Show when={update().notes}>
+                    <p class="whitespace-pre-wrap max-h-32 overflow-auto" data-tid="update-notes">
+                      {update().notes}
+                    </p>
+                  </Show>
+                </>
+              )}
+            </Show>
+            <Show when={platform.updater?.state().status === "ready"}>
+              <p>{language.t("settings.updates.onClose")}</p>
+            </Show>
+          </div>
+          <Button data-tid="update-action" size="small" disabled={!updater.action().run} onClick={installUpdate}>
+            {language.t(updater.action().label)}
+          </Button>
+        </div>
       </Show>
       <div class="flex-1 min-h-0 min-w-0 flex">
         <div class="flex-1 min-h-0 relative">
@@ -2408,38 +2438,4 @@ export default function LegacyLayout(props: ParentProps) {
       <ToastRegion v2={false} />
     </div>
   )
-}
-
-function UpdateAvailableToast(props: {
-  version: string
-  install: () => void
-  language: ReturnType<typeof useLanguage>
-}) {
-  let toastId: number | undefined
-
-  onMount(() => {
-    toastId = showToast({
-      persistent: true,
-      icon: "download",
-      title: props.language.t("toast.update.title"),
-      description: props.language.t("toast.update.description", { version: props.version }),
-      actions: [
-        {
-          label: props.language.t("toast.update.action.installRestart"),
-          onClick: props.install,
-        },
-        {
-          label: props.language.t("toast.update.action.notYet"),
-          onClick: "dismiss",
-        },
-      ],
-    })
-  })
-
-  onCleanup(() => {
-    if (toastId === undefined) return
-    dismissToast(toastId)
-  })
-
-  return null
 }

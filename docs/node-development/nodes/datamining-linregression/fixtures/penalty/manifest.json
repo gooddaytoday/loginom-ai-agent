@@ -1,0 +1,37 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal": ".",
+  "null": "?",
+  "types": {
+    "RowID": "integer",
+    "X1": "integer",
+    "X2": "integer",
+    "X3": "integer",
+    "Y": "real",
+    "IsTest": "boolean"
+  },
+  "files": {
+    "correlated": {
+      "bytes": 355,
+      "rows": 16
+    },
+    "duplicated": {
+      "bytes": 703,
+      "rows": 32
+    },
+    "negative": {
+      "bytes": 375,
+      "rows": 16
+    },
+    "scaled": {
+      "bytes": 359,
+      "rows": 16
+    },
+    "shifted": {
+      "bytes": 359,
+      "rows": 16
+    }
+  },
+  "construction": "Full factorial X1/X2/X3 and independent E in {-1,1}; Y=3+2X1+0.5X2+0.25E. Duplicated doubles rows; scaled multiplies X1 by 2; negative subtracts 6 from Y; correlated replaces X2 by X1+X2. IDs regenerated sequentially."
+}

@@ -1,0 +1,64 @@
+--- containers.sh
++++ containers-742.sh
+@@ -55,8 +55,9 @@
+ elif docker compose version >/dev/null 2>&1; then compose=(docker compose); else compose=(docker-compose); fi
+ command -v "${compose[0]}" >/dev/null || die "${compose[0]} is required"
+ (cd "$bundle" && sha256sum -c SHA256SUMS) || die "Release checksum mismatch"
+-image=$(cat "$bundle/image.ref")
+-[[ $image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$ ]] || die "Invalid image.ref"
++source_image=$(cat "$bundle/image.ref")
++[[ $source_image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:-]+$ ]] || die "Invalid image.ref"
++image=$source_image-enterprise-742
+ installed=false
+ builder_image=
+ if [[ -e $state || -L $state ]]; then
+@@ -125,6 +126,7 @@
+ }
+ if [[ $action == install ]]; then
+   "$engine" load -i "$bundle/image.tar"
++  "$bundle/normalize-m7-image.sh" "$source_image" "$image"
+   builder_image=$(builder_image_id) || die "Cannot determine builder image ID for $image"
+ elif [[ $installed == true && ( $action == check || $action == start ) ]]; then
+   [[ -n $builder_image ]] || die "Missing saved builder image ID; run install with the matching release"
+@@ -154,11 +156,11 @@
+     exit 0
+   fi
+ fi
+-mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
++mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.project=loginom-release --filter label=com.docker.compose.service=http --format '{{.ID}}')
+ [[ ${#studios[@]} == 1 ]] || die "Expected one running standard Loginom installation"
+ studio=${studios[0]}
+ project=$("$engine" inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$studio")
+-mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')
++mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=server --format '{{.ID}}')
+ [[ ${#servers[@]} == 1 ]] || die "Loginom server not found in selected installation"
+ server=${servers[0]}
+ mapfile -t conf_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
+@@ -313,6 +315,7 @@
+   chmod 755 "$storage/$probe.dashboards"
+   mkdir -m 755 "$directory"
+   json publication "$probe" "$guid" "$workflow" </dev/null > "$directory/.upload"
++  chown "$publisher_user" "$directory/.upload"
+   chmod 644 "$directory/.upload"
+   source_hash=$(sha256sum "$directory/.upload" | cut -d ' ' -f 1)
+   mv "$directory/.upload" "$publication"
+@@ -335,10 +338,6 @@
+     [[ $status == "$expected" ]] || die "HTTP check failed: $kind expected $expected, got $status"
+     cat "$tmp/headers" "$tmp/body" | json response "$kind" "$(saved DASHBOARD_APP_ORIGIN)" "$clients" "${integrity:-}" "${encoding:-identity}"
+   }
+-  mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
+-  [[ ${#studios[@]} == 1 ]] || die "Expected one installed Studio"
+-  studio=${studios[0]}
+-  conf=$("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{.Source}}{{end}}{{end}}' "$studio")
+   "$engine" exec "$studio" httpd -t
+   modules=$("$engine" exec "$studio" httpd -M)
+   for module in substitute headers proxy proxy_http env; do
+@@ -377,7 +376,7 @@
+   for role in web publisher builder; do
+     "$engine" exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import assert from "node:assert/strict"; const status=readFileSync("/proc/1/status","utf8"); for (const name of ["CapInh","CapPrm","CapEff","CapBnd","CapAmb"]) assert(new RegExp("^"+name+":\\s+0+$","m").test(status), name)'
+   done
+-  [[ $("$engine" exec "$("$engine" ps --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')" stat -c '%u:%g' /proc/1) == "$(saved DASHBOARD_PUBLISHER_USER)" ]] || die "Publisher UID/GID differs from Loginom"
++  [[ $("$engine" exec "$server" stat -c '%u:%g' /proc/1) == "$(saved DASHBOARD_PUBLISHER_USER)" ]] || die "Publisher UID/GID differs from Loginom"
+   for role in publisher builder; do
+     "$engine" exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {connect} from "node:net"; const socket=connect({host:"192.0.2.1",port:9}); socket.on("connect",()=>process.exit(1)); socket.on("error",()=>process.exit(0)); socket.setTimeout(2000,()=>{socket.destroy();process.exit(0)})'
+   done

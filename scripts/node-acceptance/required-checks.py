@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""List path-based acceptance obligations; verify report text without running checks."""
+"""List path-based acceptance obligations; verify report text without running checks.
+
+verify outcomes: exit 0 | FAIL; журнал: path:N | NOT_RUN; причина: text | CI; <actions run URL>
+| COVERED; LAB-N | APPROVED; решение id (ID without command only); prints a per-outcome summary.
+"""
 import argparse
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -12,6 +16,12 @@ CONTRACTS = (C + 'node-contracts.*', C + 'effect-contracts.mjs',
              C + 'node-read-contract.mjs', C + 'node-result-schema.mjs')
 # The only path-rule table: glob(s), stable check IDs, suggested run-check cases.
 RULES = (
+    ((C + 'loop-*.mjs', 'docs/node-development/nodes/control-loop/acceptance/**',
+      'packages/product/skills/loginom-automation/references/nodes/control.loop.md'),
+     ('live-ui',), ('loop-pages-offline', 'loop-pages-rest', 'supernode-calc', 'rest-get-plain')),
+    ((C + 'supernode-*.mjs', 'scripts/node-acceptance/supernode-*.mjs',
+      'docs/node-development/nodes/control-supernode/acceptance/**',
+      'docs/node-development/nodes/control-supernode/fixtures/**'), ('live-ui',), ('supernode-calc',)),
     (('packages/loginom-runtime/src/**',), ('host-unit',), ()),
     (('packages/loginom-runtime/client/**',), ('client-full',), ()),
     (('scripts/node-acceptance/**',), ('acceptance-tests',), ()),
@@ -22,22 +32,51 @@ RULES = (
     ((C + '*read*.mjs', C + '*output*.mjs', C + '*context*.mjs', C + 'node-*.mjs',
       C + 'workspace*.mjs', C + 'ui*.mjs', C + 'observ*.mjs', C + 'native*.mjs',
       C + 'bridge.mjs', 'packages/loginom-runtime/src/connection-check.mjs'), ('live-ui',), ()),
-    ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8')),
-    ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1',)),
+    ((C + 'text-export*.mjs', C + 'browser-downloads.mjs'), ('live-ui', 'cold-export'), ('s1', 's8', 'text-export-cp1251', 'text-export-fixed-width', 'text-export-encodings')),
+    ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1', 'sorting-locale')),
+    ((C + 'variables-datatovar-*.mjs', 'docs/node-development/nodes/variables-datatovar/acceptance/**', 'scripts/node-acceptance/variables-datatovar.mjs'), ('live-ui',), ('variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty', 'variables-from-table-aggregates', 'variables-from-table-scalars')),
+    ((C + 'calculator-*.mjs', 'docs/node-development/nodes/calculator/acceptance/**'),
+     ('live-ui',), ('calculator-vars', 'calculator-vars-update', 'calculator-expression-options', 'calculator-javascript')),
+    ((C + 'sorting-*.mjs', 'scripts/node-acceptance/sorting-modes.mjs'), ('live-ui',), ('sorting-case', 'sorting-threads', 'sorting-auto', 'sorting-variant')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
+    ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/types/**'), ('live-ui',), ('group-real', 'group-boolean', 'group-date', 'group-mode-tie', 'group-empty', 'group-variant')),
+    ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/modes/**'), ('live-ui',), ('grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result')),
+    ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none', 'row-filter-value-list', 'row-filter-top-n', 'row-filter-typed', 'row-filter-null')),
+    ((C + 'variable-binding-*.mjs', 'scripts/node-acceptance/bindings-grouping-sort.mjs', 'docs/node-development/variables/bindings/acceptance/cycle3/**'), ('live-ui',), ('bindings-grouping-sort', 'bindings-sorting-locale')),
+    ((C + 'variable-binding-*.mjs', C + 'filter-bindings.mjs', 'docs/node-development/variables/bindings/**', 'scripts/node-acceptance/filter-bindings.mjs'), ('live-ui',), ('filter-bindings',)),
+    ((C + 'import-bindings.mjs', 'scripts/node-acceptance/import-bindings.mjs', 'docs/node-development/variables/bindings/acceptance/import/**'), ('live-ui',), ('import-bindings',)),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),
-    ((C + 'missing-values-*.mjs',), ('live-ui',), ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean')),
-    ((C + 'join-*.mjs',), ('live-ui',), ('join-right', 'join-full', 'join-difference')),
-    ((C + 'reform-*.mjs',), ('live-ui',), ('s3',)),
-    ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
-    ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),
+    (('docs/node-development/nodes/duplicates/acceptance/**',
+      'docs/node-development/nodes/duplicates/fixtures/typed-*.csv',
+      'packages/product/skills/loginom-automation/references/nodes/research.duplicates.md'),
+     ('live-ui',), ('duplicates-typed', 'duplicates-empty', 'duplicates-singleton')),
+    ((C + 'variables-vartodata-*.mjs', 'docs/node-development/nodes/variables-vartodata/acceptance/**'), ('live-ui',), ('variables-columns', 'variables-rows', 'variables-totable-switch')),
+    ((C + 'missing-values-*.mjs', 'docs/node-development/nodes/missing-values/acceptance/modes/**'), ('live-ui',),
+     ('missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean', 'missing-median-mode', 'missing-previous', 'missing-delete', 'missing-linear', 'missing-random')),
+    ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite', 'enrich-three-lookups', 'enrich-four-lookups')),
+    ((C + 'join-*.mjs', 'docs/node-development/nodes/join/acceptance/**'), ('live-ui',), ('join-right', 'join-full', 'join-difference', 'join-full-no-keys', 'join-cross')),
+    ((C + 'reform-*.mjs', 'scripts/node-acceptance/reform-cache.mjs', 'docs/node-development/nodes/field-parameters/acceptance/v040/**'), ('live-ui',), ('s3', 'reform-rename-lossy', 'reform-cache')),
+    ((C + 'replacement-*.mjs',), ('live-ui',), ('replace-external', 'replace-boolean', 'replace-mixed', 'replace-keep-variant', 'regex-add', 'regex-replace', 's3')),
+    ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**',
+      'scripts/node-acceptance/tests/union-two-stage.test.mjs',
+      'packages/product/skills/loginom-automation/references/nodes/transform.union_data.md'),
+     ('live-ui',), ('union-auto-match', 's4', 'union-two-stage', 'union-auto-label')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
+    ((C + 'control-condition-*.mjs', 'scripts/node-acceptance/control-condition.mjs', 'docs/node-development/nodes/control-condition/acceptance/**',
+      'packages/product/skills/loginom-automation/references/nodes/control.condition.md'), ('live-ui',), ('condition-variable',)),
+    ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact', 'variables-replace-match')),
+    ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union', 'variables-union-inputs', 'variables-union-manual', 'variables-union-type-refusal')),
+    ((C + 'variables-calculator-*.mjs', 'docs/node-development/nodes/variables-calculator/acceptance/**', 'scripts/node-acceptance/variables-calculator.mjs'),
+     ('live-ui',), ('variables-calculator', 'variables-calculator-modes')),
+    ((C + 'crosstable-variables.mjs', 'docs/node-development/nodes/variables-user/acceptance/**', 'scripts/node-acceptance/variables-user-real-date.mjs'), ('live-ui',), ('variables-user-real-date',)),
     ((C + 'javascript-*.mjs',), ('live-ui',), ('n18', 'throw1', 'js-declared-empty')),
     ((C + 'node-port-*.mjs', C + 'node-output-context.mjs', C + 'node-read*.mjs',
       C + '*tooltip*.mjs'), ('live-ui',), ('s1', 's3', 's5', 'n18', 'n19', 'n20', 'calculator-viewport')),
     ((C + 'calculator-*.mjs',
       'docs/node-development/nodes/transform-calculator/acceptance/calculator-viewport/**'),
      ('live-ui',), ('calculator-viewport',)),
+    (('docs/node-development/nodes/transform-calculator/acceptance/calculator-eight/**',),
+     ('live-ui',), ('calculator-eight',)),
     ((C + 'node-execution-*.mjs', C + 'node-process-context.mjs', C + 'node-procedure.mjs', C + 'executor.mjs',
       C + 'workspace-ui.mjs', C + '*toast*.mjs'),
      ('live-ui',), ('s1', 's3', 's5', 'n18', 'n19', 'n20', 'linreg-short', 'throw1')),
@@ -46,27 +85,112 @@ RULES = (
      ('live-ui',), ('linreg-short', 'throw1')),
     (('docs/node-development/nodes/programming-javascript/acceptance/js-declared-empty/**',),
      ('live-ui',), ('js-declared-empty',)),
-    ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
-    ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age')),
-    ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
-    ((C + 'clustering-*.mjs',), ('live-ui',), ('n19', 'r1', 'r2')),
+    ((C + 'auto-correlation-*.mjs', 'docs/node-development/nodes/research-autocorrelation/acceptance/edges/**',
+      'packages/product/skills/loginom-automation/references/nodes/research.auto_correlation.md'),
+     ('live-ui',), ('acf-nonzero', 'acf-empty', 'acf-null', 'acf-one', 'acf-series', 'acf-eight', 'acf-update')),
+    ((C + 'col-union-*.mjs', 'scripts/node-acceptance/col-union-*.mjs', 'docs/node-development/nodes/transform-coluniondata/acceptance/v040/**'), ('live-ui',), ('colunion-third-determining', 'colunion-third-repeat', 'colunion-edit', 'colunion-repeat', 'union-auto-match')),
+    ((C + 'quality-*.mjs', 'scripts/node-acceptance/quality*.mjs',
+      'docs/node-development/nodes/research-quality/acceptance/**',
+      'docs/node-development/nodes/research-quality/fixtures/**'), ('live-ui',), ('quality-default', 'quality-spikes', 'quality-types')),
+
+    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal', 'ungroup-seasonal-zero', 'ungroup-seasonal-null', 'ungroup-seasonal-empty-support', 'ungroup-seasonal-empty-totals')),
+    ((C + 'python-*.mjs',), ('live-ui',), ('py-stdlib', 'py-pandas')),
+    ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age', 'corr-ranks', 'corr-discrete')),
+    ((C + 'elim-outlier-*.mjs', 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance/**',
+      'docs/node-development/nodes/preprocessing-elimoutlier/fixtures/**'), ('live-ui',),
+     ('outlier-replacement-limit', 'outlier-delete', 'outlier-constant',
+      'outlier-replacement-mean', 'outlier-replacement-median', 'outlier-replacement-most-probable',
+      'outlier-quartile-boundaries', 'outlier-sd', 'outlier-iqr')),
+    (('scripts/node-acceptance/clustering-apply.mjs',), ('live-ui',), ('clustering-apply',)),
+    (('scripts/node-acceptance/clustering-gmeans.mjs', 'docs/node-development/nodes/datamining-clustering/acceptance/v040/**'), ('live-ui',), ('clustering-gmeans',)),
+    ((C + 'clustering-*.mjs',), ('live-ui',), ('clustering-apply', 'clustering-gmeans', 'n19', 'r1', 'r2', 'clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
+    (('docs/node-development/nodes/datamining-clustering/acceptance/scaling/**',), ('live-ui',),
+     ('clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
+    ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap', 'factor-rotation', 'factor-apply')),
+    ((C + 'assn-rules-*.mjs', 'scripts/node-acceptance/assnrules-holdout.mjs', 'scripts/node-acceptance/assnrules-exclude.mjs', 'packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md', 'docs/node-development/nodes/datamining-assnrules/acceptance/**', 'docs/node-development/nodes/datamining-assnrules/fixtures/v040/**'), ('live-ui',), ('assnrules-exclude', 'assnrules-holdout', 'assnrules-recommend', 'assnrules-consequents', 'assnrules-basic', 'assnrules-length', 'assnrules-retrain')),
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
-    ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
-    ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise')),
-    ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4')),
+    ((C + 'coarse-classes-*.mjs', 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/**'), ('live-ui',), ('coarse-classes-frozen-zero', 'coarse-classes-continuous-manual', 'coarse-classes-train', 'coarse-classes-apply')),
+    ((C + 'binning-*.mjs', 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/**'), ('live-ui',), ('binning-auto', 'binning-sd', 'binning-count', 'binning-width', 'binning-frequency', 'binning-apply', 'binning-datetime-manual', 'binning-ties-current', 'binning-frequency-ties')),
+    (('scripts/node-acceptance/logreg-normalization.mjs', 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization/**'), ('live-ui',), ('logreg-normalization',)),
+    (('docs/node-development/nodes/datamining-logregression/acceptance/modes/validation-kfold/**',), ('live-ui',), ('logreg-validation-kfold',)),
+    (('docs/node-development/nodes/datamining-logregression/acceptance/modes/partition-column/**',), ('live-ui',), ('logreg-partition-column',)),
+    ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-validation-kfold', 'logreg-partition-sequential', 'logreg-partition-column', 'logreg-elastic-net', 'logreg-lasso', 'logreg-ridge', 'logreg-weights', 'logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
+    (('scripts/node-acceptance/scenarios/linreg-elastic/**',), ('live-ui',), ('linreg-elastic',)),
+    (('scripts/node-acceptance/scenarios/linreg-lasso/**',), ('live-ui',), ('linreg-lasso',)),
+    ((C + 'linregression-*.mjs', 'packages/product/skills/loginom-automation/references/nodes/datamining.lin_regression.md'), ('live-ui',), ('n20', 'r3', 'r4', 'linreg-forward-f', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge', 'linreg-lasso', 'linreg-coefficients', 'linreg-elastic', 'linreg-partition-sequential', 'linreg-summary', 'linreg-categorical')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
+    ((C + 'rest-request*.mjs', C + 'rest-connection.mjs',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/*-body/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/delete/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/headers/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-headers.md'),
+     ('live-ui',), ('rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers')),
     (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
+    ((C + 'rest-request*.mjs', 'docs/node-development/nodes/integration-restrequest/acceptance/modes/variables/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-variables.md'), ('live-ui',), ('rest-variables',)),
+    ((C + 'rest-request*.mjs',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/simulation/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-simulation.md'),
+     ('live-ui',), ('rest-simulation',)),
+    ((C + 'rest-request*.mjs', C + 'rest-connection.mjs',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/content-types/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-content-types.md'),
+     ('live-ui',), ('rest-content-types',)),
+    ((C + 'rest-request*.mjs',
+      'docs/node-development/nodes/integration-restrequest/acceptance/modes/error-descriptions/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-error-descriptions.md'),
+     ('live-ui',), ('rest-error-descriptions',)),
+    (('packages/product/skills/loginom-automation/references/nodes/integration.rest_request.md',),
+     ('live-ui',), ('rest-headers', 'rest-variables')),
+    (('docs/node-development/variables/acceptance/**', C + 'package-persistence.mjs'),
+     ('live-ui',), ('rest-query-variables',)),
+    (('docs/node-development/nodes/preprocessing-*/acceptance/v040/**', C + 'sampling-*.mjs', C + 'data-partition-*.mjs', 'scripts/node-acceptance/sampling-modes.mjs'), ('live-ui',), ('sampling-uniform', 'partition-uniform', 'partition-test-priority')),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
-    (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random')),
-    ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec')),
-    ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
+    (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random', 'sampling-stratified', 'sampling-biased', 'partition-stratified', 'partition-biased')),
+    ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec', 'date-time-formats')),
+    ((C + 'smoothing-*.mjs', 'docs/node-development/nodes/preprocessing-smoothing/acceptance/modes/**'), ('live-ui',), ('smoothing-hp', 'smoothing-haar', 'smoothing-haar-depth2', 'smoothing-db2', 'smoothing-db2-depth2', 'smoothing-coif1', 'smoothing-cdf97', 'smoothing-db2-zero', 'smoothing-cdf97-reflect')),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
-    ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('tree-repeat', 'tree-no-repeat')),
-    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single')),
+    ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**',
+      'scripts/node-acceptance/tests/trees.test.mjs', 'scripts/node-acceptance/tests/tree-dates.test.mjs',
+      'docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/**'), ('live-ui',),
+     ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices', 'trees-to-table-wide', 'trees-to-table-siblings',
+      'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers', 'tree-dates', 'tree-scalar-arrays',
+      'table-tree-dates-variant', 'tree-to-table-typed', 'trees-to-table-composite')),
+    (('packages/product/skills/loginom-automation/references/nodes/trees.to_table.md',), ('live-ui',), ('tree-to-table-typed', 'trees-to-table-siblings', 'trees-to-table-composite')),
+    ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-*.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding', 'excel-import-multi', 'excel-import-parallel', 'excel-import-auto-none', 'excel-import-auto-new', 'excel-import-auto-columns', 'excel-import-auto-types')),
+    ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
+      'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
+     ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
+    ((C + 'text-import-*.mjs', C + 'node-import-continuation.mjs',
+      'docs/node-development/nodes/text-import/fixtures/multi-file/**',
+      'docs/node-development/nodes/text-import/acceptance/task-multi-file-list.md',
+      'docs/node-development/nodes/text-import/acceptance/task-multi-file.md',
+      'scripts/node-acceptance/scenarios/text-mask/**',
+      'docs/node-development/nodes/text-import/acceptance/task-variant.md',
+      'scripts/node-acceptance/scenarios/text-auto-label/**',
+      'scripts/node-acceptance/scenarios/text-parallel/**',
+      'scripts/node-acceptance/scenarios/text-file-info/**',
+      'packages/product/skills/loginom-automation/references/nodes/imports.text.md'),
+     ('live-ui',), ('text-file-info', 'text-parallel', 'text-auto-label', 'text-variant', 'text-mask', 'text-multi-file-list', 'text-auto-types', 'text-auto-update', 'text-autodetect-types', 'import-bindings', 'text-folder-masks')),
+    (('scripts/node-acceptance/scenarios/text-folder-masks/**', C + 'storage-policy.mjs'),
+     ('live-ui',), ('text-folder-masks', 'text-mask', 'text-multi-file-list')),
+    (('docs/node-development/nodes/text-import/acceptance/autodetect/**',), ('live-ui',), ('text-autodetect-types',)),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
+    ((C + 'collapse-*.mjs', 'docs/node-development/nodes/collapse-columns/acceptance/**',
+      'scripts/node-acceptance/tests/collapse-variant.test.mjs',
+      'packages/product/skills/loginom-automation/references/nodes/transform.collapse_columns.md'),
+     ('live-ui',), ('collapse-null', 'collapse-null-ignore', 'collapse-header', 'collapse-header-ignore', 'collapse-ignore', 'collapse-variant', 'collapse-mixed', 'variant-reader-collapse')),
+    ((C + 'variant-native-*.mjs', C + 'node-port-output.mjs', C + 'node-procedure.mjs', 'docs/node-development/nodes/variant-reader/acceptance/**'),
+     ('live-ui',), ('variant-reader-collapse', 'collapse-variant', 'collapse-mixed', 'replace-keep-variant', 'replace-boolean', 'variables-rows', 'lgd-import-empty-variant', 'sorting-variant')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
      ('live-ui',), ('crosstable-real-keys',)),
+    (('docs/node-development/nodes/transform-crosstable/acceptance/modes/**',
+      'docs/node-development/nodes/transform-crosstable/acceptance/task-*-aggregates.md',
+      'docs/node-development/nodes/transform-crosstable/acceptance/task-null-cells.md',
+      'packages/product/skills/loginom-automation/references/nodes/transform.cross_table.md'),
+     ('live-ui',), ('crosstable-numeric', 'crosstable-scalar', 'crosstable-datetime', 'crosstable-null-cells')),
 )
 UNITS = {
     'host-unit': ('(cd packages/loginom-host && bun test)', '#447: runtime/src требует полный host bun test'),
@@ -238,10 +362,21 @@ def obligations(base, head):
     return head, base, ancestor, [(key, *specs[key], sorted(checks[key])) for key in sorted(checks)]
 
 
+OUTCOMES = ('exit 0', 'FAIL', 'NOT_RUN', 'CI', 'COVERED', 'APPROVED')
+
+
+def outcome_of(outcome, command):
+    patterns = (('FAIL', r'FAIL; журнал: \S+:[1-9][0-9]*'), ('NOT_RUN', r'NOT_RUN; причина: \S.*'),
+                ('CI', r'CI; https://github\.com/gooddaytoday/loginom-ai-agent/actions/runs/[1-9][0-9]*(?:/job/[1-9][0-9]*)?'),
+                ('COVERED', r'COVERED; LAB-[1-9][0-9]*'))
+    patterns += (('exit 0', r'exit 0'),) if command is not None else (('APPROVED', r'APPROVED; решение \S+'),)
+    return next((name for name, pattern in patterns if re.fullmatch(pattern, outcome)), None)
+
+
 def verify(checks, report):
-    missing = []
+    missing, summary = [], {name: [] for name in OUTCOMES}
     for key, command, _, _ in checks:
-        valid = False
+        found = []
         for line in report.splitlines():
             fields = [field.strip() for field in line.strip().strip('|').split('|')]
             # One Markdown table row per ID, command, reason and result.
@@ -249,12 +384,18 @@ def verify(checks, report):
                 continue
             if fields[1] != ('`' + command + '`' if command else '—'):
                 continue
-            outcome = fields[3]
-            failed = re.fullmatch(r'FAIL; журнал: \S+:[1-9][0-9]*', outcome) is not None
-            valid = valid or failed or (command is not None and outcome == 'exit 0')
-        if not valid:
+            name = outcome_of(fields[3], command)
+            if name and name not in found: found.append(name)
+        if not found:
             missing.append(key)
-    return missing
+        for name in found:
+            summary[name].append(key)
+    return missing, summary
+
+
+def summary_line(summary):
+    return 'Исходы: ' + '; '.join(name + ': ' + str(len(keys)) + (' (' + ', '.join(keys) + ')' if keys else '')
+                                  for name, keys in summary.items())
 
 
 def main():
@@ -270,9 +411,10 @@ def main():
     try:
         head, base, ancestor, checks = obligations(args.base, args.head)
         if args.action == 'verify':
-            missing = verify(checks, args.report.read_text(encoding='utf-8'))
+            missing, summary = verify(checks, args.report.read_text(encoding='utf-8'))
+            print(summary_line(summary))
             print('Недостающие / неполные ID: ' + ', '.join(missing) if missing
-                  else 'Все ID отражены (только сверка текста; FAIL не означает приёмку).')
+                  else 'Все ID отражены (только сверка текста; FAIL и NOT_RUN не означают приёмку).')
             return 1 if missing else 0
         print(f'head: {head}; base: {base}; merge-base: {ancestor}\n')
         print('Команды из корня репозитория. $PAIR — каталог тестовой пары. Проверки здесь не запускаются.\n')

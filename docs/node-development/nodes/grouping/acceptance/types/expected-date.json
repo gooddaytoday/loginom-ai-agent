@@ -1,0 +1,86 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FirstDay",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "LastDay",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "FinalDay",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "MissingDays",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "FirstDay": "2026-01-05T00:00:00.000",
+          "LastDay": "2026-02-10T00:00:00.000",
+          "FinalDay": null,
+          "MissingDays": 1
+        },
+        {
+          "Region": "B",
+          "FirstDay": "2026-06-20T00:00:00.000",
+          "LastDay": "2026-07-14T00:00:00.000",
+          "FinalDay": "2026-07-14T00:00:00.000",
+          "MissingDays": 0
+        },
+        {
+          "Region": "C",
+          "FirstDay": null,
+          "LastDay": null,
+          "FinalDay": null,
+          "MissingDays": 2
+        },
+        {
+          "Region": "D",
+          "FirstDay": "2026-02-01T00:00:00.000",
+          "LastDay": "2026-02-01T00:00:00.000",
+          "FinalDay": "2026-02-01T00:00:00.000",
+          "MissingDays": 0
+        },
+        {
+          "Region": "E",
+          "FirstDay": "2026-01-20T00:00:00.000",
+          "LastDay": "2026-01-22T00:00:00.000",
+          "FinalDay": "2026-01-22T00:00:00.000",
+          "MissingDays": 0
+        }
+      ]
+    }
+  ]
+}

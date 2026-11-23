@@ -15,6 +15,25 @@ function fixture(mode='left'){
  const phases=Object.entries(values).map(([phase,value])=>({phase,receipt_id:'op:'+phase,status:'verified',value:{...value,verified:true,cleanup_complete:true}}));
  return {node,phases,operation_id:'op'};
 }
+test('Join readback accepts empty keys only for full and validates the complete Cartesian schema',()=>{
+ const f=fixture('full');
+ f.phases[1].value.configuration.keys=[];f.phases[1].value.keys=[];
+ const m=f.phases[3].value.native_mapping,source=f.phases[0].value.ports[1].native_mapping.source_fields[0];
+ m.source_fields.splice(2,0,source);
+ m.target_fields.splice(2,0,{...source,record_id:'t'+source.record_id,data_kind:'Дискретный',excluded:false,source});
+ m.target_fields.forEach((field,index)=>field.index=index);
+ const r=joinConfigurationReadback(f);
+ assert.deepEqual(r.keys,[]);assert.deepEqual(r.output_mapping.fields.map(field=>field.name),['Key','Left','Id','Right']);
+ const result=readback=>validate({operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,
+  execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
+  package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback}});
+ assert.equal(result(r).valid,true,JSON.stringify(result(r)));
+ for(const mode of ['inner','left','right','difference']){
+  assert.equal(result({...r,mode}).valid,false,mode);
+  f.phases[1].value.configuration.mode=mode;
+  assert.throws(()=>joinConfigurationReadback(f),/configuration owner/);
+ }
+});
 test('Join readback binds two inputs, complete output and exact receipts',()=>{const r=joinConfigurationReadback(fixture());assert.equal(r.kind,'join');assert.equal(r.input_mappings.length,2);assert.deepEqual(r.output_mapping.fields.map(f=>f.name),['Key','Left','Right']);assert.equal(r.package_persistence_verified,false);});
 test('Join readback rejects foreign or partial inputs, incomplete output and invented flags',()=>{
  for(const change of [f=>f.phases[0].value.ports[1].port=0,f=>f.phases[0].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[0].value.ports[1].native_mapping.source_identity_verified=false,f=>f.phases[0].value.ports.pop(),f=>delete f.phases[1].value.configuration.case_sensitive,f=>f.phases[3].value.native_mapping.target_fields.pop(),f=>f.phases[3].value.finish={settings_applied:true,mode:'done',node_context:{}},f=>f.phases[4].receipt_id='other']){

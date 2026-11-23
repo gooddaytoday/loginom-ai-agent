@@ -18,8 +18,34 @@ function fixture(){
  const controller=Object.assign(new MethodSettingsWizard(),{FView:{},FGrdColumns:grid,FInputColumnStore:store,FBinItemsStore:binStore,FBinsReloading:false,FWizardForm:{FView:w},FViewedColumnRecord:records[1],FMethodSettingFrames:{}});
  view['@@TestCmpController']=controller;Object.assign(components,{[root.id]:view,[wizard.id]:w,[gridElement.id]:grid,[binElement.id]:binGrid});
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- return {controller,store,binStore,records,bins,selection,grid,w,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
+ const settings=(method,extra)=>{
+  records[1].data.MethodType=method;
+  const frame=element('MethodSettingFrame',root);frame.getAttribute=()=> 'MethodSettingFrame';frame.querySelectorAll=()=>[];
+  const values={'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false,chkRoundingLevel:false,
+   ...extra};
+  for(const [key,value] of Object.entries(values)){
+   const e=element('MethodSettingFrame;'+key,frame);components[e.id]={el:{dom:e},getValue:()=>value};
+  }
+  controller.FMethodSettingFrames={frequency:{FInputColumnRecord:records[1],FOwner:controller,FView:{el:{dom:frame}}}};
+ };
+ return {controller,store,binStore,records,bins,selection,grid,w,
+  frequency:ties=>settings(4,{'cbbTileCount;ValueControl':2,'cbbMatchingObservationsMode;ValueControl':ties,'chkSummTile;ValueControl':false}),
+  sd:code=>settings(5,{'cbbSDBinsMode;ValueControl':code,'chkLowerLimitOpen;ValueControl':true,'chkUpperLimitOpen;ValueControl':true}),
+  read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
 }
+test('SD reads native zero-based coefficient and retains observed false open-tail inclusion',()=>{
+ const f=fixture();f.sd(0);f.bins[0].data.BoundModes=0;f.bins[1].data.BoundModes=1;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.settings.method,'sd');
+ assert.equal(r.settings.sd_coefficient,1);assert.equal(r.settings.limits,null);
+ assert.equal(r.settings.lower_open,true);assert.equal(r.settings.upper_open,true);
+ assert.equal(r.intervals[0].lower_included,false);assert.equal(r.intervals[1].upper_included,false);
+ for(const code of [1,2]){const f=fixture();f.sd(code);assert.equal(f.read().settings.sd_coefficient,code+1);}
+});
+test('native frequency tie code 1 reads back current without falling back to next',()=>{
+ const f=fixture();f.frequency(1);const r=f.read();
+ assert.equal(r.verified,true);assert.equal(r.settings.method,'frequency');assert.equal(r.settings.ties,'current');
+ assert.equal(r.frame.values['cbbMatchingObservationsMode;ValueControl'],1);
+});
 test('bound binning UI inventory survives detached vendor FView and never calls column RPC',()=>{
  const f=fixture(),r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.fields.map(f=>[f.index,f.label,f.method_code]),[[0,'RowID',0],[1,'X',3]]);
  assert.equal(r.state,'materialized');assert.deepEqual(r.intervals.map(b=>[b.lower,b.upper,b.lower_included,b.upper_included]),[[0,10,true,true],[10,20,false,true]]);
@@ -35,6 +61,13 @@ test('incomplete input/bins, pending selection, foreign owners and invalid inter
 });
 test('settings-only field is distinguished from a materialized saved model',()=>{
  const f=fixture();f.records[1].data.BinsCount=0;f.bins.splice(0);const r=f.read();assert.equal(r.verified,true);assert.equal(r.state,'settings');assert.deepEqual(r.intervals,[]);
+});
+test('materialized DateTime bounds retain civil milliseconds in the production reader',()=>{
+ const f=fixture();f.records[1].data.DataType=2;
+ f.bins.forEach((b,i)=>{b.data.LowerBoundValue=new Date(2026,0,1+i,0,0,0,123);b.data.UpperBoundValue=new Date(2026,0,2+i,0,0,0,123);});
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[1].type,'datetime');
+ assert.equal(r.intervals[0].lower,'2026-01-01T00:00:00.123');
+ assert.equal(r.intervals[1].upper,'2026-01-03T00:00:00.123');
 });
 test('an empty numeric store after reopening is not a ready Binning inventory',()=>{
  const f=fixture();f.records.splice(0);f.selection.splice(0);f.bins.splice(0);f.controller.FViewedColumnRecord=null;
@@ -57,8 +90,8 @@ test('Binning field and method cells are actionable only on their own wizard pag
  for(const own of [true,false]){
   const page=new Page(),base='MF;TF-1;WizrdMCF',root=page.add('div',base,'',{x:0,y:70,width:900,height:600});
   page.add('div',base+(own?';MethodSettingsWizard-1;grdColumns':';CalcDataWizard;btnAddExpression'),'',{x:0,y:75,width:400,height:300},root);
-  for(const [i,name] of ['colDisplayName_1','colMethodType_1'].entries())page.add('td',base+';MethodSettingsWizard-1;'+name,'X',{x:50+i*150,y:120,width:100,height:25},root);
-  const r=await page.observe(),cells=r.ui.elements.filter(e=>/;col(?:DisplayName|MethodType)_1$/.test(e.tid??''));
-  assert.equal(cells.length,own?2:0);for(const cell of cells)assert.ok(cell.allowed_actions.includes('double_click'));
+  for(const [i,name] of ['colDisplayName_1','colMethodType_1','colUpperBoundValue_0','colBinLabel_0'].entries())page.add('td',base+';MethodSettingsWizard-1;'+name,'X',{x:50+i*150,y:120,width:100,height:25},root);
+  const r=await page.observe(),cells=r.ui.elements.filter(e=>/;col(?:DisplayName_1|MethodType_1|UpperBoundValue_0|BinLabel_0)$/.test(e.tid??''));
+  assert.equal(cells.length,own?4:0);for(const cell of cells)assert.ok(cell.allowed_actions.includes('double_click'));
  }
 });

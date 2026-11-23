@@ -2,18 +2,19 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
+import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
+import { dashboardStorage } from "./dashboard-storage.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
-import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
-import { createBridge } from "../client/lib/bridge.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
+import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -22,6 +23,9 @@ const state = {
   startupController: new AbortController(),
   startupCleanupFailed: false,
   startupDiagnostics: [],
+  startupPhase: "runtime.start",
+  startupStarted: performance.now(),
+  startupStateDir: undefined,
   closing: undefined,
   bridge: undefined,
   client: undefined,
@@ -33,8 +37,28 @@ const state = {
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
+  timers: new Map(),
+  exiting: false,
 }
+// In-memory MCP shares this process with Playwright, whose completed operations
+// can leave referenced Promise.race timeout losers. Retain them during resource
+// cleanup; after checked close they must not postpone normal isolate disposal.
+createHook({
+  init(id, type, _trigger, resource) {
+    if (type !== "Timeout") return
+    if (state.exiting) { resource.unref(); return }
+    state.timers.set(id, resource)
+  },
+  destroy(id) { state.timers.delete(id) },
+}).enable()
 const requests = new Set()
+async function startupPhase(event) {
+  state.startupPhase = event.phase
+  await appendFile(join(state.startupStateDir, "startup-phases.jsonl"), JSON.stringify({ version: 1,
+    recorded_at: new Date().toISOString(), generation: state.owner.generation, chat: state.owner.chat,
+    elapsed_ms: Math.round(performance.now() - state.startupStarted), ...event,
+  }) + "\n", { mode: 0o600 }).catch(() => undefined)
+}
 const terminalTrace = (stage) => {
   if (!state.session?.directory) return
   try {
@@ -48,7 +72,12 @@ const send = (message, disconnect = false) => {
     process.send(message, (error) => {
       if (!disconnect) return
       terminalTrace(error ? "reply_failed" : "reply_flushed")
-      if (!error && process.connected) process.disconnect()
+      if (!error && process.connected) {
+        // disconnect() clears process.channel even when an incomplete frame
+        // keeps the underlying pipe open. Release its event-loop reference first.
+        process.channel?.unref()
+        process.disconnect()
+      }
       terminalTrace("disconnect_returned")
       // Node may postpone 'disconnect' while an incomplete later IPC frame is
       // buffered. The reply is flushed and admitted work/resources are already
@@ -74,7 +103,23 @@ const stop = (exitCode = 0) => {
     void Promise.resolve().then(() => state.browser?.close()).finally(() => process.exit(1))
   }, 30000)
   void close().then(
-    () => { clearTimeout(timer); terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => {
+      clearTimeout(timer)
+      terminalTrace("exit_requested")
+      // Let Node dispose the isolate before joining V8 workers. process.exit()
+      // can deadlock after 'exit' when a worker needs foreground GC (#66171).
+      // The owner still requires the close ACK and actual clean process exit.
+      process.channel?.unref()
+      if (process.connected) process.disconnect()
+      process.exitCode = exitCode
+      state.exiting = true
+      state.timers.forEach(timer => timer.unref())
+      state.timers.clear()
+      setTimeout(() => {
+        terminalTrace("exit_fallback")
+        process.exit(exitCode)
+      }, 3000).unref()
+    },
     () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
 }
@@ -100,13 +145,24 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
+      state.startupStateDir = input.stateDir
+      state.startupStarted = performance.now()
       state.uploadDirectory = `/${input.connection.username}`
       // Match the existing supervisor allowance; retries never restart it.
       const deadline = Math.min(Date.now() + (input.validation === true ? 210_000 : 120_000), input.startupDeadline ?? Infinity)
-      const resources = await verifyResources(input.resources)
+      await startupPhase({ phase: "resources.verify", status: "starting" })
+      // Every start rechecks file metadata against the Host's profile cache;
+      // a changed file is hashed again and a mismatch refuses the start.
+      const resources = await verifyResources(input.resources, { manifestHash: input.resourceManifestHash,
+        cachePath: input.resourceCachePath, cacheVersion: input.resourceCacheVersion,
+        signal: state.startupController.signal })
+      await startupPhase({ phase: "resources.verify", status: "ready",
+        duration_ms: Math.round(performance.now() - state.startupStarted), ...resources.verification })
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
+      const profileStarted = performance.now()
+      await startupPhase({ phase: "runtime.profile", status: "starting" })
       const directory = join(
         input.stateDir,
         "generations",
@@ -123,13 +179,17 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+      await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,
+        // Host resets this directory on credential changes and after normal shutdown.
+        httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
         signal: state.startupController.signal,
         deadline,
+        onPhase: startupPhase,
         onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
@@ -138,13 +198,15 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:join(directory,'browser-downloads'),
+      // Connection validation never needs the executor's large dependency tree.
+      const { createSession } = await import("../client/lib/session.mjs")
+      const { createBridge } = await import("../client/lib/bridge.mjs")
+      const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
+      state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
-        endpoint: input.endpoint,
-        apiKey: input.connection.apiKey,
         // Preparation must bind to the same canonical path used by private login.
         loginomUrl: loginomAddress(input.connection.url),
         stateDir: input.stateDir,
@@ -215,6 +277,33 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
+      if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
+        if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+        if (message.input.origin !== state.owner.origin) throw Error("DASHBOARD_ORIGIN_MISMATCH")
+      }
+      if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+      const controller = new AbortController()
+      state.controller = controller
+      const cancellation = { close: undefined }
+      const cancel = () => {
+        cancellation.close ??= state.browser.close()
+        void cancellation.close.catch(() => undefined)
+      }
+      controller.signal.addEventListener("abort", cancel, { once: true })
+      try {
+        const result = await dashboardStorage(state.browser, message.input, message.operation, controller.signal)
+        send({ id: message.id, result })
+      } catch (error) {
+        if (controller.signal.aborted && (message.operation === "dashboardRead" || message.operation === "dashboardVersions")) throw Error("DASHBOARD_CANCELLED")
+        throw error
+      } finally {
+        controller.signal.removeEventListener("abort", cancel)
+        await cancellation.close
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,
@@ -282,10 +371,11 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
-          result,
+          result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },
@@ -294,6 +384,14 @@ async function handle(message) {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && state.startupStateDir) {
+      await appendFile(join(state.startupStateDir, "startup-failures.jsonl"), JSON.stringify({ version: 1,
+        recorded_at: new Date().toISOString(), generation: state.owner.generation, chat: state.owner.chat,
+        phase: state.startupPhase, elapsed_ms: Math.round(performance.now() - state.startupStarted),
+        error: startupDiagnostic(error, [message.input?.connection?.apiKey, message.input?.connection?.password,
+          message.input?.connection?.username]),
+      }) + "\n", { mode: 0o600 }).catch(() => undefined)
+    }
     if (message.operation === "start" && !state.startupDiagnostics.length)
       state.startupDiagnostics.push({ phase: "runtime.start", retry: false,
         error: startupDiagnostic(error, [message.input?.connection?.apiKey, message.input?.connection?.password,
@@ -307,7 +405,7 @@ async function handle(message) {
     }
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
-    const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
+    const code = /^(?:LOGINOM|DASHBOARD)_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, ...(artifactFailure(error) ?? { error: code }),
       ...(message.operation === "start" ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === "close")
     if (message.operation === "start") {

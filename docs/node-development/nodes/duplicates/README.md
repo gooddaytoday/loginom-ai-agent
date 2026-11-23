@@ -4,7 +4,17 @@
 
 [Подплан](plan.md) · [реестр](../../registry.json).
 
-## Состояние
+## Текущий срез v0.4.0
+
+Зарегистрирован `research.duplicates` / `mark`. Полные роли input_fields/output_fields и четыре служебных поля Duplicate, DuplicateGroup, Contradiction, ContradictionGroup.
+
+Ограничения: Все строки сохраняются; Duplicate=false удалит все помеченные копии, а не оставит одного представителя. Mapping overrides запрещены; роли полей задаются полностью, служебные имена/метки зарезервированы. Код допускает пять scalar-типов, но исторически приняты integer/string; bool/real/datetime и NULL в ключах требуют отдельного аналитического подтверждения.
+
+Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [duplicates-node.mjs](../../../../packages/loginom-runtime/client/lib/duplicates-node.mjs):1–41; [duplicates-parameters.mjs](../../../../packages/loginom-runtime/client/lib/duplicates-parameters.mjs):1–30; [research.duplicates.md](../../../../packages/product/skills/loginom-automation/references/nodes/research.duplicates.md):1–4. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+
+## Исторические материалы и план расширений
+
+### Прежнее состояние
 
 Обработчик `research.duplicates` / `mark` реализован; реестр сохраняет историческое `accepted_scoped` и технические Desktop случаи V02. Приёмки текущего standalone CLI нет: после прежних проверок изменена общая оболочка. Следующая карточка Multica — этап 0 подплана, перепроверка принятого объёма; статус `reverification_required`. Исторический PASS не переносится.
 

@@ -17,6 +17,18 @@ import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import {createActionRuntime,executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
   rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult} from '../../lib/executor.mjs';
 
+// The SDK client compiles every advertised outputSchema on each listTools().
+// The bridge advertises several identical large schemas, so compile each
+// distinct schema once per client; every tool keeps the same Ajv validation.
+class SchemaCachingValidator extends AjvJsonSchemaValidator {
+  #validators = new Map();
+  getValidator(schema) {
+    const key = JSON.stringify(schema);
+    if (!this.#validators.has(key)) this.#validators.set(key, super.getValidator(schema));
+    return this.#validators.get(key);
+  }
+}
+
 // Exercise the actual bridge request handler and MCP Server/Client protocol.
 // Only external services, catalog delivery and browser transport are replaced;
 // no localhost listener, real browser, credentials or model is involved.
@@ -25,6 +37,7 @@ test('MCP application refusals remain typed normal content and the same connecti
   const resources = await createBundledSkillFixture(t);
   const page = new Page(); let browserCalls = 0, preparationPath=[];
   const sourceCalls=[];
+  let browserPause, nodePause, actionRuntime, nodeHandlers;
   const catalog = await createActionCatalogFixture();
   const compatibility = catalog.compatibility;
   const fault = process.env.LOGINOM_TEST_CATALOG_FAULT;
@@ -52,6 +65,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       }
       assert.equal(this.browser, true);
       assert.equal(request.name, 'browser_run_code_unsafe');
+      if(browserPause){const pause=browserPause;browserPause=null;pause.enter();await pause.wait;}
       browserCalls++;
       const code = request.arguments.code;
       if (code.includes('async function prepareWorkspace(')) preparedDrafts++;
@@ -77,7 +91,18 @@ test('MCP application refusals remain typed normal content and the same connecti
   mock.module(new URL('../../lib/executor.mjs', import.meta.url).href, { namedExports: {
     executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
     rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult,
-    createActionRuntime: options => createActionRuntime({...options,
+    createActionRuntime: options => actionRuntime=createActionRuntime({...options,
+      nodeApplyHandlers:nodeHandlers=new Map(options.nodeApplyHandlers),
+      nodeApplyDriverFactory:input=>input.operation.id==='bridge-background'
+        ?Object.fromEntries(['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation']
+          .map(name=>[name,()=>{throw Error('Unexpected background browser driver: '+name);}])):options.nodeApplyDriverFactory(input),
+      onRecord:async event=>{
+        const recorded=await options.onRecord(event);
+        if(nodePause&&event.operation_id==='bridge-background'&&event.phase==='prepared'){
+          const pause=nodePause;nodePause=null;pause.enter();await pause.wait;
+        }
+        return recorded;
+      },
       nodeTargetAdapterFactory:()=>({observe:async request=>{
         assert.equal(request.target.kind,'existing');assert.equal(request.target.type,'programming.javascript');
         sourceCalls.push('graph');return {nodes:[{ref:request.target.ref,type:'programming.javascript'}],links:[]};
@@ -117,7 +142,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     }
     assert.equal(browserEnvironment.PLAYWRIGHT_BROWSERS_PATH, session.browserRoot);
     assert.equal(browserEnvironment.DOCK_TEST_SECRET, undefined);
-    client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' });
+    client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' }, { jsonSchemaValidator: new SchemaCachingValidator() });
     const [agentTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(bridgeTransport), client.connect(agentTransport)]);
     assert.match(client.getInstructions(), /activate.*loginom-automation/i);
@@ -145,6 +170,9 @@ test('MCP application refusals remain typed normal content and the same connecti
       observation_id:'o',operation_id:'u',destination:'/other'}});
     assert.equal(JSON.parse(rejectedUpload.content[0].text).error.code,'REQUEST_REJECTED');
     assert.equal(browserCalls,0);
+    const unpreparedCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
+    assert.notEqual(unpreparedCards.isError,true,JSON.stringify(unpreparedCards));
+    assert.equal(JSON.parse(unpreparedCards.content[0].text).node_types.length,2);
     const available = await client.callTool({ name: 'dock_action_describe', arguments: {} });
     assert.notEqual(available.isError, true);
     assert.deepEqual(JSON.parse(available.content[0].text).available_actions, ['node.add', 'link.create', 'package.save_as', 'node.configure_text_import', 'package.save_checkpoint']);
@@ -152,7 +180,19 @@ test('MCP application refusals remain typed normal content and the same connecti
 
     // Bootstrap starts from a known blank browser page, before mocked preparation.
     page.url = () => 'about:blank';
-    const bootstrap = await client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    let releaseBrowser,enteredBrowser,timer;
+    const entered=new Promise(resolve=>{enteredBrowser=resolve;});
+    browserPause={enter:enteredBrowser,wait:new Promise(resolve=>{releaseBrowser=resolve;})};
+    const bootstrapPending=client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
+    await entered;
+    const describePending=client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text']}});
+    let descriptionAvailable;
+    try{
+      descriptionAvailable=await Promise.race([describePending.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),2000);})]);
+    }finally{clearTimeout(timer);releaseBrowser();}
+    const bootstrap=await bootstrapPending;
+    assert.notEqual((await describePending).isError,true);
+    assert.equal(descriptionAvailable,true,'diagnostic describe must not queue behind browser work');
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');
     assert.equal(initial.output.bootstrap, true);
@@ -208,6 +248,15 @@ test('MCP application refusals remain typed normal content and the same connecti
     const replay=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
     assert.deepEqual(replay.structuredContent,sourceReceipt);
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
+    const undescribed=await client.callTool({name:'dock_node_apply',arguments:{operation_id:'without-card',target:{kind:'new',type:'imports.text'}}});
+    assert.equal(undescribed.isError,true);
+    assert.equal(JSON.parse(undescribed.content[0].text).error.code,'REQUEST_REJECTED');
+    assert.equal(browserCalls,beforeSource);
+    const diagnosticTypes=metadata.executor.available_node_types;
+    const largeCards=await client.callTool({name:'dock_action_describe',arguments:{node_types:diagnosticTypes}});
+    assert.notEqual(largeCards.isError,true);
+    assert.ok(Buffer.byteLength(JSON.stringify(largeCards))>46000);
+    assert.equal(JSON.parse(largeCards.content[0].text).node_types.length,diagnosticTypes.length);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);
@@ -267,7 +316,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       browserRoot:session.browserRoot,metadata:{...session.metadata,sessionId:'unit-bridge-compact'},async save(){},
       artifactStore:await createArtifactStore({directory:join(compactDirectory,'input')})};
     bridge=await createBridge({...config,resultProfile:'user-v1',stateDir:compactDirectory},compactSession);
-    client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'});
+    client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'},{jsonSchemaValidator:new SchemaCachingValidator()});
     const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
     const compactTools=await client.listTools(),contextTool=compactTools.tools.find(t=>t.name==='dock_node_read');
@@ -284,6 +333,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     const compactReadValidator=new AjvJsonSchemaValidator().getValidator(contextTool.outputSchema);
     assert.equal(compactReadValidator(contextReceipt).valid,true);
     assert.equal(compactReadValidator(sourceReceipt).valid,true);
+    assert.equal(compactReadValidator({...contextReceipt,cleanup_complete:false}).valid,false);
     const missingContext=structuredClone(contextReceipt);delete missingContext.ports;
     assert.equal(compactReadValidator(missingContext).valid,false);
     const compactCaption=compactTools.tools.find(tool=>tool.name==='dock_node_apply').inputSchema.properties.target.properties.label;
@@ -305,6 +355,40 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.deepEqual(compactResponse.structuredContent,compactReceipt);
     assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     assert.equal(browserCalls,beforeCompact);
+    nodeHandlers.set('programming.javascript',{revision:'1',modes:['script'],validate:()=>{},
+      configure:async()=>({verified:true,cleanup_complete:true})});
+    let releaseNode, enterNode;
+    const enteredNode=new Promise(resolve=>{enterNode=resolve;});
+    nodePause={enter:enterNode,wait:new Promise(resolve=>{releaseNode=resolve;})};
+    const background=actionRuntime.startNodeApply({operation_id:'bridge-background',contract_revision:'1.0.0',
+      document_id:sourceRequest.document_id,workflow_ref:sourceRequest.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:sourceRequest.node},inputs:[],mode:'script',
+      parameters:{},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
+      budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+    assert.equal(background.state,'running');
+    try {
+      await Promise.race([enteredNode,actionRuntime.waitNodeApply('bridge-background',{timeoutMs:1000}).then(job=>{
+        assert.equal(job.state,'running',JSON.stringify(job));
+      })]);
+      const beforeRefusal=browserCalls;
+      const rejected=await client.callTool({name:'dock_node_read',arguments:{operation_id:'competing-read',
+        source_operation_id:'bridge-background',execution:'existing'}});
+      assert.notEqual(rejected.isError,true);
+      assert.equal(rejected.structuredContent.error.code,'REQUEST_REJECTED');
+      assert.equal(rejected.structuredContent.request_rejected,true);
+      assert.equal(rejected.structuredContent.next_step.tool,'dock_node_wait');
+      assert.equal(rejected.structuredContent.next_step.rejected_operation_id,'competing-read');
+      assert.equal(browserCalls,beforeRefusal,'the competing read must not reach the browser');
+      const waiting=await client.callTool({name:'dock_node_wait',arguments:{operation_id:'bridge-background',timeout_ms:1}});
+      assert.equal(waiting.structuredContent.state,'running');
+      assert.equal(bridge.hasActiveWork(),true);
+    } finally {
+      actionRuntime.cancelNodeApply('bridge-background');
+      releaseNode();
+      await actionRuntime.waitNodeApply('bridge-background',{timeoutMs:1000});
+    }
+    const afterRefusal=await client.callTool({name:'dock_node_read',arguments:{...compactRequest,operation_id:'after-refusal'}});
+    assert.equal(afterRefusal.structuredContent.source_text,sourceReceipt.source_text);
   } finally {
     await client?.close();
     await bridge?.close();

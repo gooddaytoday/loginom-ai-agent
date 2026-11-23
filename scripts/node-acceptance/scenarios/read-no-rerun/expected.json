@@ -1,0 +1,49 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Amount": 2
+        },
+        {
+          "RowID": 2,
+          "Amount": 4
+        },
+        {
+          "RowID": 3,
+          "Amount": 6
+        }
+      ]
+    }
+  ]
+}

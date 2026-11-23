@@ -17,7 +17,10 @@ mock.module(new URL('../../lib/session.mjs', import.meta.url).href, { namedExpor
 }) } });
 mock.module(new URL('../../lib/bridge.mjs', import.meta.url).href, { namedExports: { createBridge: async () => bridge } });
 process.argv = [process.execPath, new URL('../../bin/loginom-dock.mjs', import.meta.url).pathname];
-process.on('message', () => { process.send({ kind: 'state', calls }); });
+process.on('message', message => {
+  if (['SIGTERM', 'SIGINT'].includes(message?.signal)) { process.emit(message.signal); return; }
+  process.send({ kind: 'state', calls });
+});
 process.stdin.resume();
 await import('../../bin/loginom-dock.mjs');
 process.send({ kind: 'ready', port: lease.port });

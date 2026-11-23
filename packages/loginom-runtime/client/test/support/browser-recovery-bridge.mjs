@@ -60,6 +60,9 @@ test('browser recovery tools follow the private capability through the managed b
     await Promise.all([client.connect(agent), bridge.server.connect(server)]);
     const prepared = await client.callTool({ name: 'dock_prepare', arguments: {} });
     assert.notEqual(prepared.isError, true, JSON.stringify(prepared));
+    const knowledge=JSON.parse(prepared.content[0].text).knowledge;
+    assert.equal(knowledge.node_types.filter(n=>n.type==='transform.col_union_data').length,1);
+    assert.equal(new Set(knowledge.node_types.map(n=>n.type)).size,knowledge.node_types.length);
     const tools = (await client.listTools()).tools.map(tool => tool.name);
     assert.equal(tools.includes('dock_browser_recovery'), capability);
     for (const name of ['browser_click', 'browser_navigate', 'browser_snapshot', 'browser_run_code_unsafe'])

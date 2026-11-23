@@ -1,0 +1,4 @@
+Отправь каждую строку requests-c1.csv в https://httpbin.org/anything отдельно методами POST, PUT, PATCH и DELETE. Для POST, PUT и PATCH отправь Body как исходное тело с Content-Type application/json; у DELETE тела нет.
+Выгрузи ответы REST без разбора JSON и без промежуточных Калькуляторов или JS. Нужны только четыре столбца: RowID (целое, исходный номер строки 0 или 1), Method (строка, запрошенный метод из соответствующего столбца MethodPOST/MethodPUT/MethodPATCH/MethodDELETE источника), HttpStatusCode (целое, фактический код из REST), Response (строка, исходный текст ответа REST). Сохрани строки и NULL без подмены; текст Response не преобразовывай. RowID соответствует нативному RequestID REST.
+Выгрузи все восемь результатов в methods-body.csv (UTF-8, запятая, заголовок) рядом с пакетом.
+Сохрани сценарий в {{PACKAGE_PATH}}.

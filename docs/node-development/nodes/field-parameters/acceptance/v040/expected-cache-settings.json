@@ -1,0 +1,51 @@
+{
+  "sequence": [
+    {
+      "value": 0,
+      "display": "Отключено",
+      "variable": false
+    },
+    {
+      "value": 1,
+      "display": "При активации",
+      "variable": false
+    },
+    {
+      "value": 2,
+      "display": "При обращении",
+      "variable": false
+    },
+    {
+      "value": 3,
+      "display": "Выбранные поля",
+      "variable": false
+    }
+  ],
+  "caching": {
+    "value": 3,
+    "display": "Выбранные поля",
+    "variable": false
+  },
+  "fields": [
+    {
+      "name": "RowID",
+      "caching_method": 0
+    },
+    {
+      "name": "A",
+      "caching_method": 1
+    },
+    {
+      "name": "B",
+      "caching_method": 2
+    },
+    {
+      "name": "R",
+      "caching_method": 0
+    },
+    {
+      "name": "S",
+      "caching_method": 0
+    }
+  ]
+}

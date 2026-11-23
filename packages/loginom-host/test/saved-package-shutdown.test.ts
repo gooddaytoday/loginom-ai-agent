@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
 import { buildNodeHost } from "../script/build-node-host"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost } from "../src/node-client"
@@ -11,11 +12,15 @@ import { supervise } from "../src/supervisor"
 import { createLoginomHost } from "../src/host"
 import { stageKnowledgeFixture } from "./fixtures/knowledge"
 
-const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
+const fixture = { directory: "", entry: "", supervisor: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
   if (!fixture.node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-saved-package-policy-"))
   fixture.entry = await buildNodeHost(fixture.directory)
+  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/supervisor.ts")], target: "node" })
+  if (!built.success) throw new AggregateError(built.logs, "Supervisor test bundle failed")
+  fixture.supervisor = join(fixture.directory, "supervisor.mjs")
+  await Bun.write(fixture.supervisor, built.outputs[0])
 })
 afterAll(async () => {
   await rm(fixture.directory, { recursive: true, force: true })
@@ -27,8 +32,8 @@ async function configuredRuntime(directory: string, source: string) {
   await mkdir(join(resources, "bin"), { recursive: true })
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await stageKnowledgeFixture(resources)
-  await symlink(fixture.node, join(resources, "bin/node"))
-  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+  await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
+  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
   await mkdir(root, { recursive: true, mode: 0o700 })
   if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
@@ -113,7 +118,7 @@ test("a runtime exit without requested closure cannot certify normal CLI shutdow
 })
 
 test.each([undefined, false, true].flatMap((policy) => [false, true].map((headless) => ({ policy, headless }))))(
-  "private CLI policies reach task and preflight runtimes: %j",
+  "private CLI policies reach task, validation and Dashboard runtimes: %j",
   async (input) => {
     const directory = await mkdtemp(join(fixture.directory, "profile-"))
     const resources = join(directory, "resources")
@@ -121,8 +126,8 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     await mkdir(join(resources, "bin"), { recursive: true })
     await mkdir(join(resources, "runtime/src"), { recursive: true })
     await stageKnowledgeFixture(resources)
-    await symlink(fixture.node, join(resources, "bin/node"))
-    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+    await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
     // Real compiled Host and real Node IPC; the external browser runtime is a
     // controlled boundary. This proves routing, not package closure in Loginom.
     await Bun.write(
@@ -141,6 +146,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
           ?{protocol:1,generation:m.input.generation,checked:true}
           :{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       }
+      if(m.operation==='dashboardRead') process.send({id:m.id,result:null});
       if(m.operation==='call') process.send({id:m.id,result:{result:{ok:true},recoveryPending:false,activeWork:false}});
       if(m.operation==='interrupt') process.send({id:m.id,result:{interrupted:true}});
       if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
@@ -170,6 +176,15 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     })
     try {
       await host.request("connection.ready", {})
+      expect(await host.request("dashboard.read", {
+        origin: "http://example.test",
+        generation: 1,
+        binding: {
+          packagePath: "/user/example.lgp",
+          workflowGuid: "11111111-1111-4111-8111-111111111111",
+          nodeGuid: "22222222-2222-4222-8222-222222222222",
+        },
+      })).toBeNull()
       expect(
         await host.request("connection.check", {
           revision: 1,
@@ -201,18 +216,12 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line))
-    expect(starts).toHaveLength(2)
+    expect(starts).toMatchObject([
+      { headless: input.headless, validation: false, closeSavedPackageOnShutdown: input.policy === true },
+      { headless: input.headless, validation: true, closeSavedPackageOnShutdown: false },
+      { headless: input.headless, validation: false, closeSavedPackageOnShutdown: input.policy === true },
+    ])
     expect(starts.filter((value) => value.chat === "readiness")).toEqual([])
-    expect(starts.filter((value) => value.validation)).toHaveLength(1)
-    expect(starts.every((value) => value.headless === input.headless)).toBe(true)
-    expect(
-      starts
-        .filter((value) => value.validation || value.chat === "readiness")
-        .every((value) => value.closeSavedPackageOnShutdown === false),
-    ).toBe(true)
-    expect(starts.find((value) => !value.validation && value.chat !== "readiness").closeSavedPackageOnShutdown).toBe(
-      input.policy === true,
-    )
     expect(starts.every((value) => value.acceptancePath === null && value.environmentPolicy === null)).toBe(true)
   },
   15_000,
@@ -284,7 +293,6 @@ test.each([
     stateDir: directory,
     generation: 1,
     chat: "chat",
-    endpoint: "https://example.test/mcp",
     connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" },
     ...policy,
   })
@@ -294,7 +302,7 @@ test.each([
   expect(await runtime.exited).toEqual({ code: 0, signal: null })
 }, 10_000)
 
-test.each(["success", "refused", "private-error", "bad-ack", "bad-exit", "timeout"])(
+test.each(["success", "slow-6s", "slow-8s", "missing-ack-6s", "refused", "private-error", "bad-ack", "bad-exit", "timeout"])(
   "private shutdown evidence distinguishes IPC and exit without weakening cleanup: %s",
   async (mode) => {
     const directory = await mkdtemp(join(fixture.directory, "diagnostic-"))
@@ -303,27 +311,40 @@ test.each(["success", "refused", "private-error", "bad-ack", "bad-exit", "timeou
       if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       if(m.operation!=='close')return;
       const mode=${JSON.stringify(mode)};
-      if(mode==='timeout'){setTimeout(()=>process.disconnect(),5250);return;}
+      if(mode.startsWith('slow-')){setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),mode==='slow-6s'?6000:8000);return;}
+      if(mode==='missing-ack-6s'){setTimeout(()=>process.disconnect(),6000);return;}
+      if(mode==='timeout'){setTimeout(()=>process.disconnect(),15250);return;}
       if(mode==='bad-exit')process.exitCode=1;
       const value=mode==='refused'?{error:'LOGINOM_RUNTIME_CLEANUP_FAILED'}:
         mode==='private-error'?{error:'private-secret-must-not-escape'}:{result:{closed:mode!=='bad-ack',extra:'private-secret-must-not-escape'}};
       process.send({id:m.id,...value},()=>process.disconnect());
     });`)
-    const runtime = await supervise({ node: fixture.node, entry, resources: directory, stateDir: directory,
-      generation: 1, chat: "chat", endpoint: "https://example.test/mcp",
-      connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" } })
-    if (mode === "success") await runtime.close()
-    if (mode !== "success") await expect(runtime.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    // The shipped Host supervises Node from Node/Electron. Bun's Windows fork
+    // can deliver disconnect before the last message; exercise the real owner.
+    const child = Bun.spawn([fixture.node, "--input-type=module", "--eval", `
+      import assert from 'node:assert/strict';
+      import { supervise } from ${JSON.stringify(pathToFileURL(fixture.supervisor).href)};
+      const runtime = await supervise(${JSON.stringify({ node: fixture.node, entry, resources: directory, stateDir: directory,
+        generation: 1, chat: "chat",
+        connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" } })});
+      const closing = runtime.close();
+      assert.equal(runtime.close(), closing);
+      if (${JSON.stringify(["success", "slow-6s", "slow-8s"].includes(mode))}) await closing;
+      else await assert.rejects(closing, /LOGINOM_RUNTIME_CLEANUP_FAILED/);
+    `], { stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" })
     const files = (await readdir(directory)).filter((name) => name.startsWith("runtime-close-"))
     expect(files).toHaveLength(1)
     const text = await readFile(join(directory, files[0]), "utf8")
     expect(text).not.toContain("private-secret")
-    expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
     const result = JSON.parse(text)
     expect(result.request_error).toBe(mode === "timeout" ? "LOGINOM_RUNTIME_TIMEOUT"
+      : mode === "missing-ack-6s" ? "LOGINOM_RUNTIME_DISCONNECTED"
       : mode === "refused" ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : mode === "private-error" ? "LOGINOM_RUNTIME_FAILED" : null)
-    expect(result.closed_ack).toBe(["success", "bad-exit"].includes(mode))
+    expect(result.closed_ack).toBe(["success", "slow-6s", "slow-8s", "bad-exit"].includes(mode))
     expect(result.exit_code).toBe(mode === "bad-exit" ? 1 : 0)
     expect(result.exit_signal).toBeNull()
-  }, 10_000,
+  }, 20_000,
 )

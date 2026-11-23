@@ -1,0 +1,97 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "port": 0,
+  "kind": "variables",
+  "manual": [
+    {
+      "name": "right_amount",
+      "label": "Правая сумма",
+      "type": "integer",
+      "value": 19
+    },
+    {
+      "name": "left_amount",
+      "label": "Левая сумма",
+      "type": "integer",
+      "value": 7
+    }
+  ],
+  "manual_updated": [
+    {
+      "name": "right_amount",
+      "label": "Правая сумма",
+      "type": "integer",
+      "value": 23
+    },
+    {
+      "name": "left_amount",
+      "label": "Левая сумма",
+      "type": "integer",
+      "value": 7
+    }
+  ],
+  "three_inputs": [
+    {
+      "name": "amount",
+      "label": "amount",
+      "type": "integer",
+      "value": 7
+    },
+    {
+      "name": "empty",
+      "label": "empty",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "name": "amount_1",
+      "label": "amount",
+      "type": "integer",
+      "value": 19
+    },
+    {
+      "name": "enabled",
+      "label": "enabled",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "zero",
+      "label": "Ноль",
+      "type": "integer",
+      "value": 0
+    }
+  ],
+  "control_connected": {
+    "status": "blocked_no_native_control_port_observed"
+  },
+  "third_removed": [
+    {
+      "name": "amount",
+      "label": "amount",
+      "type": "integer",
+      "value": 7
+    },
+    {
+      "name": "empty",
+      "label": "empty",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "name": "amount_1",
+      "label": "amount",
+      "type": "integer",
+      "value": 19
+    },
+    {
+      "name": "enabled",
+      "label": "enabled",
+      "type": "boolean",
+      "value": false
+    }
+  ],
+  "control_is_not_appended": [
+    "limit"
+  ]
+}

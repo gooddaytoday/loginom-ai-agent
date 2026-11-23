@@ -136,3 +136,15 @@ test('unsupported continuous scalar milliseconds refuse before changing existing
   assert.equal(edits,0);
  }
 });
+
+test('saved variable conditions retain binding while changed sources affect execution, never literal reconstruction',async()=>{
+ const field={kind:'input_field',name:'Id'},variable={kind:'variable',name:'limit'};
+ const baseline={verified:true,inventory_complete:true,input_fields:[{name:'Id',type:'integer'}],control_variables:[{name:'limit',type:'integer',value:15,is_null:false}],rows:[{kind:'condition',field,type:'integer',operator_code:3,value:variable}],dialogs:[],editor:null};
+ let edits=0;const channel={observe:async()=>({wizard:{stage:'row_filter'},node_filter:baseline}),perform:async()=>{edits++;}};
+ const result=await configureFilter(channel,{});assert.deepEqual(result.groups[0][0].value,variable);assert.equal(edits,0);
+ assert.equal(filterConditionMatches(baseline.rows[0],result.groups[0][0]),true);
+ assert.equal(filterConditionMatches({...baseline.rows[0],value:15},result.groups[0][0]),false);
+ for(const variables of [[],[{name:'limit',type:'string',value:'15',is_null:false}],[{name:'limit',type:'integer',value:null,is_null:true}]]){
+  baseline.control_variables=variables;await assert.rejects(configureFilter(channel,{}));assert.equal(edits,0);
+ }
+});

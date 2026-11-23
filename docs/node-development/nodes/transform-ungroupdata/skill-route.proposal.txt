@@ -1,0 +1,1 @@
+| `transform.ungroup_data` | Разгруппировка по заданным долям | [Контракт](references/nodes/transform-ungroupdata.md) |

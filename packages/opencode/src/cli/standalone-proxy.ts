@@ -17,13 +17,18 @@ export async function applyCliSystemProxy() {
     environment: process.env,
     probe: (url) => probeProxyUrl(url, 1000),
   }).catch(() => undefined)
-  const settled =
+  const resolved =
     result ??
     ({
       state: "failed",
       summary: { source: "none", noProxy: "", skipped: [] },
       notices: [{ code: "internal" }],
     } satisfies SystemProxyResult)
+  // A proxy that refuses connections at startup would fail every request: go direct and report it.
+  const settled: SystemProxyResult =
+    resolved.state === "applied" && resolved.notices.some((notice) => notice.code === "unreachable")
+      ? { ...resolved, state: "direct", environment: undefined }
+      : resolved
   if (settled.environment) Object.assign(process.env, settled.environment)
   const line = systemProxyNoticeLine(settled)
   if (line) process.stderr.write(`${line}\n`)

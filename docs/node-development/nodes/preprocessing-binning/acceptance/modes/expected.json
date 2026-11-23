@@ -1,0 +1,358 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.binning"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.binning",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "When",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_BinsID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "When_Number",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "When_Label",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "When_LowBound",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_UppBound",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "When_LowBoundIncl",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "When_UppBoundIncl",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "When_LowLimOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "When_UppLimOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "When_OutOfBins",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Target",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Segment",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0,
+          "When": "2026-01-01T00:00:00.000",
+          "Target": "yes",
+          "Segment": "A",
+          "When_BinsID": "When",
+          "When_Number": 0,
+          "When_Label": "Early",
+          "When_LowBound": "2026-01-01T00:00:00.000",
+          "When_UppBound": "2026-01-02T00:00:00.000",
+          "When_LowBoundIncl": true,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 2,
+          "X": 2,
+          "When": "2026-01-01T12:00:00.000",
+          "Target": "no",
+          "Segment": "A",
+          "When_BinsID": "When",
+          "When_Number": 0,
+          "When_Label": "Early",
+          "When_LowBound": "2026-01-01T00:00:00.000",
+          "When_UppBound": "2026-01-02T00:00:00.000",
+          "When_LowBoundIncl": true,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 3,
+          "X": 2,
+          "When": "2026-01-02T00:00:00.000",
+          "Target": "no",
+          "Segment": "B",
+          "When_BinsID": "When",
+          "When_Number": 0,
+          "When_Label": "Early",
+          "When_LowBound": "2026-01-01T00:00:00.000",
+          "When_UppBound": "2026-01-02T00:00:00.000",
+          "When_LowBoundIncl": true,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 4,
+          "X": 6,
+          "When": "2026-01-02T12:00:00.000",
+          "Target": "yes",
+          "Segment": "B",
+          "When_BinsID": "When",
+          "When_Number": 1,
+          "When_Label": "Late",
+          "When_LowBound": "2026-01-02T00:00:00.000",
+          "When_UppBound": "2026-01-04T00:00:00.000",
+          "When_LowBoundIncl": false,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 5,
+          "X": 8,
+          "When": "2026-01-03T00:00:00.000",
+          "Target": "yes",
+          "Segment": "C",
+          "When_BinsID": "When",
+          "When_Number": 1,
+          "When_Label": "Late",
+          "When_LowBound": "2026-01-02T00:00:00.000",
+          "When_UppBound": "2026-01-04T00:00:00.000",
+          "When_LowBoundIncl": false,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 6,
+          "X": 10,
+          "When": "2026-01-03T12:00:00.000",
+          "Target": "no",
+          "Segment": "C",
+          "When_BinsID": "When",
+          "When_Number": 1,
+          "When_Label": "Late",
+          "When_LowBound": "2026-01-02T00:00:00.000",
+          "When_UppBound": "2026-01-04T00:00:00.000",
+          "When_LowBoundIncl": false,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 7,
+          "X": null,
+          "When": "2026-01-04T00:00:00.000",
+          "Target": "no",
+          "Segment": null,
+          "When_BinsID": "When",
+          "When_Number": 1,
+          "When_Label": "Late",
+          "When_LowBound": "2026-01-02T00:00:00.000",
+          "When_UppBound": "2026-01-04T00:00:00.000",
+          "When_LowBoundIncl": false,
+          "When_UppBoundIncl": true,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": 0
+        },
+        {
+          "RowID": 8,
+          "X": 14,
+          "When": null,
+          "Target": "yes",
+          "Segment": "D",
+          "When_BinsID": "When",
+          "When_Number": null,
+          "When_Label": null,
+          "When_LowBound": null,
+          "When_UppBound": null,
+          "When_LowBoundIncl": null,
+          "When_UppBoundIncl": null,
+          "When_LowLimOpen": false,
+          "When_UppLimOpen": false,
+          "When_OutOfBins": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.binning",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "BinsID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "BoundsDataType",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Number",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "LowBound",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "UppBound",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Label",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "LowBoundQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "UppBoundQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "BinQuota",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "LowDev",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "UppDev",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "LowLimitOpen",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "UppLimitOpen",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "BinsID": "When",
+          "BoundsDataType": 2,
+          "Number": 0,
+          "LowBound": "2026-01-01T00:00:00.000",
+          "UppBound": "2026-01-02T00:00:00.000",
+          "Label": "Early",
+          "LowBoundQuota": 1.0,
+          "UppBoundQuota": 1.0,
+          "BinQuota": null,
+          "LowDev": "2026-01-01T00:00:00.000",
+          "UppDev": "2026-01-02T00:00:00.000",
+          "LowLimitOpen": false,
+          "UppLimitOpen": false
+        },
+        {
+          "BinsID": "When",
+          "BoundsDataType": 2,
+          "Number": 1,
+          "LowBound": "2026-01-02T00:00:00.000",
+          "UppBound": "2026-01-04T00:00:00.000",
+          "Label": "Late",
+          "LowBoundQuota": 0.0,
+          "UppBoundQuota": 1.0,
+          "BinQuota": null,
+          "LowDev": "2026-01-02T00:00:00.000",
+          "UppDev": "2026-01-04T00:00:00.000",
+          "LowLimitOpen": false,
+          "UppLimitOpen": false
+        }
+      ]
+    }
+  ]
+}

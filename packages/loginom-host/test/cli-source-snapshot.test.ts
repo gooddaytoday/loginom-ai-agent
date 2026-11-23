@@ -109,3 +109,24 @@ test("snapshot bounds synchronous git calls and identifies an actual child timeo
     sync.mockRestore()
   }
 })
+
+test('snapshot diagnostics identify a changed path without exposing source bytes', async () => {
+  const repo = await mkdtemp(join(tmpdir(), "cli-snapshot-diff-"))
+  const git = (...args: string[]) => {
+    const result = Bun.spawnSync(["git", ...args], { cwd: repo })
+    if (result.exitCode !== 0) throw Error(result.stderr.toString())
+  }
+  try {
+    git("init", "--quiet")
+    await writeFile(join(repo, "file.txt"), "private-before")
+    git("add", ".")
+    git("-c", "user.name=Snapshot Test", "-c", "user.email=snapshot@example.invalid", "commit", "--quiet", "-m", "fixture")
+    const before = new Map<string, string>(), after = new Map<string, string>()
+    await cliSourceSnapshot(repo, before)
+    await writeFile(join(repo, "file.txt"), "private-after")
+    await cliSourceSnapshot(repo, after)
+    expect([...before.keys()]).toEqual(["file.txt"])
+    expect(before.get("file.txt")).toMatch(/^[a-f0-9]{64}$/)
+    expect(before.get("file.txt")).not.toBe(after.get("file.txt"))
+  } finally { await rm(repo, { recursive: true, force: true }) }
+})

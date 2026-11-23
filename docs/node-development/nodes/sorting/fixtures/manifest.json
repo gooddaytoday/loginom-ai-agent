@@ -1,0 +1,92 @@
+{
+  "status": "proposal",
+  "files": [
+    {
+      "file": "modes.csv",
+      "bytes": 95,
+      "sha256": "a02017a08a0b326eb52c9a413e543ce01de75d405224f2a097ade83999d57958",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input",
+      "rows": 10,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Word",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ]
+    },
+    {
+      "file": "variant-wide.csv",
+      "bytes": 73,
+      "sha256": "dbd5e92bd56b32ac19fd15d0c5293ae2bf459a90697700d7f115906d8dca0ff8",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IntValue",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RealValue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "TextValue",
+          "type": "string",
+          "label_any": true
+        }
+      ]
+    },
+    {
+      "file": "variant.csv",
+      "bytes": 43,
+      "sha256": "3980b4391c1c578b6e41e15a326d78dddf4afe55eb64e34ade1076bec858251c",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "native discovery only",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "variant",
+          "label_any": true
+        }
+      ]
+    }
+  ]
+}

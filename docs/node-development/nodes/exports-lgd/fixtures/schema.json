@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Id",
+    "label": "Номер",
+    "type": "integer",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Text",
+    "label": "Текст",
+    "type": "string",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Amount",
+    "label": "Сумма",
+    "type": "real",
+    "data_kind": "continuous"
+  },
+  {
+    "name": "Occurred",
+    "label": "Момент",
+    "type": "datetime",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Active",
+    "label": "Активен",
+    "type": "boolean",
+    "data_kind": "discrete"
+  }
+]

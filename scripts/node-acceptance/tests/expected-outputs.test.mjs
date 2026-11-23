@@ -1,3 +1,4 @@
+import {parseExpectedVariableInventory,matchVariableInventoryOutput,matchVariableInventoryLinks,auditRestQueryVariables} from '../expected-outputs.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -173,4 +174,250 @@ test('cold preserves expected negative zero including exact native decimal strin
   a.data.sample[0][1].value=native?'0':0;
   assert.throws(()=>matchExpectedOutputs([a],[report(-0)]));
  }
+});
+
+test('explicit factor_signs permits only a shared factor sign across scores/loadings',()=>{
+ const columns=[{name:'Factor1',type:'real',label_any:true,tolerance:{abs:1e-8,rel:1e-10}}];
+ const outputs=[0,1].map(output_port=>({output_node_type:'research.factor_analysis',output_port,ordered:true,column_order:'exact',columns,rows:[{Factor1:1},{Factor1:-2}]}));
+ const rows=[0,1].map(output_port=>({node:{node_id:'factor'},type:'research.factor_analysis',output_port,data:{schema:columns,row_count:2,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'real',is_null:false,value:-1}],[{type:'real',is_null:false,value:2}]]}}));
+ const factorSigns={columns:['Factor1'],ports:[0,1]};
+ assert.equal(matchExpectedOutputs(rows,outputs,{factorSigns}).length,2);
+ assert.throws(()=>matchExpectedOutputs(rows,outputs));
+ const bad=structuredClone(rows);bad[0].data.sample[1][0].value=-2;
+ assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
+ bad[0].data.sample[1][0].value=2;bad[1].data.sample[0][0].value=1;
+ assert.throws(()=>matchExpectedOutputs(bad,outputs,{factorSigns}));
+});
+
+const variableExpected={package_path:'/own/v.lgp',nodes:[{type:'variables.user'}],outputs:[],variable_inventory:{outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'enabled',type:'boolean',value:false},{name:'empty',type:'string',value:''},{name:'n',type:'integer',value:null}]}]}};
+const variableActual=()=>({kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'read-new',execution_id:null,fresh:true,complete:true,count:3,
+ completeness:{count:3,store_count:3,unique_ids:3,loaded:true},variables:variableExpected.variable_inventory.outputs[0].variables.map((v,index)=>({id:index,index,name:v.name,label:v.name,type:v.type,cell:{type:v.type,is_null:v.value===null,value:v.value}}))});
+test('W1 cold variable-only fixture needs explicit typed inventory and preserves the old table parser',()=>{
+ assert.deepEqual(parseExpectedOutputs(variableExpected),{multiple:true,outputs:[]});assert.ok(parseExpectedVariableInventory(variableExpected));
+ assert.throws(()=>parseExpectedOutputs({...variableExpected,variable_inventory:undefined}),/EXPECTED_OUTPUTS_INVALID/);
+ assert.equal(matchVariableInventoryOutput(variableActual(),variableExpected.variable_inventory.outputs[0]),true);
+});
+for(const fault of ['missing','null-false','duplicate','partial','fake-execution','wrong-source','package-modified'])test('W1 cold variable matcher refuses '+fault,()=>{
+ const a=variableActual();if(fault==='missing')a.variables.pop();if(fault==='null-false')a.variables[0].cell.is_null=true;
+ if(fault==='duplicate')a.variables[1].id=0;if(fault==='partial')a.completeness.store_count=2;
+ if(fault==='fake-execution')a.execution_id='fake';if(fault==='wrong-source')a.native_source='VariablesForm';if(fault==='package-modified')a.package_modified=true;
+ assert.throws(()=>matchVariableInventoryOutput(a,variableExpected.variable_inventory.outputs[0]));
+});
+test('W1 cold variable/control links match exact typed namespaces and reject an ambiguous node',()=>{
+ const graph={nodes:[{ref:{node_id:'s'},type:'variables.user'},{ref:{node_id:'t'},type:'transform.calculator'}],variable_links:[{source:'s',output:4,target:'t',input:0,kind:'control',source_port_guid:'s4',target_port_guid:'c'}]};
+ const inventory={links:[{source:{type:'variables.user'},output:4,target:{type:'transform.calculator'},input:0,kind:'control'}]};
+ assert.equal(matchVariableInventoryLinks(graph,inventory).length,1);graph.variable_links[0].kind='variables';assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
+ graph.variable_links[0].kind='control';graph.nodes.push({ref:{node_id:'other'},type:'transform.calculator'});assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
+});
+
+// v040-nan-exact: expected {non_finite} matches only the exact marked typed cell.
+test('expected non-finite Real matches the exact typed marker, never NULL or a number',()=>{
+ const want=v=>({...report({non_finite:v}),columns:[columns[0],{...columns[1],tolerance:{abs:1e-12,rel:1e-12}}]});
+ const marked=(v)=>{const a=actual('nan',0),cell=a.data.sample[0][1];for(const k of Object.keys(cell))delete cell[k];Object.assign(cell,{type:'real',is_null:false,value:null,non_finite:v,representation:'binary64_non_finite',precision:'exact_non_finite'});return a;};
+ for(const v of ['NaN','Infinity','-Infinity'])assert.equal(matchExpectedOutputs([marked(v)],[want(v)]).length,1);
+ assert.throws(()=>matchExpectedOutputs([marked('Infinity')],[want('NaN')]));
+ const nul=actual('null',0);Object.assign(nul.data.sample[0][1],{is_null:true,value:null,precision:'exact_null'});
+ assert.throws(()=>matchExpectedOutputs([nul],[want('NaN')]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(null)]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(1)]));
+ assert.throws(()=>parseExpectedOutputs({package_path:'/t.lgp',nodes:[],outputs:[report({non_finite:'nan'})]}));
+});
+
+test('v040-c8-filetime: comparison present accepts any non-NULL DateTime and never compares the value',()=>{
+ const columns=[{name:'File',type:'string',label_any:true},{name:'FileTime',type:'datetime',label_any:true,comparison:'present'}];
+ const output={output_node_type:'imports.text',output_port:0,ordered:false,column_order:'exact',columns,rows:[{File:'a.csv',FileTime:true},{File:'b.csv',FileTime:true}]};
+ const expected={package_path:'/own/p.lgp',nodes:[{type:'imports.text'}],outputs:[output]};
+ const {outputs}=parseExpectedOutputs(expected);
+ const schema=[{name:'File',label:'File',type:'string'},{name:'FileTime',label:'Время файла',type:'datetime'}];
+ const time=value=>({type:'datetime',is_null:false,value,precision:'millisecond',representation:'local_datetime',timezone:'unspecified'});
+ const read=cells=>[{node:{node_id:'t'},type:'imports.text',output_port:0,data:{schema,row_count:2,sample_complete:true,precision:{numbers_verified:true},
+  sample:cells.map((cell,i)=>[{type:'string',is_null:false,value:['a.csv','b.csv'][i]},cell])}}];
+ // Any present value passes: the time is not promised to equal a local mtime.
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),time('1999-01-01T00:00:00.000')]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([{...time('2026-11-09T10:11:00.000'),timezone:'Europe/Moscow'},
+  {type:'datetime',is_null:false,value:'2026-11-09T10:11:00.000',precision:'minute'}]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),{type:'datetime',is_null:false,value:'00000000c079e640',
+  precision:'exact_native',native:{tag:7,bytes_le:'00000000c079e640'}}]),outputs).length,1);
+ for(const bad of [{type:'datetime',is_null:true,value:null},{...time(''),value:''},{...time('x'),value:'not a date'},
+  {...time('x'),value:null},{type:'string',is_null:false,value:'2026-11-09T10:11:00.000'},undefined])
+  assert.throws(()=>matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),bad]),outputs),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ // The form is datetime-only, and its rows carry only the presence token.
+ const variant=change=>{const e=structuredClone(expected);change(e.outputs[0]);return e;};
+ for(const change of [o=>{o.columns[1].type='string';},o=>{o.columns[1].types=['datetime','string'];},
+  o=>{o.rows[0].FileTime=null;},o=>{o.rows[0].FileTime='2026-11-09T10:11:00.000';},o=>{o.rows[0].FileTime=false;}])
+  assert.throws(()=>parseExpectedOutputs(variant(change)),/EXPECTED_COMPARISON_INVALID/);
+});
+
+test('v040-c8-filetime: C8 path expectations add FileTime present after FileName and the task asks for the time',()=>{
+ const kit=new URL('../../../docs/node-development/nodes/text-import/acceptance/',import.meta.url);
+ const task=readFileSync(new URL('task-file-info.md',kit),'utf8');
+ assert.match(task,/путь и время/);assert.match(task,/relative-path\.csv/);
+ for(const [name,prefix] of [['absolute-path','/own/dir/'],['relative-path','']]){
+  const text=readFileSync(new URL('extended/expected-'+name+'.json',kit),'utf8').replaceAll('{{SOURCE_DIR}}','/own/dir').replace('{{PACKAGE_PATH}}','/own/dir/run.lgp');
+  const [output]=parseExpectedOutputs(JSON.parse(text)).outputs;
+  assert.deepEqual(output.columns.map(c=>c.name),['SaleID','Month','Amount','Note','FileName','FileTime']);
+  assert.deepEqual(output.columns.at(-1),{name:'FileTime',type:'datetime',label_any:true,comparison:'present'});
+  assert.ok(output.rows.length===5&&output.rows.every(r=>r.FileTime===true&&r.FileName.startsWith(prefix+'sales_2026-0')));
+ }
+});
+
+function restQueryHistory(direct=false){
+ const initial=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected-initial.json',import.meta.url)));
+ const final=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected.json',import.meta.url)));
+ for(const [w,limit,skip] of [[initial,3,2],[final,5,10]])w.variable_inventory={outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'limit',type:'integer',value:limit},{name:'skip',type:'integer',value:skip}]}]};
+ const node=id=>({document_id:'d',workflow_id:'w',node_id:id}),events=[];
+ const add=(id,type,request,result={})=>{
+  events.push({phase:'node_apply_prepared',operation_id:id,request:{target:{kind:'existing',type,ref:node(type)},mode:'request',parameters:{},inputs:[],mappings:[],...request}});
+  events.push({phase:'node_checkpoint',result:{operation_id:id,node:node(type),status:'SUCCEEDED',cleanup_complete:true,output:{},...result}});
+ };
+ const snapshot=w=>({variable_ports:[{kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'snapshot-'+w.outputs[0].rows[0].limit,execution_id:null,fresh:true,complete:true,count:2,completeness:{count:2,store_count:2,unique_ids:2,loaded:true},variables:w.variable_inventory.outputs[0].variables.map((v,id)=>({id,index:id,name:v.name,type:'integer',cell:{type:'integer',is_null:false,value:String(v.value),precision:'exact_integer'}}))}]});
+ const raw=(w,id)=>({execution:{status:'completed',execution_id:id},output:{ports:[{port:0,fresh:true,sample_complete:true,row_count:1,schema:[{name:'RequestID'},{name:'Response'}],sample:[[{value:0},{value:JSON.stringify({args:{limit:w.outputs[0].rows[0].limit,skip:w.outputs[0].rows[0].skip},url:w.outputs[0].rows[0].url})}]]}]}});
+ add('initial-vars','variables.user',{mode:'values'},{output:snapshot(initial)});
+ add('table','variables.to_table',{mode:'columns',variable_inputs:[{source:node('variables.user'),output:4,input:0,kind:'variables'}]});
+ add('cast','transform.calculator',{inputs:[{source:node('variables.to_table'),output:0,input:0}]});
+ const readback={kind:'rest_request',method:'GET',connection:{base_url:'https://httpbin.org/anything'},query_parameters:[{name:'limit',field:'limit_text'},{name:'skip',field:'skip_text'}]};
+ add('first','integration.rest_request',{inputs:[{source:node('transform.calculator'),output:0,input:0}]},{...raw(initial,'first'),configuration:{readback}});
+ add('updated-vars','variables.user',{mode:'values',parameters:{variables:final.variable_inventory.outputs[0].variables}},{output:snapshot(final)});
+ add('second','integration.rest_request',{mode:'read_existing_output',parameters:{source_operation_id:'first'}},raw(final,'second'));
+ if(direct){
+  events[6].request.inputs=[{source:node('variables.to_table'),output:0,input:0}];
+  readback.query_parameters=[{name:'limit',field:'limit'},{name:'skip',field:'skip'}];
+  events.splice(4,2);
+ }
+ return {events,initial,final};
+}
+test('REST query variables audit accepts integer snapshots and unchanged same-node execution',()=>{
+ const {events,initial,final}=restQueryHistory();assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query variables audit accepts direct integer query fields without a Calculator or table read',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query direct path accepts observed integer fields renamed by output mappings',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ events[2].request.mappings=[{direction:'output',port:0,fields:[{source:'limit',name:'limit_query'},{source:'skip',name:'skip_query'}]}];
+ events[3].result.output={ports:[{port:0,schema:[{name:'limit_query',type:'integer'},{name:'skip_query',type:'integer'}]}]};
+ events[5].result.configuration.readback.query_parameters=[{name:'limit',field:'limit_query'},{name:'skip',field:'skip_query'}];
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const type of ['real','boolean'])test('REST query direct path rejects observed '+type+' query fields',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ events[3].result.output={ports:[{port:0,schema:[{name:'limit',type},{name:'skip',type:'integer'}]}]};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION/);
+});
+for(const direct of [false,true])for(const type of ['real','boolean'])test('REST query audit rejects '+type+' source on '+(direct?'direct':'Calculator')+' path',()=>{
+ const {events,initial,final}=restQueryHistory(direct);
+ const variable=events[1].result.output.variable_ports[0].variables[0];
+ variable.type=type;variable.cell={type,is_null:false,value:type==='real'?3:true};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_INITIAL_INTEGER_VARIABLES/);
+});
+for(const fault of ['missing input','foreign source','wrong output','wrong input','rows mode','missing query field','changed query binding'])
+test('REST query direct path rejects '+fault,()=>{
+ const {events,initial,final}=restQueryHistory(true),request=events[4].request;
+ if(fault==='missing input')request.inputs=[];
+ if(fault==='foreign source')request.inputs[0].source.workflow_id='other';
+ if(fault==='wrong output')request.inputs[0].output=1;
+ if(fault==='wrong input')request.inputs[0].input=1;
+ if(fault==='rows mode')events[2].request.mode='rows';
+ if(fault==='missing query field')events[5].result.configuration.readback.query_parameters[1].field='missing';
+ if(fault==='changed query binding')events[9].result.configuration={readback:{...structuredClone(events[5].result.configuration.readback),query_parameters:[{name:'limit',field:'skip'},{name:'skip',field:'limit'}]}};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),fault==='changed query binding'?/REST_QUERY_BINDINGS_CHANGED/:/REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION/);
+});
+function restQuerySchemaRead(ports=[0,1]){
+ const history=restQueryHistory(),source=history.events[7].result,request=history.events[10].request;
+ source.output.ports[0].schema=[{index:0,name:'RequestID',label:'Идентификатор запроса',type:'integer',data_kind:'Непрерывный'},
+  {index:1,name:'Response',label:'Ответ сервера',type:'string',data_kind:'Дискретный'}];
+ source.output.ports.push({port:1,schema:[{index:0,name:'RequestID',label:'Идентификатор запроса',type:'integer'},
+  {index:1,name:'ErrorCode',label:'Код завершения',type:'integer'},{index:2,name:'ErrorDesc',label:'Описание ошибки',type:'string'},
+  {index:3,name:'HttpStatusCode',label:'Код состояния HTTP',type:'integer'}]});
+ request.finish='execute';request.read={ports};
+ request.parameters.schemas=source.output.ports.filter(p=>ports.includes(p.port)).map(p=>({port:p.port,schema:structuredClone(p.schema)}));
+ return history;
+}
+for(const ports of [[0],[0,1],[1,0]])test('REST query audit accepts retained read schemas for ports '+ports,()=>{
+ const {events,initial,final}=restQuerySchemaRead(ports);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query audit accepts explicit execute policy from the current node read contract',()=>{
+ const {events,initial,final}=restQuerySchemaRead();
+ events[10].request.parameters.execution_policy='execute';
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const policy of ['existing','unknown',null])test('REST query audit rejects non-executing read policy '+policy,()=>{
+ const {events,initial,final}=restQuerySchemaRead();
+ events[10].request.parameters.execution_policy=policy;
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_RECONFIGURED/);
+});
+for(const fault of ['missing source','future source','foreign source','failed source','unclean source','not executed source',
+ 'wrong name','wrong type','wrong label','wrong data kind','wrong index','reordered fields','duplicate port','missing port','unknown port','empty schemas',
+ 'null schema','extra schema property','wrong finish','configuration mode','missing read ports','ambiguous source port','bindings','connection','query','mappings'])
+test('REST query audit refuses unproven read schemas or real edits: '+fault,()=>{
+ const {events,initial,final}=restQuerySchemaRead(),r=events[10].request;
+ let source=events[7].result;
+ if(['foreign source','failed source','unclean source','not executed source'].includes(fault)){
+  source=structuredClone(source);source.operation_id='bad-source';r.parameters.source_operation_id='bad-source';
+  events.splice(10,0,{phase:'node_checkpoint',result:source});
+ }
+ if(fault==='missing source')r.parameters.source_operation_id='missing';
+ if(fault==='future source')r.parameters.source_operation_id='second';
+ if(fault==='foreign source')source.node={...source.node,node_id:'other'};
+ if(fault==='failed source')source.status='FAILED';
+ if(fault==='unclean source')source.cleanup_complete=false;
+ if(fault==='not executed source')source.execution.status='not_requested';
+ if(fault==='wrong name')r.parameters.schemas[0].schema[0].name='Other';
+ if(fault==='wrong type')r.parameters.schemas[0].schema[0].type='string';
+ if(fault==='wrong label')r.parameters.schemas[0].schema[0].label='Other';
+ if(fault==='wrong data kind')r.parameters.schemas[0].schema[0].data_kind='Дискретный';
+ if(fault==='wrong index')r.parameters.schemas[0].schema[0].index=1;
+ if(fault==='reordered fields')r.parameters.schemas[0].schema.reverse();
+ if(fault==='duplicate port')r.parameters.schemas[1]=structuredClone(r.parameters.schemas[0]);
+ if(fault==='missing port')r.parameters.schemas.pop();
+ if(fault==='unknown port')r.parameters.schemas[0].port=2;
+ if(fault==='empty schemas')r.parameters.schemas=[];
+ if(fault==='null schema')r.parameters.schemas[0].schema=null;
+ if(fault==='extra schema property')r.parameters.schemas[0].connection={name:'other'};
+ if(fault==='wrong finish')r.finish='done';
+ if(fault==='configuration mode')r.mode='request';
+ if(fault==='missing read ports')delete r.read;
+ if(fault==='ambiguous source port')source.output.ports.push(structuredClone(source.output.ports[0]));
+ if(fault==='bindings')r.bindings=[{name:'limit',source:'other'}];
+ if(fault==='connection')r.parameters.connection={name:'Other connection',base_url:'https://example.invalid/anything',method:'GET'};
+ if(fault==='query')r.parameters.query_parameters=[{name:'limit',field:'skip_text'},{name:'skip',field:'limit_text'}];
+ if(fault==='mappings')r.mappings=[{direction:'output',port:0,fields:[{source:{schema_id:'rest-output',field_id:'response'},name:'Other'}]}];
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_RECONFIGURED/);
+});
+test('REST query audit allows a new downstream Calculator after the initial REST response',()=>{
+ const {events,initial,final}=restQueryHistory();
+ events.splice(8,0,{phase:'node_apply_prepared',operation_id:'parse-initial',request:{
+  target:{kind:'new',type:'transform.calculator'},mode:'expression',
+  inputs:[{source:events[7].result.node,output:0,input:0}],
+  parameters:{expressions:[{name:'limit',formula:'return JSON.parse(Response).args.limit;'}]}
+ }});
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const edit of ['parameters','read parameters','GUID','input','variable input','mappings','connection readback'])test('REST query audit still rejects REST reconfiguration: '+edit,()=>{
+ const {events,initial,final}=restQueryHistory(),r=events[10].request;
+ if(edit==='parameters'){r.mode='request';r.parameters={connection:{base_url:'https://example.invalid'}};}
+ if(edit==='read parameters')r.parameters.connection={base_url:'https://example.invalid'};
+ if(edit==='GUID')r.target.ref.node_id='replacement';
+ if(edit==='input')r.inputs=[{source:{node_id:'different'},input:0,output:0}];
+ if(edit==='variable input')r.variable_inputs=[{source:{node_id:'different'},input:0,output:4,kind:'variables'}];
+ if(edit==='mappings')r.mappings=[{field:'limit',source:'other'}];
+ if(edit==='connection readback')events[11].result.configuration={readback:{...structuredClone(events[7].result.configuration.readback),connection:{base_url:'https://example.invalid'}}};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_(RECONFIGURED|REPLACED|CONNECTION)/);
+});
+test('REST query initial response can be an independent read after verified configuration',()=>{
+ const {events,initial,final}=restQueryHistory(),read=structuredClone(events[7]);
+ read.result.operation_id='read-first';delete read.result.configuration;
+ events[7].result.output.ports=[];events.splice(8,0,read);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const fault of ['source type','source ID','request edit','missing cast','wrong response'])test('REST query variables audit rejects '+fault,()=>{
+ const {events,initial,final}=restQueryHistory();
+ if(fault==='source type')events[1].result.output.variable_ports[0].variables[0].type='string';
+ if(fault==='source ID')events[9].result.output.variable_ports[0].variables[0].id=42;
+ if(fault==='request edit'){events[10].request.mode='request';events[10].request.parameters={connection:{name:'different'}};}
+ if(fault==='missing cast')events.splice(4,2);
+ if(fault==='wrong response')events[11].result.output.ports[0].sample[0][1].value='{}';
+ assert.throws(()=>auditRestQueryVariables(events,initial,final));
 });

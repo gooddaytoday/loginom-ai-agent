@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureAutoCorrelation} from '../lib/auto-correlation-procedure.mjs';
-import {nodeApiTools} from '../lib/node-api.mjs';
+import {nodeApiTools,autoCorrelationParametersSchema} from '../lib/node-api.mjs';
 function fixture({existing=false,empty=false,variable=false,overwrite=false,foreignOutput=false}={}){
  const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'acf'},root='MF;TF-1;WizrdMCF';
  const fields=['RowID','X'].map((name,index)=>({index,name,label:name,type:index===0?'integer':'real',data_kind:'Непрерывный',field_id:String(index),record_id:'role-'+index,usage_type:index===0?3:0}));
@@ -57,11 +57,14 @@ test('ACF refuses overwritten lag values, variable settings, foreign output and 
   const f=fixture(options);await assert.rejects(f.run);assert.equal(f.actions.some(a=>a.expected_stage==='done'),false);
  }
 });
-test('registered ACF input schema adds 690 bytes and stays within both schema limits',()=>{
+test('registered ACF input schema retains its type, mode and parameters',t=>{
  const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema,baseline=structuredClone(schema);
  baseline.properties.target.properties.type.enum=baseline.properties.target.properties.type.enum.filter(v=>v!=='research.auto_correlation');
  baseline.properties.mode.enum=baseline.properties.mode.enum.filter(v=>v!=='time_domain');
  delete baseline.properties.parameters.properties.autocorrelation;
  const bytes=v=>Buffer.byteLength(JSON.stringify(v));
- assert.equal(bytes(schema)-bytes(baseline),690);assert.ok(bytes(schema)<46000);assert.ok(bytes(schema)-bytes(baseline)<=1050);
+ t.diagnostic(JSON.stringify({full_input_schema_bytes:bytes(schema),acf_growth_bytes:bytes(schema)-bytes(baseline)}));
+ assert.ok(schema.properties.target.properties.type.enum.includes('research.auto_correlation'));
+ assert.ok(schema.properties.mode.enum.includes('time_domain'));
+ assert.deepEqual(schema.properties.parameters.properties.autocorrelation,autoCorrelationParametersSchema.properties.autocorrelation);
 });

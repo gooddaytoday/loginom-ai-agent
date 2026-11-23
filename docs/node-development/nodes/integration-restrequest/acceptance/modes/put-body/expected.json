@@ -1,0 +1,82 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "put-body.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Response",
+          "type": "string",
+          "label_any": true,
+          "comparison": "rest_echo"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Response": "{\"method\": \"PUT\", \"data\": \"{\\\"amount\\\":10,\\\"note\\\":\\\"Привет & + /\\\"}\"}"
+        },
+        {
+          "RequestID": 1,
+          "Response": "{\"method\": \"PUT\", \"data\": \"{\\\"amount\\\":20,\\\"note\\\":\\\"second\\\"}\"}"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ErrorCode",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ErrorDesc",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ],
+      "output_port": 1
+    }
+  ]
+}

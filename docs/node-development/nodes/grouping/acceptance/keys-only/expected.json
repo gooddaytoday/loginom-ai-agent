@@ -1,0 +1,27 @@
+{
+  "package_path": "/acceptance/grouping-keys-only.lgp",
+  "nodes": [
+    {"type": "imports.text"},
+    {"type": "imports.text"},
+    {"type": "transform.union_data"},
+    {"type": "transform.group_data"},
+    {"type": "exports.text"}
+  ],
+  "null_marker": "NULL",
+  "outputs": [{
+    "output_node_type": "export_input",
+    "export_destination": "distinct.csv",
+    "ordered": false,
+    "columns": [
+      {"name": "Key", "type": "integer", "label_any": true},
+      {"name": "Text", "type": "string", "label_any": true}
+    ],
+    "rows": [
+      {"Key": 2, "Text": "z"},
+      {"Key": 1, "Text": null},
+      {"Key": 1, "Text": ""},
+      {"Key": 1, "Text": "a"},
+      {"Key": null, "Text": "z"}
+    ]
+  }]
+}

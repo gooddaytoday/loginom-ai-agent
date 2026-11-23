@@ -1,6 +1,10 @@
-import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
-import {buildNodeReadRequest} from './node-read-contract.mjs';
+import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic,downloadFailureDiagnostic} from './browser-failure.mjs';
+import {createRedactor} from './redact.mjs';
+import {browserDownloadsPath} from './browser-downloads.mjs';
+import {journalCopy} from './execution-journal.mjs';
+import {readSavedPackageState} from './package-persistence.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
+import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
@@ -8,6 +12,7 @@ import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
+import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
@@ -307,6 +312,42 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
   };
   let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false,progress,retained=false;
   const trace=[],destination=task.server_source_binding??task.output_binding??task.artifact.upload;
+  const captureFailure=async error=>{
+    const causes=[],seen=new Set();
+    for(let current=error;current&&causes.length<3&&!seen.has(current);current=current.cause){
+      seen.add(current);causes.push({name:String(current.name??'Error'),message:String(current.message??current),stack:current.stack??null});
+    }
+    let failure={state:'missing'},native={state:'unavailable'};
+    if(download)try{
+      // failure() waits for completion. A broken copy/transport must not leave
+      // diagnostics waiting on a still-running download before cancellation.
+      failure=await Promise.race([
+        download.failure().then(value=>({state:'read',value})),
+        page.waitForTimeout(100).then(()=>({state:'pending'})),
+      ]);
+    }catch{failure={state:'unavailable'};}
+    try{native=await page.evaluate(function downloadFailureReceipt(task){
+      if(location.origin!==task.origin)return {state:'owner_changed'};
+      const identity=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+      if(identity&&identity.document!==document)return {state:'owner_changed'};
+      const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+      const tab=main?.Items?.Workspace?.getActiveTab?.();
+      const loaders=tab?.Controller?.FController?.FFileSenderManager?.FDownloadViewController?.FFileLoaders;
+      if(!Array.isArray(loaders))return {state:'unavailable'};
+      const matching=loaders.filter(l=>l.FFullFileName===task.destination);
+      if(matching.length!==1)return {state:matching.length?'ambiguous':'missing'};
+      const loader=matching[0],blobs=loader.FFileBlobs;
+      if(loader.FFileName!==task.name||!Array.isArray(blobs)
+        ||blobs.some(blob=>!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<0))return {state:'unverified'};
+      const bytes=blobs.reduce((sum,blob)=>sum+blob.size,0);
+      return {state:'observed',expected_bytes:Number.isSafeInteger(loader.FFileSize)?loader.FFileSize:null,
+        received_bytes:Number.isSafeInteger(bytes)?bytes:null,chunks:blobs.length};
+    },{origin:task.expected_origin,destination:destination.destination,name:task.artifact.name});}catch{}
+    return {operation_id:task.operation_id,...causes[0],causes,
+      failure_state:failure.state,download_failure:failure.value??null,
+      cancelled:/cancel|abort/i.test(failure.value??'')||causes.some(c=>/cancel|abort/i.test(c.message)),
+      received_bytes:progress?.bytes??native.received_bytes??null,native_receipt:native};
+  };
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
     error:code?{code,message:code}:null,trace});
@@ -499,7 +540,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
         if(retainedJob.cancel_requested){await download.cancel();completed=true;return result('AMBIGUOUS','DOWNLOAD_CANCELLED');}
         await download.saveAs(task.download_path);
         completed=true;
-        if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        if(await download.failure()!==null){
+          trace.push({event:'download_browser_failure',step:browserStep,private_download:await captureFailure()});
+          return result('AMBIGUOUS','DOWNLOAD_FAILED');
+        }
         return result('SUCCEEDED',null,{download_completed:true});
       }
       if(retainedJob)throw Error('Server download already started');
@@ -510,7 +554,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       // host registry owns the original deadline and drains this job on abort.
       entry.completion=(async()=>{
         try{await download.saveAs(task.download_path);if(await download.failure()!==null)entry.failed=true;}
-        catch(error){entry.failed=true;entry.failure={reason:'save_failed',
+        catch(error){entry.failed=true;entry.failure={reason:'save_failed',private_download:await captureFailure(error),
           ...( ['EACCES','EPERM','ENOSPC','ENOENT','EISDIR'].includes(error.code)?{code:error.code}:{})};}
         finally{
           try{await progress?.close();}catch{entry.failed=true;}
@@ -522,7 +566,10 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
     }
     await download.saveAs(task.download_path);
     browserStep='download.failure';
-    if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
+    if(await download.failure()!==null){
+      trace.push({event:'download_browser_failure',step:browserStep,private_download:await captureFailure()});
+      return result('AMBIGUOUS','DOWNLOAD_FAILED');
+    }
     completed=true;
     browserStep='post_download_observation';
     let after=await observe(page),toastRefused=false;
@@ -638,10 +685,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal,track) {
       suggested_name:name,download_completed:true,bytes_verification_required:true,
       file_ref:task.file_ref,observation_id:task.observation_id});
   } catch(error) {
-    trace.push({event:'download_browser_failure',...failureEvidence(error)});
+    const evidence={event:'download_browser_failure',...failureEvidence(error)};
     // An unexpected gesture exception may have emitted a download already.
     // Drain the bounded listener and cancel any captured transfer before exit.
     if(event && !download)try{download=await event;}catch{}
+    evidence.private_download=await captureFailure(error);trace.push(evidence);
     if(download && !completed)try{await download.cancel();completed=true;}catch(error){
       browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
     }
@@ -675,7 +723,7 @@ export function makeServerSourceDownloadCode(options) {
   const name=options.artifact?.name;
   if(!b||!Number.isSafeInteger(b.bytes)||b.bytes<0||typeof b.mtime!=='string'||!b.mtime
     ||!Number.isSafeInteger(options.deadline_at)||options.deadline_at<=Date.now()
-    ||!name||!/\.(csv|tsv|txt|xlsx)$/i.test(name)||b.destination!==b.directory+'/'+name
+    ||!name||!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(name)||b.destination!==b.directory+'/'+name
     ||s.file_storage?.directory!==b.directory||m.length!==1||m[0].label!==name
     ||m[0].tid!==s.workflow_ref?.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)
     ||m[0].storage_entry?.bytes!==b.bytes||m[0].storage_entry?.mtime!==b.mtime
@@ -718,18 +766,18 @@ export function makeNativeOutputDownloadCode(options){
 
 // Trusted adapter only: every public reference must additionally be checked
 // against createObservationPages.assertIssued before this code is constructed.
-// This candidate covers CSV/TSV/TXT/XLSX double-click downloads only; package files require
+// This candidate covers CSV/TSV/TXT/XLSX/LGD double-click downloads only; package files require
 // an explicit download command instead of opening their scenario.
 export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xls|xlsx|lgd|db|json)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
-    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLSX file');
+    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLS/XLSX/LGD/DB/JSON file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   // Upload may have observed the folder tree. Verification owns the separately
-  // issued exact CSV/TSV/TXT/XLSX ref, so its narrow reads must follow that file, not the
+  // issued exact CSV/TSV/TXT/XLSX/LGD ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared},{downloadToastObservation:true});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
@@ -737,7 +785,8 @@ export function makeArtifactDownloadCode(options) {
 }
 
 export function rebindNodeTargetLinkEpochs(context,observed) {
-  const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node)});
+  // The native output boundary follows the diagram right extent on repaint.
+  const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node.type==='control.supernode_output'&&node.boundary_role==='output'&&Number.isFinite(node.position?.x)?{...node,position:{...node.position,x:0}}:node)});
   if(!context.graph_baseline||observed?.complete!==true||JSON.stringify(shape(context.graph_baseline))!==JSON.stringify(shape(observed)))
     throw Error('Node target link graph changed before gesture');
   return context.nodes.map(expected=>{
@@ -761,11 +810,13 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     const bind=(expected,direction,port)=>{
       const nodes=diagram.FNodes.FCollection.filter(n=>n.FGuid===expected.id);
       if(nodes.length!==1)throw Error('Link validation node changed');
-      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':(port.kind==='connection'?'Connection-':port.kind==='tree'?'DataTree-':'Data-')+port.index);
+      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='control_var'?'ControlVar':port.kind==='add'?'Add':(port.kind==='var'?'Var-':port.kind==='connection'?'Connection-':port.kind==='tree'?'DataTree-':'Data-')+port.index);
       const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.parent===node&&p.FCell?.parent===node.FCell
         &&(graph.view.getState(p.FCell)?.shape?.node?.getAttribute('data-tid')===tid||receipt.nodeTargetPortIdentities?.get(p)?.tid===tid));
       const elements=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
       if(ports.length!==1||elements.length!==1)throw Error('Link validation port changed');
+      if(['var','control_var'].includes(port.kind)&&(!ports[0].FGuid||!ports[0].data||ports[0].FType!==(direction==='Input'?0:1)
+        ||ports[0].FSubType!==(port.kind==='var'?3:4)))throw Error('Link validation variable native kind changed');
       return {port:ports[0],element:elements[0]};
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
@@ -776,13 +827,16 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
     const box=target.element.getBoundingClientRect();
     if(!(box.width>0&&box.height>0))throw Error('Link validation target is hidden');
+    const cellId=cell=>typeof cell?.id==='string'&&/^[0-9a-f_-]{1,128}$/i.test(cell.id)?cell.id:null;
     return {state:value===true?'ready':value===false?'rejected':'pending',
       point:{x:box.x+box.width/2,y:box.y+box.height/2},
+      marker_cell:{id:cellId(handler.marker?.validState?.cell),target:handler.marker?.validState?.cell===target.port.FCell},
+      target_cell_id:cellId(target.port.FCell),
       target_ready:handler.error==null&&handler.marker?.validState?.cell===target.port.FCell};
   },{context,parameters});
 }
 
-function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation) {
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph, readSavedState) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -887,12 +941,25 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const prefixes=[...new Set(graph.map(e=>/^(MF;TF(?:-\d+)?;Graph;)/.exec(e.getAttribute('data-tid'))[1]))];
       if(prefixes.length>1)throw new Error('Multiple native graph namespaces in the active container');
       const native=prefixes[0]??null,tids=graph.map(e=>e.getAttribute('data-tid'));
-      const labels=[...new Set(tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
-        .filter(t=>t && t!=='Переменные_сценария'))].sort();
+      const linkedVariables=tids.some(t=>t.startsWith(native+'Переменные_сценария|Output_Var-'));
+      const labels=[...new Set([
+        ...tids.filter(t=>t.endsWith(';Label;Label')).map(t=>t.slice(native.length).replace(/;Label;Label$/,''))
+          .filter(t=>t && t!=='Переменные_сценария'),
+        ...(linkedVariables && tids.includes(native+'Переменные_сценария')?['Переменные_сценария']:[])
+      ])].sort();
       const actionable=tids.filter(t=>{charge();const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body)
         || labels.some(label=>body===label || body===label+';Label;Label' || body===label+';Setting'
           || body.startsWith(label+';') && /;(?:Input|Output)_[^;]+$/.test(body));});
-      if(new Set(actionable).size!==actionable.length)throw new Error('Duplicate actionable graph identifiers');
+      const seen=new Set(),duplicates=[];for(const t of actionable){if(seen.has(t)&&!duplicates.includes(t))duplicates.push(t);seen.add(t);}
+      // Name the first duplicates with owner chain, geometry and style so a
+      // live refusal is diagnosable from the journal alone. Still a refusal.
+      if(duplicates.length){
+        const describe=e=>{const b=e.getBoundingClientRect(),s=getComputedStyle(e),chain=[];
+          for(let p=e.parentElement;p && p!==element && chain.length<3;p=p.parentElement){charge();const t=p.getAttribute?.('data-tid');if(t)chain.push(t.startsWith(native)?'~'+t.slice(native.length):t);}
+          return `${String(e.tagName??'?').toLowerCase()}@${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}x${Math.round(b.height)} ${s.display}/${s.visibility}/${s.opacity??''} <${chain.join('<')}`;};
+        throw new Error(('Duplicate actionable graph identifiers: '+duplicates.slice(0,3).map(t=>{const items=graph.filter(e=>e.getAttribute('data-tid')===t);
+          return t+' x'+items.length+' {'+items.slice(0,2).map(describe).join('; ')+'}';}).join(' | ')).slice(0,1600));
+      }
       return {native_prefix:native,nodes:labels.map(label=>({label,ports:tids.filter(t=>t.startsWith(native+label+';') && /;(?:Input|Output)_[^;]+$/.test(t)).sort()})),
         links:tids.filter(t=>{const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body);}).sort()};
     },prefix);
@@ -1203,6 +1270,32 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const prefix = await ensureReady();
     const { source_node: sourceNode, target_node: targetNode, target_port: targetPort } = task.parameters;
     checkNodeRef(sourceNode); checkNodeRef(targetNode);
+    const bound=task.node_target_context;
+    if(effectPossible&&readNodeTargetGraph&&bound?.request?.target?.kind==='new'
+      &&['variables.to_table','variables.column_union'].includes(bound.request.target.type)&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
+      const baseline=bound.graph_baseline,source=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[0].id),target=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[1].id);
+      const outputs=source[0]?.variable_outputs?.filter(p=>p.kind==='variables'&&p.native_index===task.parameters.source_port.index);
+      const inputs=target[0]?.variable_inputs?.filter(p=>p.kind==='variables'&&p.native_index===targetPort.index);
+      if(source.length===1&&target.length===1&&outputs?.length===1&&inputs?.length===1){
+        const edge={source:source[0].ref.node_id,output:outputs[0].port,target:target[0].ref.node_id,input:inputs[0].port,kind:'variables'};
+        const native=await readNodeTargetGraph(page,{...bound.graph_probe,read_bindings:true});
+        if(normalizeVariablesToTableLinkGraph(baseline,native,edge)!==native){
+          const bindings=native.native_bindings?.filter(n=>n.node_id===edge.target),original=bound.nodes[1].tid;
+          if(bindings?.length!==1)throw Error('VarToData caption binding disappeared');
+          const label=bindings[0].label,graphPrefix=await graphPrefixFor(prefix);
+          const exact=graphPrefix+sourceNode.node_label+'|Output_Var-'+task.parameters.source_port.index+'|'+label+'|Input_Var-'+targetPort.index;
+          const links=await graphLinks(prefix),actualPorts=await ports(prefix,label),oldPrefix=graphPrefix+original+';',newPrefix=graphPrefix+label+';';
+          if(!before.ports.every(p=>p.startsWith(oldPrefix))||links.filter(l=>l===exact).length!==1
+            ||!(bound.request.target.type==='variables.column_union'
+              ?same(sorted(links.filter(l=>l!==exact)),sorted(before.links.map(l=>l.replace('|'+original+'|','|'+label+'|'))))
+              :same(links.filter(l=>l!==exact),before.links))
+            ||!same(sorted(actualPorts),sorted(before.ports.map(p=>newPrefix+p.slice(oldPrefix.length)))))throw Error('VarToData caption DOM differs from its native graph');
+          bound.nodes=bound.nodes.map(n=>{const b=native.native_bindings.filter(b=>b.node_id===n.id),v=native.nodes.filter(v=>v.ref.node_id===n.id);if(b.length!==1||v.length!==1)throw Error('VarToData link endpoint disappeared');return {id:n.id,tid:b[0].label,dom_epoch:v[0].dom_epoch};});
+          phase='verified';record('variables_to_table_link_caption_verified',{node_id:edge.target,before:target[0].label,after:native.nodes.find(n=>n.ref.node_id===edge.target).label});
+          return result('SUCCEEDED',{link_ref:{kind:'link',tid:exact},variable_target_label_transition:{node_id:edge.target},reconciled:false});
+        }
+      }
+    }
     const currentLinks = await graphLinks(prefix);
     const currentPorts = await ports(prefix, targetNode.node_label);
     const addedLinks = currentLinks.filter(value => !before.links.includes(value));
@@ -1276,11 +1369,16 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
             if(validation.state==='pending')await wait(50);
           }while(validation.state==='pending');
           await ensureReady();
-          // Validation enlarges the target SVG. Re-enter its current center so
-          // mxGraph refreshes the marker after the asynchronous result arrived.
-          await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
+          // Validation can enlarge the SVG. Recenter only when needed: another
+          // move at the already-ready center can clear mxGraph's valid marker.
+          if(!validation.target_ready||validation.point.x!==targetPoint.x||validation.point.y!==targetPoint.y)
+            await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
           const settled=await interact(()=>readLinkValidation(page,task.node_target_context,task.parameters));
-          if(settled.state!=='ready'||!settled.target_ready)throw Error('Validated link target is no longer ready');
+          if(settled.state!=='ready'||!settled.target_ready){
+            // Private, single-entry evidence; never add native IDs to the reply.
+            page[Symbol.for('loginom-dock.node-target-link-diagnostic')]={operation_id:task.operation_id,before:validation,after:settled};
+            throw Error('Validated link target is no longer ready');
+          }
           record('link_validation_settled',{attempt:attempt+1});
         }:undefined });
       await wait(150);
@@ -1341,7 +1439,23 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true };
+        const diagrams = [app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController?.FDiagram];
+        const pending = [node], seen = new Set();
+        while (pending.length) {
+          const current = pending.pop();
+          if (seen.has(current)) continue;
+          if (seen.size >= 10000) throw Error('Package reference inventory exceeds bound');
+          seen.add(current);
+          diagrams.push(current.FCustomForm?.FDiagram);
+          pending.push(...(current.FSubNodes?.FItems ?? []));
+        }
+        // Cold Open can dirty these observed node types; Save normalizes once.
+        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization','bg-vendor-icon-condition','bg-vendor-icon-datatovariables'].includes(n.FIconCls)));
+        const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
+        if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
+        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
+          running: node.HasRunningNodes?.() === true,
+          rest_reference: restReference,...(nativeNodes?{native_nodes:nativeNodes}:{}) };
       }
       node = node.ParentNode;
     }
@@ -1361,7 +1475,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
     let node=card?.Controller?.Node?.data?.node,packageNode,workflowNode;
     const seen=new Set();for(let i=0;node&&i<32&&!seen.has(node);i++,node=node.ParentNode){seen.add(node);
-      if(app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+      if(!workflowNode&&app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
       if(app.PackageTreeNode&&node instanceof app.PackageTreeNode){packageNode=node;break;}}
     const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
     if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1
@@ -1391,6 +1505,70 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     }
     return [...result.values()];
   },binding);
+  const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
+      const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+      if(!binding)return [];
+      const pending=prep?.savedPackageReopen;
+      if(mode==='recover'){
+        if(!pending)return [];
+        if(JSON.stringify(binding)!==JSON.stringify(pending.binding)||path!==pending.path
+          ||current.tab_tid!==pending.current.tab_tid||current.prefix!==pending.current.prefix)
+          throw Error('Saved reopen binding changed');
+        previous=pending.previous;nativeNodes=pending.nativeNodes;
+      }
+      if(location.origin!==binding.origin||prep?.document!==document||prep.id!==binding.document_id
+        ||app?.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName!==binding.loginom_account)throw Error('Saved workflow document/account changed');
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+      const tabs=exact(current.tab_tid),card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+      const diagram=card.Controller.FController.FDiagram,graph=exact(current.prefix+';ModelForm;cmpDiagram');
+      const observed=diagram.FNodes.FCollection.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+      if(tabs.length!==1||!tabs[0].classList.contains('x-tab-active')||graph.length!==1||diagram.FmxGraph.container!==graph[0]
+        ||JSON.stringify(observed)!==JSON.stringify(nativeNodes))throw Error('Saved workflow native graph changed');
+      let node=card.Controller.Node.data.node,workflowNode,packageNode;const seen=new Set();
+      while(node&&!seen.has(node)&&seen.size<32){seen.add(node);
+        if(!workflowNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+        if(node instanceof app.PackageTreeNode){packageNode=node;break;}node=node.ParentNode;}
+      if(!workflowNode||!packageNode||'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '')!==path)throw Error('Saved workflow package changed');
+      const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(current.prefix+';cnrNaviMode;b.s_')+']')];
+      const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
+      if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
+      const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
+      const connection=app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+      if(mode==='remember'&&(!connection.Session||connection.Connected!==true))throw Error('Saved reopen session unavailable');
+      if(mode==='recover'&&(pending.packageNode!==packageNode||pending.workflowNode!==workflowNode
+        ||pending.tab!==tabs[0]||pending.connection!==connection||pending.serverSession!==connection.Session
+        ||pending.records.some(p=>![...prep.receipts.values()].includes(p.record)||p.record.tab!==p.tab
+          ||p.record.packageNode!==p.packageNode||p.record.request!==p.request
+          ||p.record.nodeTargetWorkflowNode!==p.workflowNode)))throw Error('Saved reopen native owner changed');
+      const recordsBefore=[];
+      for(const prior of previous){
+        const old=exact(prior.workflow_ref.tab_tid);
+        if(prior.document_id!==prep.id||old.length&&(mode!=='reconcile'||old.length!==1||old[0]!==tabs[0]))throw Error('Saved workflow close was not confirmed');
+        const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===prior.workflow_ref.workflow_id);
+        if(!records.length||records.some(r=>JSON.parse(r.request).session!==binding.session_id))throw Error('Original saved workflow receipt unavailable');
+        if(mode==='recover'&&records.some(r=>!pending.records.some(p=>p.record===r)))throw Error('Saved reopen receipt inventory changed');
+        for(const record of records)recordsBefore.push({record,tab:record.tab,packageNode:record.packageNode,request:record.request,workflowNode:record.nodeTargetWorkflowNode});
+      }
+      if(mode==='remember'){
+        // Evidence only: an ambiguous Save cannot transfer the issued ownership.
+        prep.savedPackageReopen={previous,current,path,nativeNodes,binding,packageNode,workflowNode,tab:tabs[0],
+          connection,serverSession:connection.Session,records:recordsBefore};
+        return [];
+      }
+      const rebound=[];
+      for(const prior of previous){
+        for(const {record:r} of recordsBefore.filter(p=>p.record.workflowId===prior.workflow_ref.workflow_id)){
+          const replaced=r.tab!==tabs[0]||r.packageNode!==packageNode||r.nodeTargetWorkflowNode!==workflowNode;
+          r.tab=tabs[0];r.packageNode=packageNode;r.nodeTargetWorkflowNode=workflowNode;r.crumbs=crumbs;
+          if(replaced){delete r.nodeTargetPortIdentities;delete r.navigationParentWorkflow;delete r.navigationParentReceipt;}}
+        rebound.push({document_id:prep.id,previous_workflow_ref:prior.workflow_ref,
+          workflow_ref:{...current,workflow_id:prior.workflow_ref.workflow_id,navigation_path:crumbs}});
+      }
+      delete prep.savedPackageReopen;
+      return rebound;
+    },{previous,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding,mode});
+
   const refreshSavedNavigation = async current => {
     const crumbs=current.workflow_ref.navigation_path, binding=current.workflow_ref;
     const parent=crumbs.at(-2),last=crumbs.at(-1);
@@ -1446,7 +1624,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const prefix = await ensureReady();
     const tab = await resolve('workspace.active_tab', {}, { stable: false });
     return { workflow_ref: { ...workflow }, path: normalizedPackagePath(),
-      identity: (await tab.innerText()).trim(), package_identity: await packageIdentity(), graph: await graphSnapshot(prefix) };
+      identity: (await tab.innerText()).trim(), package_identity: await packageIdentity(), graph: await graphSnapshot(prefix),
+      continuations: await packageContinuations(workflow) };
   };
   const verifyReopenedPackage = async before => {
     const prefix = await ensureReady();
@@ -1455,7 +1634,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const reopenedIdentity = await packageIdentity();
     const normalizedPath = normalizeStoredPath(reopenedIdentity.path);
     const signature = await graphSnapshot(prefix);
-    const pathMatches = normalizedPath === before.path, graphMatches = same(signature, before.graph);
+    const pathMatches = normalizedPath === before.path, graphMatches = same(signature, before.graph)
+      &&(!before.package_identity.native_nodes||same(reopenedIdentity.native_nodes,before.package_identity.native_nodes));
     record('reopened_package_observed', { requested_path: before.path, actual_path: normalizedPath,
       tab_caption: identity, path_matches: pathMatches, graph_matches: graphMatches, graph: signature });
     if (!pathMatches || !graphMatches) {
@@ -1477,9 +1657,19 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   };
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
+    if (before.package_identity.running)
+      throw new Error('Cannot save the package while a process is running or its nodes are locked. Wait for the process to finish or stop it before requesting a new Save. No save request was sent.');
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
       throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
+    const normalizeRest = before.package_identity.rest_reference === true
+      && ['packages.close','packages.open'].every(symbol => task.action.selector_symbols.includes(symbol));
+    const continuationsBefore = await packageContinuations(before.workflow_ref);
+    if (normalizeRest && !continuationsBefore.length) throw Error('Saved workflow continuation unavailable before Save');
+    if((!keepOpen||normalizeRest)&&continuationsBefore.length&&(!Array.isArray(before.package_identity.native_nodes)
+      ||before.package_identity.native_nodes.some(n=>typeof n[0]!=='string'||!n[0])
+      ||new Set(before.package_identity.native_nodes.map(n=>n[0])).size!==before.package_identity.native_nodes.length))
+      throw Error('Saved workflow native identities unavailable before Save');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1527,7 +1717,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
     } catch { arrangement.reason = 'arrangement_unconfirmed'; }
     record('package_arrangement', { ...arrangement, warning: true });
-    const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
     if (!(await resolve('packages.save_as', {}, { cardinality: 'zeroOrOne' }))) await click('packages.menu');
@@ -1536,7 +1725,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await writeFileName(input, before.path);
     // Keep the original graph; inspect it after staging the dialog, beyond the
     // layout repaint, and before the gesture that writes the package.
-    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
+    const staged = await packageCheckpoint();
+    if (staged.package_identity.running)
+      throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
+    if (!same(staged, before)) throw Error('Package changed after save preflight');
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1583,7 +1775,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const saveError = await resolve('message.error', {}, { cardinality: 'zeroOrOne', stable: false });
     if (saveError) throw new Error((await saveError.innerText()).slice(0, 500));
     record('save_flow_completed', { path: before.path });
-    if (keepOpen) {
+    const normalizationStarted = Date.now();
+    if (keepOpen && !normalizeRest) {
       const prefix = await ensureReady();
       const actualPath = normalizeStoredPath((await packageIdentity()).path);
       const graph = await graphSnapshot(prefix);
@@ -1594,6 +1787,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         graph_matches: graphMatches, graph });
       if (!workflowMatches || !pathMatches || !graphMatches)
         return result('AMBIGUOUS', { reason: 'Saved destination, workflow or graph changed' });
+      let recovered=[];
+      try { recovered=await bindSavedContinuations(before,[],'recover'); }
+      catch { record('saved_reopen_recovery_refused'); }
       let continuationsAfter = await packageContinuations(before.workflow_ref);
       if(continuationsBefore.length && continuationsAfter.length
           && !same(continuationsBefore[0].workflow_ref.navigation_path,continuationsAfter[0].workflow_ref.navigation_path)) {
@@ -1604,9 +1800,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       const identity = value => ({document_id:value.document_id,workflow_id:value.workflow_ref.workflow_id,
         tab_tid:value.workflow_ref.tab_tid,prefix:value.workflow_ref.prefix});
-      if(!same(continuationsBefore.map(identity),continuationsAfter.map(identity)))throw new Error('Saved continuation identities changed');
-      const continuations=continuationsAfter.map((value,i)=>({...value,previous_workflow_ref:continuationsBefore[i].workflow_ref}));
-      record('save_continuations_observed', { continuations });
+      if(!recovered.length&&!same(continuationsBefore.map(identity),continuationsAfter.map(identity)))throw new Error('Saved continuation identities changed');
+      const continuations=recovered.length?recovered:continuationsAfter.map((value,i)=>({...value,previous_workflow_ref:continuationsBefore[i].workflow_ref}));
+      record('save_continuations_observed', { continuations,...(recovered.length?{recovered_reopen:true,native_identity_verified:true}:{}) });
       transientDialog = false; phase = 'verified';
       record('postcondition_verified', { proof: 'awaited_save_flow_same_open_workflow', package_path: actualPath,
         workflow_ref: workflow, graph, reopened: false, persisted_content_verified: false });
@@ -1662,7 +1858,108 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     });
     await waitForNoMask(60000);
     transientDialog = false;
-    return verifyReopenedPackage(before);
+    const verified = await verifyReopenedPackage(before);
+    // Keep the native relationship even if graph verification or normalization
+    // subsequently remains ambiguous. It authorizes no action until another Save.
+    if(continuationsBefore.length)try { await bindSavedContinuations(before,continuationsBefore,'remember'); }
+    catch { record('saved_reopen_binding_refused'); }
+    if (verified.status !== 'SUCCEEDED' || !continuationsBefore.length || !normalizeRest&&!task.storage_binding) return verified;
+    let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
+    if(normalizeRest)try {
+      const binding = task.storage_binding;
+      if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
+      const read = async () => (await page.evaluate(readSavedState, {
+        sessionId: binding.session_id, documentId: binding.document_id, account: binding.loginom_account,
+        packagePath: before.path, origin: binding.origin, loginomBuild,
+      })).modified;
+      modifiedBefore = await read();
+      modifiedAfter = modifiedBefore;
+      if (modifiedBefore) {
+        await click('packages.menu');
+        const definition = task.normalization_selector;
+        if (definition?.strategy !== 'data_tid' || definition.match !== 'exact') throw Error('Native normalization Save selector unavailable');
+        const button = tid('', definition.value);
+        if (await button.count() !== 1 || !await button.isVisible() || !await button.isEnabled()
+          || normalizeStoredPath((await packageIdentity()).path) !== before.path) throw Error('REST normalization Save owner changed');
+        additionalSave = true;
+        transientDialog = true;
+        await interact(timeout => button.click({ timeout }), true);
+        await poll(async () => !await button.isVisible());
+        await waitForNoMask(60000);
+        transientDialog = false;
+        modifiedAfter = await read();
+      }
+      if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
+    } finally {
+      record('rest_package_normalization', { path: before.path, modified_before: modifiedBefore,
+        modified_after: modifiedAfter, additional_save: additionalSave,
+        started_at_ms: normalizationStarted, finished_at_ms: Date.now(), duration_ms: Date.now() - normalizationStarted });
+    }
+    // Only our verified Save roundtrip may replace native objects behind an
+    // issued logical workflow. Node GUID/type and complete graph checks above
+    // preserve source ownership; subsequent operations still observe fresh links.
+    const continuations=await bindSavedContinuations(before,continuationsBefore,'rebind');
+    record('save_continuations_observed',{continuations,reopened:true,native_identity_verified:true});
+    if(normalizeRest)record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
+    return keepOpen ? result('SUCCEEDED', { ...verified.output, workflow_preserved: false, save_completed: true,
+      persisted_content_verified: false, workflow_continuations: continuations }) : verified;
+  };
+  const reconcilePackageSave = async () => {
+    const before = task.checkpoint, receipt = task.save_receipt, binding = task.storage_binding;
+    effectPossible = receipt?.effect_possible === true;
+    if (!binding || receipt?.status !== 'AMBIGUOUS' || receipt.effect_possible !== true
+        || !receipt.trace?.some(e => e.event === 'save_requested' && e.path === before?.path)
+        || !before?.continuations?.length || !Array.isArray(before.package_identity.native_nodes)
+        || before.package_identity.native_nodes.some(n => typeof n[0] !== 'string' || !n[0])
+        || new Set(before.package_identity.native_nodes.map(n => n[0])).size !== before.package_identity.native_nodes.length)
+      return result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'The original Save request and native workflow proof are required; no Save was repeated' });
+    await page.evaluate(b => {
+      const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
+      const c = app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
+      if (location.origin !== b.origin || app?.Version !== b.loginom_build || prep?.document !== document
+          || prep.id !== b.document_id || c?.Connected !== true || c.UserName !== b.loginom_account)
+        throw Error('Saved workflow document/account changed');
+    }, binding);
+    // Only this admitted Save may replace the tab/native objects. Reuse the
+    // normal Save As proof before rebinding any previously issued identities.
+    workflow = null; graphBinding = null;
+    const prefix = await ensureReady(), actual = await packageIdentity(), graph = await graphSnapshot(prefix);
+    const pathMatches = normalizeStoredPath(actual.path) === before.path;
+    const graphMatches = same(graph, before.graph) && same(actual.native_nodes, before.package_identity.native_nodes);
+    record('save_result_observed', { requested_path: before.path, actual_path: normalizeStoredPath(actual.path),
+      path_matches: pathMatches, graph_matches: graphMatches });
+    if (!pathMatches || !graphMatches) {
+      phase = 'verified';
+      return result('NOT_APPLIED', { reason: 'Saved destination or graph does not match the original request' },
+        { code: 'SAVE_RESULT_MISMATCH', message: 'The saved result does not match the original request. Do not repeat this Save.' });
+    }
+    if (await resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false })
+        || await resolve('message.text', {}, { cardinality: 'zeroOrOne', stable: false })
+        || await resolve('message.error', {}, { cardinality: 'zeroOrOne', stable: false }))
+      return result('AMBIGUOUS', {}, { code: 'SAVE_UI_UNSETTLED', message: 'The original Save UI is still open; no Save was repeated' });
+    const state = await page.evaluate(readSavedState, { sessionId: binding.session_id, documentId: binding.document_id,
+      account: binding.loginom_account, packagePath: before.path, origin: binding.origin, loginomBuild });
+    if (state.modified !== false)
+      return result('AMBIGUOUS', {}, { code: 'SAVE_RESULT_UNVERIFIED', message: 'The package still has unsaved changes; no Save was repeated' });
+    if (!same(await graphSnapshot(prefix), before.graph)) throw Error('Saved graph changed during reconciliation');
+    let continuations = await bindSavedContinuations(before, before.continuations, 'reconcile');
+    const reopened = workflow.tab_tid !== before.workflow_ref.tab_tid;
+    if (!reopened && continuations.some(c => !same(c.previous_workflow_ref.navigation_path, c.workflow_ref.navigation_path))) {
+      // The saved caption can precede the native NavigationBar key rebuild.
+      // Settle it through the same owned UI transition as ordinary Save before
+      // a variable wizard returns to the graph and rebuilds those keys itself.
+      await refreshSavedNavigation(continuations[0]);
+      await ensureReady();
+      if (!same(await graphSnapshot(workflow.prefix), before.graph)) throw Error('Saved graph changed while refreshing navigation');
+      continuations = await bindSavedContinuations(before, before.continuations, 'reconcile');
+    }
+    record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
+    phase = 'verified'; effectPossible = true;
+    record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
+    const output = { package_ref: { kind: 'package', path: before.path, active_identity: before.path }, reopened };
+    return result('SUCCEEDED', task.handler === 'packageSaveCheckpoint'
+      ? { ...output, workflow_preserved: !reopened, save_completed: true, persisted_content_verified: false, workflow_continuations: continuations }
+      : output);
   };
   const observe = async () => {
     const prefix = await ensureReady();
@@ -1692,9 +1989,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       nodeAdd: { prepare: nodeCheckpoint, apply: runNodeAdd, reconcile: () => reconcileNode(task.checkpoint) },
       linkCreate: { prepare: linkCheckpoint, apply: runLinkCreate, reconcile: () => reconcileLink(task.checkpoint), recover_link: recoverLink },
       packageSaveCheckpoint: { prepare: packageCheckpoint, apply: () => runPackageSaveAs({ keepOpen: true }),
-        reconcile: () => result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'An open package does not prove completion of an unknown save' }) },
+        reconcile: reconcilePackageSave },
       packageSaveAs: { prepare: packageCheckpoint, apply: runPackageSaveAs,
-        reconcile: () => result('AMBIGUOUS', {}, { code: 'SAVE_RECEIPT_MISSING', message: 'A lost save response cannot prove close/reopen from a read-only DOM snapshot' }) },
+        reconcile: reconcilePackageSave },
     };
     let outcome;
     try {
@@ -1720,8 +2017,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const cleanup = async (name, operation) => {
         try { await operation(); record('cleanup_completed', { resource: name }); }
         catch (error) {
-          record('cleanup_failed', { resource: name });
-          outcome = result('AMBIGUOUS', {}, { code: 'CLEANUP_FAILED', message: safeMessage(error) });
+          const cleanupError = { code: 'CLEANUP_FAILED', message: safeMessage(error) };
+          record('cleanup_failed', { resource: name, ...cleanupError });
+          // Keep Loginom's Save refusal visible even when dismissing its dialog
+          // exhausts the deadline. Neither observation is a save receipt.
+          outcome = ['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler) && outcome.error
+            ? { ...outcome, status: 'AMBIGUOUS', output: { ...outcome.output, cleanup_error: { resource: name, ...cleanupError } } }
+            : result('AMBIGUOUS', {}, cleanupError);
         }
       };
       if (mouseHeld) await cleanup('mouse', () => page.mouse.up());
@@ -1729,6 +2031,16 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         if (await transientEditor.isVisible()) await transientEditor.press('Escape', { timeout: 3000 });
       });
       if (transientDialog) await cleanup('transient_dialog', async () => {
+        const title = page.locator('[data-tid="msgbox;p.h;p.t"]');
+        if (['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler)
+            && await title.count() === 1 && await title.isVisible()
+            && (await title.innerText()).trim() === 'Восстановление сессии') {
+          // Escape answers No to this native prompt and logs out the account.
+          // Leave it to the original-session guard on the next inspection.
+          outcome.output.connection_recovery_pending = true;
+          record('cleanup_deferred', { resource: 'connection_recovery' });
+          return;
+        }
         await page.keyboard.press('Escape');
         if (['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler)) {
           await poll(async () => !(await resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }))
@@ -1738,7 +2050,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       });
       if (restoreViewport) await cleanup('viewport', restoreViewport);
     }
-    outcome.cleanup_complete = !trace.some(entry => entry.event === 'cleanup_failed');
+    outcome.cleanup_complete = !trace.some(entry => ['cleanup_failed', 'cleanup_deferred'].includes(entry.event));
     return outcome;
   })();
 }
@@ -1754,8 +2066,9 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
   const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
-    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector) } : {}) };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()})`;
+    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector),
+      normalization_selector: structuredClone(selectorCatalog.native_rest_save) } : {}) };
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()}, ${readSavedPackageState.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }
@@ -1796,15 +2109,15 @@ export function withBrowserReceipt(body, options) {
   return `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify(options)}, () => ${body})`;
 }
 
-export function parseCapabilityResult(response) {
+export function parseCapabilityResult(response,{redactor}={}) {
   if (response?.isError) {
     const details=browserFailureDetails(response);
-    // Keep the original cause private; upload journals it through its
-    // redactor while callers retain the fixed public refusal.
+    // Keep the original cause private while callers retain the fixed public
+    // refusal. Mask before bounding so a cut cannot expose a secret prefix.
     const message=(response.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
-      .map(block=>block.text.slice(0,2048)).join('\n').slice(0,2048);
+      .map(block=>block.text.replace(/(?:^|\n)### Ran Playwright code\n[\s\S]*?(?=\n### |$)/g,'')).join('\n');
     throw Object.assign(new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']'+(details?' ('+details+')':''),
-      {cause:new Error(message)}),{code:browserFailureCategory(response)});
+      {cause:new Error(Buffer.from((redactor??createRedactor()).text(message)).subarray(0,2048).toString().replace(/�$/, ''))}),{code:browserFailureCategory(response)});
   }
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
@@ -1812,7 +2125,12 @@ export function parseCapabilityResult(response) {
     const source = match?.[1] ?? block.text;
     try { return assertActionOutcome(JSON.parse(source)); } catch {}
   }
-  const error=new Error('Pinned browser capability returned no typed result');
+  const message=(response?.content??[]).filter(block=>block.type==='text'&&typeof block.text==='string')
+    // Generated source can precede the modal state and exhaust the diagnostic
+    // allowance. Retain browser feedback, never the echoed capability code.
+    .map(block=>block.text.replace(/(?:^|\n)### Ran Playwright code\n[\s\S]*?(?=\n### |$)/g,'')).join('\n');
+  const error=new Error('Pinned browser capability returned no typed result',
+    {cause:new Error(Buffer.from((redactor??createRedactor()).text(message)).subarray(0,2048).toString().replace(/�$/, ''))});
   if(browserFailureCategory(response)==='UPLOAD_DEBUG_DIALOG')error.code='UPLOAD_DEBUG_DIALOG';
   throw error;
 }
@@ -1821,6 +2139,33 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
+  const executeBrowser=execute;
+  execute=async(...args)=>{
+    let result;
+    try{result=await executeBrowser(...args);}
+    catch(error){
+      // Export and delivery callers can replace the exception during recovery.
+      // Persist its cause here while the original transport error still exists.
+      if(args[0].includes('async function browserArtifactDownload('))try{
+        await onRecord({phase:'browser_capability_failed',cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});
+      }catch{}
+      throw error;
+    }
+    const diagnostics=[];
+    const consume=value=>{
+      if(!value||typeof value!=='object')return;
+      if((value.event==='download_browser_failure'||value.reason==='save_failed')&&Object.hasOwn(value,'private_download')){
+        const cause=value.private_download;delete value.private_download;
+        diagnostics.push({phase:'download_browser_diagnostic',operation_id:cause?.operation_id,step:value.step,
+          cause:downloadFailureDiagnostic(cause,redactor)});
+      }
+      // Receipt inspection can return an earlier download nested in output.
+      for(const child of Object.values(value))consume(child);
+    };
+    consume(result);
+    for(const diagnostic of diagnostics)try{await onRecord(diagnostic);}catch{}
+    return result;
+  };
   let pending = null;
   let running = false;
   const operations = new Map();
@@ -1871,7 +2216,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!file)throw Error('LOGINOM_FILE_CHANGED');
       const options={operation_id,snapshot,file_ref:file.ref,artifact:{name:source.destination.slice(source.destination.lastIndexOf('/')+1)},
         server_source_binding:{...source,directory:source.destination.slice(0,source.destination.lastIndexOf('/'))},
-        download_path:path,browser_downloads_path:join(cacheDirectory,'..','browser-downloads'),
+        download_path:path,browser_downloads_path:browserDownloadsPath(join(cacheDirectory,'..')),
         deadline_at:deadline,expected_origin:targetOrigin,expected_build:targetBuild};
       signal.throwIfAborted();
       const code=makeServerSourceDownloadCode(options);
@@ -2009,6 +2354,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
     }
     const mutation = ['apply', 'recover_link'].includes(mode);
+    const saveReconciliation = mode === 'reconcile' && ['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key);
+    if (saveReconciliation) operation.saveReceipt ??= structuredClone(operation.outcome);
     const receipt = mutation ? receiptOptions(operation, receiptId ?? operation.id, operation.action.action_key,
       fingerprint(mode, [operation.action.action_key, operation.parameters, operation.checkpoint])) : {};
     // Recovery receipts retain the original action identity; their storage ID is
@@ -2016,13 +2363,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (mutation) operation.lastReceipt.operation_id = operation.id;
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
+      ...(saveReconciliation ? { save_receipt: operation.saveReceipt } : {}),
       ...(operation.action.effect?.destination_policy==='session_storage'||['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
         ?{storage_binding:getStorageBinding()}:{}),
       ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
         : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
     }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
       ? Math.max(1, Math.min(operation.action.timeout_ms, operation.deadline - now())) + 5000
-      : operation.action.timeout_ms + 5000, ...options });
+      : operation.action.timeout_ms + 5000, ...options, ...(saveReconciliation ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(outcome);
     if (outcome.action_key !== operation.action.action_key || outcome.action_revision !== operation.action.revision) {
       throw new Error('Dock capability outcome identity does not match the pinned action');
@@ -2040,7 +2388,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000 });
+    const value = await execute(code, { timeout: 10000,
+      ...(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key) ? { storageSession: 'save-reconcile' } : {}) });
     assertActionOutcome(value);
     const state = value.output;
     if (state?.state === 'completed') {
@@ -2136,7 +2485,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
     const response=await execute(wrapped,options);if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node target transport failed');return response.output.value;
-  },pinned,origin:targetOrigin,build:targetBuild});
+  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord});
   const nodeApplyOutcome=(operation,result)=>({status:result.status,action_key:'node.apply',
     action_revision:operation.action.revision,operation_id:operation.id,
     phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',
@@ -2189,6 +2538,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const {graph}=validateNodeApplyRequest(state.request,nodeApplyHandlers);
         const result=await inspectNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
           record:nodeTargetRecord,deadline:now()+15000});
+        if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase.move_mismatch&&!operation.targetPhase.pending){
+          const outcome={...operation.outcome.output,status:'FAILED',pending_phase:null,cleanup_complete:true,
+            error:{code:'NODE_APPLY_STOPPED',message:result.error}};
+          const event={operation_id:operation.id,action_key:'node.apply',action_revision:state.request.contract_revision,
+            phase:'node_checkpoint',signature:state.signature,result:outcome};
+          const ack=await onRecord(event);
+          if(!ack||fingerprint('ack',ack.result)!==fingerprint('ack',event.result))throw Error('Node target failure journal acknowledgement differs');
+          state.pending=null;state.cleanup_complete=true;state.result=structuredClone(outcome);
+        }
         if(result.cleanup_complete===true && !operation.targetPhase.pending
           && (result.resume_available===true || result.status==='SUCCEEDED')){
           // Only child effects have been reconciled. The node remains pending
@@ -2197,7 +2555,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const event={operation_id:operation.id,action_key:'node.apply',action_revision:state.request.contract_revision,
             phase:'node_target_reconciled',signature:state.signature,result:structuredClone(result)};
           const ack=await onRecord(event);
-          if(!ack || fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',event))
+          if(!ack || fingerprint('ack',Object.fromEntries(Object.keys(event).map(k=>[k,ack[k]])))!==fingerprint('ack',journalCopy(event)))
             throw Error('Node target recovery journal acknowledgement differs');
           state.pending=null;state.cleanup_complete=true;state.target_reconciled=true;
           operation.outcome=nodeApplyOutcome(operation,{...operation.outcome.output,pending_phase:null,cleanup_complete:true,
@@ -2224,7 +2582,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const result=await inspectNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,deadline:now()+15000});
     const outcome=nodeTargetOutcome(operation,result);await remember(operation,'reconciled',outcome);
     operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
-    if(result.status==='SUCCEEDED')pending=null;
+    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
     return outcome;
   };
   const reconcilePending = async () => {
@@ -2262,7 +2620,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       if(operation.cleanupConfirmed===false && operation.verification?.byteOutcome?.output?.bytes_verified===true)
         return failed(operation,'TRANSFER_FINALIZATION_PENDING','Verified bytes are retained; transfer cleanup has not completed');
-      if (operation.cleanupConfirmed === false) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
+      if (['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
+          && operation.outcome?.error && operation.outcome.output?.cleanup_error)
+        return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
+      if (operation.cleanupConfirmed === false && !(['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
+          && operation.outcome?.output?.connection_recovery_pending === true)) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
       if (['ui.act','artifact.upload'].includes(operation.action.capability)) {
         await remember(operation, 'reconciled', operation.outcome);
@@ -2273,6 +2635,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const outcome = await invoke(operation, 'reconcile');
       await remember(operation, 'reconciled', outcome);
       operation.outcome = outcome;
+      operation.cleanupConfirmed = outcome.cleanup_complete === true;
       if (outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') {
         pending = null;
         operation.outcome = outcome;
@@ -2337,12 +2700,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return structuredClone(returned);
     }finally{running=false;}
   };
+  const saveConnectionPending=operation=>!operation?.transportUncertain
+    &&['package.save_as','package.save_checkpoint'].includes(operation?.action.action_key)
+    &&operation.outcome?.output?.connection_recovery_pending===true;
   const dockRecoveryAdvice = operation => {
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
+    if(saveConnectionPending(operation))return {recovery_options:[],next_steps:[{...base[0],
+      instruction:'The original Save awaits native session recovery. Repeat dock_operation_inspect with this SAME operation_id; each inspection waits up to 10 seconds for the original reconnect. Continue inspecting while connection recovery is pending within the original operation deadline. Do not repeat Save, use workspace observation or stop after the first reconnect timeout. Save completion and cleanup must be reconciled from the original receipt.'}]};
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='open'
       &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function'&&!operation.transportUncertain){
       // Release stays available if the opening proof is refused on resume.
@@ -2656,8 +3024,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         : operation.outcome?.resolution ? 'observed_unverified' : 'verified',
       ...recoveryAdvice(operation),
     } });
-  const retainObservation = outcome => {
-    try { return observations.retain(outcome); }
+  const retainObservation = (outcome, options) => {
+    try { return observations.retain(outcome, options); }
     catch {
       // Delivery failure after a gesture must not become a pre-action rejection.
       // The immutable browser receipt remains in the journal/operation record.
@@ -2751,14 +3119,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const runtime=Object.freeze({
     serverDownload(request,name,{signal,sourceOperation,deadlineAt}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
-      if(name==='dock_storage_source')return (async()=>{
+      if(name==='dock_storage_source'||name==='dock_storage_list')return (async()=>{
         if(storageNavigating||serverDownloads.unsettled||running||pending
           ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
-        const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
-        if(!/\.(csv|tsv|txt|xlsx)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX');
-        const id=request.operation_id,signature='storage.source:'+path;
+        // A folder listing reads the same native Files rows; it never uploads,
+        // imports, creates or deletes anything on the server.
+        const listing=name==='dock_storage_list',directories=getStorageBinding()?.directories;
+        // LAB-1468 stage 0: folder and `<folder>/*.csv` paths were refused only
+        // after navigation. Name the listing tool before any browser action.
+        if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||/[*?]/.test(request.path)||!/\.[^./]{1,8}$/.test(request.path)))
+          throw Error('dock_storage_source needs one exact file path, not a folder or mask; to see a server folder\'s files call dock_storage_list with the folder path and pattern');
+        const path=listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
+          :requireStorageDestination(request.path,directories,'inputs');
+        if(!listing&&!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
+        if(listing)storageListPattern(request.pattern);
+        const id=request.operation_id,signature=(listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path);
         if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
         if(auxiliary.has(id)){
           const previous=auxiliary.get(id);
@@ -2775,13 +3152,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const hasScrollAnchor=output=>scrollOnly&&output.file_storage?.status==='observed'
             &&output.ui.elements.some(e=>e.tid?.startsWith(output.workflow_ref.prefix+';FileStorageForm;colName_')
               &&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
-          guard();const result=await runtime.observe({...options,signal,deadlineAt:deadline});
+          // One browser read per navigation observation (LAB-1843): a whole internal
+          // page with row geometry instead of ~5 rows per fresh paged read.
+          guard();const result=await runtime.observe({...options,whole:true,signal,deadlineAt:deadline});
           if(result.status!=='SUCCEEDED')throw Object.assign(Error(result.error?.message??'Server storage observation failed'),{code:result.error?.code});
           const output=structuredClone(result.output);let cursor=output.page?.next_cursor;
           for(let page=0;cursor;page++){
             // The table probe needs a delivered scroll owner, not every row.
             // Targeted row reads still consume all pages for their witness.
-            if(hasScrollAnchor(output))break;
+            if(!options.allPages&&hasScrollAnchor(output))break;
             if(page>=32)throw Error('Server storage observation page limit');
             const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
             if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
@@ -2816,9 +3195,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // Scrolling detaches virtual rows. Preserve the original grid root
           // so the post-gesture observation can confirm this one scroll.
           if(verb==='scroll'){
-            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            // Retained whole, like its reads (LAB-1843): the settled in-view rows
+            // that issue the next gesture follow the buffer rows above them.
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline,whole:true});
             if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
-            return;
+            // Its retained post-scroll observation issues the next gesture (LAB-1872).
+            return result.output;
           }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
@@ -2859,14 +3241,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           throw Error('Server storage UI is not ready');
         };
-        const directory=expected=>ready(async()=>{
+        const directory=(expected,owner)=>ready(async()=>{
           const s=await roots();
           // The confirmed Files click can precede its tab/region mounting.
           // Reading the previous graph's NavigationPanel races its detach.
           if(!s.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;')))return null;
           const bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
           if(bars.length!==1)return null;
-          try{return await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
+          let fresh;
+          try{fresh=await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
+          // Loginom can replace the newly mounted Files tab with the previous
+          // one after a confirmed click. Its route belongs to a different tab;
+          // stop waiting for that route and plan from the restored breadcrumbs.
+          if(owner&&fresh.file_storage?.status==='observed'
+            &&fresh.dom_epoch.document===owner.dom_epoch.document
+            &&JSON.stringify(fresh.workflow_ref)!==JSON.stringify(owner.workflow_ref))
+            throw Object.assign(Error('Files tab restored'),{storageRestored:fresh});
+          return fresh;
         },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
         try{
           const initial=await roots();
@@ -2874,11 +3265,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
             await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
           }
-          let current=await directory();const destination=path.slice(0,path.lastIndexOf('/'));
-          if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
-            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
-            current=await directory('/');
-          }
+          let current=await directory();const destination=listing?path:path.slice(0,path.lastIndexOf('/'));
           const row=async name=>{
             const parent=current;let last;
             return findNativeStorageRow({name,guard,roots:async()=>{last=await roots();return last;},
@@ -2888,17 +3275,34 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 last=state;return state;
               },ready:(probe,predicate)=>ready(probe,predicate),act});
           };
-          for(const part of destination.slice(current.file_storage.directory==='/'?0:current.file_storage.directory.length).split('/').filter(Boolean)){
-            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
-            await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
+          while(current.file_storage.directory!==destination){
+            try{
+              if(!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
+                await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
+                current=await directory('/',current);continue;
+              }
+              const part=destination.slice(current.file_storage.directory==='/'?1:current.file_storage.directory.length+1).split('/')[0];
+              const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
+              await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part,current);
+            }catch(error){
+              if(!error.storageRestored)throw error;
+              current=error.storageRestored;
+            }
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          if(listing){
+            const output=await listStorageDirectory({destination,pattern:request.pattern,guard,ready,roots,read,act});
+            const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.list',cleanup_complete:true,effect_possible:step>0,output};
+            auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_directory_listed',operation_id:id,outcome:result});return result;
+          }
           const state=await row(path.slice(path.lastIndexOf('/')+1));
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
           const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
+          auxiliary.get(id).sourceObservation=structuredClone(state);
+          auxiliary.get(id).sourceSequence=operations.size;
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
-          await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
+          await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
           const reason=error.code==='UI_ROOT_STALE'?'observation_root_changed'
@@ -2908,7 +3312,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             :'storage_observation_refused';
           const unsettled=!!pending||running;
           const result={result_version:'user-v1',operation_id:id,status:unsettled?'AMBIGUOUS':'FAILED',
-            action_key:'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
+            action_key:listing?'storage.list':'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
             output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason,
               ...(/^[A-Z_]{1,80}$/.test(error.code??'')?{code:error.code}:{}),
               ...(['main_toolbar','files_button','files_root','folder','source_file','storage_control'].includes(error.storageControl)?{control:error.storageControl}:{})}}};
@@ -2947,7 +3351,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
-        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id)));
+        const read=buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]});
+        // Completed node receipts retain their original navigation. Follow our
+        // verified Save chain, including a native-identity-verified reopen.
+        for(const save of operations.values()){
+          const outcome=save.outcome;
+          const rebound=outcome?.trace?.find(e=>e.event==='save_continuations_observed'&&e.reopened===true&&e.native_identity_verified===true);
+          const normalized=rebound&&outcome.output?.reopened===true;
+          if(!['package.save_checkpoint','package.save_as'].includes(save.action.action_key)||outcome?.action_key!==save.action.action_key
+            ||outcome.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||save.cleanupConfirmed!==true
+            ||!normalized&&(outcome.output?.save_completed!==true||outcome.output.workflow_preserved!==true||outcome.output.reopened!==false))continue;
+          for(const continuation of outcome.output.workflow_continuations??rebound?.continuations??[]){
+            const previous=continuation.previous_workflow_ref,next=continuation.workflow_ref,current=read.workflow_ref;
+            if(continuation.document_id!==read.document_id||!previous||!next
+              ||previous.workflow_id!==current.workflow_id||next.workflow_id!==current.workflow_id
+              ||!['tab_tid','prefix'].every(key=>previous[key]===current[key]&&(normalized||next[key]===current[key]))
+              ||previous.navigation_path?.length!==current.navigation_path.length
+              ||!previous.navigation_path.every((part,i)=>part.tid===current.navigation_path[i].tid&&part.label===current.navigation_path[i].label))continue;
+            read.workflow_ref=structuredClone(next);
+          }
+        }
+        return nodeJobs.start(read);
       }
       if(!sourceReads.has(args.operation_id)
         &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
@@ -3023,8 +3447,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (running) throw new Error('Another Dock action is still running');
       running = true;
       try {
-        await reconcilePending();
+        const reconciled=await reconcilePending();
         if (!pending) return { ...structuredClone(operation.outcome), recovery_operation_id: recoveryOperationId };
+        if(strategy==='restore_control'&&saveConnectionPending(operation)){
+          // A connection guard refusal happens before restore_control exists in
+          // the browser. Keep the original Save receipt and its known effects;
+          // replacing it with that missing recovery receipt makes pending final.
+          const returned={...structuredClone(reconciled),recovery_operation_id:recoveryOperationId};
+          await remember({...operation,id:recoveryOperationId,parameters:{original_operation_id:operationId,strategy}},'recovery_completed',reconciled);
+          auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
+          return returned;
+        }
         if (operation.transportUncertain) throw new Error('The browser operation has not confirmed completion; inspect before recovery');
         if (strategy !== 'restore_control' && !operation.cleanupConfirmed) throw new Error('Restore browser control before repairing the graph');
         if (strategy === 'accept_observed_state' || strategy === 'abandon_operation') {
@@ -3064,6 +3497,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const restored = await execute(withBrowserReceipt(body, receipt), { timeout: 15000 });
             if (!restored.cleanup_complete) { operation.cleanupConfirmed = false; outcome = failed(operation, 'CLEANUP_FAILED', 'Browser cleanup failed'); }
             else { operation.cleanupConfirmed = true; outcome = operation.action.capability === 'ui.act'
+              || ['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
+                && operation.outcome?.error && operation.outcome.output?.cleanup_error
               ? { ...operation.outcome, cleanup_complete: true } : await invoke(operation, 'reconcile'); }
           }
         } catch (error) {
@@ -3084,7 +3519,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return returned;
       } finally { running = false; }
     },
-    async observe({ signal, scope, cursor, rootRef, observationId, storageName, deadlineAt } = {}) {
+    async observe({ signal, scope, cursor, rootRef, observationId, storageName, deadlineAt, whole } = {}) {
       signal?.throwIfAborted();
       const browserOptions=(limit=35000)=>{
         signal?.throwIfAborted();const timeout=Math.min(limit,deadlineAt===undefined?limit:deadlineAt-now());
@@ -3132,12 +3567,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         outcome.trace.push({event:'observation_scope_fallback',requested_scope:scope??'all',
           delivered_scope:'roots',reason:'UI_SCAN_LIMIT'});
       }
+      // Empty nodes/links without an observed active graph (e.g. the Files tab)
+      // are not a complete graph: deliver roots, as for UI_SCAN_LIMIT above.
+      if(cursor===undefined && selectedRoot===undefined && scope==='graph' && deliveredScope==='graph'
+          && outcome.status==='SUCCEEDED' && outcome.output?.graph_identity?.status!=='observed') {
+        signal?.throwIfAborted();
+        outcome=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:observationOperationId,
+          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),browserOptions());
+        deliveredScope='roots';
+        outcome.trace.push({event:'observation_scope_fallback',requested_scope:'graph',
+          delivered_scope:'roots',reason:'graph_unobserved'});
+      }
       serverSources.retain(outcome);
       await onRecord({operation_id:observationOperationId,phase:'observation_completed',outcome:structuredClone(outcome)});
       outcome.output.operation = view(pending).output;
-      return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope }) : observations.next(cursor, outcome);
+      return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope, whole:whole===true }) : observations.next(cursor, outcome);
     },
-    async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt } = {}) {
+    // `whole` is internal (storage navigation); dock_ui_action never passes it.
+    async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt, whole = false } = {}) {
       signal?.throwIfAborted(); checkId(operationId);
       const signature = fingerprint('ui.act', [observationId, action, recoveryOperationId ?? null]);
       if (auxiliary.has(operationId)) {
@@ -3232,7 +3679,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const resolved = await reconcilePending();
           outcome.output.recovery = view(original, resolved).output;
         } else if (!original && !owner.transportUncertain && owner.cleanupConfirmed && outcome.status !== 'AMBIGUOUS') pending = null;
-        outcome = retainObservation(outcome);
+        outcome = retainObservation(outcome, whole ? { whole: true } : undefined);
         auxiliary.set(operationId, { signature, outcome: structuredClone(outcome) });
         return outcome;
       } finally { running = false; }
@@ -3316,7 +3763,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const task={operation_id:operationId,artifact,snapshot,binding,expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline};
       const key=fingerprint('large-file-reuse',[binding.loginom_account,targetOrigin,artifact.upload.directory,artifact.name,artifact.bytes,artifact.sha256]);
       const state={task,submitted:false,bound:false,settled:false,verified:false};largeTasks.set(operationId,state);
-      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      const native=async(mode,extra={})=>{
+        const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});
+        const owned=result?.operation_id===operationId&&result.action_key==='artifact.large.native'&&result.action_revision==='1'&&result.phase===mode;
+        if(result?.status!=='SUCCEEDED'||!owned){
+          await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});
+          if(owned&&mode==='bind'&&result.status==='FAILED'&&result.error?.code==='UPLOAD_PATH_CONFLICT'
+            &&result.effect_possible===false&&result.cleanup_complete===true&&result.output?.conflict_rejected===true&&result.output.upload_submitted===false)
+            throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});
+          throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        }
+        return result.output;
+      };
       try {
         signal?.throwIfAborted();
         state.sourceLease=await artifactStore.stageUpload(artifactId);
@@ -3477,7 +3935,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const dispatched=withBrowserReceipt(`(${code})(page)`,receipt);
           onDispatched?.();
           raw=await execute(dispatched,{timeout:65000});
-        } catch {
+        } catch(error) {
+          try{await onRecord({phase:'artifact_download_transport_failed',operation_id:verificationId,
+            cause:operationFailureDiagnostic(error,{downloadCause:true,redactor})});}catch{}
           operation.transportUncertain=true;operation.cleanupConfirmed=false;
           attempt.outcome=failed(attempt,'BROWSER_CALL_UNCERTAIN','Inspect the original upload before any repeated download');
           await remember(attempt,'download_transport_uncertain',attempt.outcome);
@@ -3487,14 +3947,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally {running=false;}
     },
     preflightDeliveredArtifact(artifact,snapshot) {
-      if(!/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLSX files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(!/\.(?:csv|tsv|txt|xls|xlsx|lgd|db|json)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLS/XLSX/LGD/DB/JSON files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
     verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true,compareExisting:true}),
     // Private entry point for the node.apply shell (03). No new public MCP
     // action: the graph phase shares this runtime's gate, IDs and journal.
-    async runNodeTarget(request,{operationId,signal,resume=false}={}) {
+    async runNodeTarget(request,{operationId,signal,resume=false,actionKey='node.target.internal'}={}) {
       signal?.throwIfAborted();checkId(operationId);validateNodeTargetRequest(request);
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.target.internal',request);
@@ -3513,7 +3973,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       running=true;
       try{
-        if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:'node.target.internal',capability:'node.target.internal',revision:'1'}};
+        if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:actionKey,capability:'node.target.internal',revision:'1'}};
           operation.nodeTargetAdapter=targetAdapter(operation);
           operation.checkpoint={workflow_ref:request.workflow_ref,document_id:request.document_id};
         }
@@ -3529,6 +3989,49 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
         return structuredClone(outcome);
       }finally{running=false;}
+    },
+    // Public deletion of one node of the prepared workflow. It reuses the
+    // journaled node target phase; a busy session refuses before any gesture.
+    async deleteNode(args,{signal}={}) {
+      signal?.throwIfAborted();checkId(args.operation_id);
+      const request={document_id:args.document_id,workflow_ref:args.workflow_ref,
+        target:{kind:'delete',ref:args.node,...(args.label!==undefined?{label:args.label}:{})},inputs:[]};
+      validateNodeTargetRequest(request);
+      const id=args.operation_id,known=operations.get(id);
+      const settled=(outcome,next)=>({operation_id:id,attempt:1,state:'settled',
+        outcome:{...outcome,action_key:'node.delete',...(next?{next_step:next}:{})}});
+      const active=nodeJobs.active;
+      if(nodeJobs.busy||sourceReads.busy||sourceReads.unsettled||delivery.busy||delivery.blocksMutations||running
+        ||nodeJobs.unsettled||pending&&pending!==known||storageNavigating||serverDownloads?.unsettled)
+        return settled({status:'NOT_APPLIED',operation_id:id,phase:'preconditions',effect_possible:false,cleanup_complete:true,
+          output:{node:null,package_saved:false,warnings:['Nothing was deleted: the node graph was not touched.']},
+          error:{code:'NODE_OPERATION_RUNNING',message:(active?'Node operation '+active.operation_id+' is still running':'Another Dock operation is running or unresolved')
+            +'; deletion is refused while it runs and was not attempted.'}},
+          {tool:'dock_node_wait',...(active?{arguments:{operation_id:active.operation_id}}:{}),
+            instruction:'Do not retry deletion while the operation runs. Report the refusal; delete later only if the user still asks after it settles, with a NEW operation_id.'});
+      let outcome=await runtime.runNodeTarget(request,{operationId:id,signal,actionKey:'node.delete'});
+      const operation=operations.get(id);
+      if(known&&outcome.status==='AMBIGUOUS'&&operation&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
+        outcome=await runtime.runNodeTarget(request,{operationId:id,signal,resume:true,actionKey:'node.delete'});
+      const result=outcome.output??{};
+      const deleted=result.deleted_node;
+      // LAB-1904: a deleted REST leaves its connection reference on the graph.
+      // Name it only when no other REST still uses it in the final graph.
+      const finalGraph=operation?.targetPhase?.final_graph;
+      const unused=outcome.status==='SUCCEEDED'&&deleted?.type==='integration.rest_request'&&finalGraph
+        ?[...new Set((result.removed_service_links??[]).map(e=>e.source))].filter(id=>finalGraph.nodes.some(n=>n.ref.node_id===id&&n.type==='bg-vendor-icon-restclientconnection')
+          &&!(finalGraph.rest_connection_links??[]).some(e=>e.source===id||e.target===id)&&!finalGraph.links.some(e=>e.source===id||e.target===id)):[];
+      return settled({...outcome,output:{node:null,package_saved:false,
+        warnings:outcome.status==='SUCCEEDED'&&deleted?['Deleted node '+JSON.stringify(deleted.label)+' ('+deleted.type+') with '
+          +(result.removed_links.length+result.removed_variable_links.length+result.removed_service_links.length)
+          +' own link(s); other nodes and links are unchanged. The package is not saved: use package.save_checkpoint.',
+          ...unused.map(id=>'Its connection reference '+JSON.stringify(finalGraph.nodes.find(n=>n.ref.node_id===id).label)+' ('+id+') is now unused by any REST. '
+            +'When this REST was replaced, delete that reference too with dock_node_delete (NodeRef only, no label).')]
+          :outcome.status==='NOT_APPLIED'?['Nothing was deleted: '+String(result.error??'precondition refused')]:[],
+        ...(deleted?{output:{status:'deleted'},deleted_node:deleted}:{})}},
+        outcome.status==='SUCCEEDED'?null:outcome.status==='NOT_APPLIED'
+          ?{tool:'dock_node_delete',instruction:'Nothing was deleted. Do not repeat the same request; report the reason to the user.'}
+          :{tool:'dock_node_delete',instruction:'Deletion is unresolved. Repeat dock_node_delete with the SAME operation_id and arguments to reconcile; never start a new deletion of this node.'});
     },
     // Host-only until the complete real drivers pass admission. All child
     // phases own the same runtime gate; they cannot re-enter public run/act.
@@ -3599,6 +4102,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             await verifyDeferredTextImportSources(request,history,resolve);
           }
           if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+          if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
+            for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
         }catch(error){
           if(pending||running)throw error;
           error.nodePhaseRefusal??={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
@@ -3630,6 +4135,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               const source=admissionSources?.get(ref)??await inspectServerSource(ref,{signal,deadline:operation.deadline});
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
+            isBoundFileInput:path=>{
+              if(!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))return false;
+              try{requireStorageDestination(path,getStorageBinding()?.directories,'inputs');return true;}
+              catch{return false;}
+            },
+            resolveBoundFileSource:path=>{
+              // Hand the original native Files witness to this one Import
+              // request. Its later graph preflight must not navigate Files or
+              // inspect an inactive storage view while holding the node gate.
+              const entry=[...auxiliary.values()].findLast(e=>e.signature==='storage.source:'+path);
+              if(!['imports.text','imports.excel'].includes(request.target.type)||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
+                ||entry.boundImportOperation&&entry.boundImportOperation!==operation.id)
+                throw Error('BINDING_SOURCE_UNVERIFIED: observe the current input file with dock_storage_source before Execute');
+              const ref=entry.outcome.output.source.server_source_ref;
+              const laterUpload=[...operations.values()].slice(entry.sourceSequence).some(o=>o.action.capability==='artifact.upload'&&o.parameters.destination===path
+                &&!(o.outcome?.status==='NOT_APPLIED'&&o.outcome.effect_possible===false));
+              if(laterUpload||serverSources.referenceForPath(path)!==ref)throw Error('BINDING_SOURCE_UNVERIFIED: input file witness changed');
+              const source=serverSources.resolve(ref,{status:'SUCCEEDED',output:entry.sourceObservation});
+              if(source.document_id!==request.document_id)throw Error('BINDING_SOURCE_UNVERIFIED: file document changed');
+              entry.boundImportOperation=operation.id;return source;
+            },
             resolveDeliveredSource:path=>admissionSources?.get(serverSources.referenceForPath(path))
               ??inspectServerSource(serverSources.referenceForPath(path),{signal,deadline:operation.deadline}),
             verifySourceSwitchSave:id=>{
@@ -3656,6 +4182,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const originalContinuation=operation.nodeApplyDrivers.verifyContinuation;
           const originalSource=operation.nodeApplyDrivers.verifySource;
           operation.nodeApplyDrivers={...operation.nodeApplyDrivers,
+            ...(request.target.type==='variables.user'&&typeof operation.nodeTargetAdapter.needsWorkflowActivation==='function'?{
+              needsWorkflowActivation:ctx=>operation.nodeTargetAdapter.needsWorkflowActivation(
+                {document_id:request.document_id,workflow_ref:request.workflow_ref},ctx)}:{}),
             verifySource:async(...args)=>{
               try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
               // Admission observations are valid for this initial source phase
@@ -3699,11 +4228,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 // Bind the freshly reopened native graph before a schema
                 // preflight reads its source port. Workflow activation alone
                 // does not establish the embedded node-context identity.
+                const existingRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
+                if(existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
                 const sourceGraph=await operation.nodeTargetAdapter.observe(graph,ctx.deadline,ctx.signal);
                 if(sourceGraph?.complete!==true||sourceGraph.document_id!==graph.document_id
                   ||JSON.stringify(sourceGraph.workflow_ref)!==JSON.stringify(graph.workflow_ref))
                   throw Error('Complete owned graph required before node preflight');
-                preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
+                if(!existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
             };
             try{
@@ -3719,6 +4250,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
+              if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
+                error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
+                  settings_unchanged:true,verification:'node_move_position_mismatch'};
               if(result.status==='NOT_APPLIED' && result.partial_effect===false && result.cleanup_complete===true
                 && operation.targetPhase?.effect_possible===false && !operation.targetPhase?.pending){
                 if(preflight?.effect_possible!==true)
@@ -3871,7 +4405,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
   const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
-  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
+  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
       if((storageNavigating||serverDownloads?.unsettled)&&!['serverDownload','cleanupServerCache'].includes(name)){

@@ -1,0 +1,4 @@
+DeviceID,CustomerID,Platform,LoginCount
+D-100,C-001,android,42
+D-101,C-002,ios,7
+D-102,C-004,web,113

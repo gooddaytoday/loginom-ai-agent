@@ -27,6 +27,16 @@ describe("tab migration", () => {
     expect(migrateTabs(null, server)).toEqual([])
     expect(migrateTabs({}, server)).toEqual([])
   })
+
+  test("restores the source project for each dashboard tab", () => {
+    const tabs: Tab[] = [
+      { type: "draft", server, draftID: "d1", directory: "/fixture/dashboard/work", dashboardOrigin: "/fixture/a" },
+      { type: "session", server, sessionId: "s1", dashboardOrigin: "/fixture/b" },
+      { type: "session", server, sessionId: "s2", dashboardOrigin: null },
+      sessionTab("ordinary"),
+    ]
+    expect(migrateTabs(tabs, server)).toEqual(tabs)
+  })
 })
 
 describe("tab memory", () => {

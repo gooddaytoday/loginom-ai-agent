@@ -232,8 +232,8 @@ function releaseManifest(platform: "linux" | "win32") {
     target: { platform, arch: "x64", minimumOS: windows ? "Windows 11 x64" : "Ubuntu 22.04", backend: "v1" },
     build: { os: platform, arch: "x64", bun: "1.3.14", lockSha256: "3".repeat(64) },
     runtime: {
-      electron: "42.3.3",
-      electronNode: "24.0.0",
+      electron: "42.11.18",
+      electronNode: "24.19.0",
       node: "24.19.0",
       playwright: "1.0.0",
       playwrightMcp: "1.0.0",
@@ -262,7 +262,7 @@ function releaseManifest(platform: "linux" | "win32") {
       profiles: "profile/loginom/runtime",
       secretStore: windows ? "electron-safeStorage-dpapi-current-user" : "plaintext-private-0600",
     },
-    connection: { schemaVersion: 1, generationProtocol: 1, knowledgeEndpoint: "https://example.test" },
+    connection: { schemaVersion: 1, generationProtocol: 1 },
     updater: { feed: null, channel: "prod", previousVersion: null },
     signing: { status: "unsigned", identity: null, notarized: false },
     installation: {

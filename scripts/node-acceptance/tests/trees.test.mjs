@@ -3,6 +3,101 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {parseExpectedOutputs} from '../expected-outputs.mjs';
+import {readFileSync} from 'node:fs';
+
+test('trees-to-table-wide keeps all 70 ordered integer columns, original task and one JSON document private from the oracle',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,json,tempfile
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-wide');e=r.expected_for(c,'/owned/wide.lgp')
+assert c['external'] and c['base'] is None and c['input_files']==['wide.csv']
+assert c['prompt'].name=='task-wide.md'
+case=next(x for x in r.read(c['source']/'expected.json')['cases'] if x['id']=='wide')
+out=e['outputs'][0]
+assert out['columns']==case['output']['columns'] and out['rows']==case['output']['rows']
+assert out['export_destination']=='wide.csv' and out['column_order']=='exact' and out['ordered']
+assert [x['name'] for x in out['columns']]==['f'+str(i).zfill(2) for i in range(70)]
+assert all(x['type']=='integer' for x in out['columns'])
+with (c['data']/'wide.csv').open() as f:rows=list(csv.DictReader(f,delimiter=';'))
+assert len(rows)==1 and json.loads(rows[0]['Document'])==case['settings_proposal']['tree_input']
+class StopBeforeModel(Exception):pass
+with tempfile.TemporaryDirectory() as directory:
+ root=Path(directory);folder=root/'run'/'wide';folder.mkdir(parents=True)
+ workspace=root/'workspace';workspace.mkdir()
+ runner=object.__new__(r.Runner);runner.options={};runner.env={};runner.out=root/'run'
+ def phase(*args,**kwargs):raise StopBeforeModel()
+ runner.phase=phase
+ try:runner.model('trees-to-table-wide',folder,root/'profile',workspace,'/owned/wide.lgp',{'package_directory':'/owned'},root/'build')
+ except StopBeforeModel:pass
+ assert sorted(p.name for p in workspace.iterdir())==['wide.csv']
+ assert (workspace/'wide.csv').read_bytes()==(c['data']/'wide.csv').read_bytes()
+ prompt=(folder/'task.md').read_text()
+ assert prompt.startswith(c['prompt'].read_text().replace('{{PACKAGE_PATH}}','/owned/wide.lgp'))
+ assert 'oracle' not in prompt and 'expected' not in prompt
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});
+
+test('tree-only expectations require a nonempty tree contract when no tables are requested',()=>{
+ const base={package_path:'/owned/tree.lgp',nodes:[],outputs:[]};
+ const tree={output_node_type:'trees.from_json',output_port:0,document:{path:'',type:'object',children:[]}};
+ assert.deepEqual(parseExpectedOutputs({...base,tree_outputs:[tree]}),{multiple:true,outputs:[]});
+ for(const tree_outputs of [undefined,null,[],{},'tree'])
+  assert.throws(()=>parseExpectedOutputs({...base,tree_outputs}),/EXPECTED_OUTPUTS_INVALID/);
+});
+
+test('cold tree-only read planning selects the tree and skips tabular outputs',()=>{
+ const source=readFileSync(new URL('../cold-check.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('  const reads=expectedOutputs.length===0');
+ const end=source.indexOf('  if(expected.sorting_mode)',start);
+ assert.ok(start>=0&&end>start);
+ const plan=new Function('expected','graph',`const expectedOutputs=[],state={},variableInventory={outputs:[]},multiple=true,saved={},exportInput=null;
+ const selectColdOutputReads=()=>{throw Error('TABULAR_READ_FOR_TREE_ONLY')};
+ ${source.slice(start,end)};return reads;`);
+ const tree={output_node_type:'trees.from_json',output_port:0};
+ const node={type:'trees.from_json',ref:{node_id:'tree'},outputs:[0]};
+ const graph={nodes:[node,{type:'imports.text',ref:{node_id:'import'},outputs:[0]}]};
+ assert.deepEqual(plan({tree_outputs:[tree]},graph),[{node,ports:[{port:0}],treeContract:tree}]);
+ assert.throws(()=>plan({tree_outputs:[]},graph),/TABULAR_READ/);
+ assert.throws(()=>plan({tree_outputs:[tree]},{nodes:[]}),/COLD_TREE_NODE_AMBIGUOUS/);
+ assert.throws(()=>plan({tree_outputs:[tree]},{nodes:[node,node]}),/COLD_TREE_NODE_AMBIGUOUS/);
+});
+
+test('tree-only scenarios retain approved trees and send only their task and documents.csv',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util,json,tempfile
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+class StopBeforeModel(Exception):pass
+with tempfile.TemporaryDirectory() as directory:
+ root=Path(directory)
+ runner=object.__new__(r.Runner);runner.options={};runner.env={};runner.out=root/'run'
+ def phase(*args,**kwargs):raise StopBeforeModel()
+ runner.phase=phase
+ for name,key,task in [('tree-null-leaves','null','null-leaves'),('tree-nested-records','nested','nested-records'),('tree-empty-containers','empty','empty-containers')]:
+  case=r.scenario(name)
+  assert case['tree_only'] and case['external'] and case['base'] is None
+  assert case['source'].name=='nested-records' and case['data'].name=='nested-records'
+  assert case['input_files']==['documents.csv'] and case['prompt'].name=='task-'+task+'.md'
+  approved=r.read(case['source']/'expected.json')['cases'][key]
+  for cold in [False,True]:
+   e=r.expected_for(case,'/owned/tree.lgp',cold=cold)
+   assert e['outputs']==[] and e['package_path']=='/owned/tree.lgp'
+   assert e['proposed_tree_output']==approved['proposed_tree_output']
+   assert e['tree_outputs']==[approved['proposed_tree_output']]
+  folder=root/name/name;folder.mkdir(parents=True)
+  workspace=root/name/'workspace';workspace.mkdir()
+  try:runner.model(name,folder,root/name/'profile',workspace,'/owned/tree.lgp',{'package_directory':'/owned'},root/'build')
+  except StopBeforeModel:pass
+  prompt=(folder/'task.md').read_text()
+  assert prompt.startswith(case['prompt'].read_text().replace('{{PACKAGE_PATH}}','/owned/tree.lgp'))
+  assert 'CSV' not in prompt and 'Выгрузи' not in prompt and 'oracle' not in prompt
+  assert sorted(p.name for p in workspace.iterdir())==['documents.csv']
+  assert (workspace/'documents.csv').read_bytes()==(case['data']/'documents.csv').read_bytes()
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});
 test('tree scenarios bind both immutable tasks, original CSV, export destination and private tree oracle',()=>{
  const r=spawnSync('python3',['-B','-c',`import importlib.util
 from pathlib import Path
@@ -91,4 +186,73 @@ print(json.dumps(results))
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
  for(const expected of JSON.parse(r.stdout))assert.doesNotThrow(()=>parseExpectedOutputs(expected));
+});
+
+test('trees-to-table-siblings binds the owner-approved native stacked rows, its own documents.csv and the oracle projection',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,io,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-siblings');e=r.expected_for(c,'/owned/tree.lgp')
+assert c['external'] and c['base'] is None
+assert [p.name for p in c['data'].iterdir()]==['documents.csv']
+task=c['prompt'].read_text()
+assert c['prompt'].name=='task-siblings.md' and 'documents.csv' in task and 'tags/tag' in task
+assert not any(w in task for w in ['oracle','input.json','NULL','декарт','5 строк'])
+case=next(x for x in json.loads((c['source']/'expected.json').read_text())['cases'] if x['id']=='siblings')
+assert case['native_status']=='observed'
+out,want=e['outputs'][0],case['output']
+assert [n['type'] for n in e['nodes']]==['imports.text','trees.from_json','trees.to_table']
+assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered'] and out['export_destination']=='siblings.csv'
+assert out['columns']==want['columns'] and out['rows']==want['rows']
+assert [c['name'] for c in out['columns']]==['batch','code','qty','tag']
+assert [(x['code'],x['qty'],x['tag']) for x in out['rows']]==[('x',2,None),('y',0,None),(None,None,'a'),(None,None,'b'),(None,None,'c')]
+assert {x['batch'] for x in out['rows']}=={'Бета'}
+source=json.loads((c['source'].parent.parent/'fixtures/modes/input.json').read_text())['document']
+rows=list(csv.DictReader(io.StringIO((c['data']/'documents.csv').read_text())))
+assert [int(x['RowID']) for x in rows]==[1] and json.loads(rows[0]['Document'])==source
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+ const e=JSON.parse(spawnSync('python3',['-B','-c',`import importlib.util,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+e=r.expected_for(r.scenario('trees-to-table-siblings'),'/owned/tree.lgp')
+for o in e['outputs']:o.pop('export_destination')
+print(json.dumps(e))`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'}).stdout);
+ assert.doesNotThrow(()=>parseExpectedOutputs(e));
+});
+
+test('trees-to-table-indices binds the approved task, documents.csv and expected derived from the independent oracle',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,io,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-indices');e=r.expected_for(c,'/owned/tree.lgp')
+assert c['external'] and c['base'] is None
+assert c['input_files']==['documents.csv']
+task=c['prompt'].read_text()
+assert c['prompt'].name=='task-indices.md' and 'documents.csv' in task and 'oracle' not in task and 'input.json' not in task and 'group' not in task
+oracle=json.loads((c['source']/'expected.json').read_text())
+case=next(x for x in oracle['cases'] if x['id']=='indices')
+assert [o['export_destination'] for o in e['outputs']]==['indices.csv']
+out,want=e['outputs'][0],case['output']
+assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered']
+assert out['columns']==want['columns'] and out['rows']==want['rows']
+assert [c['name'] for c in out['columns']]==['batch','item_index','code','qty'] and out['columns'][1]['name_any']
+assert [r['item_index'] for r in out['rows']]==[0,1]
+source=json.loads((c['data']/'input.json').read_text())
+rows=list(csv.DictReader(io.StringIO((c['data']/'documents.csv').read_text())))
+assert [int(x['RowID']) for x in rows]==[1]
+assert json.loads(rows[0]['Document'])=={'batch':source['document']['batch'],'items':source['document']['items']}
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+ const e=JSON.parse(spawnSync('python3',['-B','-c',`import importlib.util,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+e=r.expected_for(r.scenario('trees-to-table-indices'),'/owned/tree.lgp')
+for o in e['outputs']:o.pop('export_destination')
+print(json.dumps(e))`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'}).stdout);
+ assert.doesNotThrow(()=>parseExpectedOutputs(e));
 });

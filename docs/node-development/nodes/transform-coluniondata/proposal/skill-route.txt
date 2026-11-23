@@ -1,0 +1,1 @@
+Соединение таблиц по позиции: `transform.col_union_data` → `references/nodes/transform-coluniondata.md`.

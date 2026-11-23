@@ -1,0 +1,77 @@
+{
+  "type": "variables.to_table",
+  "title": "Переменные в таблицу",
+  "palette_group": "Переменные",
+  "icon_class": "bg-vendor-icon-variablestodata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 0,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "columns",
+    "rows"
+  ],
+  "variable_inputs": 1,
+  "input_kinds": [
+    "variables"
+  ],
+  "output_kinds": [
+    "table"
+  ],
+  "semantics": "Proposal: switch columns/rows on the same existing node, refresh derived output schema after source membership changes, and preserve node/link identities. Scalar types, typed NULL and string-backed Variant input; empty connected rows input produces zero rows with Name/DisplayName/Value schema. Zero-column cardinality unresolved; disconnected source differs from empty. Explicit old-schema mappings must refuse before mutation. No implementation claim.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "variables-vartodata-v2-internal-1",
+  "configuration_status": "proposal_pending_owner_approval",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/variables/variables-to-table.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "columns",
+    "rows"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false,
+    "description": "Proposal, not implemented: parameters:{} with columns/rows including explicit existing-mode switches. Read new output schema after switching or upstream membership changes. No formulas or embedded values. Variant proof requires declared type and per-cell subtype; empty columns pending decision."
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}

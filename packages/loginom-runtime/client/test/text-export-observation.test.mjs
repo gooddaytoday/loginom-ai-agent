@@ -49,8 +49,26 @@ test('export refuses a restored unrelated folder before any additional navigatio
  const state=()=>({file_storage:{status:'observed',directory},workflow_ref:{prefix:'MF;TF-4'},ui:{elements:[{tid:'MF;TF-4;FileStorageForm;colName_mimo',label:'mimo',storage_entry:{kind:'folder'}}]}});
  await assert.rejects(navigateExportDirectory({directory:'/mimo/run',
   inDirectory:expected=>waitForExportStorageObservation({observe:async()=>state(),condition:s=>!expected||expected.includes(s.file_storage.directory),quiet:()=>true,guard:()=>{},sleep:async()=>{}}),
-  row:async()=>state(),act:async()=>{clicks++;directory='/mimo/other';}}),/did not settle/);
+  row:async()=>state(),act:async()=>{clicks++;directory='/mimo/other';}}),/outside the requested ancestry/);
  assert.equal(clicks,1);
+});
+test('export returns a reused destination descendant to Files before continuing',async()=>{
+ let directory='/',prefix='MF;TF-6',opens=0;const gestures=[];
+ const root=()=>({tid:prefix+';cnrNaviMode;b.s_Сервер>Файлы',label:'Файлы'});
+ const state=(elements=[root()])=>({file_storage:{status:'observed',directory},workflow_ref:{prefix},ui:{elements}});
+ const result=await navigateExportDirectory({directory:'/mimo',
+  inDirectory:(expected,previous)=>waitForExportStorageObservation({observe:async()=>state(),
+   condition:s=>(!expected||expected.includes(s.file_storage.directory))&&(!previous||previous.file_storage.directory!==s.file_storage.directory||previous.workflow_ref.prefix!==s.workflow_ref.prefix),
+   quiet:()=>true,guard:()=>{},sleep:async()=>{}}),
+  row:async name=>state([{tid:prefix+';FileStorageForm;colName_'+name,label:name,storage_entry:{kind:'folder'}}]),
+  act:async(s,e,verb)=>{
+   gestures.push([prefix,e.label,verb??'click']);
+   if(e.label==='Файлы'){assert.equal(verb,undefined);directory='/';return;}
+   assert.equal(e.label,'mimo');assert.equal(verb,'double_click');
+   opens++;prefix='MF;TF-'+(6-opens);directory=opens<3?'/mimo/mask-'+opens:'/mimo';
+  }});
+ assert.equal(result.file_storage.directory,'/mimo');
+ assert.deepEqual(gestures.map(g=>g.slice(1)),[['mimo','double_click'],['Файлы','click'],['mimo','double_click'],['Файлы','click'],['mimo','double_click']]);
 });
 test('third export resumes from a confirmed reused root and rejects navigation cycles',async()=>{
  for(const cycle of [false,true]){

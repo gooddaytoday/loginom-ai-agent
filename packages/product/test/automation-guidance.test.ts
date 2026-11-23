@@ -3,12 +3,70 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
-test("sampling advertises random and explicitly refuses deferred modes", () => {
-  expect(skill).toContain('mode:"random"')
-  expect(skill).toContain('«Этот режим пока не поддерживается»')
-  expect(skill).toContain('Не подменяй эти режимы другим алгоритмом')
-  expect(skill).not.toContain('mode:"stratified"')
-  expect(skill).not.toContain('mode:"biased"')
+test("frequent recoverable mistakes have concrete preventive forms within the entry budget", () => {
+  for (const hint of [
+    'node_types:["imports.text"],modes:["delimited"]',
+    "Preparation operation conflict",
+    "repeat the original prepare arguments and operation_id",
+    "After open_package, old source_operation_id receipts are invalid",
+    "fresh workspace_observe",
+    "settings.source.source_path",
+    "verified delivery destination",
+    "label:null",
+    'label:"Amount"',
+    "reuse the existing Export",
+    "new upstream node AND a different destination",
+  ]) expect(skill).toContain(hint)
+  // 0.4.0 hint growth: REST replacement (#1235) and XLSX/REST type hints (#1239), each verified live.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 2_000)
+})
+
+test("existing Import edits retain verified source and Close requires a complete first form", () => {
+  expect(skill).toContain("resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches)")
+  expect(skill).toContain("Only unchanged Execute may omit source")
+  expect(skill).toContain("After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip)")
+  expect(skill).toContain('explicit decimal_separator "." or ",", never "Не задано (…)"')
+  expect(skill).toContain('columns or auto_detect_columns:"new"/"all"')
+  expect(skill).toContain("Reuse the verified delivery; do not upload again")
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+})
+
+test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
+  const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
+  expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
+  const entry = skill.split("\n## ")[0]
+  expect(entry).toContain("открыть «Loginom»")
+  expect(entry).toContain("адрес, логин и пароль")
+  expect(entry).toContain("без поиска конфигураций/ключей")
+  expect(browser).toContain("LOGINOM_CONFIG_REQUIRED")
+  expect(browser).toContain("state=unconfigured")
+  expect(browser).toContain("открыть «Loginom»")
+  expect(browser).toContain("адрес, логин и пароль")
+  expect(browser).toContain("повторить запрос")
+  expect(browser).toContain("Не ищи причину в файлах")
+  expect(browser).toContain("bash/PowerShell")
+  expect(browser).toContain("чужие конфигурации и ключи")
+  expect(browser).toContain("Не проси присылать пароль или API-ключ в чат")
+})
+
+test("sampling selects native modes through node-specific guidance", async () => {
+  for (const type of ["preprocessing.sampling", "preprocessing.data_partition"]) {
+    const settings = await Bun.file(new URL(`../skills/loginom-automation/references/nodes/${type}.md`, import.meta.url)).text()
+    expect(skill).toContain(`[читать](references/nodes/${type}.md)`)
+    expect(settings).toContain('mode:"biased"')
+    expect(settings).toContain('strata_fields:[{kind:"input_field",name:"Class"}]')
+    expect(settings).toContain('bias_factors:[{value:"A",factor:0.4},{value:"B",factor:1}]')
+    expect(settings).toContain('используй существующий узел и `finish:"execute"`')
+    expect(settings).toContain('<!-- mode: uniform -->')
+    expect(settings).toContain('mode:"uniform"')
+    expect(settings).toContain('group_size_rows:1')
+    if (type === "preprocessing.data_partition") {
+      expect(settings).toContain('train_group_size_rows:1,test_group_size_rows:1')
+      expect(settings).toContain('test_priority:true,test_priority_position:"beginning"')
+    }
+    expect(settings).not.toContain('Равномерный случайный метод: «Этот режим пока не поддерживается»')
+    expect(skill + settings).not.toMatch(/\$(?:[1-9]\d*|ARGUMENTS)/)
+  }
 })
 
 test("automation preserves technical output names explicitly requested by the user", () => {
@@ -16,8 +74,8 @@ test("automation preserves technical output names explicitly requested by the us
   expect(skill).toMatch(/выходное техническое имя[\s\S]*?ровно[\s\S]*?без приставок[\s\S]*?Returned[\s\S]*?переводов[\s\S]*?суффиксов/)
 })
 
-test("exports preserve NULL separately from empty strings with an explicit announced marker", () => {
-  const exports = skill.split("## Экспорт\n")[1]?.split("\n## ")[0] ?? ""
+test("exports preserve NULL separately from empty strings with an explicit announced marker", async () => {
+  const exports = await Bun.file(new URL("../skills/loginom-automation/references/nodes/exports.text.md", import.meta.url)).text()
   expect(exports).toContain("NULL и пустые строки")
   expect(exports).toContain("пользователь не задал маркер выгрузки")
   expect(exports).toContain("`exports.text`")
@@ -31,6 +89,15 @@ test("exports preserve NULL separately from empty strings with an explicit annou
   expect(exports).not.toMatch(/\$(?:1|ARGUMENTS)/)
 })
 
+test("continuation adds a new Export only for a new upstream node and a different destination", async () => {
+  const exports = await Bun.file(new URL("../skills/loginom-automation/references/nodes/exports.text.md", import.meta.url)).text()
+  expect(exports).toMatch(/новый узел выше Export[\s\S]*?другой destination[\s\S]*?новый Export[\s\S]*?прежний не трогай/)
+  expect(exports).toMatch(/прежний не трогай\. Иначе исправь прежнюю upstream-цепочку на месте или сообщи ограничение/)
+  expect(exports).toContain("второй Export на тот же destination не создавай")
+  expect(exports).toContain("только смена файла не требует нового Export")
+  expect(new TextEncoder().encode(exports).length).toBeLessThanOrEqual(6000)
+})
+
 test("single chain calculation permits source activation only after a safe preflight refusal", () => {
   expect(chain).toContain('finish:"done"')
   expect(chain).toContain("requires an active source output")
@@ -39,13 +106,16 @@ test("single chain calculation permits source activation only after a safe prefl
   expect(chain).toMatch(/повтори настройку[\s\S]*?новым operation_id/)
   expect(chain).toContain("не нарушает правило одного расчёта")
   expect(chain).toContain("Последний вычисляющий узел")
-  expect(chain).toContain("После расчёта не вызывай")
+  expect(chain).toMatch(/`loginom_dock_node_read` читает выход последнего\s+завершённого выполнения и ждёт идущее/)
+  expect(chain).toContain('Изменения внешнего файла/БД/REST не обнаруживает')
+  expect(chain).toContain('если пользователь сообщил об изменении источника, нужен `execution:"execute"`')
+  expect(chain).toMatch(/Не повторяй\s+Execute вычисляющих узлов ради чтения, ответа или экспорта/)
 })
 
 test("REST JSON tables use the tabular path instead of the blanket tree instruction", async () => {
-  const trees = skill.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/node-settings.md", import.meta.url)).text()
-  const details = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/trees.from_json.md", import.meta.url)).text()
+  const trees = settings.split("## JSON в дерево и дерево в таблицу\n")[1]?.split("\n## ")[0] ?? ""
+  const details = settings
 
   expect(trees).toMatch(/REST[\s\S]*?Калькулятор[\s\S]*?Свёртка[\s\S]*?Кросс-таблица/)
   expect(trees).toContain("по просьбе о дереве")
@@ -57,4 +127,34 @@ test("REST JSON tables use the tabular path instead of the blanket tree instruct
   expect(details).toContain("operation.recover")
   expect(details).toContain("не останавливай")
   expect(details).not.toContain("При отказе области поддержки\nсообщи ограничение")
+})
+
+test("relocated large-file and JavaScript rules stay reachable from the entry", async () => {
+  const references = new URL("../skills/loginom-automation/references/", import.meta.url)
+  const large = await Bun.file(new URL("large-files.md", references)).text()
+  const javascript = await Bun.file(new URL("nodes/programming.javascript.md", references)).text()
+  expect(skill).toMatch(/XLSX любого размера[\s\S]*?16 МиБ[\s\S]*?10 МиБ[\s\S]*?неизвестного размера[\s\S]*?\(references\/large-files.md\)/)
+  expect(skill).toContain("полный расчёт будет после загрузки полного файла")
+  expect(large).toContain("число `expected_records` передавать запрещено")
+  expect(large).toContain("(workflow.md#серверный-источник-и-cache)")
+  expect(skill).toMatch(/Узел JavaScript разрешён только[\s\S]*?\(references\/nodes\/programming.javascript.md\)/)
+  expect(skill).toContain("Существующие JS-узлы не удаляй автоматически")
+  expect(javascript).toMatch(/unknown functions,\s*invalid parameters,\s*transient failure,\s*unavailable terminal\/\s*execute_code and incomplete preview are not gaps/)
+})
+
+test("variables calculator dependencies use the Expr. prefix accepted in Loginom 7.4.2", async () => {
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/variables.calculator.md", import.meta.url)).text()
+  const schema = await Bun.file(new URL("../../loginom-runtime/client/lib/variables-calculator-schema.mjs", import.meta.url)).text()
+  // `Expr.limit - Expr.skip` passed variables-calculator 3/3 (LAB-873); no negative prefix probe exists.
+  expect(settings).toContain("Для зависимости используй Expr.name")
+  expect(schema).toContain("Expr.name refers to an earlier expression")
+  expect(settings).not.toMatch(/Expr\.[^\n]*не поддерж/)
+})
+
+test("binning ties guidance keeps the rule without echoing the acceptance task", async () => {
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/preprocessing.binning.md", import.meta.url)).text()
+  expect(settings).toContain('ties:"current"')
+  expect(settings).toContain("совпадения на границе остаются в текущем интервале")
+  expect(settings).not.toContain('size:4,ties:"current"')
+  expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
 })

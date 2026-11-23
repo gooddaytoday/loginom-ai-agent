@@ -105,7 +105,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    const r=await roots(),prefix=r.workflow_ref?.prefix;
    const bars=r.ui.elements.filter(e=>e.tid===prefix+';NavigationBar;NavigationPanel');
    requireValue(bars.length<=1,'Storage navigation is ambiguous');
-   return bars.length?detail(r,bars[0]):null;
+   // Native Files opening can temporarily expose Home's navigation panel.
+   // Wait for the same form's actual storage root before binding its detail.
+   const storage=r.ui.elements.some(e=>e.tid===prefix+';FileStorageForm;pnlFileStorage;tbl');
+   return storage&&bars.length?detail(r,bars[0]):null;
   },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
   const readRow=async(name,parent)=>{
    const owner=JSON.stringify({document:parent.dom_epoch?.document,workflow:parent.workflow_ref});
@@ -124,13 +127,13 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   };
   try {
    let upload,inspected;
-   check();job.phase='preflight';
+   if(!resumeId||preUploadResume)check();job.phase='preflight';
    if(job.packageUpload)requireValue(/\.lgp$/i.test(artifact.name)&&artifact.upload.overwrite==='reject','Private package upload requires an admitted .lgp with reject policy');
    else runtime.preflightDeliveredArtifact(artifact);
    if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
-    check();inspected=await runtime.inspect({operationId:job.uploadId});
+    inspected=await runtime.inspect({operationId:job.uploadId});
     await acknowledge(job,'artifact_delivery_resume_inspected',{resume_id:resumeId,inspection:inspected});
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
       &&inspected.output?.outcome?.operation_id===job.uploadId,'Original delivery receipt remains uncertain');
@@ -158,21 +161,36 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
      requireValue(sameOwner(root),'Delivery toolbar owner changed');
      const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
      const full=await detail(root,toolbar);
+     // Initial roots can precede creation of the first native tab. Confirm
+     // its newly observed owner with fresh roots before authorizing Files.
+     if(r.workflow_ref===null&&full.workflow_ref!=null){
+      const fresh=await roots();
+      requireValue(fresh.dom_epoch?.document===r.dom_epoch.document
+        &&JSON.stringify(fresh.workflow_ref)===JSON.stringify(full.workflow_ref),'Delivery toolbar owner changed');
+      r=fresh;
+     }
      requireValue(sameOwner(full),'Delivery toolbar owner changed');
-     // Roots carry the native tab identity in workflow_ref, but only a detail
-     // read issues active_tab_ref. Pin that ref across subsequent detail reads.
-     requireValue(typeof full.active_tab_ref==='string'&&(!toolbarTab||full.active_tab_ref===toolbarTab),'Delivery toolbar tab changed');
-     toolbarTab??=full.active_tab_ref;
+     // An empty workspace has no tab, even when Files is already reachable.
+     // Only detail reads issue tab refs; pin the first one and refuse its loss.
+     requireValue(typeof full.active_tab_ref==='string'
+       ? toolbarTab===undefined||full.active_tab_ref===toolbarTab
+       : full.active_tab_ref===null&&full.workflow_ref===null&&toolbarTab===undefined,'Delivery toolbar tab changed');
+     if(typeof full.active_tab_ref==='string')toolbarTab??=full.active_tab_ref;
      return full;
     };
     const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
       &&e.enabled===true&&e.visible===true&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed').length===1;
-    let full=await readToolbar(r);
-    // Preparation can return while the toolbar is still outside the viewport.
-    // Wait for a fresh owned hit point; never send the known offscreen click.
-    if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
-    const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
-    await click(full,files);
+    for(let attempt=0;;attempt++){
+     let full=await readToolbar(attempt===0?r:await roots());
+     // Preparation can return while the toolbar is still outside the viewport.
+     // Wait for a fresh owned hit point; never send the known offscreen click.
+     if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
+     const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
+     // Reuse folder navigation's matched, no-effect stale-epoch proof.
+     // An uncertain click never reaches a second attempt.
+     if(await click(full,files,'click',{},true))break;
+     requireValue(attempt<2,'Delivery toolbar navigation remained stale; inspection required');
+    }
    }
    let s=await directory();
    requireValue(s.file_storage?.status==='observed','Storage path is not observed');
@@ -270,10 +288,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
-   check();const final=await runtime.inspect({operationId:job.uploadId});
+   // Verification owns its dispatched work through cleanup. Cancellation or
+   // deadline expiry cannot discard its committed proof; only inspect it here.
+   const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   if(!(error instanceof Error))error=Object.assign(Error(String(error?.message??error?.code
+     ??(typeof error==='string'&&error?error:'Artifact delivery failed without an error message'))),{code:error?.code});
    if(job.largeUpload){
     try{await acknowledge(job,'large_upload_failed',{failed_phase:job.phase,upload_started:job.uploadStarted===true,
      cause:operationFailureDiagnostic(error)});}catch{ /* Diagnostics cannot prevent native cleanup. */ }
@@ -283,9 +305,17 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     catch(cleanupError){try{await acknowledge(job,'large_upload_cleanup_failed',{cause:operationFailureDiagnostic(cleanupError)});}catch{}}
     const cancelled=signal?.aborted===true&&cleanup;
     job.status=!cleanup?'uncertain':cancelled?'cancelled':'failed';job.phase=job.status;
-    const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';
+    const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.code==='UPLOAD_PATH_CONFLICT'?'UPLOAD_PATH_CONFLICT':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';
     job.error={code,message:code};job.outcome={status:cleanup?'FAILED':'AMBIGUOUS',code,cleanup_complete:cleanup,effect_possible:!cleanup,upload_completion_verified:false};
-    try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};job.outcome={...job.outcome,status:'AMBIGUOUS',code:'LOGINOM_UPLOAD_UNCERTAIN',cleanup_complete:false,effect_possible:true};}
+    if(code==='UPLOAD_PATH_CONFLICT'){
+     const localHash=typeof artifact.sha256==='string'&&/^[a-f0-9]{64}$/.test(artifact.sha256);
+     Object.assign(job.outcome,{destination:artifact.upload.destination,upload_operation_id:job.uploadId,upload_submitted:false,...(localHash?{sha256:artifact.sha256}:{}),
+      next_step:{tool:'loginom_dock_storage_source',instruction:'Call loginom_dock_storage_source with this destination path, then loginom_dock_storage_download_start with its server_source_ref and loginom_dock_storage_download_wait with the same operation_id. Run loginom_file_profile on the returned output.path, then loginom_file_scan with that profile_id for the sha256 of the downloaded copy'
+       +(localHash?', and compare it with sha256 of the local artifact in this outcome.':', and compare it with the sha256 of the local artifact file from loginom_file_profile and loginom_file_scan.')
+       +' Only if the hashes match, use the verified server file as the import source. If they differ, stop and tell the user. Never overwrite or delete the server file.'}});
+    }
+    try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};
+     const {next_step:_,...retained}=job.outcome;job.outcome={...retained,status:'AMBIGUOUS',code:'LOGINOM_UPLOAD_UNCERTAIN',cleanup_complete:false,effect_possible:true};}
     return snapshot(job);
    }
    // A known Skip wrote nothing. If its current bytes cannot be compared,
@@ -310,13 +340,16 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
+    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',
+      message:String(error.message).slice(0,1000),...(error.code!=null?{cause_code:String(error.code)}:{})};
    // Known navigation effects remain recorded, but an undelivered attachment
    // with no unknown child is a settled refusal, not an ambiguous transfer.
    job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
-    ...(submitted&&!job.verificationStarted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
-      instruction:'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
+    ...(submitted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+      instruction:job.verificationStarted
+       ? 'Inspect and finalize the original upload with its original operation_id, a new resume_id and budget_ms; do not upload or download again.'
+       : 'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
     ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
      instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};
   } finally {job.state='settled';active=null;}
@@ -363,7 +396,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Admitted artifact changed');
    const renew=!job.packageUpload&&job.preUploadResume===true&&job.uploadStarted===undefined
      &&job.outcome?.cleanup_complete===true&&job.outcome.inspection_required===false&&!job.deadlineRenewed;
-   requireValue(renew||now()<job.deadline,'Artifact delivery deadline elapsed');
+   // An expired dispatched verification can only reconcile its original receipt.
+   requireValue(renew||job.verificationStarted||now()<job.deadline,'Artifact delivery deadline elapsed');
    admitResume(job.uploadId,request.resume_id,signature,{preUpload:job.preUploadResume===true,deliveryId:job.id});
    const deadline=now()+(job.packageUpload?request.budget_ms:Math.max(request.budget_ms,referenceUploadBudget(artifact.bytes)));
    job.deadline=renew?Math.max(job.deadline,deadline):Math.min(job.deadline,deadline);

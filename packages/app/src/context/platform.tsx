@@ -7,6 +7,7 @@ import type { DesktopMenuAction } from "../desktop-menu"
 import { ServerConnection } from "./server"
 import type { WslServersPlatform } from "../wsl/types"
 import type { UpdaterPlatform } from "../updater"
+import type { DiagnosticsApi } from "@/utils/diagnostics"
 import type { DraftStore } from "@/utils/draft-store"
 import type { SystemProxyStatus } from "@/system-proxy"
 
@@ -46,7 +47,7 @@ type PlatformBase = {
   openLocalFile?(url: string): void
 
   /** Reveal a local path in the system file manager; false when the path does not exist (desktop only) */
-  revealPath?(path: string): Promise<boolean>
+  revealPath?(path: string, options?: { checkOnly?: boolean }): Promise<boolean>
 
   /** Restart the app  */
   restart(): Promise<void>
@@ -78,6 +79,13 @@ type PlatformBase = {
 
   /** Application-global desktop updater */
   updater?: UpdaterPlatform
+
+  /** Resolve a local Loginom dashboard snapshot selected in the browser. */
+  getDashboardTarget?(
+    id: string,
+  ): Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
+  checkDashboardTarget?(id: string): Promise<boolean>
+  isDashboardWork?(directory: string): Promise<boolean>
 
   /** Fetch override */
   fetch?: typeof fetch
@@ -120,6 +128,9 @@ type PlatformBase = {
 
   /** Export collected diagnostic logs (desktop only) */
   exportDebugLogs?(): Promise<string>
+
+  /** Prepare, preview and save a diagnostics archive (desktop only) */
+  diagnostics?: DiagnosticsApi
 
   /** Force focus styles on interactive elements through desktop devtools (desktop only) */
   setForceFocus?(enabled: boolean): Promise<void>

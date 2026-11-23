@@ -36,7 +36,19 @@ const config: Configuration = {
   // electron-builder uses productName for /opt, while desktop metadata keeps the display name.
   productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
   artifactName: Product.artifactName,
-  publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
+  // A generic target writes metadata even with --publish never. The invalid
+  // placeholder only enables asset generation; Product keeps runtime updates off.
+  publish: {
+    provider: "generic",
+    url: process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || "https://updates.invalid/",
+    channel: "latest",
+  },
+  async afterAllArtifactBuild(result) {
+    const { buildBlockMap } = await import("app-builder-lib/out/targets/blockmap/blockmap")
+    const images = result.artifactPaths.filter((file) => file.endsWith(".AppImage"))
+    for (const file of images) await buildBlockMap(file, "gzip", `${file}.blockmap`)
+    return images.map((file) => `${file}.blockmap`)
+  },
   // Native backend dependencies run in the bundled Node sidecar. Renderer/main
   // dependencies use N-API or platform packages already selected by the lockfile.
   npmRebuild: false,
@@ -47,7 +59,10 @@ const config: Configuration = {
     // before DEB ownership becomes root.
     await execFileAsync("/bin/chmod", [
       "4755",
-      path.join(context.appOutDir, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`),
+      path.join(
+        context.appOutDir,
+        `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
+      ),
     ])
   },
   directories: { output: "dist", buildResources: "resources" },
@@ -61,6 +76,7 @@ const config: Configuration = {
   extraResources: [
     { from: "resources/loginom", to: "loginom" },
     { from: "resources/icons", to: "icons" },
+    { from: "resources", to: ".", filter: ["updates-s3.json"] },
   ],
   protocols: { name: Product.name, schemes: [Product.scheme] },
   mac: {
@@ -73,7 +89,13 @@ const config: Configuration = {
     minimumSystemVersion: "14.0",
     identity: "-",
     // Preserve upstream signatures and the staged resource-manifest hashes.
-    signIgnore: ["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"],
+    signIgnore: [
+      "/Contents/Resources/loginom/bin/",
+      "/Contents/Resources/loginom/browsers/",
+      "/Contents/Resources/loginom/ripgrep/",
+      // The dashboard kit's npm packages ship signed esbuild and rollup binaries.
+      "/Contents/Resources/loginom/dashboard/",
+    ],
     notarize: false,
     target: [
       { target: "dmg", arch: ["arm64"] },
@@ -90,6 +112,7 @@ const config: Configuration = {
     verifyUpdateCodeSignature: true,
   },
   nsis: {
+    include: path.join(packageDir, "resources", "uninstall-uri.nsh"),
     oneClick: true,
     perMachine: false,
     deleteAppDataOnUninstall: false,

@@ -1,6 +1,10 @@
 // Native canvas coordinates and bounded, UI-only viewport navigation.
 export function samePlacementGraph(before,after) {
- const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node)});
+ // Channel serialization can enumerate native workflow/port fields differently.
+ // Keep ordered arrays and identities. SVG epochs and the native output
+ // boundary's automatic horizontal layout may refresh; its y stays bound.
+ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+ const shape=g=>canonical({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node.type==='control.supernode_output'&&node.boundary_role==='output'&&Number.isFinite(node.position?.x)?{...node,position:{...node.position,x:0}}:node)});
  return JSON.stringify(shape(before))===JSON.stringify(shape(after));
 }
 export function nodePlacementViewport(element,nodeId) {
@@ -9,14 +13,23 @@ export function nodePlacementViewport(element,nodeId) {
  if(g?.container!==element||!g.view||!Number.isFinite(g.view.scale)||g.view.scale<=0||!Number.isFinite(g.view.translate?.x)||!Number.isFinite(g.view.translate?.y))throw Error('Native canvas transform unavailable');
  let nodeBounds;
  if(nodeId!==undefined){
-  const nodes=d.FNodes?.FCollection?.filter(n=>n.FGuid===(typeof nodeId==='object'?nodeId.node_id:nodeId));
-  if(nodes?.length!==1)throw Error('Placement node identity unavailable');
-  const body=g.view.getState(nodes[0].FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
-  if(!tid||!element.contains(body))throw Error('Placement node drawing unavailable');
-  const drawings=[...element.querySelectorAll('[data-tid]')].filter(e=>{const id=e.getAttribute('data-tid');return id===tid||id.startsWith(tid+';');});
-  if(drawings.length>128||!drawings.includes(body))throw Error('Placement node drawing bound exceeded');
-  // Existing Export settings open targets the full native body, not its label/ports.
-  const boxes=(nodeId?.body_only===true?[body]:drawings).map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+  // Links reveal both port footprints; full node labels/bodies can exceed
+  // the canvas at minimum zoom even when the ports fit together.
+  const ids=Array.isArray(nodeId)?nodeId:[nodeId];
+  const boxes=ids.flatMap(id=>{
+   const nodes=d.FNodes?.FCollection?.filter(n=>n.FGuid===(typeof id==='object'?id.node_id:id));
+   if(nodes?.length!==1)throw Error('Placement node identity unavailable');
+   const body=g.view.getState(nodes[0].FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
+   if(!tid||!element.contains(body))throw Error('Placement node drawing unavailable');
+   const drawings=[...element.querySelectorAll('[data-tid]')].filter(e=>{const id=e.getAttribute('data-tid');return id===tid||id.startsWith(tid+';');});
+   if(drawings.length>128||!drawings.includes(body))throw Error('Placement node drawing bound exceeded');
+   // Existing Export settings open targets the full native body, not its label/ports.
+   const footprint=id?.body_only===true?[body]:id?.ports_only===true
+    ?drawings.filter(e=>/^(?:(?:Input|Output)_(?:Data(?:Tree)?|Var)-\d+|Input_ControlVar)$/.test(e.getAttribute('data-tid').slice(tid.length+1))):drawings;
+   const bounds=footprint.map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+   if(!bounds.length)throw Error('Placement node has no rendered bounds');
+   return bounds;
+  });
   if(!boxes.length)throw Error('Placement node has no rendered bounds');
   const x=Math.min(...boxes.map(r=>r.x)),y=Math.min(...boxes.map(r=>r.y));
   nodeBounds={x,y,width:Math.max(...boxes.map(r=>r.x+r.width))-x,height:Math.max(...boxes.map(r=>r.y+r.height))-y};
@@ -50,10 +63,26 @@ export function nodePlacementGap(view,point,occupied){
 // A crowded viewport does not imply a crowded model. Choose a fresh row below
 // every observed drawing; the existing guarded UI navigation reveals it before
 // any creation gesture. This helper is serialized into the browser evaluator.
-export function nodePlacementOverflow(view,occupied,min,max,clearance=0) {
- if(!occupied.length)return null;
+export function nodePlacementOverflow(view,occupied,min,max,clearance=0,requested,accept) {
  if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,min,max,clearance].every(Number.isFinite)||view.scale<=0||clearance<0
   ||occupied.some(r=>![r.left,r.right,r.top,r.bottom].every(Number.isFinite)||r.left>r.right||r.top>r.bottom))throw Error('Invalid placement overflow bounds');
+ if(requested){
+  if(![requested.x,requested.y,view.width,view.height,view.viewportWidth,view.viewportHeight].every(Number.isFinite)||typeof accept!=='function')throw Error('Invalid requested placement bounds');
+  const left=Math.ceil(Math.max(min,(Math.max(view.x,0)+8-view.x+view.scroll.x)/view.scale-view.translate.x)/8)*8;
+  const right=Math.floor(Math.min(max,(Math.min(view.x+view.width,view.viewportWidth)-8-view.x+view.scroll.x)/view.scale-view.translate.x)/8)*8;
+  const top=Math.ceil(Math.max(min,(Math.max(view.y,0)+8-view.y+view.scroll.y)/view.scale-view.translate.y)/8)*8;
+  const bottom=Math.floor(Math.min(max,(Math.min(view.y+view.height,view.viewportHeight)-8-view.y+view.scroll.y)/view.scale-view.translate.y)/8)*8;
+  let best=null,distance=Infinity;
+  for(let y=top;y<=bottom;y+=8)for(let x=left;x<=right;x+=8){
+   const d=(x-requested.x)**2+(y-requested.y)**2;
+   if(d>=distance)continue;
+   const point={x:view.x+(x+view.translate.x)*view.scale-view.scroll.x,y:view.y+(y+view.translate.y)*view.scale-view.scroll.y};
+   if(!accept(point))continue;
+   best={x,y};distance=d;
+  }
+  return best;
+ }
+ if(!occupied.length)return null;
  const x=Math.round(Math.max(min,(80+view.scroll.x)/view.scale-view.translate.x)/8)*8;
  const bottom=Math.max(...occupied.map(r=>(r.bottom-view.y+view.scroll.y)/view.scale-view.translate.y));
  const y=Math.ceil(Math.max(min,bottom+128/view.scale+clearance)/8)*8;
@@ -117,9 +146,9 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  // Loginom allocates outline IDs per form (cnt, cnt-1, ...). A global
  // cnt lookup can select a hidden outline belonging to another workflow.
  try {
-  // Existing targets can already have native scrollable canvas space. Reveal
-  // that exact drawing before zooming, preserving model-grid drag coordinates.
-  if(scrollNode&&nodeId!==undefined&&!within(view,point))await scroll();
+  // Opted-in targets and new positions can already have native scroll space.
+  // Zooming first can shrink away the free overflow row.
+  if(scrollNode&&!within(view,point))await scroll();
   if(!within(view,point)) {
    await guard();remaining();
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');

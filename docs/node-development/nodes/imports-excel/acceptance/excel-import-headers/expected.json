@@ -1,0 +1,44 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "export_destination": "headers11.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id",
+          "label": "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount",
+          "label": "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id": 1,
+          "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount": 10
+        },
+        {
+          "Id_Id_Id_Id_Id_Id_Id_Id_Id_Id_Id": 2,
+          "Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount_Amount": 20
+        }
+      ]
+    }
+  ]
+}

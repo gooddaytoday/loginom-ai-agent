@@ -45,7 +45,7 @@ test('local bundle verification enforces frontmatter, required assets and genera
     const content = await readFile(source.main, 'utf8');
     const changed = variant === 'frontmatter' ? content.replace('name: loginom-automation', 'name: wrong-name')
       : variant === 'font' ? content + '\n[Font](assets/missing.ttf)\n'
-      : content.replace('\n---\n', '\nmetadata:\n  loginom-generated: scripts/missing.mjs\n---\n');
+      : content.replace(/\r?\n---\r?\n/, '\nmetadata:\n  loginom-generated: scripts/missing.mjs\n---\n');
     assert.notEqual(changed, content);
     await writeFile(source.main, changed);
     await refreshSkillFixtureManifest(source.resources);
@@ -57,7 +57,7 @@ test('local bundle verification enforces frontmatter, required assets and genera
 test('bundled skill frontmatter rejects fields outside the Agent Skills specification', async t => {
   const source = await createBundledSkillFixture(t);
   const content = await readFile(source.main, 'utf8');
-  await writeFile(source.main, content.replace('\n---\n', '\nunsupported: value\n---\n'));
+  await writeFile(source.main, content.replace(/\r?\n---\r?\n/, '\nunsupported: value\n---\n'));
   await refreshSkillFixtureManifest(source.resources);
   await assert.rejects(createSkillLoader({ resources: source.resources }).prepare(), /LOGINOM_SKILL_FRONTMATTER_INVALID/);
 });
@@ -94,7 +94,12 @@ test('pinned local bundle rejects modified bytes, missing files and escaping sym
     await loader.prepare();
     if (change === 'content') await writeFile(source.main, 'tampered');
     if (change === 'missing' || change === 'symlink') await rm(source.main);
-    if (change === 'symlink') await symlink('/etc/hosts', source.main);
+    if (change === 'symlink') {
+      const outside = source.resources + '-outside';
+      await writeFile(outside, 'unrelated');
+      t.after(() => rm(outside, { force: true }));
+      await symlink(outside, source.main);
+    }
     await assert.rejects(loader.prepare(), change === 'content' ? /LOGINOM_SKILL_HASH_MISMATCH/
       : change === 'symlink' ? /LOGINOM_SKILL_RESOURCE_ESCAPE/ : { code: 'ENOENT' });
   }

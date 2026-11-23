@@ -1,4 +1,400 @@
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
+source IDs and unchanged query bindings on the same REST. Cold uses the updated
+expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
+`read_existing_output` reexecutes without configuring the REST node; its internal
+`schemas` are allowed only when every requested port exactly matches the output
+of the earlier successful, clean, completed source operation on the same REST.
+Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+The current read contract's explicit `execution_policy:"execute"` is accepted
+only with `finish:"execute"`; it does not authorize configuration changes.
+The query-path audit accepts both integer → string conversion through a Calculator
+and direct integer columns from `variables.to_table` bound to `query_parameters`;
+the REST handler performs URL encoding for the direct path. Integer source types,
+both value updates, stable identities/bindings and the second echo remain required.
+
+`rest-content-types` uses the reduced C5 `task-content-types.md`, only
+`content-types.csv` and `acceptance/modes/content-types/expected.json`.
+Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed
+rows with echoed content type, unchanged body and actual HTTP status. The two
+GET response-MIME branches were removed to reserve at least 25% of the unchanged
+1800s model limit under the observed slower-REST timing; this case no longer
+claims live coverage of response MIME text/plain or */*.
+Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
+Only task and CSV reach the model; expected/oracle remain private.
+
+
+`rest-error-descriptions` uses the unchanged C10 `task-error-descriptions.md`,
+only `response.json` and frozen `acceptance/modes/error-descriptions/expected.json`.
+The native REST output 1 must contain exactly RequestID/ErrorCode/HttpStatusCode
+in that order, all integer, without ErrorDesc. Stock full typed reads, CSV, Save,
+cold execution of the saved node without reconfiguration and cleanup apply.
+Only task and response file reach the model; oracle/expected remain private.
+
+`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
+in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
+
+`rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
+and frozen `acceptance/modes/simulation/expected.json`. The native file simulation
+returns one typed message/amount/ok row without a table input. Full output, CSV,
+Save, cold execution of the saved REST without recreation and cleanup use stock
+checks. Only task and response file reach the model; expected/oracle stay private.
+
+`rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
+unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
+update the response on the same REST without reconfiguration. Full typed output,
+CSV, Save, cold reexecution and cleanup use stock checks. Only task and CSV reach
+the model; oracle/expected stay private.
+
+`text-file-info` uses the unchanged text-import `task-file-info.md` and original
+January/February inputs next to the saved package. Both complete typed tables
+and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.json`;
+SOURCE_DIR is bound by the existing harness. The same Import changes absolute
+to relative paths while retaining FileTime (datetime, non-NULL, comparison present).
+Stock Save, cold execution without configuration and cleanup apply.
+
+`excel-import-auto-none`, `excel-import-auto-new`, `excel-import-auto-columns`
+and `excel-import-auto-types` use the unchanged C8 capability tasks and original
+schema-ab/abd/bc or types-a/b XLSX fixtures. `auto-schema/oracle.py` registers
+the unchanged `cases` from the independent capability expected container and
+checks source hashes. Only tasks and original books reach the model. The main
+audit requires two complete typed executions on one Excel GUID and a path-only
+native policy patch, without manual column replacement. Stock CSV, Save and
+cold output checks apply; cold additionally reads the saved native policy,
+source, Data sheet and header settings through an owned wizard and cancels it
+without applying settings. Each attempt requires confirmed package close/logout.
+Only the business task and source paths reach the model.
+
+`text-parallel` uses the unchanged text-import `task-parallel.md`, original
+January/February filenames and frozen `extended/expected-parallel.json` for
+BOTH `sequential.csv` and `parallel.csv`. Complete typed reads, row multisets,
+NULLs, duplicates and field order are checked before each export. Observed
+sequential → parallel/two threads must keep the same Import GUID and source.
+Stock Save, cold execution without configuration and cleanup apply. Only task
+and input paths reach the model; oracle/expected remain private.
+
+`text-auto-label` uses the unchanged text-import `task-auto-label.md`,
+`typed.csv` and `typed-update.csv` with their original server basenames.
+The frozen `expected-auto-label.json` and `expected-custom-label.json` check
+both full typed exports. Observed title modes, both automatic basenames and
+custom-caption preservation through both source switches require the SAME
+Import GUID. Final Save, cold execution without configuration and cleanup use
+stock checks. Only task and input paths reach the model.
+
+`text-variant` uses the approved text-import `task-variant.md` and only
+`fixtures/extended/variant.csv`. The unchanged stage-0 `expected-variant.json`
+checks integer/string/real/NULL native cell types before `variant-on.csv`;
+`expected-variant-off.json` checks the same Import after disabling Variant and
+redetecting types, then `variant-off.csv`. Both full typed reads, retained node
+identity and observed checkbox values are required. Final Save, cold execution
+without configuration and cleanup use stock checks. Oracle/expected stay private.
+
+`factor-rotation` uses the approved factor-analysis `modes/task-rotation.md`
+and only `fixtures/rotation.csv`. The intermediate full typed Varimax round
+is checked by `factor-initial-signs`; the final Quartimax round must belong
+to the same node with unchanged X/Y/Z features and two trained factors.
+The independent Kaiser oracle checks both ports, exact field order and Factor3
+(NULL scores, zero loadings). Stock final CSV, Save, cold and cleanup apply.
+Oracle and expected values never reach the model.
+
+`duplicates-typed`, `duplicates-empty`, `duplicates-singleton` use the approved
+`duplicates/acceptance/task-{typed-keys,empty,singleton}.md`, one corresponding
+`fixtures/typed-*.csv` and unchanged `acceptance/modes/expected*.json`.
+Only task and CSV reach the model. Stock exact typed matching checks Boolean,
+real precision, civil datetime, NULL versus empty string, all original fields
+and four marker columns; CSV, Save, cold execution and cleanup are required.
+
+`corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
+and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
+production checkpoints verify Spearman followed by Kendall tau-b on the same
+node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
+Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
+
+`text-mask` uses the approved `text-import/acceptance/task-multi-file.md` and
+the original January/February/returns files in a unique owned subdirectory.
+After the initial CSV and Save, verified delivery adds only
+`fixtures/multi-file/variants/sales_2026-03.csv` to that directory. A continuation
+executes the saved mask on the same Import. Both complete typed tables and CSVs
+are checked against unchanged `expected-mask.json` (five rows) and
+`expected-mask-new-month.json` (six rows). Settings/identity, final Save, cold
+without configuration and cleanup are required; missing delivery is NOT_RUN
+for the new-month stage. The delivered input is never counted as an export.
+Only tasks and source paths reach the model; oracle/expected stay private.
+
+`text-multi-file-list` uses `text-import/acceptance/task-multi-file-list.md`,
+only the three original `fixtures/multi-file/*.csv` inputs and the independent
+`extended/expected-list.json` from `oracle-multi-file.py`. One native Import
+appends February then January, excludes returns, retains duplicates and adds
+the native FileName field. Full typed output, exact field order, CSV, Save,
+cold reexecution without configuration and cleanup use the stock checks.
+Only task and CSV inputs reach the model.
+The existing fixture uploader seeds exact original basenames with reject/equal-byte
+verification. The model receives their server paths and obtains fresh storage
+references. Inline and small local admission otherwise prefix physical filenames.
+
+`text-folder-masks` uses `scenarios/text-folder-masks/task.md` (the owner's
+request without file names) and seeds its `data/` into six new folders under a
+new parent `<run> Silent Talk` (a space in the path): transactions 3 CSV plus
+README.txt, customers and beneficiaries 2 CSV, accounts, devices and
+risk_reference 1 CSV. The main run requires one Import per folder: the native
+`<folder>/*.csv` mask for 2+ CSV, the exact path for one, full typed port reads
+against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
+exported; cold reexecutes the saved package without configuration and matches
+all six labelled outputs. Only task and folder paths reach the model.
+
+`tree-dates` uses the approved `trees-jsontotree/acceptance/typed/task-dates.md`
+and unchanged `fixtures/typed/documents.csv` (all three input columns are strings).
+Only task and CSV reach the model. `expected-dates.json` is the separate stock
+projection of `expected.json → cases.dates`, checked by the same independent oracle.
+Full ordered schema/instances, DateTime civil `YYYY-MM-DDTHH:MM:SS.mmm`,
+`precision:millisecond`, `representation:local_datetime` and typed NULL are required.
+Native default format is `YYYY-MM-DDThh:mm:ss`; winter and summer values must
+retain their civil time. Tree-only Save, a fresh cold profile executing without
+configuration, the same full typed matcher and cleanup apply; no CSV export.
+
+`tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
+`trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
+and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
+the unchanged `cases.{null,nested,empty}.proposed_tree_output` directly, including
+full schema, field and instance order, native types and NULL distinct from empty
+string, false and zero. A production tree read, Save, cold reexecution without
+settings changes and cleanup are required. No export/CSV is requested or passed
+to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
+the model; oracle and expected remain private.
+
+`tree-variant` uses unchanged `typed/task-variant.md` and only
+`fixtures/typed/documents.csv`. Its private `expected-variant.json` projects
+`cases.variant.tree_outputs`, checked by `oracle.py --check`. Full ordered schema
+and instances must retain DataType 6 and exact native subtypes integer/string/
+boolean/NULL/real/Int64 (`9007199254740993`), compared by `cell_type` and `value`.
+Tree-only Save, fresh cold execution without configuration and cleanup apply;
+no CSV export. Only the business task and original CSV reach the model.
+
+`table-tree-dates-variant` uses the unchanged DataToTree `modes/task-dates-variant.md`,
+rows.csv and input.json. Stock source-package delivery creates a new own package
+with only TypedInput → TypedSource: explicit DateTime/Integer/Boolean/String
+columns followed by native Collapse (ignore NULLs; keep false and empty string).
+The verified seed lab1685-types.csv retains its original basename; the source
+package reads it relative to its own folder. The model opens this prepared package
+and verifies its source before conversion. The private expected-dates-variant.json
+projects the frozen proposal using the existing DateTime/Variant `check_tree`
+forms and label_any. Full ordered tree, exact civil milliseconds and native
+subtypes/Int64, Save, fresh cold execution without configuration and cleanup are
+required. Tree-only mode requests no CSV; oracle/expected stay private.
+
+`tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
+`fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
+projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
+types `string_array`/`real_array`, ordered values, parent row ranges and both
+empty arrays in the second record are checked directly. Full tree read, Save,
+cold reexecution without configuration and cleanup are required; no CSV export.
+Only the business task and original CSV reach the model.
+
 Run live acceptance without repeatedly reading live logs:
+
+`group-mode-tie` and `group-empty` use grouping `acceptance/types/task-mode-tie.md`
+and `task-empty.md`, respectively, with only `fixtures/types/mode-tie.csv` or
+`empty.csv`. Separate `expected-mode-tie.json` and `expected-empty.json` preserve
+unchanged `cases.mode_tie.stages` and `cases.empty.stages` from LAB-1558.
+Native observations LAB-1581 Q2/Q7 confirm integer/string mode ties select the
+smallest value and header-only input produces zero rows with the complete
+string/integer/real/datetime/boolean schema. Stock full typed matching, exact
+field order, CSV (header only for empty), Save, cold Execute without configuration
+and cleanup apply. Only task and CSV reach the model; oracle/expected stay private.
+
+`group-variant` uses grouping `acceptance/types/task-variant.md` and only
+`fixtures/types/variant.csv`. The separate `expected-variant.json` preserves
+unchanged `cases.variant.stages` from LAB-1558. A native Collapse produces Values
+in IntValue/RealValue/TextValue order, retaining NULL; Grouping checks integer
+count/null_count and Variant first/last with exact `cell_type`/`value`, including
+edge NULLs. Full typed reads, exact field order, CSV, Save, cold Execute without
+configuration and cleanup use stock checks. Only task and CSV reach the model;
+oracle and expected stay private.
+
+`group-date` uses grouping `acceptance/types/task-date.md` and only
+`fixtures/types/types.csv`. `expected-date.json` preserves unchanged
+`cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
+integer null_count, full typed rows and exact field order with `ordered:false`.
+The independent oracle stays private. CSV, Save, cold Execute without
+configuration and cleanup use stock checks; only task and CSV reach the model.
+
+`group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
+`fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
+`cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer
+unique/null counts, tie → False and all-NULL mode → False are checked as full
+typed rows with exact field order and `ordered:false`. The independent oracle
+stays private. CSV, Save, cold execution without configuration and cleanup use
+stock checks; only the business task and CSV reach the model.
+
+`group-real` uses grouping `acceptance/types/task-real.md` and only
+`fixtures/types/types.csv`. `expected-real.json` contains the unchanged
+`cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
+--check` stays outside the model workspace. Native Real median/mode/stddev,
+all-NULL and the mode tie are checked as complete typed rows with exact field
+order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
+the existing node, cold execution without configuration and cleanup use stock
+checks. Only the business task and CSV reach the model.
+
+`read-no-rerun[-1..3]` and `read-wait-running[-1..3]` are the owner-approved
+`run-check-two-turn` mode (LAB-1720, 2026-11-16). Owner review permits the known post-turn-two
+`closed_ack=false` / `LOGINOM_RUNTIME_TIMEOUT` signature only when the runtime
+exits 0, both turns complete, package cleanup succeeds, logout is confirmed and
+no unsaved changes are discarded. It is recorded in `shutdown-signature.json`;
+other shutdown failures remain failures. Only these cases use one
+interactive CLI process for both prompts, one chat, and one runtime. The package
+stays open between prompts. The transcript database is read without modification;
+its actual tool parts feed the stock CSV/Save/cold/cleanup checks. No oracle or
+expected file reaches the model. Ordinary scenarios keep `run --format json`.
+`turns.jsonl` records submitted/completed boundaries, the same CLI PID and session;
+`read-turn-proof.json` names the execution_id and exact journal lines. A second
+turn must contain a separate successful current-output read, with no new Execute
+request for that node. The no-rerun case must retain the first turn's execution_id.
+The wait case must observe native pending progress for the same root/group during
+the second turn and then read that completed execution; a completed-only smoke
+does not pass. After the first model reply, its second prompt is held until a fresh
+native process record proves the requested node is running; merely starting an
+asynchronous configuration job is insufficient. That native execution_id is also
+recorded on the turn boundary. Both use independent integer-row oracles and stock cold execution.
+The no-rerun case filters a six-row CSV; its physical input name includes run and
+attempt names to avoid collisions with previous uploads (#1157). The wait case
+uses a zero-input native JavaScript node computing three rows after 90 seconds,
+so the execution window is reproducible without a large-file upload or simulated
+process state. It neither intercepts nor modifies Loginom internals.
+
+`row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
+and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
+both full ordered outputs and four CSVs. The source alone changes on the same
+Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
+Stock Save, cold binding/field readback without configuration, both typed
+outputs and cleanup apply. Oracle/expected never reach the model.
+
+`row-filter-typed` and `row-filter-null` use the unchanged approved
+`acceptance/typed/task-variable-{typed,null}.md` and `fixtures/typed/rows.csv`.
+The private stdlib oracle checks initial RowID 2,8 → final 2,3,7,8 for typed,
+and empty output 0 / all eight rows in output 1 for real NULL, as confirmed
+by the LAB-1661 native probe before registration. Typed changes only MinScore
+and Since on the same builtin source, retaining both scalar bindings and the
+Filter GUID. Full typed outputs, four/two CSVs, Save, cold native `>=` predicates
+and binding identities without reconfiguration, and cleanup use stock checks.
+Only task and CSV reach the model; oracle and expected remain private.
+
+Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
+native NaN/±Infinity of a Real or an untyped Variant column as
+`{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
+precision:"exact_non_finite"}` without `numeric_display_precision`. A typed
+Variant cell (`variant-native-decode.mjs`) still refuses a non-finite number.
+Expected writes the same marker as the Real cell, `{"non_finite":"NaN"}`. Typed
+comparison needs that exact marker; CSV accepts only the observed NaN spelling,
+case-insensitively (`Nan`/`NaN`); unobserved infinity spellings fail closed.
+NaN differs from NULL, from the export null marker and from an empty string.
+
+`reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
+and independent expected-cache.json (one export). Production readbacks prove
+disabled → on_activation → on_access → selected_fields executions on one node,
+unchanged complete typed data, A=on_activation, B=on_access and other fields
+disabled. Cold reads both saved cache levels and cancels without reapplying,
+then stock execution/CSV/Save/cleanup checks apply. Settings codes are pinned in
+oracle.py and expected-cache-settings.json from the initial UI observation.
+Only the approved business task and CSV reach the model.
+
+`import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
+and both original CSVs. Three exports check the initial file, source-only CsvPath
+update on the same Import, and saved-package reopen. The private oracle verifies
+fresh typed rows, field order, variable identities and retained Sentinel; cold
+independently reads the filename binding and W1 mapping before execution.
+Only the business task and the two input files reach the model.
+
+`excel-import-binding` (Excel C7) uses `imports-excel/acceptance/excel-import-binding`:
+task.md, sales-a/b.xlsx and a stdlib OOXML oracle (2 rows → 1 row). The same audit
+checks an ExcelPath-only update on the same Excel node, `/excel/source_path` in
+`configuration.bindings`, re-execution only via `{excel:{}}` or a reread, and cold
+reads the Excel W1 variable caption and mapping before execution.
+
+`excel-import-multi` and `excel-import-parallel` (Excel C4) use
+`imports-excel/acceptance/excel-import-multi`: the stage-0 tasks, the original
+capabilities `sales-a/b.xlsx` delivered into a fresh owned directory, and a stdlib
+OOXML oracle. `multi` checks the explicit list a→b (ordered, `multi.csv`) and then
+the native mask `sales-*.xlsx` on the SAME Import (row multiset, `mask.csv`), both
+sequential on sheet Data. `parallel` checks two threads with the row multiset.
+Stock Save, cold execution without configuration and cleanup apply.
+Only tasks and server paths reach the model.
+
+`acf-nonzero` uses the approved LAB-1144 edge task and
+fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
+return all lags 0…7. The Fraction oracle stays private. Singleton is only an
+unclaimed observation and has no registered acceptance scenario.
+Exact types/field order/NULL, real abs=1e-8/rel=1e-10,
+CSV, Save, cold execution and cleanup use the stock matchers.
+`acf-empty` (series → empty) and `acf-null` (series → null) replace the file of the
+same Import and re-execute the same node. They use the stock `execution_error`
+matcher: the runtime guard text from `edges/expected-empty.json` (no native Execute
+on an empty input) or the native «Данные содержат пустые значения» from
+`expected.json`; no export or CSV, Save after the error, no cold run.
+
+`join-full-no-keys` and `join-cross` use the approved full-without-keys and
+Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
+from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the
+independent `oracle-v040.py`. Each checks all six combinations, four columns
+in exact order and native types, CSV, Save, cold reexecution and cleanup.
+Only the selected task and the two inputs reach the model.
+
+`tree-parent-child`, `tree-parent-roots`, `tree-parent-cycle`, `tree-parent-orphan`
+use the owner-approved id/parent_id cases under `trees-datatotree/acceptance/parent-child`.
+Only one CSV and its business task reach the model. The independent Python oracle
+generates stock JSON AST expectations for CSV/cold and observed execution-error
+expectations (cycle A, B; orphan Z). All cases require Save and cleanup; negative
+cases require the exact id list, no export and no partial result, as in `throw1`.
+
+`graph-large-execute` opens a saved 72-node background graph through the existing
+source-package phase, then imports customers, executes and reconfigures one
+Grouping node. The unchanged grouping-unique table oracle checks CSV, Save, cold reexecution
+and cleanup; the production observation journal supplies the graph node count. Only task.md and CSV reach
+the model; the source fixture and expected tables stay in the acceptance harness.
+
+`quality-default` and `quality-spikes` use the approved five-output fixtures in
+`nodes/research-quality/acceptance/`. Only task/data reach the model. The stock
+typed matcher checks full production receipts before and after the same Import
+and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
+reexecutes the saved node without configuration. Only Moda/variant uses the
+bounded native decoder; ordinary scalar reading and other node limits are unchanged.
+
+`quality-types` uses the approved `research-quality/acceptance/task-types.md`
+and only `fixtures/types.csv`. The single-round Quality audit and stock typed
+matcher check all five outputs, Boolean Moda, datetime, discrete numeric fields,
+field order and NULL. Five CSVs, Save, cold without configuration and cleanup
+remain required; `oracle-types.py` and `expected-types.json` stay private.
+
+`lgd-import`, `lgd-properties`, `lgd-corrupt`, `lgd-export` используют
+утверждённые задания LGD и бинарные fixtures этапа 0. Ожидания `expected-*-run.json`
+переносят независимые CSV/manifest-значения в штатную форму полного CSV/cold reader.
+Модели передаются только исходный LGD либо typed.csv + schema.json.
+LGD копируется без изменения байтов в рабочий каталог; в запрос добавляется
+его локальный путь для штатного `loginom_file_admit`. Бинарная часть провайдеру
+не передаётся: его API не поддерживает `application/octet-stream`.
+Положительные случаи проверяют все значения, типы, порядок, Save, cold и cleanup;
+дополнительный LGD-аудит читает сохранённый checksum, LZ4 и виды полей без настройки.
+Параметры источника проверяются до cold Execute, свойства выходных полей —
+после штатного выполнения и полного чтения: LGD материализует определения при выполнении.
+Экспорт проверяет собственный файловый результат без табличного output, непустой
+BGDATA/LZ4 файл и новый обратный импорт. Независимый BGDATA-decoder по решению
+владельца не применяется. Corrupt требует исходную ошибку checksum, сообщение
+пользователю и Save без успешного импорта; холодное выполнение отрицательного
+случая не запускается. Stock-проверки остальных сценариев сохранены.
+`lgd-export-overwrite` проверяет сохранённый default reject, явный replace того
+же файла с изменёнными данными и cold-настройки. `lgd-export-variable` проверяет
+два актуальных пути одной привязки LgdPath и сохранение bindings после reopen.
+Оба используют штатные LGD reverse-import/CSV oracle, Save и cleanup.
+
+`lgd-export-empty-variant` сохраняет схему пустого набора и Variant
+(integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
+CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
+
+`date-time-parts` and `date-time-parts-week` use the approved `date-time/acceptance/parts`
+fixture and independent oracle (native-confirmed h1 weeks). The first adds day of
+year and milliseconds to the same executed quarter node; the second replaces ISO
+week with ordinary week on the same node. Full typed tables, CSV, Save, cold and
+cleanup use stock checks; only task and parts.csv reach the model.
 
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
@@ -17,9 +413,25 @@ Oracle/expected не передаются модели.
 `excel-import-sheet` imports the second, explicitly named worksheet «Продажи 2026»
 from a three-sheet workbook with different schemas. `excel-import-wide` imports
 all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
+`excel-import-columns` checks all 16 integer fields, including C16;
+`excel-import-headers` skips 11 header rows and checks both compound names.
 `excel-import-single` retains the original three-field, first-sheet fixture.
+`excel-import-boolean` checks native Boolean/discrete Active with false, true
+and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
+`factor-apply`: утверждённый `task-apply.md`, matrix.csv → update.csv на том же
+обученном PCA-узле без Teach. Проверяет Real scores и прежние нагрузки двух
+портов через независимый sign-aware matcher; CSV, Save, cold и cleanup штатные.
+Oracle и expected модели не передаются.
+
+`excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
+затем продолжение до последней заполненной строки на том же узле (3 строки).
+Два CSV проверяются отдельно; внутренние typed-checkpoints подтверждают оба
+состояния и неизменный узел. Cold читает сохранённые имя/продолжение диапазона,
+отменяет мастер без применения настроек и штатно проверяет конечную таблицу.
+Модель получает только исходный task-named-range и named.xlsx.
 
 `missing-zero`, `missing-zero-threshold`, `missing-zero-empty` and `missing-mean`
 use `nodes/missing-values/acceptance/zero`. Only the named CSV and business task
@@ -44,13 +456,42 @@ Cancel, which can deselect/deactivate outputs, a fresh production execution
 reselects this node and verifies completion before reading any port. Two such
 rounds must match main. Field presentation permutations are normalized by
 verified names/types. Save, port proofs, cancellation and cleanup remain mandatory.
-Stratified, biased and uniform are not registered.
+Stratified and biased are registered as `sampling-stratified`, `sampling-biased`,
+`partition-stratified`, `partition-biased`. Stratified additionally checks exact
+size, Class quotas and combined/train/test relations. Biased checks repeats and
+exact typed membership without sizes or quotas. Both require saved native field
+order; uniform is registered below.
+`sampling-uniform`, `partition-uniform` and `partition-test-priority` use the
+approved v040 task/expected/source fixtures. Uniform checks typed membership,
+unique RowID, unchanged executions, separate native group row sizes and every
+CSV. Partition additionally checks disjoint train/test and combined IsTestSet.
+The priority task checks beginning then end on the same node; cold compares
+the final end result. Cold inspects saved method, sizes, seed and priority
+through the production reader and verified Cancel without applying settings.
+No PRNG formula or Class quotas are asserted for uniform.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh
 python3 scripts/node-acceptance/run-check.py start --head dbeb10ee --scenarios n1,q7 --pair ~/.config/loginom-multica/cards/PAIR --cold
 python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --timeout 4500
 ```
+
+`calculator-vars` and `calculator-vars-update` use the approved Calculator
+Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
+Only the task and `fixtures/variables.csv` reach the model. The update task
+changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
+
+`calculator-vars-saveas` (LAB-1729) uses `scenarios/calculator-vars-saveas/task.md`: the
+Calculator Var.Amount task (7), Save As with reopen, then Amount=11 and the same Calculator
+in the reopened package, final Save As with reopen. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
+a confirmed `save_as` receipt with `reopened:true` and an accepted
+`reopened_package_cleanup_binding` for the saved path (#986 cleanup branch).
+
+`calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
+`modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
+
+`calculator-javascript` uses `task-javascript.md` and `modes/expected.json` (JavaScript language, `this.Expr`,
+intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` reach the model.
 
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
@@ -83,11 +524,9 @@ At a phase deadline, SIGINT goes to the CLI owner first, with 100 seconds for
 normal close/ACK. If it stays alive, the process group receives SIGINT and
 another 40-second wait, then SIGKILL as the final fallback.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
-They embed the knowledge service key like release builds: `LOGINOM_MCP_API_KEY`
-from the environment or `~/.config/loginom-ai-agent/mcp-api-key` (mode 600) on
-the stand; it reaches only the build environment. The pair `api_key` is no longer
-sent to setup. A supplied build must have matching SHA, `sourceDirty=false` and
-`resources/loginom/knowledge-key`.
+Builds ship Loginom Help in `resources/loginom/help`; no knowledge service key is
+needed. The pair `api_key` is no longer sent to setup. A supplied build must have
+matching SHA, `sourceDirty=false` and `resources/loginom/help/help-manifest.json`.
 The total budget is shared by sequential scenarios. If it expires before a
 scenario starts (including its first load/spacing gate), that scenario is
 `NOT_RUN` with reason `BATCH_BUDGET_EXHAUSTED`, displayed as
@@ -118,6 +557,8 @@ rules. Names, widths, counts and every value remain checked.
 When `expected.json` sets `null_marker`, CSV NULL cells must use that exact
 marker. Otherwise, for outputs containing NULL, the CSV check uses the explicit
 `parameters.null_marker` of the `exports.text` request for that exact destination.
+A new export that omits it uses `settings.null_marker` from the correlated
+successful configuration readback of the same `operation_id` and destination.
 Existing-node patches require the correlated successful configuration readback
 (including retained settings), also through wait/inspect receipts. Supported
 markers are `''`, `?`, `null`, and `NULL`; a marker matching any non-NULL value
@@ -207,6 +648,23 @@ the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
+Each output may declare `header: false` in private `expected.json` for a CSV
+without a header (including a single JSON cell). Columns then declare CSV
+positions, and every record, including the first, is checked as data. Omitted
+or `true` keeps the existing names/labels header checks. Cold readback checks
+the saved native output and Export input mapping without treating a data cell
+as a header.
+
+For a general safe refusal, use `outputs: []` and
+`refusal: {"text":"Не могу выполнить запрос: этот тип данных не поддерживается."}`.
+The nonempty `text` is a required substring of the final answer; choose a
+phrase containing both the refusal and its explanation. `nodes` may list only
+allowed input imports (or be empty); creating result or Export nodes fails.
+CSV export instructions are not appended, and CSV/cold checks are inapplicable,
+including with `--cold`. Save, close/logout and runtime ACK remain required.
+The oracle and refusal text never reach the model. `refusal` cannot be combined
+with `rejection` or `execution_error`; the S-tamper rejection below is unchanged.
+
 For the S-tamper negative case, use `outputs: []` and
 `rejection: {"code":"LOGINOM_FILE_CHANGED","node_type":"transform.group_data"}`
 in private `expected.json`. PASS requires a successful replacement export,
@@ -259,6 +717,18 @@ large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
 
+`missing-median-mode`, `missing-previous`, `missing-delete`: цикл 1 «Заполнение пропусков»
+(median/most_probable, previous при ordered, delete). Модель получает только
+`acceptance/task-*.md` и CSV из `fixtures/` (statistics, ordered, delete); ожидания —
+`acceptance/modes/expected*.json` (воспроизводит `oracle.py --check`). CSV, Save, cold и cleanup — штатная оснастка.
+Цикл 2: `missing-linear` (linear при ordered, ordered.csv) и `missing-random` (random, random-single-value.csv,
+единственное известное значение — результат детерминирован) по тем же правилам.
+
+`grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
+`fixtures/modes.csv` модели; ожидания берутся из независимого
+`acceptance/modes/oracle.py` (case median), Amount integer, выход Metric real,
+all-NULL группа D → NULL. CSV, Save, cold и cleanup — штатная оснастка.
+
 `grouping-unique`: повторяющиеся клиенты по регионам, integer/string,
 NULL и пустая строка; count одновременно с unique_count. Одна Группировка
 перенастраивается и переименовывается. Task, независимый set/count oracle
@@ -271,6 +741,7 @@ To add a scenario for a new node:
 | Name | Stock fixture under docs/node-development/nodes | Acceptance |
 |---|---|---|
 | calculator-viewport | transform-calculator/acceptance/calculator-viewport | Nine calculators, distant financial node, export then fresh port/tooltip read; CSV/Save/cold/cleanup |
+| calculator-eight | transform-calculator/acceptance/calculator-eight | 20,000 AB rows, one Calculator with eight expressions and a one-row exact sample, grouped audit totals; summary CSV/Save/cold/cleanup. Run with `--viewport 1280x800` and `--viewport 1920x945`. Native Calculator Preview opens before execution; source Preview is requested when public tools support it. |
 | linreg-short | datamining-linregression/acceptance/linreg-short | Expected Loginom training error: two rows, four coefficients; Save/cleanup, no CSV |
 | throw1 | programming-javascript/acceptance/throw1 | Expected JavaScript exception; Save/cleanup, no CSV |
 | js-declared-empty | programming-javascript/acceptance/js-declared-empty | Positive declared Broken:real empty table; header-only CSV/Save/cold/cleanup |
@@ -297,6 +768,54 @@ With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
 table is read with the existing completed-port reader. Repeat on/off run in
 separate chats, profiles and packages; no oracle content reaches the model.
 
+`trees-to-table-indices` uses `trees-treetodata/acceptance/modes/task-indices.md`
+and only `fixtures/modes/documents.csv` (one JSON document). `expected-indices-run.json`
+is derived from the independent `expected.json` case `indices`: one Tree-to-Table
+table with the native global index column (`name_any`, native 7.4.2 position:
+first column of the array branch), CSV, Save, cold.
+
+`trees-to-table-wide` uses the unchanged `trees-treetodata/acceptance/modes/task-wide.md`
+and only `fixtures/modes/wide.csv`: one JSON document with rows[0].f00…f69.
+Private `expected-wide-run.json` projects the independent `wide` case, checked
+by `oracle.py --check`. All 70 ordered integer columns and their values must
+match in the complete main read and fresh cold execution of the saved node.
+Stock CSV, Save and cleanup checks apply; expected/oracle remain private.
+
+`trees-to-table-siblings` (LAB-1807, owner decision `tree-siblings-native`) uses
+`trees-treetodata/acceptance/modes/task-siblings.md` and only
+`fixtures/siblings/documents.csv` (one document with sibling arrays items and tags).
+`trees.from_json` admits sibling object arrays; `trees.to_table` selects batch,
+items/code, items/qty and tags/tag. `expected-siblings-run.json` is the oracle
+projection of case `siblings` as observed natively in 7.4.2: five ordered rows,
+items rows then tags rows, absent fields NULL (not empty strings), batch repeated;
+exact types, CSV (inferred NULL marker), Save, cold.
+
+`tree-to-table-typed` (LAB-1699) uses `trees-treetodata/acceptance/modes/task-typed.md`
+with the same prepared TypedSource package, seed, rows.csv and input.json as
+`table-tree-dates-variant`. The model builds the When/Value tree and converts it
+with `trees.to_table`. Private `expected-typed-run.json` is the pair oracle's
+`tree_to_table_typed_projection` (checked by `oracle.py --check`): one ordered
+table When DateTime (civil milliseconds) and Value Variant with native subtypes
+integer `9007199254740993`/boolean false/string "", label_any, its CSV, Save and
+cold (exact typed Variant port read). Even with the requested CSV When format
+`yyyy-mm-dd hh:nn:ss.zzz` applied (readback), the native writer prints
+2026-11-08T00:00:00.001 as `2026-11-08` (LAB-1699 a1/b1). Owner decision
+`d76-tree-to-table`: this is the counted D76 `midnight_date` form only, CSV
+status «PASS с ограничением платформы D76»; port read and cold stay exact.
+The CSV compares Variant integers as numbers; Int64 exactness is proven only
+by the typed read. Variant NULL is not covered (the R4 Collapse drops NULL).
+
+`trees-to-table-composite` (LAB-1815) uses `trees-treetodata/acceptance/modes/task-composite.md`
+and the prepared `fixtures/modes/composite-source.lgp`: Documents (relative
+`documents.csv`, seeded into the own package folder) → DocumentTree, JSON to tree
+with user labels batch/items/code/qty = Партия/Позиции/Код/Количество on its output
+port (native «Настроить порт…»; the model cannot set tree labels). The prompt names
+only the prepared node. The model adds Tree to Table with composite names and labels,
+separator «.». Private `expected-composite-run.json` is the pair oracle's
+`tree_to_table_composite_projection` (owner decision `tree-composite-native`): exact
+names `Root_items_code`, `Root_items_qty` and labels `Root.Позиции.Код`,
+`Root.Позиции.Количество`, two rows, its CSV, Save and cold.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.
@@ -309,6 +828,7 @@ separate chats, profiles and packages; no oracle content reaches the model.
    `start --head <SHA> --scenarios <name> --pair "$PAIR" --cold` and foreground `wait`.
    Add its file patterns/scenario hint to `required-checks.py`; for an additive
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
+   `required-checks.py verify` results: `exit 0`, `FAIL`, `NOT_RUN`, `CI`, `COVERED`, `APPROVED` (formats and summary in `required-checks.md`).
 
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
@@ -343,11 +863,31 @@ runtime-close ACK. CSV export and cold are not applicable, even with `--cold`.
 The existing generated-source storage/disk cleanup runs afterwards. External
 `case.json` may set `"upload_only": true` for the same assertions.
 
+`crosstable-numeric`, `crosstable-scalar`, `crosstable-datetime`, `crosstable-null-cells`:
+цикл A Кросс-таблицы, соответственно 4/2/2/1 полных отчётов. Задания —
+`transform-crosstable/acceptance/task-*-aggregates.md` и `task-null-cells.md`,
+независимые ожидания — `acceptance/modes/expected-*.json`. Модель получает ровно
+один `aggregate-values.csv` из fixtures и выбранное задание. CSV/Save/cold
+сверяют значения, типы, NULL и порядок полей. Только `crosstable-datetime`
+учитывает D76 `midnight_date`: отсутствие строго нулевого времени; потеря
+ненулевых миллисекунд не разрешена. У numeric нет выходных DateTime-полей,
+`negative_zero` не расширен. Настройки масок и ISO-ожидания прежние (#914).
+
 `crosstable-real-keys`: непрерывный real-ключ строк, затем real + дискретный
 ключ на той же Кросс-таблице (fixed → sliding). Фикстура и независимый oracle —
 `docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
 Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
 близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
+
+Python node scenarios (`programming.python`, `external_process`): `py-stdlib`
+(declared Id/Amount/AmountScaled/Text/Flag/Date, `InputTable.Get`/`OutputTable.Set`,
+AmountScaled = Amount×3, NULL and `''` kept) and `py-pandas` (schema from code,
+`to_data_frame(InputTable, True)` → Flag=true rows → `fill_table`). Fixtures and
+expected tables are in `docs/node-development/nodes/programming-python/acceptance/<case>`;
+the model receives `values.csv` and the case `.py` file, and the saved code must
+equal that file (readback `source_sha256`). The names avoid a standalone
+`python` token: the saved package name appears in breadcrumbs, where the UI
+code-name guard denies it and the cold return to the scenario cannot click.
 
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
@@ -369,6 +909,12 @@ cold сверяет каждый output_port того же узла с отде�
 только `data/train.csv` передаётся модели. CSV проверяет независимый
 `oracle.py`; холодный порт 0 — отдельный `expected.json` с допуском
 вероятности abs=1e-8/rel=1e-10 и точным порядком полей.
+
+`reform-rename-lossy`: Параметры полей, обмен технических имён и меток A/B и
+real→integer с потерей дроби в одном узле. Источник —
+`docs/node-development/nodes/field-parameters/acceptance/v040/task-rename-lossy.md`,
+модели передаётся только `fixtures/reform.csv`; точный порядок полей RowID/B/A/R/S,
+типы, значения, метки A/B, CSV/Save/cold. Кэш — отдельным циклом.
 
 `types300` (через `--cases`) требует `--cold`. Только для этого сценария
 runner допускает два ограничения нативного CSV writer D76: текст `0` вместо
@@ -414,9 +960,551 @@ abs=1e-8 только для real, метки через label_any.
 `docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
 из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
 
+`date-time-formats`: строковые представления года, даты и времени и свой формат с
+числовыми маркерами (%Y %Q %m %d %H %i %s %u) на двух datetime-полях в «Дата и время».
+Утверждённые `task-string-formats.md`, `fixtures/formats.csv` и независимый expected из
+`docs/node-development/nodes/date-time/acceptance/modes`; модели передаются только
+задание и CSV. Порядок полей и строк точный, Raw не разбирается, Keep не меняется,
+пропуски остаются NULL; CSV/Save/cold/cleanup. Полночь с миллисекундами в проходном datetime CSV Loginom пишет датой — учитывается как D76 `midnight_date` (LAB-1101), остальные ячейки строгие.
+
 `logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
 со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
 Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
 информационные/строгий/мягкий сценарии исключены из активного каталога.
 Источник — `datamining-logregression/acceptance/task-*.md`, только selection.csv
 передаётся модели; полный порт 0 (64×9), независимый MLE/LR oracle, CSV/Save/cold/cleanup.
+
+`colunion-edit`, `colunion-repeat`, `colunion-matrix-regular`, `colunion-matrix-reverse`,
+`colunion-matrix-empty-main`, `colunion-matrix-empty-attached`, `colunion-matrix-both-empty`:
+Соединение двух таблиц по позиции; утверждённые task*.md и независимые expected
+из `transform-coluniondata/acceptance`. Модель получает только задание и выбранные
+CSV. Полный CSV, точные типы/значения/порядок, оба Code, Save/cold/cleanup.
+Для живой приёмки матрицы разделены без изменения исходных expected:
+`colunion-matrix-regular-a/b/c`, `colunion-matrix-reverse-a/b/c` — по четыре
+Соединения; `colunion-matrix-{empty-main,empty-attached,both-empty}-{minimum,maximum,main,attached}`
+— по три Соединения одного правила длины. Каждая часть имеет собственное
+задание, пакет и cold, получает прежние входы и выбирает непересчитанное
+подмножество outputs исходной матрицы. Всего 18 частей, 60 матричных выходов;
+с неизменёнными edit/repeat — 62 выхода ровно один раз. Лимит модели 1800 с.
+
+`clustering-scale-minus-one-one`, `clustering-scale-zero-one`, `clustering-scale-absolute`:
+k-means с нативной нормировкой [-1;1], [0;1] и max-abs соответственно.
+Только task и scaling.csv передаются модели. Stdlib oracle вычисляет
+преобразования и Lloyd k-means независимо; номера кластеров свободны,
+назначения, оба порта, центры в исходных единицах, Distance в нормированных,
+порядок полей, типы, CSV/Save/cold и сохранённый NormType проверяются.
+Допуски real abs=1e-8/rel=1e-10. Каждый метод меняет raw-разбиение.
+
+`coarse-classes-continuous-manual`: integer/continuous X, ручной разделитель 7,
+предварительное квантование выключено, разбиение сохранено без автопересчёта.
+Вход `fixtures/continuous.csv` включает X=7; независимый `modes/expected.json`
+проверяет его класс 0, все три выхода, типы Variant NULL/real, CSV, Save/cold/cleanup.
+IncludeUpperBound — наблюдаемое нативное false, не заявленный параметр.
+
+`coarse-classes-train` и `coarse-classes-apply`: один дискретный Segment,
+бинарная Target, автоматические конечные классы. Приёмочный комплект —
+`preprocessing-coarseclasses/acceptance`; три CSV в порядке портов 0/1/2,
+Save/cold/cleanup. Apply заменяет источник того же импорта, сохраняя обучение.
+`factor-pca` и `factor-retrain`: «Факторный анализ», PCA корреляционной матрицы,
+K=2, без вращения. Оба порта: 8 строк факторов и 3 строки нагрузок, точные
+типы, NULL и порядок полей. `factor-retrain` заменяет источник того же импорта
+и переобучает тот же узел. Только task/data передаются модели. Явное
+`factor_signs` в expected разрешает один общий знак на фактор в обоих портах;
+main использует typed matcher, CSV сверяется с его знаком, cold — тем же matcher.
+Без этого поля сравнение остаётся прежним. CSV/Save/cold/cleanup обязательны.
+`assnrules-consequents`: train.csv из fixtures/v040, support 50%, confidence 60%,
+max_items=3, max_consequents=2, min_lift=0 → 1.2 с явным Teach того же узла.
+Четыре CSV в порядке портов 0/1 обоих расчётов; Fraction-oracle генерирует
+expected-consequents.json, cold сверяется с двумя итоговыми портами из
+expected-consequents-cold.json. Нативный порядок A0/C0/A1/C1, RuleID и NULL
+связаны reader до прогонов; модели передаются только task и train.csv.
+Save, cold без настройки и cleanup обязательны.
+
+`assnrules-basic` и `assnrules-length`: частые наборы и правила FP-Growth,
+поддержка 50%, достоверность 60%, max_items=2; вход Transaction/Item.
+Источник — `datamining-assnrules/acceptance` и `length/`; два CSV, Save,
+cold обоих портов с независимым Apriori oracle, точными типами/NULL/ID.
+`assnrules-retrain` сначала обучает на transactions.csv, затем заменяет вход
+на length.csv и переобучает тот же узел; CSV/Save/cold проверяют конечные 0/1.
+
+`enrich-data-left`, `enrich-data-composite`: Дополнение данных, `left`, выход 0.
+Только `enrich-data-left` входит в `COLD_COLUMNS_BY_NAME_SCENARIOS`: native
+autosync Loginom при cold Execute переставляет `RowID, Key` в `Key, RowID`
+(LAB-1853/LAB-1869, `lab1837-b04/enrich-data-left/cold/actual-readback.json:1`).
+Для cold создаётся отдельный `expected-cold.json` с `column_order: any`;
+имена, типы, число строк, набор столбцов и значения сверяются строго штатным
+matcher. Основной expected, CSV и порядок столбцов остальных сценариев сохраняются.
+Первый сценарий сохраняет все сочетания двух справочников, меняет данные
+первого справочника на том же узле импорта: 8 → 13 → 8 → 13 строк.
+Второй использует один справочник и составной ключ Code+Zone.
+Точные значения, NULL отдельно от пустой строки, метки, типы, порядок полей
+через autosync=false, CSV/Save/cold/cleanup; строки — мультимножество.
+Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
+модели передаются только соответствующее задание и перечисленные CSV.
+
+`enrich-three-lookups`, `enrich-four-lookups`: Дополнение данных, три и четыре
+справочника одного узла (7×6 и 7×7); четвёртый добавляется к тому же узлу после
+выполнения с тремя. Задания `task-three-lookups.md`, `task-four-lookups.md`,
+ожидания `acceptance/extended/`, CSV `fixtures/extended/`.
+
+`ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
+по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
+Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
+CSV из fixtures передаются модели. Все значения, типы, порядок, CSV/Save/cold/cleanup.
+
+`variables-calculator` uses the approved eight ordered scalar expressions from
+`nodes/variables-calculator/acceptance/task.md`: create with limit 100, patch
+only limit to 120, freshly execute and Save. Typed variable output 0 and native
+configuration receipts establish both states, stable IDs/types and preservation
+of unrequested expressions. Stock W1 typed cold execution and cleanup apply.
+Only the user task reaches the model; expected values and oracle stay private.
+
+`variables-replace-exact`: точная замена переменных всех четырёх типов, исходный JSON через Калькулятор (переменные). Три полных typed-чтения по 10 переменных: initial, patch только Count, source refresh только Color без перенастройки замены. Проверяются порядок/метки/типизированный NULL, отсутствие каскада, сохранённые пары остальных переменных, Save/cold/cleanup.
+`variables-column-union` использует исходный `source.lgp` только с двумя
+Калькуляторами переменных. Штатный private package delivery загружает отдельную
+копию в каталог назначенной пары до модели; oracle/expected не передаются.
+Модель получает исходный task.md и inputs.json. Аудит проверяет два свежих
+полных упорядоченных native вывода, patch правого a0, неизменные связи и mapping.
+Cold W1 проверяет сохранённый граф, типы, значения и порядок, затем cleanup.
+
+`variables-rows` uses the authored variable Calculator package and approved r02
+rows task. Private delivery prepares a new package for each run. The native
+three-column output is checked in source order, including each Variant subtype,
+civil datetime milliseconds, NULL/empty/FALSE/zero; CSV, Save and independent
+cold execution with the same variable edge and confirmed cleanup are required.
+
+`variables-user-real-date`: builtin output 4, real threshold and civil report_date,
+typed NULL/empty/zero/false; two business reports before and after patching only
+two variables. Task and transactions.csv reach the model; independent stage-0
+oracle supplies expected-initial-run/expected-updated-run. Stock typed matchers
+check both phases and retained IDs/labels/order/consumers; final two CSVs, Save,
+cold typed variable inventory and both reports, package Close and logout apply.
+
+`rest-post-body`, `rest-put-body`, `rest-patch-body`, `rest-delete`: C1 разделён
+на импорт → один REST → экспорт, две исходные строки requests.csv на сценарий.
+Модель выгружает RequestID/Response с порта 0 без Слияний и JSON-разбора;
+HTTP-коды читает отдельно на порту 1. Python oracle и cold matcher rest_echo
+сверяют фактический method и точные UTF-8 байты data; DELETE требует data="",
+не NULL. Cold проверяет также native port 1: ErrorCode=0, ErrorDesc=OK, HTTP=200.
+Только task-<метод>.md и requests.csv передаются модели. CSV/Save/cold/cleanup
+обязательны. POST — ≥2 PASS из 3 на одном SHA, PUT/PATCH/DELETE — по одному
+PASS с cold; затем n11/r5/r6 по одному на том же SHA (решение LAB-985).
+Прежний восьмистрочный methods-body оставлен только как неактивный пример:
+в каталоге run-check и required-checks его нет.
+
+
+`linreg-forward-f` and `linreg-forward-r2` use the approved C1 selection.csv and
+Forward task. Independent mode oracle expectations remain private. Both typed
+outputs, downloaded prediction CSV, Save, cold execution and cleanup apply.
+The C1 adapter supplies the three intrinsic labels already defined by the
+production coefficient/prediction output contract. Oracle numeric types, IDs,
+values and tolerances remain exact; integer predictors are never relaxed to real.
+
+`linreg-forward-r2-cutoffs`: owner-authorized R² diagnostic with explicit native
+entry/removal cutoffs 0/1, unchanged selection.csv and expected/forward-r2.json.
+
+Owner decision after the single 0/1 diagnostic: R² is not supported in this PR.
+Its catalog cases remain historical reproductions for the diagnostic SHA;
+current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
+
+`linreg-stepwise-f`: C3, исходный task-stepwise.md и только selection.csv.
+Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.json, оба typed
+порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
+
+
+`linreg-categorical`: C11, исходный task-categorical.md и только categorical.csv.
+Enter, X numeric и дискретная строковая Category с indicator/reference:first,
+видимый нулевой коэффициент опорной A. Неизменённый modes/categorical/expected.json
+проверяет оба полных typed порта: 18 прогнозов и 5 строк коэффициентов, повторяемый
+Name=Category различается по UniqueValues; у A SE/t/p/границы NULL.
+CSV прогнозов, Save, cold без настройки и cleanup — штатные; task/CSV передаются
+модели, oracle/expected остаются приватными.
+
+`linreg-summary`: C8, исходный task-summary.md и только design.csv. Enter с
+константой и всеми X1/X2/X3. Основной прогон требует свежий полный VariablesForm
+из 15 переменных, принадлежащий завершённому исполнению того же узла; существующий
+typed matcher проверяет имена, порядок, типы и значения. Третий физический выход
+имеет отдельный variable ordinal 0: `read.variable_ports:[0]`, не table port 2.
+Native-проба подтвердила форму; oracle изменён только в адресе выхода.
+Оба табличных порта, CSV прогнозов, Save, cold без настройки и cleanup обязательны.
+Oracle и expected остаются вне рабочего каталога модели.
+
+`linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
+обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
+передаются модели; неизменённые expected.json и oracle остаются в оснастке.
+Полные порты 0/1, прогнозы теста 6.5/9.5, CSV, Save, cold без настройки и cleanup.
+
+`linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
+утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
+Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
+метки только у Name/Y_coefficients, остальные `label_any`. CSV прогнозов,
+Save, cold без перенастройки и Teach, cleanup.
+
+
+
+`logreg-apply`: обучение Enter на train.csv, затем замена источника того же
+импорта на holdout.csv и применение прежнего узла без Teach. Утверждённый
+`datamining-logregression/acceptance/modes/apply/task-apply.md`; независимые
+3×8 ячеек, NULL Target/ActualEvent, точные типы и порядок, CSV/Save/cold.
+
+`logreg-coefficients`: Enter на train.csv, полная таблица коэффициентов порта 1,
+2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
+`modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
+точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`logreg-lasso`: ручной L1, lambda_lasso=1, утверждённые task-lasso.md и train.csv
+из `datamining-logregression/acceptance/modes/lasso`. Неизменённый независимый
+oracle.py проверяет полный прогноз 32×8, типы, порядок и NULL. Повтор настройки
+и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
+Модель получает только задачу и CSV; expected и oracle остаются приватными.
+
+`logreg-elastic-net`: ручной Elastic Net, lambda_lasso=lambda_ridge=1;
+утверждённые `modes/elastic-net/task-elastic-net.md` и train.csv из
+`datamining-logregression/acceptance`. Независимый неизменённый modes/oracle.py
+проверяет весь прогноз 32×8, точные типы, порядок и NULL. Повтор настройки и
+Teach — на том же узле; CSV, Save, cold без настройки/Teach и cleanup штатные.
+Только задача и CSV передаются модели; oracle и expected приватны.
+
+`logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
+повтор настройки и Teach того же узла; прогноз по независимому штрафному
+score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
+Модели передаются только task-ridge.md и train.csv.
+
+`sorting-locale`: импорт modes.csv, сортировка Word и RowID без учёта регистра;
+на одном узле сначала compare_with_locale=false, затем true (русская локаль
+пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
+независимый `oracle.py`: два CSV (первый — бинарный порядок, второй — итоговый
+и сохранённый), точные типы, NULL/пустая строка и порядок полей, Save/cold.
+
+
+`text-export-fixed-width` uses the approved task-fixed-width.md/formats.csv;
+`text-export-encodings` uses task-encodings.md/encodings.csv. The unchanged
+stage-0 modes/oracle.py compares every downloaded byte, including BOM and final
+CRLF. Stock cold reads the saved export input with exact types, values and field
+order; fixed width supplies the real .txt file without treating it as CSV,
+while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
+the byte oracle for the file passed through --csv. No oracle reaches the model.
+
+`text-export-file-variable` uses `nodes/text-import/acceptance/task-file-variable-export.md`
+with only `sales-2026-11-05.csv`. run-check substitutes `{{EXPORTS_DIR}}` with the pair
+folder and a run-unique prefix for `report-`, so `overwrite=reject` never meets an older
+run. Both downloaded CSV (dates 11-05 and 11-06) must carry the first-stage rows
+(`oracle.py --export`: typed rows, header names, LF, no BOM) and come from one Export
+whose readback has `file_name_variable=ReportFile`, the resolved destination and a
+reject check; no exports.text request may carry a literal destination. Cold reads the
+last output and requires the saved filename binding to resolve to the final path.
+
+`factor-auto` uses the approved `modes/task-auto.md`: eigenvalue 1.1 then
+variance 90% on the same node, both complete typed outputs after each execution.
+Both stages use the unchanged independent `modes/expected.json` and stock
+factor-sign matcher. Final two CSVs, Save, cold and cleanup are required.
+`factor-cap` uses `task-cap.md`: fixed two trained factors, then output cap one
+on the same node, physically one Factor field on both ports. The cap oracle
+and stock CSV/cold matcher retain exact types, NULL and field order.
+Only task and matrix.csv reach the model.
+
+`grouping-first`, `grouping-last`, `grouping-only`, `grouping-concat`: цикл 3
+Группировки из `nodes/grouping/acceptance/modes`. Модель получает только
+соответствующий task и modes.csv; независимый oracle остаётся в проверке.
+Для concat три последовательных результата одного узла сверяются с тремя
+CSV в порядке задания, cold Execute проверяет последнее состояние.
+Первое/последнее включают крайний NULL; единственное допускает повторы;
+список исключает NULL, сохраняет пустую строку, сортировку и уникальность.
+Типы/порядок полей, Save и cleanup проверяются штатными reader/matcher.
+
+`replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
+и только fixtures/extended/input.csv из replacement. Независимые expected.json
+и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
+Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`variables-union-type-refusal`: по решению владельца `variables-union-refusal-reads` ([LAB-1851](mention://issue/01a1ef25-a792-7d35-b096-1c6cd0fdfcb8)) после отказа разрешён только `read_existing_output` / `execution_policy:existing` готовых источников без изменения настроек (finish receipt `settings_applied:false`, `execution_started:false`); изменение настроек/источников и создание узлов остаются FAIL. Для ожидаемого отказа CSV/cold штатно неприменимы, включая запуск с `--cold`.
+
+`variables-union-inputs`: на одном native Соединении сначала два входа, затем
+третий, затем удаление только третьей связи. Три независимых Variables Calculator
+берут точные имена/метки/типы/значения из modes.json. Полный ordered variable
+output 0 после каждого шага; тот же GUID и первые две GUID-пары сохраняются.
+Control не подменяется обычным входом. Только task-inputs.md и modes.json
+передаются модели; oracle/expected приватны. Save, stock typed cold с точными
+сохранёнными связями и проверкой GUID узла, Close/logout обязательны.
+
+`sorting-case`, `sorting-threads`, `sorting-auto`: утверждённые задания
+`sorting/acceptance/modes/task-*.md` и modes.csv. Независимый oracle проверяет
+оба полных CSV и оба typed-результата на одном узле, порядок, NULL/пустую строку.
+Case меняет регистр true→false; threads — максимум 1→2; auto — 2→0.
+Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
+затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
+
+`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
+`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
+including three NULLs. Frozen `expected-variant.json` is checked against the
+independent oracle; two executions of the same Sorting preserve exact native
+integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
+Both ordered full typed outputs and CSVs, Save, cold without configuration and
+cleanup are required. Only task and CSV reach the model.
+
+`text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
+задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
+Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
+oracle и expected — нет. Проверяются все значения, типы, порядок полей, Save, cold и
+cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
+сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
+выгрузке run-check не различает — его подтверждает журнал вызова узла.
+
+`ungroup-weights`: Разгруппировка с расчётом долей по всей выборке,
+положительные целые опорные веса и повторяющиеся позиции. Только
+`task-weights.md` и weights-totals/support.csv передаются модели; независимый
+Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
+повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
+`ungroup-seasonal`: Разгруппировка с учётом временных колебаний и сезонности,
+постоянная опора. Только `task-seasonal.md`, seasonal-totals.csv и
+seasonal-constant-support.csv передаются модели; Fraction oracle
+`oracle-seasonal.py` и expected-seasonal.json остаются в harness. Порт 0 без
+доверительных границ (исключены в соответствии полей), порт 1 целиком; повтор
+Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
+`ungroup-seasonal-zero` и `ungroup-seasonal-null`: те же штатные проверки двух
+портов и CSV, Save, cold Execute без настройки и cleanup. Исходные
+`task-seasonal-{zero,null}.md` и соответствующие CSV — единственные входы
+модели; наблюдённые expected утверждены решением `v040-scope-expansion`.
+Zero проверяет 4/2 строки, null — 0/0 с полной схемой, без подмены NULL нулями.
+`ungroup-seasonal-empty-support` и `ungroup-seasonal-empty-totals` проверяют
+явный отказ с понятной причиной, Save и cleanup; успешная пустая выгрузка
+не считается распределением. Expected отказа фиксируется до прогонов;
+CSV и cold для отказа не требуются. Oracle/expected остаются вне модели.
+
+`clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
+Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
+Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
+Distance из независимой геометрии, точные типы/NULL/порядок, два CSV, Save,
+cold Execute с сохранёнными ролями/auto/min/max/threshold/seed и cleanup.
+Эталон геометрии из stage-0 oracle остаётся только в оснастке.
+
+В `clustering-gmeans` точный hot-порядок порта 0 —
+Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
+Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
+нативное восстановление ставит используемые поля перед сохранёнными ID.
+Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`binning-datetime-manual`: DateTime When из modes.csv, count=2, затем ручные
+граница 02.01 и Early/Late на том же обученном узле без повторного Train.
+Задание task-datetime-manual.md; неизменный modes/expected.json проверяет
+146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
+Модель получает только task и modes.csv; oracle остаётся в оснастке.
+
+`binning-ties-current` использует task-ties-current.md и только fixtures/ties-modes.csv:
+frequency, size=4, ties=current, без сумм. Неизменный modes/expected-current.json
+проверяет все 156 значений двух портов, типы/порядок, NULL, два CSV, Save,
+cold без перенастройки и cleanup. `binning-frequency-ties` проверяет прежний
+next по умолчанию; oracle/expected остаются вне модельного контекста.
+
+`binning-auto` и `binning-sd` используют task-auto.md/task-sd.md и только
+fixtures/numeric-modes.csv; expected_name=modes/expected-auto.json либо
+modes/expected-sd.json, два экспорта. Auto — count=2 без ручных пределов;
+SD — ±1 СКО с открытыми хвостами, без округления. Метки меняются на том же
+обученном узле без повторного Train. Оба полных порта, точные типы/порядок,
+CSV, Save, cold без перенастройки и cleanup проверяются штатно.
+Oracle и expected остаются вне модельного контекста.
+
+`replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
+на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
+прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
+typed matcher native reader, порядок, CSV/Save/cold/cleanup.
+
+`clustering-apply`: обучение k=3/none/seed 42 на train.csv, замена источника
+того же импорта на holdout.csv, Activate сохранённого узла без Teach.
+X/Y допускают integer или real при совпадении типов train/holdout и обоих выходов (решение `clustering-apply-types-consistent`, LAB-1850).
+Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
+2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
+и два исходных CSV передаются модели; oracle/expected остаются в оснастке.
+
+`variables-totable-switch` (LAB-1095, «Переменные в таблицу», цикл 1): модель получает `task-switch-run.md`
+и `modes.json` (initial/changed; метки равны именам), сама собирает источник и преобразователь columns,
+затем переключает тот же узел columns→rows, правит источник, повторяет выполнение и возвращает columns.
+Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
+аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
+свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.
+
+`variables-calculator-modes` uses the approved three-expression datetime/intermediate
+`task-datetime-intermediate.md`. Only the task reaches the model; modes/oracle.py
+supplies the private initial/final W1 expectations. Two typed execution variables
+retain civil milliseconds, IDs, types and order; native configuration retains
+three expressions, intermediate base and every property except base formula 2→4.
+Save, independent cold execution and confirmed package close/logout are required.
+
+`smoothing-haar` and `smoothing-haar-depth2` use the approved Haar tasks and
+immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
+`fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
+real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
+
+`outlier-replacement-mean`, `outlier-replacement-median` и
+`outlier-replacement-most-probable` используют утверждённые `task-replacement-*.md`
+и только `fixtures/replacement-discriminator.csv` узла preprocessing-elimoutlier.
+`outlier-quartile-boundaries` использует `task-quartile-boundaries.md` и только
+`fixtures/quartile-boundaries.csv`. Неизменённые expected/oracle остаются вне
+workspace модели. Штатные проверки сверяют все значения, типы и порядок
+полей портов 0/1/2, три CSV, Save, cold без перенастройки и cleanup.
+Регрессии detect: `outlier-sd`, `outlier-iqr`.
+
+`variant-reader-collapse` — task-collapse.md + mixed.csv общего Variant reader;
+expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Values
+сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
+порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
+проверяется принятым `replace-keep-variant`.
+
+`colunion-third-determining`: `transform-coluniondata/acceptance/v040/task-third-determining.md`,
+три CSV из `v040/fixtures`, один экспорт и `expected-third.json` (одна строка).
+`col_union_settings` требует readback `row_count=input`, `determining_input=third`,
+`padding=null` на том же узле до Save; cold читает сохранённые настройки через
+production `readColUnion` и отменяет мастер без применения изменений. CSV без
+этого аудита не даёт PASS: `minimum` возвращает ту же строку.
+
+`coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
+
+`outlier-replacement-limit`, `outlier-delete`, `outlier-constant`: edit E2.
+Утверждённые task-replacement-limit.md/task-delete.md/task-constant.md из
+preprocessing-elimoutlier/acceptance; только replacement-discriminator.csv
+для limit, policies.csv для остальных из fixtures. Независимые expected/oracle
+модели не передаются. Limit SD с множителями 1/2: RowID 8, X=4.463921244845127
+с допуском 1e-10; delete: семь строк порта 0; constant: обе политики -7.
+Для limit выбран replacement-discriminator.csv: он различает границу по нормальной выборке и по всему входу; task-limit.md/policies.csv остаются отдельным примером.
+Полные typed-порты 0/1/2, три CSV, Save, cold без перенастройки и cleanup.
+
+`smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
+`smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
+expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
+передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
+CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
+
+`colunion-third-repeat`: утверждённый `transform-coluniondata/acceptance/v040/task-third.md`,
+три CSV из `acceptance/v040/fixtures`, maximum/repeat, полный mapping семи полей.
+Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
+Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
+`colunion-repeat`, `union-auto-match`.
+
+`linreg-elastic`: C10, утверждённая независимая точка (1,3) на shifted.csv.
+Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
+8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
+прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.
+
+`assnrules-recommend`: обучение и повторное выполнение того же узла на
+`fixtures/v040/recommend-train.csv`, max_items=2, одно следствие, lift=0.
+Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
+Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
+совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.
+
+`assnrules-holdout`: `task-recommendations.md`, только recommend-train.csv и
+recommend-holdout.csv из fixtures/v040. Oracle сохраняет правила train и
+проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
+Аудит требует обучение и apply одного GUID, без повторного Train;
+оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.
+
+`logreg-weights`: Enter с частотными весами Real, 32×9 полных значений.
+Только утверждённые task-weights.md и weighted.csv передаются модели;
+независимый modes/oracle.py и expected.json остаются в harness.
+Weight сохраняется в прогнозе, не используется как фактор. CSV/Save/cold/cleanup.
+
+
+`assnrules-exclude`: train.csv из fixtures/v040, support 50%, confidence 60%,
+lift 0, max_items=3, max_consequents=2, исключение поддержки >90%.
+Только task-exclude.md и train.csv передаются модели. Экспортируются два CSV: наборов и правил.
+Основной прогон строго проверяет наборы и правила (3/2); cold — сохранённые
+флаг исключения/порог 90 и правила B→C/C→B. После Save/Open Loginom 7.4.2
+без Teach возвращает исключённый одиночный набор; число наборов в этом cold
+не сверяется (решение владельца 12.11). Остальные сценарии сохраняют строгий cold.
+Save/cleanup обязательны; expected-exclude*.json генерируются oracle.py --write-exclude.
+Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
+
+`supernode-calc` uses the approved control-supernode/acceptance/task.md and only
+input.csv/replacement.csv. Stock typed output and CSV matchers check the complete
+ordered external output 0 (5×6, then 3×6), exact field order/types and Real abs/rel=0.
+The node audit checks retained Import/container/Calculator/boundary GUIDs and a
+normal NW1 observation of InputNode → Calculator → OutputNode. Cold enters and
+leaves through the production NW1 adapter, observes that graph, then executes the
+saved parent with stock typed reads and cleanup. No settings are reapplied.
+Oracle and expected JSON remain private. Empty input is outside this scenario.
+
+`loop-pages-offline` and `loop-pages-rest` use the frozen control-loop kit and only
+fixtures/pages.csv. A same-workflow Supernode is the live body; one fixed-size
+group (one row) runs sequentially, all optional Loop flags off. Offline requires
+explicit Calculator output mappings in PageNo/Limit/Skip/LastIndex order; REST
+keeps RequestID=0 per iteration and the exact 98-byte httpbin response including
+its final LF. Both require full typed reads, CSV, Save, cold execution without
+configuration and confirmed cleanup. Only task and CSV reach the model; oracle
+and expected remain private. Regression: supernode-calc and rest-get-plain once.
+
+`supernode-vars` uses control-supernode/acceptance/variables/task.md without input
+files. Its independent oracle checks the original Page=99, Limit=2 body: Skip=198,
+exact integer Skip/Page/Limit order, full typed output and downloaded CSV.
+The existing Supernode audit requires InputNode variable links to both converter
+and Calculator, converter table → Calculator → OutputNode, and retained integer
+definition IDs/values and input-port GUID across Save/cold. Only task reaches
+the model; no Loop or XML oracle is involved. Cold uses owned port inspection
+with Close, then stock execution/export checks and confirmed package/logout cleanup.
+
+`logreg-partition-sequential`: утверждённый `modes/partition-sequential/task-partition-sequential.md`
+и только partition.csv. Enter, первые 50% train / следующие 50% test, без валидации.
+Независимый неизменённый modes/oracle.py проверяет прогноз 64×10, типы,
+порядок и NULL; Split/Fold не факторы. Сводка порта 2 в expected не входит;
+размеры выборок доступны в configuration.partition. CSV/Save/cold без Teach
+и cleanup штатные. Только task и CSV получает модель; oracle/expected приватны.
+
+Решение владельца 16.11 `logreg-partition-csv-by-name`: только CSV сценария
+`logreg-partition-sequential` сравнивается по техническим именам независимо
+от порядка колонок (`CSV_COLUMNS_BY_NAME_SCENARIOS`). Native порт0 при первом
+выполнении сохраняет RowID,X,Target, а после reopen+apply — X,Target,RowID
+(E:973/974 и F:1103/1104 против E:1505/F:1631). Набор и число колонок,
+значения, строки и их порядок, NULL и существующие проверки типов остаются
+строгими. Дубли/пропавшие/лишние имена и другие значения отказывают.
+Typed port/cold expected и oracle неизменны; остальные сценарии сохраняют
+свои прежние правила порядка CSV. Это не D76-исключение значений.
+
+Решение владельца 16.11 `logreg-kfold-csv-by-name` добавляет только
+`logreg-validation-kfold` в тот же список: первое выполнение сохраняет
+RowID,X,Target, после переоткрытия — X,Target,RowID. CSV сверяется по
+техническим именам; значения, типы, число строк и набор столбцов строго.
+Порядок в cold строго по неизменённому expected; oracle не меняется.
+
+`logreg-partition-column` (решение владельца `logreg-c6-boolean-split`, 16.11):
+только `partition-column/task-partition-column.md` и `data/partition.csv`.
+Split Boolean: false обучает, true тестирует; Split/Fold не факторы.
+`modes/oracle.py --check` проверяет обновлённый expected: прежние числа,
+64 строки, Boolean Split, конец порядка Note,Fold,Split. Сводка не критерий.
+Для native-перестановки warm/reopen сценарий включён в
+`CSV_COLUMNS_BY_NAME_SCENARIOS`; только CSV сравнивается по именам,
+значения/типы/набор полей строго, cold-порядок строго. Штатные Save/cold/cleanup;
+oracle/expected модели не передаются.
+
+`logreg-validation-kfold`: неизменённые `modes/validation-kfold/task-validation-kfold.md`
+и validation.csv, Enter без нормализации, 100% train, K-fold/3/Последовательный.
+Помимо полного CSV и штатных typed/cold проверок обязательны readback
+folds/sampling и независимые native ValidationSamples=32/ValidationPartitions=3
+из VariablesForm после Teach, привязанные к его execution_id. Cold проверяет
+сохранённые настройки без применения/Teach и строгий порядок expected.
+Полная сводка порта 2 и её метрики в expected не входят; только task/CSV
+передаются модели. Save, cold и cleanup штатные.
+
+
+`loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
+expected-for-{offline,rest}.json with no input files. Only the task reaches the
+model. Sequential literal count=3 substitutes the saved Page definition 99 with
+0/1/2; Limit remains 2 and native integer IterationId is last. Both require full
+typed output, downloaded CSV, Save and cold execution without configuration.
+The private audit observes the variable boundary GUID/definition IDs, local
+converter/Calculator links (and REST when present), saved FOR and identifiers;
+cold compares those identities after opening the saved package. Regression:
+loop-pages-offline, loop-pages-rest, supernode-vars, supernode-calc, rest-get-plain.
+
+
+`node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`
+and only sales.csv. Four nodes Import → Row Filter «Крупные продажи» → Sorting →
+Export; the user then asks to delete the filter, reconnect Import to the same Sorting
+and export all rows. Exactly one verified `loginom_dock_node_delete` (SUCCEEDED,
+output.status deleted, no AMBIGUOUS), frozen sorted six-row CSV, Save, cold with
+`absent_node_types:["transform.filter_data"]` and stock cleanup.
+
+`node-delete-refused` (LAB-1721): approved `node-delete-refused/task.md` and only
+numbers.csv. The user asks to delete a JavaScript node while its 60-second (below the 120 s default execute budget)
+execution runs. Every deletion reply must be NOT_APPLIED with effect_possible:false
+and at least one `NODE_OPERATION_RUNNING`; the node stays, its CSV, Save, cold and
+cleanup use stock checks. Expected/oracle never reach the model.

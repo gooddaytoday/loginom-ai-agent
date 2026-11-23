@@ -1,0 +1,100 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {validateVariablesCalculatorParameters,resolveVariablesCalculatorPatch} from '../lib/variables-calculator-parameters.mjs';
+const fixture=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/variables-calculator/fixtures/expressions.json',import.meta.url)));
+const parameters={expressions:fixture.expressions.map(e=>({target:{kind:'new'},...e}))};
+const request={target:{kind:'new'},inputs:[],mappings:[],read:{ports:[]}};
+const expression=(e,index)=>({...e,index,record_id:'r'+index,expression_id:String(index),description:'',intermediate:false,selected:index===0});
+const observed=expressions=>({verified:true,inventory_complete:true,mode:'expression',expressions:expressions.map(expression)});
+const blank=()=>observed([{name:'Expr1',label:'Выражение1',type:'real',formula:''}]);
+test('stage-0 ordered fixture creates eight typed expressions without a table input',()=>{
+ validateVariablesCalculatorParameters(parameters,'expression',request);
+ const plan=resolveVariablesCalculatorPatch(parameters,blank(),{newNode:true});
+ assert.deepEqual(plan.expressions.map(({name,label,type,formula})=>({name,label,type,formula})),fixture.expressions);
+ assert.equal(plan.changes[0].before.record_id,'r0');
+ assert.equal(plan.expressions[0].record_id,'r0');
+ assert.equal(plan.expressions[6].formula,'""');assert.equal(plan.expressions[7].formula,'NULL');
+});
+test('one saved formula patch preserves identities, types, descriptions and ordered remainder',()=>{
+ const before=observed(fixture.expressions);before.expressions[1].description='Keep me';
+ const p={expressions:[{target:{kind:'existing',name:'limit'},formula:fixture.update.limit}]};
+ validateVariablesCalculatorParameters(p,'expression',{...request,target:{kind:'existing'}});
+ const plan=resolveVariablesCalculatorPatch(p,before);
+ assert.equal(plan.expressions[0].formula,'120');assert.deepEqual(plan.expressions.slice(1),before.expressions.slice(1));
+ assert.equal(before.expressions[0].formula,'100');
+});
+test('unsupported controls and malformed values refuse before mutation',()=>{
+ const e=parameters.expressions[0];
+ for(const p of [{expressions:[]},{...parameters,order:['limit']},{expressions:[{...e,type:'variant'}]},
+  {expressions:[{...e,intermediate:'true'}]},{expressions:[{...e,replace:false}]},{expressions:[{...e,cached:true}]},
+  {expressions:[{...e,target:{kind:'new',name:'limit'}}]},{expressions:[{...e,formula:''}]},
+  {expressions:[{...e,formula:'1\r2'}]},{expressions:[{...e,name:'имя'}]},
+  {expressions:[{...e,description:'x'.repeat(513)}]},{expressions:[e,{...e,name:'LIMIT'}]}])
+  assert.throws(()=>validateVariablesCalculatorParameters(p,'expression',request));
+ assert.throws(()=>validateVariablesCalculatorParameters(parameters,'javascript',request));
+ assert.throws(()=>validateVariablesCalculatorParameters(parameters,'expression',{...request,inputs:[{input:0}]}));
+ assert.throws(()=>validateVariablesCalculatorParameters(parameters,'expression',{...request,mappings:[{port:0}]}));
+ assert.throws(()=>validateVariablesCalculatorParameters(parameters,'expression',{...request,read:{ports:[0]}}));
+});
+test('existing parameters:{} executes saved expressions unchanged; new {} and explicit [] still refuse',()=>{
+ const existing={...request,target:{kind:'existing'},read:{ports:[],variable_ports:[0]}},before=observed(fixture.expressions);
+ validateVariablesCalculatorParameters({},'expression',existing);
+ const plan=resolveVariablesCalculatorPatch({},before);
+ assert.deepEqual(plan.changes,[]);assert.deepEqual(plan.expressions,before.expressions);assert.deepEqual(plan.baseline,before.expressions);
+ assert.throws(()=>validateVariablesCalculatorParameters({},'expression',request),/1–32 expressions required/);
+ assert.throws(()=>resolveVariablesCalculatorPatch({},blank(),{newNode:true}),/1–32 expressions required/);
+ assert.throws(()=>validateVariablesCalculatorParameters({expressions:[]},'expression',existing),/1–32 expressions required/);
+ assert.throws(()=>resolveVariablesCalculatorPatch({expressions:[]},before),/1–32 expressions required/);
+});
+test('resolve all targets and collision constraints before writing the first expression',()=>{
+ const before=observed(fixture.expressions);
+ for(const expressions of [
+  [{target:{kind:'existing',name:'limit'},name:'skip'}],
+  [{target:{kind:'existing',name:'LIMIT'},formula:'2'}],
+  [{target:{kind:'existing',name:'limit'},formula:'120'},{target:{kind:'existing',name:'absent'},formula:'3'}],
+  [{target:{kind:'new'},name:'skip',label:'new',type:'integer',formula:'2'}],
+ ])assert.throws(()=>resolveVariablesCalculatorPatch({expressions},before));
+ const changed=blank();changed.expressions[0].formula='100';
+ assert.throws(()=>resolveVariablesCalculatorPatch(parameters,changed,{newNode:true}),/default/);
+ assert.throws(()=>resolveVariablesCalculatorPatch(parameters,{...blank(),inventory_complete:false},{newNode:true}),/Complete/);
+});
+
+test('published parameter schema agrees on new expressions and saved patches',async()=>{
+ const {variablesCalculatorParametersSchema}=await import('../lib/variables-calculator-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const check=new AjvJsonSchemaValidator().getValidator(variablesCalculatorParametersSchema);
+ for(const p of [parameters,{expressions:[{target:{kind:'existing',name:'limit'},formula:'120'}]},{}])assert.equal(check(p).valid,true);
+ const added=parameters.expressions[0],missing={...added};delete missing.formula;
+ for(const p of [{expressions:[missing]},{expressions:[{...added,target:{kind:'new',name:'limit'}}]},
+  {expressions:[{target:{kind:'existing'},formula:'120'}]},{expressions:[{...added,type:'variant'}]},
+  {expressions:[{...added,formula:'1\r2'}]},{expressions:[{...added,formula:' '}]},{expressions:[]}])assert.equal(check(p).valid,false);
+});
+
+test('datetime and intermediate patches agree with the schema and preserve omitted flags and identities',async()=>{
+ const {variablesCalculatorParametersSchema}=await import('../lib/variables-calculator-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const check=new AjvJsonSchemaValidator().getValidator(variablesCalculatorParametersSchema);
+ const p={expressions:[
+  {target:{kind:'new'},name:'report_date',label:'Дата отчёта',type:'datetime',formula:'EncodeDateTime(2026,11,7,23,59,58,123)'},
+  {target:{kind:'new'},name:'base',label:'Основа',type:'integer',formula:'2',intermediate:true},
+  {target:{kind:'new'},name:'total',label:'Итого',type:'integer',formula:'Expr.base+1'},
+ ]};
+ assert.equal(check(p).valid,true);validateVariablesCalculatorParameters(p,'expression',request);
+ const created=resolveVariablesCalculatorPatch(p,blank(),{newNode:true});
+ assert.equal(created.expressions[1].intermediate,true);assert.equal(created.expressions[0].intermediate,false);
+ assert.equal(created.expressions[2].intermediate,false);
+ const before=observed(created.expressions);before.expressions[1].intermediate=true;
+ const update={expressions:[{target:{kind:'existing',name:'base'},formula:'4'}]};
+ const plan=resolveVariablesCalculatorPatch(update,before);
+ assert.deepEqual(plan.expressions[1],{...before.expressions[1],formula:'4'});
+ assert.deepEqual(plan.expressions.filter(e=>e.name!=='base'),before.expressions.filter(e=>e.name!=='base'));
+ const unset={expressions:[{target:{kind:'existing',name:'base'},intermediate:false}]};
+ assert.equal(check(unset).valid,true);
+ assert.equal(resolveVariablesCalculatorPatch(unset,before).expressions[1].intermediate,false);
+ for(const intermediate of [null,0,1,'false']){
+  const invalid={expressions:[{...update.expressions[0],intermediate}]};
+  assert.equal(check(invalid).valid,false);
+  assert.throws(()=>resolveVariablesCalculatorPatch(invalid,before));
+ }
+});

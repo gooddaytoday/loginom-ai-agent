@@ -1,20 +1,53 @@
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 export const restRequestParametersSchema={type:'object',additionalProperties:false,properties:{
- connection:{type:'object',additionalProperties:false,properties:{name:{...text(120),description:'Module label; reuse only with same URL/ordered query names; else NEW name/base_url.'},base_url:{...text(2048),description:'New native REST connection: absolute HTTP(S) base URL, no query/fragment/credentials. GET with optional query parameters, no auth, certificates verified.'},response_content_type:{type:'string',enum:['application/json','text/html'],description:'Allowed native Content-Type; omit=preserve (new default application/json). httpbin.org/status/200 or /status/404: text/html. Rejected type can give ErrorCode=-1 even for HTTP success.'}},required:['name']},
- query_parameters:{type:'array',minItems:0,maxItems:32,items:{type:'object',additionalProperties:false,properties:{name:{...text(128),description:'Service query name.'},field:{...text(128),description:'Observed string field, input0. Raw values only; handler adds URL encoding. No pre-encoding/codec node.'}},required:['name','field']},description:'All query bindings in order, to raw input fields. Handler URL-encodes once before native REST; preserves source table.'},
-},description:'GET by full URL with query_parameters:[] needs no table input; nonempty string bindings require one raw table input. Explicit settings require finish=execute. For an existing REST directly connected to that raw source, repeat that same source/output in inputs to authorize inserting the encoder on this link; a different source is rejected. This authorizes materializing the automatic URL-encoding step. Do not pre-encode values. The handler creates/reuses a native module connection and its graph reference; table input 0 is the native Data input, not the service or variable port. Output 0 is RequestID/Response text (it can be empty on request failure); output 1 contains RequestID/ErrorCode/ErrorDesc/HttpStatusCode, including failures. HTTP >=400 yields ErrorCode=6 while node execution can complete normally. Derive a request error flag from ErrorCode != 0, not from node execution status or missing response rows. Parse Response using supported downstream transformations and obtain the actual HTTP status from output 1, joining by native RequestID if needed. Existing parameters:{} preserves saved settings and supports Done/Close without executing.'};
+ produce_error_descriptions:{type:'boolean',description:'false removes ErrorDesc from native output 1; true includes it. Omit preserves the saved flag (new default true).'},
+ simulation:{type:'object',additionalProperties:false,properties:{enabled:{type:'boolean'},file_path:{...text(2048),description:'Absolute server path of the delivered response file; required when enabled. Omit simulation to preserve; enabled:false disables.'}},required:['enabled']},
+ connection:{type:'object',additionalProperties:false,properties:{method:{type:'string',enum:['GET','POST','PUT','PATCH','DELETE'],description:'Native HTTP method. New connection defaults to GET; reuse must match. POST/PUT/PATCH requires body_field.'},request_content_type:{type:'string',enum:['application/json','text/plain','application/xml'],description:'POST/PUT/PATCH native request MIME type; omit preserves native setting. Body is sent as UTF-8.'},name:{...text(120),description:'Module label; reuse only with same URL/ordered query names; else NEW name/base_url.'},base_url:{...text(2048),description:'New native REST connection: absolute HTTP(S) base URL, no query/fragment/credentials. HTTP method with optional query parameters, no auth, certificates verified.'},response_content_type:{type:'string',enum:['application/json','text/html','text/plain','*/*'],description:'Allowed native Content-Type; omit=preserve (new default application/json). httpbin.org/status/200 or /status/404: text/html. Rejected type can give ErrorCode=-1 even for HTTP success.'}},required:['name']},
+ query_parameters:{type:'array',minItems:0,maxItems:32,items:{type:'object',additionalProperties:false,properties:{name:{...text(128),description:'Service query name.'},field:{...text(128),description:'Observed string or safe integer field, input0; raw values, no pre-encoding/codec node.'}},required:['name','field']},description:'All query bindings in order, to raw input fields. Handler URL-encodes once before native REST; preserves source table.'},
+ body_field:{...text(128),description:'POST/PUT/PATCH: raw string input0 field sent as UTF-8 body for each row. Required for these methods, forbidden for GET/DELETE; cannot also bind a query parameter. Do not URL-encode the body.'},
+ headers:{type:'array',maxItems:32,items:{type:'object',additionalProperties:false,properties:{name:{...text(128),pattern:"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"},value:{anyOf:[{type:'string',maxLength:2048,pattern:'^[^\\u0000-\\u001f\\u007f]*$'},{type:'object',additionalProperties:false,properties:{variable:{...text(128),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'}},required:['variable']}]}},required:['name','value']},description:'Replace custom headers; omit preserves, [] clears. Case-insensitive unique names; no credentials. value:{variable:"Cycle"}: non-NULL string on variable_inputs kind variables/input 0, independent of table input. Source-only change: execute SAME REST with parameters:{}. Literal change: SAME node, unchanged connection/query_parameters/body_field, new headers, finish=execute.'},
+},description:'POST/PUT/PATCH: connection.method, body_field and one table input. DELETE has no body. GET with query_parameters:[] needs no table input; nonempty raw string/safe integer bindings need one. Explicit settings: finish=execute; encoder insertion needs the SAME raw source/output. Table input 0 is Data, separate from variables. Output 0: RequestID/Response (may be empty on failure). Output 1: RequestID/ErrorCode, optional ErrorDesc, HttpStatusCode. ErrorCode!=0 signals request failure even when node execution completed; HTTP>=400 gives ErrorCode=6. Join Response/status by RequestID. Existing parameters:{} preserves settings; Done/Close supported.'};
 const need=(ok,message)=>{if(!ok)throw Error('REST request: '+message);};
 export function validateRestRequestParameters(p,mode,r){
  need(mode==='request','only request mode is supported');
  need(p&&typeof p==='object'&&!Array.isArray(p),'parameters must be an object');
- need(Object.keys(p).every(k=>['connection','query_parameters'].includes(k)),'only connection and query_parameters are supported in stage 1');
+ need(Object.keys(p).every(k=>['connection','query_parameters','body_field','headers','simulation','produce_error_descriptions'].includes(k)),'only connection, query_parameters, body_field, headers, simulation and produce_error_descriptions are supported in stage 1');
+ if(p.produce_error_descriptions!==undefined)need(typeof p.produce_error_descriptions==='boolean','produce_error_descriptions must be boolean');
+ if(p.simulation!==undefined){
+  const s=p.simulation;
+  need(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['enabled','file_path'].includes(k))&&typeof s.enabled==='boolean','simulation requires enabled and optional file_path');
+  need(!s.enabled||s.file_path!==undefined,'simulation enabled requires file_path');
+  if(s.file_path!==undefined)need(typeof s.file_path==='string'&&s.file_path.length<=2048&&/^\/(?:[^/\\\x00-\x1f\x7f]+\/)*[^/\\\x00-\x1f\x7f]+$/.test(s.file_path)&&s.file_path.split('/').every(p=>p!=='.'&&p!=='..'),'simulation file_path must be an absolute server file path without traversal');
+ }
+ if(p.headers!==undefined){
+  need(Array.isArray(p.headers)&&p.headers.length<=32,'headers requires 0–32 pairs');
+  const names=new Set();
+  for(const h of p.headers){
+   need(h&&typeof h==='object'&&Object.keys(h).sort().join(',')==='name,value','each header requires exactly name and value');
+   need(typeof h.name==='string'&&h.name.length<=128&&/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(h.name),'header name must be an HTTP token');
+   const name=h.name.toLowerCase();
+   need(!names.has(name),'header names must be unique ignoring case');names.add(name);
+   need(!['authorization','proxy-authorization','cookie','set-cookie','x-api-key','api-key','x-auth-token','x-access-token','x-csrf-token'].includes(name)&&!/(^|-)(api-?key|token|secret|password|auth)(-|$)/i.test(name),'credential headers are unsupported');
+   need(!['content-type','content-length','host'].includes(name),'native transport headers are unsupported');
+   const variable=h.value&&typeof h.value==='object'&&!Array.isArray(h.value)&&Object.keys(h.value).join(',')==='variable'&&typeof h.value.variable==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(h.value.variable);
+   need(variable||typeof h.value==='string'&&h.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(h.value),'header value must be a bounded literal without control characters or {variable:name}');
+   if(variable)need(r.target.kind==='existing'||r.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0),'header binding requires native variable input 0');
+  }
+ }
  if(!Object.keys(p).length)need(r.target.kind==='existing','a new request requires connection and query_parameters');
  else{
   need(r.finish==='execute'&&(!p.query_parameters?.length||r.inputs.length===1),'explicit raw query bindings require one table input when nonempty and finish=execute to authorize URL encoding. next_step: retry with a NEW operation_id, '+(r.target.kind==='existing'?'the SAME existing target, inputs confirming the same raw source and output already connected to input 0, unchanged connection/query_parameters, and finish=execute':'one raw table input and finish=execute'));
   const c=p.connection;
-  need(c&&typeof c==='object'&&!Array.isArray(c)&&Object.keys(c).every(k=>['name','base_url','response_content_type'].includes(k)),'connection requires name, optional base_url and response_content_type only');
+  need(c&&typeof c==='object'&&!Array.isArray(c)&&Object.keys(c).every(k=>['name','base_url','response_content_type','method','request_content_type'].includes(k)),'connection requires name, optional base_url, method and content types only');
+  need(c.method===undefined||['GET','POST','PUT','PATCH','DELETE'].includes(c.method),'method must be GET, POST, PUT, PATCH or DELETE');
+  const body=['POST','PUT','PATCH'].includes(c.method);
+  need(c.request_content_type===undefined||(body&&['application/json','text/plain','application/xml'].includes(c.request_content_type)),'request_content_type requires POST/PUT/PATCH and application/json, text/plain or application/xml');
+  if(body){
+   need(typeof p.body_field==='string'&&p.body_field.trim()&&p.body_field.length<=128&&!/[\0\r\n]/.test(p.body_field),'POST/PUT/PATCH requires a string body_field');
+   need(r.inputs.length===1,'body_field requires one table input');
+  }else need(p.body_field===undefined,'body_field is only supported for POST/PUT/PATCH; GET/DELETE has no body');
   need(typeof c.name==='string'&&c.name.trim().length>0&&c.name.length<=120&&!/[\0\r\n]/.test(c.name),'connection.name must be a nonempty single-line label');
-  if(c.response_content_type!==undefined)need(['application/json','text/html'].includes(c.response_content_type),'response_content_type must be application/json or text/html');
+  if(c.response_content_type!==undefined)need(['application/json','text/html','text/plain','*/*'].includes(c.response_content_type),'response_content_type must be application/json, text/html, text/plain or */*');
   if(c.base_url!==undefined){
    need(typeof c.base_url==='string'&&c.base_url.length<=2048,'base_url must be a bounded string');
    let url;try{url=new URL(c.base_url);}catch{throw Error('REST request: base_url must be an absolute HTTP(S) URL');}
@@ -26,10 +59,12 @@ export function validateRestRequestParameters(p,mode,r){
    need(q&&Object.keys(q).sort().join(',')==='field,name','each query binding requires exactly name and field');
    need(['name','field'].every(k=>typeof q[k]==='string'&&q[k].trim()&&q[k].length<=128&&!/[\0\r\n]/.test(q[k])),'query names and fields must be nonempty single-line strings');
    need(!names.has(q.name),'query parameter names must be unique');names.add(q.name);
+   need(q.field!==p.body_field,'body_field cannot also bind a query parameter');
   }
  }
  need(r.target.kind==='existing'||p.query_parameters?.length===0||r.inputs.length===1,'a new request requires one table input at input 0');
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'only table input 0 is supported');
+ need((r.variable_inputs??[]).length<=1&&(r.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),'only native variable input 0 is supported');
  need(r.read.ports.every(port=>port===0||port===1),'only output ports 0 and 1 are available');
  need(r.mappings.every(m=>m.direction==='input'&&m.port===0),'output remapping is outside stage 1; preserve the native REST output fields');
  need(r.finish!=='close'||r.mappings.length===0,'Close cannot commit mappings');

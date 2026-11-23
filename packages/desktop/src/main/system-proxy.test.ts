@@ -3,7 +3,7 @@ import { createServer as createNetServer } from "node:net"
 import { once } from "node:events"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { assignProxyEnvironment, SidecarStartError, startWithProxyFallback } from "./proxy-env"
 import { formatSystemProxyLog, loopbackNoProxy, sidecarEnvironment, startSystemProxyDetection } from "./system-proxy"
 
@@ -15,6 +15,12 @@ test("sidecar receives the application resource root independently of shell and 
     expect(env.DEBUG).toBeUndefined()
   }
   expect(base.LOGINOM_AI_AGENT_RESOURCES).toBe("/untrusted/shell")
+})
+
+test("sidecar finds the bundled ripgrep after the inherited PATH", () => {
+  const env = sidecarEnvironment({ PATH: ["/usr/bin", "/bin"].join(delimiter) }, undefined, "/application/resources/loginom")
+  expect(env.PATH).toBe(["/usr/bin", "/bin", join("/application/resources/loginom", "ripgrep")].join(delimiter))
+  expect(sidecarEnvironment({ PATH: "/usr/bin" }).PATH).toBe("/usr/bin")
 })
 
 test("a later proxy message replaces only proxy variables", () => {
@@ -133,6 +139,34 @@ test("stop() settles detection while chromium hangs", async () => {
   expect(result.state).toBe("direct")
   expect(Date.now() - started).toBeLessThan(500)
 })
+
+test("Windows detection with an immediate read does not wait for the PowerShell timeout without Chromium", async () => {
+  const started = Date.now()
+  const detection = startSystemProxyDetection({
+    platform: "win32",
+    environment: {},
+    read: async () => ({
+      windows: { autoDetect: false, autoConfigUrl: "", proxy: "", bypass: "" },
+    }),
+  })
+  const result = await detection.result
+  expect(result.state).toBe("direct")
+  expect(result.notices).toEqual([])
+  expect(Date.now() - started).toBeLessThan(9000)
+}, 35_000)
+
+test("Windows detection allows a cold read beyond the former total cap", async () => {
+  const detection = startSystemProxyDetection({
+    platform: "win32",
+    read: () => new Promise((resolve) => setTimeout(() => resolve({
+      windows: { autoDetect: false, autoConfigUrl: "", proxy: "", bypass: "" },
+    }), 10_100)),
+  })
+  detection.useChromium(async () => "DIRECT")
+  const result = await detection.result
+  expect(result.state).toBe("direct")
+  expect(result.notices).toEqual([])
+}, 15_000)
 
 test("detection settles by the total cap even if a stage never resolves", async () => {
   const started = Date.now()

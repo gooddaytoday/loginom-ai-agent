@@ -1,0 +1,388 @@
+{
+  "status": "proposal_pending_owner_approval",
+  "series": {
+    "X": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true,
+        "pacf": 1.0
+      },
+      {
+        "lag": 1,
+        "acf": 0.47023809523809523,
+        "error": 0.3535533905932738,
+        "significant": true,
+        "pacf": 0.6721936196477039
+      },
+      {
+        "lag": 2,
+        "acf": 0.25,
+        "error": 0.42459506185692736,
+        "significant": false,
+        "pacf": 0.9282386949173305
+      },
+      {
+        "lag": 3,
+        "acf": -0.005952380952380952,
+        "error": 0.4426126597300262,
+        "significant": false,
+        "pacf": 0.9030150838223789
+      }
+    ],
+    "Y": [
+      {
+        "lag": 0,
+        "acf": 1.0,
+        "error": 0.0,
+        "significant": true,
+        "pacf": 1.0
+      },
+      {
+        "lag": 1,
+        "acf": 0.2916666666666667,
+        "error": 0.3535533905932738,
+        "significant": false,
+        "pacf": 0.2945205479452055
+      },
+      {
+        "lag": 2,
+        "acf": 0.23809523809523808,
+        "error": 0.38244916147262126,
+        "significant": false,
+        "pacf": 0.3362125835489056
+      },
+      {
+        "lag": 3,
+        "acf": -0.4226190476190476,
+        "error": 0.4005492438040773,
+        "significant": true,
+        "pacf": -0.6776241473414283
+      }
+    ]
+  },
+  "frequency_definition": "linear autocovariance through zero-padded DFT, not circular correlation",
+  "pacf_definition": "Pearson of residuals of lag endpoints on an intercept and all intermediate lags, using N-k overlapping rows; lag zero is one",
+  "cases": {
+    "frequency": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.auto_correlation"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.auto_correlation",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Lag",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "X_ACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_StdErr",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_Significant",
+              "label_any": true,
+              "type": "boolean"
+            }
+          ],
+          "rows": [
+            {
+              "Lag": 0,
+              "X_ACF": 1.0,
+              "X_StdErr": 0.0,
+              "X_Significant": true
+            },
+            {
+              "Lag": 1,
+              "X_ACF": 0.47023809523809523,
+              "X_StdErr": 0.3535533905932738,
+              "X_Significant": true
+            },
+            {
+              "Lag": 2,
+              "X_ACF": 0.25,
+              "X_StdErr": 0.42459506185692736,
+              "X_Significant": false
+            },
+            {
+              "Lag": 3,
+              "X_ACF": -0.005952380952380952,
+              "X_StdErr": 0.4426126597300262,
+              "X_Significant": false
+            }
+          ]
+        }
+      ]
+    },
+    "pacf": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.auto_correlation"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.auto_correlation",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Lag",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "X_ACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_StdErr",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_Significant",
+              "label_any": true,
+              "type": "boolean"
+            },
+            {
+              "name": "X_PACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "Lag": 0,
+              "X_ACF": 1.0,
+              "X_StdErr": 0.0,
+              "X_Significant": true,
+              "X_PACF": 1.0
+            },
+            {
+              "Lag": 1,
+              "X_ACF": 0.47023809523809523,
+              "X_StdErr": 0.3535533905932738,
+              "X_Significant": true,
+              "X_PACF": 0.6721936196477039
+            },
+            {
+              "Lag": 2,
+              "X_ACF": 0.25,
+              "X_StdErr": 0.42459506185692736,
+              "X_Significant": false,
+              "X_PACF": 0.9282386949173305
+            },
+            {
+              "Lag": 3,
+              "X_ACF": -0.005952380952380952,
+              "X_StdErr": 0.4426126597300262,
+              "X_Significant": false,
+              "X_PACF": 0.9030150838223789
+            }
+          ]
+        }
+      ]
+    },
+    "multiple": {
+      "package_path": "{{PACKAGE_PATH}}",
+      "nodes": [
+        {
+          "type": "imports.text"
+        },
+        {
+          "type": "research.auto_correlation"
+        },
+        {
+          "type": "exports.text"
+        }
+      ],
+      "outputs": [
+        {
+          "output_node_type": "research.auto_correlation",
+          "output_port": 0,
+          "ordered": true,
+          "column_order": "exact",
+          "columns": [
+            {
+              "name": "Lag",
+              "label_any": true,
+              "type": "integer"
+            },
+            {
+              "name": "X_ACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_StdErr",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "X_Significant",
+              "label_any": true,
+              "type": "boolean"
+            },
+            {
+              "name": "Y_ACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Y_StdErr",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Y_Significant",
+              "label_any": true,
+              "type": "boolean"
+            },
+            {
+              "name": "X_PACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            },
+            {
+              "name": "Y_PACF",
+              "label_any": true,
+              "type": "real",
+              "tolerance": {
+                "abs": 1e-08,
+                "rel": 1e-10
+              }
+            }
+          ],
+          "rows": [
+            {
+              "Lag": 0,
+              "X_ACF": 1.0,
+              "X_StdErr": 0.0,
+              "X_Significant": true,
+              "Y_ACF": 1.0,
+              "Y_StdErr": 0.0,
+              "Y_Significant": true,
+              "X_PACF": 1.0,
+              "Y_PACF": 1.0
+            },
+            {
+              "Lag": 1,
+              "X_ACF": 0.47023809523809523,
+              "X_StdErr": 0.3535533905932738,
+              "X_Significant": true,
+              "Y_ACF": 0.2916666666666667,
+              "Y_StdErr": 0.3535533905932738,
+              "Y_Significant": false,
+              "X_PACF": 0.6721936196477039,
+              "Y_PACF": 0.2945205479452055
+            },
+            {
+              "Lag": 2,
+              "X_ACF": 0.25,
+              "X_StdErr": 0.42459506185692736,
+              "X_Significant": false,
+              "Y_ACF": 0.23809523809523808,
+              "Y_StdErr": 0.38244916147262126,
+              "Y_Significant": false,
+              "X_PACF": 0.9282386949173305,
+              "Y_PACF": 0.3362125835489056
+            },
+            {
+              "Lag": 3,
+              "X_ACF": -0.005952380952380952,
+              "X_StdErr": 0.4426126597300262,
+              "X_Significant": false,
+              "Y_ACF": -0.4226190476190476,
+              "Y_StdErr": 0.4005492438040773,
+              "Y_Significant": true,
+              "X_PACF": 0.9030150838223789,
+              "Y_PACF": -0.6776241473414283
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "null_case": {
+    "proposal": "readable refusal, no imputation or stale result",
+    "native_message": "Данные содержат пустые значения"
+  },
+  "unresolved": [
+    "additional non-power-of-two length comparison for spectral padding"
+  ],
+  "tolerance": {
+    "abs": 1e-08,
+    "rel": 1e-10
+  }
+}

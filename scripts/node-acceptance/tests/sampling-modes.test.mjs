@@ -21,13 +21,13 @@ function fixture(partition=false,mode='random',relaxed=false){
    sample:tables[i].map(r=>want.columns.map(c=>({type:c.type,value:c.type==='integer'?String(r[c.name]):r[c.name],is_null:false})))}})));
  const replies=['first','second'].map(execution_id=>({status:'SUCCEEDED',node:{node_id:'sample'},cleanup_complete:true,
   execution:{status:'completed',execution_id},configuration:{readback:{kind:partition?'data_partition':'sampling',mode,seed:42,
-   counts:Object.values(expected.sampling_modes.requested_sizes),test_priority:false,
+   counts:Object.values(expected.sampling_modes.requested_sizes),test_priority:false,strata_fields:mode==='stratified'?['Class']:[],bias_field:'Class',bias_factors:[{value:'A',factor:0.4},{value:'B',factor:1}],
 }},
   output:{ports:actual.filter(r=>r.execution.execution_id===execution_id).map(r=>r.data)}}));
  const csvs=[0,1].flatMap(()=>expected.outputs.map((want,i)=>[want.columns.map(c=>c.name),...tables[i].map(r=>want.columns.map(c=>String(r[c.name])))]));
  return {expected,actual,replies,csvs};
 }
-for(const partition of [false,true])for(const mode of ['random'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
+for(const partition of [false,true])for(const mode of ['random','stratified','biased'])test(`${partition?'partition':'sampling'} ${mode}: independent repeats, exact types/values, CSV and cold`,()=>{
  const {expected,actual,replies,csvs}=fixture(partition,mode);
  assert.equal(parseSamplingExpected(expected).sample_rows,20);
  const baseline=checkSamplingMain(expected,[{output:{outcome:replies}},...replies],csvs);
@@ -43,14 +43,14 @@ test('proposal remains rejected by stock parser; ordinary exact expectations ret
  assert.equal(matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs).length,1);
  exact.outputs[0].rows[0].Value=999;
  assert.throws(()=>matchExpectedOutputs([actual[0]],parseExpectedOutputs(exact).outputs));
- assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'uniform','/test/x.lgp'),/MODE_UNSUPPORTED/);
+ assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),'uniform','/test/x.lgp'),/GROUP_SIZES_INVALID/);
 });
 test('random decision 1 accepts variable sizes, source ordering and independent partition subsets',()=>{
  for(const partition of [false,true]){
   const f=fixture(partition,'random',true),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
   assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,false);
  }
- for(const mode of ['stratified','biased'])assert.throws(()=>makeSamplingExpected(proposal('preprocessing-sampling'),mode,'/test/x.lgp'),/MODE_UNSUPPORTED/);
+
 });
 test('invariants reject missing or conflicting executions, foreign rows, values/types, repeat ordering, CSV and cleanup',()=>{
  const mutations=[
@@ -95,15 +95,22 @@ test('cold graph requires direct source, own target identity and no substitute t
   const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
  }
 });
-test('saved native model-variables service is admitted only without tabular ports or links',()=>{
- const f=fixture(),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
- const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:'preprocessing.sampling',ref:{node_id:'sample'}},
-  {type:'exports.text',ref:{node_id:'out'}},{type:'bg-vendor-icon-modelvariables',ref:{node_id:'variables'},inputs:[],outputs:[]}],
-  links:[{source:'in',target:'sample',input:0,output:0},{source:'sample',target:'out',input:0,output:0}]};
+for(const partition of [false,true])for(const type of ['bg-vendor-icon-modelvariables','variables.user'])test(`${partition?'partition':'sampling'} cold admits ${type} only without tabular ports or links`,()=>{
+ const f=fixture(partition,'stratified'),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+ // LAB-915 main-extract.jsonl:1: the built-in service exists before Import,
+ // with empty tabular ports and no links; cold.stderr:5 lists it as variables.user.
+ const graph={complete:true,nodes:[{type:'imports.text',ref:{node_id:'in'}},{type:f.expected.sampling_modes.node_type,ref:{node_id:'sample'}},
+  ...f.expected.outputs.map((o,i)=>({type:'exports.text',ref:{node_id:'out-'+i}})),
+  {type,ref:{node_id:'variables'},inputs:[],outputs:[]}],
+  links:[{source:'in',target:'sample',input:0,output:0},...f.expected.outputs.map((o,i)=>({source:'sample',target:'out-'+i,input:0,output:o.output_port}))]};
+ const service=graph.nodes.at(-1);
  assert.equal(checkSamplingGraph(f.expected,graph,baseline),true);
- for(const mutate of [g=>g.nodes[3].inputs.push(0),g=>g.nodes[3].outputs.push(0),
-  g=>g.links.push({source:'variables',target:'sample',input:0,output:0}),g=>g.nodes.push({...g.nodes[3],ref:{node_id:'variables-2'}})]){
-  const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline));
+ for(const mutate of [g=>g.nodes.at(-1).inputs.push(0),g=>g.nodes.at(-1).outputs.push(0),
+  g=>delete g.nodes.at(-1).inputs,g=>delete g.nodes.at(-1).outputs,
+  g=>g.links.push({source:'variables',target:'sample',input:0,output:0}),
+  g=>g.links.push({source:'sample',target:'variables',input:0,output:0}),
+  ...['bg-vendor-icon-modelvariables','variables.user'].map(type=>g=>g.nodes.push({...service,type,ref:{node_id:'variables-2'}}))]){
+  const bad=structuredClone(graph);mutate(bad);assert.throws(()=>checkSamplingGraph(f.expected,bad,baseline),/SAMPLING_GRAPH_SERVICE/);
  }
 });
 test('cold native and Table permutations require independently verified field names and types',()=>{
@@ -139,4 +146,82 @@ test('cold output definition uses owned port, complete native schema and verifie
   else assert.deepEqual((await result).columns,want.columns.map(({name,type})=>({name,type})));
   assert.deepEqual(calls,[port,'table','cancel']);
  }
+});
+test('stratified enforces cardinality, class quotas, port relations and native definition order',()=>{
+ for(const partition of [false,true]){
+  const bad=fixture(partition,'stratified',true);
+  assert.throws(()=>checkSamplingMain(bad.expected,bad.replies,bad.csvs),/ROW_COUNT/);
+  const f=fixture(partition,'stratified'),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+  const cold=structuredClone(f.actual);cold[0].sampling_mapping.columns.reverse();
+  assert.throws(()=>checkSamplingCold(f.expected,cold,baseline),/COLD_MAPPING_PROOF/);
+ }
+ const f=fixture(false,'stratified');
+ for(const r of f.replies)r.output.ports[0].sample=f.expected.sampling_modes.source.slice(0,8).map(row=>f.expected.outputs[0].columns.map(c=>({type:c.type,value:c.type==='integer'?String(row[c.name]):row[c.name],is_null:false})));
+ assert.throws(()=>checkSamplingMain(f.expected,f.replies,f.csvs),/CLASS_QUOTA/);
+ const p=fixture(true,'stratified');
+ for(const r of p.replies)r.output.ports[0].sample[0][0].value=true;
+ assert.throws(()=>checkSamplingMain(p.expected,p.replies,p.csvs),/COMBINED_RELATION/);
+});
+test('biased accepts variable sizes and quotas but requires the observed factors',()=>{
+ for(const partition of [false,true]){
+  const f=fixture(partition,'biased',true),baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+  assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,false);
+  f.replies[0].configuration.readback.bias_factors[0].factor=0.5;
+  assert.throws(()=>checkSamplingMain(f.expected,f.replies,f.csvs),/BIAS_CHANGED/);
+ }
+});
+
+test('cold admits the complete frozen categorical definition without claiming native source links',async()=>{
+ for(const mode of ['stratified','biased','random']){
+  const f=fixture(false,mode),node=f.actual[0].node,want=f.expected.outputs[0];
+  const mapping={verified:true,inventory_complete:true,source_identity_verified:false,autosync:false,source_fields:[],
+   node_context:{...node,output_port:{direction:'output',port:0}},
+   target_fields:want.columns.map(c=>({...c,excluded:false,inherited:false,source:null}))};
+  const channel={openOutputPort:async()=>{},observe:async o=>{assert.ok(o.ready({node_mapping:mapping}));return {node_mapping:mapping};}};
+  const load=async()=>({showMissingValuesMappingTable:async()=>{},closePreparedWizard:async()=>({verified:true,cleanup_complete:true,settings_applied:false})});
+  const run=()=>observeSamplingColdMapping({load,channel,node,port:0,expected:f.expected});
+  if(mode==='random'){await assert.rejects(run(),/MAPPING_OWNER/);continue;}
+  assert.deepEqual((await run()).columns,want.columns.map(({name,type})=>({name,type})));
+  for(const mutate of [m=>m.autosync=true,m=>m.source_fields.push({name:'foreign'}),m=>m.target_fields[0].inherited=true]){
+   const before=structuredClone(mapping);mutate(mapping);await assert.rejects(run(),/MAPPING_OWNER/);Object.assign(mapping,before);
+  }
+ }
+});
+
+for(const partition of [false,true])test('uniform complete membership, repeat, group settings, CSV and cold '+partition,()=>{
+ const f=fixture(partition,'stratified');
+ f.expected.sampling_modes.mode='uniform';f.expected.sampling_modes.group_size_rows=partition?[1,1]:[1];
+ for(const r of f.replies)Object.assign(r.configuration.readback,{mode:'uniform',group_size_rows:partition?[1,1]:[1]});
+ const baseline=checkSamplingMain(f.expected,f.replies,f.csvs);
+ assert.equal(checkSamplingCold(f.expected,f.actual,baseline).evidence.relations,true);
+ const changed=structuredClone(f.replies);changed[0].configuration.readback.group_size_rows=[9];
+ assert.throws(()=>checkSamplingMain(f.expected,changed,f.csvs),/GROUP_SIZES_CHANGED/);
+ if(partition){
+  const overlap=structuredClone(f.replies);overlap.forEach(r=>r.output.ports[2].sample[0]=structuredClone(r.output.ports[1].sample[0]));
+  assert.throws(()=>checkSamplingMain(f.expected,overlap,f.csvs),/TRAIN_TEST_OVERLAP/);
+ }
+});
+
+test('uniform priority checks beginning and end on one node and retains final cold baseline',()=>{
+ const f=fixture(true,'stratified'),source=f.expected.sampling_modes.source;
+ Object.assign(f.expected.sampling_modes,{mode:'uniform',group_size_rows:[1,1],test_priority:true,test_priority_position:'both'});
+ for(const [index,reply] of f.replies.entries()){
+  const test= index===0?source.slice(0,4):source.slice(-4),train=source.slice(4,12);
+  const tables=[[...train.map(r=>({IsTestSet:false,...r})),...test.map(r=>({IsTestSet:true,...r}))],train,test];
+  Object.assign(reply.configuration.readback,{mode:'uniform',group_size_rows:[1,1],test_priority:true,test_priority_position:index===0?'beginning':'end'});
+  for(const [port,data] of reply.output.ports.entries()){
+   data.row_count=tables[port].length;
+   data.sample=tables[port].map(row=>f.expected.outputs[port].columns.map(c=>({type:c.type,value:c.type==='integer'?String(row[c.name]):row[c.name],is_null:false})));
+  }
+ }
+ const csvs=f.replies.flatMap(reply=>reply.output.ports.map(data=>[data.schema.map(c=>c.name),...data.sample.map(row=>row.map(c=>String(c.value)))]));
+ const baseline=checkSamplingMain(f.expected,f.replies,csvs);
+ const cold=['cold1','cold2'].flatMap(execution_id=>f.actual.slice(3).map(r=>({...r,execution:{status:'completed',execution_id},data:{...f.replies[1].output.ports[r.output_port],execution_id}})));
+ assert.equal(checkSamplingCold(f.expected,cold,baseline).evidence.membership,true);
+ const wrong=structuredClone(f.replies);wrong[0].configuration.readback.test_priority_position='end';
+ assert.throws(()=>checkSamplingMain(f.expected,wrong,csvs));
+ const recreated=structuredClone(f.replies);recreated[1].node.node_id='different';
+ assert.throws(()=>checkSamplingMain(f.expected,recreated,csvs));
+ const missing=structuredClone(f.replies);missing[0].output.ports.pop();
+ assert.throws(()=>checkSamplingMain(f.expected,missing,csvs),/PORTS_INCOMPLETE/);
 });

@@ -1,0 +1,13 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.lgd",
+      "label_any": true
+    }
+  ],
+  "lgd": {
+    "kind": "corrupt"
+  },
+  "outputs": []
+}

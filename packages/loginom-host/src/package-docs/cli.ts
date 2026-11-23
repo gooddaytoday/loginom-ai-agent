@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { link, lstat, mkdir, open, realpath, rename, unlink, writeFile } from "node:fs/promises"
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path"
-import { pathToFileURL } from "node:url"
+import { fileURLToPath } from "node:url"
 import { extractPackage } from "./extract"
 import { renderSkeleton } from "./skeleton"
 import { renderReport, validateReport } from "./emit"
@@ -96,12 +96,13 @@ function isErrno(error: unknown, code: string) {
   return !!error && typeof error === "object" && "code" in error && error.code === code
 }
 
-// Node resolves module URLs through symlinks; argv retains the launch path.
+// Compare canonical filesystem paths on both sides: Windows module URLs can
+// retain a different drive-letter case, and argv can name a symlink/junction.
 // Keep this explicit: Bun lowers import.meta.main incorrectly for bundled ESM.
 const entry = process.argv[1] && isAbsolute(process.argv[1])
   ? await realpath(process.argv[1]).catch(() => undefined)
   : undefined
-if (entry && import.meta.url === pathToFileURL(entry).href) {
+if (entry && entry === await realpath(fileURLToPath(import.meta.url)).catch(() => undefined)) {
   await main(process.argv.slice(2)).catch((error: unknown) => {
     process.stderr.write((error instanceof Error && /^PACKAGE_DOCS_[A-Z_]+$/.test(error.message) ? error.message : "PACKAGE_DOCS_FAILED") + "\n")
     process.exitCode = 1

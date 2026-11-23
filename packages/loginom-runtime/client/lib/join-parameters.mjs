@@ -9,7 +9,7 @@ export function validateJoinParameters(p,mode,r){
  if(!preserve){
   need(Object.keys(p).sort().join(',')==='case_sensitive,include_joined_keys,keys','Explicit join keys and options required');
   need(typeof p.case_sensitive==='boolean'&&typeof p.include_joined_keys==='boolean','Explicit join booleans required');
-  need(Array.isArray(p.keys)&&p.keys.length>0&&p.keys.length<=1000,'Bounded nonempty join keys required');
+  need(Array.isArray(p.keys)&&(p.keys.length>0||mode==='full')&&p.keys.length<=1000,'Bounded join keys required; empty keys only for full Cartesian product');
   const left=new Set(),right=new Set();
   for(const k of p.keys){
    need(k&&Object.keys(k).sort().join(',')==='left,right'&&name(k.left)&&name(k.right),'Join key pair requires left and right field names');

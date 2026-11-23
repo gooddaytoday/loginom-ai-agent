@@ -210,6 +210,53 @@ test.skipIf(process.platform !== "linux")(
   20000,
 )
 
+test.skipIf(process.platform !== "linux")(
+  "an unreachable system proxy is reported and not applied",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-cli-proxy-"))
+    // Reserve a port and close it, so nothing listens there.
+    const closed = createServer()
+    closed.listen(0, "127.0.0.1")
+    await once(closed, "listening")
+    const port = portOf(closed)
+    closed.close()
+    try {
+      const bin = join(directory, "bin")
+      await mkdir(bin)
+      await writeFile(
+        join(bin, "gsettings"),
+        `#!/bin/sh
+printf "%s\\n" "org.gnome.system.proxy mode 'manual'" "org.gnome.system.proxy.http host '127.0.0.1'" "org.gnome.system.proxy.http port ${port}" "org.gnome.system.proxy.https host '127.0.0.1'" "org.gnome.system.proxy.https port ${port}"
+`,
+        { mode: 0o755 },
+      )
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "-e",
+          `import { applyCliSystemProxy } from "./src/cli/standalone-proxy.ts"
+const result = await applyCliSystemProxy()
+console.log(JSON.stringify({ state: result.state, http: process.env.HTTP_PROXY ?? null, https: process.env.HTTPS_PROXY ?? null }))`,
+        ],
+        {
+          cwd: agent,
+          env: { ...cleanProxy(process.env), PATH: `${bin}:${process.env.PATH ?? ""}`, XDG_CURRENT_DESKTOP: "GNOME" },
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const output = await new Response(child.stdout).text()
+      const errors = await new Response(child.stderr).text()
+      expect(await child.exited).toBe(0)
+      expect(errors).toContain(`SYSTEM_PROXY_NOT_APPLIED: unreachable 127.0.0.1:${port}`)
+      expect(JSON.parse(output)).toEqual({ state: "direct", http: null, https: null })
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  20000,
+)
+
 function portOf(server: ReturnType<typeof createServer>) {
   const address = server.address()
   if (!address || typeof address === "string") throw new Error("port")

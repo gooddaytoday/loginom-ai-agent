@@ -5,10 +5,11 @@ import {ensureMappingTableView,mappingLinksView} from './mapping-table-view.mjs'
 // Some native source loads complete after their initial response and restore
 // Links view. Admit that state only to restore the owned, unchanged mapping;
 // it is never a substitute for a complete definition page.
-async function observeDefinition(channel,options){
+const outputStage=(s,stage)=>stage?s.wizard?.stage===stage:['output_mapping','input_mapping'].includes(s.wizard?.stage);
+async function observeDefinition(channel,options,stage){
  const accepts=options.ready;
- let state=await channel.observe({...options,ready:s=>accepts(s)||mappingLinksView(s)});
- if(!mappingLinksView(state))return state;
+ let state=await channel.observe({...options,ready:s=>accepts(s)||mappingLinksView(s,stage)});
+ if(!mappingLinksView(state,stage))return state;
  const root=state.wizard.root_ref,tid=state.wizard.root_tid;
  const native=await channel.observe({condition:'owned native mapping before table read',readMappings:true,
   ready:s=>s.wizard?.root_ref===root&&s.wizard.root_tid===tid&&s.node_mapping?.verified===true
@@ -20,21 +21,21 @@ export async function readImportDefinitionPages(channel,{expectedCount,ready=()=
   return readDefinitionPages(channel,{expectedCount,ready,output:false});
 }
 
-export async function readOutputDefinitionPages(channel,{expectedCount,ready=()=>true}={}) {
-  return readDefinitionPages(channel,{expectedCount,ready,output:true});
+export async function readOutputDefinitionPages(channel,{expectedCount,ready=()=>true,stage}={}) {
+  return readDefinitionPages(channel,{expectedCount,ready,output:true,stage});
 }
 
-async function readDefinitionPages(channel,{expectedCount,ready,output}) {
+async function readDefinitionPages(channel,{expectedCount,ready,output,stage}) {
   if(expectedCount!==undefined&&(!Number.isInteger(expectedCount)||expectedCount<1||expectedCount>1000))
     throw new Error('Expected import definition count must be within 1–1000');
   const fields=[];let schemaId=null,total=null,offset=0;
   for(let pageNumber=0;pageNumber<125;pageNumber++) {
     const columnKey=output?'output_columns':'import_columns';
     let state=await (output?observeDefinition:((channel,options)=>channel.observe(options)))(channel,{condition:'complete '+(output?'output':'import')+' definition page at '+offset,
-      [output?'outputColumnPage':'importColumnPage']:{offset,limit:8},ready:state=>(output?['output_mapping','input_mapping'].includes(state.wizard?.stage):state.wizard?.stage==='text_import_format')
+      [output?'outputColumnPage':'importColumnPage']:{offset,limit:8},ready:state=>(output?outputStage(state,stage):state.wizard?.stage==='text_import_format')
         && (state.wizard[columnKey]?.page?.status==='complete_definition_page'
-          || output && state.wizard[columnKey]?.page?.status==='rendered_definition_window')&&ready(state)});
-    if(output)state=await revealOutputPage(channel,state,{offset,schemaId,total,ready});
+          || output && state.wizard[columnKey]?.page?.status==='rendered_definition_window')&&ready(state)},stage);
+    if(output)state=await revealOutputPage(channel,state,{offset,schemaId,total,ready,stage});
     const columns=state.wizard?.[columnKey],p=columns?.page;
     if(p?.status!=='complete_definition_page'||typeof p.schema_id!=='string'||!p.schema_id
       ||p.offset!==offset||p.limit!==8||!Number.isInteger(p.total_columns)||p.total_columns<1||p.total_columns>1000
@@ -52,13 +53,13 @@ async function readDefinitionPages(channel,{expectedCount,ready,output}) {
   throw new Error('Import definition page budget exceeded');
 }
 
-async function revealOutputPage(channel,state,{offset,schemaId,total,ready}) {
+async function revealOutputPage(channel,state,{offset,schemaId,total,ready,stage}) {
   const firstPage=state.wizard.output_columns.page;
   const identity={schema_id:schemaId??firstPage.schema_id,total_columns:total??firstPage.total_columns};
   for(let scrolls=0;state.wizard.output_columns.page.status==='rendered_definition_window';scrolls++) {
     if(scrolls>=128)throw new Error('Output definition scroll budget exceeded');
     const valid=s=>{const c=s.wizard?.output_columns,p=c?.page;
-      return ['output_mapping','input_mapping'].includes(s.wizard?.stage) && p?.status==='rendered_definition_window'
+      return outputStage(s,stage) && p?.status==='rendered_definition_window'
         && p.schema_id===identity.schema_id && p.total_columns===identity.total_columns && p.offset===offset
         && Number.isInteger(p.rendered_start) && Number.isInteger(p.rendered_end) && p.rendered_start>=0
         && p.rendered_end>p.rendered_start && p.rendered_end<=p.total_columns && ready(s);};
@@ -73,24 +74,24 @@ async function revealOutputPage(channel,state,{offset,schemaId,total,ready}) {
         return {verb:'scroll',ref:e.ref,delta_y:direction*500};
       }});
     state=await channel.observe({condition:'output definition page after native scroll',outputColumnPage:{offset,limit:8},
-      ready:s=>['output_mapping','input_mapping'].includes(s.wizard?.stage) && ['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status) && ready(s)});
+      ready:s=>outputStage(s,stage) && ['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status) && ready(s)});
     const p=state.wizard.output_columns.page;
     if(p.schema_id!==identity.schema_id || p.total_columns!==identity.total_columns)throw new Error('Output definitions changed during scroll');
   }
   return state;
 }
 
-export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,fieldAction='click'}={}) {
+export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true,schemaId,total,field,stage,fieldAction='click'}={}) {
   if(!Number.isInteger(offset)||offset<0||offset>=1000)throw new Error('Bounded output definition offset required');
-  const accepts=s=>['output_mapping','input_mapping'].includes(s.wizard?.stage)
+  const accepts=s=>outputStage(s,stage)
     &&['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status)&&ready(s);
-  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts});
-  state=await revealOutputPage(channel,state,{offset,schemaId,total,ready});
+  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts},stage);
+  state=await revealOutputPage(channel,state,{offset,schemaId,total,ready,stage});
   const p=state.wizard.output_columns.page;
   if(p.status!=='complete_definition_page'||p.offset!==offset||schemaId!==undefined&&p.schema_id!==schemaId
     ||total!==undefined&&p.total_columns!==total)throw new Error('Addressed output definition changed');
   if(!field)return state;
-  const identity={offset,ready,schemaId:p.schema_id,total:p.total_columns};
+  const identity={offset,ready,stage,schemaId:p.schema_id,total:p.total_columns};
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===field.index&&f.name===field.name&&f.label===field.label);
   const cellOf=s=>s.ui.elements.find(e=>e.ref===rowOf(s)?.name_ref);
   for(let attempt=0;attempt<128;attempt++){

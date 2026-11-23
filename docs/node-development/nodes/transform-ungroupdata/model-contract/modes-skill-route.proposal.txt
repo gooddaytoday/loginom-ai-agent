@@ -1,0 +1,1 @@
+|Доли итогов|`transform.ungroup_data` / shares, computed|[читать](references/nodes/transform.ungroup_data.md)|

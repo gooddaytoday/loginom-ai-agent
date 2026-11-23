@@ -1,0 +1,153 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.collapse_columns"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.collapse_columns",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Field",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FieldLabel",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Cell",
+          "type": "variant",
+          "label_any": false,
+          "label": "Значение"
+        },
+        {
+          "name": "Kind",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Field": "Text",
+          "FieldLabel": "Text",
+          "Cell": {
+            "cell_type": "string",
+            "value": "alpha"
+          },
+          "Kind": 5
+        },
+        {
+          "RowID": 1,
+          "Field": "Units",
+          "FieldLabel": "Units",
+          "Cell": {
+            "cell_type": "integer",
+            "value": 10
+          },
+          "Kind": 4
+        },
+        {
+          "RowID": 1,
+          "Field": "R",
+          "FieldLabel": "R",
+          "Cell": {
+            "cell_type": "real",
+            "value": 1.25
+          },
+          "Kind": 3
+        },
+        {
+          "RowID": 1,
+          "Field": "B",
+          "FieldLabel": "B",
+          "Cell": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Kind": 1
+        },
+        {
+          "RowID": 1,
+          "Field": "D",
+          "FieldLabel": "D",
+          "Cell": {
+            "cell_type": "datetime",
+            "value": "2026-11-07T12:00:00.000"
+          },
+          "Kind": 2
+        },
+        {
+          "RowID": 2,
+          "Field": "Text",
+          "FieldLabel": "Text",
+          "Cell": {
+            "cell_type": "string",
+            "value": ""
+          },
+          "Kind": 5
+        },
+        {
+          "RowID": 2,
+          "Field": "Units",
+          "FieldLabel": "Units",
+          "Cell": {
+            "cell_type": "integer",
+            "value": 0
+          },
+          "Kind": 4
+        },
+        {
+          "RowID": 2,
+          "Field": "R",
+          "FieldLabel": "R",
+          "Cell": {
+            "cell_type": "real",
+            "value": -2.5
+          },
+          "Kind": 3
+        },
+        {
+          "RowID": 2,
+          "Field": "B",
+          "FieldLabel": "B",
+          "Cell": {
+            "cell_type": "boolean",
+            "value": false
+          },
+          "Kind": 1
+        },
+        {
+          "RowID": 2,
+          "Field": "D",
+          "FieldLabel": "D",
+          "Cell": {
+            "cell_type": "datetime",
+            "value": "2026-11-08T00:00:00.000"
+          },
+          "Kind": 2
+        }
+      ]
+    }
+  ]
+}

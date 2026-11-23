@@ -27,6 +27,12 @@ export function protectWindowsDirectory(path, platform = process.platform) {
   const root = process.env.SystemRoot ?? process.env.SYSTEMROOT;
   if (!root || !win32.isAbsolute(root)) throw new Error('Cannot protect the Windows Dock directory');
   const sid = windowsSid();
+  // /grant:r replaces only the named SIDs. Reset first so explicit foreign
+  // ACEs from restored or manually created directories cannot survive.
+  const reset = spawnSync(win32.join(root, 'System32', 'icacls.exe'), [path, '/reset'], {
+    encoding: 'utf8', windowsHide: true,
+  });
+  if (reset.error || reset.status !== 0) throw new Error('Cannot protect the Windows Dock directory');
   const result = spawnSync(win32.join(root, 'System32', 'icacls.exe'), [path, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], {
     encoding: 'utf8', windowsHide: true,
   });

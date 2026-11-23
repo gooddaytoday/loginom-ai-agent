@@ -3,16 +3,15 @@ import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { createLoginomHost } from "../src/host"
 import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
-import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { stageHeldKnowledge } from "./fixtures/knowledge"
 
-test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interrupt", "close", "generation", "host-close"])(
-  "prepare waits for the existing MCP catalog without late admission: %s",
+test.each(["ready", "unavailable", "deadline", "release", "interrupt", "close", "generation", "host-close"])(
+  "prepare waits for the existing Help catalog without late admission: %s",
   async (ending) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
     if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
@@ -20,34 +19,13 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
     const resources = join(directory, "resources")
     const root = join(directory, "profile")
     const calls = join(directory, "calls.json")
-    const cleanup: (() => void | Promise<void>)[] = []
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    let lists = 0
-    const server = await knowledgeServer(
-      { after: (callback) => cleanup.push(callback) },
-      {
-        list: async () => {
-          if (++lists === 1) {
-            entered.resolve()
-            await release.promise
-          }
-          if (ending === "twice" || ending === "retry" && lists === 1)
-            throw Object.assign(Error("temporary catalog outage"), { code: 503 })
-          if (ending === "semantic") throw Error("invalid catalog")
-          return { tools: server.tools }
-        },
-      },
-    )
     await mkdir(join(resources, "bin"), { recursive: true })
-    await mkdir(join(resources, "runtime/src"), { recursive: true })
     await symlink(node, join(resources, "bin/node"))
-    await symlink(
-      fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+    const catalog = await stageHeldKnowledge(
       join(resources, "runtime/src/knowledge-entry.mjs"),
+      join(directory, "catalog-gate"),
     )
-    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    await Bun.write(join(resources, "knowledge-key"), "UNIT-NONSECRET")
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
@@ -95,7 +73,7 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
     })
     try {
       await host.settled()
-      await entered.promise
+      await catalog.entered()
       expect(await host.api.status()).toMatchObject({ state: "starting", generation: 1 })
       expect(host.acquire("ordinary")).toBeUndefined()
       await client.request("acquire", { run: "one", session: "chat" })
@@ -127,7 +105,7 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
       expect(early).toBeUndefined()
       expect(await readdir(join(root, "recovery"))).toEqual([])
       expect(await Bun.file(calls).exists()).toBe(false)
-      // Both local operations stay responsive while the remote listTools is held.
+      // Both local operations stay responsive while the Help catalog is held.
       expect(await client.request("tools", { run: "local" })).toMatchObject({ tools: expect.any(Array) })
       expect(
         await client.request("call", { run: "local", name: "dock_diagnostics", userMessage: "msg_original" }),
@@ -155,11 +133,11 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
         expect(await pending).toEqual({ error: "LOGINOM_CONNECTION_NOT_READY" })
         expect(await readdir(join(root, "recovery"))).toEqual([])
       }
-      release.resolve()
-      if (["twice", "semantic"].includes(ending)) await expect(host.catalog(1)).rejects.toThrow()
+      await catalog.release(ending === "unavailable" ? "fail" : undefined)
+      if (ending === "unavailable") await expect(host.catalog(1)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
       else if (!["host-close", "generation"].includes(ending)) await host.catalog(1)
       const outcome = await pending
-      if (ending === "ready" || ending === "retry") {
+      if (ending === "ready") {
         expect(outcome).toEqual({ result: { prepared: true } })
         const startup = JSON.parse((await readFile(join(directory, "startup.json"), "utf8")).trim())
         expect(typeof startup.deadline).toBe("number")
@@ -174,28 +152,27 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
         expect(dispatched.name).toBe("dock_prepare")
         expect(dispatched.arguments.timeout_ms).toBeGreaterThan(0)
         expect(dispatched.arguments.timeout_ms).toBeLessThan(budget - 20)
-        expect(lists).toBe(ending === "retry" ? 2 : 1)
+        expect(await catalog.lists()).toBe(1)
       } else {
         if (ending !== "close") expect(outcome).toHaveProperty("error")
         expect(await Bun.file(calls).exists()).toBe(false)
       }
-      if (["retry", "twice", "semantic"].includes(ending)) {
-        expect(lists).toBe(ending === "semantic" ? 1 : 2)
+      if (ending === "unavailable") {
+        expect(await catalog.lists()).toBe(1)
         const log = await readFile(join(root, "knowledge/1/startup-failures.jsonl"), "utf8")
-        expect(log).toContain(ending === "semantic" ? "invalid catalog" : '"code":"503"')
+        expect(log).toContain("LOGINOM_HELP_INTEGRITY")
         expect(log).not.toContain("UNIT-NONSECRET")
         const [id] = await readdir(join(root, "knowledge/1/diagnostics"))
         expect(await readFile(join(root, "knowledge/1/diagnostics", id, "events.jsonl"), "utf8"))
           .toContain("runtime.startup_failure")
-        if (ending !== "retry") expect(await host.api.status()).toMatchObject({ failure: "LOGINOM_RUNTIME_START_FAILED" })
+        expect(await host.api.status()).toMatchObject({ failure: "LOGINOM_RUNTIME_START_FAILED" })
       }
       expect(await readdir(join(root, "recovery"))).toEqual([])
     } finally {
-      release.resolve()
+      await catalog.release()
       client.close()
       await port.close()
       await host.close()
-      for (const close of cleanup.reverse()) await close()
       await rm(directory, { recursive: true, force: true })
     }
   },

@@ -1,0 +1,1 @@
+|Импорт из базы данных (SQLite)|`imports.database` / table, sql|[читать](references/nodes/imports.database.md)|

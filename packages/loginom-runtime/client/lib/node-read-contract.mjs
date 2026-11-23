@@ -6,13 +6,21 @@ const need=(ok,message)=>{if(!ok)throw Error(message);};
 // No input/configuration/mapping edit is requested. Execute the saved node
 // through the existing read lifecycle, rather than committing its wizards
 // after a preliminary execution (which would deactivate that result).
-export function isUnchangedTransformExecution(request){
+export function isUnchangedTransformExecution(request,handler){
  const type=request?.target?.type,p=request?.parameters;
  return request?.target?.kind==='existing'&&request.finish==='execute'
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0
   &&p&&typeof p==='object'&&!Array.isArray(p)
-  &&(type==='transform.join_data'&&['inner','left','right','full','difference'].includes(request.mode)&&Object.keys(p).length===0
+  &&(type==='variables.from_table'&&request.mode==='aggregate'&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
+   ||handler?.binding_schema&&['transform.group_data','transform.sorting'].includes(type)&&request.mode===(type==='transform.group_data'?'aggregate':'keys')&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
+   ||type==='control.supernode'&&['tabular_boundary','variable_boundary'].includes(request.mode)&&Object.keys(p).length===0
+   ||type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
+   ||type==='transform.filter_data'&&request.mode==='conditions'&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
+   ||type==='variables.replace'&&['exact','rules'].includes(request.mode)&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
+   ||type==='transform.enrich_data'&&request.mode==='left'&&Object.keys(p).length===0
+   ||type==='transform.col_union_data'&&request.mode==='positional'&&Object.keys(p).length===0
+   ||type==='transform.join_data'&&['inner','left','right','full','difference'].includes(request.mode)&&Object.keys(p).length===0
    ||type==='transform.reform_columns'&&request.mode==='scalar'&&Object.keys(p).join(',')==='changes'
     &&Array.isArray(p.changes)&&p.changes.length===0);
 }
@@ -20,6 +28,7 @@ export function isUnchangedTransformExecution(request){
 // configuration, not a new file or an upload receipt from a previous session.
 export function isUnchangedTextImportExecution(request){
  return request?.target?.type==='imports.text'&&request.target.kind==='existing'
+  &&!request.bindings?.length
   &&request.mode==='delimited'&&request.finish==='execute'
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0
@@ -32,9 +41,16 @@ function retainedMappingSchemas(node,sourceId,type){
  const r=node.configuration?.readback;
  if(!r)return [];
  const javascript=r.kind==='javascript';
+ if(type==='control.loop')need(r.kind==='loop'&&(r.mode==='group_rows'&&r.group_size===1&&r.iteration_identifiers===false||r.mode==='for'&&Number.isSafeInteger(r.count)&&r.count>0&&r.variable?.type==='integer'&&typeof r.iteration_identifiers==='boolean')
+  &&r.parallel===false&&r.ignore_errors===false&&r.save_configuration===false
+  &&r.body?.ref?.document_id===node.node.document_id&&r.body.ref.workflow_id===node.node.workflow_id,
+ 'Invalid parameters.source_operation_id: supported Loop configuration required');
  // REST retains connection settings at Done, not an output-mapping wizard.
  // Its table schemas must still come from the completed output below.
  const rest=type==='integration.rest_request'&&r.kind==='rest_request';
+ const skippedMaterialization=javascript&&r.schema_mode==='declared'
+  &&['materialization_start','materialization_execute'].every(name=>r.receipt_ids?.includes(sourceId+':'+name)&&node.phases?.filter(p=>p.phase===name
+   &&p.receipt_id===sourceId+':'+name&&p.status==='not_requested'&&p.effect_possible===false).length===1);
  need(node.configuration.status==='applied'
   &&r.scope===(javascript?'observed_after_verified_finish':'observed_before_verified_finish')
   &&r.values_are===(javascript?'independent_owned_source_readback':'observed_ui_values')
@@ -42,7 +58,8 @@ function retainedMappingSchemas(node,sourceId,type){
   &&Array.isArray(r.receipt_ids)&&r.receipt_ids.length>0&&new Set(r.receipt_ids).size===r.receipt_ids.length
   &&(rest?['configure','node_finish']:['finish','output_mapping']).every(phase=>r.receipt_ids.includes(sourceId+':'+phase))
   &&r.receipt_ids.every(id=>node.phases?.filter(p=>p.receipt_id===id&&id===sourceId+':'+p.phase
-   &&p.status==='verified').length===1),
+   &&(p.status==='verified'||skippedMaterialization&&['materialization_start','materialization_execute'].includes(p.phase)
+    &&p.status==='not_requested'&&p.effect_possible===false)).length===1),
   'Invalid parameters.source_operation_id: output mapping readback ownership or receipts differ');
  if(rest)return [];
  if(javascript)need(['code','declared'].includes(r.schema_mode)&&r.settings_preserved===true
@@ -65,69 +82,98 @@ function retainedMappingSchemas(node,sourceId,type){
   return {port:m.port,schema};
  });
 }
-export function buildNodeReadRequest(args,source){
+export function buildNodeReadRequest(args,source,{saves=[]}={}){
  if(source?.kind==='browser_recovery')return buildRecoveredReadRequest(args,source);
  const outcome=source?.outcome,node=outcome?.output,request=source?.parameters;
  // A release after a stopped read keeps the verified configuration and the
  // completed execution; only its output was not refreshed.
+ if(request?.target?.type==='variables.user'){
+  need(outcome.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true&&node.node&&node.execution?.status==='not_requested'
+   &&node.execution.execution_id===null,'Builtin snapshot requires a successful local builtin operation with confirmed cleanup');
+  need(!(args.read?.ports?.length)&&(args.read?.variable_ports===undefined||JSON.stringify(args.read.variable_ports)==='[4]'),'Builtin snapshot reads user output four only');
+  let workflow=request.workflow_ref;
+  const sameWorkflow=(a,b)=>a&&b&&['workflow_id','tab_tid','prefix'].every(k=>a[k]===b[k])&&a.navigation_path?.length===b.navigation_path?.length
+    &&a.navigation_path.every((c,i)=>c.tid===b.navigation_path[i].tid&&c.label===b.navigation_path[i].label);
+  for(const save of saves){
+   const o=save?.outcome;
+   if(save?.action?.action_key!=='package.save_checkpoint'||o?.action_key!=='package.save_checkpoint'||o.status!=='SUCCEEDED'||o.cleanup_complete!==true
+    ||o.output?.save_completed!==true||o.output.workflow_preserved!==true||o.output.reopened!==false)continue;
+   for(const c of o.output.workflow_continuations??[])if(c.document_id===node.node.document_id&&sameWorkflow(c.previous_workflow_ref,workflow)
+     &&['workflow_id','tab_tid','prefix'].every(k=>c.workflow_ref?.[k]===workflow[k]))workflow=c.workflow_ref;
+  }
+  const budget=args.budget_ms??300000;
+  return {operation_id:args.operation_id,contract_revision:request.contract_revision,document_id:node.node.document_id,workflow_ref:structuredClone(workflow),
+   target:{kind:'existing',type:'variables.user',ref:structuredClone(node.node)},inputs:[],mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id},
+   mappings:[],finish:'done',read:{ports:[],variable_ports:[4],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
+ }
  const releasedRead=outcome?.status==='FAILED'&&node?.checkpoint_kind==='local_node_released'&&node.released_phase==='read';
  need((outcome?.status==='SUCCEEDED'||releasedRead)&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
-  &&node.execution?.status==='completed'&&node.node&&!['exports.text','exports.excel'].includes(request?.target?.type),
+  &&node.execution?.status==='completed'&&node.node&&!['exports.text','exports.excel','exports.lgd'].includes(request?.target?.type),
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
  const javascript=request.target.type==='programming.javascript';
  const readback=node.configuration?.readback;
  if(javascript)need(readback?.kind==='javascript', 'JavaScript output reread requires source-bound admission');
  const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.port_kind==='tree'?p.tree.schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
- // original operation requested no preview. Fresh execution and table-schema
+ // original operation requested no preview. Native freshness and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
  const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
- const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
+ const retained=request.target.type==='transform.cross_table'||previews.length===0&&node.output?.variable_ports?.length?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
  // JS binds to the owned full mapping even when an earlier preview exists.
  const schemas=javascript?retained:[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
- need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
+ const observedVariables=node.output?.variable_ports??[];
+ const variablePorts=args.read?.variable_ports??observedVariables.map(p=>p.port);
+ need(variablePorts.every(port=>observedVariables.some(p=>p.port===port&&p.source==='execution'&&p.complete===true&&p.execution_id===node.execution.execution_id)),
+  'Invalid parameters.read.variable_ports: choose complete variable outputs of the executed source');
+ need(schemas?.length>0||variablePorts.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output or variable output');
  const ports=args.read?.ports??schemas.map(p=>p.port);
- need(ports.length>0&&ports.every(p=>schemas.some(s=>s.port===p)),
+ need((ports.length>0||variablePorts.length>0)&&ports.every(p=>schemas.some(s=>s.port===p)),
   'Invalid parameters.read.ports: choose ports present in the completed source result');
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(node.node)},inputs:[],
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 // A browser recovery receipt carries only runtime-proven release facts and the
-// model's attested settings. No schema is trusted from it: the read executes the
-// node fresh and returns the observed output schema as its own evidence.
+// model's attested settings. No schema is trusted from it: the read requires
+// native freshness and returns the observed output schema as its own evidence.
 function buildRecoveredReadRequest(args,receipt){
  const request=receipt.request;
  need(receipt.status==='continuable'&&receipt.facts?.includes('node_released_on_quiet_graph')&&receipt.node&&request?.target
-  &&!['programming.javascript','exports.text','exports.excel'].includes(request.target.type),
+  &&!['programming.javascript','exports.text','exports.excel','exports.lgd'].includes(request.target.type),
   'Invalid parameters.source_operation_id: this browser recovery receipt has no readable table node');
  const ports=args.read?.ports??[0];
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:receipt.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(receipt.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,observed_schema:true,
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(receipt.node)},inputs:[],
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',observed_schema:true,
    schemas:ports.map(port=>({port,schema:null}))},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 export function nodeReadHandler(handler){
  return {revision:handler.revision+':read-existing-v1',modes:[NODE_READ_MODE],
   validate(parameters,mode,request){
+   if(request.target.type==='variables.user'){
+    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&!(request.variable_inputs?.length)&&request.mappings.length===0
+      &&request.finish==='done'&&request.read.ports.length===0&&JSON.stringify(request.read.variable_ports)==='[4]'&&request.read.coverage===undefined
+      &&parameters&&Object.keys(parameters).join(',')==='source_operation_id'&&typeof parameters.source_operation_id==='string','Builtin snapshot cannot execute, configure or read other ports');return;
+   }
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
-    &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
+    &&request.finish===(parameters.execution_policy==='existing'?'done':'execute')&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
    const javascript=request.target.type==='programming.javascript';
    const observed=parameters?.observed_schema===true;
-   need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
+   need(parameters&&(parameters.execution_policy===undefined||['existing','execute'].includes(parameters.execution_policy))
+    &&Object.keys(parameters).filter(k=>k!=='execution_policy').sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
-    &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&parameters.schemas.length>0,
+    &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&(parameters.schemas.length>0||request.read.variable_ports?.length>0),
     'Verified local output schemas required');
    if(parameters.cross_table_policy)need(request.target.type==='transform.cross_table'
     &&parameters.cross_table_policy.kind==='crosstable_sliding'

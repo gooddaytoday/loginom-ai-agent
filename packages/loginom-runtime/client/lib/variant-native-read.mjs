@@ -1,3 +1,83 @@
+// Generic completed-port capability. The owning port reader supplies its
+// existing source/execution guards; no Preview/static-import provenance is used.
+// Serialized into that reader, so all dependencies are explicit.
+export async function createNativeVariantReader(source,{deadline,stable,variableValue=false,treeValue=false},decode,collect,pins,treePins) {
+ const need=(ok,message)=>{if(!ok)throw Error('Variant read: '+message);};
+ const session=source.$S,identity=source.$,owner=identity?.$OW,object=identity?.$O;
+ const interfaceId=treeValue?166:variableValue?427:116;
+ need(typeof variableValue==='boolean'&&typeof treeValue==='boolean'&&!(variableValue&&treeValue)&&identity?.$I===interfaceId&&Number.isInteger(owner)&&Number.isInteger(object),'interface'+interfaceId+' source required');
+ const initial=collect(session),from=Date.FromOADate,bias=Date.AddBias;
+ const treeHelper=treeValue?source.$FHelper:null,treeGetter=treeValue?bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant:null;
+ const hash=async fn=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+ if(treeValue)need(treeHelper?.FBaseProxy===source&&typeof treeGetter==='function'&&await hash(treeGetter)===treePins?.get_as_variant,'tree getter implementation');
+ for(const [key,fn] of Object.entries(initial.functions))need(await hash(fn)===pins.functions[key],'loaded implementation changed: '+key);
+ need(Object.keys(initial.functions).length===Object.keys(pins.functions).length&&JSON.stringify(initial.constants)===JSON.stringify(pins.constants),'runtime constants changed');
+ need(await hash(from)==='e35fbf955d5d95bd97724063fb6e40fbdbc6235e4cb34b00860d9611ff75949c'
+  &&await hash(bias)==='bbabbc4e121b32ea7f93ff900a4fb7cf47ec5853be1a200fc86b993e62262d19','civil datetime implementation changed');
+ let pending=0,retired=false,uncertain=false,bytes=0;
+ const check=message=>{
+  stable();need(!retired&&Date.now()<deadline,'retired or deadline');
+  need(session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
+   &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session transport not live');
+  need(source.$S===session&&source.$===identity&&identity.$OW===owner&&identity.$O===object&&identity.$I===interfaceId,'source changed');
+  if(treeValue)need(source.$FHelper===treeHelper&&treeHelper.FBaseProxy===source
+   &&bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant===treeGetter,'tree getter changed');
+  const current=collect(session);
+  need(initial.objects.every((o,i)=>o===current.objects[i])&&JSON.stringify(initial.constants)===JSON.stringify(current.constants)
+   &&Object.keys(initial.functions).every(k=>initial.functions[k]===current.functions[k]),'loaded runtime changed');
+  if(message)for(const [key,fn] of Object.entries(initial.functions))if(key.startsWith('message.'))need(message[key.slice(8)]===fn,'message implementation changed');
+  need(Date.FromOADate===from&&Date.AddBias===bias,'civil datetime implementation changed');
+ };
+ check();
+ return {
+  get pending(){return pending;},
+  get unsettled(){return pending>0||uncertain;},
+  async read(row,column){
+   need(Number.isSafeInteger(row)&&row>=0&&Number.isInteger(column)&&column>=0&&column<10000,'cell bounds');
+   need(!variableValue||row===0&&column===0,'single variable value bounds');
+   check();need(bytes<512*1024,'native byte budget');
+   let request;
+   try{
+    request=session.$M.GetDynamicData();check(request);request.set_StaticDataSize(variableValue?20:32);
+    request.InitializeMethodCallMessage(owner,object,treeValue?7230:variableValue?1141:321,0);
+    if(treeValue){request.WriteParameter$a(0,column);request.WriteParameter(4,row);}
+    else if(!variableValue){request.WriteParameter(0,row);request.WriteParameter$a(8,column);}
+   }catch(error){try{request?.Release();}catch{uncertain=true;}throw error;}
+   const cell=await new Promise((resolve,reject)=>{
+    pending++;
+    const timer=setTimeout(()=>{retired=true;reject(Error('Variant read: deadline; native cancellation unproven'));},Math.max(1,Math.min(30000,deadline-Date.now())));
+    try{session.DispatchMessageAsync(request,false).continueWith(task=>{
+     let response,cell,error;
+     try{
+      response=task.getAwaitedResult();if(retired)return;
+      check(response);need(response.get_MessageType()===1&&response.get_MessageID()===request.get_MessageID(),'non-value or foreign response');
+      response.set_StaticDataSize(12);
+      const data=response.$FData,size=response.$FDataSize;
+      need(data instanceof Uint8Array&&Number.isInteger(size)&&size>=60&&size<=65536&&size<=data.length,'payload bounds');
+      bytes+=size;need(bytes<=512*1024,'native byte budget');
+      const payload=Array.from(data.subarray(12,size)),decoded=decode(payload,size);
+      let civilTime;
+      if(decoded.tag===7){
+       const local=from(decoded.oadate),pad=(n,w=2)=>String(n).padStart(w,'0');
+       need(Number.isFinite(local.getTime())&&local.getFullYear()>=0&&local.getFullYear()<=9999,'civil datetime range');
+       civilTime={value:pad(local.getFullYear(),4)+'-'+pad(local.getMonth()+1)+'-'+pad(local.getDate())+'T'+pad(local.getHours())+':'+pad(local.getMinutes())+':'+pad(local.getSeconds())+'.'+pad(local.getMilliseconds(),3),
+        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+      }
+      cell={row,column,tag:decoded.tag,payload:payload.slice(0,decoded.consumed_bytes),frame_size:size,...(civilTime?{civilTime}:{})};
+     }catch(cause){error=cause;}
+     finally{
+      try{response?.Release();}catch(cause){uncertain=true;error=cause;}
+      try{request.Release();}catch(cause){uncertain=true;error=cause;}
+      pending--;clearTimeout(timer);
+      if(error)reject(error);else if(!retired)resolve(cell);
+     }
+    });}catch(error){try{request.Release();}catch{uncertain=true;}pending--;clearTimeout(timer);reject(error);}
+   });
+   check();return cell;
+  },
+ };
+}
+
 // Private Collapse capability. Fixed321/interface116, no generic RPC or fallback.
 export async function readNativeVariant(page,b,decode,options={}) {
  return page.evaluate(async ({b,decoder,options})=>{
@@ -13,7 +93,7 @@ export async function readNativeVariant(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const snapshot=()=>{
    const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card.Controller.FController;
-   let treeNode=card.Controller.Node?.data?.node,workflow,packageNode;for(let i=0;treeNode&&i<32;i++,treeNode=treeNode.ParentNode){if(treeNode instanceof bg.app.WorkFlowTreeNode)workflow=treeNode;if(treeNode instanceof bg.app.PackageTreeNode){packageNode=treeNode;break;}}
+   let treeNode=card.Controller.Node?.data?.node,workflow,packageNode;for(let i=0;treeNode&&i<32;i++,treeNode=treeNode.ParentNode){if(!workflow&&treeNode instanceof bg.app.WorkFlowTreeNode)workflow=treeNode;if(treeNode instanceof bg.app.PackageTreeNode){packageNode=treeNode;break;}}
    need(workflow===receipt.nodeTargetWorkflowNode&&packageNode===receipt.packageNode,'workflow/package owner');
    const manager=v(model,'FPreviewManager'),form=v(manager,'FPreviewForm'),node=v(form,'FCurrentPreviewNode'),port=v(form,'FCurrentPreviewPort');
    need(v(manager,'FPreviewVisible')===true&&node?.FGuid===b.node_id&&port?.parent===node&&port.FGuid===b.port_guid&&port.FType===1&&port.FSubType===1&&port.FParam===0,'preview owner/port');
@@ -36,7 +116,7 @@ export async function readNativeVariant(page,b,decode,options={}) {
    let graphLink,sourcePort,inputPort,chainFingerprint='';
    if(b.static_chain){
     const c=b.static_chain;
-    need(c.kind==='crosstable_static_1'&&node.FIconCls==='bg-vendor-icon-crosstab'&&Array.isArray(c.nodes)
+    need((c.kind==='crosstable_static_1'&&node.FIconCls==='bg-vendor-icon-crosstab'||c.kind==='collapse_static_1'&&node.FIconCls==='bg-vendor-icon-columnflipping'&&c.nodes?.length===2)&&Array.isArray(c.nodes)
      &&[1,2].includes(c.nodes.length)&&Array.isArray(c.edges)&&c.edges.length===c.nodes.length,'bounded static CrossTable chain required');
     need(c.nodes[0].node_id===sourceNode.FGuid&&c.nodes[0].icon==='bg-vendor-icon-importtextfile'
      &&c.nodes[0].execution_id===b.static_source.execution_id&&new Set([...c.nodes.map(n=>n.node_id),node.FGuid]).size===c.nodes.length+1,'complete unique chain provenance');

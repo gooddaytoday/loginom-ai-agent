@@ -28,7 +28,17 @@ export async function restLinkCapability(page,t,readValidation){
   const parameters={source_port:{kind:'connection',index:0},target_port:{kind:'connection',index:0}};
   let validation;
   do{need(Date.now()<t.deadline,'validation deadline elapsed');validation=await readValidation(page,context,parameters);need(validation.state!=='rejected','native compatibility rejected the ports');if(validation.state==='pending')await page.waitForTimeout(Math.min(50,t.deadline-Date.now()));}while(validation.state==='pending');
-  await page.mouse.move(validation.point.x,validation.point.y);validation=await readValidation(page,context,parameters);need(validation.state==='ready'&&validation.target_ready,'native target marker is not ready');
+  const before=validation;
+  // As with data links (#1154), another move at the ready center clears mxGraph's marker.
+  if(!validation.target_ready||validation.point.x!==target.x||validation.point.y!==target.y)
+   await page.mouse.move(validation.point.x,validation.point.y);
+  validation=await readValidation(page,context,parameters);
+  if(validation.state!=='ready'||!validation.target_ready){
+   const root=await page.evaluate(prefix=>{const expected=prefix+';ModelForm;cmpDiagram',graph=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph;
+    return {expected,actual:graph.container?.getAttribute('data-tid'),count:document.querySelectorAll('[data-tid='+JSON.stringify(expected)+']').length,connected:graph.container?.isConnected};
+   },t.workflow_ref.prefix).catch(()=>({observed:false}));
+   need(false,'native target marker is not ready; '+JSON.stringify({root,drag_target:target,before,after:validation}));
+  }
   await page.mouse.up();held=false;
   while(await find(edgeTid).count()!==1){need(Date.now()<t.deadline,'connection edge did not settle');await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}
   need(await page.evaluate(t=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram,g=d.FmxGraph;
@@ -44,7 +54,7 @@ export async function restLinkCapability(page,t,readValidation){
 export async function restRequestCapability(page,t,readContext){
  const need=(v,m)=>{if(!v)throw Error('REST request: '+m);};
  const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
- const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',base=root+';RESTRequestWizard;ParamLinks;';
+ const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node},root=t.workflow_ref.prefix+';WizrdMCF',defaultBase=root+';RESTRequestWizard;ParamLinks;';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  let effect=false,step='owned wizard',control=root;
  try{
@@ -77,18 +87,28 @@ export async function restRequestCapability(page,t,readContext){
    return await panel()!==before;
   });await quiet();};
   let inputPages=0;
-  while(!await find(root+';RESTRequestWizard;ParamLinks').isVisible()){
+  // With no URL parameters, POST/PUT/PATCH renders only MessageBody and hides
+  // ParamLinks. The owned page caption identifies the request step in both modes.
+  while((await title()).trim()!=='Настройка запроса'){
    need(inputPages++<3,'input wizard page bound exceeded');
    need((await title()).trim()==='Настройка входных столбцов','unexpected page before request');await advance();
   }
   const read=async()=>{
    await guard();return page.evaluate(({root,base})=>{
-    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard'),p=w?.FRequestConfig;
+    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,w=c.FWizardItems.map(w=>w.FWizard).find(w=>w.constructor.name==='RESTRequestWizard');
+    // POST/PUT/PATCH owns MessageBody. Bind its ParamLinks child through that
+    // native controller and the unique DOM of its own view.
+    const v=bg.TBGHTTPVerb,method=Object.entries({GET:v.httpGET,POST:v.httpPOST,PUT:v.httpPUT,DELETE:v.httpDELETE,PATCH:v.httpPATCH}).find(([,value])=>value===w?.FVerb)?.[0];
+    const body=['POST','PUT','PATCH'].includes(method),p=body?w.FRequestConfig?.FParamLinks:w?.FRequestConfig;
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-    if(!p||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(base.slice(0,-1)).length!==1||p.FView.el.dom!==exact(base.slice(0,-1))[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
+    const tid=body?p?.FView?.el?.dom?.getAttribute('data-tid'):base.slice(0,-1);
+    if(!p||typeof tid!=='string'||!tid.startsWith(root+';RESTRequestWizard;')||!tid.endsWith(';ParamLinks')||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(tid).length!==1||p.FView.el.dom!==exact(tid)[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
      ||p.FItems.grdFields.getStore()!==p.FColumnsStore||p.FItems.grdParams.getStore()!==p.FGrdParamStore||p.FColumnsStore.loading||p.FGrdParamStore.loading||p.FRequestParamLinks.loading||p.FRequestParamLinks.complete!==true)throw Error('Native REST binding inventories are unavailable');
     const columnRows=p.FColumnsStore.getRange(),parameterRows=p.FParamStore.getRange();
-    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
+    if(body&&(!w.FColumns?.Store||w.FColumns.Store.loading||w.FRequestConfig.FColumns!==w.FColumns))throw Error('Native REST body columns are unavailable');
+    // Body selection filters that column out of ParamLinks. Read the owned
+    // source inventory so reconfiguring the same saved body remains valid.
+    const columns=(body?w.FColumns.Store.getRange():columnRows).map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
     const parameters=parameterRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
     // AutoLink changes the rendered draft; FRequestParamLinks still contains
     // the saved bindings until the wizard commits its page.
@@ -101,10 +121,30 @@ export async function restRequestCapability(page,t,readContext){
      return {name:pair[1].data.Name,field:pair[0].data.Name};
     });
     if(columns.length>1000||parameters.length>32||links.length>32)throw Error('REST binding inventory exceeds bound');
-    return {method:w.FVerb,columns,parameters,links};
-   },{root,base});
+    return {method,columns,parameters,links,binding_tid:tid};
+   },{root,base:defaultBase});
   };
-  let current=await read();need(current.method===0,'only GET is supported');
+  let current=await read();
+  const base=current.binding_tid+';';
+  const method=current.method;
+  need(method,'unsupported native HTTP method');
+  need(!t.connection?.method||method===t.connection.method,'native method differs from requested connection');
+  const bodyMethod=['POST','PUT','PATCH'].includes(method);
+  let body_field;
+  if(bodyMethod){
+   const tid=root+';RESTRequestWizard;MessageBody;edtMessageBodyColumn';
+   need(t.body_field===undefined||current.columns.some(c=>c.name===t.body_field&&c.type===5),'body_field requires an observed string input field');
+   await quiet();await guard();await point(tid);
+   const value=()=>find(tid).locator('input').inputValue();
+   if(t.body_field!==undefined&&await value()!==t.body_field){
+    await click(tid+';trg_picker');
+    await wait('request body options',async()=>await find(tid+';boundlist;'+t.body_field).count()===1);
+    await click(tid+';boundlist;'+t.body_field);
+    await wait('request body binding',async()=>await value()===t.body_field);
+   }
+   body_field=await value();
+   need(t.body_field===undefined||body_field===t.body_field,'request body readback differs');
+  }else need(t.body_field===undefined,'GET/DELETE does not support a body');
   if(t.query_parameters){
    need(JSON.stringify(current.parameters.map(p=>p.name))===JSON.stringify(t.query_parameters.map(p=>p.name))&&current.parameters.every(p=>p.type===5),'query parameter definitions differ');
    need(t.query_parameters.every(q=>current.columns.some(c=>c.name===q.field&&c.type===5)),'each query parameter requires an existing string input field');
@@ -122,12 +162,164 @@ export async function restRequestCapability(page,t,readContext){
     control=base+'pnlLinkGrid';current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});
    }
   }
-  const configuration={verified:true,node_context:{...t.node,verified:true},method:'GET',query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
+  const configuration={verified:true,node_context:{...t.node,verified:true},method,...(body_field!==undefined?{body_field}:{}),query_parameters:current.links,input_fields:current.columns.map(c=>({name:c.name,type:c.type===5?'string':'unsupported'}))};
   await advance();
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){
-   const caption=(await title()).trim();if(caption==='Описание узла')return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
-   need(allowed.includes(caption),'unexpected REST wizard page: '+caption);await advance();
+   const caption=(await title()).trim();if(caption==='Описание узла'){
+    need(t.headers===undefined||configuration.headers,'custom headers page was not reached');
+    return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
+   }
+   need(allowed.includes(caption),'unexpected REST wizard page: '+caption);
+   if(caption==='Настройка пользовательских заголовков'&&t.headers!==undefined){
+    const headers=root+';RESTCustomHeadersWizard',grid=headers+';grdCustomHeaders;tbl';
+    const readHeaders=async()=>{
+     await guard();return find(grid).evaluate((table,{root,headers})=>{
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+      if(exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||!c.FCardLayout.getActiveItem().el.dom.contains(table)||exact(headers+';grdCustomHeaders;tbl').length!==1)throw Error('Owned REST header grid changed');
+      const cells=key=>[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';'+key+';StringPropEdit')+'][data-tid$=";PropContainer;ValueContainer;ValueControl"]')];
+      const names=cells('colName'),values=cells('colHeaderValue'),deletes=[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';colDelete_')+']')];
+      if(names.length>32||names.length!==values.length||names.length!==deletes.length)throw Error('REST literal header inventory is unavailable');
+      const field=(e,visible=true)=>{const input=e.querySelector('input'),field=Ext.getCmp(e.id);
+       if(!input||field?.el?.dom!==e||field.inputEl?.dom!==input||visible&&(input.disabled||input.readOnly||!e.getBoundingClientRect().width)||typeof field.getValue()!=='string')throw Error('REST header literal field unavailable');
+       return {tid:e.getAttribute('data-tid'),value:field.getValue()};};
+      return names.map((e,i)=>{
+       const literal=field(values[i],false),base=literal.tid.slice(0,-';PropContainer;ValueContainer;ValueControl'.length);
+       const switches=exact(base+';SwitchButton'),sw=switches.length===1&&Ext.getCmp(switches[0].id);
+       if(sw?.el?.dom!==switches[0]||typeof sw.pressed!=='boolean')throw Error('REST header mode switch is unavailable');
+       const vs=exact(base+';PropContainer;VariableContainer;VariableControl');
+       if(sw.pressed&&vs.length!==1)throw Error('REST header variable control is ambiguous');
+       const value=sw.pressed?{tid:vs[0].getAttribute('data-tid'),variable_mode:true}:field(values[i]);
+       return {name:field(e),value,base,delete_tid:deletes[i].getAttribute('data-tid')};
+      });
+     },{root,headers});
+    };
+    let rows=await readHeaders();
+    if(JSON.stringify(rows.map(r=>r.name.value))!==JSON.stringify(t.headers.map(h=>h.name))){
+     while(rows.length){
+      const count=rows.length;await click(rows[0].delete_tid);
+      rows=await wait('header removed',async()=>{const r=await readHeaders();return r.length===count-1?r:null;});
+     }
+     for(const h of t.headers){
+      const count=(await readHeaders()).length;await click(headers+';btnAddHeader');
+      rows=await wait('header added',async()=>{const r=await readHeaders();return r.length===count+1?r:null;});
+      const row=rows.at(-1);await quiet();await guard();await point(row.name.tid);effect=true;
+      await find(row.name.tid).locator('input').fill(h.name,{timeout:remaining()});await find(row.name.tid).locator('input').press('Tab',{timeout:remaining()});
+      await wait('header name committed',async()=>(await readHeaders()).at(-1)?.name.value===h.name);
+     }
+    }
+    rows=await readHeaders();
+    const readVariable=async row=>{
+     await guard();return find(row.base+';PropContainer;VariableContainer;VariableControl').evaluate((e,{root})=>{
+      const c=Ext.getCmp(e.id),store=c?.getStore?.(),records=store?.getData?.()?.items,owner=document.querySelectorAll('[data-tid='+JSON.stringify(root)+']');
+      if(owner.length!==1||!owner[0].contains(e)||c?.el?.dom!==e||store?.isLoading?.()||!Array.isArray(records)||records.length>128)throw Error('REST header variable inventory unavailable');
+      const variables=records.map(r=>{
+       const v=r.get?.(r.getFields?.()[2]?.getName?.());
+       if(!v||typeof v.DisplayName!=='string'||!Number.isSafeInteger(v.Index)||typeof v.IsNull!=='boolean')throw Error('REST header variable identity unavailable');
+       const option=c.getPicker?.()?.getNode?.(r),tid=option?.getAttribute('data-tid');
+       return {name:v.DisplayName,index:v.Index,type:v.DataType,is_null:v.IsNull,value:v.Value,selected:r.data.field1===c.getValue(),...(tid?{option_tid:tid}:{})};
+      });
+      return variables;
+     },{root});
+    };
+    for(let index=0;index<t.headers.length;index++){
+     let row=(await readHeaders())[index];const h=t.headers[index];
+     if(typeof h.value==='object'){
+      const fields=t.header_variables?.fields?.filter(f=>f.name===h.value.variable);
+      need(t.header_variables?.kind==='variables'&&t.header_variables.port===0&&fields?.length===1,'header variable mapping is unavailable');
+      const f=fields[0];
+      need(f.type===5&&f.source?.type===5&&Number.isSafeInteger(f.id)&&Number.isSafeInteger(f.source.id),'header variable must have a connected string source');
+      if(!row.value.variable_mode){await click(row.base+';SwitchButton');row=await wait('header variable mode',async()=>{const r=(await readHeaders())[index];return r?.value.variable_mode?r:null;});}
+      const select=vs=>{const matches=vs.filter(v=>v.name===f.name&&v.index===f.index);need(matches.length===1,'header variable name/index differs');const v=matches[0];
+       need(v.type===5&&!v.is_null&&typeof v.value==='string'&&v.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(v.value),'header variable requires a bounded non-NULL string without control characters; execute its source, then retry the SAME REST with a NEW operation_id');return v;};
+      let v=select(await readVariable(row));
+      if(!v.selected){
+       await click(row.value.tid+';trg_picker');
+       v=await wait('header variable option',async()=>{const v=select(await readVariable(row));return v.option_tid?v:null;});
+       need(v.option_tid.startsWith(row.value.tid+';boundlist;'),'header variable choice belongs to another picker');await click(v.option_tid);
+       await find(row.value.tid).locator('input').press('Tab',{timeout:remaining()});
+      }
+      await wait('header variable committed',async()=>select(await readVariable(row)).selected);
+      continue;
+     }
+     if(row.value.variable_mode){await click(row.base+';SwitchButton');row=await wait('header literal mode',async()=>{const r=(await readHeaders())[index];return r&&!r.value.variable_mode?r:null;});}
+     if(row.value.value===h.value)continue;
+     await quiet();await guard();await point(row.value.tid);effect=true;
+     await find(row.value.tid).locator('input').fill(h.value,{timeout:remaining()});await find(row.value.tid).locator('input').press('Tab',{timeout:remaining()});
+     await wait('header value committed',async()=>(await readHeaders())[index]?.value.value===h.value);
+    }
+    const observed=[];
+    for(const row of await readHeaders()){
+     const selected=row.value.variable_mode?(await readVariable(row)).filter(v=>v.selected):[];
+     need(!row.value.variable_mode||selected.length===1,'header variable selection is ambiguous');
+     observed.push({name:row.name.value,value:row.value.variable_mode?{variable:selected[0].name}:row.value.value});
+    }
+    need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&JSON.stringify(h.value)===JSON.stringify(t.headers[i].value)),'custom header readback differs');
+    configuration.headers=observed;
+   }
+   if(caption==='Дополнительные параметры'){
+    const advanced=root+';AdditionalParamsWizard',flag=advanced+';pedUseResponseStub;ValueControl',file=advanced+';pedResponseStub;ValueControl';
+    const descriptions=advanced+';pedProduceErrorDescs;ValueControl';
+    const readDescriptions=async()=>{await guard();return page.evaluate(({advanced,descriptions})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),es=exact(descriptions),e=es[0],field=e&&Ext.getCmp(e.id),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0]||es.length!==1||!roots[0].contains(e)
+      ||field?.el?.dom!==e||field.getXType()!=='checkboxfield'||!field.inputEl?.dom||typeof field.getValue()!=='boolean')throw Error('REST error descriptions field binding unavailable');
+     return field.getValue();
+    },{advanced,descriptions});};
+    let observedDescriptions=await readDescriptions();
+    if(t.produce_error_descriptions!==undefined&&observedDescriptions!==t.produce_error_descriptions){
+     await click(descriptions+';DisplayEl');
+     await wait('error descriptions readback',async()=>(await readDescriptions())===t.produce_error_descriptions);
+     observedDescriptions=await readDescriptions();
+    }
+    configuration.produce_error_descriptions=observedDescriptions;
+    const readSimulation=async()=>{await guard();return page.evaluate(({advanced,flag,file})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('Owned REST additional parameters page changed');
+     const fields=[flag,file].map((tid,i)=>{const es=exact(tid),e=es[0],field=e&&Ext.getCmp(e.id);
+      if(es.length!==1||!roots[0].contains(e)||field?.el?.dom!==e||field.getXType()!==(i?'pickerfield':'checkboxfield')||!field.inputEl?.dom)throw Error('REST simulation field binding unavailable');
+      const value=field.getValue();if(typeof value!==(i?'string':'boolean'))throw Error('REST simulation field value unavailable');return value;});
+     return {enabled:fields[0],file_path:fields[1]};
+    },{advanced,flag,file});};
+    let observed=await readSimulation();
+    if(t.simulation){
+     if(t.simulation.enabled&&t.simulation.file_path!==observed.file_path){
+      // Enable the native picker before editing its file path.
+      if(!observed.enabled){await click(flag+';DisplayEl');observed=await wait('simulation enabled',async()=>{const s=await readSimulation();return s.enabled?s:null;});}
+      await quiet();await guard();await point(file);effect=true;
+      const input=find(file).locator('input');await input.fill(t.simulation.file_path,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+     }
+     observed=await readSimulation();
+     if(observed.enabled!==t.simulation.enabled)await click(flag+';DisplayEl');
+     observed=await wait('simulation readback',async()=>{const s=await readSimulation();return s.enabled===t.simulation.enabled&&(!s.enabled||s.file_path===t.simulation.file_path)?s:null;});
+    }
+    configuration.simulation=observed;
+   }
+   if(caption==='Дополнительные параметры'&&t.new_node===true){
+    const advanced=root+';AdditionalParamsWizard';
+    const readDefaults=async()=>{await guard();return page.evaluate(({advanced})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('Owned REST additional parameters page changed');
+     return Object.fromEntries(['pedTimeout','pedFailedRequestRepeat'].map(key=>{
+      const es=exact(advanced+';'+key+';ValueControl'),e=es[0],field=e&&Ext.getCmp(e.id);
+      if(es.length!==1||!roots[0].contains(e)||field?.el?.dom!==e||field.getXType()!=='numberfield'
+       ||!field.inputEl?.dom||field.inputEl.dom.readOnly||field.inputEl.dom.disabled)throw Error('REST default field binding unavailable');
+      return [key,field.getValue()];
+     }));
+    },{advanced});};
+    await quiet();await readDefaults();
+    // A body stall after HTTP 200 reaches the native overall timeout without
+    // another timeout interval; leave retry settings at their native value.
+    const tid=advanced+';pedTimeout;ValueControl';await quiet();await guard();await point(tid);
+    const input=find(tid).locator('input');effect=true;await input.fill('30',{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+    const observed=await wait('REST timeout defaults readback',async()=>{const r=await readDefaults();return r.pedTimeout===30?r:null;});
+    // Private configure evidence; the public parameter/readback contracts stay fixed.
+    configuration.request_defaults={timeout_seconds:observed.pedTimeout,retries:observed.pedFailedRequestRepeat};
+   }
+   await advance();
   }
   throw Error('REST wizard page bound exceeded');
  }catch(error){

@@ -1,0 +1,62 @@
+{
+  "cards": [
+    {
+      "type": "imports.text",
+      "baseline_bytes": 7390,
+      "proposed_bytes": 8154,
+      "budget": 12000
+    },
+    {
+      "type": "exports.text",
+      "baseline_bytes": 3564,
+      "proposed_bytes": 4328,
+      "budget": 12000
+    }
+  ],
+  "apply_projection_on_w1": {
+    "full_input_schema_bytes": 59751,
+    "baseline_full_input_schema_bytes": 59276,
+    "model_tool_bytes": 14512
+  },
+  "skill": {
+    "baseline_bytes": 38215,
+    "proposed_bytes": 38287,
+    "budget": 40000
+  },
+  "routing": [
+    {
+      "text": "| Экспорт CSV/TXT, путь из переменной | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |",
+      "bytes": 142,
+      "budget": 200
+    },
+    {
+      "text": "| Импорт CSV/TXT, путь из переменной | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |",
+      "bytes": 140,
+      "budget": 200
+    }
+  ],
+  "references": [
+    {
+      "type": "imports.text",
+      "baseline_bytes": 4756,
+      "proposed_bytes": 5362,
+      "budget": 6000
+    },
+    {
+      "type": "exports.text",
+      "baseline_bytes": 4887,
+      "proposed_bytes": 5557,
+      "budget": 6000
+    }
+  ],
+  "skill_on_w1": {
+    "baseline_bytes": 38892,
+    "proposed_bytes": 38964,
+    "budget": 40000
+  },
+  "provenance": {
+    "base": "4d4748513c984133147a1f288711733d68661b11",
+    "w1": "d01482c0534d90e652360d56ea7000dcc92ceb52",
+    "status": "proposal_only"
+  }
+}

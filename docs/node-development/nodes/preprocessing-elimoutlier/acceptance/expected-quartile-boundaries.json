@@ -1,0 +1,195 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.elim_outlier"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": -3.25,
+          "Note": "a"
+        },
+        {
+          "RowID": 2,
+          "X": -3.0,
+          "Note": "b"
+        },
+        {
+          "RowID": 3,
+          "X": -2.75,
+          "Note": "c"
+        },
+        {
+          "RowID": 4,
+          "X": 2.0,
+          "Note": "d"
+        },
+        {
+          "RowID": 5,
+          "X": 3.0,
+          "Note": "e"
+        },
+        {
+          "RowID": 6,
+          "X": 3.0,
+          "Note": "f"
+        },
+        {
+          "RowID": 7,
+          "X": 3.0,
+          "Note": "g"
+        },
+        {
+          "RowID": 8,
+          "X": 4.0,
+          "Note": "h"
+        },
+        {
+          "RowID": 9,
+          "X": 5.0,
+          "Note": "i"
+        },
+        {
+          "RowID": 10,
+          "X": 6.0,
+          "Note": "j"
+        },
+        {
+          "RowID": 11,
+          "X": 6.0,
+          "Note": "k"
+        },
+        {
+          "RowID": 12,
+          "X": 6.0,
+          "Note": "l"
+        },
+        {
+          "RowID": 13,
+          "X": 7.0,
+          "Note": "m"
+        },
+        {
+          "RowID": 14,
+          "X": 13.0,
+          "Note": "n"
+        },
+        {
+          "RowID": 15,
+          "X": 13.25,
+          "Note": "o"
+        },
+        {
+          "RowID": 16,
+          "X": 25.0,
+          "Note": "p"
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": -3.25,
+          "Note": "a"
+        },
+        {
+          "RowID": 15,
+          "X": 13.25,
+          "Note": "o"
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 16,
+          "X": 25.0,
+          "Note": "p"
+        }
+      ]
+    }
+  ]
+}

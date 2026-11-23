@@ -1,0 +1,26 @@
+{
+  "files": [
+    {
+      "name": "source.lgd",
+      "bytes": 334,
+      "sha256": "f748f8652775e1173a34c91fe83c5ffe2d51f3b4985e2d612dbab5d086d18725"
+    },
+    {
+      "name": "properties-stage0.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13"
+    },
+    {
+      "name": "corrupt-block.lgd",
+      "bytes": 334,
+      "sha256": "8e89edbc0c84d994d7794ee46e461c0eba95ce0f2ee87cf99467419cef0ef452"
+    }
+  ],
+  "corrupt": {
+    "base": "source.lgd",
+    "copy": "corrupt-block.lgd",
+    "offset": 320,
+    "xor": 1
+  },
+  "qualification": "current live import NOT_RUN; inherited binary fixtures; no candidate handler used"
+}

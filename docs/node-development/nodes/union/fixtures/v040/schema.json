@@ -1,0 +1,16 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ";",
+  "first_line_as_title": true,
+  "null_marker": "NULL",
+  "files": {
+    "main.csv": {
+      "rows": 3,
+      "columns": [{"name": "Code", "label": "Код", "type": "string"}, {"name": "Backup", "label": "Резерв", "type": "string"}, {"name": "Amount", "label": "Сумма", "type": "integer"}]
+    },
+    "second.csv": {
+      "rows": 5,
+      "columns": [{"name": "Amount", "label": "Другая сумма", "type": "integer"}, {"name": "Code", "label": "Резерв", "type": "string"}, {"name": "Reserve", "label": "Резерв", "type": "string"}]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {wizardCloseBinding,boundWizardCloseConfirmation,cancelledWizardReady} from '../lib/node-wizard-close.mjs';
+import {wizardCloseBinding,boundWizardCloseConfirmation,cancelledWizardReady,closePreparedWizard} from '../lib/node-wizard-close.mjs';
 const fixture=()=>{
  const state={prepared_node_context:{verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node'},
   wizard:{status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF',stage:'done',owner_context:{status:'observed',node:{tid:'node',label:'Import'},path:[]}},
@@ -91,4 +91,58 @@ test('output-port cancellation binds both the native opening receipt and observe
   s=>s.prepared_node_context.output_port.port_guid='',s=>s.wizard.port_context.kind='input_data',s=>delete s.wizard.port_context.node.ref]) {
   const altered=structuredClone(state);change(altered);assert.throws(()=>wizardCloseBinding(altered),/prepared wizard/);
  }
+});
+
+// An open column-kind list is read as the sole observation root: only its
+// options are delivered and the wizard Close control is not.
+const listCleanup=({owned=true,escapeCloses=true}={})=>{
+ const root='MF;TF-1;WizrdMCF',node={document_id:'doc',workflow_id:'flow',node_id:'node'};
+ const base=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},
+  wizard:{status:'observed',root_ref:'wizard',root_tid:root,stage:'text_import_format',
+   owner_context:{status:'observed',node:{ref:'n',tid:'node',label:'RU'},path:[]}},ui:{dialogs:[],masks:[],elements:[]}});
+ const listRoot=owned?root:'MF;TF-2;WizrdMCF',listOwner=owned?'wizard':'foreign-wizard';
+ const states={
+  list:()=>{const s=base();s.observation_root={ref:'list'};s.ui.elements=['Неопределенное','Дискретный'].map((label,i)=>({ref:'opt'+i,
+   tid:listRoot+';ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1;tbl;celleditor;cbx;boundlist;'+label,role:'option',label,
+   wizard_combo:{kind:'option',field:{name:'data_kind',scope:'import_column',root_ref:listOwner,owner_ref:'cell',input_ref:'input'},list_ref:'list',label},
+   allowed_actions:['click','press','select_wizard_option']}));return s;},
+  wizard:()=>{const s=base();s.ui.elements=[{ref:'close',tid:root+';btnClose',allowed_actions:['click']}];return s;},
+  confirm:()=>{const s=base();s.ui.dialogs=[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}];
+   s.ui.masks=[{ref:'wizard',kind:'modal_background'}];
+   s.ui.elements=['yes','no'].map(name=>({ref:name,tid:'msgbox;tlb;'+name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},
+    allowed_actions:name==='yes'?['click','confirm_wizard_close']:['click']}));return s;},
+  closed:()=>({wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}}),
+ };
+ let current=states.list();const actions=[];
+ const next=(state,action)=>action.verb==='press'?(escapeCloses?'wizard':'list'):state.ui.elements.find(e=>e.ref===action.ref)?.tid?.endsWith(';btnClose')?'confirm':'closed';
+ const channel={
+  async observe({ready}){assert.equal(ready(current),true,'observation returned an unready state');return structuredClone(current);},
+  async perform({ready,resolve,initialObservation}){
+   const s=initialObservation??current;assert.equal(ready(s),true);const action=resolve(s);
+   const target=s.ui.elements.find(e=>e.ref===action.ref);
+   assert.ok(target?.allowed_actions.includes(action.verb),'action ref was not delivered for '+action.verb);
+   actions.push({verb:action.verb,tid:target.tid,key:action.key});current=states[next(s,action)]();return {status:'SUCCEEDED'};},
+ };
+ return {channel,actions,initial:()=>structuredClone(current)};
+};
+
+for(const release of [true,false])test('release closes an owned open wizard list before Close'+(release?' (stopped release)':''),async()=>{
+ const {channel,actions,initial}=listCleanup();
+ const closed=await closePreparedWizard(channel,release?{initialObservation:initial()}:{});
+ assert.equal(closed.draft_discarded,true);assert.equal(closed.confirmation_required,true);
+ assert.deepEqual(actions.map(a=>[a.verb,a.key??null]),[['press','Escape'],['click',null],['confirm_wizard_close',null]]);
+ assert.match(actions[0].tid,/^MF;TF-1;WizrdMCF;.*;boundlist;Неопределенное$/);
+ assert.equal(actions[1].tid,'MF;TF-1;WizrdMCF;btnClose');
+});
+
+test('a foreign list is never dismissed and Close refuses as before',async()=>{
+ const {channel,actions,initial}=listCleanup({owned:false});
+ await assert.rejects(closePreparedWizard(channel,{initialObservation:initial()}),/Close control is unavailable or ambiguous/);
+ assert.deepEqual(actions,[]);
+});
+
+test('a wizard list that stays open after one Escape keeps the previous refusal',async()=>{
+ const {channel,actions,initial}=listCleanup({escapeCloses:false});
+ await assert.rejects(closePreparedWizard(channel,{initialObservation:initial()}),/Close control is unavailable or ambiguous/);
+ assert.deepEqual(actions.map(a=>a.verb),['press']);
 });

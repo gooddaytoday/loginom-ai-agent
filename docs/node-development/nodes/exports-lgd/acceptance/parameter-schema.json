@@ -1,0 +1,64 @@
+{
+  "type": "object",
+  "properties": {
+    "lgd_export": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Absolute .lgd file in the selected own export directory. Exclusive with bindings.destination."
+        },
+        "compression": {
+          "type": "string",
+          "enum": [
+            "lz4"
+          ],
+          "description": "Native LZ4 compression."
+        },
+        "checksum": {
+          "type": "string",
+          "enum": [
+            "compressed"
+          ],
+          "description": "Checksum of compressed data."
+        },
+        "overwrite": {
+          "type": "string",
+          "enum": [
+            "reject",
+            "replace"
+          ],
+          "description": "Default reject. Replace requires an explicit destination or binding in this request; only the exact own file may be replaced."
+        },
+        "bindings": {
+          "type": "object",
+          "properties": {
+            "destination": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "variable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "required": [
+                "variable"
+              ],
+              "description": "Exact string variable on the connected variables input 0; its observed value must be an own absolute .lgd path."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

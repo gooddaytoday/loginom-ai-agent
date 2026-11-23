@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateReplacementParameters,validateReplacementValue,resolveReplacementParameters} from '../lib/replacement-parameters.mjs';
+import {validateReplacementParameters,validateReplacementValue,resolveReplacementParameters,resolveExternalReplacementParameters} from '../lib/replacement-parameters.mjs';
 const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
@@ -70,4 +70,30 @@ test('partial replacement validates saved rules with the effective output mode',
  assert.deepEqual(resolve({rules:[rule('C')]},fields,[rule('B')],'add').rules.map(r=>r.field.name),['B','C']);
  for(const mode of ['replace','add'])assert.deepEqual(resolve({output_mode:mode},fields,[rule('B'),rule('C')],'replace').rules.map(r=>r.field.name),['B','C']);
  assert.doesNotThrow(()=>resolve({rules:[rule('A')]},fields,[rule('B')],'replace'));
+});
+
+test('Boolean result constants preserve false and NULL and allow keep as Variant and refuse boolean remaining editor',()=>{
+ const p=params(),r=p.rules[0];r.result_type='boolean';r.other={mode:'null'};
+ r.pairs=[{from:value('yes'),to:value(true,'boolean')},{from:value('no'),to:value(false,'boolean')},{from:value(null),to:value(null,'boolean')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ for(const v of ['false',0,1])assert.throws(()=>validateReplacementValue(value(v,'boolean'),'boolean'),/Boolean/);
+ r.other={mode:'keep'};assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ r.result_type='real';r.pairs=[{from:value('1.25'),to:value(1.25,'real')}];assert.throws(()=>validateReplacementParameters(p,'exact',request),/only Boolean/);r.result_type='boolean';
+ r.pairs=[{from:value('yes'),to:value(true,'boolean')}];
+ r.other={mode:'value',value:value(false,'boolean')};assert.throws(()=>validateReplacementParameters(p,'exact',request),/Boolean.*null/);
+});
+test('mixed mode validates exact keys independently of ordered regex pairs',()=>{
+ const p=params(),r=p.rules[0];r.pairs=[{from:value('AB-12'),to:value('EXACT-FIRST')}];r.regex_pairs=[{from:value('AB-([0-9]{2})'),to:value('REGEX')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'mixed',request));
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/mixed/);
+ for(const change of [r=>r.regex_pairs[0].from.value='a*',r=>r.regex_pairs[0].to.value=null,r=>r.result_type='integer',r=>r.case_sensitive=undefined]){const bad=structuredClone(p);change(bad.rules[0]);assert.throws(()=>validateReplacementParameters(bad,'mixed',request));}
+});
+
+test('external roles cover both effective input schemas before mutation',()=>{
+ const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,other:{mode:'keep'},external:{port:1,value:'Value',replacement:'Replacement',information:['Info'],unused:['Ignored']}}]};
+ const r={...request,inputs:[{input:0},{input:1}]},schemas=[[{name:'Code',type:'string'}],['Value','Replacement','Info','Ignored'].map(name=>({name,type:'string'}))];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'external',r));assert.doesNotThrow(()=>resolveExternalReplacementParameters(p,schemas));
+ for(const change of [p=>p.rules[0].pairs=[],p=>p.rules[0].regex_pairs=[],p=>p.rules[0].external.port=2,p=>p.rules[0].external.unused=['Value'],p=>p.rules[0].type='integer']){const bad=structuredClone(p);change(bad);assert.throws(()=>validateReplacementParameters(bad,'external',r));}
+ for(const change of [s=>s[1].pop(),s=>s[1][0].type='integer',s=>s[0].push({name:'CodeInfo',type:'string'}),s=>s[1][0].name='MappedValue']){const bad=structuredClone(schemas);change(bad);assert.throws(()=>resolveExternalReplacementParameters(p,bad));}
+ assert.throws(()=>validateReplacementParameters(p,'exact',r));
 });

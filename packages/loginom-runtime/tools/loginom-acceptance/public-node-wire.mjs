@@ -11,11 +11,15 @@ import {appendFile,writeFile} from 'node:fs/promises';
 
 export async function createPublicNodeWire(runtime,{directory,browserSequence,userProfile=false}) {
  const server=new Server({name:'dock-public-node-live-qa',version:'1'},{capabilities:{tools:{}}});
- const definitions=[...runtime.tools.filter(t=>isNodeApiTool(t.name)||t.name==='dock_action_run').map(t=>userProfile&&isNodeApiTool(t.name)?{...t,outputSchema:userResultSchema}:t),{name:'qa_user_node_status',description:'Operator-only verification of the actual compact node result',inputSchema:{type:'object',properties:{operation_id:{type:'string'}},required:['operation_id'],additionalProperties:false},outputSchema:userResultSchema}];
+ const definitions=[...runtime.tools.filter(t=>isNodeApiTool(t.name)||['dock_action_run','dock_action_describe'].includes(t.name)).map(t=>userProfile&&isNodeApiTool(t.name)?{...t,outputSchema:userResultSchema}:t),{name:'qa_user_node_status',description:'Operator-only verification of the actual compact node result',inputSchema:{type:'object',properties:{operation_id:{type:'string'}},required:['operation_id'],additionalProperties:false},outputSchema:userResultSchema}];
  server.setRequestHandler(ListToolsRequestSchema,async()=>({tools:definitions}));
  server.setRequestHandler(CallToolRequestSchema,async(request,extra)=>{
   const {name,arguments:args={}}=request.params;
   try {
+   if(name==='dock_action_describe'){
+    const description=runtime.describe(args);
+    return {content:[{type:'text',text:JSON.stringify(description)}],structuredContent:description};
+   }
    if(name==='qa_user_node_status')return nodeResultReply(runtime.nodeApplyStatus(args.operation_id),{userProfile:true});
    const result=isNodeApiTool(name)?await dispatchNodeApi(runtime,name,args,{signal:extra.signal}):name==='dock_action_run'
     ?await runtime.run(args.action_key,args.parameters,{operationId:args.operation_id,signal:extra.signal}):null;

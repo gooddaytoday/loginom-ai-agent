@@ -40,6 +40,16 @@ function alive(pid: number) {
   }
 }
 
+function killIfPresent(pid: number) {
+  if (!pid) return
+  try {
+    process.kill(pid, "SIGKILL")
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") return
+    throw error
+  }
+}
+
 async function tmpdir() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-core-test-"))
   return {
@@ -229,6 +239,128 @@ describe("cross-spawn spawner", () => {
   })
 
   describe("process control", () => {
+    for (const scenario of [
+      "scope-stubborn",
+      "scope-exited",
+      "scope-exited-stubborn",
+      "kill-detached",
+      "kill-exited-detached",
+    ] as const) {
+      fx.live(
+        `bounds cancellation with inherited stdio: ${scenario}`,
+        Effect.gen(function* () {
+          if (process.platform !== "linux") return
+
+          const tmp = yield* Effect.acquireRelease(
+            Effect.promise(() => tmpdir()),
+            (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+          )
+          const marker = path.join(tmp.path, "ready")
+          const child = yield* Effect.acquireRelease(
+            Effect.sync(() => ({ pid: 0 })),
+            (child) =>
+              Effect.sync(() => {
+                killIfPresent(child.pid)
+              }),
+          )
+          const detached = scenario.includes("detached")
+          const exited = scenario.includes("exited")
+          const released = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const code = [
+                'const fs = require("node:fs")',
+                scenario.endsWith("stubborn") ? 'process.on("SIGTERM", () => {})' : "",
+                `fs.writeFileSync(${JSON.stringify(marker)}, String(process.pid))`,
+                "setTimeout(() => process.exit(0), 8000)",
+              ]
+                .filter(Boolean)
+                .join("; ")
+              const handle = yield* js(
+                [
+                  'const { spawn } = require("node:child_process")',
+                  `const child = spawn(process.execPath, ["-e", ${JSON.stringify(code)}], { detached: ${detached}, stdio: ["ignore", 1, 2] })`,
+                  "child.unref()",
+                  exited ? "process.exit(0)" : "setInterval(() => {}, 1000)",
+                ].join("; "),
+                { forceKillAfter: 500 },
+              )
+              yield* Effect.gen(function* () {
+                while (!child.pid) {
+                  child.pid = Number(yield* Effect.promise(() => fs.readFile(marker, "utf8").catch(() => "0")))
+                  if (!child.pid) yield* Effect.sleep("10 millis")
+                }
+              }).pipe(Effect.timeout("3 seconds"))
+              if (exited) expect(yield* Effect.promise(() => gone(Number(handle.pid)))).toBe(true)
+              const started = Date.now()
+              if (detached) yield* handle.kill({ forceKillAfter: 500 })
+              return { started, pid: Number(handle.pid) }
+            }),
+          )
+          const elapsed = Date.now() - released.started
+          // The 500 ms allowance covers scheduling around the 500 + 2000 ms bound.
+          expect(elapsed).toBeLessThan(3_000)
+          expect(yield* Effect.promise(() => gone(released.pid))).toBe(true)
+          if (detached) {
+            expect(alive(child.pid)).toBe(true)
+            return
+          }
+          // Orphans may remain as zombies until the host's init reaps them.
+          // Closing the pipe can precede the kernel's final process state change.
+          yield* Effect.gen(function* () {
+            while (true) {
+              const state = yield* Effect.promise(() => fs.readFile(`/proc/${child.pid}/stat`, "utf8").catch(() => ""))
+              if (state === "" || state.slice(state.lastIndexOf(")") + 2).startsWith("Z ")) return
+              yield* Effect.sleep("10 millis")
+            }
+          }).pipe(Effect.timeout("1 second"))
+        }),
+        15_000,
+      )
+    }
+
+    fx.live(
+      "bounds release when a detached descendant keeps stdio",
+      Effect.gen(function* () {
+        if (process.platform === "win32") return
+
+        const tmp = yield* Effect.acquireRelease(
+          Effect.promise(() => tmpdir()),
+          (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+        )
+        const marker = path.join(tmp.path, "descendant")
+        const descendant = yield* Effect.acquireRelease(
+          Effect.sync(() => ({ pid: 0 })),
+          (child) =>
+            Effect.sync(() => {
+              killIfPresent(child.pid)
+            }),
+        )
+        const released = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const handle = yield* js(
+              [
+                'const { spawn } = require("node:child_process")',
+                'const fs = require("node:fs")',
+                'const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 8000)"], { detached: true, stdio: ["ignore", 1, 2] })',
+                "child.unref()",
+                `fs.writeFileSync(${JSON.stringify(marker)}, String(child.pid))`,
+                "setInterval(() => {}, 1000)",
+              ].join("; "),
+            )
+            while (!descendant.pid) {
+              descendant.pid = Number(yield* Effect.promise(() => fs.readFile(marker, "utf8").catch(() => "0")))
+              if (!descendant.pid) yield* Effect.sleep("10 millis")
+            }
+            return { pid: Number(handle.pid), started: Date.now() }
+          }),
+        )
+        expect(yield* Effect.promise(() => gone(released.pid))).toBe(true)
+        expect(Date.now() - released.started).toBeLessThan(4_000)
+        expect(alive(descendant.pid)).toBe(true)
+      }),
+      15_000,
+    )
+
     fx.effect(
       "kills a running process",
       Effect.gen(function* () {

@@ -1,13 +1,14 @@
 import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { basename, isAbsolute, join } from "node:path"
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron"
-import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
+import type { IpcMainEvent, IpcMainInvokeEvent, WebContents } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
+import type { FatalRendererError, PendingDeepLinks, ServerReadyData, TitlebarTheme } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
@@ -23,7 +24,7 @@ import {
   setTitlebar,
   updateTitlebar,
 } from "./windows"
-import type { UpdaterController } from "./updater-controller"
+import type { setupAutoUpdater } from "./updater"
 import { createUpdaterSubscriptions } from "./updater-subscriptions"
 import { createDesktopDraftStore } from "./draft-store"
 import { nativeT } from "./native-translations"
@@ -39,7 +40,12 @@ type Deps = {
   killSidecar: () => Promise<void> | void
   relaunch: () => void
   awaitInitialization: () => Promise<ServerReadyData>
-  consumeInitialDeepLinks: () => Promise<string[]> | string[]
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
+  isDashboardWork: (directory: string) => Promise<boolean>
+  consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
   isFirstLaunchOnboardingPending: () => Promise<boolean> | boolean
@@ -49,13 +55,19 @@ type Deps = {
   setDisplayBackend: (backend: string | null) => Promise<void> | void
   checkAppExists: (appName: string) => Promise<boolean> | boolean
   resolveAppPath: (appName: string) => Promise<string | null>
-  updater: UpdaterController
+  updater: ReturnType<typeof setupAutoUpdater>
   showUpdater: () => Promise<void> | void
   setBackgroundColor: (color: string) => void
   exportDebugLogs: () => Promise<string>
+  diagnostics: {
+    prepare: (request: unknown) => Promise<unknown>
+    preview: (id: unknown, name: unknown) => Promise<unknown>
+    save: (id: unknown, window?: BrowserWindow) => Promise<string | undefined>
+  }
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   setNativeTranslations: (bundle: DesktopNativeBundle) => void
   systemProxyEnabled: () => boolean
+  systemProxyStatus: () => Promise<SystemProxyStatus>
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -68,15 +80,23 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
-  ipcMain.handle("get-system-proxy-status", () => ({
-    ...currentSystemProxyStatus(),
-    enabled: deps.systemProxyEnabled(),
-  }))
+  ipcMain.handle("get-system-proxy-status", () => deps.systemProxyStatus())
   ipcMain.handle("set-system-proxy-enabled", (_event: IpcMainInvokeEvent, enabled: boolean) => {
     getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
   })
-  ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
+  ipcMain.handle("consume-deep-links", (event) => deps.consumeDeepLinks(event.sender))
+  ipcMain.handle("get-dashboard-target", (_event, id: string) => deps.getDashboardTarget(id))
+  ipcMain.handle("check-dashboard-target", (_event, id: string) => deps.checkDashboardTarget(id))
+  ipcMain.handle("is-dashboard-work", async (_event, directory: unknown) => {
+    if (typeof directory !== "string" || !isAbsolute(directory)) return false
+    try {
+      return await deps.isDashboardWork(directory)
+    } catch {
+      // The directory can disappear between the filesystem checks.
+      return false
+    }
+  })
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
   ipcMain.handle("set-default-server-url", (_event: IpcMainInvokeEvent, url: string | null) =>
     deps.setDefaultServerUrl(url),
@@ -105,9 +125,17 @@ export function registerIpcHandlers(deps: Deps) {
   })
   ipcMain.handle("updater-unsubscribe", (event) => updaterSubscriptions.delete(event.sender.id))
   ipcMain.handle("updater-check", () => deps.updater.check())
-  ipcMain.handle("updater-install", () => deps.updater.install())
+  ipcMain.handle("updater-install", () => deps.updater.requestInstall())
+  ipcMain.handle("updater-set-channel", (_event, channel: "stable" | "unstable") => deps.updater.setChannel(channel))
   ipcMain.handle("set-background-color", (_event: IpcMainInvokeEvent, color: string) => deps.setBackgroundColor(color))
   ipcMain.handle("export-debug-logs", () => deps.exportDebugLogs())
+  ipcMain.handle("diagnostics-prepare", (_event: IpcMainInvokeEvent, request: unknown) => deps.diagnostics.prepare(request))
+  ipcMain.handle("diagnostics-preview", (_event: IpcMainInvokeEvent, id: unknown, name: unknown) =>
+    deps.diagnostics.preview(id, name),
+  )
+  ipcMain.handle("diagnostics-save", (event: IpcMainInvokeEvent, id: unknown) =>
+    deps.diagnostics.save(id, BrowserWindow.fromWebContents(event.sender) ?? undefined),
+  )
   ipcMain.handle("set-force-focus", (event: IpcMainInvokeEvent, enabled: boolean) =>
     setForceFocus(event.sender, enabled),
   )
@@ -219,6 +247,7 @@ export function registerIpcHandlers(deps: Deps) {
   )
 
   ipcMain.on("open-external", (_event: IpcMainEvent, url: string) => {
+    if (deps.updater.openUpdateLink(url)) return
     openExternalURL(url)
   })
 
@@ -235,13 +264,13 @@ export function registerIpcHandlers(deps: Deps) {
     })
   })
 
-  ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string) => {
+  ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string, options?: { checkOnly?: boolean }) => {
     const exists = await stat(path).then(
-      () => true,
+      (info) => (options?.checkOnly ? info.isFile() : true),
       () => false,
     )
     if (!exists) return false
-    shell.showItemInFolder(path)
+    if (!options?.checkOnly) shell.showItemInFolder(path)
     return true
   })
 
@@ -313,6 +342,6 @@ export function sendMenuCommand(win: BrowserWindow, id: string) {
   win.webContents.send("menu-command", id)
 }
 
-export function sendDeepLinks(win: BrowserWindow, urls: string[]) {
-  win.webContents.send("deep-link", urls)
+export function notifyDeepLinks(win: BrowserWindow) {
+  win.webContents.send("deep-link")
 }

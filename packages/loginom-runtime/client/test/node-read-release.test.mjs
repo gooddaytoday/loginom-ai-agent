@@ -11,7 +11,7 @@ const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspa
 const schema=[{index:0,name:'Region',label:'Регион',type:'string'}];
 const source={parameters:{contract_revision:'1.0.0',target:{type:'transform.sorting'},workflow_ref:workflow},
  outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}};
-const request=()=>buildNodeReadRequest({operation_id:'read-ru',source_operation_id:'rename-ru'},source);
+const request=()=>buildNodeReadRequest({operation_id:'read-ru',source_operation_id:'rename-ru',execution:'execute'},source);
 const refused={operation_id:'read-ru:n19',action_key:'ui.act',status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,
  cleanup_complete:true,error:{code:'GRAPH_EXECUTION_CONTEXT_CHANGED'},trace:[{event:'ui_observation_started'}]};
 

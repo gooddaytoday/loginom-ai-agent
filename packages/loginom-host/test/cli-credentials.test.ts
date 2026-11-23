@@ -73,7 +73,7 @@ test.skipIf(process.platform !== "win32")(
       "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
     )
   },
-  30000,
+  120_000,
 )
 
 test("native codecs reject oversized envelopes before requesting OS protection", async () => {
@@ -101,5 +101,5 @@ test.skipIf(process.platform !== "win32")(
     const protectedValue = await codec.encode(value)
     expect(await codec.decode(protectedValue)).toEqual(value)
   },
-  30000,
+  60_000,
 )

@@ -9,6 +9,11 @@ import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
+import {preflightBooleanBindings} from '../lib/variable-binding-source.mjs';
+import {booleanBindingSchema} from '../lib/variable-binding-parameters.mjs';
+import {validateGroupingParameters} from '../lib/grouping-parameters.mjs';
+import {validateSortingParameters} from '../lib/sorting-parameters.mjs';
 for(const cleanup of [true,false])test('proved native error uses NODE_EXECUTION_FAILED and standard release; cleanup='+cleanup,async()=>{
  const f=fixture(),message='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
  f.drivers.finish=async()=>{throw Object.assign(Error(message),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message,native:{source:'loginom_error_toast'}}});};
@@ -42,6 +47,74 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const [type,mode,parameter] of [['transform.group_data','aggregate','/sort_result'],['transform.sorting','keys','/compare_with_locale']])
+test(type+' target preflight retains the builtin source node required by v040',async()=>{
+ const f=fixture(),p=request(),source={document_id:'doc',workflow_id:'workflow',node_id:'variables'},table={...source,node_id:'table'};
+ p.target={kind:'new',type};p.mode=mode;
+ p.parameters=type==='transform.group_data'?{group_by:[{kind:'input_field',name:'Region'}],measures:[{field:{kind:'input_field',name:'Amount'},function:'sum',name:'Metric',label:'Metric'}]}:{keys:[{field:{kind:'input_field',name:'Region'},direction:'ASC',case_sensitive:false}]};
+ p.inputs=[{source:table,output:0,input:0}];
+ p.bindings=[{parameter,variable:{kind:'control',input:0,name:'Flag'}}];
+ p.variable_inputs=[{source,output:4,input:0,kind:'control'}];
+ f.handlers.set(type,{...f.handlers.get('imports.text'),modes:[mode],binding_schema:booleanBindingSchema(type),validate:type==='transform.group_data'?validateGroupingParameters:validateSortingParameters});
+ const sourceNode={ref:source,type:'variables.user',variable_outputs:[{kind:'variables',port:4,port_guid:'runtime-port'}]};
+ f.operation.parameters=p;
+ f.operation.action={action_key:'node.apply',revision:'1.0.0'};
+ f.operation.nodeTargetAdapter={observe:async()=>({complete:true,document_id:p.document_id,workflow_ref:p.workflow_ref,nodes:[sourceNode,{ref:table,type:'imports.text',outputs:[0]}]})};
+ let previews=0,preflightError;
+ const options={operation:f.operation,now:()=>1,onRecord:async e=>{f.records.push(structuredClone(e));return e;},receiptOptions:()=>({}),execute:async code=>{
+  previews++;assert.ok(code.includes('runtime-port'));assert.ok(code.includes('variables'));
+  const prepared=f.records.at(-1);
+  return {status:'SUCCEEDED',operation_id:prepared.internal_operation_id,action_key:'node.variables.user_runtime_read.internal',effect_possible:false,cleanup_complete:true,
+   output:{verified:true,cleanup_complete:true,independent_readback:true,source_active:true,settings_applied:false,node_context:source,
+    variables:[{id:7,name:'Flag',type:'boolean',cell:{type:'boolean',is_null:false,value:false}}]}};
+ }};
+ const prepare=f.drivers.prepareTarget;
+ f.drivers.prepareTarget=async(graph,ctx)=>{
+  assert.deepEqual(Object.keys(graph).sort(),['document_id','inputs','target','variable_inputs','workflow_ref']);
+  validateNodeTargetRequest(graph);
+  f.operation.deadline=ctx.deadline;
+  try{await preflightBooleanBindings(options,ctx,{targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});}
+  catch(error){preflightError=error.stack;throw error;}
+  return prepare(graph,ctx);
+ };
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error)+'\n'+(preflightError??''));
+ assert.equal(previews,1);assert.deepEqual(f.operation.variableBindingSource.source,source);
+ assert.ok(f.records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='target'));
+ assert.deepEqual(sourceNode.variable_outputs,[{kind:'variables',port:4,port_guid:'runtime-port'}]);
+});
+for(const fault of [null,'type','transport','receipt','question','button','journal'])test('variables calculator deactivation refusal automatically releases only its owned question: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.calculator';p.mode='expressions';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expressions']});
+ const n={document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph',tid:'MF;TF-1;Graph;Source',locked:false,pending_wizard_node:{tid:p.workflow_ref.navigation_path.at(-1).tid+'>Source',label:'Source'}};
+ f.drivers.openWizard=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'ui.act'};if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Deactivation opening context changed'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'ui.act',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,error:{code:'WIZARD_CONTEXT_CHANGED'},trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:'begin_wizard'}],
+   output:{authenticated:true,origin:'https://app.loginom.ai/',loginom_build:'7.4.2',active_tab_ref:'tab',dom_epoch:{document:'browser'},workflow_ref:p.workflow_ref,package_identity:{path:null},prepared_node_context:n,wizard:{status:'absent'},workflow_navigation:{status:'observed',path:p.workflow_ref.navigation_path,current_path:p.workflow_ref.navigation_path},
+    ui:{dialogs:[{ref:'question',title:'Loginom 7.4.2',text:fault==='question'?'Удалить пакет?':'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет'}],masks:[{kind:'modal_background',target_tid:'MF;TF-1',dialog_ref:null}],elements:Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([id,label])=>({tid:'msgbox;tlb;'+id,label:fault==='button'?'Other':label,signature:{dialog_ref:'question'},allowed_actions:['click']}))}}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-vars-question');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:false}};};
+ const result=await f.run(p);assert.equal(result.status,fault?'AMBIGUOUS':'FAILED');assert.equal(result.cleanup_complete,!fault);assert.equal(result.pending_phase,fault?'open':null);assert.equal(f.calls.includes('cancel-vars-question'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
+for(const fault of [null,'type','transport','receipt','gesture','journal'])test('Union opening refusal automatically uses guarded release and durable ACK: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.column_union';p.mode='append_variables';
+ f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['append_variables']});
+ f.drivers.openWizard=async()=>{
+  f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'ui.act'};if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Node procedure step did not confirm completion'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'ui.act',phase:'observing',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+   output:{prepared_node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph'},wizard:{status:'absent'}},
+   trace:[{event:'ui_preconditions_verified',verb:'begin_wizard'},{event:'ui_gesture_applied',verb:fault==='gesture'?'execute_wizard':'begin_wizard'}],error:{code:'WIZARD_CONTEXT_CHANGED'}}});
+ };
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-union-opening');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const result=await f.run(p);assert.equal(result.status,fault?'AMBIGUOUS':'FAILED');assert.equal(result.cleanup_complete,!fault);assert.equal(result.pending_phase,fault?'open':null);
+ assert.equal(result.error.code,'NODE_APPLY_STOPPED');assert.equal(f.calls.includes('cancel-owned-union-opening'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
+for(const fault of [null,'other-node','transport','receipt','journal'])test('Calculator variable mapping refusal cleanup is scoped and durably acknowledged: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='other-node'?'imports.text':'transform.calculator';p.mode='expression';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expression']});
+ f.drivers.mapPorts=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'node.variables.variable_mapping.internal'};
+  if(fault==='transport')f.operation.transportUncertain=true;
+  throw Object.assign(Error('Unique connected variable source required: missing'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'node.variables.variable_mapping.internal',phase:'variable_mapping',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:'Unique connected variable source required: missing'}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('cancel-owned-variable-mapping');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:true}};};
+ const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
+ assert.equal(f.calls.includes('cancel-owned-variable-mapping'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+});
 for(const corruptAck of [false,true])test('Calculator JSON Response read uses exact durable phase ACK: '+corruptAck,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  const journal=createExecutionJournal({directory,metadata:{}}),f=fixture();
@@ -77,7 +150,7 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 
-for(const [type,mode,preserve] of [['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','k_means',false]])
+for(const [type,mode,preserve] of [['datamining.assn_rules','apply',true],['datamining.assn_rules','fp_growth',false],['preprocessing.coarse_classes','apply',true],['preprocessing.coarse_classes','internal',false],['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','apply',true],['datamining.clustering','k_means',false]])
 for(const close of [true,false])test('saved-model intermediate finish guard '+type+'/'+mode+' close='+close,async()=>{
  const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
  p.target={kind:'existing',type,ref:node};p.mode=mode;
@@ -87,6 +160,37 @@ for(const close of [true,false])test('saved-model intermediate finish guard '+ty
  const result=await f.run(p);
  assert.equal(result.status,close===preserve?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
  if(close!==preserve){assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('execute'));}
+});
+
+test('saved factor analysis apply accepts Cancel and rejects committing its inspection draft',async()=>{
+ const {createFactorAnalysisNodeSupport}=await import('../lib/factor-analysis-node.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'research.factor_analysis',ref:node};p.mode='apply';p.parameters={};
+ f.handlers.set(p.target.type,createFactorAnalysisNodeSupport({}).nodeApplyHandlers.get(p.target.type));
+ f.drivers.configureCalculator=async()=>({verified:true,cleanup_complete:true,settings_applied:false,
+  configuration:{verified:true,mode:'apply',node_context:node,fields:['X','Y'].map(name=>({name,usage_type:3})),criterion:'fixed',factors:2,rotation:'none',output_cap:false},
+  validation:{status:'observed_saved_settings'}});
+ f.drivers.mapPorts=async()=>({verified:true,cleanup_complete:true,ports:[]});
+ f.drivers.finish=async mode=>{assert.equal(mode,'done');return {verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false};};
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:false,execution_id:'execution1'});
+ const result=await f.run(p);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(result.configuration.readback.mode,'apply');assert.equal(result.configuration.readback.training.status,'not_requested');
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'done',settings_applied:true,execution_started:false});
+ const rejected=await applyNode({request:p,operation:{id:p.operation_id},handlers:f.handlers,drivers:f.drivers,record:async e=>e,now:()=>1});
+ assert.equal(rejected.status,'AMBIGUOUS');assert.match(rejected.error.message,/must discard/);
+});
+
+for(const phase of ['configure','output_mapping'])test('known factor apply refusal releases only the cancelled owned draft: '+phase,async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'research.factor_analysis',ref:node};p.mode='apply';
+ const refusal=()=>{throw Object.assign(Error('unsupported saved PCA settings'),{nodePhaseRefusal:{phase,status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+  verification:'factor_analysis_apply_preserved',proof:{closed:{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:{...node,verified:true}}}}});};
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',configure:phase==='configure'?refusal:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=()=>assert.fail('refused apply cannot execute');
+ if(phase==='output_mapping')f.drivers.mapPorts=async(_,ctx)=>ctx.receipt_id.endsWith(':output_mapping')?refusal():{verified:true,cleanup_complete:true};
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(f.operation.nodeApply.pending,null);
+ assert.ok(!f.calls.includes('execute'));
 });
 
 test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{
@@ -399,6 +503,13 @@ function separateFixture(){
  f.drivers.finishGraph=async mode=>{f.calls.push('graph-'+mode);return {verified:true,cleanup_complete:true,effect_possible:mode==='execute',mode,settings_applied:true,execution_started:mode==='execute',execution_id:mode==='execute'?'execution1':null};};
  return f;
 }
+for(const kind of ['grouping','sorting'])test(kind+' projects independent binding receipts into configuration.bindings',async()=>{
+ const f=separateFixture(),bindings=[{parameter:kind==='grouping'?'/sort_result':'/compare_with_locale',mode:'variable',verified:true,variable:{name:'Flag',type:'boolean',id:5}}];
+ f.handlers.get('imports.text').configurationReadback=()=>({kind});
+ const finish=f.drivers.finish;f.drivers.finish=async mode=>({...await finish(mode),bindings});
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.configuration.bindings,bindings);
+ bindings[0].variable.name='changed';assert.equal(result.configuration.bindings[0].variable.name,'Flag');
+});
 for(const mode of ['done','execute','close'])test('separate output wizard preserves complete '+mode+' lifecycle',async()=>{
  const f=separateFixture(),p=request();p.finish=mode;if(mode!=='execute')p.read.ports=[];
  const r=await f.run(p);assert.equal(r.status,'SUCCEEDED');
@@ -492,6 +603,19 @@ test('invalid Duplicates input ends conclusively only with durable unchanged-dra
  }
 });
 
+test('invalid Excel variable binding ends conclusively at input mapping only when the refusal reports the saved input',async()=>{
+ for(const failure of ['none','cleanup_complete','input_saved','claims_unchanged','verification','phase','journal','foreign_type']){
+  const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
+  p.target={kind:'existing',type:failure==='foreign_type'?'exports.text':'exports.excel',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+  p.read={ports:[],sample_rows:0,require_exact_numbers:false};f.handlers.set(p.target.type,{...f.handlers.get('imports.text')});
+  f.drivers.mapPorts=async()=>{const e=Error('Excel binding requires one connected non-NULL string variable: sheet_name');e.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:false,input_saved:true,verification:'excel_export_binding_refused'};
+   if(failure==='claims_unchanged')e.nodePhaseRefusal.settings_unchanged=true;else if(!['none','journal','foreign_type'].includes(failure))delete e.nodePhaseRefusal[failure];throw e;};
+  const r=await f.run(p);assert.equal(r.status,failure==='none'?'FAILED':'AMBIGUOUS',failure);
+  assert.equal(r.cleanup_complete,failure==='none',failure);assert.equal(r.pending_phase,failure==='none'?null:'input_mapping',failure);
+  assert.ok(!f.calls.includes('open')&&!f.calls.includes('configure')&&!f.calls.includes('execute'));
+ }
+});
+
 test('calculator syntax refusal retains the node and names its restored default expression for new and existing targets',async()=>{
  for(const kind of ['new','existing'])for(const failure of [null,'journal','graph','receipt','identity']){
   const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();p.target.type='transform.calculator';p.mode='expression';
@@ -536,22 +660,24 @@ test('refused date configure proof preserves the original pending boundary',asyn
  await assert.rejects(f.run(p,{resume:true}),/Live package/);assert.deepEqual(f.operation.nodeApply.pending,boundary);assert.equal(f.calls.length,count);
 });
 
-test('verified failed execution settles once without output and refuses unproven failure receipts',async()=>{
+for(const variablePorts of [false,true])test('verified failed execution settles once without output and refuses unproven failure receipts; variable ports='+variablePorts,async()=>{
  const proof={verified:true,cleanup_complete:true,status:'failed',execution_id:'doc:root:1',node:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},
   root_id:'root',group_id:'1',group_record_id:'record',failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:'Input file not found'}};
  for(const mutate of [null,p=>p.failure_verified=false,p=>p.cleanup_complete=false,p=>p.node.node_id='foreign',p=>p.root_id='other',p=>p.error.message='',p=>p.output_refreshed=true]){
   const f=fixture(),p=structuredClone(proof);mutate?.(p);
   f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1',execution_started:true});
   f.drivers.waitExecution=async()=>p;
-  const result=await f.run();assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
+  const r=request();if(variablePorts)r.read.variable_ports=[0];
+  const result=await f.run(r);assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
   if(!mutate){assert.equal(result.execution.status,'failed');assert.equal(result.cleanup_complete,true);assert.equal(result.error.message,proof.error.message);
    assert.equal(result.next_step.tool,'dock_node_apply');assert.match(result.next_step.instruction,/NEW operation_id/);
    assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
-   const calls=f.calls.length;assert.deepEqual(await f.run(),result);assert.equal(f.calls.length,calls);}
+   const calls=f.calls.length;assert.deepEqual(await f.run(r),result);assert.equal(f.calls.length,calls);}
  }
  for(const failure of ['phase','checkpoint']) {
   const f=fixture();f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1'});f.drivers.waitExecution=async()=>proof;
-  const result=await f.run(request(),{record:async e=>{if(failure==='phase'&&e.phase==='node_phase_completed'&&e.receipt.phase==='execute'||failure==='checkpoint'&&e.phase==='node_checkpoint')throw Error('disk unavailable');return structuredClone(e);}});
+  const r=request();if(variablePorts)r.read.variable_ports=[0];
+  const result=await f.run(r,{record:async e=>{if(failure==='phase'&&e.phase==='node_phase_completed'&&e.receipt.phase==='execute'||failure==='checkpoint'&&e.phase==='node_checkpoint')throw Error('disk unavailable');return structuredClone(e);}});
   assert.equal(result.status,'AMBIGUOUS');assert.equal(f.operation.nodeApply.result,undefined);
  }
 });
@@ -668,6 +794,21 @@ test('JavaScript materialization is an awaited public phase before mapping and a
  assert.equal(result.phases.find(p=>p.phase==='materialization_start').status,'verified');
  assert.equal(result.phases.find(p=>p.phase==='materialization_execute').status,'verified');
  assert.equal(f.operation.nodeApply.phases.find(p=>p.phase==='node_finish').value.execution_started,null);
+});
+
+for(const proof of [true,false])test('unconnected JS rejects reuse even with empty-input proof '+proof,async()=>{
+ const f=javascriptMaterializationFixture();f.p.inputs=[];f.p.parameters.input_state='unconnected';
+ f.drivers.mapPorts=async()=>{f.calls.push('mapping');return {verified:true,cleanup_complete:true,
+  native_mapping:{input_state:'unconnected',no_incoming_links_verified:proof}};};
+ f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',execution_id:'materialization1',
+  input_state:'unconnected',execution_reused:true});
+ const read=f.drivers.readOutput;
+ f.drivers.readOutput=async(options,ctx)=>({...await read(options,ctx),execution_id:ctx.execution.execution_id});
+ const result=await f.run();
+ assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(f.calls.filter(c=>c==='materialize').length,1);
+ assert.ok(!f.calls.includes('graph-execute'));
+ assert.equal(f.calls.includes('read'),false);
 });
 
 for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled'])
@@ -791,4 +932,15 @@ test('failed final readback cannot certify settlement without an exact durable c
   assert.equal(result.status,'AMBIGUOUS');assert.match(result.error.message,/disk unavailable|acknowledgement differs/);
   assert.equal(f.operation.nodeApply.result,undefined);
  }
+});
+
+for(const owned of [false,true])test('W1 variable output requires an owned completed process before reading: '+owned,async()=>{
+ const f=fixture(),r=request();r.read.variable_ports=[0];
+ f.drivers.waitExecution=async()=>{f.calls.push('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'execution1',...(owned?{owner_verified:true,process_id:'1.1',process_record_id:'p'}:{})};};
+ f.drivers.readOutput=async()=>{f.calls.push('read');return {verified:true,cleanup_complete:true,status:'complete',execution_id:'execution1',evidence_ref:'e',ports:[{port:0,fresh:true}],variable_ports:[{port:0,kind:'variables',source:'execution',native_source:'VariablesForm',execution_id:'execution1',fresh:true,complete:true,read_id:'new-read',count:0,variables:[],completeness:{count:0,store_count:0,unique_ids:0}}]};};
+ const result=await f.run(r);assert.equal(result.status,owned?'SUCCEEDED':'AMBIGUOUS');assert.equal(f.calls.includes('read'),owned);
+});
+for(const code of ['BINDING_TYPE_MISMATCH','BINDING_NULL_UNSUPPORTED'])test('binding refusal keeps its public reason '+code,async()=>{
+ const f=fixture();f.drivers.prepareTarget=async()=>{throw Object.assign(Error(code+': /groups/0/0/value'),{nodePhaseRefusal:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}});};
+ const r=await f.run();assert.equal(r.error.code,code);assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);
 });

@@ -1,0 +1,55 @@
+{
+  "type": "transform.col_union_data",
+  "title": "Соединение",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-coluniondata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": true,
+  "modes": ["positional"],
+  "semantics": "Combine exactly two tables by row position: input 0 is main, input 1 is attached; output 0 is a table. Never match keys or sort rows. Preserve both inputs' fields and scalar types, including same-name fields. Read native generated names before mapping the output. row_count minimum/maximum chooses the shorter/longer length; input uses determining_input main/attached. padding null/repeat/last fills absent rows with NULL, cycles the whole shorter table, or repeats its final row. An empty table has no row to repeat: its fields remain NULL. Preserve source NULL, empty string, zero and false. Execute recomputes current inputs without training; no saved-model apply or variables. Existing parameters:{} preserves supported settings. New nodes require both table connections and explicit row_count/padding. More tables and variable ports are unsupported.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "colunion-v1-candidate",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": ["positional"],
+  "parameter_schema": {
+    "type": "object",
+    "description": "Proposed stage-1 schema, not registered. New nodes require col_union with row_count and padding; existing omission preserves settings. Reject unsupported saved configurations before mutation.",
+    "properties": {
+      "col_union": {
+        "type": "object",
+        "description": "Positional table settings. Existing fields form a patch; omitted fields retain their saved supported values.",
+        "properties": {
+          "row_count": {
+            "type": "string",
+            "enum": ["minimum", "maximum", "input"],
+            "description": "Output length: min or max of the two input row counts; input uses determining_input. No key matching."
+          },
+          "padding": {
+            "type": "string",
+            "enum": ["null", "repeat", "last"],
+            "description": "Absent row: NULL cells, cyclic repetition of the entire input, or repetition of its last row. An empty input always contributes NULL cells."
+          },
+          "determining_input": {
+            "type": "string",
+            "enum": ["main", "attached"],
+            "description": "Required with row_count=input: main=input 0, attached=input 1. Reject with minimum/maximum; never identify the source by label."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {}
+}

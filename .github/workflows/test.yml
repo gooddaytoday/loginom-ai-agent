@@ -2,7 +2,8 @@ name: test
 
 on:
   push:
-    branches: ["**"]
+    # PR branches run through pull_request; pushing them as well doubled every run.
+    branches: ["dev", "loginom", "v0[0-9][0-9]"]
   pull_request:
   workflow_dispatch:
   # release.yml runs this workflow as a release gate.
@@ -158,6 +159,249 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows-runtime:
+    name: windows-runtime (${{ matrix.suite }})
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [client, runtime, host]
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: matrix.suite == 'host'
+        with:
+          bun-version: "1.3.14"
+      - name: Install locked host dependencies
+        if: matrix.suite == 'host'
+        run: bun install --frozen-lockfile --linker hoisted --ignore-scripts --filter '@loginom-ai-agent/loginom-host'
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Resolve pinned test browser
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          browser=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'const fs = require("node:fs"); const browser = require("playwright").chromium.executablePath(); fs.accessSync(browser); process.stdout.write(browser)')
+          echo "LOGINOM_DOCK_TEST_BROWSER=$browser" >> "$GITHUB_ENV"
+      - name: Verify platform-dependent client tests
+        if: matrix.suite == 'client'
+        timeout-minutes: 6
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 \
+            test/agent-command.test.mjs test/archive.test.mjs test/artifacts.test.mjs \
+            test/artifact-download.test.mjs test/artifact-upload.test.mjs test/artifact-verification.test.mjs \
+            test/browser-downloads.test.mjs test/browser-launch.test.mjs test/browser-temp.test.mjs \
+            test/bridge.test.mjs test/connection-check-windows.test.mjs test/landing.test.mjs \
+            test/clipboard.test.mjs test/clipboard-shutdown.test.mjs test/config.test.mjs \
+            test/execution-journal.test.mjs test/file-reference.test.mjs test/history.test.mjs \
+            test/hook-runtime.test.mjs test/hooks.test.mjs test/host-artifacts.test.mjs test/host-inputs.test.mjs \
+            test/install.test.mjs test/install-profile.test.mjs test/local-diagnostics.test.mjs \
+            test/managed-shutdown.test.mjs test/managed-signal-order.test.mjs \
+            test/platform-windows.test.mjs test/runtime-pin.test.mjs test/skill.test.mjs \
+            test/storage-download.test.mjs test/storage-source.test.mjs \
+            test/text-export.test.mjs test/text-export-cp1251.test.mjs test/text-import-encoding.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-client-tests.log"
+      - name: Verify complete supervised runtime suite
+        if: matrix.suite == 'runtime'
+        timeout-minutes: 5
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          tests=()
+          for file in test/*.test.mjs; do
+            [ "$file" = test/connection-cancellation.test.mjs ] || tests+=("$file")
+          done
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 "${tests[@]}" \
+            2>&1 | tee "$RUNNER_TEMP/windows-runtime-tests.log"
+      - name: Verify private browser cancellation without parallel load
+        if: matrix.suite == 'runtime' && !cancelled()
+        timeout-minutes: 3
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          # Windows Chromium graceful close under the parallel suite took up to 2.3 s (LAB-1769, run 43939744169); cancel budgets (2 s before launch, 10 s with Chromium, LAB-1790) are measured alone.
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=1 test/connection-cancellation.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-runtime-cancellation-tests.log"
+      - name: Verify platform-dependent host tests
+        if: matrix.suite == 'host'
+        timeout-minutes: 8
+        working-directory: packages/loginom-host
+        run: |
+          set -euo pipefail
+          {
+          host_failed=0
+          # A Bun crash in one file must not hide the remaining Windows cases.
+          for test_file in \
+            test/process.test.ts test/environment.test.ts test/windows-powershell.test.ts \
+            test/cli-install-windows.test.ts test/cli-install.test.ts test/cli-credentials.test.ts \
+            test/keychain-platform.test.ts test/keychain-envelope.test.ts \
+            test/system-proxy.test.ts test/system-proxy-behavior.test.ts test/system-proxy-io.test.ts \
+            test/file-reference.test.ts test/file-reference-ipc.test.ts test/inputs.test.ts \
+            test/node-host.test.ts test/runtime-startup.test.ts test/transport.test.ts \
+            test/host.test.ts test/parallel-calls.test.ts test/saved-package-shutdown.test.ts \
+            test/cli-owner-crash.test.ts test/cli-manifest.test.ts test/cli-source-snapshot.test.ts \
+            test/bundled-ripgrep.test.ts test/stage-resources.test.ts; do
+            timeout 120 bun test "$test_file" || host_failed=1
+          done
+          exit "$host_failed"
+          } 2>&1 | tee "$RUNNER_TEMP/windows-host-tests.log"
+      - name: Upload Windows runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-*-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-cli-ipc:
+    name: windows-cli-ipc
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install locked CLI dependencies
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile --linker hoisted --ignore-scripts --network-concurrency=1
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Build native CLI with the production Node Host
+        run: bun packages/loginom-host/script/build-cli.ts "$(cygpath -m "$RUNNER_TEMP")/cli-ipc" --no-archive
+      - name: Verify twenty CLI Host roundtrips and acknowledged shutdowns
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --input-type=module <<'NODE' 2>&1 | tee "$RUNNER_TEMP/windows-cli-ipc-tests.log"
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { existsSync } from 'node:fs';
+          import { join } from 'node:path';
+          const binary = join(process.env.RUNNER_TEMP, 'cli-ipc/bin/loginom-ai-agent-cli.exe');
+          const profile = join(process.env.RUNNER_TEMP, 'cli-ipc-profile');
+          for (let repetition = 1; repetition <= 20; repetition++) {
+            // Each real command exchanges start, connection.status and terminal
+            // close replies through launchNodeHost, then awaits the Host exit.
+            const result = spawnSync(binary, ['loginom', 'status', '--format', 'json'], {
+              env: { ...process.env, LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_CHANNEL: 'dev' },
+              encoding: 'utf8', timeout: 30000,
+            });
+            console.log(JSON.stringify({ repetition, status: result.status, signal: result.signal,
+              error: result.error?.message, stdout: result.stdout, stderr: result.stderr }));
+            assert.ifError(result.error);
+            assert.equal(result.status, 0);
+            assert.equal(result.signal, null);
+            assert.equal(result.stderr, '');
+            assert.equal(JSON.parse(result.stdout).state, 'unconfigured');
+            assert.equal(existsSync(join(profile, '.writer')), false);
+          }
+          console.log('CLI IPC: 20/20 commands, 60/60 replies (start/status/close), 20/20 clean exits; lost replies: 0');
+          NODE
+      - name: Upload CLI IPC evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-cli-ipc-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-cli-ipc-tests.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  dashboard-template:
+    name: dashboard-template (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(toJSON(inputs.macos) == 'false' && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install locked dashboard workspace dependencies
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile --ignore-scripts --filter @loginom-ai-agent/dashboard
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: |
+          node_dir=$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")
+          npm_cli=$node_dir/../lib/node_modules/npm/bin/npm-cli.js
+          [[ -f $npm_cli ]] || npm_cli=$node_dir/node_modules/npm/bin/npm-cli.js
+          "$LOGINOM_AI_AGENT_TEST_NODE" "$npm_cli" ci --ignore-scripts --no-audit --fund=false
+          du -sh node_modules
+
+      - name: Build the template and examples like dashboard_draft
+        working-directory: packages/dashboard
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/build.test.mjs test/build/resolver.test.mjs'
+
+  dashboard-browser:
+    name: dashboard-browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Check dashboard stand installer
+        run: |
+          bash -n packages/dashboard/deploy/dev-master.sh
+          bash -n packages/dashboard/deploy/containers.sh
+          bash -n packages/dashboard/deploy/mounts.sh
+          shellcheck packages/dashboard/deploy/dev-master.sh packages/dashboard/deploy/containers.sh packages/dashboard/deploy/mounts.sh
+          cat > "$RUNNER_TEMP/dashboard-invalid.json" <<'JSON'
+          {"server":"example-server","studio":"example-studio","network":"example-net","web":"invalid/name","project":"example-services","userstorage":"example-storage"}
+          JSON
+          if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --config "$RUNNER_TEMP/dashboard-invalid.json" 2>&1); then
+            echo "Expected invalid web name rejection" >&2
+            exit 1
+          fi
+          [[ $output == *'Error: Invalid web'* ]]
+          DASHBOARD_PROJECT=example-services DASHBOARD_IMAGE=example:local \
+            DASHBOARD_WEB=example-web DASHBOARD_WEB_USER=1000:1000 \
+            DASHBOARD_PUBLISHER_USER=1000:1000 DASHBOARD_OWNER_KEY=codex.owner \
+            DASHBOARD_JOB_GROUP=1000 DASHBOARD_STUDIO_PROXY=example-studio \
+            DASHBOARD_OWNER_VALUE=example DASHBOARD_STATE="$RUNNER_TEMP/dashboard" \
+            DASHBOARD_APP_PORT=32801 DASHBOARD_APP_ORIGIN=http://dashboards.localhost:32801 \
+            DASHBOARD_CLIENT_ORIGINS=http://127.0.0.1:32800 DASHBOARD_USERSTORAGE=example-storage \
+            DASHBOARD_NETWORK=example-net docker compose -f packages/dashboard/deploy/compose.yaml config --quiet
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install pinned Chromium system dependencies
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          # Keep the Chromium sandbox enabled, as in chromium-direct.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts'
+
+      - name: Verify dashboard browser behavior
+        working-directory: packages/dashboard
+        run: |
+          bun typecheck
+          bun run build
+          bun run check:size
+          bun run test:browser
+
   unit:
     name: unit
     runs-on: ubuntu-24.04
@@ -171,14 +415,45 @@ jobs:
         with:
           install-flags: --frozen-lockfile
 
-      # Exports LOGINOM_AI_AGENT_TEST_NODE (pinned Node) for the loginom-host process
-      # tests; turbo.json passes it through to `@loginom-ai-agent/loginom-host#test`.
+      # Exports LOGINOM_AI_AGENT_TEST_NODE for loginom-host and dashboard service
+      # tests; turbo.json passes the pinned executable through to both tasks.
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts'
+
       - name: Verify Loginom workspace address and native link contracts
         working-directory: packages/loginom-runtime
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs client/test/model-schema-budget.test.mjs client/test/user-response-budget.test.mjs client/test/node-guidance.test.mjs client/test/user-profile-bridge.test.mjs'
+
+      - name: Prepare runtime Chromium dependencies
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          # Match chromium-direct: Ubuntu 24.04 otherwise denies the user
+          # namespaces required by our sandboxed, non-system Chromium build.
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Verify complete supervised runtime suite with pinned Chromium
+        timeout-minutes: 6
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          # setup-loginom-inputs pins Playwright and PLAYWRIGHT_BROWSERS_PATH.
+          # Resolve its executable explicitly so browser tests cannot silently skip.
+          export LOGINOM_DOCK_TEST_BROWSER
+          LOGINOM_DOCK_TEST_BROWSER=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'process.stdout.write(require("./client/node_modules/playwright").chromium.executablePath())')
+          if [ ! -x "$LOGINOM_DOCK_TEST_BROWSER" ]; then
+            echo "::error::Pinned Chromium executable is missing: $LOGINOM_DOCK_TEST_BROWSER"
+            exit 1
+          fi
+          # Leave CPU for the real managed children on the 4-vCPU runner.
+          # Bound every test and the process tree, including broken test cleanup.
+          # GNU timeout exits 124 on a hang; the job then fails within minutes.
+          timeout --kill-after=10s 5m nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 test/*.test.mjs
 
       - name: Verify explicit proxy environment with real Node networking
         working-directory: packages/desktop
@@ -236,6 +511,10 @@ jobs:
           rm -rf "$archive" ripgrep-15.1.0-x86_64-unknown-linux-musl
           rg --version
 
+      - name: Verify signed update feed publication
+        working-directory: script
+        run: bun test ./update-feed.test.ts
+
       - name: Run unit tests
         timeout-minutes: 30
         # The resume acceptance driver observes its owned X11 windows even when
@@ -250,6 +529,9 @@ jobs:
         working-directory: packages/opencode
         # A rare hang inside the effect run otherwise holds the job until its 60-minute limit.
         timeout-minutes: 10
+        # The exerciser runs without test/preload.ts; keep its background plugin install offline.
+        env:
+          npm_config_offline: "true"
         run: bun run test:httpapi
 
   desktop:
@@ -274,6 +556,12 @@ jobs:
       - name: Run desktop tests
         working-directory: packages/desktop
         run: bun test --path-ignore-patterns=src/main/draft-store.test.ts
+
+      # The draft store (drafts saved on exit) runs under the pinned Node 24 instead,
+      # which provides `node:sqlite` and strips the test's TypeScript types natively.
+      - name: Run desktop draft store tests under pinned Node
+        working-directory: packages/desktop
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --version && "$LOGINOM_AI_AGENT_TEST_NODE" --test src/main/draft-store.test.ts'
 
   e2e:
     name: e2e

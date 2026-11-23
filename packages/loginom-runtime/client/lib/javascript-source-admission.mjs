@@ -77,8 +77,14 @@ function canonicalSettings(settings) {
 export function javascriptSourceSettingsDigest(settings) {
   return createHash('sha256').update(JSON.stringify(canonicalSettings(settings))).digest('hex');
 }
-function policyFor(source) {
+function policyFor(source,requireDeclaredOutput,preflight=false) {
   const policy = inspectJavascriptModulePolicy(source);
+  if(policy.effect_imports?.length&&requireDeclaredOutput){
+    const required=requireDeclaredOutput();
+    if(required===undefined&&preflight)return null;
+    need(typeof required==='boolean','settings_binding');
+    if(required)throw new SourceAdmissionError('declared_output_required',policy);
+  }
   if (policy.status !== 'ADMITTED') throw new SourceAdmissionError('policy', policy);
   return policy;
 }
@@ -87,8 +93,10 @@ function policyFor(source) {
 // sourceAdapter is trusted owned navigation; callbacks are host driver functions,
 // never model-provided scripts. Existing/new identities are checked by the real
 // source reader, not by an injected "verified:true" admission result.
-export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAdapter, redactor, record, chunkBytes = 4096, settingsTransition, expectedSource, expectedSettings}) {
+export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAdapter, redactor, record, chunkBytes = 4096, settingsTransition, expectedSource, expectedSettings,requireDeclaredOutput}) {
   need(kind === 'new' || kind === 'existing', 'kind');
+  need(requireDeclaredOutput===undefined||typeof requireDeclaredOutput==='function','dependencies');
+  const effectivePolicyFor=source=>policyFor(source,requireDeclaredOutput);
   const initialOwner = normalizedOwner(owner, kind), admissionId = randomUUID();
   need(expectedSource === undefined || kind === 'existing' && expectedSource
     && Object.getPrototypeOf(expectedSource) === Object.prototype && Object.getOwnPropertySymbols(expectedSource).length === 0
@@ -135,11 +143,12 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     // Only a completely delivered owned read/discard, before a host callback,
     // can settle a policy refusal. Unknown Close/ACK/callback failures cannot.
     if (error instanceof SourceAdmissionError && ['admitting','checking_effect'].includes(before)
-      && ['policy','stale_identity','stale_digest','effect_drift'].includes(error.code) && lastClosedRead?.read_id === readId) {
+      && ['policy','stale_identity','stale_digest','effect_drift','declared_output_required'].includes(error.code) && lastClosedRead?.read_id === readId) {
       const proof = immutable({owner:targetOwner,admission_id:admissionId,read_id:readId,deadline,
         reason:error.code,source_identity:lastClosedRead.identity,settings_sha256:lastClosedRead.settings,
         policy:inspectJavascriptModulePolicy(lastClosedRead.source),source_read_discard_verified:true,
-        check_callback_dispatched:false});
+        check_callback_dispatched:false,...(error.code==='declared_output_required'
+          ?{declared_schema:false,effective_policy:error.refusal}:{})});
       await journal({phase:'javascript_source_closed_check_refused',proof});
       error.javascriptSourceClosedRefusal = proof;
     }
@@ -211,7 +220,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
         if (supplied) {
           prepareDelivery(requested.source_text);
           // A known unsupported replacement must not open an existing wizard.
-          effectivePolicy = policyFor(requested.source_text);
+          effectivePolicy = policyFor(requested.source_text,requireDeclaredOutput,true);
         }
         if (kind === 'existing') {
           previous = await readFull(initialOwner); observedSettings = previous.settings;
@@ -221,7 +230,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
         }
         effectiveSource = supplied ? requested.source_text : previous.source;
         prepareDelivery(effectiveSource);
-        effectivePolicy ??= policyFor(effectiveSource);
+        effectivePolicy ??= effectivePolicyFor(effectiveSource);
         // Preserve explicit empty/same-text replacement intent; digest equality
         // must never turn a supplied replacement into an omitted-source request.
         intent = kind === 'new' ? 'create' : supplied ? 'replace' : 'preserve';
@@ -239,7 +248,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
           need(equal(fresh.identity, previous.identity) && fresh.settings === observedSettings, 'mutation_drift');
         }
         prepareDelivery(effectiveSource);
-        need(equal(policyFor(effectiveSource), effectivePolicy), 'policy_drift');
+        need(equal(effectivePolicyFor(effectiveSource), effectivePolicy), 'policy_drift');
         await journal({phase: 'javascript_source_mutation_dispatch', receipt});
         // The asynchronous dispatch ACK is not a source freshness proof.
         if (kind === 'existing') {
@@ -247,14 +256,14 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
           need(equal(fresh.identity, previous.identity) && fresh.settings === observedSettings, 'mutation_drift');
         }
         prepareDelivery(effectiveSource);
-        need(equal(policyFor(effectiveSource), effectivePolicy), 'policy_drift');
+        need(equal(effectivePolicyFor(effectiveSource), effectivePolicy), 'policy_drift');
         const result = await bounded(() => perform({owner: targetOwner, deadline, intent: receipt.intent, source_text: effectiveSource, policy: effectivePolicy, planned_settings: plannedSettings}));
         const observedOwner = normalizedOwner(result?.owner, 'existing');
         need(['document_id','workflow_id','operation_id','ui_epoch'].every(key => observedOwner[key] === initialOwner[key])
           && (kind === 'new' || equal(observedOwner, initialOwner)), 'mutation_owner');
         targetOwner = observedOwner;
         const after = await readFull(targetOwner);
-        need(equal(policyFor(after.source), effectivePolicy)
+        need(equal(effectivePolicyFor(after.source), effectivePolicy)
           && (plannedSettingsDigest !== null ? after.settings === plannedSettingsDigest : kind === 'new' || after.settings === observedSettings), 'configured_drift');
         observedSettings = after.settings; receipt = currentReceipt('configured');
         await journal({phase: 'javascript_source_configured', receipt});
@@ -266,10 +275,10 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
       try {
         validateReceipt(input); need(typeof perform === 'function', 'callback'); state = 'checking_effect';
         const observed = await readFull(targetOwner);
-        need(equal(policyFor(observed.source), effectivePolicy) && observed.settings === observedSettings, 'effect_drift');
+        need(equal(effectivePolicyFor(observed.source), effectivePolicy) && observed.settings === observedSettings, 'effect_drift');
         await journal({phase: 'javascript_source_effect_dispatch', receipt});
         const final = await readFull(targetOwner);
-        need(equal(policyFor(final.source), effectivePolicy) && final.settings === observedSettings, 'effect_drift');
+        need(equal(effectivePolicyFor(final.source), effectivePolicy) && final.settings === observedSettings, 'effect_drift');
         // The future effect driver must still guard its native owner/epoch at
         // dispatch. Separate UI reads are not atomic exclusion of human edits.
         state = 'effect_dispatched';

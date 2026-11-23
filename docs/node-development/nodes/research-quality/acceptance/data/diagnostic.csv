@@ -1,0 +1,9 @@
+RowID,Value,Class,Note
+1,1,A,ёж
+2,1,A,ёж
+3,2,B,alpha
+4,?,B,beta
+5,3,A,gamma
+6,4,B,delta
+7,100,"",omega
+8,0,?,?

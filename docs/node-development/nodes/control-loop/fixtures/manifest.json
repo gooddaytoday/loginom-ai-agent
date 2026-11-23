@@ -1,0 +1,11 @@
+{
+  "status": "proposal_pending_approval",
+  "format": {"encoding": "utf-8", "delimiter": ",", "decimal_separator": ".", "header": true, "null_marker": "?", "text_qualifier": "\""},
+  "files": {
+    "pages.csv": {"rows": 3, "bytes": 36, "sha256": "a721ba94d471365fd4105bc056329032e041592786ea1e60fdea63bf6ec22377",
+      "columns": [{"name": "PageNo", "type": "integer"}, {"name": "Limit", "type": "integer"}, {"name": "Skip", "type": "integer"}]}
+  },
+  "network": {"rest_case": "https://httpbin.org/response-headers?limit=<Limit>&skip=<Skip>, public, reached by the Loginom server; not a LAN host",
+              "offline_case": "none"},
+  "limits": "No NULL, Variant or datetime: the slice proves iterations and accumulation, not import typing."
+}

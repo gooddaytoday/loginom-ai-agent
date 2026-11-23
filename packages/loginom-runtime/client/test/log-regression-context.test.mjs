@@ -1,7 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {chromium} from 'playwright-core';
 import {readLogRegressionBrowser,readLogRegressionContext} from '../lib/log-regression-context.mjs';
+import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
+import {Page,build,origin,clone} from './support/workspace-ui-fixture.mjs';
+
+test('production DOM observes only the K-fold validation pickers and fold input in the owned partition wizard',async t=>{
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
+ t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:1280,height:800}});
+ const root='MF;TF-1;WizrdMCF',partition=root+';LearnPartitionWizard',validation=partition+';ValidationSettings';
+ const admitted=[partition+';ByColumnMethodForm;pedPartitionColumn;ValueControl;trg_picker',partition+';ByColumnMethodForm;pedPartitionColumn;ValueControl;boundlist;Split',partition+';pedSamplingMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;boundlist;K-fold_кросс-валидация',validation+';pedKFoldsSamplingMethod;ValueControl;trg_picker',validation+';pedKFoldsSamplingMethod;ValueControl;boundlist;Последовательный'];
+ const foreign=[validation+';pedIterations;ValueControl;trg_picker',validation+';pedValidationColumnName;ValueControl;trg_picker',validation+';pedForeign;ValueControl;boundlist;Последовательный',partition+';Other;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker','MF;TF-2;WizrdMCF;LearnPartitionWizard;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker'];
+ await page.route(origin+'/**',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><style>[data-tid]{min-width:20px;min-height:20px} .picker{width:80px;height:22px}</style>
+ <button data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">Account</button>
+ <div class="x-tab-active" data-tid="MF;cntMain;cntWorkspace;Workspace;t.br;tb-1">Сценарий</div>
+ <div data-tid="${root}"><div data-tid="${partition}"><div data-tid="${partition};SizeGridForm;grdDataSet"></div>
+ ${[...admitted,...foreign].map(tid=>`<div class="picker" data-tid="${tid}">Choice</div>`).join('')}
+ <div data-tid="${validation};pedFolds;ValueControl"><input value="3"></div></div>
+ <div class="x-hidden-offsets" style="display:none" data-tid="${root};LogRegressionWizard"><div data-tid="${root};LogRegressionWizard;pedRegressionMethod"></div></div>
+ <button data-tid="${root};btnNext">Next</button></div>`}));
+ await page.goto(origin+'/');await page.evaluate(build=>{globalThis.bg={app:{Version:build}};},build);
+ const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:root};
+ const observed=await workspaceUiCapability(page,{mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},async()=>owner);
+ assert.equal(observed.status,'SUCCEEDED',JSON.stringify(observed.error));assert.equal(observed.output.wizard.stage,'learn_partition');
+ for(const tid of admitted)assert.ok(observed.output.ui.elements.some(e=>e.tid===tid&&e.allowed_actions.includes('click')),tid);
+ for(const tid of foreign)assert.ok(!observed.output.ui.elements.some(e=>e.tid===tid),tid);
+ assert.ok(observed.output.ui.elements.some(e=>e.identity?.anchor_tid===validation+';pedFolds;ValueControl'&&e.signature.tag==='input'&&e.allowed_actions.includes('fill')));
+});
+
+test('prepared logistic wizard scans its active card without the cached inactive training pages',async t=>{
+ for(const active of ['NormTuneWizard','LearnPartitionWizard','LogRegressionWizard','LogRegressionWizard-1']){
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+  const markers={TuneDataSourceInputPortWizard:'grdTargetColumns',NormTuneWizard:'txtActivationPortStatus',LearnPartitionWizard:'SizeGridForm;grdDataSet',LogRegressionWizard:'pedRegressionMethod', 'LogRegressionWizard-1':'pedEpsilon'};
+  for(const [name,marker] of Object.entries(markers)){
+   const card=page.add('div',base+';'+name,'',undefined,form);
+   if(name!==active){card.attrs.class='x-hidden-offsets';card.style.display='none';}
+   page.add('div',base+';'+name+';'+marker,'',undefined,card);
+   for(let i=0;i<200;i++)page.add('span',null,'',undefined,card);
+  }
+  page.add('button',base+';btnNext','Далее',undefined,form);
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:base})));
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.ok(result.output.scan.detail_elements<250,active+': '+result.output.scan.detail_elements);
+  assert.equal(result.output.scan.max_ms,500);assert.equal(result.output.scan.max_elements,6000);
+  assert.ok(result.output.ui.elements.some(e=>e.tid===base+';btnNext'&&e.allowed_actions.includes('wizard_step')));
+  assert.equal(result.output.wizard.stage,{NormTuneWizard:'normalization',LearnPartitionWizard:'learn_partition',LogRegressionWizard:'lin_regression','LogRegressionWizard-1':'lin_regression_details'}[active]);
+  t.diagnostic(active+': '+result.output.scan.detail_elements+' detail elements');
+  const unbound=await page.execute({mode:'observe'});
+  assert.equal(unbound.status,'SUCCEEDED');assert.ok(unbound.output.scan.detail_elements>1000);
+  const dialog=page.add('div',null,'Остановка');dialog.attrs.role='dialog';
+  const blocked=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:base})));
+  assert.equal(blocked.status,'SUCCEEDED');assert.equal(blocked.output.ui.dialogs.length,1);
+ }
+});
 
 function fixture(count=5) {
  const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard;',elements=[],components={};
@@ -106,4 +162,114 @@ test('selection criterion picker is actionable through the serialized workspace 
  const control=observed.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));
  assert.ok(control?.allowed_actions.includes('click'));
  assert.equal((await page.act({verb:'click',ref:control.ref},observed)).status,'SUCCEEDED');
+});
+
+
+test('Ridge setup picker and lambda input are actionable through serialized workspace observation',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ for(const [name,part,verb] of [['pedRidgeSetupMethod','trg_picker','click'],['pedLambdaRidge','input','fill'],['pedLassoSetupMethod','trg_picker','click'],['pedLambdaLasso','input','fill']]){
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+  page.add('div',base+';LogRegressionWizard-1;pedEpsilon','',undefined,form);
+  const owner=page.add('div',base+';LogRegressionWizard-1;'+name+';ValueControl','',undefined,form);
+  const control=page.add(part==='input'?'input':'div',part==='input'?null:owner.getAttribute('data-tid')+';'+part,'',{x:100,y:100,width:80,height:20},owner);
+  const observed=await page.observe();assert.equal(observed.wizard.stage,'lin_regression_details');
+  const e=observed.ui.elements.find(e=>part==='input'?e.signature?.tag==='input'&&e.identity?.anchor_tid===owner.getAttribute('data-tid'):e.tid===control.getAttribute('data-tid'));
+  assert.ok(e?.allowed_actions.includes(verb),name);
+ }
+});
+
+
+test('Ridge native details wait for initialized setup, finite lambda and editable controls',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'ridge'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',4);
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedRidgeSetupMethod:0}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const lambda=add(base+'LogRegressionWizard-1;pedLambdaRidge;ValueControl',1);
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaRidge,1);assert.equal(read().disabled.pedLambdaRidge,false);
+ for(const value of [null,NaN,Infinity,-1,0]){lambda.getValue=()=>value;assert.equal(read().verified,false);}
+ lambda.getValue=()=>1;delete lambda.isDisabled;assert.equal(read().verified,false);
+});
+
+
+test('logistic role reader retains a Real frequency weight outside predictor normalization',()=>{
+ const f=fixture();f.records[3].data.DataType=3;f.records[3].data.UsageType=7;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[3].usage_type,7);assert.equal(r.fields[3].type,'real');
+ f.records[3].data.DataType=4;assert.equal(f.read().verified,false);
+});
+
+
+test('LASSO native details observe its method identity and initialized editable L1',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'lasso'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ const method=add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',5);
+ Object.assign(method,{valueField:'id',displayField:'label',getStore:()=>({getData:()=>({items:[{data:{id:5,label:'LASSO (L1-регуляризация)'}}]})})});
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedLassoSetupMethod:0}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const lambda=add(base+'LogRegressionWizard-1;pedLambdaLasso;ValueControl',1);
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')(' + JSON.stringify('MF;TF') + ')',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaLasso,1);assert.equal(read().disabled.pedLambdaLasso,false);
+ for(const value of [null,NaN,Infinity,-1,0]){lambda.getValue=()=>value;assert.equal(read().verified,false);}
+ lambda.getValue=()=>1;delete lambda.isDisabled;assert.equal(read().verified,false);
+});
+
+
+test('Elastic Net native details require both initialized penalties and editable-state observations',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'elastic'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ const method=add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',6);
+ Object.assign(method,{valueField:'id',displayField:'label',getStore:()=>({getData:()=>({items:[{data:{id:6,label:'Elastic-net (Регрессия эластичная сеть)'}}]})})});
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedLassoSetupMethod:0,pedLambdaLasso:0.75,pedRidgeSetupMethod:0,pedLambdaRidge:1.25}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')(' + JSON.stringify('MF;TF') + ')',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaLasso,0.75);assert.equal(read().values.pedLambdaRidge,1.25);
+ for(const name of ['pedLambdaLasso','pedLambdaRidge','pedLassoSetupMethod','pedRidgeSetupMethod']){
+  const c=components[elements.find(e=>e.tid===base+'LogRegressionWizard-1;'+name+';ValueControl').id],value=c.getValue();
+  for(const invalid of name.startsWith('pedLambda')?[null,NaN,Infinity,0,-1]:[null,2]){c.getValue=()=>invalid;assert.equal(read().verified,false,name);}
+  c.getValue=()=>value;const disabled=c.isDisabled;delete c.isDisabled;assert.equal(read().verified,false,name);c.isDisabled=disabled;
+ }
+});
+
+function partitionFixture(){
+ const base='MF;TF;WizrdMCF;LearnPartitionWizard',elements=[],components={},values={};
+ const add=(tid,value)=>{const e={id:'partition-'+elements.length,checkVisibility:()=>true,getBoundingClientRect:()=>({x:1,y:1,width:100,height:20}),tid};elements.push(e);const c={el:{dom:e},getValue:()=>values[tid],isDisabled:()=>false};components[e.id]=c;values[tid]=value;return c;};
+ add(base);
+ for(const [path,value] of [['SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl',50],['SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl',50],['pedSamplingMethod;ValueControl',1],['ValidationSettings;pedLearnValidationMethod;ValueControl',0],['SizeGridForm;colAbsoluteSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl',32],['SizeGridForm;colAbsoluteSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl',32],['txtTotalRecords','64']])add(base+';'+path,value);
+ const records=[0,1,2].map((PartitionType,SequenceOrder)=>({isModel:true,data:{PartitionType,SequenceOrder,SizePath:''}})),grid=add(base+';SequenceMethodForm;grdSequence');
+ const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>3,isLoading:()=>false};grid.getStore=()=>store;
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ return {base,add,values,store,records,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)))};
+}
+test('partition reader binds percentages, native row counts and complete train/test/unused order',()=>{
+ const f=partitionFixture(),r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.values,{train:50,test:50,sampling:1,validation:0});assert.deepEqual(r.sequence,[0,1,2]);assert.equal(r.train_count,32);assert.equal(r.test_count,32);assert.equal(r.total_count,64);
+ f.records[0].data.PartitionType=1;assert.equal(f.read().verified,false);
+});
+test('column partition reader binds only the native Boolean picker and selected field',()=>{
+ const f=partitionFixture();f.values[f.base+';pedSamplingMethod;ValueControl']=2;
+ assert.equal(f.read().verified,false);
+ const field=f.add(f.base+';ByColumnMethodForm;pedPartitionColumn;ValueControl','Split');
+ field.valueField='Value';field.displayField='DisplayText';
+ const records=[{data:{Value:'Split',DisplayText:'Split',IconCls:'bg-TBGDataType-dtBoolean'}}];
+ field.getStore=()=>({isLoading:()=>false,getCount:()=>1,getData:()=>({items:records})});
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.values.field,'Split');assert.deepEqual(r.column_choices,[{name:'Split',label:'Split'}]);
+ records[0].data.IconCls='bg-TBGDataType-dtInteger';assert.equal(f.read().verified,false);
+});
+test('partition reader refuses stale sequence inventory and retains variable binding flags',()=>{
+ for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.getCount=()=>2,f=>f.records[1].data.SequenceOrder=0,f=>f.records[1].data.SizePath='Var.X']){const f=partitionFixture();mutate(f);assert.equal(f.read().verified,false);}
+ const f=partitionFixture();f.add(f.base+';SizeGridForm;colRelativeSize;FloatPropEdit;SwitchButton').pressed=true;assert.equal(f.read().switches.train,true);
+});
+
+test('K-fold reader requires initialized fold count and sampling, and retains disabled and binding flags',()=>{
+ const f=partitionFixture();f.values[f.base+';ValidationSettings;pedLearnValidationMethod;ValueControl']=1;
+ assert.equal(f.read().verified,false);
+ const folds=f.add(f.base+';ValidationSettings;pedFolds;ValueControl',3);
+ f.add(f.base+';ValidationSettings;pedKFoldsSamplingMethod;ValueControl',1);
+ assert.equal(f.read().verified,true);assert.equal(f.read().values.folds,3);assert.equal(f.read().values.fold_sampling,1);
+ folds.isDisabled=()=>true;assert.equal(f.read().disabled.folds,true);
+ f.add(f.base+';ValidationSettings;pedFolds;SwitchButton').pressed=true;assert.equal(f.read().switches.folds,true);
+ for(const value of [null,1,2.5,NaN,Infinity]){f.values[f.base+';ValidationSettings;pedFolds;ValueControl']=value;assert.equal(f.read().verified,false);}
 });

@@ -1,0 +1,78 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "url-modes.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "UrlMode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "RequestId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Url",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "UrlMode": "query",
+          "RequestId": "r-a",
+          "Url": "https://httpbin.org/anything?RequestId=r-a&Key=a%20b%26%D1%8F",
+          "HttpStatusCode": 200
+        },
+        {
+          "UrlMode": "query",
+          "RequestId": "r-b",
+          "Url": "https://httpbin.org/anything?RequestId=r-b&Key=x%2Fy%3F",
+          "HttpStatusCode": 200
+        },
+        {
+          "UrlMode": "segments",
+          "RequestId": "r-a",
+          "Url": "https://httpbin.org/anything/r-a/a%20b%26%D1%8F",
+          "HttpStatusCode": 200
+        },
+        {
+          "UrlMode": "segments",
+          "RequestId": "r-b",
+          "Url": "https://httpbin.org/anything/r-b/x%2Fy%3F",
+          "HttpStatusCode": 200
+        },
+        {
+          "UrlMode": "replacement",
+          "RequestId": "r-a",
+          "Url": "https://httpbin.org/anything/r-a/a%20b%26%D1%8F",
+          "HttpStatusCode": 200
+        },
+        {
+          "UrlMode": "replacement",
+          "RequestId": "r-b",
+          "Url": "https://httpbin.org/anything/r-b/x%2Fy%3F",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}

@@ -25,7 +25,7 @@ export async function startBackgroundCli(
     ? join(process.resourcesPath, executableName())
     : join(root, "../../resources", executableName())
   logger.log("v2 CLI executable resolved", { bundled, packaged: app.isPackaged })
-  const version = await run(bundled, ["--version"], logger)
+  const version = await run(bundled, ["--version"], logger, { proxyEnvironment })
   const binary = app.isPackaged ? await installCli(bundled, version, logger) : bundled
 
   const candidates = [
@@ -34,7 +34,7 @@ export async function startBackgroundCli(
   const discovered = await Promise.all(
     candidates.map(async (candidate) => ({
       stateHome: candidate,
-      url: serviceUrl(await run(binary, ["service", "status"], logger, { stateHome: candidate })),
+      url: serviceUrl(await run(binary, ["service", "status"], logger, { stateHome: candidate, proxyEnvironment })),
     })),
   )
   const found = discovered.find((candidate) => candidate.url !== undefined)
@@ -48,6 +48,7 @@ export async function startBackgroundCli(
   const password = await run(binary, ["service", "get", "password"], logger, {
     redact: true,
     stateHome: daemonStateHome,
+    proxyEnvironment,
   })
   logger.log("v2 CLI background service ready", {
     existing: Boolean(found),

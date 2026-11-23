@@ -1,6 +1,6 @@
 import {bindLoadedNativeRuntime,collectNativeRuntime,verifyLoadedNativeRuntime} from './collapse-native-runtime.mjs';
 import {createHash} from 'node:crypto';
-import {completedCrossTableCollapses,validateCrossTableNativeSources,verifyCrossTableExecutionOwner} from './crosstable-native-source.mjs';
+import {completedCrossTableCollapses,collapseAncestorSources,validateCrossTableNativeSources,verifyCrossTableExecutionOwner} from './crosstable-native-source.mjs';
 import {completedStaticImports,bindCollapseNative} from './collapse-native-source.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {readNativeVariant,cancelNativeVariant,nativeVariantStatus} from './variant-native-read.mjs';
@@ -11,7 +11,7 @@ export async function recordNativeProof(onRecord,operationId,proof) {
  // The journal canonicalizes URLs during redaction. Normalize the non-secret
  // origin in the evidence copy; the browser binding retains location.origin.
  proof={...proof,binding:{...proof.binding,origin:new URL(proof.binding.origin).href}};
- const event={phase:proof.binding.static_chain?'crosstable_native_full_completed':'collapse_native_full_completed',operation_id:operationId,proof},saved=await onRecord(event);
+ const event={phase:proof.binding.static_chain?.kind==='crosstable_static_1'?'crosstable_native_full_completed':'collapse_native_full_completed',operation_id:operationId,proof},saved=await onRecord(event);
  need(saved?.phase===event.phase&&saved.operation_id===operationId&&JSON.stringify(saved.proof)===JSON.stringify(proof),'Exact read proof was not durably acknowledged');
 }
 export const nativeFrontendPins=Object.freeze({
@@ -90,8 +90,12 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const {execute,operation,onRecord,now}=options;
  need(options.exclusiveNodeOperation?.()===true,'Exact read requires the owning executor operation lock');
  const imports=options.coldStaticSources?.imports??completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
+ let chainOwnerVerified=false;
  const crossSources=crossTableConfiguration?validateCrossTableNativeSources(imports,options.coldStaticSources?.collapses??completedCrossTableCollapses(options.nodeHistory?.(),ctx),crossTableConfiguration.input_fields,crossTableConfiguration.input_mapping,crossTableConfiguration.node_context):null;
  if(crossSources)verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);
+ // Offered to the browser only; it uses it when this Collapse is fed by another Collapse.
+ const collapseChain=crossTableConfiguration?null:{collapses:options.coldStaticSources?.collapses??collapseAncestorSources(options.nodeHistory?.()??[],ctx,ctx.node)};
+ if(collapseChain?.collapses.length)try{verifyCrossTableExecutionOwner(options.nativeExecutionProof,ctx);chainOwnerVerified=true;}catch{}
  const frontends=await verifyFrontends(execute,config.targetOrigin,ctx.signal);
  let handle;
  if(options.ownedPreview){
@@ -101,7 +105,7 @@ export async function readCollapseNativeOutput(channel,read,ctx,options,config,c
  const codes={boolean:1,datetime:2,real:3,integer:4,string:5,variant:6};
  const args={document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,
   node_id:ctx.node.node_id,port_guid:port.port_guid,execution:ctx.execution,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,
-  origin:config.targetOrigin,imports,...(crossSources?{cross_table:crossSources,execution_owner_verified:true}:{}),schema:preview.node_preview_schema.fields.map(f=>({name:f.name,label:f.label,type:codes[f.type]}))};
+  origin:config.targetOrigin,imports,...(crossSources?{cross_table:crossSources,execution_owner_verified:true}:{}),...(collapseChain?.collapses.length?{collapse_chain:collapseChain,execution_owner_verified:chainOwnerVerified}:{}),schema:preview.node_preview_schema.fields.map(f=>({name:f.name,label:f.label,type:codes[f.type]}))};
  const readId='native-'+createHash('sha256').update(operation.id+':'+ctx.execution.execution_id).digest('hex').slice(0,48);
  const binding=await execute(`async page=>(${bindCollapseNative.toString()})(page,${JSON.stringify(args)})`,{timeout:10000});
  if(binding.refusal){

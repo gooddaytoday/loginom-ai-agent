@@ -1,0 +1,26 @@
+[
+  {
+    "path": "typed-update.csv",
+    "bytes": 118,
+    "sha256": "34d34b4e2dd4bfa67309ed74cedb6a74b50e80f82cea2d086f9b61b4065c0413",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "records": 2
+  },
+  {
+    "path": "typed.csv",
+    "bytes": 144,
+    "sha256": "8d985c381210e9abd8f7ea942454d35cdb760456f40e5dff5a383fa0e3687cf1",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "records": 3
+  },
+  {
+    "path": "variant.csv",
+    "bytes": 32,
+    "sha256": "c79fa642dbd8102008fde9b7440c690c012fd3f0f6b8a7cedad4cff75948875d",
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "records": 4
+  }
+]

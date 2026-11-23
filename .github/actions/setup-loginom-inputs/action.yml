@@ -1,7 +1,7 @@
 name: "Setup Loginom inputs"
 description: >-
   Provision the pinned official Node distribution and the pinned Playwright Chromium from
-  packages/product/loginom-release.json, cache both, and export LOGINOM_AI_AGENT_NODE_SOURCE,
+  packages/product/loginom-release.json, cache both together with the pinned ripgrep archive, and export LOGINOM_AI_AGENT_NODE_SOURCE,
   LOGINOM_AI_AGENT_TEST_NODE, LOGINOM_AI_AGENT_BROWSER_SOURCE and PLAYWRIGHT_BROWSERS_PATH as absolute paths.
 outputs:
   node:
@@ -67,6 +67,16 @@ runs:
           ${{ steps.pins.outputs.browsers }}
         # Playwright decides which companion builds (headless shell, ffmpeg) accompany the Chromium revision.
         key: ${{ runner.os }}-${{ runner.arch }}-node-${{ steps.pins.outputs.node-version }}-chromium-${{ steps.pins.outputs.chromium-revision }}-playwright-${{ steps.pins.outputs.playwright }}
+
+    # Resource staging (packages/loginom-host/script/ripgrep-resource.ts) reads the pinned ripgrep
+    # archive from this directory, verifies its SHA256 and downloads from GitHub only on a miss.
+    # A separate entry keyed by the pins: jobs that never stage leave the directory absent, so
+    # nothing is saved until a build or test has put the verified archive there.
+    - name: Restore pinned ripgrep archive
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/loginom-bootstrap/ripgrep
+        key: ${{ runner.os }}-${{ runner.arch }}-ripgrep-${{ hashFiles('packages/loginom-host/script/ripgrep-resource.ts') }}
 
     - name: Download pinned Node
       if: steps.cache.outputs.cache-hit != 'true'

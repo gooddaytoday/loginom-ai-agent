@@ -20,7 +20,7 @@ test("private IPC admits only a reserved original-input reference and retains th
     incoming = join(directory, "incoming.jsonl")
   await stageKnowledgeFixture(resources)
   await mkdir(join(resources, "bin"))
-  await symlink(node, join(resources, "bin/node"))
+  await symlink(node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),

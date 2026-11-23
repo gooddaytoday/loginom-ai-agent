@@ -1,0 +1,4 @@
+RowID;IntValue;RealValue;TextValue
+1;10;3.5;text
+2;2;2.5;word
+3;\N;\N;\N

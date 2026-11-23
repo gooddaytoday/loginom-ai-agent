@@ -1,0 +1,121 @@
+{
+  "type": "preprocessing.elim_outlier",
+  "title": "Редактирование выбросов",
+  "palette_group": "Предобработка",
+  "icon_class": "bg-vendor-icon-elimoutlier",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 3,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "detect",
+    "edit"
+  ],
+  "semantics": "Detect keeps values; edit selects independent outlier/extreme policies keep/delete/mean/median/most_probable/constant/limit for continuous numeric fields. Always fit current input; three ports: edited rows, original outliers excluding extremes, original extremes. NULL is retained, excluded from fit. IQR uses upper-rank Q(p)=sorted_non_null[min(floor(n*p),n-1)] with strict fences. SD 1/2 mean uses normal values; median and histogram mode include all non-NULL training values. Quality is hidden in 7.4.2 UI and frozen-model apply is unavailable: source changes recompute even with Always Run.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "elim-outlier-v1-internal-1",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/preprocessing/eliminate-outliers.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "detect",
+    "edit"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "outlier": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Complete continuous numeric field names; retain unlisted fields."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "sd",
+              "iqr"
+            ],
+            "description": "SD about mean or IQR fences."
+          },
+          "outlier_factor": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Explicit outlier multiplier."
+          },
+          "extreme_factor": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Explicit extreme multiplier >= outlier_factor."
+          },
+          "ordered": {
+            "type": "boolean",
+            "description": "Input already ordered; does not sort."
+          },
+          "outlier_policy": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "delete",
+              "mean",
+              "median",
+              "most_probable",
+              "constant",
+              "limit"
+            ],
+            "description": "Independent native policy for this class; new edit nodes require both. Side ports retain source values; delete removes rows only from port 0."
+          },
+          "extreme_policy": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "delete",
+              "mean",
+              "median",
+              "most_probable",
+              "constant",
+              "limit"
+            ],
+            "description": "Independent native policy for this class; new edit nodes require both. Side ports retain source values; delete removes rows only from port 0."
+          },
+          "outlier_constant": {
+            "type": "number",
+            "description": "Proposed replacement only when the matching policy is constant; finite number."
+          },
+          "extreme_constant": {
+            "type": "number",
+            "description": "Proposed replacement only when the matching policy is constant; finite number."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {}
+}

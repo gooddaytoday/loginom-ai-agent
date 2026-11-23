@@ -1,0 +1,61 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.union_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.union_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Backup",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Code": "A",
+          "Backup": "Q",
+          "Amount": 10
+        },
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 10
+        },
+        {
+          "Code": "A",
+          "Backup": "X",
+          "Amount": 11
+        },
+        {
+          "Code": "B",
+          "Backup": "Y",
+          "Amount": 20
+        },
+        {
+          "Code": "C",
+          "Backup": "Z",
+          "Amount": 30
+        }
+      ]
+    }
+  ]
+}

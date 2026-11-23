@@ -1,0 +1,333 @@
+import test from 'node:test';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import assert from 'node:assert/strict';
+import {configureTextImportFields,configureTextImportPatch,reconcileImportColumnPatch,validateTextImportFieldsRequest,validateTextImportPatch,autoDetectLabels,ImportColumnBindingError} from '../lib/text-import-procedure.mjs';
+import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
+import {textImportStepBudget} from '../lib/text-import-limits.mjs';
+
+const col=(name,type,extra={})=>({name,label:name,type,data_kind:'Дискретный',used:true,...extra});
+const native=()=>[col('Id','integer'),col('Amount','real'),col('Active','boolean'),col('EventAt','datetime'),col('Note','string'),col('Extra','integer')];
+const source={source_path:'/test/typed.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true};
+const format={delimiter:';',text_qualifier:'"',null_marker:'NULL',decimal_separator:'.'};
+
+// Minimal native wizard: «Автоопределение столбцов» combo, rows field and both refresh buttons.
+function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет',initialVariant=false,hideVariantInPicker=false,hideVariant=false,initialPath='/test/typed.csv'}={}) {
+ const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
+ let variant=initialVariant;
+ let stage='text_import_file',mode=initialMode,rows='25',opened=false,columns=existing?structuredClone(retained):native(),path=initialPath;
+ const gestures=[],initial=structuredClone(columns);
+ const field=(value,extra={})=>({status:'observed',truncated:false,value,...extra});
+ const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
+  import_source:{fields:Object.fromEntries(Object.entries({source_path:path,connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true}).map(([k,v])=>[k,field(v,{input_ref:k,display_ref:k})]))},
+  settings:{fields:{...(!hideVariant&&(!opened||!hideVariantInPicker)?{variant_as_general_type:field(variant,{display_ref:'variant'})}:{}),...Object.fromEntries(Object.entries(format).map(([k,v])=>[k,field(v,{input_ref:k})])),
+   auto_detect_columns:field(mode,{owner_ref:'auto-owner',input_ref:'auto-input',enabled:true,read_only:true}),
+   analysis_rows:field(rows,{owner_ref:'rows-owner',input_ref:'rows-input',enabled:mode!=='Нет',read_only:false})}},
+  import_columns:{initial_layout:{status:'rendered_definition_layout'},fields:columns.slice(offset,offset+8).map((c,i)=>({...c,index:i+offset,status:'observed',cell_refs:{}})),
+   page:{status:'complete_definition_page',schema_id:columns.map(c=>c.name+c.type).join(','),offset,limit:8,returned:columns.length,total_columns:columns.length,next_offset:null}}},
+  ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'wizard;btnPrev',ref:'prev',allowed_actions:['wizard_step']},
+   {tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshAll',ref:'refresh-all',allowed_actions:['click']},
+   {tid:'wizard;ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshData',ref:'refresh-data',allowed_actions:['click']},
+   {ref:'auto-picker',allowed_actions:['click'],wizard_combo:{kind:'picker',field:{scope:'import_format',name:'auto_detect_columns',owner_ref:'auto-owner',input_ref:'auto-input',root_ref:'wizard-ref'}}},
+   ...(opened?Object.values(autoDetectLabels).map(label=>({ref:'option-'+label,allowed_actions:['select_wizard_option'],wizard_combo:{kind:'option',label,field:{scope:'import_format',name:'auto_detect_columns',owner_ref:'auto-owner',input_ref:'auto-input',root_ref:'wizard-ref'}}})):[]),
+   {tid:'rows-input',ref:'rows-input',allowed_actions:['set_wizard_field'],wizard_field:{scope:'import_format',name:'analysis_rows',owner_ref:'rows-owner',root_ref:'wizard-ref'}}]}});
+ const channel={observe:async options=>{const s=structuredClone(state(options.importColumnPage?.offset??0));if(!options.ready(s))throw Error('Observation refused: '+options.condition);return s;},
+  act:async action=>{
+   gestures.push(action);
+   if(action.verb==='fill'&&action.ref==='source_path'){path=action.text;return;}
+   if(action.verb==='press'&&action.ref==='source_path'&&action.key==='Tab')return;
+   if(action.verb==='set_checked'&&action.ref==='variant'){variant=action.checked;return;}
+   if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
+   if(action.verb==='click'&&action.ref==='auto-picker'){opened=true;return;}
+   if(action.verb==='select_wizard_option'){mode=action.ref.slice('option-'.length);opened=false;return;}
+   if(action.verb==='set_wizard_field'&&action.ref==='rows-input'){assert.notEqual(mode,'Нет','rows field is disabled without detection');rows=action.text;return;}
+   if(action.verb==='click'&&['refresh-all','refresh-data'].includes(action.ref)){
+    assert.notEqual(rows,'25','analysis rows must be set before refresh when requested');
+    columns=action.ref==='refresh-all'?native():columns.map(c=>({...c,type:native().find(n=>n.name===c.name)?.type??c.type}));return;
+   }
+   assert.fail('Unexpected gesture '+JSON.stringify(action));
+  }};
+ channel.perform=async ({initialObservation,resolve})=>channel.act(resolve(initialObservation));
+ return {owner,channel,gestures,initial,get mode(){return mode;},get rows(){return rows;}};
+}
+const brief=cs=>cs.map(({name,type})=>name+':'+type).join(',');
+
+for(const mode of ['new','all'])test('discarded preview keeps native detection without injecting a manual schema: '+mode,async()=>{
+ const f=fixture({existing:false,initialPath:''});
+ const settings={source,format:{...format,auto_detect_columns:mode}};
+ const before=structuredClone(settings);
+ const result=await configureTextImportPatch(f.channel,settings,f.owner,source.source_path);
+ assert.equal(result.verified,true);
+ assert.equal(result.source.fields.source_path.value,source.source_path);
+ assert.equal(result.format.fields.auto_detect_columns.value,autoDetectLabels[mode]);
+ assert.deepEqual(result.columns.map(({name,type})=>({name,type})),native().map(({name,type})=>({name,type})));
+ assert.deepEqual(settings,before);
+ assert.equal(f.gestures.filter(a=>a.verb==='fill'&&a.ref==='source_path').length,1);
+});
+
+test('auto type settings are validated and stay optional',()=>{
+ const base={source,format:{...format}};
+ validateTextImportFieldsRequest({...base,columns:[col('Id','integer')]});
+ validateTextImportFieldsRequest({source,format:{...format,auto_detect_columns:'all'},analysis:{rows:2,refresh:'all'}});
+ validateTextImportFieldsRequest({source,format:{...format,auto_detect_columns:'new'},columns:[col('Amount','string')]});
+ validateTextImportPatch({format:{auto_detect_columns:'none'},analysis:{rows:1000000,refresh:'types'}});
+ assert.throws(()=>validateTextImportFieldsRequest(base),/Unexpected text import parameters/);
+ assert.throws(()=>validateTextImportFieldsRequest({source,format:{...format,auto_detect_columns:'all'},columns:[col('Id','integer')]}),/auto_detect_columns=all/);
+ assert.throws(()=>validateTextImportPatch({format:{auto_detect_columns:'all'},columns:[{name:'Amount',type:'string'}]}),/auto_detect_columns=all/);
+ for(const bad of [{auto_detect_columns:'Все'},{auto_detect_columns:true}])assert.throws(()=>validateTextImportPatch({format:bad}));
+ for(const bad of [{},{rows:0},{rows:1.5},{rows:1000001},{refresh:'rows'},{rows:2,extra:1}])assert.throws(()=>validateTextImportPatch({analysis:bad}),/analysis/);
+});
+
+test('new import without columns is admitted only for native type detection',()=>{
+ const request={target:{kind:'new'},finish:'done',inputs:[],mappings:[],read:{ports:[]}};
+ const p=settings=>({source:{kind:'storage',server_source_ref:'ref'},settings});
+ const ok=settings=>validateTextImportNodeParameters(p(settings),'delimited',request);
+ ok({source,format:{...format,auto_detect_columns:'all'},analysis:{rows:2,refresh:'all'}});
+ ok({source,format:{...format,auto_detect_columns:'new'}});
+ assert.throws(()=>ok({source,format:{...format,auto_detect_columns:'none'}}),/settings.columns/);
+ assert.throws(()=>ok({source,format}),/settings.columns/);
+ assert.equal(textImportStepBudget({target:{kind:'new'},parameters:{settings:{source,format,analysis:{refresh:'all'}}},mappings:[]})>0,true);
+});
+
+test('auto_detect_columns=all with output mappings or autosync is refused before any wizard mutation',()=>{
+ const p=(target,settings)=>({source:{kind:'storage',server_source_ref:'ref'},settings});
+ const all={...format,auto_detect_columns:'all'};
+ for(const [target,settings] of [['new',{source,format:all}],['existing',{format:{auto_detect_columns:'all'}}]])
+  for(const mapping of [{direction:'output',port:0,autosync:true},{direction:'output',port:0,fields:[{name:'Custom',source:{kind:'configured_field',name:'Id'}}]}]) {
+   const request={target:{kind:target},finish:'done',inputs:[],mappings:[mapping],read:{ports:[]}};
+   assert.throws(()=>validateTextImportNodeParameters(p(target,settings),'delimited',request),/auto_detect_columns=all/,target+JSON.stringify(mapping));
+  }
+ const request={target:{kind:'existing'},finish:'done',inputs:[],mappings:[{direction:'output',port:0,autosync:true}],read:{ports:[]}};
+ validateTextImportNodeParameters(p('existing',{format:{auto_detect_columns:'new'}}),'delimited',request);
+});
+
+test('a column patch of an existing «Все» import without an explicit mode is refused before any settings gesture',async()=>{
+ for(const patch of [{columns:[{name:'Amount',type:'string'}]},{source:{rows_to_skip:1},columns:[{name:'Amount',type:'string'}]}]) {
+  const f=fixture({initialMode:'Все'});
+  // The configure catch closes this class as text_import_binding_draft_discarded (no draft, no pending phase).
+  await assert.rejects(configureTextImportPatch(f.channel,patch,f.owner,'/test/typed.csv'),
+   error=>error instanceof ImportColumnBindingError&&/auto_detect_columns=all/.test(error.message));
+  assert.deepEqual(f.gestures.filter(g=>g.verb!=='wizard_step'),[],JSON.stringify(patch));
+ }
+ // An explicit new mode passes this guard (the fixture has no column editor, so it fails later).
+ const f=fixture({initialMode:'Все'});
+ await assert.rejects(configureTextImportPatch(f.channel,{format:{auto_detect_columns:'new'},columns:[{name:'Amount',type:'string'}]},f.owner,'/test/typed.csv'),
+  error=>!/auto_detect_columns=all/.test(error.message));
+ assert.equal(f.mode,'Только новые');
+});
+
+test('native detection adds new fields while retained manual types win by name',()=>{
+ const before=native().slice(0,5).map(c=>c.name==='Amount'?{...c,type:'string'}:c);
+ const parsed=native();
+ assert.throws(()=>reconcileImportColumnPatch(before,parsed,[],{schemaChangeRequested:true}),/New source field requires explicit/);
+ const merged=reconcileImportColumnPatch(before,parsed,[],{schemaChangeRequested:true,acceptNewFields:true});
+ assert.equal(brief(merged),'Id:integer,Amount:string,Active:boolean,EventAt:datetime,Note:string,Extra:integer');
+});
+
+test('all with analysis selects the mode, sets rows, then refreshes before taking native types',async()=>{
+ const f=fixture();
+ const result=await configureTextImportPatch(f.channel,{format:{auto_detect_columns:'all'},analysis:{rows:2,refresh:'all'}},f.owner,'/test/typed.csv');
+ assert.equal(f.mode,'Все');assert.equal(f.rows,'2');
+ const order=f.gestures.map(g=>g.ref);
+ assert.deepEqual(order.filter(r=>['auto-picker','option-Все','rows-input','refresh-all'].includes(r)),['auto-picker','option-Все','rows-input','refresh-all']);
+ assert.equal(brief(result.columns),brief(native()));
+ assert.equal(result.format.fields.auto_detect_columns.value,'Все');
+});
+
+test('explicit types refresh in none keeps the structure and takes native types for every field',async()=>{
+ const f=fixture();
+ f.gestures.length=0;
+ const first=f.channel.act;
+ const result=await configureTextImportPatch(f.channel,{format:{auto_detect_columns:'new'},analysis:{rows:2,refresh:'types'}},f.owner,'/test/typed.csv');
+ assert.equal(f.gestures.filter(g=>g.ref==='refresh-data').length,1);
+ assert.equal(f.gestures.filter(g=>g.ref==='refresh-all').length,0);
+ assert.equal(brief(result.columns),'Id:integer,Amount:real,Active:boolean,EventAt:datetime,Note:string');
+ assert.equal(first,f.channel.act);
+});
+
+test('new import takes all fields from the observed native schema without declared columns',async()=>{
+ const f=fixture({existing:false});
+ const result=await configureTextImportFields(f.channel,{source,format:{...format,auto_detect_columns:'all'},analysis:{rows:2,refresh:'all'}},f.owner);
+ assert.equal(brief(result.columns),brief(native()));
+ assert.equal(f.gestures.filter(g=>g.ref==='refresh-all').length,1);
+ assert.equal(f.mode,'Все');
+});
+
+test('a request without detection settings gives no mode, rows or refresh gesture',async()=>{
+ const f=fixture();
+ await configureTextImportPatch(f.channel,{},f.owner,'/test/typed.csv');
+ assert.deepEqual(f.gestures.map(g=>g.verb),['wizard_step']);
+ assert.equal(f.mode,'Нет');
+});
+
+test('a native output mapping timeout names the observed reason and stays a readiness timeout',async()=>{
+ const {readNativeImportMapping}=await import('../lib/text-import-node.mjs');
+ const {NodeReadinessTimeout}=await import('../lib/node-procedure.mjs');
+ const calls=[];
+ const channel={observe:async options=>{
+  calls.push(options.condition);
+  if(options.condition==='mapping')throw new NodeReadinessTimeout('mapping');
+  return {node_mapping:{verified:false,reason:'mapping_source_pending',source_identity_verified:false}};
+ }};
+ await assert.rejects(readNativeImportMapping(channel,'mapping',()=>false),error=>
+  error instanceof NodeReadinessTimeout&&/mapping \(mapping_source_pending, source_identity_verified=false\)/.test(error.message));
+ assert.deepEqual(calls,['mapping','mapping state']);
+ const ok=await readNativeImportMapping({observe:async()=>({node_mapping:{verified:true}})},'mapping',()=>true);
+ assert.equal(ok.node_mapping.verified,true);
+ await assert.rejects(readNativeImportMapping({observe:async()=>{throw new Error('transport');}},'mapping',()=>true),/transport/);
+});
+
+test('an empty native mapping is deferred to execution only for auto-detect all with configured fields',async()=>{
+ const {deferredImportOutput}=await import('../lib/text-import-node.mjs');
+ const {textImportConfigurationReadback}=await import('../lib/text-import-readback.mjs');
+ const configured=mode=>({format:{fields:{auto_detect_columns:{status:'observed',value:mode}}},columns:[col('Id','integer'),col('Amount','real',{used:false}),col('Note','string')]});
+ const empty={verified:true,source_fields:[],target_fields:[]};
+ assert.deepEqual(deferredImportOutput(configured('Все'),empty,[]).map(c=>c.name),['Id','Note']);
+ assert.equal(deferredImportOutput(configured('Нет'),empty,[]),null);
+ assert.equal(deferredImportOutput(configured('Только новые'),empty,[]),null);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,target_fields:[{name:'Old'}]},[]).length,2);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,source_fields:[{name:'A'}]},[]),null);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,verified:false},[]),null);
+ assert.throws(()=>deferredImportOutput(configured('Все'),empty,[{direction:'output',port:0}]),/auto_detect_columns=all/);
+ const phase=(name,value)=>({phase:name,status:'verified',receipt_id:'op:'+name,value:{verified:true,cleanup_complete:true,...value}});
+ const fields=(o)=>({fields:Object.fromEntries(Object.entries(o).map(([k,v])=>[k,{status:'observed',value:v}]))});
+ const input={node:{document_id:'d',workflow_id:'w',node_id:'n'},operation_id:'op',phases:[
+  phase('configure',{source:fields({source_path:'/a.csv',connection:'Server',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}),
+   format:fields({delimiter:';',text_qualifier:'"',null_marker:'',decimal_separator:'.',auto_detect_columns:'Все',analysis_rows:'1000'}),
+   columns:[{...col('Id','integer'),status:'observed',index:0},{...col('Note','string'),status:'observed',index:1}]}),
+  phase('output_mapping',{source_identity_verified:true,deferred_output:true,native_mapping:{verified:true,source_identity_verified:true,inventory_complete:true,autosync:true,source_fields:[],target_fields:[]}}),
+  phase('finish',{settings_applied:true,mode:'execute'})]};
+ const readback=textImportConfigurationReadback(input);
+ assert.deepEqual(readback.output_mapping.fields,[]);
+ input.phases[1].value.native_mapping.target_fields=[{name:'Old',source:null}];
+ assert.deepEqual(textImportConfigurationReadback(input).output_mapping.fields,[]);
+ input.phases[1].value.deferred_output=false;
+ assert.throws(()=>textImportConfigurationReadback(input));
+});
+
+const fieldOf=(name,id)=>({record_id:'s'+id,field_id:String(id),name,label:name,type:'string'});
+const targetOf=(source,name=source.name)=>({name,label:name,type:'string',source:{record_id:source.record_id,field_id:source.field_id,name:source.name,label:source.label}});
+function mappingFixture({targetsOf,autosync=false,reset=false,names=['Id','Amount','Extra']}) {
+ const sources=names.map((n,i)=>fieldOf(n,i));
+ let on=autosync,targets=targetsOf(sources),clicks=0;
+ const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:true,autosync:on,source_fields:sources,target_fields:structuredClone(targets)});
+ const state=()=>({wizard:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'wizard',output_columns:{auto_sync:{status:'observed',value:on,ref:'sync'}}},
+  node_mapping:mapping(),ui:{elements:[{tid:'wizard;ColumnsMappingEngineOutputPortWizard;btnAutoSyncThroughColumns',ref:'sync',allowed_actions:['click']}]}});
+ let epoch=0;
+ const channel={observe:async options=>{const s=state();if(options.readMappings)epoch++;s.epoch=epoch;if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
+  perform:async o=>{if(o.initialObservation.epoch!==epoch)throw Error('Initial bound observation is no longer current or ready');assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
+   clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source?.record_id===s.record_id))||targetOf(s));}};
+ const rename=changes=>{for(const c of changes){const s=sources.find(x=>x.name===c.source.name);targets=targets.map(t=>t.source?.record_id===s.record_id?{...t,name:c.name,label:c.label}:t);}return {verified:true,edits:changes};};
+ return {sources,channel,rename,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
+}
+
+test('«Только новые» adds the outputs of new source fields natively and restores autosync',async()=>{
+ const {outputsOutOfSync,resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const {shouldResyncNewOutputs}=await import('../lib/text-import-node.mjs');
+ const f=mappingFixture({targetsOf:s=>[targetOf(s[0]),targetOf(s[1])]});
+ assert.equal(outputsOutOfSync(f.native),true);
+ const configured=mode=>({format:{fields:{auto_detect_columns:{value:mode}}}});
+ assert.equal(shouldResyncNewOutputs(configured('Только новые'),f.native),true);
+ for(const other of ['Нет','Все'])assert.equal(shouldResyncNewOutputs(configured(other),f.native),false);
+ assert.equal(shouldResyncNewOutputs(configured('Только новые'),{...f.native,autosync:true}),false);
+ const result=await resyncOutputFields(f.channel,f.native);
+ assert.equal(f.clicks,2);assert.equal(f.autosync,false);assert.equal(result.added_outputs,1);
+ assert.deepEqual(result.native_mapping.target_fields.map(t=>t.name),['Id','Amount','Extra']);
+ assert.equal(outputsOutOfSync(result.native_mapping),false);
+});
+
+test('a synchronized or disconnected output mapping is classified without touching autosync',async()=>{
+ const {outputsOutOfSync,resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const full=mappingFixture({targetsOf:s=>s.map(x=>targetOf(x))});
+ assert.equal(outputsOutOfSync(full.native),false);
+ const stale=mappingFixture({targetsOf:s=>s.map(x=>({...targetOf(x),source:{record_id:'old'+x.record_id,field_id:x.field_id}}))});
+ assert.equal(outputsOutOfSync(stale.native),true);
+ const on=mappingFixture({targetsOf:s=>[targetOf(s[0])],autosync:true});
+ await assert.rejects(resyncOutputFields(on.channel,on.native),/requires autosync to be off/);
+ assert.equal(on.clicks,0);
+ const renamed=mappingFixture({targetsOf:s=>[targetOf(s[0],'Custom'),targetOf(s[1])],reset:true});
+ await assert.rejects(resyncOutputFields(renamed.channel,renamed.native),/changed an existing output field: Id/);
+});
+
+test('resynchronization after a source re-read restores aliases of outputs bound to old source records',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const old=x=>({record_id:'old'+x.record_id,field_id:x.field_id,name:x.name,label:x.label});
+ for(const reset of [false,true]) {
+  const f=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),label:'Своё',source:old(s[0])},{...targetOf(s[1]),source:old(s[1])}],reset});
+  const calls=[];
+  const result=await resyncOutputFields(f.channel,f.native,{restoreOutputs:async changes=>{calls.push(changes);return f.rename(changes);}});
+  assert.deepEqual(calls,[[{source:{kind:'configured_field',name:'Id'},name:'Custom',label:'Своё'}]]);
+  assert.deepEqual(result.native_mapping.target_fields.map(t=>[t.name,t.label]),[['Custom','Своё'],['Amount','Amount'],['Extra','Extra']]);
+  assert.equal(f.autosync,false);
+  const silent=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),source:old(s[0])}],reset});
+  await assert.rejects(resyncOutputFields(silent.channel,silent.native),/changed an existing output field: Id/);
+  const lost=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),source:old(s[0])}],reset});
+  await assert.rejects(resyncOutputFields(lost.channel,lost.native,{restoreOutputs:async()=>({verified:true})}),/did not restore an existing output field: Id/);
+ }
+});
+
+test('an output that lost its source on re-read keeps its alias or refuses before synchronization',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ // execution-events.jsonl:1003 (text-auto-update): the type refresh recreated Amount's source; its output kept source null.
+ const orphan=(name,label=name)=>({name,label,type:'string',source:null});
+ const restore=f=>({restoreOutputs:async changes=>f.rename(changes)});
+ const plain=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Amount'),targetOf(s[2])]});
+ const kept=await resyncOutputFields(plain.channel,plain.native,restore(plain));
+ assert.deepEqual(kept.restored_outputs,[]);assert.deepEqual(kept.native_mapping.target_fields.map(t=>t.name),['Id','Amount','Extra']);
+ // The aliased output may belong only to a field of the previous schema (Amount, whose type changed).
+ const alias=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom','Своё'),targetOf(s[2])]});
+ const restored=await resyncOutputFields(alias.channel,alias.native,{...restore(alias),previousColumns:['Id','Amount','Extra']});
+ assert.deepEqual(restored.native_mapping.target_fields.map(t=>[t.name,t.label]),[['Id','Id'],['Custom','Своё'],['Extra','Extra']]);
+ const ambiguous=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom')]});
+ await assert.rejects(resyncOutputFields(ambiguous.channel,ambiguous.native,{...restore(ambiguous),previousColumns:['Id','Amount','Extra']}),/cannot attribute an output that lost its source: Custom/);
+ assert.equal(ambiguous.clicks,0);
+});
+
+test('a renamed source column does not inherit the output of the removed column',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ // «Только новые», autosync off: the new file renames Amount to Sum. The Amount output lost its source.
+ const orphan=(name,label=name)=>({name,label,type:'string',source:null});
+ const previousColumns=['Id','Amount','Extra'],calls=[];
+ const restore=f=>({previousColumns,restoreOutputs:async changes=>{calls.push(changes);return f.rename(changes);}});
+ const renamed=mappingFixture({names:['Id','Sum','Extra'],targetsOf:s=>[targetOf(s[0]),orphan('Amount'),targetOf(s[2])]});
+ const result=await resyncOutputFields(renamed.channel,renamed.native,restore(renamed));
+ assert.deepEqual(calls,[]);assert.deepEqual(result.restored_outputs,[]);
+ assert.deepEqual(result.native_mapping.target_fields.map(t=>[t.name,t.source.name]),[['Id','Id'],['Sum','Sum'],['Extra','Extra']]);
+ // An alias whose column was removed has no field of the previous schema left: refuse before any gesture.
+ const alias=mappingFixture({names:['Id','Sum','Extra'],targetsOf:s=>[targetOf(s[0]),orphan('Custom'),targetOf(s[2])]});
+ await assert.rejects(resyncOutputFields(alias.channel,alias.native,restore(alias)),/cannot attribute an output that lost its source: Custom/);
+ assert.equal(alias.clicks,0);assert.deepEqual(calls,[]);
+});
+
+test('mapPorts passes the previous import schema to resynchronization of a renamed «Только новые» source',()=>{
+ // The node driver runs in a child with module mocks: browser procedures are stubbed, resyncOutputFields records its options.
+ const probe=new URL('./support/text-import-map-ports-probe.mjs',import.meta.url);
+ const child=spawnSync(process.execPath,['--experimental-test-module-mocks','--no-warnings',fileURLToPath(probe)],{encoding:'utf8',timeout:60000});
+ assert.equal(child.status,0,child.stderr);
+ const result=JSON.parse(child.stdout.trim().split('\n').at(-1));
+ assert.equal(result.stop,'probe stop');
+ assert.deepEqual(result.calls,[{previousColumns:['Id','Amount'],before_targets:['Id','Amount']}]);
+});
+
+for(const enabled of [true,false])test('Variant toggle precedes native type refresh and retains the same Import: '+enabled,async()=>{
+ const f=fixture({initialMode:'Только новые',initialVariant:!enabled});
+ f.gestures.length=0;
+ const result=await configureTextImportPatch(f.channel,{format:{variant_as_general_type:enabled},analysis:{rows:4,refresh:'types'}},f.owner,'/test/typed.csv');
+ assert.equal(result.format.fields.variant_as_general_type.value,enabled);
+ assert.deepEqual(f.gestures.filter(g=>['variant','refresh-data'].includes(g.ref)).map(g=>g.verb),['set_checked','click']);
+ assert.equal(result.source.fields.source_path.value,'/test/typed.csv');
+});
+
+test('requested Variant remains configurable while its checkbox is hidden by the owned detection picker',async()=>{
+ const f=fixture({hideVariantInPicker:true});
+ const result=await configureTextImportPatch(f.channel,{format:{variant_as_general_type:true,auto_detect_columns:'new'},analysis:{rows:4,refresh:'types'}},f.owner,'/test/typed.csv');
+ assert.equal(result.format.fields.variant_as_general_type.value,true);
+ assert.equal(f.mode,'Только новые');
+ assert.deepEqual(f.gestures.filter(g=>['variant','option-Только новые','refresh-data'].includes(g.ref)).map(g=>g.verb),['set_checked','select_wizard_option','click']);
+});
+
+test('a missing requested Variant checkbox outside a picker refuses before its mutation',async()=>{
+ const f=fixture({hideVariant:true});
+ await assert.rejects(configureTextImportPatch(f.channel,{format:{variant_as_general_type:true}},f.owner,'/test/typed.csv'),/Observation refused/);
+ assert.equal(f.gestures.some(g=>['set_checked','set_wizard_field','select_wizard_option'].includes(g.verb)),false);
+});

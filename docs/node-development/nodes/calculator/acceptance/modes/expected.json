@@ -1,0 +1,103 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.calculator",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Quantity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "UnitPrice",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Bare",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "FromField",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "JsTotal",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "FromExpr",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Quantity": 2,
+          "UnitPrice": 5,
+          "Amount": 10,
+          "Bare": 100,
+          "FromField": 100,
+          "JsTotal": 202,
+          "FromExpr": 10
+        },
+        {
+          "RowID": 2,
+          "Quantity": 0,
+          "UnitPrice": 3,
+          "Amount": 0,
+          "Bare": 7,
+          "FromField": 7,
+          "JsTotal": 16,
+          "FromExpr": 0
+        },
+        {
+          "RowID": 3,
+          "Quantity": -2,
+          "UnitPrice": 4,
+          "Amount": -8,
+          "Bare": -5,
+          "FromField": -5,
+          "JsTotal": -8,
+          "FromExpr": -8
+        },
+        {
+          "RowID": 4,
+          "Quantity": null,
+          "UnitPrice": 8,
+          "Amount": null,
+          "Bare": 9,
+          "FromField": 9,
+          "JsTotal": 20,
+          "FromExpr": null
+        }
+      ]
+    }
+  ]
+}

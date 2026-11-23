@@ -1,0 +1,16 @@
+Group,Item,Share
+G,a,0.25
+G,b,0.75
+H,c,0.2
+H,d,0.3
+H,e,0.5
+N,f,0.25
+N,g,0.25
+Z,h,0
+Z,i,1
+NEG,j,-0.25
+NEG,k,1.25
+Q,l,1
+U,m,1
+?,n,1
+"",o,1

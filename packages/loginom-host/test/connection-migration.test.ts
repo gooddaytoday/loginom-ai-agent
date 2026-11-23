@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { Product } from "@loginom-ai-agent/product"
@@ -34,8 +34,25 @@ async function fixture(codec: CredentialCodec) {
     store,
     prepared,
     runtime,
+    async legacy(url = original.url, pendingUrl?: string) {
+      await mkdir(join(directory, "generations"), { mode: 0o700 })
+      const record = {
+        generation: 1, revision: 1, url, urlSource: "explicit", username: original.username,
+        secrets: await codec.encode(original),
+      }
+      await writeFile(join(directory, "connection.json"), JSON.stringify(record), { mode: 0o600 })
+      await writeFile(join(directory, "generations", "1.json"), JSON.stringify(record), { mode: 0o600 })
+      if (pendingUrl) {
+        const pending = { ...record, url: pendingUrl, generation: 2, revision: 2 }
+        await writeFile(join(directory, "pending.json"), JSON.stringify(pending), { mode: 0o600 })
+        await writeFile(join(directory, "generations", "2.json"), JSON.stringify(pending), { mode: 0o600 })
+      }
+    },
+    async marker() {
+      return readFile(join(directory, "v040-migration.json"), "utf8")
+    },
     async start() {
-      const service = await connectionService(store, runtime)
+      const service = await connectionService(connectionStore(directory, codec), runtime)
       services.push(service)
       await service.settled()
       return service
@@ -54,6 +71,112 @@ for (const [name, codec] of [
   ["Desktop", credentials("linux")],
   ["CLI", cliCredentials("linux")],
 ] as const) {
+  test(`${name}: v0.4.0 resets a legacy foreign host before preparing any runtime and removes stored secrets`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.legacy("http://10.200.11.224/app/", "https://pending.example/app/")
+      const service = await f.start()
+      expect(await service.api.status()).toMatchObject({
+        url: Product.connection.url, username: "user", hasPassword: false, state: "unconfigured", generation: 0,
+      })
+      expect(f.prepared).toEqual([])
+      expect(service.acquire("run")).toBeUndefined()
+      expect(await f.store.read()).toBeUndefined()
+      expect(await f.store.pending()).toBeUndefined()
+      expect(await readdir(join(f.directory, "generations"))).toEqual([])
+      expect(JSON.parse(await f.marker())).toEqual({ state: "complete" })
+      expect((await stat(join(f.directory, "v040-migration.json"))).mode & 0o777).toBe(0o600)
+      await service.close()
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ state: "unconfigured", hasPassword: false })
+      expect(f.prepared).toEqual([])
+    } finally { await f.close() }
+  })
+
+  for (const url of ["https://app.loginom.ai", "https://app.loginom.ai/app/", "https://app.loginom.ai/app/?testable=true"]) {
+    test(`${name}: v0.4.0 preserves a legacy public host and its credentials (${url})`, async () => {
+      const f = await fixture(codec)
+      try {
+        await f.legacy(url)
+        const before = await readFile(join(f.directory, "connection.json"), "utf8")
+        const history = await f.history()
+        await f.start()
+        expect(await readFile(join(f.directory, "connection.json"), "utf8")).toBe(before)
+        expect(await f.history()).toBe(history)
+        expect(await f.store.read()).toMatchObject({ url, password: original.password, username: original.username })
+        expect(f.prepared).toEqual([url])
+        expect(JSON.parse(await f.marker())).toEqual({ state: "complete" })
+      } finally { await f.close() }
+    })
+  }
+
+  test(`${name}: v0.4.0 is one-shot and permits another host to be saved afterwards`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.legacy()
+      const first = await f.start()
+      const current = await first.api.status()
+      const validation = await first.api.check({
+        revision: current.revision, url: original.url, username: original.username,
+        password: { operation: "replace", value: "new-password" },
+      })
+      await first.api.save({ revision: current.revision, validationId: validation.validationId })
+      await first.settled()
+      const saved = await readFile(join(f.directory, "connection.json"), "utf8")
+      const marker = await f.marker()
+      await first.close()
+      const second = await f.start()
+      expect(await second.api.status()).toMatchObject({ url: original.url, hasPassword: true, state: "ready" })
+      expect(await f.store.read()).toMatchObject({ password: "new-password" })
+      expect(await readFile(join(f.directory, "connection.json"), "utf8")).toBe(saved)
+      expect(await f.marker()).toBe(marker)
+    } finally { await f.close() }
+  })
+
+  test(`${name}: v0.4.0 marks a new profile without creating or resetting a connection`, async () => {
+    const f = await fixture(codec)
+    try {
+      const service = await f.start()
+      expect(await service.api.status()).toMatchObject({ state: "unconfigured", url: Product.connection.url })
+      expect(await f.store.read()).toBeUndefined()
+      expect(await f.store.pending()).toBeUndefined()
+      expect(await readdir(join(f.directory, "generations"))).toEqual([])
+      expect(JSON.parse(await f.marker())).toEqual({ state: "complete" })
+      expect(f.prepared).toEqual([])
+    } finally { await f.close() }
+  })
+
+  test(`${name}: v0.4.0 resumes interrupted removal before recording completion`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.legacy()
+      await writeFile(join(f.directory, "v040-migration.json"), JSON.stringify({ state: "resetting" }), { mode: 0o600 })
+      await rm(join(f.directory, "connection.json"))
+      const service = await f.start()
+      expect(await service.api.status()).toMatchObject({ state: "unconfigured" })
+      expect(await readdir(join(f.directory, "generations"))).toEqual([])
+      expect(JSON.parse(await f.marker())).toEqual({ state: "complete" })
+    } finally { await f.close() }
+  })
+
+  for (const publicPending of [false, true]) {
+    test(`${name}: v0.4.0 preserves the public connection when only ${publicPending ? "active" : "pending"} is foreign`, async () => {
+      const f = await fixture(codec)
+      try {
+        await f.legacy(
+          publicPending ? original.url : Product.connection.url,
+          publicPending ? Product.connection.url : original.url,
+        )
+        const service = await f.start()
+        expect(await service.api.status()).toMatchObject({ url: Product.connection.url, username: original.username, hasPassword: true, state: "ready" })
+        expect(await f.store.read()).toMatchObject({ url: Product.connection.url, password: original.password })
+        expect(f.prepared).toEqual([Product.connection.url])
+        expect(await readdir(join(f.directory, "generations"))).toEqual([publicPending ? "2.json" : "1.json"])
+        expect(await f.store.pending()).toBeUndefined()
+      } finally { await f.close() }
+    })
+  }
+
   for (const url of [original.url, original.url.slice(0, -1), `${original.url}?testable=true`]) {
     test(`${name}: explicit old-default URL survives setup, status and a fresh process (${url})`, async () => {
       const f = await fixture(codec)
@@ -120,7 +243,7 @@ for (const [name, codec] of [
     } finally { await f.close() }
   })
 
-  test(`${name}: preserves saved stand URLs and secrets across restarts`, async () => {
+  test(`${name}: preserves current-version stand URLs and secrets across restarts`, async () => {
     for (const url of [
       original.url,
       original.url.slice(0, -1),

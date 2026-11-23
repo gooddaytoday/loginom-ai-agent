@@ -11,6 +11,22 @@ export function SessionPermissionDock(props: {
   onDecide: (response: "once" | "always" | "reject") => void
 }) {
   const language = useLanguage()
+  const deletion = () => props.request.permission === "dashboard_delete"
+  const publicationCount = () => props.request.metadata.publicationCount
+  const confirmedRemoved = () => {
+    const count = props.request.metadata.confirmedRemoved
+    return typeof count === "number" && Number.isSafeInteger(count) && count > 0 ? String(count) : undefined
+  }
+
+  const conflict = () => {
+    if (props.request.permission !== "dashboard_publish") return
+    const value = props.request.metadata.dashboardConflict
+    if (!value || typeof value !== "object" || !("latest" in value)) return
+    const latest = value.latest
+    if (latest && typeof latest === "object" && "name" in latest && typeof latest.name === "string")
+      return { latest: latest.name, newDraft: "base" in value && value.base === null }
+  }
+  const newDraftConflict = () => conflict()?.newDraft
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.permission}.description`
@@ -35,18 +51,20 @@ export function SessionPermissionDock(props: {
           <div />
           <div data-slot="permission-footer-actions">
             <Button variant="ghost" size="normal" onClick={() => props.onDecide("reject")} disabled={props.responding}>
-              {language.t("ui.permission.deny")}
+              {language.t((deletion() || newDraftConflict()) ? "dashboard.conflict.cancel" : "ui.permission.deny")}
             </Button>
-            <Button
-              variant="secondary"
-              size="normal"
-              onClick={() => props.onDecide("always")}
-              disabled={props.responding}
-            >
-              {language.t("ui.permission.allowAlways")}
-            </Button>
+            <Show when={!deletion() && props.request.always.length > 0}>
+              <Button
+                variant="secondary"
+                size="normal"
+                onClick={() => props.onDecide("always")}
+                disabled={props.responding}
+              >
+                {language.t("ui.permission.allowAlways")}
+              </Button>
+            </Show>
             <Button variant="primary" size="normal" onClick={() => props.onDecide("once")} disabled={props.responding}>
-              {language.t("ui.permission.allowOnce")}
+              {language.t(deletion() ? "dashboard.delete.confirm" : newDraftConflict() ? "dashboard.conflict.publishMine" : "ui.permission.allowOnce")}
             </Button>
           </div>
         </>
@@ -56,6 +74,30 @@ export function SessionPermissionDock(props: {
         <div data-slot="permission-row">
           <span data-slot="permission-spacer" aria-hidden="true" />
           <div data-slot="permission-hint">{toolDescription()}</div>
+        </div>
+      </Show>
+
+      <Show when={conflict()}>
+        {(version) => <div data-slot="permission-row" role="alert">
+          <span data-slot="permission-spacer" aria-hidden="true" />
+          <div data-slot="permission-hint">
+            {language.t(version().newDraft ? "dashboard.conflict.newDraft" : "dashboard.conflict", { latest: version().latest })}
+          </div>
+        </div>}
+      </Show>
+
+      <Show when={deletion()}>
+        <div data-slot="permission-row" role="alert">
+          <span data-slot="permission-spacer" aria-hidden="true" />
+          <div data-slot="permission-hint">
+            <Show when={Number.isSafeInteger(publicationCount())}>
+              <div>{language.t("dashboard.delete.count", { count: String(publicationCount()) })}</div>
+            </Show>
+            <Show when={confirmedRemoved()}>
+              {(count) => <div>{language.t("dashboard.delete.confirmedRemoved", { count: count() })}</div>}
+            </Show>
+            <div>{language.t("dashboard.delete.warning")}</div>
+          </div>
         </div>
       </Show>
 

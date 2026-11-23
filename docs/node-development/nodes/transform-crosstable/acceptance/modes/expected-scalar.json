@@ -1,0 +1,159 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Текст",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Text_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Text_Min",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Text_Max",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Text_UniqueCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Text_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Text_First",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Text_Last",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Text_Count": 1,
+          "Text_Min": null,
+          "Text_Max": null,
+          "Text_UniqueCount": 0,
+          "Text_NullCount": 1,
+          "Text_First": null,
+          "Text_Last": null
+        },
+        {
+          "Region": "North",
+          "Text_Count": 4,
+          "Text_Min": "a",
+          "Text_Max": "z",
+          "Text_UniqueCount": 2,
+          "Text_NullCount": 1,
+          "Text_First": "z",
+          "Text_Last": null
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.cross_table",
+      "output_node_label": "Логика",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Flag_Count",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag_Min",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Flag_Max",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Flag_UniqueCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag_NullCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag_First",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Flag_Last",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": null,
+          "Flag_Count": 1,
+          "Flag_Min": null,
+          "Flag_Max": null,
+          "Flag_UniqueCount": 0,
+          "Flag_NullCount": 1,
+          "Flag_First": null,
+          "Flag_Last": null
+        },
+        {
+          "Region": "North",
+          "Flag_Count": 4,
+          "Flag_Min": false,
+          "Flag_Max": true,
+          "Flag_UniqueCount": 2,
+          "Flag_NullCount": 1,
+          "Flag_First": true,
+          "Flag_Last": null
+        }
+      ]
+    }
+  ]
+}

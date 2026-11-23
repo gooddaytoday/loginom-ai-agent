@@ -5,13 +5,13 @@ import { validateStartInput } from "../src/start-input.mjs"
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
 
 test("managed start without cleanup input stays a product launch", () => {
-  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
+  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false, validationHttpCache: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false, validationHttpCache: false })
 })
 
 test("managed start accepts an exact saved package path for acceptance cleanup", () => {
   const path = "/user/loginom-ai-agent-acceptance-run-A.lgp"
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false, browserRecovery: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false, browserRecovery: false, validationHttpCache: false })
   assert.equal(validateStartInput({ ...base, acceptanceCleanupPackage: "/a b/пакет.lgp" }).acceptanceCleanupPackage, "/a b/пакет.lgp")
 })
 
@@ -20,6 +20,14 @@ test("private normal shutdown policy accepts only an explicit boolean", () => {
     assert.equal(validateStartInput({ ...base, closeSavedPackageOnShutdown: value }).closeSavedPackageOnShutdown, value === true)
   for (const value of [null, "true", 1, {}, []])
     assert.throws(() => validateStartInput({ ...base, closeSavedPackageOnShutdown: value }), /^Error: LOGINOM_START_INVALID$/)
+})
+
+test("HTTP cache capability is private to validation and accepts only booleans", () => {
+  assert.equal(validateStartInput({ ...base, validation: true, validationHttpCache: true }).validationHttpCache, true)
+  for (const patch of [{}, { validation: false }, { validation: true, chat: "readiness" }])
+    assert.throws(() => validateStartInput({ ...base, ...patch, validationHttpCache: true }), /LOGINOM_START_INVALID/)
+  for (const value of [null, 0, "true", {}, []])
+    assert.throws(() => validateStartInput({ ...base, validation: true, validationHttpCache: value }), /LOGINOM_START_INVALID/)
 })
 
 test("normal cleanup cannot borrow acceptance identity or run in validation/readiness", () => {

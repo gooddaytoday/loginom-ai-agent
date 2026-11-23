@@ -1,0 +1,35 @@
+{
+  "batch": "Бета",
+  "items": [
+    {
+      "id": 9007199254740993,
+      "details": {
+        "code": "A",
+        "active": true
+      },
+      "parts": [
+        {
+          "sku": "a",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": 9007199254740994,
+      "details": {
+        "code": "",
+        "active": false
+      },
+      "parts": [
+        {
+          "sku": "b",
+          "qty": 0
+        },
+        {
+          "sku": "c",
+          "qty": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "type": "variables.from_table",
+  "title": "Таблица в переменные",
+  "candidate_modes": [
+    "aggregate"
+  ],
+  "platform_availability": "requires_live_preflight",
+  "semantics": "Aggregate one current table into output variables port 0. This is not first-row extraction. For numeric fields support sum,count,min,max,avg. count includes NULL rows; sum/avg skip NULL. Sum and average are real; count integer; min/max preserve input numeric type. One aggregate retains the input name; several use observed native suffixes. Exact variable order, names, labels, types and values come from the output, not formatted cell text. No training. Reject other aggregates and nonnumeric selections in stage 1.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "Aggregate a required table input into one variable set; no grouping or arbitrary row selection.",
+    "additionalProperties": false,
+    "properties": {
+      "fields": {
+        "type": "array",
+        "description": "Full selected-field specification in desired field order. Omission is not a patch; use current readback when retaining settings.",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "type": "object",
+          "description": "Selected field and its aggregate functions.",
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "type": "object",
+              "description": "One observed numeric integer/real field.",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "description": "Reference to a verified current table field.",
+                  "maxLength": 128,
+                  "enum": [
+                    "input_field"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Exact technical input field name from current context.",
+                  "maxLength": 128
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "aggregations": {
+              "type": "array",
+              "description": "Unique aggregation names. Native output order is sum,count,min,max,avg regardless of click order; read actual names and labels.",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "description": "sum is real; count counts every row including NULL; min/max preserve numeric input type; avg is real. sum/avg skip NULL.",
+                "maxLength": 128,
+                "enum": [
+                  "sum",
+                  "count",
+                  "min",
+                  "max",
+                  "avg"
+                ]
+              }
+            }
+          },
+          "required": [
+            "field",
+            "aggregations"
+          ]
+        }
+      }
+    },
+    "required": [
+      "fields"
+    ]
+  },
+  "port_contract_dependency": "W1; proposal only, not registered"
+}

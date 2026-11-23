@@ -14,6 +14,16 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('an unrelated workflow replacement retires its previous identity before another node request',()=>{
+ const b=createUserWorkflowBindings(),previous=workspace();b.remember(previous);
+ const fresh={...previous,workflow_ref:{...previous.workflow_ref,workflow_id:'reopened',tab_tid:'fresh-tab',prefix:'fresh-prefix'}};
+ b.remember({...fresh,previous_workflow_ref:previous.workflow_ref});
+ assert.throws(()=>b.expandNode(request()),/UNKNOWN_PREPARED_WORKFLOW/);
+ assert.throws(()=>b.expandNodeRead({kind:'source',document_id:'doc',workflow_ref:{workflow_id:'wf'}}),/UNKNOWN_PREPARED_WORKFLOW/);
+ const current={...request(),workflow_ref:{workflow_id:'reopened'},target:{...request().target,ref:{...request().target.ref,workflow_id:'reopened'}}};
+ assert.deepEqual(b.expandNode(current).workflow_ref,fresh.workflow_ref);
+});
+
 test('LAB-374 preview request expands without an upload destination or import defaults',async()=>{
  const b=createUserWorkflowBindings();b.remember(workspace());
  const parameters={source:{kind:'storage',server_source_ref:'storage-one'},preview_only:true,
@@ -282,19 +292,30 @@ test('user resume accepts only an operation ID and dispatches without reconstruc
  await assert.rejects(dispatchNodeApi({tools:nodeApiTools},'dock_node_resume',{...args,finish:'execute'}));
 });
 
-test('published compact schema rejects contradictory finish/read requests and preserves defaults',()=>{
+test('compact apply retains runtime rejection of contradictory finish/read requests and defaults',async()=>{
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const handlers=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers;
+ const bindings=createUserWorkflowBindings();bindings.remember({document_id:'doc',workflow_ref:{workflow_id:'wf',
+  tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]}});
+ const runtime=value=>validateNodeApplyRequest(bindings.expandNode(value),handlers);
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
  const check=new AjvJsonSchemaValidator().getValidator(tool.inputSchema);
  const original=request();assert.equal(check(original).valid,true);
  for(const finish of ['done','close']){
-  const p={...original,finish};assert.equal(check(p).valid,false);
-  delete p.read;assert.equal(check(p).valid,true);
-  p.read={ports:[]};assert.equal(check(p).valid,true);
+  const p={...original,finish};assert.equal(check(p).valid,true);
+  assert.throws(()=>runtime(p),/Done and Close/);
+  delete p.read;assert.equal(check(p).valid,true);assert.doesNotThrow(()=>runtime(p));
+  p.read={ports:[]};assert.equal(check(p).valid,true);assert.doesNotThrow(()=>runtime(p));
  }
- const full={...original,read:{coverage:'full',ports:[0]}};assert.equal(check(full).valid,false);
- full.target={...full.target,type:'transform.collapse_columns'};assert.equal(check(full).valid,true);
- delete full.read.ports;assert.equal(check(full).valid,true);
- full.read.ports=[1];assert.equal(check(full).valid,false);
- const exported={...original,target:{...original.target,type:'exports.text'}};assert.equal(check(exported).valid,false);
- exported.read={ports:[]};assert.equal(check(exported).valid,true);
+ const full={...original,read:{coverage:'full',ports:[0]}};assert.equal(check(full).valid,true);
+ assert.throws(()=>runtime(full),/full requires/);
+ full.target={...full.target,type:'transform.collapse_columns'};full.mode='unpivot';
+ assert.equal(check(full).valid,true);assert.doesNotThrow(()=>runtime(full));
+ delete full.read.ports;assert.equal(check(full).valid,true);assert.doesNotThrow(()=>runtime(full));
+ full.read.ports=[1];assert.equal(check(full).valid,true);assert.throws(()=>runtime(full),/full requires/);
+ const exported={...original,target:{...original.target,type:'exports.text'},mode:'delimited'};
+ assert.equal(check(exported).valid,true);assert.throws(()=>runtime(exported),/ports|output/i);
+ exported.read={ports:[]};assert.equal(check(exported).valid,true);assert.doesNotThrow(()=>runtime(exported));
+ assert.throws(()=>runtime({...original,mode:'invented'}),/Unsupported node configuration mode/);
 });

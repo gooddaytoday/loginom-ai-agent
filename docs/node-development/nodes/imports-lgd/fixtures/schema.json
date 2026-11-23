@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Id",
+    "label": "Id",
+    "type": "integer",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Text",
+    "label": "Text",
+    "type": "string",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Amount",
+    "label": "Amount",
+    "type": "real",
+    "data_kind": "continuous"
+  },
+  {
+    "name": "Occurred",
+    "label": "Occurred",
+    "type": "datetime",
+    "data_kind": "discrete"
+  },
+  {
+    "name": "Active",
+    "label": "Active",
+    "type": "boolean",
+    "data_kind": "discrete"
+  }
+]

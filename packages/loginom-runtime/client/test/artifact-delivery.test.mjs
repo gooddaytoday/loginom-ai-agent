@@ -52,6 +52,59 @@ function fixture(fault,initialDirectory='/',options={}) {
  const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;},...options});
  return {service,artifact,calls,events,runtime};
 }
+for(const interruption of ['cancel','deadline','both'])test('confirmed verification completes despite '+interruption,async()=>{
+ let clock=0;
+ const f=fixture(undefined,'/',{now:()=>clock}),verify=f.runtime.verifyDeliveredArtifact,controller=new AbortController();
+ f.runtime.verifyDeliveredArtifact=async options=>{
+  const result=await verify(options);
+  if(interruption!=='deadline')controller.abort('Request timed out');if(interruption!=='cancel')clock=200000;
+  return result;
+ };
+ const result=await f.service.deliver(request,{signal:controller.signal});
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.events.at(-1).phase,'artifact_delivery_completed');assert.equal(f.service.unsettled,false);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+test('a failed completion acknowledgement resumes from committed proof without another transfer',async()=>{
+ let failed=false;
+ const f=fixture(undefined,'/',{record:async event=>{
+  if(event.phase==='artifact_delivery_completed'&&!failed){failed=true;throw Object.assign(Error('Disk unavailable'),{code:'EIO'});}
+  return event;
+ }}),inspect=f.runtime.inspect;
+ f.runtime.inspect=async options=>{const result=await inspect(options);result.output.operation_id='delivery:upload';result.output.outcome.operation_id='delivery:upload';return result;};
+ const first=await f.service.deliver(request);
+ assert.equal(first.error.code,'ARTIFACT_DELIVERY_INCOMPLETE');assert.equal(first.error.cause_code,'EIO');assert.equal(first.error.message,'Disk unavailable');
+ assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'ack-completed',budget_ms:1000});
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.unsettled,false);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Original receipt temporarily unavailable'},
+ {code:-32001,message:'Request timed out'},null,undefined,
+ ...['ABORT_ERR','ERR_ASSERTION','BROWSER_CLOSED'].map(code=>Object.assign(Error('Internal failure '+code),{code}))])test('post-verification failure exposes an executable inspection-only resume: '+JSON.stringify(error),async()=>{
+ let clock=0,failed=false;
+ const f=fixture(undefined,'/',{now:()=>clock}),inspect=f.runtime.inspect;
+ f.runtime.inspect=async options=>{
+  assert.equal(options.operationId,'delivery:upload');
+  if(f.calls.includes('verify')&&!failed){failed=true;throw error;}
+  const result=await inspect(options);
+  result.output.operation_id='delivery:upload';result.output.outcome.operation_id='delivery:upload';
+  return result;
+ };
+ const first=await f.service.deliver(request);
+ assert.equal(first.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);
+ assert.equal(first.error.message,error?.message??error??'Artifact delivery failed without an error message');
+ assert.equal(first.error.code,'ARTIFACT_DELIVERY_INCOMPLETE');
+ assert.equal(first.error.cause_code,error?.code==null?undefined:String(error.code));
+ assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ assert.equal(first.outcome.next_step.original_operation_id,request.operation_id);
+ clock=200000;
+ const retry={operation_id:request.operation_id,resume_id:'inspect-completed',budget_ms:1000};
+ const promise=f.service.resume(retry),result=await promise;
+ assert.equal(f.service.resume(retry),promise);assert.equal(result.outcome.status,'SUCCEEDED');
+ assert.equal(f.service.unsettled,false);assert.equal(f.events.at(-1).phase,'artifact_delivery_completed');
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
 test('a 1000 ms request still delivers a small attachment after slower navigation',async()=>{
  let clock=0;
  const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe;
@@ -125,6 +178,30 @@ for(const fault of [null,'document','workflow','tab','offscreen','disabled','mas
   assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls[0],'Files');
   assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
  }
+});
+for(const tabs of [[null,null],[null,'tab','tab'],[null,'tab','foreign'],[null,'tab',null],[undefined],['tab',null]])test('Files toolbar pins the first tab after an empty workspace: '+JSON.stringify(tabs),async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let reads=0,opened=false;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;s.workflow_ref=null;s.file_storage={status:'unobserved'};
+  s.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'}];
+  if(options.rootRef){
+   s.active_tab_ref=tabs[Math.min(reads++,tabs.length-1)];
+   s.observation_id='toolbar-'+reads;
+   s.ui.elements.push({tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',ref:'files-'+reads,enabled:true,visible:true,
+    allowed_actions:['click'],interaction:{state:reads>=tabs.length?'point_observed':'outside_viewport'}});
+  }else delete s.active_tab_ref;
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){assert.equal(a.ref,'files-'+tabs.length);assert.equal(o.observationId,'toolbar-'+tabs.length);
+   opened=true;f.calls.push('Files');return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request),safe=tabs.every(t=>t===null)||tabs.join(',')===',tab,tab';
+ assert.equal(result.outcome.status,safe?'SUCCEEDED':'NOT_APPLIED',JSON.stringify(result));
+ assert.equal(opened,safe);assert.equal(f.calls.filter(c=>c==='upload').length,safe?1:0);
+ if(!safe)assert.match(result.error.message,/toolbar tab changed/);
 });
 test('delivery navigates exact authorized folders and reuses upload and byte verification once',async()=>{
  const f=fixture(),first=f.service.deliver(request),second=f.service.deliver(request);assert.equal(first,second);assert.equal(f.service.busy,true);
@@ -387,9 +464,11 @@ for(const fault of ['document','tab','missing_receipt','changed_artifact'])test(
 });
 
 test('an unresolved started download is never dispatched again on resume',async()=>{
- const f=fixture('verify'),inspect=f.runtime.inspect;
+ let clock=0;
+ const f=fixture('verify','/',{now:()=>clock}),inspect=f.runtime.inspect;
  f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';return r;};
  await f.service.deliver(request);
+ clock=200000;
  const result=await f.service.resume({operation_id:'delivery',resume_id:'resume-pending',budget_ms:120000});
  assert.equal(result.outcome.status,'AMBIGUOUS');assert.match(result.error.message,/no repeated download/);
  assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);
@@ -405,6 +484,25 @@ test('folder navigation waits for the requested breadcrumb without repeating its
  assert.deepEqual(f.calls,['click','double_click','double_click','upload','inspect','verify','inspect']);
 });
 
+test('Files readiness waits for its storage root instead of binding a transient home navigation panel',async()=>{
+ const f=fixture(),observe=f.runtime.observe;let roots=0,wrongDetail=0;
+ f.runtime.observe=async options=>{
+  if(options.scope==='roots')roots++;
+  const result=await observe(options),s=result.output;
+  // LAB-955 seed-2 :6-14: Home/Files tabs change while native Files loads.
+  if(roots>=2&&roots<=4){
+   if(options.rootRef){wrongDetail++;throw Error('Transient home navigation detached');}
+   s.workflow_ref={prefix:'MF;TF-home'};s.file_storage={status:'unobserved'};
+   s.ui.elements=[{ref:'home-navigation',tid:'MF;TF-home;NavigationBar;NavigationPanel'}];
+  }
+  return result;
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(wrongDetail,0);assert.ok(roots>=5);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+
 test('delivery reads the observed toolbar when a populated graph only yields roots',async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let opened=false;
  f.runtime.observe=async options=>{
@@ -417,6 +515,63 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
  };
  f.runtime.uiAct=async(a,o)=>{if(a.ref==='files'){assert.equal(o.observationId,'toolbar-observation');opened=true;return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}return act(a,o);};
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
+});
+
+for(const fault of [null,'persistent','owner','tab','uncertain'])test('Files stale-epoch retry retains owner and a bounded gesture proof: '+fault,async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct,attempts=[];let opened=false,reads=0;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;s.file_storage={status:'unobserved'};s.observation_id='toolbar-'+(++reads);
+  if(attempts.length&&fault==='owner')s.dom_epoch.document='foreign';
+  if(attempts.length&&fault==='tab')s.active_tab_ref='foreign';
+  if(!options.rootRef){delete s.active_tab_ref;s.ui.elements=[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar'}];}
+  else s.ui.elements=[{ref:'files-'+reads,tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,
+   allowed_actions:['click'],interaction:{state:'point_observed'}}];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(opened)return act(a,o);
+  attempts.push({id:o.operationId,ref:a.ref,observation:o.observationId});
+  if(fault==='uncertain')return {...noEffect(o.operationId),status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false};
+  if(attempts.length===1||fault==='persistent')return noEffect(o.operationId,{error:{code:'UI_EPOCH_CHANGED'}});
+  opened=true;return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,fault==='uncertain'?'AMBIGUOUS':fault?'NOT_APPLIED':'SUCCEEDED');
+ assert.equal(attempts.length,fault==='persistent'?3:fault?1:2);
+ assert.equal(f.calls.filter(c=>c==='upload').length,fault?0:1);
+ assert.equal(new Set(attempts.map(a=>a.id)).size,attempts.length);
+ assert.equal(new Set(attempts.map(a=>a.ref)).size,attempts.length);
+ assert.equal(new Set(attempts.map(a=>a.observation)).size,attempts.length);
+});
+
+for(const fault of [null,'document','workflow'])test('empty workspace toolbar discovery is confirmed by fresh roots: '+fault,async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let roots=0,opened=false;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);if(opened)return result;
+  const s=result.output;
+  s.file_storage={status:'unobserved'};
+  const root=!options.rootRef;
+  if(root){
+   roots++;delete s.active_tab_ref;
+   if(roots===1)s.workflow_ref=null;
+   if(roots>1&&fault==='document')s.dom_epoch.document='foreign';
+   if(roots>1&&fault==='workflow')s.workflow_ref={prefix:'MF;TF-foreign'};
+  }
+  s.ui.elements=root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar'}]:[
+   {ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,
+    allowed_actions:['click'],interaction:{state:'point_observed'}}];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){assert.equal(a.ref,'files');assert.equal(roots,2);opened=true;
+   return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));
+ assert.equal(opened,!fault);assert.equal(f.calls.filter(c=>c==='upload').length,fault?0:1);
+ if(fault)assert.match(result.error.message,/toolbar owner changed/);
 });
 
 test('an inaccessible input folder reports an admitted artifact and never uploads',async()=>{
@@ -531,6 +686,41 @@ test('no-effect verification cannot erase an already submitted upload',async()=>
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
 });
 
+for(const stale of [false,true])test('native delivery adapter rebinds the first tab before its single Files gesture; stale='+stale,async()=>{
+ const vm=await import('node:vm');
+ const {createActionRuntime}=await import('../lib/executor.mjs');
+ const {Page,origin,build}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),toolbar=page.add('div','MF;cntMain;tlbMainToolbar','',{x:0,y:40,width:48,height:700});
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.tab.remove();
+ page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:0,y:240,width:48,height:48},toolbar);
+ const f=fixture(),events=[];let invalidated=false;
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
+  targetOrigin:origin,targetBuild:build,artifactStore:{getUploadGrant:()=>f.artifact},onRecord:async e=>{
+   events.push(e);
+   // LAB-950 :2 has no tab; :3 discovers the first native tab during detail.
+   if(e.phase==='observation_completed'&&e.outcome.output.workflow_ref===null)page.document.body.append(page.tab);
+   if(stale&&!invalidated&&e.phase==='observation_completed'
+     &&e.outcome.output.ui.elements.some(c=>c.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage')){
+    invalidated=true;page.mutationObserver.pending.push({type:'childList',target:toolbar,addedNodes:[],removedNodes:[]});
+   }
+   return e;
+  },execute:code=>{
+   // The upload is outside this regression: stop after the real Files gesture.
+   if(page.events.includes('click'))throw Error('End of toolbar regression boundary');
+   return vm.runInContext(`(${code})`,page.context)(page);
+  }});
+ await runtime.deliverArtifact(request);
+ const navigation=events.filter(e=>e.operation_id==='delivery:nav'+(stale?2:1)&&e.outcome?.status==='SUCCEEDED');
+ assert.equal(navigation.length,1,JSON.stringify(events));
+ if(stale){
+  const refusal=events.find(e=>e.operation_id==='delivery:nav1'&&e.outcome?.status==='NOT_APPLIED')?.outcome;
+  assert.equal(refusal?.error?.code,'UI_EPOCH_CHANGED');
+  assert.equal(refusal.effect_possible,false);assert.equal(refusal.cleanup_complete,true);
+ }
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal(events.some(e=>e.phase==='artifact_delivery_upload_receipt'),false);
+});
+
 for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files readiness and safe refusal clear the runtime delivery gate: '+mode,async()=>{
  const vm=await import('node:vm');
  const {createActionRuntime}=await import('../lib/executor.mjs');
@@ -580,6 +770,42 @@ for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files 
  assert.doesNotThrow(()=>runtime.assertPreparationAllowed());assert.equal(page.events.includes('click'),false);
 });
 
+
+for(const cleanup of [true,false])test('large conflict offers byte verification only after confirmed cleanup: '+cleanup,async()=>{
+ const f=fixture();f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});};
+ f.runtime.cancelLargeArtifact=async()=>cleanup;
+ await f.service.deliver(request);await f.service.drain();
+ const result=f.service.status(request.operation_id);
+ assert.equal(result.error.code,cleanup?'UPLOAD_PATH_CONFLICT':'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(result.outcome.cleanup_complete,cleanup);assert.equal(result.outcome.effect_possible,!cleanup);
+ assert.equal(f.service.unsettled,!cleanup);
+ if(cleanup){
+  assert.equal(result.outcome.destination,f.artifact.upload.destination);
+  assert.equal(result.outcome.sha256,f.artifact.sha256);
+  assert.equal(result.outcome.next_step.tool,'loginom_dock_storage_source');
+  const steps=['loginom_dock_storage_source','loginom_dock_storage_download_start','loginom_dock_storage_download_wait','loginom_file_profile','loginom_file_scan'];
+  const at=steps.map(name=>result.outcome.next_step.instruction.indexOf(name));
+  assert.ok(at.every((i,n)=>i>=0&&(n===0||i>at[n-1])),'chain names model-visible tools in order');
+  assert.match(result.outcome.next_step.instruction,/sha256 of the local artifact in this outcome/);
+  assert.match(result.outcome.next_step.instruction,/differ, stop and tell the user/);
+  assert.match(result.outcome.next_step.instruction,/Never overwrite or delete the server file/);
+ }else assert.equal(result.outcome.next_step,undefined);
+ assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
+});
+
+test('large conflict without a durable outcome receipt withdraws the server-file next step',async()=>{
+ const f=fixture(undefined,'/',{record:async e=>{if(e.phase==='large_upload_failed'&&e.result)throw Error('Disk unavailable');return e;}});
+ f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});};
+ f.runtime.cancelLargeArtifact=async()=>true;
+ await f.service.deliver(request);await f.service.drain();
+ const result=f.service.status(request.operation_id);
+ assert.equal(result.status,'uncertain');assert.equal(result.error.code,'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(result.outcome.code,'LOGINOM_UPLOAD_UNCERTAIN');assert.equal(result.outcome.effect_possible,true);
+ assert.equal(result.outcome.next_step,undefined);
+ assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
+});
 
 test('large delivery journals the first browser failure before failed cancellation replaces it',async()=>{
  const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';

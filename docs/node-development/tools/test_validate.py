@@ -38,10 +38,17 @@ class RegistryTests(unittest.TestCase):
     def test_current_registry_and_grouped_dispatch_types(self):
         result=self.check()
         self.assertEqual(result['errors'],[])
-        self.assertEqual(result['handler_types'],32)
-        self.assertEqual(result['counts'],{'implemented':32,'backlog':43,'conditional_reserve':3})
+        self.assertEqual(result['handler_types'],49)
+        self.assertEqual(result['counts'],{'implemented':48,'backlog':27,'conditional_reserve':3})
         types={n['handler']['type'] for n in self.data['nodes'] if n['handler']}
-        self.assertTrue({'transform.join_data','integration.rest_request'}<=types)
+        self.assertTrue({'transform.join_data','integration.rest_request','transform.ungroup_data'}<=types)
+        self.assertEqual([h['type'] for h in self.data['builtin_handlers']],['variables.user'])
+        for node in self.data['nodes']:
+            if not node['handler']:continue
+            card=(self.docs/node['card']).read_text()
+            self.assertNotRegex(card,r'Обработчика (?:пока )?нет')
+            for mode in node['handler']['modes']:
+                self.assertIn('`'+mode+'`',card)
 
     def test_dropped_handler_is_rejected(self):
         node=next(n for n in self.data['nodes'] if n['slug']=='exports-excel')
@@ -54,7 +61,7 @@ class RegistryTests(unittest.TestCase):
         self.assertIn('runtime modes differ: transform.join_data',self.check()['errors'])
 
     def test_current_source_hash_is_checked(self):
-        key='v039-node-contracts'
+        key='v040-node-contracts'
         self.data['evidence_catalog'][key]['sha256']='0'*64
         self.assertIn('evidence hash '+key,self.check()['errors'])
 
@@ -65,6 +72,11 @@ class RegistryTests(unittest.TestCase):
     def test_missing_snapshot_source_is_rejected(self):
         self.data['source_snapshot']['evidence'].append('missing-source')
         self.assertIn('unknown snapshot evidence missing-source',self.check()['errors'])
+
+    def test_builtin_modes_are_checked_without_changing_historical_catalog(self):
+        self.data['builtin_handlers'][0]['modes']=['unknown']
+        self.assertIn('runtime modes differ: variables.user',self.check()['errors'])
+        self.assertEqual(len(self.data['nodes']),78)
 
     def test_render_is_reproducible_and_detects_staleness(self):
         self.data['nodes'][0]['limitations'].append('Адресное ограничение.')

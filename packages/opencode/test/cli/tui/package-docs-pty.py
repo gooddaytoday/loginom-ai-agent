@@ -97,7 +97,7 @@ def run(args, workspace):
     shutil.copyfile(fixtures / "demo.lgp", lgp)
     original = hashlib.sha256(lgp.read_bytes()).hexdigest()
     # Keep the installed acceptance matrix aligned with packages/product/src/skills.ts.
-    product_skills = ["loginom-automation", "package-docs", "package-linter"]
+    product_skills = ["loginom-automation", "loginom-dashboard", "package-docs", "package-linter"]
     reserved = [*product_skills, "package_docs"]
     if args.reserved_diagnostics == "skills":
         for name in reserved:

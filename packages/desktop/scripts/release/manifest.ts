@@ -55,7 +55,8 @@ export const Manifest = Schema.Struct({
   connection: Schema.Struct({
     schemaVersion: Schema.Literal(1),
     generationProtocol: Schema.Literal(1),
-    knowledgeEndpoint: text,
+    // Released manifests before 0.4.0 name the retired knowledge service; new ones omit it.
+    knowledgeEndpoint: Schema.optional(text),
   }),
   updater: Schema.Struct({ feed: nullable, channel: text, previousVersion: nullable }),
   signing: Schema.Struct({
@@ -171,7 +172,7 @@ export async function verifyResourceTree(
     if (item.directory === true ? !(await stat(path)).isDirectory() : !(await stat(path)).isFile())
       throw Error("RELEASE_RESOURCE_TYPE_INVALID")
     if ((item.directory === true ? hash(item.link) : await fileHash(path)) !== item.sha256)
-      throw Error("RELEASE_RESOURCE_HASH_MISMATCH")
+      throw Error(`RELEASE_RESOURCE_HASH_MISMATCH: ${item.path}`)
   }
   for (const entry of [manifest.node, manifest.browser]) {
     if (!seen.has(entry)) throw Error("RELEASE_EXECUTABLE_MISSING")

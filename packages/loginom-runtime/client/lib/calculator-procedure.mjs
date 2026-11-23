@@ -27,17 +27,34 @@ export async function previewCalculator(channel) {
  return {status:'accepted_by_loginom_preview',settings_applied:false};
 }
 
-export async function configureCalculator(channel,parameters,{newNode=false,recoverRejectedRequest=false,captureBaseline}={}) {
+// The language is one native setting for the whole node. Its button is a split
+// button: the arrow opens the menu, whose portal items are the two choices.
+async function selectCalculatorSyntax(channel,syntax) {
+ const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
+ let s=await channel.observe({condition:'calculator language before change',readCalculator:true,ready});
+ if(s.node_calculator.syntax===syntax)return s;
+ await channel.perform({condition:'open calculator language menu',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({verb:'press',ref:control(s,';CalcDataWizard;btnCalcMode','press').ref,key:'ArrowDown'})});
+ const item=';CalcDataWizard;btnCalcMode;mn;'+(syntax==='javascript'?'cmJavaScript':'cmExpression');
+ s=await channel.observe({condition:'calculator language choices',readCalculator:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+item&&e.allowed_actions.includes('click'))});
+ await channel.perform({condition:'choose calculator language',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({verb:'click',ref:control(s,item,'click').ref})});
+ s=await channel.observe({condition:'calculator language changed',readCalculator:true,ready:s=>ready(s)&&s.ui.dialogs.length===0&&s.node_calculator.syntax===syntax});
+ return s;
+}
+
+export async function configureCalculator(channel,parameters,{newNode=false,createdByOperation=false,recoverRejectedRequest=false,captureBaseline}={}) {
  const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
  const observe=condition=>channel.observe({condition,readCalculator:true,ready});
  const baseline=await observe('complete calculator configuration before patch');
  captureBaseline?.(structuredClone(baseline));
  let plan;
- try {plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode});}
+ try {plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode,removeDefault:newNode&&createdByOperation});}
  catch(error){
   if(recoverRejectedRequest&&!newNode)await rejectUnchangedCalculatorDraft(channel,baseline,error);
   throw error;
  }
+ if(parameters.syntax!==undefined)await selectCalculatorSyntax(channel,parameters.syntax);
  const identities=new Map(baseline.node_calculator.expressions.map(e=>[e.name,e.record_id]));
  const row=(s,id)=>s.node_calculator?.expressions.find(e=>e.record_id===id);
  const select=async id=>{
@@ -85,12 +102,12 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
   const patch=change.after;
   if(change.before) {
    requireValue(same(semantic(row(s,recordId)),semantic(change.before)),'Expression changed since patch planning');
-   if(['name','label','type'].some(k=>patch[k]!==change.before[k])) {
+   if(['name','label','type','intermediate','cached'].some(k=>patch[k]!==change.before[k])) {
     await channel.perform({condition:'edit retained calculator parameters',initialObservation:s,ready,
      identity:()=>({record_id:recordId}),resolve:s=>({verb:'double_click',ref:control(s,';CalcDataWizard;colExpressionName_'+row(s,recordId).name,'double_click').ref})});
    }
   }
-  if(!change.before||['name','label','type'].some(k=>patch[k]!==change.before[k])) {
+  if(!change.before||['name','label','type','intermediate','cached'].some(k=>patch[k]!==change.before[k])) {
    for(const [key,value] of Object.entries({name:patch.name,label:patch.label,type_label:types[patch.type]})) {
     s=await channel.observe({condition:'calculator parameter '+key,ready:s=>s.wizard?.stage==='calculator'&&s.wizard.expression_parameters?.fields[key]?.status==='observed'});
     const field=s.wizard.expression_parameters.fields[key];if(field.value===value)continue;
@@ -105,6 +122,21 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
     } else await channel.perform({condition:'set calculator '+key,initialObservation:s,ready:s=>s.wizard.expression_parameters?.fields[key]?.status==='observed',
      identity:s=>({editor:s.wizard.expression_parameters.root_ref,expression:s.wizard.expression_parameters.selected_expression,key}),
      resolve:s=>({verb:'set_wizard_field',ref:s.wizard.expression_parameters.fields[key].input_ref,text:value})});
+   }
+   // A new expression opens unchecked (default-expression check in the patch plan).
+   for(const key of ['intermediate','cached'].filter(k=>patch[k]!==(change.before?change.before[k]:false))) {
+    const option=state=>state.wizard?.expression_parameters?.options?.[key];
+    s=await channel.observe({condition:'calculator option '+key,ready:s=>s.wizard?.stage==='calculator'&&option(s)?.status==='observed'});
+    requireValue(option(s).enabled===true,'Calculator option unavailable: '+key);
+    if(option(s).value!==patch[key]) {
+     await channel.perform({condition:'set calculator '+key,initialObservation:s,ready:s=>option(s)?.status==='observed',
+      identity:s=>({editor:s.wizard.expression_parameters.root_ref,expression:s.wizard.expression_parameters.selected_expression,key}),
+      resolve:s=>{const refs=[option(s).input_ref,option(s).display_ref];
+       const box=s.ui.elements.find(e=>refs.includes(e.ref)&&e.allowed_actions.includes('set_checked')&&e.interaction?.state==='point_observed');
+       requireValue(box,'Calculator option checkbox is not painted: '+key);return {verb:'set_checked',checked:patch[key],ref:box.ref};}});
+     s=await channel.observe({condition:'calculator option '+key+' read back',ready:s=>option(s)?.status==='observed'});
+    }
+    requireValue(option(s).value===patch[key],'Calculator option '+key+' was not set');
    }
    s=await channel.observe({condition:'calculator parameters ready to apply',ready:s=>s.wizard.expression_parameters?.status==='observed'});
    await channel.perform({condition:'apply calculator expression parameters',initialObservation:s,ready:s=>s.wizard.expression_parameters?.status==='observed',
@@ -129,6 +161,26 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
   s=await observe('calculator formula and untouched options read back');
   requireValue(same(semantic(row(s,recordId)),semantic(patch)),'Calculator expression readback differs');identities.set(patch.name,recordId);
  }
+ if(plan.discard_default){
+  const original=plan.discard_default,s=await select(original.record_id);
+  requireValue(same(semantic(row(s,original.record_id)),semantic(original)), 'New Calculator template changed before deletion');
+  const retained=s.node_calculator.expressions.filter(e=>e.record_id!==original.record_id);
+  requireValue(retained.length===plan.expressions.length&&retained.length>0,'Requested expressions must exist before template deletion');
+  await channel.perform({condition:'delete only this new Calculator untouched template',initialObservation:s,
+   ready:s=>ready(s)&&row(s,original.record_id)?.selected===true&&same(semantic(row(s,original.record_id)),semantic(original)),
+   identity:()=>({record_id:original.record_id,template:semantic(original)}),
+   resolve:s=>{
+    const button=control(s,';CalcDataWizard;btnDelExpr','click');
+    // At 1024px the editor toolbar covers Delete. Loginom documents Delete
+    // on the expression list; retain the exact selected template and readback.
+    return button.interaction?.state==='point_observed'?{verb:'click',ref:button.ref}
+     :{verb:'press',ref:control(s,';CalcDataWizard;colExpressionName_'+original.name,'press').ref,key:'Delete'};
+   }});
+  const after=await observe('new Calculator template deleted');
+  requireValue(!row(after,original.record_id)&&after.node_calculator.expressions.length===retained.length
+   &&retained.every(e=>same(semantic(row(after,e.record_id)),semantic(e))),'Template deletion changed another expression');
+  identities.delete(original.name);
+ }
  // Move existing records with Loginom controls. Never delete/recreate expressions
  // to obtain an order: dependent references and unrequested options survive.
  for(const [index,name] of (parameters.order===undefined?[]:plan.order).entries()) {
@@ -144,6 +196,6 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
  }
  const final=await observe('complete configured calculator readback');
  requireValue(same(final.node_calculator.expressions.map(semantic),plan.expressions.map(semantic)),'Complete calculator differs from requested patch');
- return {verified:true,cleanup_complete:true,effect_possible:plan.changes.length>0||parameters.order!==undefined,
+ return {verified:true,cleanup_complete:true,effect_possible:plan.changes.length>0||parameters.order!==undefined||(parameters.syntax!==undefined&&parameters.syntax!==(baseline.node_calculator.syntax??'expression')),
   before:baseline.node_calculator,configuration:final.node_calculator,settings_applied:false};
 }

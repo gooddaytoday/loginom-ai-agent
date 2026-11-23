@@ -1,0 +1,33 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.calculator"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.calculator"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "report_date",
+            "label": "Дата отчёта",
+            "type": "datetime",
+            "value": "2026-11-07T23:59:58.123"
+          },
+          {
+            "name": "total",
+            "label": "Итого",
+            "type": "integer",
+            "value": 3
+          }
+        ]
+      }
+    ]
+  }
+}

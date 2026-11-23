@@ -101,8 +101,8 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
  'return_tabs_active','return_tabs_package','return_tabs_deadline','return_tabs_cancelled',
  'observation_initial','observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name','observation_time_exhausted','observation_work','observation_elements','observation_traversal','observation_missing_trace','observation_mixed_limits','observation_action','observation_phase','observation_gesture','observation_incomplete','observation_ambiguous','observation_unclean','observation_preconditions','observation_transport','observation_deadline','observation_cancelled',
- 'verified_return_observation','retain_failure','retain_private'])test('native export read and real save: '+kind,async()=>{
- const success=['success','return_tabs_stale','observation_time'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
+ 'verified_return_observation','retain_failure','retain_private','offscreen_refresh','offscreen_refresh_refused','offscreen_refresh_duplicate'])test('native export read and real save: '+kind,async()=>{
+ const success=['success','return_tabs_stale','observation_time','offscreen_refresh'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
  const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted','return_tabs_deadline','return_tabs_cancelled','observation_deadline','observation_cancelled','observation_document'].includes(kind);
  let observationAttempts=0;
@@ -118,9 +118,10 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
    element('MF;cntMain;tlbMainToolbar'),element('MF;cntMain;tlbMainToolbar;btnFilestorage'),
    element('MF;cntMain;cntWorkspace;Workspace;t.br',failed&&kind.startsWith('return_tabs_')?'fresh-tabs':undefined),element(workflow.tab_tid),element('files-tab'),element('MF;TF-1;ModelForm;cmpDiagram','graph'),
-   element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
+   element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh',undefined,kind.startsWith('offscreen_refresh')?{interaction:{state:'outside_viewport',point:null},bounding_box:{x:1212,y:74,width:22,height:22}}:{}),
+   ...(kind.startsWith('offscreen_refresh')?[element('MF;TF-2;cnrNaviMode;b.s_Сервер>Файлы'),...(kind==='offscreen_refresh_duplicate'?[element('MF;TF-2;cnrNaviMode;b.s_Сервер>Файлы','duplicate-files')]:[])]:[]),
    element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
-   ...(kind==='directory_navigation'?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
+   ...(kind==='directory_navigation'||kind.startsWith('offscreen_refresh')?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
    ...(storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
     scroll:{ref:'ui-scroll-owner',top:kind==='changed_scroll'?999:scrollTop,max_top:3000},allowed_actions:['scroll']})]
     :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
@@ -134,6 +135,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
     assert.ok(success);retained++;},
    verify:async()=>{assert.ok(downloadSucceeded);return {artifact_id:'artifact',bytes:57,sha256:'abc'};}};}},
   execute:async code=>{
+   if(code.startsWith('async page=>page.evaluate(({tid,ref})'))return {viewport:{width:1024,height:633},ancestors:[]};
    if(code.includes('async function browserArtifactDownload')){
     downloads++;if(kind==='download_transport'){failed=true;throw Error('download call unconfirmed');}
     if(downloadSucceeded)return {operation_id:'export-op:export-download',action_key:'artifact.download',status:'SUCCEEDED',cleanup_complete:true,
@@ -152,6 +154,14 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
     assert.equal(task.operation_id,JSON.parse(receipt[1]).operation_id,
      'the native UI outcome must identify the same export step as its browser receipt, including the return to graph');
     const tid=task.snapshot.ui.elements.find(e=>e.ref===task.action.ref).tid;gestures.push(tid);
+    if(kind.startsWith('offscreen_refresh')){
+     if(tid.endsWith('FileStorageForm;btnRefresh'))return {status:'NOT_APPLIED',cleanup_complete:true,effect_possible:false,error:{code:'UI_REFERENCE_OFFSCREEN'}};
+     if(tid.endsWith('cnrNaviMode;b.s_Сервер>Файлы')){
+      if(kind==='offscreen_refresh_refused')return {status:'NOT_APPLIED',cleanup_complete:true,effect_possible:false,error:{code:'UI_CONTEXT_CHANGED'}};
+      directory='/';
+     }
+     if(task.action.verb==='double_click')directory='/user';
+    }
     if(tid.endsWith('btnFilestorage')){
      files=true;
      if(['open_files','mutating','unknown_gesture'].includes(kind)){
@@ -272,5 +282,11 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   assert.equal(tabReads,3,'two original tab reads and one existing refusal-restoration read');
   assert.equal(freshRoots,2,'one refresh and existing recovery roots; no retry inside recovery');
   assert.equal(gestures.filter(t=>t===workflow.tab_tid).length,0);
+ }
+ if(kind.startsWith('offscreen_refresh')){
+  assert.equal(gestures.some(t=>t.endsWith('FileStorageForm;btnRefresh')),false,'never dispatch to the offscreen toolbar');
+  assert.equal(gestures.filter(t=>t.endsWith('cnrNaviMode;b.s_Сервер>Файлы')).length,kind==='offscreen_refresh_duplicate'?0:1);
+  assert.equal(gestures.filter(t=>t.endsWith('FileStorageForm;colName_user')).length,success?1:0);
+  assert.equal(downloads,success?1:0);
  }
 });

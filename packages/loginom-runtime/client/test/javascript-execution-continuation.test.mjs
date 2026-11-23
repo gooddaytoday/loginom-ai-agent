@@ -42,6 +42,19 @@ for(const phase of ['materialization_execute','execute'])test('JS continuation a
   const bad=fixture(phase);mutate(bad.retained);assert.equal(javascriptExecutionWaitContext(bad.state,bad.retained),null);
  }
 });
+test('declared continuation retains the single final wait without dispatching skipped materialization',()=>{
+ const f=fixture('execute');f.state.phases.find(p=>p.phase==='node_finish').value.schema_mode='declared';
+ for(const name of ['materialization_start','materialization_execute']){
+  const p=f.state.phases.find(p=>p.phase===name);p.status='not_requested';p.effect_possible=false;
+  p.value={verified:true,cleanup_complete:true,materialization_required:false,schema_mode:'declared'};
+ }
+ assert.ok(javascriptExecutionWaitContext(f.state,f.retained));
+ const skipped=f.state.phases.find(p=>p.phase==='materialization_execute');
+ for(const change of [p=>p.effect_possible=true,p=>p.value.materialization_required=true,p=>p.value.schema_mode='code',p=>p.status='pending']){
+  const original=structuredClone(skipped);change(skipped);assert.equal(javascriptExecutionWaitContext(f.state,f.retained),null);
+  Object.assign(skipped,original);
+ }
+});
 test('native read wait accepts later completion but rejects foreign, replaced, cancelled or caption-only children',()=>{
  const f=fixture(),binding=verifyExecutionReadWait(f.execution,f.native);
  const completed=structuredClone(f.native);completed.processes.forEach(p=>p.progress_state={...p.progress_state,state:'completed',terminal:true,can_cancel:false});

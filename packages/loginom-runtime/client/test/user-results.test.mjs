@@ -4,6 +4,36 @@ import { compactNodeResult, compactActionResult, compactKnowledgeBundle, userRes
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 const validate = new AjvJsonSchemaValidator().getValidator(userResultSchema);
 
+test('compact variable snapshots retain complete exact values and source identity without UI traces',()=>{
+ const port={port:4,kind:'variables',port_guid:'user-port',fresh:true,source:'snapshot',native_source:'VariablesEditValuesWizard',read_id:'snapshot-1',execution_id:null,
+  complete:true,count:4,package_modified:false,completeness:{loaded:true,count:4,store_count:4,unique_ids:4},internal:'UI trace',
+  variables:[['integer',null],['integer','0'],['boolean',false],['string','']].map(([type,value],id)=>({id,index:id,name:'v'+id,label:'v'+id,type,
+   cell:{type,is_null:value===null,value,precision:'exact'},internal:'UI trace'}))};
+ const raw={operation_id:'snapshot',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{execution:{status:'not_requested',execution_id:null},output:{ports:[],variable_ports:[port]}}}};
+ const before=structuredClone(raw),result=compactNodeResult(raw);
+ assert.equal(validate(result).valid,true);assert.equal(result.output.variable_ports[0].count,4);
+ assert.deepEqual(result.output.variable_ports[0].variables.map(v=>v.cell.value),[null,'0',false,'']);
+ assert.equal(result.output.variable_ports[0].source,'snapshot');assert.equal(result.output.variable_ports[0].execution_id,null);
+ assert.equal(result.output.variable_ports[0].read_id,'snapshot-1');assert.ok(!JSON.stringify(result).includes('UI trace'));
+ assert.deepEqual(raw,before);
+});
+
+test('input Done readiness failure explains the retained checkpoint and recovery route',()=>{
+ for(const phase of ['target','input_mapping']) {
+  const raw={operation_id:'combine-first',state:'settled',outcome:{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+   error:{code:'NODE_APPLY_STOPPED',message:'Node procedure readiness timeout: calculator done available; no mutation was authorized'},
+   output:{pending_phase:phase,node:null,package_saved:false,output:{status:'not_refreshed',ports:[]}}}};
+  const before=structuredClone(raw),reply=compactNodeResult(raw);
+  assert.equal(validate(reply).valid,true);
+  assert.equal(reply.next_step.tool,'dock_operation_inspect');
+  assert.equal(reply.next_step.arguments.operation_id,'combine-first');
+  assert.match(reply.next_step.instruction,/input mapping.*Done/);
+  assert.match(reply.next_step.instruction,/earlier.*effects/);
+  assert.match(reply.next_step.instruction,/abandon_operation.*dock_browser_recovery/);
+  assert.deepEqual(raw,before);
+ }
+});
+
 test('zero interpretation warning counts only explicit numeric zeros in returned cells',()=>{
  const sample=[[{type:'integer',value:'0',is_null:false},{type:'real',value:0,is_null:false},
   {type:'string',value:'0',is_null:false},{type:'real',value:0,is_null:true},
@@ -103,12 +133,16 @@ test('compact Save retains optional arrangement warnings after dropping its inte
     assert.equal(validate(result).valid, true);
   }
 });
-test('initial knowledge bundle omits per-type schemas while retaining revision pins', () => {
+test('initial knowledge bundle omits per-type schemas, cache hashes and repeated handler identities', () => {
   const schema = { type: 'object', required: ['keys'] };
   const result = compactKnowledgeBundle({ session_manifest: { digest: 'pin' }, actions: [{ action_key: 'save', input_schema: schema, revision: '2' }],
-    node_types: [{ type: 'transform.sorting', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references' }] });
+    node_types: [{ type: 'transform.sorting', contract_revision: '1.0.0', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references',
+      candidate_node_apply_available: true, candidate_apply_tool: 'dock_node_apply', configuration_handler: 'sorting-v1', semantics: 'Sort rows.' }] });
   assert.equal(result.session_manifest.digest, 'pin');assert.equal(result.node_types[0].parameter_schema, undefined);
-  assert.equal(result.node_types[0].cache_key, 'cache');assert.equal(result.node_types[0].source, undefined);
+  assert.equal(result.node_types[0].cache_key, undefined);assert.equal(result.node_types[0].source, undefined);
+  // Identical in every type or handler-internal; dock_action_describe keeps them per type.
+  for (const key of ['contract_revision', 'candidate_apply_tool', 'configuration_handler']) assert.equal(result.node_types[0][key], undefined, key);
+  assert.deepEqual(result.node_types[0], { type: 'transform.sorting', candidate_node_apply_available: true, semantics: 'Sort rows.', modes: ['keys'] });
 });
 
 test('user-v1 retains exact scalar representation and an explicitly unverified variant without type guessing',()=>{
@@ -128,7 +162,7 @@ test('installed import discovery supplies its complete parameter vocabulary on t
   const { describeNodeTypes } = await import('../lib/node-contracts.mjs');
   const { nodeApplyInputSchema } = await import('../lib/node-api.mjs');
   const support = createCandidateNodeSupport({ targetOrigin: 'http://example.test', targetBuild: '7.4.2' });
-  const cards = describeNodeTypes([...support.nodeApplyHandlers.keys()], { runtime: 'pin' }, new Map(), support.nodeApplyHandlers, '7.4.2');
+  const cards = [...support.nodeApplyHandlers.keys()].flatMap(type=>describeNodeTypes([type], { runtime: 'pin' }, new Map(), support.nodeApplyHandlers, '7.4.2'));
   // The initial prepare bundle only lists installed types; the schema of a
   // selected type comes from dock_action_describe({node_types:[type]}).
   const knowledge = compactKnowledgeBundle({ session_manifest: { runtime: 'pin' }, actions: [], node_types: cards });
@@ -136,13 +170,14 @@ test('installed import discovery supplies its complete parameter vocabulary on t
   for (const card of cards) assert.ok(card.parameter_schema, card.type);
   const schema = cards.find(card => card.type === 'imports.text').parameter_schema;
   assert.deepEqual(schema.required, ['settings']);
-  assert.match(schema.properties.source.description, /Required for new imports and configuration changes/);
-  assert.match(schema.properties.source.description, /Omit source only to execute an unchanged existing Import/);
+  assert.match(schema.properties.source.description, /Required except unchanged Execute/);
+  assert.match(schema.properties.source.description, /Unchanged existing Execute may omit source/);
   for (const key of ['source', 'settings']) {
     const { description, ...shape } = schema.properties[key];
     assert.deepEqual(shape, nodeApplyInputSchema.properties.parameters.properties[key]);
   }
-  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns']);
+  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns', 'analysis', 'node_title']);
+  assert.deepEqual(schema.properties.settings.properties.node_title.properties.mode.enum, ['automatic', 'custom']);
   schema.properties.settings.properties.columns.maxItems = 0;
   const fresh = describeNodeTypes(['imports.text'], {}, new Map(), support.nodeApplyHandlers)[0];
   assert.equal(fresh.parameter_schema.properties.settings.properties.columns.maxItems, 1000);

@@ -1,0 +1,397 @@
+{
+  "type": "imports.text",
+  "title": "Текстовый файл",
+  "palette_group": "Импорт",
+  "icon_class": "bg-vendor-icon-importtextfile",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 0,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "delimited"
+  ],
+  "semantics": "Текстовый файл Proposed extension, not installed: one delimited import appends same-schema files and preserves duplicates. Choose source_paths OR source_mask; legacy source_path remains single-file. Each concrete source needs its own issued receipt. Lists skip empty entries, retain nonempty order and require at least one file. Mask: * in the basename only, one assigned directory, no recursion; sources must cover the observed current matching set. Reexecute a saved mask against the current directory, never promise a frozen set or sorted order. Additional output FileName is string; FileTime is datetime when requested. Configure service columns separately from CSV columns. Heterogeneous schemas are outside initial acceptance; never silently merge by names or claim lossless positional import. Save separately.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "text-import-multi-file-proposal",
+  "configuration_status": "proposal_owner_approval_required",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/integration/import/txt/README.md"
+  },
+  "catalog_add_available": true,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "delimited"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "preview_only": {
+        "const": true,
+        "description": "source.kind=storage; settings.source={source_path}; finish=close; inputs=mappings=read.ports=[]. Read encoding/format/columns and <=25 rendered rows; discard without Execute. server_profile: coverage=preview, no SHA/full N. Reuse node after download/profile/scan/sample."
+      },
+      "source_switch": {
+        "type": "object",
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "save_operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          }
+        },
+        "required": [
+          "profile_id",
+          "save_operation_id"
+        ],
+        "additionalProperties": false,
+        "description": "Only for an existing text or Excel import: after an exact full scan and package.save_checkpoint, switch settings.source.source_path (text) or excel.source_path and optional sheet_name (Excel) alone, preserve/reopen-check all columns and output mapping; text uses finish:done/read.ports:[], then dock_storage_source immediately before one terminal-node Execute with source identity/size/SHA rechecked; Excel uses Execute and verifies full output-0 row count. Only profile_id is supplied: backend binds an exact scan receipt to the delivered source digest. Missing receipt yields N not verified with a reason, never successful count verification. Never supply expected_records. No column, format or mapping changes allowed. Timeout: inspect the SAME operation, never execute again."
+      },
+      "source": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "storage"
+              },
+              "server_source_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              }
+            },
+            "required": [
+              "kind",
+              "server_source_ref"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "verified_delivery"
+              },
+              "artifact_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              "upload_operation_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "artifact_id",
+              "upload_operation_id"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Required for new imports and configuration changes: kind:storage with server_source_ref from a native Files observation selects an existing server file WITHOUT upload; or kind:verified_delivery with artifact_id and upload_operation_id from completed verified delivery (legacy delivery IDs remain accepted). Optional bytes and sha256 must match that receipt. Omit source only to execute an unchanged existing Import: settings:{}, inputs:[], mappings:[], finish:execute and read.ports:[0]. This uses the saved native configuration without uploading again; an old upload ID is not a current receipt."
+      },
+      "settings": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "object",
+            "properties": {
+              "source_path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "encoding": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "rows_to_skip": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "first_line_as_title": {
+                "type": "boolean"
+              },
+              "source_paths": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 16,
+                "items": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "description": "Ordered absolute storage paths; empty entries are skipped. At least one nonempty item. Aggregate native source text <=2048 characters; join internally with U+FF5C."
+              },
+              "source_mask": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "description": "Absolute path in one assigned directory; only * in basename. No URL, recursion, directory wildcard, ? or mixed list/mask in the first increment. Refuse no matches."
+              },
+              "parallel_processing": {
+                "type": "boolean",
+                "description": "New multi-file default false; omission on an existing import preserves it."
+              },
+              "max_threads": {
+                "enum": [
+                  "auto",
+                  2,
+                  4,
+                  8,
+                  16,
+                  32
+                ],
+                "description": "Native maximum; relevant only with parallel_processing=true. Preserve when omitted."
+              },
+              "file_info": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "name",
+                  "relative_path",
+                  "absolute_path",
+                  "name_time",
+                  "relative_path_time",
+                  "absolute_path_time"
+                ],
+                "description": "Initial acceptance: none/name. FileName and optional FileTime are generated service fields, not CSV input columns; path/time acceptance is proposed separately."
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "format": {
+            "type": "object",
+            "properties": {
+              "delimiter": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1
+              },
+              "decimal_separator": {
+                "type": "string",
+                "enum": [
+                  ".",
+                  ","
+                ]
+              },
+              "null_marker": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "text_qualifier": {
+                "type": "string",
+                "maxLength": 1
+              },
+              "multiple_delimiters": {
+                "type": "boolean"
+              },
+              "date_format": {
+                "type": "string",
+                "enum": [
+                  "dd/mm/yyyy",
+                  "mm/dd/yyyy",
+                  "yyyy/mm/dd",
+                  "dd/mm/yy",
+                  "mm/dd/yy",
+                  "yy/mm/dd"
+                ]
+              },
+              "date_separator": {
+                "type": "string",
+                "enum": [
+                  ".",
+                  "/",
+                  "\\",
+                  "-"
+                ]
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "description": "Observed source name or unique CSV header/label; never guess transliteration. name=result identifier, label=title."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                  "description": "ASCII name; title=label."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "integer",
+                    "real",
+                    "string",
+                    "boolean",
+                    "datetime"
+                  ]
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "Неопределенное",
+                    "Непрерывный",
+                    "Дискретный"
+                  ]
+                },
+                "used": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "maxItems": 1000,
+            "minItems": 1
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Optional settings.format.multiple_delimiters is boolean; date_format is an explicit dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, dd/mm/yy, mm/dd/yy or yy/mm/dd order and date_separator is ., /, backslash or -. Omission preserves native settings, including on partial existing-node patches; no automatic encoding or date substitution. For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name. Proposed multi-file branch uses sources instead of source. settings.source uses source_paths OR source_mask instead of source_path; encoding/header/format/CSV columns remain explicit. Existing omission preserves saved selection and processing options."
+      },
+      "sources": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "storage"
+                },
+                "server_source_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_.:-]+$"
+                }
+              },
+              "required": [
+                "kind",
+                "server_source_ref"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "verified_delivery"
+                },
+                "artifact_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_.:-]+$"
+                },
+                "upload_operation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9_.:-]+$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifact_id",
+                "upload_operation_id"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "Proposal: concrete issued source receipts, one per nonempty list entry or current mask match; exclusive with legacy source. Never use a single file receipt as authority for a directory mask."
+      }
+    },
+    "required": [
+      "settings"
+    ],
+    "additionalProperties": false,
+    "description": "Proposal only. Existing delimited single-file contract is preserved. New multi-file requests use sources plus source_paths/source_mask. No new public tool, deadline or top-level mode. Runtime must check exclusive branches, all source identities and complete schema before mutation; these guards are not installed by this document."
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}

@@ -37,5 +37,8 @@ export function createDuplicatesNodeSupport(config){return createTabularTransfor
   const done=await channel.observe({condition:'duplicate roles accepted',ready:s=>s.wizard?.stage==='done'});
   return {...changed,validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
  },
- configureOutput:(channel,c,p,m)=>configureSortingOutput(channel,{input_fields:[...DUPLICATES_OUTPUT,...c.fields]},p,m),
+ configureOutput:configureDuplicatesOutput,
 });}
+export function configureDuplicatesOutput(channel,c,p,m,request){
+ return configureSortingOutput(channel,{input_fields:[...DUPLICATES_OUTPUT,...c.fields]},p,m,request);
+}

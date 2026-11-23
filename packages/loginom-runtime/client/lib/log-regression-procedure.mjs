@@ -1,6 +1,8 @@
+import {configureLogRegressionNormalization} from './log-regression-normalization.mjs';
 import {resolveLogRegressionRoles} from './log-regression-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -26,7 +28,7 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
   s=await channel.observe({condition:'bound regression role editor',ready:pickerReady});
   await channel.perform({condition:'open regression role choices',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click')).ref})});
-  const label={0:'Не задано',3:'Входное',4:'Выходное'}[wanted.usage_type];
+  const label={0:'Не задано',3:'Входное',4:'Выходное',7:'Вес'}[wanted.usage_type];
   s=await channel.observe({condition:'regression role option',ready:s=>editor(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===label)});
   await channel.perform({condition:'select regression role',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'select_wizard_option',ref:unique(s,e=>choice(e,'option')&&e.wizard_combo.label===label).ref})});
@@ -44,6 +46,7 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
 }
 
 export async function configureLogRegression(channel,parameters,{inputMapping,request}){
+ if(request?.mode==='apply')return configureLogRegressionApply(channel,parameters.logistic);
  const mode=request?.mode??'enter',p=parameters.logistic,roles=await configureLogRegressionRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const ready=kind=>s=>s.node_logregression?.verified===true&&s.node_logregression.kind===kind;
@@ -51,21 +54,22 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  const next=async(stage,destination)=>channel.perform({condition:'logistic '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
  await next('input_mapping','normalization');
- let state=await observe('normalization','complete logistic normalizers');const normalization=state.node_logregression;
- const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
- need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
-  &&normalization.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
-   &&(p.input_fields.includes(f.name)?f.norm_type===0&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
-  'only unnormalized continuous predictors and native categorical target encoding are supported');
- if(normalization.source_status==='Не активировано'){
+ let state=await observe('normalization','complete logistic normalizers');const baseline=state.node_logregression;
+ const used=roles.configuration.fields.filter(f=>[3,4].includes(f.usage_type));
+ need(baseline.fields.length===used.length&&new Set(baseline.fields.map(f=>f.name)).size===used.length
+  &&baseline.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
+  'only none/standardize continuous predictors and native categorical target encoding are supported');
+ const normalization=await configureLogRegressionNormalization(channel,p,{request,baseline});
+ state=await observe('normalization','complete logistic normalizers after edit');
+ if(normalization.source_status==='Не активировано'&&!p.partition){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'logistic input activated',readLogRegression:true,ready:s=>ready('normalization')(s)&&s.node_logregression.source_status!=='Не активировано'});
  }
  await next('normalization','learn_partition');
  state=await observe('partition','complete logistic training partition');
- need(state.node_logregression.values.train===100&&state.node_logregression.values.test===0&&state.node_logregression.values.validation===0,'stage 1 requires 100 percent training without validation');
- const partition=state.node_logregression.values;
+ const partition=await configureLogRegressionPartition(channel,p);
  await next('learn_partition','lin_regression');
  state=await observe('parameters','complete logistic parameters and classes');
  const nativeClasses=state.node_logregression.classes;
@@ -96,7 +100,12 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   resolve:s=>({verb:'click',ref:one(s,e=>categoryOptions(s).includes(e)&&e.label===event.index+' ('+event.label+')','Unique event category unavailable').ref})});
  state=await observe('parameters','explicit logistic category readback');need(state.node_logregression.values.pedEventId===event.index,'event selection differs from the observed category');
  if(state.node_logregression.values.pedAutoMethod){await act('parameters','disable automatic logistic method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual logistic method');}
- const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)']};
+ const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)'],ridge:[4,'Ridge (Гребневая регрессия)']};
+ if(mode==='lasso'||mode==='elastic_net'){
+  const choices=state.node_logregression.method_choices?.filter(c=>(mode==='lasso'?/^LASSO\b/:/^Elastic-net\b/).test(c.label));
+  need(choices?.length===1&&Number.isInteger(choices[0].value),'one observed '+mode+' method is required');
+  methods[mode]=[choices[0].value,choices[0].label];
+ }
  need(methods[mode],'unsupported regression method');
  await choose('pedRegressionMethod',methods[mode][1],methods[mode][0]);
  if(!state.node_logregression.values.pedUseDetailedSettings){await act('parameters','show logistic details','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','logistic details enabled');}
@@ -107,15 +116,31 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  await next('lin_regression','lin_regression_details');
  state=await observe('details','complete logistic details');
  need(state.node_logregression.values.pedIntercept===true&&Object.values(state.node_logregression.switches).every(v=>v===false),'fixed intercept without variable bindings required');
+ let selection,regularization;
  const cutoffs=[];
- if(mode!=='enter'){
-  // Native defaults observed on a new 7.4.2 node (LAB-657 strict journal:493).
-  await choose('pedRegSelQuality','Deviance',0,'details');
+ if(mode==='ridge'||mode==='elastic_net'){
+  need(state.node_logregression.disabled?.pedRidgeSetupMethod===false,'manual Ridge setup must be editable');
+  await choose('pedRidgeSetupMethod','Задать вручную',0,'details');
+  need(state.node_logregression.disabled?.pedLambdaRidge===false&&state.node_logregression.values.pedRidgeSetupMethod===0,'manual Ridge lambda must be editable');
+  cutoffs.push(['pedLambdaRidge',p.regularization.lambda_ridge,'lambda_ridge']);
+ }
+ if(mode==='lasso'||mode==='elastic_net'){
+  need(state.node_logregression.disabled?.pedLassoSetupMethod===false,'manual LASSO setup must be editable');
+  await choose('pedLassoSetupMethod','Задать вручную',0,'details');
+  need(state.node_logregression.disabled?.pedLambdaLasso===false&&state.node_logregression.values.pedLassoSetupMethod===0,'manual LASSO lambda must be editable');
+  cutoffs.push(['pedLambdaLasso',p.regularization.lambda_lasso,'lambda_lasso']);
+ }
+ if(!['enter','ridge','lasso','elastic_net'].includes(mode)){
+  const criteria={deviance:[0,'Deviance'],aic:[1,'Информационный критерий Акаике'],aicc:[2,'Информационный критерий Акаике скорректированный'],bic:[3,'Информационный критерий Байеса'],hqic:[4,'Информационный критерий Ханнана-Куинна']};
+  const wanted=p.selection??{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})};
+  await choose('pedRegSelQuality',criteria[wanted.criterion][1],criteria[wanted.criterion][0],'details');
   need(state.node_logregression.disabled?.pedRegSelQuality===false,'selection criterion must be editable');
-  for(const [key,value,applicable] of [['pedAddSignificance',0.05,mode!=='backward'],['pedRemoveSignificance',0.1,mode!=='forward']]){
+  for(const [key,name,applies] of [['pedAddSignificance','entry_significance',mode!=='backward'],['pedRemoveSignificance','removal_significance',mode!=='forward']]){
+   const applicable=wanted.criterion==='deviance'&&applies;
    need(state.node_logregression.disabled?.[key]===!applicable,'unexpected selection cutoff availability: '+key);
-   if(applicable)cutoffs.push([key,value]);
+   if(applicable)cutoffs.push([key,wanted[name],name]);
   }
+  selection={criterion:Object.keys(criteria).find(k=>criteria[k][0]===state.node_logregression.values.pedRegSelQuality)};
  }
  for(const [key,value] of [['pedEpsilon',1e-10],['pedThreshold',p.threshold],...cutoffs]){
   if(state.node_logregression.values[key]!==value){
@@ -143,9 +168,147 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   }
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);
  }
+ if(['ridge','lasso','elastic_net'].includes(mode))regularization={
+  ...(['lasso','elastic_net'].includes(mode)?{lambda_lasso:state.node_logregression.values.pedLambdaLasso}:{}),
+  ...(['ridge','elastic_net'].includes(mode)?{lambda_ridge:state.node_logregression.values.pedLambdaRidge}:{})};
+ if(selection)for(const [key,,name] of cutoffs)selection[name]=state.node_logregression.values[key];
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition,classes:classes.map(({index,label})=>({index,label})),
-  mode:observedMode,target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  mode:observedMode,...(selection?{selection}:{}),...(regularization?{regularization}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+// Native apply is ActivateNode, not a new training method. Inspect the saved
+// wizard and discard it: even an unchanged Done can invalidate its model.
+async function configureLogRegressionApply(channel,p){
+ const observe=(stage,condition)=>channel.observe({condition,readLogRegression:true,
+  ready:s=>s.wizard?.stage===stage&&s.node_logregression?.verified===true});
+ const saved=async(value,message)=>{
+  if(value)return;
+  const error=Error('Logistic regression apply: saved '+message+' differs; no training requested');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'logregression_apply_preserved',proof:{closed:await closePreparedWizard(channel)}};
+  throw error;
+ };
+ const next=async(stage,destination)=>channel.perform({condition:'inspect saved logistic '+stage,
+  ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,resolve:s=>{
+   const buttons=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+   need(buttons.length===1,'Next unavailable');return {verb:'wizard_step',ref:buttons[0].ref,expected_stage:destination};}});
+ let state=await observe('input_mapping','saved logistic roles');
+ const roles=state.node_logregression;
+ const expected=resolveLogRegressionRoles({logistic:p},roles.fields);
+ await saved(roles.fields.every((f,i)=>f.usage_type===expected[i].usage_type),'roles');
+ await next('input_mapping','normalization');
+ state=await observe('normalization','saved logistic normalization');
+ const normalization=state.node_logregression.fields,used=roles.fields.filter(f=>[3,4].includes(f.usage_type));
+ await saved(normalization.length===used.length&&new Set(normalization.map(f=>f.name)).size===used.length
+  &&normalization.every(f=>used.some(role=>['name','label','type','index'].every(k=>role[k]===f[k]))
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');
+ await next('normalization','learn_partition');
+ state=await observe('learn_partition','saved logistic partition');const partition=state.node_logregression.values;
+ await saved((p.partition?.method==='column'?partition.sampling===2&&partition.field===p.partition.field:partition.sampling!==2&&partition.train===(p.partition?.train_percent??100)&&partition.test===(p.partition?.test_percent??0))&&partition.validation===(p.validation?1:0)
+  &&(!p.validation||partition.folds===p.validation.folds&&partition.fold_sampling===1)
+  &&(!p.partition||p.partition.method==='column'||partition.sampling===1&&same(state.node_logregression.sequence,[0,1,2]))&&Object.values(state.node_logregression.switches??{}).every(v=>v===false),'partition');
+ await next('learn_partition','lin_regression');
+ state=await observe('lin_regression','saved logistic model parameters');
+ const {values,classes,switches}=state.node_logregression;
+ await saved(values.pedAutoMethod===false&&values.pedRegressionMethod===0&&values.pedDenormalize===true
+  &&values.pedUseDetailedSettings===true&&values.pedEventType===4&&values.pedUseScoring===false&&values.pedSetupCalibration===false
+  &&Object.values(switches).every(v=>v===false)&&classes.length===2&&new Set(classes.map(c=>c.index)).size===2
+  &&new Set(classes.map(c=>c.label)).size===2&&classes.some(c=>c.index===values.pedEventId&&c.label===p.event),'Enter model/event');
+ await next('lin_regression','lin_regression_details');
+ state=await observe('lin_regression_details','saved logistic threshold');const details=state.node_logregression;
+ await saved(details.values.pedIntercept===true&&details.values.pedEpsilon===1e-10&&details.values.pedThreshold===p.threshold
+  &&Object.values(details.switches).every(v=>v===false),'intercept/epsilon/threshold');
+ await next('lin_regression_details','done');
+ const done=await channel.observe({condition:'saved logistic inspection complete',ready:s=>s.wizard?.stage==='done'});
+ return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,
+  configuration:{...roles,mode:'apply',normalization,partition,classes:classes.map(({index,label})=>({index,label})),
+   target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+async function configureLogRegressionPartition(channel,p){
+ const ready=s=>s.wizard?.stage==='learn_partition'&&s.node_logregression?.verified===true&&s.node_logregression.kind==='partition';
+ const observe=condition=>channel.observe({condition,readLogRegression:true,ready});
+ let state=await observe('logistic partition before configuration');
+ const unchanged=()=>need((p.validation?[0,1].includes(state.node_logregression.values.validation):state.node_logregression.values.validation===0)&&Object.values(state.node_logregression.switches).every(v=>v===false),'partition requires supported validation and no variable bindings');
+ unchanged();
+ const wanted=p.partition;
+ if(!wanted){need(state.node_logregression.values.sampling!==2&&state.node_logregression.values.train===100&&state.node_logregression.values.test===0,'partition omitted requires 100 percent training');if(!p.validation)return state.node_logregression.values;}
+ const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>(e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb));need(es.length===1,'partition control unavailable: '+tid);return es[0];};
+ const act=async(key,action)=>channel.perform({condition:'configure logistic partition '+key,initialObservation:state,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({...action,ref:one(s,s.wizard.root_tid+';LearnPartitionWizard;'+key,action.verb).ref})});
+ if(p.validation){
+  const choose=async(key,label,value)=>{
+   if(state.node_logregression.values[key]===value)return;
+   const control=key==='validation'?'pedLearnValidationMethod':'pedKFoldsSamplingMethod';
+   await act('ValidationSettings;'+control+';ValueControl;trg_picker',{verb:'click'});
+   const option='ValidationSettings;'+control+';ValueControl;boundlist;'+label.replaceAll(' ','_');
+   state=await channel.observe({condition:'observed logistic validation option '+label,readLogRegression:true,
+    ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;'+option&&e.label===label&&e.allowed_actions.includes('click'))});
+   await act(option,{verb:'click'});state=await observe('logistic validation option readback');
+   need(state.node_logregression.values[key]===value,'validation sampling/method differs');
+  };
+  need(state.node_logregression.disabled.validation===false,'validation method must be editable');
+  await choose('validation','K-fold кросс-валидация',1);
+  need(state.node_logregression.disabled.folds===false&&state.node_logregression.disabled.fold_sampling===false,'K-fold controls must be editable');
+  if(state.node_logregression.values.folds!==p.validation.folds){
+   const tid='ValidationSettings;pedFolds;ValueControl';
+   await act(tid,{verb:'fill',text:String(p.validation.folds)});state=await observe('logistic fold count input');
+   await act(tid,{verb:'press',key:'Tab'});state=await observe('logistic fold count committed');
+  }
+  await choose('fold_sampling','Последовательный',1);unchanged();
+  const v=state.node_logregression.values;
+  need(v.train===100&&v.test===0&&v.validation===1&&v.folds===p.validation.folds&&v.fold_sampling===1,'K-fold readback differs');
+  return v;
+ }
+ if(state.node_logregression.source_status==='Не активировано'){
+  await act('btnActivationPort',{verb:'click'});
+  state=await channel.observe({condition:'logistic partition input activated with row count',readLogRegression:true,
+   ready:s=>ready(s)&&s.node_logregression.source_status==='Вход активирован'&&Number.isSafeInteger(s.node_logregression.total_count)});
+ }
+ if(wanted.method==='column'){
+  if(state.node_logregression.values.sampling!==2){
+   await act('pedSamplingMethod;ValueControl;trg_picker',{verb:'click'});
+   state=await channel.observe({condition:'observed column logistic partition',readLogRegression:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;pedSamplingMethod;ValueControl;boundlist;По_столбцу'&&e.label==='По столбцу'&&e.allowed_actions.includes('click'))});
+   await act('pedSamplingMethod;ValueControl;boundlist;По_столбцу',{verb:'click'});
+   state=await observe('column logistic partition selected');
+  }
+  need(state.node_logregression.values.sampling===2&&state.node_logregression.disabled.field===false,'column partition must be editable');
+  const choices=state.node_logregression.column_choices?.filter(c=>c.name===wanted.field);
+  need(choices?.length===1,'one observed Boolean partition field is required');
+  if(state.node_logregression.values.field!==wanted.field){
+   const field='ByColumnMethodForm;pedPartitionColumn;ValueControl';
+   await act(field+';trg_picker',{verb:'click'});
+   state=await channel.observe({condition:'observed Boolean test flag option',readLogRegression:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;'+field+';boundlist;'+wanted.field.replaceAll(' ','_')&&e.allowed_actions.includes('click'))});
+   await act(field+';boundlist;'+wanted.field.replaceAll(' ','_'),{verb:'click'});
+   state=await observe('Boolean test flag readback');
+  }
+  unchanged();const r=state.node_logregression;
+  need(r.values.sampling===2&&r.values.field===wanted.field&&r.disabled.train===true&&r.disabled.test===true,'column partition readback differs');
+  return r.values;
+ }
+ need(state.node_logregression.disabled.train===false&&state.node_logregression.disabled.test===false,'partition percentages must be editable');
+ if(state.node_logregression.values.sampling!==1){
+  await act('pedSamplingMethod;ValueControl;trg_picker',{verb:'click'});
+  state=await channel.observe({condition:'observed sequential logistic partition',readLogRegression:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;pedSamplingMethod;ValueControl;boundlist;Последовательный'&&e.label==='Последовательный'&&e.allowed_actions.includes('click'))});
+  await act('pedSamplingMethod;ValueControl;boundlist;Последовательный',{verb:'click'});
+  state=await observe('sequential logistic partition selected');need(state.node_logregression.values.sampling===1,'sequential partition selection differs');
+ }
+ for(const [key,suffix] of [['train',''],['test','-1']]){
+  const value=wanted[key+'_percent'];
+  if(state.node_logregression.values[key]===value)continue;
+  const tid='SizeGridForm;colRelativeSize;FloatPropEdit'+suffix+';PropContainer;ValueContainer;ValueControl';
+  await act(tid,{verb:'fill',text:String(value)});state=await observe('logistic partition percentage input');
+  await act(tid,{verb:'press',key:'Tab'});state=await observe('logistic partition percentage committed');
+  need(state.node_logregression.values[key]===value,'partition percentage differs: '+key);
+ }
+ unchanged();const r=state.node_logregression;
+ need(same(r.sequence,[0,1,2]),'partition order must be training then test then unused');
+ need(r.values.sampling===1&&r.values.train===wanted.train_percent&&r.values.test===wanted.test_percent,'partition readback differs');
+ need(Number.isSafeInteger(r.train_count)&&r.train_count>0&&Number.isSafeInteger(r.test_count)&&r.test_count>0
+  &&r.train_count+r.test_count===r.total_count,'partition row counts unavailable or inconsistent');
+ return {...r.values,train_count:r.train_count,test_count:r.test_count,total_count:r.total_count};
 }

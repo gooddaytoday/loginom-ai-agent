@@ -1,0 +1,52 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "header": true,
+    "null_marker": "?",
+    "text_qualifier": "\"",
+    "line_ending": "LF"
+  },
+  "columns": [
+    {
+      "name": "RowID",
+      "type": "integer",
+      "data_kind": "continuous"
+    },
+    {
+      "name": "Segment",
+      "type": "string",
+      "data_kind": "discrete"
+    },
+    {
+      "name": "Target",
+      "type": "string",
+      "data_kind": "discrete"
+    },
+    {
+      "name": "Note",
+      "type": "string",
+      "data_kind": "discrete"
+    }
+  ],
+  "files": [
+    {
+      "file": "holdout.csv",
+      "bytes": 58,
+      "sha256": "394aaa1b6dcbe536b7490b1d76d5890df104847c803d4fa04e378bdc8d06dd63",
+      "rows": 3
+    },
+    {
+      "file": "train.csv",
+      "bytes": 208,
+      "sha256": "e4500220a7d9f93c1616013de7815256a4b87abf0b0324e6614297e234b7143f",
+      "rows": 20
+    }
+  ],
+  "oracle": {
+    "implementation": "Python stdlib csv/decimal",
+    "decimal_precision": 50,
+    "dependencies": []
+  }
+}

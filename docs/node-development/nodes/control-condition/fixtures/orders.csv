@@ -1,0 +1,5 @@
+OrderID,Region,Amount,Paid,Note
+101,North,12.5,true,first
+102,South,?,false,
+103,North,-3.25,?,?
+104,?,0,true,last

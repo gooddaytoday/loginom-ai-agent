@@ -42,6 +42,67 @@ function missing(filePath: string, input: Record<string, unknown> = {}) {
   return result
 }
 
+function beyondEnd() {
+  const result = part("read", { filePath: "/data/node-settings.md", offset: 380, limit: 180 }, true)
+  if (result.state.status !== "error") throw Error("invalid fixture")
+  result.state.error = "Offset 380 is out of range for this file (316 lines)"
+  return result
+}
+
+test("tenure-churn-profile repairs offset 380 of 316 lines with offset 220", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(beyondEnd())
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("read", { filePath: "/data/node-settings.md", offset: 220, limit: 100 }, false))
+  expect(outcome.failed()).toBe(false)
+})
+
+test.each([
+  { tool: "read", filePath: "/data/other.md", sessionID: "session" },
+  { tool: "glob", filePath: "/data/node-settings.md", sessionID: "session" },
+  { tool: "read", filePath: "/data/node-settings.md", sessionID: "other-session" },
+])("an unrelated successful read cannot repair an offset error: %j", (input) => {
+  const outcome = runToolOutcome()
+  outcome.observe(beyondEnd())
+  outcome.observe({
+    ...part(input.tool, { filePath: input.filePath, offset: 220, limit: 100 }, false),
+    sessionID: input.sessionID,
+  })
+  expect(outcome.failed()).toBe(true)
+})
+
+test.each([
+  "The user rejected permission to use this specific tool call.",
+  "Offset 380 is out of range for this file (316 lines)",
+])("a successful read cannot clear a permission denial: %s", (error) => {
+  const outcome = runToolOutcome()
+  const failure = beyondEnd()
+  if (failure.state.status !== "error") throw Error("invalid fixture")
+  failure.state.error = error
+  failure.state.metadata = { permissionDenied: true }
+  outcome.observe(failure)
+  outcome.observe(part("read", { filePath: "/data/node-settings.md", offset: 220, limit: 100 }, false))
+  expect(outcome.failed()).toBe(true)
+})
+
+test("an offset error without a successful retry remains unresolved", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(beyondEnd())
+  outcome.observe(part("read", { filePath: "/data/node-settings.md", offset: 220, limit: 100 }, true))
+  expect(outcome.failed()).toBe(true)
+})
+
+test.each([
+  part("read", { filePath: "/data/node-settings.md", offset: 1 }, true),
+  part("bash", { command: "false" }, true),
+])("a corrected offset preserves another failure: %j", (failure) => {
+  const outcome = runToolOutcome()
+  outcome.observe(failure)
+  outcome.observe(beyondEnd())
+  outcome.observe(part("read", { filePath: "/data/node-settings.md", offset: 220, limit: 100 }, false))
+  expect(outcome.failed()).toBe(true)
+})
+
 test.each([
   "/data/poitns.csv",
   "/data/poins.csv",

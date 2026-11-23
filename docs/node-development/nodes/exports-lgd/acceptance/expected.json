@@ -1,0 +1,186 @@
+{
+  "proposal": true,
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "exports.lgd",
+      "label_any": true
+    },
+    {
+      "type": "imports.lgd",
+      "label_any": true
+    }
+  ],
+  "file": {
+    "format": "lgd",
+    "filename": "roundtrip.lgd",
+    "output_port": null,
+    "compression": "lz4",
+    "checksum": "compressed"
+  },
+  "table": {
+    "output_port": 0,
+    "ordered": true,
+    "column_order": "exact",
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Номер",
+        "type": "integer",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Text",
+        "label": "Текст",
+        "type": "string",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "data_kind": "continuous",
+        "tolerance": {
+          "abs": 0,
+          "rel": 0
+        }
+      },
+      {
+        "name": "Occurred",
+        "label": "Момент",
+        "type": "datetime",
+        "data_kind": "discrete",
+        "tolerance": {
+          "abs_ms": 1
+        }
+      },
+      {
+        "name": "Active",
+        "label": "Активен",
+        "type": "boolean",
+        "data_kind": "discrete"
+      }
+    ],
+    "row_count": 5,
+    "rows": [
+      [
+        1,
+        "Кириллица",
+        1234.56789,
+        "2024-02-29T12:30:00.000",
+        true
+      ],
+      [
+        2,
+        "строка с \"кавычкой\"\nи переносом",
+        0.0,
+        "2024-02-29T12:30:00.000",
+        false
+      ],
+      [
+        3,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        4,
+        "",
+        -2.5,
+        "2024-02-29T12:30:00.000",
+        false
+      ],
+      [
+        5,
+        "=SUM(A1:A2)",
+        10.0,
+        "2024-02-29T12:30:00.000",
+        true
+      ]
+    ]
+  },
+  "roundtrip": {
+    "output_node_type": "imports.lgd",
+    "output_port": 0,
+    "ordered": true,
+    "column_order": "exact",
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Номер",
+        "type": "integer",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Text",
+        "label": "Текст",
+        "type": "string",
+        "data_kind": "discrete"
+      },
+      {
+        "name": "Amount",
+        "label": "Сумма",
+        "type": "real",
+        "data_kind": "continuous",
+        "tolerance": {
+          "abs": 0,
+          "rel": 0
+        }
+      },
+      {
+        "name": "Occurred",
+        "label": "Момент",
+        "type": "datetime",
+        "data_kind": "discrete",
+        "tolerance": {
+          "abs_ms": 1
+        }
+      },
+      {
+        "name": "Active",
+        "label": "Активен",
+        "type": "boolean",
+        "data_kind": "discrete"
+      }
+    ],
+    "row_count": 5,
+    "rows": [
+      [
+        1,
+        "Кириллица",
+        1234.56789,
+        "2024-02-29T12:30:00.000",
+        true
+      ],
+      [
+        2,
+        "строка с \"кавычкой\"\nи переносом",
+        0.0,
+        "2024-02-29T12:30:00.000",
+        false
+      ],
+      [
+        3,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        4,
+        "",
+        -2.5,
+        "2024-02-29T12:30:00.000",
+        false
+      ],
+      [
+        5,
+        "=SUM(A1:A2)",
+        10.0,
+        "2024-02-29T12:30:00.000",
+        true
+      ]
+    ]
+  }
+}

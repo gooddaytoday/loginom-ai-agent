@@ -1,3 +1,46 @@
+## Части даты: native-проба LAB-1560
+
+13.11.2026, mas3, Loginom 7.4.2 / Chromium 1246, исходники
+`origin/v040@f334cfe5e4fbf2f14d338816e46c4257f6f0f64f`.
+`https://app.loginom.ai/app/?testable=true`, worker назначенной пары;
+отдельные черновик и каталог `lab1560-native`, fixture `parts.csv` без изменений.
+Импорт подтвердил DateA:datetime; использованы только штатные жесты UI.
+
+Матрица `MF;TF-1;WizrdMCF;DateReformWizard;grdDataFormat`, read-only cached store,
+точная привязка DOM через production `readDateTimeBrowser`:
+
+| Операция | Func / ISO | StringFmt | Флаг / DOM-ячейка | Выход / DataType |
+|---|---|---|---|---|
+| quarter (регрессия) | 5 / false | `%Q` | DoNumber / `;colDoNumber_5` | DateA_Q_1 / 4 |
+| week | 7 / false | `%W` | DoNumber / `;colDoNumber_7` | DateA_WY_1 / 4 |
+| day_of_year | 8 / false | `%z` | DoNumber / `;colDoNumber_8` | DateA_DY_1 / 4 |
+| millisecond | 15 / false | `%u` | DoNumber / `;colDoNumber_15` | DateA_MSEC_1 / 4 |
+
+Типы integer и метки `DateA (Неделя)`, `DateA (День года)`,
+`DateA (Миллисекунды)` прочитаны из DOM-bound cached store
+`DerivedDataSourceOutputSocketWizard;grdTargetColumns`.
+После Execute прочитаны все 8 строк четырёх признаков в native preview
+`MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt`:
+
+| RowID | Quarter | Week | DayOfYear | Millisecond |
+|---|---|---|---|---|
+| 1 | 1 | 1 | 1 | 0 |
+| 2 | 1 | 9 | 60 | 125 |
+| 3 | 4 | 53 | 366 | 999 |
+| 4 | 4 | 53 | 365 | 1 |
+| 5 | 1 | 1 | 1 | 0 |
+| 6 | 1 | 1 | 3 | 500 |
+| 7 | 3 | 27 | 182 | 10 |
+| 8 | NULL | NULL | NULL | NULL |
+
+**Выбрана h1**: понедельник, неделя 1 содержит 1 января. h2 (`strftime %W`)
+на строках 4–6 предсказывает 52/0/0, UI даёт 53/1/1. Все значения совпадают
+с независимым oracle; исходные expected сохранены до модельных прогонов.
+Точные `data-tid`, например `...;DateA_WY_1_3`, `...;DateA_DY_1_2`,
+`...;DateA_MSEC_1_5`. NULL отображён пустой ячейкой; строгая типизированная
+проверка NULL, CSV и cold остаются обязательной модельной приёмкой.
+Сырые DOM/matrix/schema — вне Git. Новых механизмов проверки нет.
+
 ## Минуты и секунды: этап 0 (LAB-707)
 
 Наблюдение 01.11.2026 на Loginom 7.4.2 / mas3, Chromium 1246,
@@ -201,3 +244,32 @@ SHA под reviewer-аккаунтом назначенной пары по де
 Общая оболочка, `packages/agent`, форматы readback, бюджеты и deadline изменений
 не требуют по результатам этого исследования. Нативное расхождение конца недели
 не предлагается исправлять в общем runtime или маскировать новой верификацией.
+
+## Строковые представления: native-проба этапа 1 (LAB-1101)
+
+База `origin/v040@d355159858e2b090a60b11cc21735fa5206c9308`, mas2, 08.11.2026,
+Loginom 7.4.2 / Chromium 1246, `https://app.loginom.ai/app/?testable=true`, своя пара;
+пакет — сохранённый результат `date-time-iso`, открыт только для чтения и закрыт
+без сохранения (`package_closed=true`, `logged_out=true`). Журналы и снимки —
+вне Git, у карточки.
+
+| Наблюдение | Значение |
+|---|---|
+| Флаг строки | колонка `;colDoString_<index>`, чекбокс в той же ячейке; `DoString` в cached store `grdDataFormat` |
+| Исходные `StringFmt` на свежем поле | Func 4 `%Y`, 16 `%Y-%m-%d`, 17 `%H:%i:%s`, 18 («Свой формат») пустая строка |
+| Редактор формата | клик по ячейке «Строка» вне картинки-чекбокса открывает Ext CellEditing: ComboBox (`editable`, `forceSelection=false`) `;grdDataFormat;tbl;celleditor;FormatStrEditor;cbx`, его input без `data-tid` |
+| Ввод | `fill` не обновляет модель; настоящий набор с клавиатуры и `Enter` записывает `StringFmt` в store (`|`, `%`, `.` в шаблоне сохраняются) |
+| Источники вывода | `DateA_Y_<n>` «DateA (Год)» **string** (то же имя метки у integer-года; различает тип), `DateA_D_<n>` «DateA (Дата)» string, `DateA_T_<n>` «DateA (Время)» string, `DateA_U_<n>` «DateA (Свой формат)» string |
+
+Справка Loginom (`trans-datatime/syntax.html`): `%d %m %H %i %s` — «с ведущим нулём»,
+`%u` — «с ведущими нулями», `%Q` — номер квартала. Выполненные значения
+(дополнение нулями `%u` = 001/003, NULL → NULL, 999 мс) этой пробой на фикстуре
+`formats.csv` **не наблюдались** — их подтверждает первый живой прогон
+`date-time-formats` независимым oracle; расхождение с expected остановит карточку
+(`blocked`), expected не подгоняется.
+
+## v0.4.0: неделя, день года, миллисекунды — этап 0 (LAB-1546)
+
+Новой native-пробы нет (пара карточке не выдана). Native-ключи строк матрицы,
+две гипотезы обычной «Недели» и предложенный комплект —
+[acceptance/parts](acceptance/parts/README.md).

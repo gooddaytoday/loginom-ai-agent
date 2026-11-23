@@ -9,18 +9,14 @@ import { trackedSnapshot } from "./tracked"
 const root = resolve(import.meta.dir, "../../..")
 const { paths: tracked, read } = trackedSnapshot(root)
 
-const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals"]
+const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals", "dashboard"]
 
 const NAME_CHAR = "[A-Za-z0-9._~-]"
 const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`
 const pluginName = "@loginom-ai-agent/plugin"
 const forkOnlyName = `@loginom-ai-agent/${FORK_ONLY[0]}`
 const pluginInstallName = new RegExp(`${pluginName}${NAME_END}`, "g")
-const pluginInstallFiles = new Set([
-  "packages/opencode/src/product/installation.ts",
-  "packages/opencode/test/product/plugin-dependency.test.ts",
-  "packages/product/test/names.test.ts",
-])
+const pluginInstallFiles = new Set(["packages/product/test/names.test.ts"])
 const forkScopeOutsideForkOnly = new RegExp(
   `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})${NAME_END})${NAME_CHAR}+`,
 )
@@ -34,7 +30,8 @@ const names = manifests.map((path) => ({ path, name: JSON.parse(read(path)).name
 
 describe("package names", () => {
   test("upstream packages keep upstream names, fork packages keep the fork scope", () => {
-    const offenders = names.filter(({ name }) => {
+    const offenders = names.filter(({ path, name }) => {
+      if (path === "packages/dashboard/template/package.json") return name !== "loginom-dashboard"
       if (name === "opencode" || name.startsWith("@opencode-ai/")) return false
       return !FORK_ONLY.some((pkg) => name === `@loginom-ai-agent/${pkg}`)
     })
@@ -45,6 +42,7 @@ describe("package names", () => {
     expect(names.find(({ name }) => name === "opencode")?.path).toBe("packages/opencode/package.json")
   })
 
+  // This repository-wide scan reads thousands of files, including on cold macOS runners.
   test("no import or dependency uses the fork scope for an upstream package", () => {
     const offenders = tracked
       .filter((path) => /\.(ts|tsx|js|mjs|json|ya?ml)$/.test(path))
@@ -52,7 +50,7 @@ describe("package names", () => {
       .filter((path) => path !== "bun.lock" && !/(^|\/)(reports|history)\//.test(path))
       .filter((path) => usesForkScopeForUpstream(pluginInstallFiles.has(path) ? withoutPluginInstallName(read(path)) : read(path)))
     expect(offenders).toEqual([])
-  })
+  }, 30_000)
 
   test("the install seam may name only the public plugin package, not a longer name that starts with it", () => {
     const named = (...names: string[]) => usesForkScopeForUpstream(withoutPluginInstallName(names.join("\n")))
@@ -68,15 +66,13 @@ describe("package names", () => {
     expect(named(pluginName, `${pluginName}-next`)).toBe(true)
   })
 
-  test("the public plugin name is requested only by the background install seam and its test", () => {
+  // The background install requests @opencode-ai/plugin (owner decision 12.11); the retired name must not come back.
+  test("nothing requests the retired public plugin name", () => {
     const requesters = tracked
       .filter((path) => /\.(ts|tsx|js|mjs)$/.test(path))
       .filter((path) => !/^(docs\/|scripts\/upstream-sync\/)/.test(path) && path !== "packages/product/test/names.test.ts")
       .filter((path) => requestsPluginInstallName(read(path)))
-    expect(requesters.toSorted()).toEqual([
-      "packages/opencode/src/product/installation.ts",
-      "packages/opencode/test/product/plugin-dependency.test.ts",
-    ])
+    expect(requesters).toEqual([])
   })
 
   test("a longer package name that starts with the public plugin name is not a request for it", () => {

@@ -37,3 +37,21 @@ test('format readback preserves observed false and exact native date displays, r
  const actual=textImportConfigurationReadback(input);assert.equal(actual.format.multiple_delimiters,false);assert.equal(actual.format.date_separator,'Дефис (-)');
  fields.multiple_delimiters.value='false';assert.throws(()=>textImportConfigurationReadback(input));fields.multiple_delimiters.value=false;fields.date_format.status='unobserved';assert.throws(()=>textImportConfigurationReadback(input));
 });
+
+test('Variant option admits only booleans in new settings and existing patches',()=>{
+ for(const value of [true,false]){
+  const p=settings();p.format.variant_as_general_type=value;validateTextImportFieldsRequest(p);
+  validateTextImportPatch({format:{variant_as_general_type:value},analysis:{refresh:'types'}});
+ }
+ for(const value of ['false',0,null])assert.throws(()=>validateTextImportPatch({format:{variant_as_general_type:value}}));
+});
+test('Variant readback preserves observed true/false and refuses unobserved or non-boolean values',()=>{
+ const input=JSON.parse(fs.readFileSync(new URL('./fixtures/text-import-readback.json',import.meta.url),'utf8'));
+ const fields=input.phases[0].value.format.fields;
+ for(const value of [true,false]){
+  fields.variant_as_general_type={status:'observed',value};
+  assert.equal(textImportConfigurationReadback(input).format.variant_as_general_type,value);
+ }
+ fields.variant_as_general_type.value='false';assert.throws(()=>textImportConfigurationReadback(input));
+ fields.variant_as_general_type={status:'unobserved',value:false};assert.throws(()=>textImportConfigurationReadback(input));
+});

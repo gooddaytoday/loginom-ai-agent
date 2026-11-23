@@ -1,0 +1,14 @@
+{
+  "status": "native-fixture-proposal-not-created",
+  "schema": [{"name":"RowID","type":"string"},{"name":"V","type":"variant"}],
+  "rows": [
+    {"RowID":"r01","V":{"type":"integer","decimal":"7"}},
+    {"RowID":"r02","V":{"type":"string","value":"7"}},
+    {"RowID":"r03","V":{"type":"string","value":""}},
+    {"RowID":"r04","V":{"type":"boolean","value":false}},
+    {"RowID":"r05","V":{"type":"integer","decimal":"0"}},
+    {"RowID":"r06","V":{"type":"null","is_null":true}},
+    {"RowID":"r07","V":{"type":"real","value":1.5}},
+    {"RowID":"r08","V":{"type":"datetime","value":"2026-11-01T12:34:56.123"}}
+  ]
+}

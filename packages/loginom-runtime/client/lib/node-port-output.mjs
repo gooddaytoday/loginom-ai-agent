@@ -1,9 +1,190 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
-import {readOutputContext} from './node-output-context.mjs';
+import {readOutputContext,readVariableRecords} from './node-output-context.mjs';
+import {createNativeVariantReader} from './variant-native-read.mjs';
+import {decodeVariantFrame} from './variant-native-decode.mjs';
+import {adaptCell} from './variant-native-values.mjs';
+import {collectNativeRuntime} from './collapse-native-runtime.mjs';
+import {nativeRuntimePins,nativeVariablePins,nativeTreePins} from './collapse-native-runtime-pins.mjs';
+const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,treePins:nativeTreePins,
+ variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins};
+
+export function makeNodeVariableOutputCode(binding,options){
+ validatePreparedNodeContext(binding);
+ if(!Number.isInteger(options?.port)||options.port<0||options.port>99||!Number.isSafeInteger(options.deadline)
+  ||typeof options.operation_id!=='string'||options.execution?.verified!==true||options.execution.owner_verified!==true
+  ||options.execution.status!=='completed'||['execution_id','process_id','process_record_id'].some(k=>typeof options.execution[k]!=='string'))throw Error('Variable read requires a completed owned execution');
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:false})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()},${JSON.stringify(variantCapability)})`;
+}
+
+// Private preflight snapshot: it never fabricates an execution receipt.
+export function makeBuiltinVariablesPreviewCode(binding,options){
+ validatePreparedNodeContext(binding);
+ if(options?.port!==4||typeof options.port_guid!=='string'||!Number.isSafeInteger(options.deadline)||typeof options.operation_id!=='string')throw Error('Exact builtin source preview required');
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:true})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+}
+
+// Executable variable sources use the native VariablesForm after a real Execute.
+// Scalar previews retain their original path. Variant values use the pinned
+// native getter, bound to this complete preview and completed execution.
+export async function readNodeVariableOutput(page,task,readNode,readOutputs,readRecords,decode,variant){
+ const b=task.binding,root=b.workflow_ref.prefix+';ModelForm;PreviewWindow';let effect=false,opened=false,output,error,pending=false,nativeRead=false;
+ const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable output deadline');return n;};
+ const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
+ const inspect=mode=>page.evaluate(async({task,mode,recordsCode,decoderCode,variant})=>{
+  const snapshot=()=>{
+  const b=task.binding,a=bg.app,p=globalThis.__loginomDockPreparationV1,exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+  const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
+  if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
+   ||rs.some(v=>v.tab!==r.tab||v.packageNode!==r.packageNode||v.nodeTargetWorkflowNode!==r.nodeTargetWorkflowNode))throw Error('Variable output document/workflow changed');
+  const tabs=exact(b.workflow_ref.tab_tid),card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
+  if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active')||!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r.nodeTargetWorkflowNode)throw Error('Variable output graph owner changed');
+  const d=m.FDiagram,g=d.FmxGraph,ns=d.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id),n=ns[0];
+  if(ns.length!==1||n.FRunning||(task.builtin_snapshot?n.FIconCls!=='bg-vendor-icon-modelvariables':n.FIconCls==='bg-vendor-icon-modelvariables'||n.FStatus!==1))throw Error('Active executable variable node required');
+  const ports=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===task.port_guid),port=ports[0];
+  if(ports.length!==1||port.parent!==n||port.FCell.parent!==n.FCell||port.FType!==1||port.FSubType!==3||(!task.builtin_snapshot&&port.FStatus!==1)||!port.data)throw Error('Active variable output owner changed');
+  let cached,processIdentity=[];
+  if(task.builtin_snapshot){
+   const ordered=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FType===1&&p.FSubType===3);
+   cached=r.nodeTargetPortIdentities?.get(port);
+   if(task.port!==4||ordered.length!==5||ordered[4]!==port||!cached||cached.graph!==g||cached.node!==n||cached.cell!==port.FCell||cached.guid!==port.FGuid
+    ||cached.data!==port.data||cached.type!==1||cached.subtype!==3||cached.nodeTid!==g.view.getState(n.FCell)?.shape?.node?.getAttribute('data-tid')
+    ||cached.tid!==cached.nodeTid+';Output_Var-4')throw Error('Builtin source output identity changed');
+   if(mode==='availability')return {source_active:port.FStatus===1};
+   if(port.FStatus!==1)throw Error('Builtin source deactivated during preview');
+  }else{
+  const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(t=>exact(t+';ProgressForm;trpProgress;treepanel;tree'));
+  if(trees.length!==1)throw Error('Variable execution tree required');
+  const store=Ext.getCmp(trees[0].id)?.getStore(),nativeRoot=store?.getRoot(),prefix=b.document_id+':',id=task.execution.execution_id;
+  if(store?.isLoading()!==false||nativeRoot?.data.loaded!==true||!id.startsWith(prefix))throw Error('Variable execution store unavailable');
+  const parts=id.slice(prefix.length).split(':'),records=[],parents=new Map(),seen=new Set();
+  if(parts.length!==2||String(nativeRoot.internalId)!==parts[0]||!/^[1-9][0-9]*$/.test(parts[1]))throw Error('Variable execution root changed');
+  const walk=parent=>{if(!Array.isArray(parent.childNodes))throw Error('Variable process children');for(const record of parent.childNodes){if(seen.has(record)||records.length>=2000||record.data.loading)throw Error('Variable process bound');seen.add(record);records.push(record);parents.set(record,parent);walk(record);}};walk(nativeRoot);
+  const groups=records.filter(v=>String(v.data.id)===parts[1]),own=records.filter(v=>v.data.ModelNode===n.data),matches=own.filter(v=>String(v.data.id)===task.execution.process_id&&String(v.internalId)===task.execution.process_record_id);
+  if(groups.length!==1||parents.get(groups[0])!==nativeRoot||groups[0].data.Status!==3||groups[0].data.ErrorDetails!==''||groups[0].data.loaded!==true
+   ||matches.length!==1||matches[0].data.Status!==3||matches[0].data.ErrorDetails!==''||!String(matches[0].data.id).startsWith(parts[1]+'.')
+   ||own.some(v=>BigInt(String(v.data.id).split('.')[0])>BigInt(parts[1])))throw Error('Variable execution is stale or incomplete');
+  let ancestor=parents.get(matches[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);if(ancestor!==groups[0])throw Error('Variable execution process owner differs');
+  processIdentity=[store,nativeRoot,groups[0],matches[0],...own];
+  }
+  const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Variable read target covered');return {x,y};};
+  const root=b.workflow_ref.prefix+';ModelForm;PreviewWindow',pf=m.FPreviewManager?.FPreviewForm,windows=exact(root).filter(visible);
+  if(mode==='port'){
+   if(windows.length||exact('mn').some(visible))throw Error('A previous preview or menu is open');
+   const es=task.builtin_snapshot?[g.view.getState(port.FCell)?.shape?.node].filter(e=>e&&g.container.contains(e)&&(e.getAttribute('data-tid')===null||e.getAttribute('data-tid')===cached.tid)):exact(task.port_tid).filter(e=>g.container.contains(e));if(es.length!==1)throw Error('Unique variable port drawing required');
+   const box=es[0].getBoundingClientRect(),gb=g.container.getBoundingClientRect();if(g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)!==port.FCell)throw Error('Variable output native hit changed');return point(es[0]);
+  }
+  if(mode==='menu'){
+   const menus=exact('mn').filter(visible),es=exact('mn;mniShowDataPreview').filter(visible);
+   if(menus.length!==1||m.FPortContextMenu?.el.dom!==menus[0]||Ext.getCmp(menus[0].id)!==m.FPortContextMenu||m.FCurrentPortMenu!==port
+    ||es.length!==1||!menus[0].contains(es[0])||es[0].closest('.x-item-disabled,.x-menu-item-disabled'))throw Error('Owned variable preview command required');return point(es[0]);
+  }
+  if(windows.length!==1||m.FPreviewManager.FPreviewWindow.FView.el.dom!==windows[0]||pf?.FCurrentPreviewNode!==n||pf.FCurrentPreviewPort!==port)throw Error('Variable preview native owner changed');
+  if(mode==='close'){
+   const es=exact(root+';p.h;close').filter(visible);if(es.length!==1||!windows[0].contains(es[0]))throw Error('Owned variable preview Close required');return point(es[0]);
+  }
+  const forms=exact(root+';PreviewForm;VariablesForm').filter(visible),es=exact(root+';PreviewForm;VariablesForm;grdValuePreview'),grid=es.length===1&&Ext.getCmp(es[0].id),form=forms.length===1&&Ext.getCmp(forms[0].id)?.Controller;
+  if(forms.length!==1||!windows[0].contains(forms[0])||form?.constructor?.name!=='VariablesForm'||form.FView.el.dom!==forms[0]||form.FModelNode!==n.data
+   ||Object.values(pf.FFormCache).filter(v=>v===form).length!==1||!grid||grid.el.dom!==es[0]||!forms[0].contains(es[0])||grid.getStore()!==form.FVariablesStore)throw Error('Bound native VariablesForm required');
+  const store=grid.getStore(),records=eval('('+recordsCode+')'),decode=eval('('+decoderCode+')');
+  if(!task.builtin_snapshot&&store.getData().items.some(r=>r.data.DataType===6))return {native:true,port,store,
+   metadata:records(store,'preview',decode,false,{metadataOnly:true}),
+   identities:[p,r,card,m,n,n.data,n.data.$,n.data.$?.$I,n.data.$?.$OW,n.data.$?.$O,n.data.$S,
+    port,port.data,port.data.$,port.data.$?.$I,port.data.$?.$OW,port.data.$?.$O,port.data.$S,form,grid,store,...processIdentity,...store.getData().items],
+   fingerprint:JSON.stringify(store.getData().items.map(r=>r.data.ValueVariant))};
+  return records(store,'preview',decode);
+  };
+  const initial=snapshot();if(!initial.native)return initial;
+  const stable=()=>{const current=snapshot();if(!current.native||current.identities.length!==initial.identities.length
+   ||current.identities.some((v,i)=>v!==initial.identities[i])||current.fingerprint!==initial.fingerprint
+   ||JSON.stringify(current.metadata)!==JSON.stringify(initial.metadata))throw Error('Variable native owner/store/execution changed');};
+  const result=await eval('('+variant.variables+')')(initial.port,initial.metadata,{deadline:task.deadline,stable},variant);
+  if(result.error)return {native_error:result.error,native_pending:result.pending};
+  stable();return {...eval('('+recordsCode+')')(initial.store,'preview',eval('('+decoderCode+')'),false,{variantCells:result.cells}),native_read:true};
+ },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString(),variant});
+ try{
+  const before=await readNode(page,b);if(!before.verified||before.surface!=='graph')throw Error('Variable output graph unavailable');
+  if(task.builtin_snapshot){
+   const state=await inspect('availability');
+   if(!state.source_active)return {status:'SUCCEEDED',verified:true,source_active:false,independent_readback:false,effect_possible:false,cleanup_complete:true,node_context:before};
+  }else{
+  const inventory=await readOutputs(page,b,readNode),ports=inventory.variable_ports?.filter(p=>p.index===task.port);
+  if(!inventory.verified||ports?.length!==1||!ports[0].active)throw Error('Requested active variable output absent');
+  task={...task,port_guid:ports[0].port_guid,port_tid:ports[0].tid};
+  }
+  const point=await inspect('port');effect=true;await page.mouse.click(point.x,point.y,{button:'right'});
+  await at('mn;mniShowDataPreview').waitFor({state:'visible',timeout:remaining()});const command=await inspect('menu');await page.mouse.click(command.x,command.y);opened=true;
+  await page.waitForFunction(t=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],grid=es.length===1&&Ext.getCmp(es[0].id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false&&grid.getStore().complete===true&&grid.getStore().loadCount>=1;},root+';PreviewForm;VariablesForm;grdValuePreview',{timeout:remaining()});
+  const inventory=await inspect('inventory');
+  if(inventory.native_error){pending=inventory.native_pending;throw Error(inventory.native_error);}
+  nativeRead=inventory.native_read===true;delete inventory.native_read;
+  output={...inventory,port:task.port,kind:'variables',port_guid:task.port_guid,read_id:task.operation_id,
+   execution_id:task.builtin_snapshot?null:task.execution.execution_id,source:task.builtin_snapshot?'snapshot':'execution',native_source:'VariablesForm',fresh:!task.builtin_snapshot,freshness_basis:task.builtin_snapshot?'active_builtin_variables_preview':'completed_execution_variables_preview'};
+ }catch(cause){error=String(cause.message).slice(0,500);}
+ let clean=!effect;
+ if(effect&&!pending)try{if(opened){const point=await inspect('close');await page.mouse.click(point.x,point.y);await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});}
+  else await page.keyboard.press('Escape');
+  // Native preview redraw can retain an unbound hover port until pointer exit.
+  if(nativeRead)await page.mouse.move(10,10);
+  const after=await readNode(page,b);clean=after.verified===true&&after.surface==='graph';}catch{clean=false;}
+ const nodeContext=clean?await readNode(page,b):null;
+ return {status:output&&!error&&clean?'SUCCEEDED':effect?'AMBIGUOUS':'NOT_APPLIED',verified:!!output&&!error&&clean,effect_possible:effect,cleanup_complete:clean,node_context:nodeContext,...(output&&!error&&clean?{output,...(task.builtin_snapshot?{source_active:true,independent_readback:true,variables:output.variables}:{})}:{}),...(error?{error}:{})};
+}
+
+// Fixed W1 chain and method1141 only. No generic method IDs or inferred tags.
+// Timeout/uncertain native release retains all proxies for browser shutdown.
+export async function readNativeVariableCells(port,metadata,{deadline,stable},capability){
+ const need=(ok,message)=>{if(!ok)throw Error('Variable native read: '+message);};
+ const session=port.data.$S,portIdentity=port.data.$,portOwner=portIdentity?.$OW,portObject=portIdentity?.$O,handles=[],methods=[];
+ let reader,bytes=0,cells,error,pending=false;
+ const check=()=>{
+  stable();need(Date.now()<deadline,'deadline');
+  need(port.data.$===portIdentity&&portIdentity?.$I===1081&&Number.isInteger(portOwner)&&portOwner>=0&&Number.isInteger(portObject)
+   &&portIdentity.$OW===portOwner&&portIdentity.$O===portObject,'port identity');
+  need(port.data.$S===session&&session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
+   &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session');
+  for(const h of handles)need(h.proxy.$S===session&&h.proxy.$===h.identity&&h.identity.$I===h.interfaceId
+   &&h.identity.$OW===h.owner&&h.identity.$O===h.object,'proxy identity');
+  for(const m of methods)need(m.object[m.name]===m.fn,'loaded variable implementation changed');
+ };
+ const pin=async(object,name,key)=>{check();const fn=object[name];need(typeof fn==='function','method '+key);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+  need(hash===capability.variablePins[key],'loaded implementation '+key);methods.push({object,name,fn});check();};
+ const call=async fn=>{check();const value=await fn();check();return value;};
+ const acquire=async(fn,interfaceId)=>call(async()=>{const proxy=await fn(),identity=proxy?.$;
+  handles.push({proxy,identity,interfaceId,owner:identity?.$OW,object:identity?.$O});
+  need(proxy&&identity&&identity.$I===interfaceId&&Number.isInteger(identity.$OW)&&identity.$OW>=0&&Number.isInteger(identity.$O),'interface'+interfaceId);return proxy;});
+ try{
+  need(port.data.$?.$I===1081&&metadata.complete===true&&metadata.count<=128,'variable port/count');
+  await pin(port.data,'get_Output','port_output');const output=await acquire(()=>port.data.get_Output(),0);
+  await pin(output,'QueryInterface','query');const variables=await acquire(()=>output.QueryInterface(bg.IBGVariables),541);
+  await pin(variables,'get_Count','count');await pin(variables,'getItem','item');
+  need(await call(()=>variables.get_Count())===metadata.count,'native count differs');
+  cells=Array(metadata.count);
+  for(const v of metadata.variables.filter(v=>v.type==='variant')){
+   const item=await acquire(()=>variables.getItem(v.index),511);
+   need(await call(()=>item.get_ID())===v.id&&await call(()=>item.get_Index())===v.index
+    &&await call(()=>item.get_Name())===v.name&&await call(()=>item.get_DisplayName())===v.label
+    &&await call(()=>item.get_DataType())===6,'native variable metadata differs: '+v.name);
+   await pin(item,'get_Value','value');const value=await acquire(()=>item.get_Value(),427);
+   await pin(value,'get_AsVariant','as_variant');
+   need(bytes<512*1024,'native byte bound');
+   reader=await eval('('+capability.read+')')(value,{deadline,stable:check,variableValue:true},eval('('+capability.decode+')'),eval('('+capability.collect+')'),capability.pins);
+   const raw=await reader.read(0,0);bytes+=raw.frame_size;need(bytes<=512*1024,'native byte bound');
+   cells[v.index]=eval('('+capability.adapt+')')(raw,{type:'variant'},{variableValue:true,dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},eval('('+capability.decode+')'));
+  }
+  need(await call(()=>variables.get_Count())===metadata.count,'native count changed');check();
+ }catch(cause){error=String(cause.message).slice(0,500);}
+ finally{
+  pending=reader?.unsettled===true;
+  if(!pending)for(const h of handles.reverse())try{await h.proxy?.dispose();}catch{pending=true;error='Variable native proxy release failed';}
+ }
+ if(!error&&!pending)try{stable();}catch(cause){error=String(cause.message).slice(0,500);}
+ return error||pending?{error:error??'Variable native request unsettled',pending}:{cells};
+}
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
-export async function readTreePortSource(source,call,track,decode) {
+export async function readTreePortSource(source,call,track,decode,native) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
  const rpc=async(name,fn,parameters={})=>call(async()=>{try{return await fn();}catch(error){
@@ -23,9 +204,9 @@ export async function readTreePortSource(source,call,track,decode) {
   const name=await rpc('schema_name',()=>def.get_Name()),label=await rpc('schema_label',()=>def.get_DisplayName());
   const container=await rpc('schema_container',()=>def.get_IsContainer()),array=await rpc('schema_array',()=>def.get_IsArray());
   need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
-   &&typeof container==='boolean'&&typeof array==='boolean'&&(!array||container),'tree_schema_metadata');
+   &&typeof container==='boolean'&&typeof array==='boolean','tree_schema_metadata');
   const type=container?'object':types[await rpc('schema_type',()=>def.get_DataType())];
-  need(type&&(!['variant','datetime'].includes(type)),'tree_scalar_type');
+  need(type,'tree_scalar_type');
   const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
   schema.push(item);definitions.push(def);
   if(container){
@@ -43,6 +224,9 @@ export async function readTreePortSource(source,call,track,decode) {
  };
  const root=await acquire('root',()=>source.get_RootNodeDef());await visit(root,null,'',0);
  const reader=await acquire('reader',()=>source.GetReader(definitions));
+ const variants=schema.some(n=>n.type==='variant');
+ need(!variants||typeof native==='function','tree_variant_reader_required');
+ const readVariant=variants?await native(reader):null;
  let nodeCount=0,maxDepth=0;
  const count=depth=>{need(++nodeCount<=256,'tree_instance_limit');need(depth<=16,'tree_depth_limit');maxDepth=Math.max(maxDepth,depth);};
  const bytes=tree=>need(new TextEncoder().encode(JSON.stringify(tree)).length<=1024*1024,'tree_response_byte_limit');
@@ -64,7 +248,9 @@ export async function readTreePortSource(source,call,track,decode) {
    for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
    const value={schema_index:index,path,type:'object',children};bytes(value);return value;
   }
-  const decoded=decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
+  const decoded=def.type==='variant'
+   ?{cell:await rpc('variant_value',()=>readVariant(row,index),{schema_index:index,row}),limitations:[]}
+   :decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
@@ -90,6 +276,10 @@ export function decodePortCell(raw,type) {
   return exact(text,'decimal_integer','exact_integer');
  }
  if(type==='real'&&typeof raw==='number'&&Number.isFinite(raw))return exact(raw,'binary64','17_significant_digits',{decimal:Object.is(raw,-0)?'-0':String(raw)});
+ // Owner decision v040-nan-exact: a native non-finite binary64 is an exact
+ // value with an explicit marker, distinct from NULL. JSON cannot carry it.
+ if(['real','variant'].includes(type)&&typeof raw==='number'&&!Number.isFinite(raw))
+  return {cell:{type,is_null:false,value:null,non_finite:Number.isNaN(raw)?'NaN':raw>0?'Infinity':'-Infinity',representation:'binary64_non_finite',precision:'exact_non_finite'},limitations:[]};
  if(type==='string'&&typeof raw==='string')return exact(raw,'data_source_string','source_text');
  if(type==='boolean'&&typeof raw==='boolean')return exact(raw,'data_source_boolean','exact_boolean');
  if((type==='datetime'||type==='variant')&&raw instanceof Date){
@@ -130,9 +320,11 @@ export function decodePortCell(raw,type) {
  throw Error('unsupported_type');
 }
 
-export function makeNodePortOutputCode(binding,request,options) {
+export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull'].includes(k)).sort().join(','))
+  ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
+  ||Object.hasOwn(request,'variantEmptyIsNull')&&(request.variantEmptyIsNull!==true||request.typedVariants!==true)
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
   ||!Number.isInteger(request.sampleRows)||request.sampleRows<0||request.sampleRows>100
   ||Object.hasOwn(request,'rowOffset')&&(!Number.isSafeInteger(request.rowOffset)||request.rowOffset<0)
@@ -141,23 +333,24 @@ export function makeNodePortOutputCode(binding,request,options) {
   ||typeof request.execution.execution_id!=='string'||typeof request.execution.process_id!=='string'||typeof request.execution.process_record_id!=='string'
   ||!options||Object.keys(options).sort().join(',')!=='build,deadline,origin'
   ||typeof options.origin!=='string'||typeof options.build!=='string'||!Number.isSafeInteger(options.deadline))throw Error('Exact bounded completed port read required');
- return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()})`;
+ if(quality&&(request.port!==4||typeof quality.binding_id!=='string'||typeof quality.read!=='function'||typeof quality.decode!=='function'))throw Error('Private Quality Moda capability required');
+ return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()},${quality?JSON.stringify({binding_id:quality.binding_id,read:quality.read.toString(),decode:quality.decode.toString()}):'null'},${JSON.stringify(variantCapability)})`;
 }
 
 // One dispatch retains native identity and owns only the proxies acquired here.
-export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource) {
+export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource,quality=null,variant=variantCapability) {
  const before=await readNode(page,binding);
  if(before.verified!==true||before.surface!=='graph')return {verified:false,cleanup_complete:false,reason:'node_context'};
  const inventory=await readOutputs(page,binding,readNode);
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
- const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader})=>{
+ const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
   const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
-  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,readDiagnostic,reason='read_failed',released=true;
+  let baseline,sourceBaseline,cacheBaseline,output,dataSource,columns,result,readDiagnostic,nativeReader,reason='read_failed',released=true,qualityNativeUncertain=false;
   const items=[];
   const snapshot=()=>{
    const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
@@ -167,7 +360,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    need(receipt&&receipts.every(r=>r.tab===receipt.tab&&r.packageNode===receipt.packageNode)&&tabs.length===1&&tabs[0]===receipt.tab&&tabs[0].classList.contains('x-tab-active'),'workflow_changed');
    const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller?.FController;
    let tree=card?.Controller?.Node?.data?.node,workflow,packageNode;
-   for(let i=0;tree&&i<32;i++,tree=tree.ParentNode){if(tree instanceof app.WorkFlowTreeNode)workflow=tree;if(tree instanceof app.PackageTreeNode){packageNode=tree;break;}}
+   for(let i=0;tree&&i<32;i++,tree=tree.ParentNode){if(!workflow&&tree instanceof app.WorkFlowTreeNode)workflow=tree;if(tree instanceof app.PackageTreeNode){packageNode=tree;break;}}
    need(workflow===receipt.nodeTargetWorkflowNode&&packageNode===receipt.packageNode&&model instanceof app.ModelForm,'graph_context_changed');
    const diagram=model.FDiagram,graph=diagram?.FmxGraph,roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram'),nodes=diagram?.FNodes?.FCollection;
    need(roots.length===1&&graph?.container===roots[0]&&Array.isArray(nodes)&&nodes.length<=200,'graph_changed');
@@ -208,13 +401,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
-   need(identity&&value(identity,'$I')===(target.kind==='tree'?141:116)
+   const interfaceId=value(identity,'$I');
+   need(identity&&(target.kind==='tree'?interfaceId===141:interfaceId===116||interfaceId===71)
     &&(target.kind==='tree'||helper&&value(helper,'FBaseProxy')===dataSource),'source_binding');
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
-   return {helper,identity,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
+   const batchProxy=interfaceId===71?bg.rpc?.TIBGDataSourceRpcCachedInternal_Proxy:null;
+   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
-  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
+  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
    live();baseline=snapshot();
    output=await baseline.portData.get_Output();live();stable();
@@ -222,7 +417,14 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    if(target.kind==='tree'){
     need(q.rowOffset===undefined,'tree_row_offset');
     const call=async read=>{live();stable();const result=await read();live();stable();return result;};
-    const tree=await readTree(dataSource,call,proxy=>{items.push(proxy);return proxy;},decode);
+    const tree=await readTree(dataSource,call,proxy=>{items.push(proxy);return proxy;},decode,async reader=>{
+     const getter=dataSource.GetReader;
+     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(getter))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+     need(hash===variant.treePins.get_reader&&reader.$S===dataSource.$S,'tree_reader_implementation');
+     const nativeDecode=eval('('+variant.decode+')'),adapt=eval('('+variant.adapt+')');
+     nativeReader=await eval('('+variant.read+')')(reader,{deadline:o.deadline,treeValue:true,stable:()=>{live();stable();need(dataSource.GetReader===getter,'tree_reader_changed');}},nativeDecode,eval('('+variant.collect+')'),variant.pins,variant.treePins);
+     return async(row,index)=>{const raw=await nativeReader.read(row,index);return adapt(raw,{type:'variant'},{dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},nativeDecode);};
+    });
     result={port:q.port,port_guid:baseline.portGuid,port_kind:'tree',fresh:true,execution_id:q.execution.execution_id,
      freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
    }else{
@@ -233,24 +435,83 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    columns=await dataSource.get_Columns();live();stable();
    const total=await columns.get_Count();live();stable();need(Number.isInteger(total)&&total>0&&total<=10000,'column_count');
    const schema=[],types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
+   const batchTypes=[];
    for(let index=0;index<total;index++){
     const column=await columns.getItem(index);items.push(column);live();stable();
     const name=await column.get_Name();live();stable();
     const label=await column.get_DisplayName();live();stable();
-    const type=types[await column.get_DataType()];live();stable();
-    need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&type,'column_metadata');
+    const typeId=await column.get_DataType();live();stable();
+    const type=types[typeId];
+    batchTypes.push(typeId);
+    need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&typeof type==='string','column_metadata');
     schema.push({index,name,label,type});
    }
    const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount-offset,q.sampleRows,Math.floor(10000/total));
+   // Private opt-in: existing ordinary reads, including Variant NULL and the
+   // full Collapse/CrossTable path, keep their previous envelopes and calls.
+   const variantFailures=[];
+   const exactVariants=q.typedVariants===true&&requested>0&&schema.some(c=>c.type==='variant');
+   const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
+   // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
+   const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
+   const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
+   const direct=sourceBaseline.interfaceId===71;
+   const batch=direct&&requested>0?await (async()=>{
+    need(typeof sourceBaseline.getValues==='function','source_batch');
+    // This RPC reads the bound server object without the browser's cached blocks.
+    const out=Array.from({length:7},()=>new Out());
+    live();stable();await sourceBaseline.getValues.call(sourceBaseline.batchProxy,dataSource,offset,requested,...out);live();stable();
+    const matrices=out.map(item=>item.value);
+    const counts=[total,0,0,0,0,0,0];
+    for(const type of batchTypes)counts[type]++;
+    need(matrices.every((matrix,type)=>Array.isArray(matrix)&&matrix.length===counts[type]
+     &&matrix.every(cells=>Array.isArray(cells)&&cells.length===requested)),'source_batch_shape');
+    const indexes=[0,0,0,0,0,0,0];
+    return batchTypes.map((type,column)=>{
+     const mask=matrices[0][column],cells=matrices[type][indexes[type]++];
+     for(const flag of mask)need(typeof flag==='boolean','source_batch_shape');
+     return {mask,cells};
+    });
+   })():null;
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount-offset,q.sampleRows);
    for(let row=offset;row<offset+requested;row++){
-    const rawValues=[];
+    const rawValues=[],nativeCells=[];
     for(let column=0;column<total;column++){
-     live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();
+     if(exactVariants&&schema[column].type==='variant'){
+      let cell;
+      try{cell=await nativeReader.read(row,column);}
+      catch(error){
+       // Only a decoder refusal (positively marked) may continue; guard, transport and deadline failures keep their exact cause and stop at once.
+       if(!error?.variantDecode||nativeReader.unsettled||Date.now()>=o.deadline)throw error;
+       // Diagnostic only, for decoder refusals: scan the rest so the refusal names every cell and its ordinary value kind.
+       let kind;try{live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();kind=raw===null||raw===undefined?'null':typeof raw;}catch(cause){if(reason!=='read_failed')throw cause;kind='unread';}
+       variantFailures.push('r'+row+'c'+column+' '+kind+' '+String(error?.message).slice(0,48));rawValues.push(null);continue;
+      }
+      nativeCells[column]=adaptNative(cell,schema[column],{dateProfile:'loginom-7.4.2-native-oadate',civilTime:cell.civilTime},nativeDecode);
+      rawValues.push(null);continue;
+     }
+     if(batch){
+      const values=batch[column],index=row-offset;
+      rawValues.push((quality&&column===8)||values.mask[index]?null:values.cells[index]);
+      continue;
+     }
+     live();stable();const raw=quality&&column===8?null:await dataSource.AsVariant(row,column);live();stable();
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
+     // Loginom 7.4.2 can retain a false NULL in its Calculator bulk cache after
+     // expression reorder while fixed321 already returns the computed value.
+     // Verify absence through the existing guarded native reader; never publish
+     // that stale cache as fresh output or silently substitute another value.
+     if(raw==null&&baseline.node.FIconCls==='bg-vendor-icon-calcdata'){
+      nativeReader??=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},
+       eval('('+variant.decode+')'),eval('('+variant.collect+')'),variant.pins);
+      const current=await nativeReader.read(row,column);live();stable();
+      need(current.tag===1,'calculator_output_cache_not_current: read the output again without Execute or settings changes');
+     }
      rawValues.push(raw);
     }
+    if(variantFailures.length)continue;
     // Settle every started full-text RPC before refusing or disposing its column.
     const fullValues=await Promise.allSettled(rawValues.map(async(raw,column)=>{
      if(!['string','variant'].includes(schema[column].type)||typeof raw!=='string'||raw.length<5000&&!raw.endsWith('…'))return raw;
@@ -258,13 +519,14 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      need(typeof full==='string','string_value');return full;
     }));
     need(fullValues.every(item=>item.status==='fulfilled'),'cell_read_failed');
-    const decoded=fullValues.map((item,column)=>decode(item.value,schema[column].type)),cells=decoded.map(item=>item.cell);
+    const decoded=fullValues.map((item,column)=>nativeCells[column]?{cell:nativeCells[column],limitations:[]}:quality&&column===8?{cell:moda[row],limitations:[]}:decode(item.value,schema[column].type)),cells=decoded.map(item=>item.cell);
     const rowValues=cells.map(c=>c.value??c.display_text??null);
     if(new TextEncoder().encode(JSON.stringify([...values,rowValues])).length>512*1024){limited=true;break;}
     need(!q.requireExactNumbers||decoded.every(item=>item.limitations.length===0),'unverified_precision');
     decoded.forEach(item=>item.limitations.forEach(limit=>limits.add(limit)));
     values.push(rowValues);sample.push(cells);
    }
+   if(variantFailures.length)throw Error('variant_cells '+variantFailures.slice(0,12).join('; '));
    live();stable();
    result={port:q.port,port_guid:baseline.portGuid,fresh:true,execution_id:q.execution.execution_id,freshness_basis:'completed_execution_port_source',schema,row_count:rowCount,sample,sample_rows:sample.length,sample_complete:offset===0&&sample.length===rowCount,
     precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'data source text; existing secret redaction applies; original byte encoding is not attested'},...(limited?{read_limit:'preview_cell_or_byte_budget'}: {})};
@@ -275,15 +537,19 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
+  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;if(reason==='read_failed'&&q.typedVariants===true){const text=error?.message??error?.get_message?.();reason='read_failed: '+String(error?.name??'Error').slice(0,40)+': '+String(text).slice(0,420);}readDiagnostic=error?.treeReadDiagnostic;result=undefined;
   }finally{
-   for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
+   // A timed-out fixed321 request still owns its buffers. Retain its source
+   // handles until the owning browser is closed; never claim native cancel.
+   if(!nativeReader?.unsettled)for(const proxy of [...items.reverse(),columns,dataSource,output])if(proxy)try{await proxy.dispose();}catch{released=false;}
   }
   let context=false;try{context=!!baseline&&same(baseline,snapshot());}catch{}
+  if(nativeReader?.unsettled)return {verified:false,cleanup_complete:false,reason:'variant_native_pending'};
+  if(qualityNativeUncertain)return {verified:false,cleanup_complete:false,reason:'quality_native_pending'};
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason,...(readDiagnostic?{read_diagnostic:readDiagnostic}:{})};
   return {verified:true,cleanup_complete:true,output:result};
- },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString()});
+ },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality,variant});
  const after=await readNode(page,binding);
  if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
  return result.verified?{...result,node_context:after}:result;

@@ -1,0 +1,206 @@
+{
+  "type": "object",
+  "properties": {
+    "smoothing": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 128,
+      "description": "Per-field HP or wavelet rules. Existing omission preserves; [] disables. Wavelet NULL interpolation is unresolved and not a selectable UI setting.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Observed continuous integer/real input name; unique."
+              },
+              "lambda": {
+                "type": "number",
+                "minimum": 0.0625,
+                "maximum": 102659800000000,
+                "description": "HP strength. Use lambda OR period; no training. Output uses saved mapping."
+              }
+            },
+            "required": [
+              "field",
+              "lambda"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Observed continuous integer/real input name; unique."
+              },
+              "period": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20000,
+                "description": "Linked HP period; use period OR lambda."
+              }
+            },
+            "required": [
+              "field",
+              "period"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact continuous numeric input field."
+              },
+              "depth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Native decomposition depth; feasibility depends on series length."
+              },
+              "boundary": {
+                "type": "string",
+                "enum": [
+                  "symmetric",
+                  "antisymmetric",
+                  "zero",
+                  "constant",
+                  "periodic",
+                  "symmetric_without_endpoint",
+                  "antisymmetric_without_endpoint"
+                ],
+                "description": "Native continuation of the series at both boundaries."
+              },
+              "family": {
+                "type": "string",
+                "enum": [
+                  "daubechies"
+                ],
+                "description": "Native wavelet family."
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Wavelet order within selected family."
+              }
+            },
+            "required": [
+              "field",
+              "family",
+              "depth",
+              "boundary",
+              "order"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact continuous numeric input field."
+              },
+              "depth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Native decomposition depth; feasibility depends on series length."
+              },
+              "boundary": {
+                "type": "string",
+                "enum": [
+                  "symmetric",
+                  "antisymmetric",
+                  "zero",
+                  "constant",
+                  "periodic",
+                  "symmetric_without_endpoint",
+                  "antisymmetric_without_endpoint"
+                ],
+                "description": "Native continuation of the series at both boundaries."
+              },
+              "family": {
+                "type": "string",
+                "enum": [
+                  "coiflet"
+                ],
+                "description": "Native wavelet family."
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Wavelet order within selected family."
+              }
+            },
+            "required": [
+              "field",
+              "family",
+              "depth",
+              "boundary",
+              "order"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact continuous numeric input field."
+              },
+              "depth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Native decomposition depth; feasibility depends on series length."
+              },
+              "boundary": {
+                "type": "string",
+                "enum": [
+                  "symmetric",
+                  "antisymmetric",
+                  "zero",
+                  "constant",
+                  "periodic",
+                  "symmetric_without_endpoint",
+                  "antisymmetric_without_endpoint"
+                ],
+                "description": "Native continuation of the series at both boundaries."
+              },
+              "family": {
+                "type": "string",
+                "enum": [
+                  "cdf_9_7"
+                ],
+                "description": "Native wavelet family."
+              }
+            },
+            "required": [
+              "field",
+              "family",
+              "depth",
+              "boundary"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

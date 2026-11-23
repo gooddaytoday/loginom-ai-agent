@@ -1,0 +1,72 @@
+{
+  "proposal": true,
+  "output_node_type": "exports.text",
+  "output_port": null,
+  "ordered": true,
+  "nodes": [
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "cases": {
+    "fixed-width": {
+      "fixture": "formats.csv",
+      "columns": [
+        "Code",
+        "Amount",
+        "Money"
+      ],
+      "widths": [
+        4,
+        8,
+        7
+      ],
+      "codec": "utf-8",
+      "bom": false,
+      "text": "Code   Amount   Money\r\nА    1234.567   9.999\r\nБ        -2.5 -12.344\r\nВ           0       0\r\n"
+    },
+    "number-format": {
+      "fixture": "formats.csv",
+      "columns": [
+        "Code",
+        "Amount",
+        "Money"
+      ],
+      "codec": "utf-8",
+      "bom": false,
+      "text": "Code;Amount;Money\r\nА;1234.57;10.00\r\nБ;-2.50;-12.34\r\nВ;0.00;0.00\r\n",
+      "availability": "blocked: numeric precision control not observed in native text export wizard"
+    },
+    "windows-1252": {
+      "fixture": "encodings.csv",
+      "columns": [
+        "Code",
+        "Text"
+      ],
+      "codec": "cp1252",
+      "bom": false,
+      "text": "Code;Text\r\n1;café €\r\n2;Ångström\r\n"
+    },
+    "utf16-le": {
+      "fixture": "encodings.csv",
+      "columns": [
+        "Code",
+        "Text"
+      ],
+      "codec": "utf-16-le",
+      "bom": true,
+      "text": "Code;Text\r\n1;café €\r\n2;Ångström\r\n"
+    },
+    "utf16-be": {
+      "fixture": "encodings.csv",
+      "columns": [
+        "Code",
+        "Text"
+      ],
+      "codec": "utf-16-be",
+      "bom": true,
+      "text": "Code;Text\r\n1;café €\r\n2;Ångström\r\n"
+    }
+  }
+}

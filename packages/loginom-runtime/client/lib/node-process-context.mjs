@@ -1,14 +1,14 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 
-export function makeNodeProcessContextCode(binding,{errorToast=false}={}) {
+export function makeNodeProcessContextCode(binding,{errorToast=false,existingOutput=false}={}) {
   validatePreparedNodeContext(binding);
-  return `async page=>{const readNode=${readPreparedNodeContext.toString()};return (${readNodeProcesses.toString()})(page,${JSON.stringify(binding)},readNode,${errorToast===true})}`;
+  return `async page=>{const readNode=${readPreparedNodeContext.toString()};return (${readNodeProcesses.toString()})(page,${JSON.stringify(binding)},readNode,${errorToast===true},${existingOutput===true})}`;
 }
 
-export async function readNodeProcesses(page,binding,readNode=readPreparedNodeContext,errorToast=false) {
+export async function readNodeProcesses(page,binding,readNode=readPreparedNodeContext,errorToast=false,existingOutput=false) {
   const before=await readNode(page,binding);
   if(!before.verified)return {verified:false,reason:'node_context'};
-  const result=await page.evaluate(({nodeId,errorToast})=>{
+  const result=await page.evaluate(({nodeId,errorToast,existingOutput})=>{
     const fail=reason=>({verified:false,reason});
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(tid=>[...exact(tid)]);
@@ -28,9 +28,9 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
     if(checked===unchecked)return fail('completed_filter_ambiguous');
     const visible=e=>e.getBoundingClientRect().width>0 && e.getBoundingClientRect().height>0 && getComputedStyle(e).visibility!=='hidden' && getComputedStyle(e).display!=='none';
     const consoleVisible=visible(body[0])&&visible(right[0]);
-    // Only the error-toast proof may inspect this already bound hidden cache.
-    // Hidden records never establish rendered controls or authorize a gesture.
-    if(!consoleVisible&&!errorToast||[...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible))return fail('console_not_ready');
+    // Existing-output and error-toast proofs may inspect the bound hidden cache.
+    // A visible mask is transient and never authorizes cached evidence or gestures.
+    if([...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible)||!existingOutput&&!consoleVisible&&!errorToast)return fail('console_not_ready');
     const nativeRows=[...body[0].querySelectorAll('table.x-grid-item')],nativeRight=[...right[0].querySelectorAll('table.x-grid-item')];
     if(nativeRows.length>200||nativeRight.length>200)return fail('render_bound');
     const processes=[],seen=new Set();let visited=0;
@@ -85,8 +85,9 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
     try{walk(root.childNodes,null);}catch(e){return fail(e.message);}
     if(new Set(processes.map(p=>p.process_id)).size!==processes.length||new Set(processes.map(p=>p.record_id)).size!==processes.length)return fail('duplicate_process');
     return {verified:true,inventory_complete:true,root_id:String(root.internalId),show_completed:checked,
-      filter_source:'cached_native_menu_check_state',processes,execution_freshness_verified:false};
-  },{nodeId:before.surface==='graph'?before.node_id:null,errorToast});
+      filter_source:'cached_native_menu_check_state',processes,execution_freshness_verified:false,
+      ...(existingOutput&&owner?{native_state:{active:owner.FStatus===1,running:owner.FRunning,locked:owner.FLocked===true}}:{})};
+  },{nodeId:before.surface==='graph'?before.node_id:null,errorToast,existingOutput});
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'node_context_changed'};
   return {...result,node_context:after};

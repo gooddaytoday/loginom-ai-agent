@@ -28,27 +28,29 @@ export async function restorePreflightSourceActivity(channel,node,before,observe
 export async function preflightSortingSource(options,ctx,config){
  return preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.keys!==undefined,resolve:resolveSortingParameters,label:'sorting'});
 }
-export async function preflightTabularSource(options,ctx,config,{required,resolve,label,inputPort,existingSource=false,inactiveSource}){
+export async function preflightTabularSource(options,ctx,config,{required,resolve,label,inputPort,existingSource=false,inactiveSource,input:linkedInput,inspect,scriptSource}){
  const {operation,execute,onRecord,now,receiptOptions}=options,request=operation.parameters;
  if(!required)return {verified:true,not_applicable:true};
  // Existing input mappings can retain names absent from the upstream output.
  // Validate their effective schema in the normal input wizard, before editing
  // or committing it. New nodes still reject bad keys before graph creation.
  if(request.target.kind==='existing'&&!existingSource)return {verified:true,not_applicable:true,validation_deferred:'input_mapping'};
- if(!(inputPort===undefined?request.inputs.length===1:request.inputs.filter(i=>i.input===inputPort).length===1)){
+ if(!linkedInput&&!(inputPort===undefined?request.inputs.length===1:request.inputs.filter(i=>i.input===inputPort).length===1)){
   const error=Error('Invalid parameters.inputs: '+label+' preflight requires an explicit input');
   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
  }
- const input=inputPort===undefined?request.inputs[0]:request.inputs.find(i=>i.input===inputPort),binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
+ const input=linkedInput??(inputPort===undefined?request.inputs[0]:request.inputs.find(i=>i.input===inputPort)),binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
  const channel=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:256,...config,signal:ctx.signal,preparedNodeContext:binding,
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
  const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
  let s=await channel.observe({condition:'upstream graph before '+label+' validation',readOutputs:true,ready:s=>graph(s)&&s.node_outputs?.verified===true});
  const ports=s.node_outputs.ports.filter(p=>p.index===input.output);need(ports.length===1,'Exact upstream '+label+' port required');const port=ports[0];
+ if(scriptSource&&s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script'
+  &&e.signature.native_graph.icon==='bg-vendor-icon-javascript').length===1)return scriptSource({channel,binding,port,state:s});
  if(port.active===false&&inactiveSource)return inactiveSource({channel,binding,port,state:s});
  if(port.active!==true){const error=Error(label+' preflight requires an active source output');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
- const admission=['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
+ const admission=(['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)||/^enrich_input_(?:0|[1-9][0-9]?)$/.test(label))&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
  let preview;
  if(admission){
   // Join input 0's preview can leave its source selected. Select the owned JS
@@ -91,9 +93,10 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  try{
   if(admission){need(preview.node_preview_schema.inventory_complete===true&&preview.node_preview_schema.node_id===input.source.node_id
    &&preview.node_preview_schema.port===0,'Managed JavaScript preview schema is incomplete');alignReadSchema(fields,admission.schema);}
-  const mapping=request.mappings.find(m=>m.direction==='input'&&(inputPort===undefined||m.port===inputPort));
+  const mapping=request.mappings.find(m=>m.direction==='input'&&m.kind===undefined&&m.port===(inputPort??input.input));
   if(mapping?.fields){need(mapping.fields.length===fields.length,'Input mapping must account for every upstream field');const seen=new Set();fields=mapping.fields.map(f=>{const source=fields.find(c=>c.name===f.source?.name);need(source&&!seen.has(source.name)&&f.excluded!==true,'Invalid '+label+' input mapping');seen.add(source.name);return {...source,name:f.name??source.name,label:f.label??source.label};});}
   resolve(request.parameters,fields);
+  if(inspect)await inspect({binding,port,preview:preview.node_preview_schema});
  }catch(e){error=e;}
  const returned=await closeNodeSchemaPreview(options,channel,preview,binding,port,{label,readOutputs:true});
  const after=returned.node_outputs.ports.filter(p=>p.index===input.output);

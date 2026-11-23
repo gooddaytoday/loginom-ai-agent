@@ -1,0 +1,15 @@
+{
+  "status": "proposal_pending_approval",
+  "format": {"encoding": "utf-8", "delimiter": ",", "decimal_separator": ".", "header": true, "null_marker": "?", "text_qualifier": "\""},
+  "columns": [
+    {"name": "RowID", "type": "integer"},
+    {"name": "Amount", "type": "real"},
+    {"name": "Note", "type": "string"},
+    {"name": "Flag", "type": "boolean"},
+    {"name": "Moment", "type": "datetime"}
+  ],
+  "datetime_format": "yyyy-mm-dd hh:nn:ss, civil time without timezone conversion",
+  "files": {"input.csv": {"rows": 5}, "replacement.csv": {"rows": 3}, "empty.csv": {"rows": 0}},
+  "empty_note": "Empty CSV Note field means empty string; ? means NULL. Enforce import types explicitly, including on empty input.",
+  "limits": "No Int64 outside JS safe range, Variant, NaN or infinity in this acceptance slice."
+}

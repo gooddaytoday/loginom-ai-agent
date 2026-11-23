@@ -39,7 +39,7 @@ test('export validation refuses unsafe destinations and unsupported formats befo
 test('existing export patches reject unsupported retained formats before finish',()=>{
  const values=Object.fromEntries(Object.entries({encoding:65001,delimiter:';',header:1,line_ending:0,bom:false}).map(([k,value])=>[k,{value}]));
  assert.doesNotThrow(()=>validateNativeExportFormat(values));
- for(const [key,value] of Object.entries({encoding:1252,delimiter:' ',header:3,line_ending:2,bom:0}))assert.throws(()=>validateNativeExportFormat({...values,[key]:{value}}));
+ for(const [key,value] of Object.entries({encoding:1250,delimiter:' ',header:3,line_ending:2,bom:0}))assert.throws(()=>validateNativeExportFormat({...values,[key]:{value}}));
 });
 test('native output lease never becomes an input/upload grant and verifies real bytes',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'dock-export-'));try{
@@ -49,6 +49,14 @@ test('native output lease never becomes an input/upload grant and verifies real 
   await assert.rejects(lease.verify('other.csv',bytes));await assert.rejects(lease.verify('test.csv',bytes-1));
   const descriptor=await lease.verify('test.csv',bytes);assert.equal(descriptor.bytes,bytes);assert.match(descriptor.sha256,/^[a-f0-9]{64}$/);assert.equal(descriptor.execution_id,'execution');
   await lease.retain();assert.deepEqual(store.list(),[]);assert.throws(()=>store.getUploadGrant(descriptor.artifact_id,'fake'));await assert.rejects(store.resolve(descriptor.artifact_id));
+  const receipt={state:'settled',status:'SUCCEEDED',output:{file_artifacts:[descriptor]}};
+  const original=JSON.stringify(receipt);
+  assert.deepEqual(await store.outputFiles(receipt),[{artifact_id:descriptor.artifact_id,path:lease.path,name:'test.csv'}]);
+  assert.equal(JSON.stringify(receipt),original,'private presentation lookup must not change the MCP receipt');
+  assert.deepEqual(await store.outputFiles({...receipt,state:'running'}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,status:'FAILED'}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,artifact_id:'foreign'}]}}),[]);
+  assert.deepEqual(await store.outputFiles({...receipt,output:{file_artifacts:[{...descriptor,sha256:'wrong'}]}}),[]);
   assert.equal((await store.resolveOutput(descriptor.artifact_id)).buffer.toString(),'id;text\n1;Привет\n');
   await writeFile(lease.path,'changed');await assert.rejects(store.resolveOutput(descriptor.artifact_id));
   await lease.release();await assert.rejects(store.resolveOutput(descriptor.artifact_id));

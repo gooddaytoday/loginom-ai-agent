@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -7,18 +7,26 @@ import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
-import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { constants } from "node:fs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
   if (!fixture.node) throw new Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-node-host-"))
   // Match connection-validation: isolate Bun's build cache from this test runner.
-  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory], {
-    stdout: "pipe", stderr: "pipe",
-  })
-  const [code, output, errors] = await Promise.all([builder.exited,
-    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  const builder = Bun.spawn(
+    [process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  )
+  const [code, output, errors] = await Promise.all([
+    builder.exited,
+    new Response(builder.stdout).text(),
+    new Response(builder.stderr).text(),
+  ])
   expect({ code, output, errors }).toEqual({ code: 0, output: "", errors: "" })
   fixture.entry = join(fixture.directory, "node-host.mjs")
 })
@@ -99,6 +107,19 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   try {
     expect(host.alive).toBe(true)
     expect(await host.request("connection.status", {})).toMatchObject({ state: "unconfigured", generation: 0 })
+    // Await IPC directly: the Bun rejection matcher can stall the Windows message loop.
+    const dashboardError = await host
+      .request("dashboard.read", {
+        origin: "http://example.test",
+        generation: 1,
+        binding: {
+          packagePath: "/user/example.lgp",
+          workflowGuid: "11111111-1111-4111-8111-111111111111",
+          nodeGuid: "22222222-2222-4222-8222-222222222222",
+        },
+      })
+      .catch((error: Error) => error.message)
+    expect(dashboardError).toBe("LOGINOM_GENERATION_UNAVAILABLE")
     const error = await host
       .request("connection.check", { apiKey: "private-sentinel" })
       .catch((error: Error) => error.message)
@@ -144,6 +165,110 @@ test("host startup permits readiness after 30 seconds and still closes completel
   expect(await host.exited).toEqual({ code: 0, signal: null })
 }, 40_000)
 
+test("CLI setup writes the Host cache before saving; check and the next process use metadata", async () => {
+  const resources = join(fixture.directory, "setup-resources")
+  const root = join(fixture.directory, "setup-profile")
+  const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+  await mkdir(join(resources, "bin"), { recursive: true })
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await copyFile(fixture.node, join(resources, binary), constants.COPYFILE_FICLONE)
+  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+  await writeFile(join(resources, "browser"), "controlled browser payload")
+  await writeFile(
+    join(resources, "runtime/src/knowledge-entry.mjs"),
+    `process.on('message', m => {
+    if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,started:true}});
+    if (m.operation === 'list') process.send({id:m.id,result:{tools:[]}});
+    if (m.operation === 'interrupt') process.send({id:m.id,result:{interrupted:true}});
+    if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+  });`,
+  )
+  await writeFile(
+    join(resources, "runtime/src/managed-entry.mjs"),
+    `process.on('message', m => {
+    if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,checked:true}});
+    if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+  });`,
+  )
+  await writeFile(
+    join(resources, "resource-manifest.json"),
+    JSON.stringify({
+      protocol: 1,
+      nodeVersion: "24.19.0",
+      node: binary,
+      browser: "browser",
+      files: await Promise.all(
+        [binary, "browser"].map(async (path) => ({
+          path,
+          sha256: createHash("sha256")
+            .update(await readFile(join(resources, path)))
+            .digest("hex"),
+        })),
+      ),
+    }),
+  )
+  const input = { node: fixture.node, entry: fixture.entry, root, resources, headless: true }
+  const candidate = {
+    revision: 0,
+    url: "https://app.loginom.ai/app/",
+    username: "fixture",
+    password: { operation: "empty" },
+  }
+  const host = await launchNodeHost(input)
+  try {
+    const cachePath = join(root, "resource-verification.json")
+    await rm(cachePath, { force: true })
+    await host.request("connection.verify-resources", {})
+    const checked = (await host.request("connection.check", candidate)) as { validationId: string }
+    const beforeSave = await readFile(join(root, "startup-phases.jsonl"), "utf8")
+    expect(await host.request("connection.save", { revision: 0, validationId: checked.validationId })).toMatchObject({
+      generation: 1,
+    })
+    expect(JSON.parse(await readFile(cachePath, "utf8"))).toMatchObject({ protocol: 1, version: "" })
+    const installationEvents = (text: string) =>
+      text
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((event) => event.scope === "installation")
+    expect(installationEvents(await readFile(join(root, "startup-phases.jsonl"), "utf8"))).toEqual(
+      installationEvents(beforeSave),
+    )
+    // A damaged resource must refuse setup even if browser validation succeeded.
+    const current = (await host.request("connection.status", {})) as { revision: number }
+    await writeFile(join(resources, "browser"), "tampered browser payload")
+    await expect(host.request("connection.verify-resources", {})).rejects.toThrow("LOGINOM_RUNTIME_START_FAILED")
+    await expect(
+      host.request("connection.save", { revision: current.revision, validationId: "unverified" }),
+    ).rejects.toThrow("LOGINOM_RUNTIME_START_FAILED")
+    await writeFile(join(resources, "browser"), "controlled browser payload")
+    await host.request("connection.verify-resources", {})
+    const retry = (await host.request("connection.check", { ...candidate, revision: current.revision })) as {
+      validationId: string
+    }
+    await host.request("connection.save", { revision: current.revision, validationId: retry.validationId })
+  } catch (error) {
+    await host.close().catch(() => undefined)
+    throw error
+  }
+  await host.close()
+  const restored = await launchNodeHost(input)
+  try {
+    await restored.request("connection.check", {
+      ...candidate,
+      revision: ((await restored.request("connection.status", {})) as { revision: number }).revision,
+    })
+    const events = (await readFile(join(root, "startup-phases.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+    expect(events.at(-1)).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
+  } finally {
+    await restored.close()
+  }
+}, 30_000)
+
 test("a non-boolean recovery mode is rejected before the host starts", async () => {
   const failure = await launchNodeHost({
     node: fixture.node,
@@ -160,35 +285,20 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
 test.each(["ready", "close"])(
   "private Help preflight waits for the catalog or cancels on shutdown: %s",
   async (mode) => {
-    const cleanup: (() => void | Promise<void>)[] = []
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    const server = await knowledgeServer(
-      { after: (callback) => cleanup.push(callback) },
-      {
-        list: async () => {
-          entered.resolve()
-          await release.promise
-          return { tools: server.tools }
-        },
-      },
-    )
     const resources = join(fixture.directory, "knowledge-resources-" + mode)
     const root = join(fixture.directory, "knowledge-profile-" + mode)
     const marker = join(root, "forbidden-browser")
     await mkdir(join(resources, "bin"), { recursive: true })
-    await mkdir(join(resources, "runtime/src"), { recursive: true })
-    await symlink(fixture.node, join(resources, "bin/node"))
-    await symlink(
-      join(import.meta.dir, "../../loginom-runtime/src/knowledge-entry.mjs"),
+    await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
+    const catalog = await stageHeldKnowledge(
       join(resources, "runtime/src/knowledge-entry.mjs"),
+      join(fixture.directory, "knowledge-gate-" + mode),
     )
     await writeFile(
       join(resources, "runtime/src/managed-entry.mjs"),
       `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
     )
-    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
+    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
     await mkdir(root, { recursive: true, mode: 0o700 })
     if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
@@ -215,7 +325,7 @@ test.each(["ready", "close"])(
         generation: 1,
         url: "http://127.0.0.1:1/app/?custom=preserve",
       })
-      await entered.promise
+      await catalog.entered()
       const settled = { value: false }
       const readiness = host.request("connection.ready", {}).finally(() => {
         settled.value = true
@@ -224,7 +334,7 @@ test.each(["ready", "close"])(
       await host.request("connection.status", {})
       expect(settled.value).toBe(false)
       if (mode === "ready") {
-        release.resolve()
+        await catalog.release()
         expect(await readiness).toMatchObject({ state: "ready", generation: 1 })
       } else {
         await host.close()
@@ -233,9 +343,8 @@ test.each(["ready", "close"])(
       }
       await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     } finally {
-      release.resolve()
+      await catalog.release()
       await host.close().catch(() => {})
-      for (const callback of cleanup) await callback()
       if (process.platform === "darwin") {
         const child = Bun.spawn(
           [

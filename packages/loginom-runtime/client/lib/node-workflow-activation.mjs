@@ -1,4 +1,14 @@
 // A declared UI phase, never part of the read-only graph observer.
+export async function needsPreparedWorkflowActivation(page,task){
+ return page.evaluate(({request,origin,build})=>{
+  const p=globalThis.__loginomDockPreparationV1;
+  if(location.origin!==origin||globalThis.bg?.app?.Version!==build||p?.document!==document||p.id!==request.document_id)return false;
+  const r=[...p.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
+  const tabs=document.querySelectorAll('[data-tid='+JSON.stringify(request.workflow_ref.tab_tid)+']');
+  return !!(r&&tabs.length===1&&tabs[0]===r.tab&&r.tab.isConnected===true&&!r.tab.classList.contains('x-tab-active'));
+ },task);
+}
+
 export async function activatePreparedWorkflow(page, task) {
   let effectPossible=false, cleanup=true;
   const trace=[];
@@ -34,6 +44,10 @@ export async function activatePreparedWorkflow(page, task) {
       effectPossible=true;cleanup=false;
       await tab.click({timeout:remaining()});cleanup=true;
       trace.push({event:'prepared_workflow_clicked',tab_tid:before.tab_tid});
+      if(task.waitForActive===true)await page.waitForFunction(tid=>{
+        const tabs=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+        return tabs.length===1&&tabs[0].isConnected&&tabs[0].classList.contains('x-tab-active');
+      },before.tab_tid,{timeout:remaining()});
     }
     remaining();const after=await inspect();
     if(!after.active)throw Error('Prepared workflow did not become active');

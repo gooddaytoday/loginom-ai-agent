@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "FP-Growth on one prepared transaction/item table. New nodes require all fields. Existing omissions preserve saved settings. Train current input before Execute; no saved-model apply in this slice.",
+  "properties": {
+    "transaction_field": {
+      "type": "string", "minLength": 1, "maxLength": 128,
+      "description": "Exact technical name of the discrete string transaction-ID field on input 0. Distinct from item_field; all rows sharing an ID form one basket. Not a display label."
+    },
+    "item_field": {
+      "type": "string", "minLength": 1, "maxLength": 128,
+      "description": "Exact technical name of the discrete string item field on input 0. One item per row. NULL, empty values and repeated transaction/item pairs are outside the prepared-input contract."
+    },
+    "min_support_pct": {
+      "type": "number", "minimum": 0, "maximum": 100,
+      "description": "Inclusive minimum support in percent, not a fraction: 50 means half of distinct transactions. Applied to frequent sets and rules."
+    },
+    "min_confidence_pct": {
+      "type": "number", "minimum": 0, "maximum": 100,
+      "description": "Inclusive minimum rule confidence in percent: 60 means 60%. Confidence is support(antecedent union consequent)/support(antecedent)."
+    },
+    "max_items": {
+      "type": "integer", "minimum": 2, "maximum": 2,
+      "description": "Supported maximum total items in a frequent set or rule: 2 (antecedent plus consequent). Native UI allows 1..1024, but other lengths are deferred. Lift filter is fixed at zero; singletons are retained. Native consequence-limit control remains at 1; port 2 is deferred."
+    }
+  },
+  "required": []
+}

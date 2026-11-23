@@ -8,7 +8,8 @@ export async function configureCollapse(channel,p){
  const before=await observe('complete collapse inventory'),baseline=before.node_collapse;
  need(!baseline.skip_null.switch_pressed,'Variable-controlled empty policy is unsupported');
  const plan=p.information===undefined?{information:baseline.information,transposed:baseline.transposed}:resolveCollapseParameters(p,baseline.input_fields);
- need(plan.transposed.length>0&&[...plan.information,...plan.transposed].every(f=>['integer','real','string','boolean','datetime'].includes(f.type)),'Existing collapse contains unsupported or incomplete roles');
+ const scalar=['integer','real','string','boolean','datetime'];
+ need(plan.transposed.length>0&&plan.information.every(f=>scalar.includes(f.type))&&plan.transposed.every(f=>[...scalar,'variant'].includes(f.type)),'Existing collapse contains unsupported or incomplete roles');
  const wanted=new Map([...plan.information.map(f=>[f.name,6]),...plan.transposed.map(f=>[f.name,7])]);
  const select=async(name,role)=>{
   let s=await observe('collapse field ready for selection');

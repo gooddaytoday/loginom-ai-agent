@@ -1,3 +1,5 @@
+import { DASHBOARD_SESSION_MARKER, dashboardSessionMarker } from "@loginom-ai-agent/product/dashboard-root"
+import { DashboardSession } from "@/product/dashboard-session"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Slug } from "@opencode-ai/core/util/slug"
@@ -425,6 +427,8 @@ export interface Interface {
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
+  readonly retireDashboard: (sessionID: SessionID) => Effect.Effect<void>
+  readonly getForExecution: (id: SessionID) => Effect.Effect<Info, NotFound>
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setMetadata: (input: typeof SetMetadataInput.Type) => Effect.Effect<void>
@@ -506,6 +510,7 @@ const layer: Layer.Layer<
       directory: string
       path?: string
       metadata?: typeof Metadata.Type
+      dashboardMarker?: ReturnType<typeof dashboardSessionMarker>
       permission?: PermissionV1.Ruleset
     }) {
       const ctx = yield* InstanceState.context
@@ -521,7 +526,7 @@ const layer: Layer.Layer<
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
         model: input.model,
-        metadata: input.metadata,
+        metadata: DashboardSession.metadata(input.metadata, input.dashboardMarker ?? DashboardSession.draftMarker(input.directory)),
         permission: input.permission ? [...input.permission] : undefined,
         cost: 0,
         tokens: EmptyTokens,
@@ -698,6 +703,9 @@ const layer: Layer.Layer<
         workspaceID: original.workspaceID,
         title,
         metadata: structuredClone(original.metadata),
+        dashboardMarker: dashboardSessionMarker(
+          original.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(original.directory),
+        ),
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -752,6 +760,31 @@ const layer: Layer.Layer<
         yield* events.publish(SessionV1.Event.Updated, { sessionID, info: next })
       })
 
+    const getForExecution = Effect.fn("Session.getForExecution")(function* (sessionID: SessionID) {
+      const session = yield* get(sessionID)
+      if (
+        DashboardSession.profile(session) !== "loginom-dashboard" ||
+        dashboardSessionMarker(session.metadata?.[DASHBOARD_SESSION_MARKER])
+      )
+        return session
+      const adopted = yield* db
+        .transaction(() =>
+          Effect.gen(function* () {
+            const current = yield* get(sessionID)
+            yield* patch(sessionID, { metadata: DashboardSession.metadata(current.metadata, true) })
+            return yield* get(sessionID)
+          }),
+        )
+        .pipe(Effect.orDie)
+      DashboardSession.profile(adopted)
+      return adopted
+    })
+
+    const retireDashboard = Effect.fn("Session.retireDashboard")(function* (sessionID: SessionID) {
+      const session = yield* get(sessionID).pipe(Effect.orDie)
+      yield* patch(sessionID, { metadata: { ...session.metadata, [DASHBOARD_SESSION_MARKER]: "deleted" } }).pipe(Effect.orDie)
+    })
+
     const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
       yield* patch(sessionID, { time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
@@ -765,7 +798,14 @@ const layer: Layer.Layer<
     })
 
     const setMetadata = Effect.fn("Session.setMetadata")(function* (input: typeof SetMetadataInput.Type) {
-      yield* patch(input.sessionID, { metadata: input.metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
+      const current = yield* get(input.sessionID).pipe(Effect.orDie)
+      yield* patch(input.sessionID, {
+        metadata: DashboardSession.metadata(
+          input.metadata,
+          dashboardSessionMarker(current.metadata?.[DASHBOARD_SESSION_MARKER], DashboardSession.isDashboardWork(current.directory)),
+        ),
+        time: { updated: Date.now() },
+      }).pipe(Effect.orDie)
     })
 
     const setAgentModel = Effect.fn("Session.setAgentModel")(function* (input: {
@@ -916,6 +956,8 @@ const layer: Layer.Layer<
       fork,
       touch,
       get,
+      getForExecution,
+      retireDashboard,
       setTitle,
       setArchived,
       setMetadata,

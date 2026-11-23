@@ -1,5 +1,6 @@
 import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { registerTool } from "@opencode-ai/session-ui/message-part"
+import { GenericTool } from "@opencode-ai/session-ui/basic-tool"
 import { PackageDocsTool } from "@/components/package-docs-tool"
 import { getFilename } from "@opencode-ai/core/util/path"
 
@@ -66,7 +67,7 @@ import { PromptInputV2Composer, usePromptInputV2Controller } from "@/components/
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { setCursorPosition } from "@/components/prompt-input/editor-dom"
 import { promptLength } from "@/components/prompt-input/history"
-import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
+import { type FollowupDraft, sendFollowupDraft, useDashboardTargetCheck } from "@/components/prompt-input/submit"
 import {
   createPromptInputController,
   createSessionComposerController,
@@ -108,6 +109,17 @@ import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
 
 registerTool({ name: "package_docs_run", render: PackageDocsTool })
+registerTool({
+  name: "dashboard_delete",
+  render: (props) => (
+    <>
+      <GenericTool {...props} />
+      <Show when={props.status === "completed" && props.output}>
+        <p class="text-13-regular text-text-base whitespace-pre-wrap">{props.output}</p>
+      </Show>
+    </>
+  ),
+})
 
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
@@ -1719,6 +1731,7 @@ export default function Page() {
     return followup.edit[id]
   })
 
+  const checkDashboard = useDashboardTargetCheck()
   const followupMutation = useMutation(() => ({
     mutationFn: async (input: { sessionID: string; id: string; manual?: boolean }) => {
       const owner = sessionOwnership.capture()
@@ -1733,6 +1746,7 @@ export default function Page() {
         sync: sync(),
         serverSync: serverSync(),
         draft: item,
+        checkDashboard,
         optimisticBusy: item.sessionDirectory === sdk().directory,
       }).catch((err) => {
         setFollowup("failed", input.sessionID, input.id)

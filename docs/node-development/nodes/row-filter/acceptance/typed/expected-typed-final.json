@@ -1,0 +1,127 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Score",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Seen",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 2,
+          "Score": 2.5,
+          "Seen": "2024-03-01T00:00:00.000",
+          "Region": "South"
+        },
+        {
+          "RowID": 3,
+          "Score": 2.4999,
+          "Seen": "2024-06-30T23:59:59.000",
+          "Region": "North"
+        },
+        {
+          "RowID": 7,
+          "Score": 0.5,
+          "Seen": "2024-02-29T08:00:00.000",
+          "Region": "North"
+        },
+        {
+          "RowID": 8,
+          "Score": 4.1,
+          "Seen": "2024-03-01T00:00:01.000",
+          "Region": "East"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Score",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Seen",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Score": 3.75,
+          "Seen": "2024-01-15T10:00:00.000",
+          "Region": "North"
+        },
+        {
+          "RowID": 4,
+          "Score": null,
+          "Seen": "2024-04-01T12:00:00.000",
+          "Region": "East"
+        },
+        {
+          "RowID": 5,
+          "Score": 5.0,
+          "Seen": null,
+          "Region": "South"
+        },
+        {
+          "RowID": 6,
+          "Score": -1.25,
+          "Seen": "2023-12-31T23:59:59.000",
+          "Region": "West"
+        }
+      ]
+    }
+  ]
+}

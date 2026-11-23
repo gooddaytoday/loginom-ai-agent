@@ -1,0 +1,102 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript",
+      "label_any": true
+    },
+    {
+      "type": "variables.from_table",
+      "label_any": true
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.from_table"
+        },
+        "port": 0,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "V_Count",
+            "type": "integer",
+            "value": 5,
+            "label_any": true
+          },
+          {
+            "name": "V_Min",
+            "type": "variant",
+            "value": {
+              "cell_type": "boolean",
+              "value": false
+            },
+            "label_any": true,
+            "native_tag": 11
+          },
+          {
+            "name": "V_Max",
+            "type": "variant",
+            "value": {
+              "cell_type": "string",
+              "value": "x"
+            },
+            "label_any": true,
+            "native_tag": 8
+          },
+          {
+            "name": "V_Mode",
+            "type": "variant",
+            "value": {
+              "cell_type": "integer",
+              "value": 2
+            },
+            "label_any": true,
+            "native_tag": 3
+          },
+          {
+            "name": "V_Uniq",
+            "type": "integer",
+            "value": 3,
+            "label_any": true
+          },
+          {
+            "name": "V_Null",
+            "type": "integer",
+            "value": 1,
+            "label_any": true
+          },
+          {
+            "name": "V_First",
+            "type": "variant",
+            "value": {
+              "cell_type": "integer",
+              "value": 2
+            },
+            "label_any": true,
+            "native_tag": 3
+          },
+          {
+            "name": "V_Last",
+            "type": "variant",
+            "value": {
+              "cell_type": "integer",
+              "value": 2
+            },
+            "label_any": true,
+            "native_tag": 3
+          },
+          {
+            "name": "V_Only",
+            "type": "variant",
+            "value": null,
+            "label_any": true,
+            "native_tag": 1
+          }
+        ]
+      }
+    ]
+  }
+}

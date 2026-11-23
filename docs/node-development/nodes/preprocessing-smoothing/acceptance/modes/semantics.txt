@@ -1,0 +1,1 @@
+Wavelet family daubechies (1-10), coiflet (1-5), cdf_9_7 (no order), depth and seven boundary extensions. Preserve rows and add real smoothed fields. No training. Wavelet NULL interpolation is unresolved; do not promise finite results for NULL input.

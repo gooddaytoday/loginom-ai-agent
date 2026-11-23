@@ -1,0 +1,112 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.to_table"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "variables.to_table",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Name",
+          "label": "Имя",
+          "type": "string"
+        },
+        {
+          "name": "DisplayName",
+          "label": "Метка",
+          "type": "string"
+        },
+        {
+          "name": "Value",
+          "label": "Значение",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        {
+          "Name": "A",
+          "DisplayName": "Количество",
+          "Value": {
+            "cell_type": "integer",
+            "value": 7
+          }
+        },
+        {
+          "Name": "B",
+          "DisplayName": "Флаг",
+          "Value": {
+            "cell_type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "Name": "Text",
+          "DisplayName": "Текст",
+          "Value": {
+            "cell_type": "string",
+            "value": "Привет"
+          }
+        },
+        {
+          "Name": "Moment",
+          "DisplayName": "Момент",
+          "Value": {
+            "cell_type": "datetime",
+            "value": "2026-01-02T03:04:05.006"
+          }
+        },
+        {
+          "Name": "Missing",
+          "DisplayName": "Пропуск",
+          "Value": null
+        },
+        {
+          "Name": "Rate",
+          "DisplayName": "Ставка",
+          "Value": {
+            "cell_type": "real",
+            "value": 1.25
+          }
+        },
+        {
+          "Name": "Empty",
+          "DisplayName": "Пустая строка",
+          "Value": {
+            "cell_type": "string",
+            "value": ""
+          }
+        },
+        {
+          "Name": "Zero",
+          "DisplayName": "Ноль",
+          "Value": {
+            "cell_type": "integer",
+            "value": 0
+          }
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.to_table"
+        },
+        "input": 0,
+        "kind": "variables"
+      }
+    ]
+  }
+}

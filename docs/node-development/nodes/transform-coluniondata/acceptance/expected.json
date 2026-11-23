@@ -1,0 +1,100 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.col_union_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.col_union_data",
+      "output_node_label": "Соединение",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "BRowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "AttachedCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rate",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Code": "A",
+          "Amount": 1.25,
+          "Flag": true,
+          "Day": "2026-01-01T00:00:00.000",
+          "BRowID": 10,
+          "AttachedCode": "X",
+          "Rate": 0.125
+        },
+        {
+          "RowID": 2,
+          "Code": "",
+          "Amount": null,
+          "Flag": false,
+          "Day": "2026-01-02T00:00:00.000",
+          "BRowID": 20,
+          "AttachedCode": "Y",
+          "Rate": null
+        },
+        {
+          "RowID": 3,
+          "Code": null,
+          "Amount": 0.0,
+          "Flag": null,
+          "Day": null,
+          "BRowID": 20,
+          "AttachedCode": "Y",
+          "Rate": null
+        }
+      ]
+    }
+  ]
+}

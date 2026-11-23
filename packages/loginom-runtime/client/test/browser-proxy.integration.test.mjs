@@ -64,15 +64,18 @@ test('HTTP upgrade and CONNECT fixture sockets survive a peer reset', {timeout:1
 // The same handlers serve native acceptance and the deterministic phase regression.
 function createProxyFixture({observe = observeWindowsCryptSvc, platform = process.platform, systemRoot = process.env.SystemRoot, sockets = new Set()} = {}) {
   const requests = [];
+  // Windows services follow the native PAC setting on their own schedule, so a
+  // PAC read is attributed to its TCP owner exactly like proxy traffic.
+  const pacReads = [];
   const observations = new Set();
-  const fixture = {requests, phase:'setup', async settle() {
+  const fixture = {requests, pacReads, phase:'setup', async settle() {
     // New requests can arrive while earlier TCP owners are being inspected.
     while (observations.size) await Promise.all([...observations]);
-  }};
-  function record(request, socket, respond) {
+  }, recordPac:(request, socket, respond) => record(request, socket, respond, pacReads)};
+  function record(request, socket, respond, entries = requests) {
     // Admission and phase must never depend on an asynchronous PID lookup.
     const entry = {phase:fixture.phase, method:request.method, url:request.url};
-    requests.push(entry);
+    entries.push(entry);
     if (platform !== 'win32') { respond(); return; }
     const observation = (async () => {
       try {
@@ -160,6 +163,31 @@ test('proxy attribution exempts only a proven Windows service owner', async t =>
   });
 });
 
+test('PAC reads are attributed like proxy traffic: only a proven Windows service is exempt', async t => {
+  const owner = {pid:2140, name:'svchost.exe', path:'C:\\Windows\\System32\\svchost.exe',
+    parentName:'services.exe', parentPath:null, services:[{pid:2140, name:'WinHttpAutoProxySvc', state:'Running'}]};
+  for (const [label, observed] of [
+    ['service', owner], ['unknown', undefined], ['PID 0', {...owner, pid:0}],
+    ['Chromium', {...owner, name:'chrome.exe', path:'C:\\Chromium\\chrome.exe', parentName:'chrome.exe'}],
+    ['lookup error', Error('TCP owner lookup failed')],
+  ]) await t.test(label, async () => {
+    let responded = false;
+    const fixture = createProxyFixture({platform:'win32', systemRoot:'C:\\Windows', observe:async () => {
+      if (observed instanceof Error) throw observed;
+      return observed;
+    }});
+    fixture.phase = 'pac-headless:product';
+    fixture.recordPac({method:'GET', url:'/proxy.pac'}, new EventEmitter(), () => { responded = true; });
+    assert.equal(fixture.pacReads.length, 1, 'Record the PAC read synchronously');
+    assert.equal(responded, false, 'Keep the TCP endpoint alive during attribution');
+    await fixture.settle();
+    assert.equal(responded, true);
+    assert.deepEqual(fixture.requests, [], 'PAC reads are not proxy traffic');
+    assert.equal(fixture.pacReads[0].phase, 'pac-headless:product');
+    assert.equal(fixture.pacReads.filter(entry => !entry.system).length, label === 'service' ? 0 : 1);
+  });
+});
+
 const html = `<!doctype html><body>
 <div data-tid="LoginForm;Login;edtUsername"><input></div>
 <div data-tid="LoginForm;Login;edtPassword"><input type="password"></div>
@@ -185,19 +213,19 @@ test('Loginom Chromium connects directly with a configured proxy', {
   const address = Object.values(networkInterfaces()).flat().find(item => item.family === 'IPv4' && !item.internal && !item.address.startsWith('169.254.'))?.address;
   assert.ok(address, 'A non-loopback interface is required: localhost would falsely pass via implicit proxy bypass');
   const directory = await mkdtemp(join(tmpdir(), 'direct-browser-'));
-  const pacReads = [];
   const sockets = new Set();
   const origin = createServer((request, response) => {
     if (request.url === '/proxy.pac') {
-      pacReads.push(request.url);
-      response.setHeader('Content-Type', 'application/x-ns-proxy-autoconfig');
-      response.end(`function FindProxyForURL(url, host) { return "PROXY ${address}:${proxy.address().port}"; }`);
+      fixture.recordPac(request, request.socket, () => {
+        response.setHeader('Content-Type', 'application/x-ns-proxy-autoconfig');
+        response.end(`function FindProxyForURL(url, host) { return "PROXY ${address}:${proxy.address().port}"; }`);
+      });
       return;
     }
     response.setHeader('Content-Type', 'text/html'); response.end(html);
   });
   const fixture = createProxyFixture({sockets});
-  const {proxy, requests} = fixture;
+  const {proxy, requests, pacReads} = fixture;
   const state = {};
   t.after(async () => {
     await fixture.settle();
@@ -249,6 +277,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
           });
         fixture.phase = `${scenario}-${mode}:control`;
         const controlBefore = requests.length;
+        const pacControlBefore = pacReads.length;
         if (scenario === 'unavailable') await run('control-unavailable');
         else {
           // Native settings are used without proxy switches. Environment-only
@@ -256,7 +285,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
           await run('control', scenario === 'environment' ? [proxyUrl] : []);
           await fixture.settle();
           assert.ok(requests.slice(controlBefore).some(entry => entry.url === url && !entry.system), 'Positive control must reach the proxy');
-          if (scenario === 'pac') assert.ok(pacReads.length > 0, 'Control must load the system PAC');
+          if (scenario === 'pac') assert.ok(pacReads.slice(pacControlBefore).some(entry => !entry.system), 'Control must load the system PAC');
         }
         await fixture.settle();
         fixture.phase = `${scenario}-${mode}:product`;
@@ -266,10 +295,11 @@ test('Loginom Chromium connects directly with a configured proxy', {
         await run('mcp');
         await fixture.settle();
         assert.deepEqual(requests.slice(before).filter(entry => !entry.system), [], 'Product navigation must never reach the proxy');
-        assert.equal(pacReads.length, pacBefore, 'Product browsers must not load a PAC');
+        assert.deepEqual(pacReads.slice(pacBefore).filter(entry => !entry.system), [], 'Product browsers must not load a PAC');
       });
     }
   }
   const systemProbes = requests.filter(entry => entry.system);
   if (systemProbes.length) t.diagnostic(`Separate Windows service probes: ${JSON.stringify(systemProbes)}`);
+  t.diagnostic(`PAC reads: ${JSON.stringify(pacReads)}`);
 });

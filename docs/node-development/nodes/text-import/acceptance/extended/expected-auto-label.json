@@ -1,0 +1,67 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Active",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "EventAt",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Extra",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 4,
+          "Amount": 8.25,
+          "Active": false,
+          "EventAt": "2026-11-10T12:01:02.000",
+          "Note": "fourth",
+          "Extra": 7
+        },
+        {
+          "Id": 5,
+          "Amount": -1.5,
+          "Active": true,
+          "EventAt": "2026-11-11T01:02:03.000",
+          "Note": "fifth",
+          "Extra": 9
+        }
+      ],
+      "output_node_label": "typed-update.csv"
+    }
+  ]
+}

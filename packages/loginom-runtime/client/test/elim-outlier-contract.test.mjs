@@ -13,12 +13,12 @@ const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0
 test('detect contract is registered with three outputs and its own parameter namespace',()=>{
  assert.equal(NODE_TYPES['preprocessing.elim_outlier'].tabular_outputs,3);
  const support=createCandidateNodeSupport({});
- assert.deepEqual(support.nodeApplyHandlers.get('preprocessing.elim_outlier').modes,['detect']);
+ assert.deepEqual(support.nodeApplyHandlers.get('preprocessing.elim_outlier').modes,['detect','edit']);
  const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema;
  assert.ok(schema.properties.target.properties.type.enum.includes('preprocessing.elim_outlier'));
  assert.ok(schema.properties.mode.enum.includes('detect'));
  assert.deepEqual(schema.properties.parameters.properties.outlier.properties.method.enum,['sd','iqr']);
- assert.deepEqual(schema.properties.parameters.properties.ordered,{const:false});
+ assert.equal(schema.properties.parameters.properties.ordered.type,'boolean');// shared top-level ordered belongs to Missing Values
 });
 test('new detect requires explicit factors, method, complete field set and ordered flag',()=>{
  assert.doesNotThrow(()=>validateElimOutlierParameters({outlier},'detect',request));
@@ -59,7 +59,7 @@ test('public apply/read accepts all three outlier ports while old type and recei
  assert.equal(published(partition).valid,true);
  for(const type of ['datamining.clustering','transform.filter_data','transform.calculator'])assert.throws(()=>validateNodeApplyEnvelope({...r,target:{...r.target,type}}));
  assert.equal(published({...r,target:{...r.target,type:'datamining.clustering'}}).valid,false);
- assert.throws(()=>validateActionParameters(nodeApplyInputSchema,{...r,read:{...r.read,ports:[3]}}));
+ assert.throws(()=>validateNodeApplyEnvelope({...r,read:{...r.read,ports:[3]}}));
  assert.doesNotThrow(()=>validateActionParameters(nodeOutputReadInputSchema,{operation_id:'read',source_operation_id:'detect',read:{ports:[0,1,2],sample_rows:100,require_exact_numbers:true}}));
  const node={document_id:'doc',workflow_id:'wf',node_id:'clustering'};
  const source={parameters:{...r,target:{type:'datamining.clustering'}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[0,1].map(port=>({port,schema:[{name:'X',label:'X',type:'real'}]}))}}}};

@@ -1,0 +1,776 @@
+{
+  "status": "PROPOSAL; owner decision and native data probes required before implementation",
+  "package_path": "{{PACKAGE_PATH}}",
+  "node": "trees-datatotree",
+  "limits": {
+    "max_nodes": 256,
+    "max_depth": 16,
+    "max_bytes": 1048576
+  },
+  "acceptance": "Existing typed main/CSV/Save/cold/cleanup standard; new comparisons require owner approval.",
+  "cases": [
+    {
+      "id": "arrays",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "grouping": false,
+        "structure": "Root/items[]/{Group,Code,Qty}",
+        "sibling_output": {
+          "port": 0,
+          "port_kind": "tree",
+          "schema": [
+            {
+              "path": "",
+              "name": "Root",
+              "label_any": true,
+              "type": "object",
+              "is_array": false,
+              "is_container": true
+            },
+            {
+              "path": "/codes",
+              "name": "codes",
+              "label_any": true,
+              "type": "object",
+              "is_array": true,
+              "is_container": true
+            },
+            {
+              "path": "/codes/Code",
+              "name": "Code",
+              "label_any": true,
+              "type": "string",
+              "is_array": false,
+              "is_container": false
+            },
+            {
+              "path": "/quantities",
+              "name": "quantities",
+              "label_any": true,
+              "type": "object",
+              "is_array": true,
+              "is_container": true
+            },
+            {
+              "path": "/quantities/Qty",
+              "name": "Qty",
+              "label_any": true,
+              "type": "integer",
+              "is_array": false,
+              "is_container": false
+            }
+          ],
+          "document": {
+            "path": "",
+            "type": "object",
+            "children": [
+              {
+                "path": "/codes",
+                "type": "array",
+                "children": [
+                  {
+                    "path": "/codes/0",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/codes/0/Code",
+                        "type": "string",
+                        "value": "x"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/codes/1",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/codes/1/Code",
+                        "type": "string",
+                        "value": "y"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/codes/2",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/codes/2/Code",
+                        "type": "string",
+                        "value": "z"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/quantities",
+                "type": "array",
+                "children": [
+                  {
+                    "path": "/quantities/0",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/quantities/0/Qty",
+                        "type": "integer",
+                        "value": "2"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/quantities/1",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/quantities/1/Qty",
+                        "type": "integer",
+                        "value": "0"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/quantities/2",
+                    "type": "object",
+                    "children": [
+                      {
+                        "path": "/quantities/2/Qty",
+                        "type": "null",
+                        "value": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "ordered": true
+        },
+        "scalar_array_output": {
+          "port": 0,
+          "port_kind": "tree",
+          "schema": [
+            {
+              "path": "",
+              "name": "Root",
+              "label_any": true,
+              "type": "object",
+              "is_array": false,
+              "is_container": true
+            },
+            {
+              "path": "/codes",
+              "name": "codes",
+              "label_any": true,
+              "type": "string",
+              "is_array": true,
+              "is_container": false
+            }
+          ],
+          "document": {
+            "path": "",
+            "type": "object",
+            "children": [
+              {
+                "path": "/codes",
+                "type": "array",
+                "children": [
+                  {
+                    "path": "/codes/0",
+                    "type": "string",
+                    "value": "x"
+                  },
+                  {
+                    "path": "/codes/1",
+                    "type": "string",
+                    "value": "y"
+                  },
+                  {
+                    "path": "/codes/2",
+                    "type": "string",
+                    "value": "z"
+                  }
+                ]
+              }
+            ]
+          },
+          "ordered": true
+        },
+        "scalar_array_contract": "not approved: current native tree reader requires arrays to be containers"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "tree",
+        "schema": [
+          {
+            "path": "",
+            "name": "Root",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/items",
+            "name": "items",
+            "label_any": true,
+            "type": "object",
+            "is_array": true,
+            "is_container": true
+          },
+          {
+            "path": "/items/Group",
+            "name": "Group",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/items/Code",
+            "name": "Code",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/items/Qty",
+            "name": "Qty",
+            "label_any": true,
+            "type": "integer",
+            "is_array": false,
+            "is_container": false
+          }
+        ],
+        "document": {
+          "path": "",
+          "type": "object",
+          "children": [
+            {
+              "path": "/items",
+              "type": "array",
+              "children": [
+                {
+                  "path": "/items/0",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/0/Group",
+                      "type": "string",
+                      "value": "A"
+                    },
+                    {
+                      "path": "/items/0/Code",
+                      "type": "string",
+                      "value": "x"
+                    },
+                    {
+                      "path": "/items/0/Qty",
+                      "type": "integer",
+                      "value": "2"
+                    }
+                  ]
+                },
+                {
+                  "path": "/items/1",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/1/Group",
+                      "type": "string",
+                      "value": "B"
+                    },
+                    {
+                      "path": "/items/1/Code",
+                      "type": "string",
+                      "value": "y"
+                    },
+                    {
+                      "path": "/items/1/Qty",
+                      "type": "integer",
+                      "value": "0"
+                    }
+                  ]
+                },
+                {
+                  "path": "/items/2",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/2/Group",
+                      "type": "string",
+                      "value": "A"
+                    },
+                    {
+                      "path": "/items/2/Code",
+                      "type": "string",
+                      "value": "z"
+                    },
+                    {
+                      "path": "/items/2/Qty",
+                      "type": "null",
+                      "value": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "ordered": true
+      }
+    },
+    {
+      "id": "grouping",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "grouping": true,
+        "group_keys": [
+          "Group"
+        ],
+        "grouping_rule": "first occurrence, A/B/A becomes A[x,z], B[y]"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "tree",
+        "schema": [
+          {
+            "path": "",
+            "name": "Root",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/groups",
+            "name": "groups",
+            "label_any": true,
+            "type": "object",
+            "is_array": true,
+            "is_container": true
+          },
+          {
+            "path": "/groups/Group",
+            "name": "Group",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/groups/items",
+            "name": "items",
+            "label_any": true,
+            "type": "object",
+            "is_array": true,
+            "is_container": true
+          },
+          {
+            "path": "/groups/items/Code",
+            "name": "Code",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/groups/items/Qty",
+            "name": "Qty",
+            "label_any": true,
+            "type": "integer",
+            "is_array": false,
+            "is_container": false
+          }
+        ],
+        "document": {
+          "path": "",
+          "type": "object",
+          "children": [
+            {
+              "path": "/groups",
+              "type": "array",
+              "children": [
+                {
+                  "path": "/groups/0",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/groups/0/Group",
+                      "type": "string",
+                      "value": "A"
+                    },
+                    {
+                      "path": "/groups/0/items",
+                      "type": "array",
+                      "children": [
+                        {
+                          "path": "/groups/0/items/0",
+                          "type": "object",
+                          "children": [
+                            {
+                              "path": "/groups/0/items/0/Code",
+                              "type": "string",
+                              "value": "x"
+                            },
+                            {
+                              "path": "/groups/0/items/0/Qty",
+                              "type": "integer",
+                              "value": "2"
+                            }
+                          ]
+                        },
+                        {
+                          "path": "/groups/0/items/1",
+                          "type": "object",
+                          "children": [
+                            {
+                              "path": "/groups/0/items/1/Code",
+                              "type": "string",
+                              "value": "z"
+                            },
+                            {
+                              "path": "/groups/0/items/1/Qty",
+                              "type": "null",
+                              "value": null
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "path": "/groups/1",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/groups/1/Group",
+                      "type": "string",
+                      "value": "B"
+                    },
+                    {
+                      "path": "/groups/1/items",
+                      "type": "array",
+                      "children": [
+                        {
+                          "path": "/groups/1/items/0",
+                          "type": "object",
+                          "children": [
+                            {
+                              "path": "/groups/1/items/0/Code",
+                              "type": "string",
+                              "value": "y"
+                            },
+                            {
+                              "path": "/groups/1/items/0/Qty",
+                              "type": "integer",
+                              "value": "0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "ordered": true
+      }
+    },
+    {
+      "id": "dates-variant",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "datetime": "civil milliseconds",
+        "variant": "per-cell subtype exact; no string-only CSV inference"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "tree",
+        "schema": [
+          {
+            "path": "",
+            "name": "Root",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/items",
+            "name": "items",
+            "label_any": true,
+            "type": "object",
+            "is_array": true,
+            "is_container": true
+          },
+          {
+            "path": "/items/When",
+            "name": "When",
+            "label_any": true,
+            "type": "datetime",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/items/Value",
+            "name": "Value",
+            "label_any": true,
+            "type": "variant",
+            "is_array": false,
+            "is_container": false
+          }
+        ],
+        "document": {
+          "path": "",
+          "type": "object",
+          "children": [
+            {
+              "path": "/items",
+              "type": "array",
+              "children": [
+                {
+                  "path": "/items/0",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/0/When",
+                      "type": "datetime",
+                      "value": "2026-11-07T12:34:56.789"
+                    },
+                    {
+                      "path": "/items/0/Value",
+                      "type": "integer",
+                      "value": "9007199254740993",
+                      "schema_type": "variant"
+                    }
+                  ]
+                },
+                {
+                  "path": "/items/1",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/1/When",
+                      "type": "datetime",
+                      "value": "2026-11-08T00:00:00.001"
+                    },
+                    {
+                      "path": "/items/1/Value",
+                      "type": "boolean",
+                      "value": false,
+                      "schema_type": "variant"
+                    }
+                  ]
+                },
+                {
+                  "path": "/items/2",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/items/2/When",
+                      "type": "datetime",
+                      "value": "2026-11-07T12:34:56.789"
+                    },
+                    {
+                      "path": "/items/2/Value",
+                      "type": "string",
+                      "value": "",
+                      "schema_type": "variant"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "ordered": true,
+        "variant_cells": [
+          {
+            "path": "/items/0/Value",
+            "type": "integer",
+            "value": "9007199254740993"
+          },
+          {
+            "path": "/items/1/Value",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "path": "/items/2/Value",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "source": "empty.csv",
+        "preserve_declared_schema": true
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "tree",
+        "schema": [
+          {
+            "path": "",
+            "name": "Root",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/items",
+            "name": "items",
+            "label_any": true,
+            "type": "object",
+            "is_array": true,
+            "is_container": true
+          },
+          {
+            "path": "/items/Group",
+            "name": "Group",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/items/Code",
+            "name": "Code",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          },
+          {
+            "path": "/items/Qty",
+            "name": "Qty",
+            "label_any": true,
+            "type": "integer",
+            "is_array": false,
+            "is_container": false
+          }
+        ],
+        "document": {
+          "path": "",
+          "type": "object",
+          "children": [
+            {
+              "path": "/items",
+              "type": "array",
+              "children": []
+            }
+          ]
+        },
+        "ordered": true
+      }
+    },
+    {
+      "id": "editor-depth",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "depth": 5,
+        "sequence": "add child; rename/label; move; Save; reopen; same structure"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "tree",
+        "schema": [
+          {
+            "path": "",
+            "name": "Root",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/level1",
+            "name": "level1",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/level1/level2",
+            "name": "level2",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/level1/level2/level3",
+            "name": "level3",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/level1/level2/level3/level4",
+            "name": "level4",
+            "label_any": true,
+            "type": "object",
+            "is_array": false,
+            "is_container": true
+          },
+          {
+            "path": "/level1/level2/level3/level4/Code",
+            "name": "Code",
+            "label_any": true,
+            "type": "string",
+            "is_array": false,
+            "is_container": false
+          }
+        ],
+        "document": {
+          "path": "",
+          "type": "object",
+          "children": [
+            {
+              "path": "/level1",
+              "type": "object",
+              "children": [
+                {
+                  "path": "/level1/level2",
+                  "type": "object",
+                  "children": [
+                    {
+                      "path": "/level1/level2/level3",
+                      "type": "object",
+                      "children": [
+                        {
+                          "path": "/level1/level2/level3/level4",
+                          "type": "object",
+                          "children": [
+                            {
+                              "path": "/level1/level2/level3/level4/Code",
+                              "type": "string",
+                              "value": "x"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "ordered": true
+      }
+    }
+  ]
+}

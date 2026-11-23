@@ -1,27 +1,63 @@
 const need=(value,message)=>{if(!value)throw Error('Logistic regression: '+message);};
 export function validateLogRegressionParameters(parameters,mode,r){
- need(['enter','forward','backward','stepwise'].includes(mode),'use enter, forward, backward or stepwise; apply is unsupported');
+ need(['enter','forward','backward','stepwise','ridge','apply','lasso','elastic_net'].includes(mode),'use enter, forward, backward, stepwise, ridge, lasso, elastic_net or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p),'use parameters.logistic');
- need(!Object.hasOwn(p,'selection'),'custom selection criteria and significance cutoffs are not supported; use native selection defaults');
- need(Object.keys(p).every(k=>['input_fields','target_field','event','threshold'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field','partition','validation'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');
  need(name(p.event),'event must be an explicit nonempty category label');
  need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>=0&&p.threshold<=1,'threshold is required in 0..1; event if p >= threshold');
- const names=[...p.input_fields,p.target_field];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors and target must be distinct');
+ need(p.weight_field===undefined||name(p.weight_field),'weight_field must name one Real frequency-weight field');
+ need(p.weight_field===undefined||['enter','apply'].includes(mode),'weight_field requires enter or saved Enter apply');
+ const validation=p.validation;
+ if(validation!==undefined){
+  need(['enter','apply'].includes(mode)&&p.partition===undefined&&p.weight_field===undefined,'validation requires Enter/apply with all rows training and no weights');
+  need(validation&&typeof validation==='object'&&!Array.isArray(validation)&&Object.keys(validation).length===3
+   &&validation.method==='kfold'&&validation.sampling==='sequential'&&Number.isSafeInteger(validation.folds)&&validation.folds>=2,
+   'validation requires {method:kfold,folds:integer >=2,sampling:sequential}');
+ }
+ const partition=p.partition;
+ if(partition!==undefined){
+  need(['enter','apply'].includes(mode),'partition requires enter or saved Enter apply');
+  need(partition&&typeof partition==='object'&&!Array.isArray(partition),'partition must be an object');
+  need(partition.method==='column'
+   ?Object.keys(partition).length===2&&name(partition.field)
+   :Object.keys(partition).length===3&&partition.method==='sequential'&&['train_percent','test_percent'].every(k=>typeof partition[k]==='number'&&Number.isFinite(partition[k])&&partition[k]>0&&partition[k]<100)&&partition.train_percent+partition.test_percent===100,
+   'partition requires column with Boolean field, or sequential with positive train_percent/test_percent summing to 100');
+ }
+ const regularization=p.regularization;
+ if(mode==='ridge')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_ridge==='number'&&Number.isFinite(regularization.lambda_ridge)&&regularization.lambda_ridge>0,'ridge requires regularization:{lambda_ridge:positive finite number}');
+ else if(mode==='lasso')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_lasso==='number'&&Number.isFinite(regularization.lambda_lasso)&&regularization.lambda_lasso>0,'lasso requires regularization:{lambda_lasso:positive finite number}');
+ else if(mode==='elastic_net')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===2&&['lambda_lasso','lambda_ridge'].every(k=>typeof regularization[k]==='number'&&Number.isFinite(regularization[k])&&regularization[k]>0),'elastic_net requires regularization:{lambda_lasso:positive finite number,lambda_ridge:positive finite number}');
+ else need(regularization===undefined,'regularization requires mode ridge, lasso or elastic_net');
+ need(p.normalization===undefined||['none','standardize'].includes(p.normalization),'normalization must be none or standardize');
+ const selection=p.selection;
+ if(['enter','apply','ridge','lasso','elastic_net'].includes(mode))need(selection===undefined,'Enter/apply/Ridge/LASSO/Elastic Net does not accept selection');
+ else if(selection!==undefined) {
+  need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','entry_significance','removal_significance'].includes(k)),'selection requires criterion and applicable significance cutoffs');
+  need(['deviance','aic','aicc','bic','hqic'].includes(selection.criterion),'unknown selection criterion');
+  for(const [key,applicable] of [['entry_significance',mode!=='backward'],['removal_significance',mode!=='forward']]){
+   const value=selection[key];
+   need(selection.criterion==='deviance'&&applicable?typeof value==='number'&&Number.isFinite(value)&&value>0&&value<1:value===undefined,'missing or inapplicable '+key);
+  }
+  if(mode==='stepwise'&&selection.criterion==='deviance')need(selection.entry_significance<selection.removal_significance,'entry_significance must be below removal_significance');
+ }
+ const names=[...p.input_fields,p.target_field,...(p.weight_field===undefined?[]:[p.weight_field]),...(partition?.method==='column'?[partition.field]:[])];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors, target, weight and partition field must be distinct');
  if(r){
+  if(mode==='apply')need(r.target.kind==='existing'&&r.inputs.length===0&&r.finish==='execute','apply requires an existing trained model, unchanged connections and finish execute');
   need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1),'one connected training table is required');
-  need(r.mappings.length===0,'mapping overrides, weights and variable bindings are outside this stage');
-  need(r.read.ports.every(port=>port===0),'only prediction output 0 is supported; coefficients and summary are outside this stage');
+  need(r.mappings.length===0,'mapping overrides and variable bindings are outside this stage');
+  need(r.read.ports.every(port=>port===0||port===1),'use prediction output 0 or full coefficient table 1; summary 2 is unsupported');
  }
 }
 export function resolveLogRegressionRoles(parameters,fields){
- validateLogRegressionParameters(parameters,'enter');const p=parameters.logistic;
+ const {selection,regularization,...common}=parameters.logistic;validateLogRegressionParameters({logistic:common},'enter');const p=parameters.logistic;
  need(Array.isArray(fields)&&fields.length>0&&new Set(fields.map(f=>f.name?.toLowerCase())).size===fields.length,'complete unique input schema required');
  for(const name of p.input_fields){const f=fields.find(f=>f.name===name);need(f&&['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный','predictor must be an observed continuous numeric field: '+name);}
  const target=fields.find(f=>f.name===p.target_field);need(target&&target.type==='string'&&target.data_kind==='Дискретный','target must be an observed discrete string field');
- return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:0}));
+ if(p.weight_field!==undefined){const weight=fields.find(f=>f.name===p.weight_field);need(weight&&weight.type==='real','weight_field requires an observed Real field; Loginom 7.4.2 has no Integer Weight role');}
+ if(p.partition?.method==='column')need(fields.some(f=>f.name===p.partition.field&&f.type==='boolean'),'partition field requires an observed Boolean test flag: false trains, true tests');
+ return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:f.name===p.weight_field?7:0}));
 }

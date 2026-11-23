@@ -28,7 +28,7 @@ class ExternalClient {
   async connect(t){this.transport=t;}
   async close(){this.f.events.push(this.browser?'browser-close':'remote-close');this.transport?.onclose?.();}
   async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
-  async callTool(request){
+  async callTool(request,_schema,options){
     if(!this.browser){
       assert.equal(request.name,'read');
       const text=this.f.catalog.files.get(request.arguments.uris[0]);assert.equal(typeof text,'string');
@@ -45,9 +45,30 @@ class ExternalClient {
       await this.f.finishPreparation?.promise;
       value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
+      if(this.f.scenario.startsWith('draft-navigated')||this.f.scenario.startsWith('draft-nav-refused'))value.package_ref={path:null,persisted:false};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
+      if(this.f.activeTab){
+        // After Save As reopened the package, only an Open binding of that
+        // already active package can issue a receipt for its new tab.
+        const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
+        if(o.bindOpenOnly)this.f.bindAttempts=(this.f.bindAttempts??0)+1;
+        if(o.bindOpenOnly&&this.f.bindingError)throw Error('Binding response lost');
+        this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
+        if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
+        value={...value,operation_id:o.operationId,created_draft:false,ownership_verified:false,effect_possible:false,
+          workflow_ref:{...value.workflow_ref,tab_tid:this.f.activeTab,prefix:'MF;TF-5'},package_ref:{path:o.packagePath,persisted:true},
+          ...(o.bindOpenOnly?this.f.rebind:{})};
+      }
+      if(this.f.drafts){
+        // Browser receipt semantics of prepareWorkspace: a known operation ID
+        // replays its own draft, an unknown one creates another package tab.
+        const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1)),known=this.f.drafts.has(o.operationId);
+        if(!known)this.f.drafts.set(o.operationId,'own-tab'+(this.f.drafts.size?'-'+(this.f.drafts.size+1):''));
+        value={...value,operation_id:o.operationId,session_id:'own-session',replayed:known,package_ref:{path:null,persisted:false},
+          workflow_ref:{...value.workflow_ref,tab_tid:this.f.drafts.get(o.operationId)}};
+      }
     }
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
@@ -69,10 +90,16 @@ class ExternalClient {
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      // Mirrors the native tab guard (package-cleanup.mjs: no own receipt for this node and tab).
+      if(this.f.activeTab&&options.tabTid!==this.f.activeTab)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
+        packages_after:1,reason:'TAB_IDENTITY_CHANGED'};
       if(this.f.scenario==='foreign-path')value.package_path=secondPath;
       if(this.f.scenario==='foreign-account')value.account='foreign';
       if(this.f.scenario==='discard-receipt')value.unsaved_changes_discarded=true;
-      if(['mutated-after-save','opened-dirty','draft-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
+      if(['mutated-after-save','opened-dirty','draft-dirty','draft-nav-refused-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
+      // Mirrors the native close guard (package-cleanup.mjs: PackageNodes.Count !== 1).
+      if(this.f.drafts&&this.f.drafts.size!==1)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
+        packages_before:this.f.drafts.size,packages_after:this.f.drafts.size,reason:'PACKAGE_INVENTORY_CHANGED'};
     } else throw Error('Unexpected browser code');
     return {content:[{type:'text',text:JSON.stringify(value)}]};
   }
@@ -115,7 +142,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       }})});
     return f.runtime;
   }
-  return {tools:executor.executorTools,describe:()=>({actions:[],node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+  return {tools:executor.executorTools,describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
       return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
@@ -131,6 +158,16 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+      if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen||f.recovered){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
+      if(f.normalized||f.verifiedReopen||f.recovered&&f.saves>1){
+        const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
+          navigation_path:['Server','Packages','Saved','Module','Workflow'].map((label,index,labels)=>({
+            tid:'MF;TF-5;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label}))}}];
+        result.trace=[...(f.normalized?[{event:'rest_package_normalization',modified_after:false}]:[]),
+          {event:'save_continuations_observed',continuations,...(f.recovered?{recovered_reopen:true}:{reopened:true}),native_identity_verified:true}];
+        if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
+      }
+      if(f.recovered){result.output.reopened=false;if(f.saves===1){result.status='AMBIGUOUS';result.output={};}}
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -553,6 +590,128 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
   }finally{try{await client?.close();await bridge?.close();}finally{await rm(directory,{recursive:true,force:true});}}
 });
 
+for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','transport','identity'])for(const normalized of [true,false])
+test('verified reopened Save keeps its successful receipt when workspace binding fails: '+profile+' '+action+' '+fault+' '+normalized,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'normalized-save-bind-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const f=current={scenario:'normalized',events:[],saves:0,path,receipts:new Map(),catalog,normalized,verifiedReopen:true,
+  bindingError:fault==='transport',rebind:fault==='identity'?{workflow_ref:{workflow_id:'foreign-workflow'}}:{}};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+  mode:'executor-replay',...(profile==='user-v1'?{resultProfile:profile}:{}),apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+  loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+ const client=new AgentClient({name:'normalized-save-bind',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  await client.callTool({name:'dock_prepare',arguments:{}});
+  const reply=await client.callTool({name:'dock_action_run',arguments:{action_key:action,parameters:{path},operation_id:'own-save'}});
+  assert.notEqual(reply.isError,true,JSON.stringify(reply));
+  const parts=reply.content.filter(c=>c.type==='text'&&c.text.startsWith('{')).map(c=>JSON.parse(c.text));
+  assert.equal(parts[0].status,'SUCCEEDED');assert.equal(parts[0].operation_id,'own-save');assert.equal(f.saves,1);
+  const advice=parts.find(p=>p.kind==='dock_saved_package_workspace');assert.ok(advice);
+  if(fault==='none'){
+   assert.equal(advice.workflow_ref.workflow_id,'own-workflow');
+   assert.equal(session.metadata.workflowRef.tab_tid,f.activeTab);
+   assert.equal(session.metadata.workspacePreparation.state.workflow_ref.tab_tid,f.activeTab);
+  }
+  else{
+   assert.equal(advice.state,'unbound');assert.match(advice.instruction,/do not repeat.*Save/i);
+   assert.equal(advice.next_step.tool,'dock_prepare');assert.equal(advice.next_step.arguments.intent,'existing_workflow');
+   assert.equal(advice.next_step.arguments.workflow_ref.document_id,'own-doc');
+   assert.equal(advice.next_step.arguments.workflow_ref.tab_tid,f.activeTab);
+   f.bindingError=false;f.rebind={};
+   const prepared=await client.callTool({name:advice.next_step.tool,arguments:advice.next_step.arguments});
+   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));assert.equal(f.saves,1);
+  }
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
+
+for(const fault of ['none','transport'])test('ambiguous reopen then confirmed overwrite rebinds workspace and shutdown: '+fault,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'ambiguous-reopen-cleanup-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const f=current={scenario:'ambiguous-reopen',events:[],saves:0,path,receipts:new Map(),catalog,recovered:true,bindingError:fault==='transport'};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+  mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+  loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+ const client=new AgentClient({name:'ambiguous-reopen-cleanup',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  await client.callTool({name:'dock_prepare',arguments:{}});
+  const first=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'ambiguous-save'}})).content[0].text);
+  assert.equal(first.status,'AMBIGUOUS');assert.equal(session.metadata.workflowRef.tab_tid,'own-tab');
+  const second=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'confirmed-save'}})).content[0].text);
+  assert.equal(second.status,'SUCCEEDED');assert.equal(second.output.reopened,false);
+  assert.equal(f.bindAttempts,1,'a confirmed recovery must attempt bindOpenOnly');
+  assert.equal(session.metadata.workflowRef.tab_tid,fault==='none'?f.activeTab:'own-tab');
+  f.bindingError=false;
+  await bridge.close();
+  const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+  assert.equal(cleanup.status,'SUCCEEDED',JSON.stringify(cleanup));
+  assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+  assert.equal(cleanup.save_operation_id,'confirmed-save');assert.equal(f.cleanupOptions.tabTid,f.activeTab);
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
+
+// LAB-1331: Save As closes the package and reopens it in a new tab. Cleanup
+// rebinds only that already active package; the tab guard stays native.
+const rebindFaults={'reopened-rebind-effect':{effect_possible:true},'reopened-rebind-path':{package_ref:{path:secondPath,persisted:true}},
+ 'reopened-rebind-document':{document_id:'other-doc'},'reopened-rebind-account':{loginom_account:'foreign'},'reopened-rebind-not-ready':{status:'NOT_READY'}};
+for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepared',...Object.keys(rebindFaults)])
+ test('normal shutdown after Save As reopened the package: '+scenario,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-reopened-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog,reopen:true,
+    rebind:rebindFaults[scenario]??{}};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+   mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'reopened-cleanup',version:'1'});
+  try{
+   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+   assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+   const saved=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',parameters:{path},operation_id:'own-save'}})).content[0].text);
+   assert.equal(saved.status,'SUCCEEDED');assert.equal(saved.output.reopened,true);
+   let expectedSave='own-save';
+   if(scenario==='reopened-then-checkpoint'){
+    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'later-save'}});
+    expectedSave='later-save';
+   }
+   if(scenario==='reopened-reprepared'){
+    const again=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path,operation_id:'prepare-reopened'}});
+    assert.notEqual(again.isError,true,JSON.stringify(again));
+   }
+   const closed=await bridge.close();
+   const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+   const accepted=['reopened','reopened-then-checkpoint','reopened-reprepared'].includes(scenario);
+   assert.equal(closed.browser_transport_closed,true);
+   assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
+   assert.equal(cleanup.package_closed===true,accepted);assert.equal(cleanup.logged_out===true,accepted);
+   assert.equal(cleanup.save_operation_id,expectedSave);assert.equal(cleanup.package_path,path);
+   assert.equal(cleanup.policy,'last_confirmed_own_save');
+   // A model preparation after the reopen already owns the new tab: no extra binding.
+   assert.deepEqual(f.events.filter(e=>e.startsWith('prepare:')),
+    scenario==='reopened-reprepared'?['prepare:open_package']:['prepare:open_package:bind']);
+   // The package is already active: the binding must not spend the host close budget (45 s) waiting for readiness.
+   if(scenario!=='reopened-reprepared'){
+    assert.ok(f.bindBudget.timeoutMs<=5000,JSON.stringify(f.bindBudget));assert.ok(f.bindBudget.timeout<=6000,JSON.stringify(f.bindBudget));
+   }
+   assert.equal(f.events.filter(e=>e==='package-cleanup').length,accepted?1:0);
+   if(accepted){
+    assert.equal(f.cleanupOptions.tabTid,f.activeTab);assert.equal(f.cleanupOptions.packagePath,path);
+    assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.account,'test-2');
+   }else assert.equal(cleanup.reason,'REOPENED_PACKAGE_UNBOUND');
+   const journal=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+   const binding=journal.filter(row=>row.phase==='reopened_package_cleanup_binding');
+   assert.equal(binding.length,scenario==='reopened-reprepared'?0:1);
+   if(binding.length)assert.equal(binding[0].accepted,accepted);
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });
+
 for(const scenario of ['generated-id','reconciled-own','reconciled-older','reconciled-not-admitted','noeffect-retry','validation-retry','changed-document-reconciled',
  'foreign-id','wrong-path','wrong-action','unresolved-inspection','unclean-inspection','unknown-inspection'])
  test('normal shutdown binds only an admitted confirmed Save: '+scenario,async t=>{
@@ -607,7 +766,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
+for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -624,6 +783,21 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}});
     const state=session.metadata.workspacePreparation.state;
     state.package_ref={path:null,persisted:scenario==='draft-persisted'};
+    if(scenario.startsWith('draft-navigated')){
+      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'navigation',intent:'existing_workflow',workflow_ref:state.workflow_ref,
+        ...(scenario==='draft-navigated-ordinary'?{}:{graph_navigation:{direction:'leave'}})});
+      state.created_draft=false;
+      if(scenario==='draft-navigated-foreign')state.document_id='foreign-document';
+    }
+    if(scenario.startsWith('draft-nav-refused')){
+      const ref={document_id:state.document_id,...structuredClone(state.workflow_ref)};
+      if(scenario==='draft-nav-refused-foreign')ref.document_id='foreign-document';
+      session.metadata.workspacePreparation={attempted:true,operation_id:'navigation',
+        identity:JSON.stringify({operation_id:'navigation',intent:'existing_workflow',workflow_ref:ref,graph_navigation:{direction:'enter',node_ref:{document_id:ref.document_id,workflow_id:ref.workflow_id,node_id:'supernode'}}}),
+        effect_possible:scenario==='draft-nav-refused-effect',state:{status:'NOT_READY',reason:'Graph navigation control unavailable',phase:'graph_navigation',
+          operation_id:'navigation',session_id:'own-session',authenticated:true,created_draft:false,effect_possible:scenario==='draft-nav-refused-effect',verification_required:scenario==='draft-nav-refused-effect',target}};
+      session.metadata.workspaceReady=false;session.metadata.targetIdentity=null;session.metadata.workflowRef=null;
+    }
     if(scenario==='draft-not-owned')state.created_draft=false;
     if(scenario.startsWith('draft-cancelled-')){
       session.metadata.workspaceReady=false;session.metadata.targetIdentity=null;
@@ -636,8 +810,9 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
     const result=await bridge.close();
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
-    assert.equal(result.package_cleanup.status,scenario==='draft-clean'?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-dirty'].includes(scenario));
+    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused'].includes(scenario)?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty'].includes(scenario));
+    if(scenario==='draft-navigated-ordinary')assert.equal(result.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
     if(f.cleanupOptions){
       assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.packagePath,null);
       assert.equal(f.cleanupOptions.diagnosticDiscard,false);
@@ -648,6 +823,41 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+// LAB-1216 s4: the first dock_prepare reply was refused by USER_RESPONSE_BUDGET
+// after its draft existed; the model retried with a new operation_id.
+test('refused prepare reply: a new-ID retry reuses the same draft and cleanup closes it',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-refused-prepare-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'draft-clean',events:[],busy:false,saves:0,path:null,receipts:new Map(),catalog,drafts:new Map()};
+  // Substitute an oversized first reply: these entries exceed the user-v1 wire budget.
+  let oversized=true;
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>oversized?Array.from({length:128},(_,i)=>({artifact_id:'input-'+i,name:'x'.repeat(400)+'.csv'})):[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'refused-prepare',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const refused=await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}});
+    assert.equal(refused.isError,true);
+    assert.equal(JSON.parse(refused.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+    assert.equal(f.drafts.size,1);
+    oversized=false;
+    const retried=await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft',operation_id:'prepare-branches'}});
+    assert.notEqual(retried.isError,true,retried.content[0].text);
+    const delivered=JSON.parse(retried.content[0].text);
+    assert.equal(delivered.prepared,true);
+    assert.equal(f.drafts.size,1,'the retry must not create a second draft');
+    assert.equal(delivered.workspace.workflow_ref.tab_tid,'own-tab');
+    const result=await bridge.close();
+    assert.equal(result.package_cleanup.status,'SUCCEEDED',JSON.stringify(result.package_cleanup));
+    assert.equal(result.package_cleanup.package_closed,true);assert.equal(result.package_cleanup.logged_out,true);
+    assert.equal(result.package_cleanup.policy,'unsaved_draft');
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
 
 for(const dirty of [false,true])test('SIGINT shutdown waits for admitted prepare and protects dirty draft: '+dirty,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-interrupt-'));

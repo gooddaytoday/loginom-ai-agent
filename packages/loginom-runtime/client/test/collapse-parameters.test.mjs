@@ -17,7 +17,9 @@ test('source resolution distinguishes duplicate labels and input order by exact 
  const r=resolveCollapseParameters(p(),fields);assert.deepEqual(r.transposed.map(f=>f.name),['S','I']);
  assert.equal(collapseOutputSources(r).find(f=>f.name==='Values').type,'variant');
  assert.throws(()=>resolveCollapseParameters({...p(),transposed:[field('missing')]},fields),/missing/);
- assert.throws(()=>resolveCollapseParameters(p(),fields.map(f=>f.name==='S'?{...f,type:'variant'}:f)),/variant/);
+ const variantTransposed=resolveCollapseParameters(p(),fields.map(f=>f.name==='S'?{...f,type:'variant'}:f));
+ assert.equal(variantTransposed.transposed[0].type,'variant');assert.equal(collapseOutputSources(variantTransposed).find(f=>f.name==='Values').type,'variant');
+ assert.throws(()=>resolveCollapseParameters(p(),fields.map(f=>f.name==='Zone'?{...f,type:'variant'}:f)),/variant/);
 });
 test('one input/output only; unique output mapping names',()=>{
  for(const change of [{inputs:[{input:1}]},{read:{ports:[1]}},{mappings:[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Names'},name:'Same'},{source:{kind:'configured_field',name:'Values'},name:'same'}]}]}])assert.throws(()=>validateCollapseParameters(p(),'unpivot',{...request(),...change}));

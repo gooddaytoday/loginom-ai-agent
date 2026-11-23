@@ -1,0 +1,57 @@
+{
+  "writer": {
+    "product": "Loginom",
+    "version": "7.4.2",
+    "bitness": 64
+  },
+  "created_utc": "2026-11-06",
+  "provenance": "Native ExportNativeParamsWizard UI, Done, fresh verified execution, original browser-context download; no candidate import used to generate files.",
+  "source_fixture": "properties-stage0.lgd",
+  "source_sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
+  "known_values": "../properties-values.csv",
+  "known_schema": "../properties-schema.json",
+  "files": [
+    {
+      "name": "compression-none.lgd",
+      "bytes": 448,
+      "sha256": "7d734fa7130659ac9fa8dd7a98187396e1250a51d4bbf69c8faf487ba4ef5c74",
+      "compression": "Без сжатия",
+      "written_checksum": "Нет"
+    },
+    {
+      "name": "compression-lzo.lgd",
+      "bytes": 320,
+      "sha256": "473e4f4304021715f559b5df1da2d549371753c1debd85682607c76e53426262",
+      "compression": "LZO",
+      "written_checksum": "Нет"
+    },
+    {
+      "name": "compression-lz4.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
+      "compression": "LZ4",
+      "written_checksum": "Сжатых данных"
+    },
+    {
+      "name": "checksum-none.lgd",
+      "bytes": 355,
+      "sha256": "810c46b3f770a0bf1d50aeb13867440015aa12d86843e09848c21c4783129763",
+      "compression": "LZ4",
+      "written_checksum": "Нет"
+    },
+    {
+      "name": "checksum-compressed.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
+      "compression": "LZ4",
+      "written_checksum": "Сжатых данных"
+    },
+    {
+      "name": "checksum-both.lgd",
+      "bytes": 363,
+      "sha256": "bbe4fd238ad62856a96a30bc077c4fc6cfac270f28a7e24891113d7be4c5c8d4",
+      "compression": "LZ4",
+      "written_checksum": "Сжатых и несжатых данных"
+    }
+  ]
+}

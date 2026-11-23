@@ -1,0 +1,107 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "BinID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Allocated",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 1,
+          "BinID": "A",
+          "Allocated": 6,
+          "Status": "assigned"
+        },
+        {
+          "OrderID": 2,
+          "BinID": "B",
+          "Allocated": 5,
+          "Status": "assigned"
+        },
+        {
+          "OrderID": 3,
+          "BinID": "A",
+          "Allocated": 4,
+          "Status": "assigned"
+        },
+        {
+          "OrderID": 4,
+          "BinID": "B",
+          "Allocated": 1,
+          "Status": "assigned"
+        },
+        {
+          "OrderID": 5,
+          "BinID": null,
+          "Allocated": 0,
+          "Status": "invalid_size"
+        },
+        {
+          "OrderID": 6,
+          "BinID": null,
+          "Allocated": 0,
+          "Status": "invalid_size"
+        },
+        {
+          "OrderID": 7,
+          "BinID": null,
+          "Allocated": 0,
+          "Status": "invalid_size"
+        },
+        {
+          "OrderID": 8,
+          "BinID": null,
+          "Allocated": 0,
+          "Status": "no_capacity"
+        },
+        {
+          "OrderID": 9,
+          "BinID": null,
+          "Allocated": 0,
+          "Status": "no_capacity"
+        },
+        {
+          "OrderID": 10,
+          "BinID": "B",
+          "Allocated": 1,
+          "Status": "assigned"
+        }
+      ]
+    }
+  ]
+}

@@ -144,6 +144,21 @@ test('storage source driver never queries upload receipts or sends upload bytes'
   resolveStorageSource:async value=>registry.resolve(value,observed()),execute:async()=>assert.fail('no source mutation')});
  assert.equal((await driver.verifySource(p)).source.destination,'/worker/full.csv');
 });
+test('bound Import rerun with parameters.source names the source-free rerun request',async()=>{
+ const proof={verified:true,kind:'storage',server_source_ref:'storage-b',destination:'/worker/b.csv'};
+ const p={source:{kind:'storage',server_source_ref:'storage-b'},settings:{}};
+ const driverFor=request=>createTextImportNodeSupport({}).nodeApplyDriverFactory({operation:{parameters:{...request,parameters:p}},
+  verifiedUploads:()=>assert.fail('storage has no uploads'),resolveStorageSource:async()=>proof,execute:async()=>assert.fail('no source mutation')});
+ const error=await driverFor({target:{kind:'existing'},bindings:[]}).verifySource(p).then(()=>assert.fail('refused'),e=>e);
+ assert.match(error.message,/^Storage source exact destination differs/);
+ assert.match(error.message,/omit parameters\.source; send parameters:\{settings:\{\}\}/);
+ assert.deepEqual(error.nodePhaseRefusal,{phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+ const fresh=await driverFor({target:{kind:'new'},bindings:[]}).verifySource(p).then(()=>assert.fail('refused'),e=>e);
+ assert.equal(fresh.message,'Storage source exact destination differs');
+ const explicit={...p,settings:{source:{source_path:'/worker/other.csv'}}};
+ const wrongPath=await driverFor({target:{kind:'existing'},bindings:[]}).verifySource(explicit).then(()=>assert.fail('refused'),e=>e);
+ assert.equal(wrongPath.message,'Storage source exact destination differs');
+});
 test('schema verification covers every column attribute, order, parsing and output mapping',()=>{
  const field={index:0,name:'A',label:'Amount',type:'real',data_kind:'Непрерывный',used:true};
  const group=values=>({fields:Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{status:'observed',truncated:false,value}]))});

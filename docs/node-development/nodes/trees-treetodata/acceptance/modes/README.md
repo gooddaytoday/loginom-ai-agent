@@ -1,0 +1,66 @@
+Предложение LAB-1042, этап 0, до утверждения владельцем.
+
+Задания: `task-indices.md`, `task-composite.md`, `task-wide.md`, `task-siblings.md`.
+Каждое задание — отдельный будущий сценарий с новым чатом, профилем и пакетом;
+состояния одного узла внутри задания проверяются последовательно.
+Модели передаются только выбранное задание и нужные входные файлы из
+`../../fixtures/modes/`. Oracle, expected, metadata типов и предложение
+контракта остаются вне контекста модели; сведения о требуемых типах источника
+доставляет штатная подготовка fixture. Ссылка на input.json в задании означает
+пользовательское описание данных, не скрытый acceptance manifest.
+
+`expected.json` — контейнер предложенных случаев, **не вход stock run-check**.
+Для wide `native_status: observed` — имена, порядок и значения LAB-1807;
+все 70 типов проверяет `trees-to-table-wide`; для composite — LAB-1815.
+Остальные статусы — `not_checked`. Совпадение арифметики не означает
+наблюдение Loginom или PASS обработчика. Нужны утверждение критериев и
+минимальные native-пробы данных, перечисленные в [modes.md](../../modes.md).
+
+Независимый stdlib oracle пересчитывает ожидания из fixtures:
+
+```sh
+python3 docs/node-development/nodes/trees-treetodata/acceptance/modes/oracle.py --check
+```
+
+Основной oracle пары находится в trees-datatotree/acceptance/modes/oracle.py;
+он не импортирует Loginom или runtime, не читает результат платформы.
+Даты — civil с миллисекундами; Int64 — точный десятичный текст в typed AST.
+Variant — отдельные subtype/value, не приведённые к строке значения.
+Порядок массивов и полей точный; не заданные пользователем метки — label_any.
+NULL отличается от пустой строки, нуля и false. Для пустых данных схема
+проверяется отдельно от числа строк/экземпляров.
+
+Стандарт этапа 1: полный typed main, каждый CSV, Save, новый профиль,
+cold Execute без перенастройки и cleanup; red→green на production-пути,
+required-checks и ≥2/3 PASS, затем независимые 2/3 на том же SHA.
+Новые способы сравнения/публичные контракты требуют решения владельца.
+Здесь нет регистрации сценариев, CLI-сборок, модельных и cold-прогонов.
+
+LAB-1112 (решение владельца): **позиция индекса — нативная раскладка 7.4.2.**
+Глобальный индекс массива — первая колонка его ветви, после листьев-предков:
+`batch, <индекс>, code, qty`; имя генерирует Loginom (`name_any`), значения
+(база 0) считает oracle. Групповой случай (несколько документов JSON) из цикла
+снят: Loginom строит из нескольких строк корень-массив, это отдельный цикл.
+Сценарий `trees-to-table-indices` использует только `fixtures/modes/documents.csv`.
+
+LAB-1699: `task-typed.md` — листья DateTime и Variant из подготовленного R4
+источника (`trees-datatotree/fixtures/modes/typed-source.lgp`), сценарий
+`tree-to-table-typed`. `expected-typed-run.json` строит
+`tree_to_table_typed_projection` общего oracle пары; `oracle.py --check`
+сверяет файл. Ограничение: Variant NULL не покрыт — native Свёртка с
+пропуском NULL отбрасывает пустые ячейки. CSV: полночь с мс пишется датой,
+учитывается как D76 `midnight_date` (решение `d76-tree-to-table`).
+
+LAB-1807: `task-siblings.md` — сценарий `trees-to-table-siblings` по решению
+владельца `tree-siblings-native`. Только `fixtures/siblings/documents.csv`
+(документ с items и tags). `expected-siblings-run.json` строит
+`tree_to_table_siblings_projection` общего oracle пары (`--check` сверяет):
+5 строк — items, затем tags, отсутствующие поля NULL, batch повторяется.
+
+LAB-1815 (решение владельца `tree-composite-native`): случай composite — native
+7.4.2 (проба LAB-1807): имя `Root_items_code` (Root и сегменты через `_`), метка
+`Root.Позиции.Код`; разделитель меняет только метки. Метки модель не задаёт:
+`task-composite.md` идёт на подготовленном `fixtures/modes/composite-source.lgp`
+(Documents с относительным `documents.csv` → DocumentTree с метками на выходном
+порту), сценарий `trees-to-table-composite`. `expected-composite-run.json` строит
+`tree_to_table_composite_projection`; `oracle.py --check` сверяет файл.

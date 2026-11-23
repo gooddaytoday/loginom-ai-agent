@@ -38,6 +38,8 @@ process.env["XDG_STATE_HOME"] = path.join(dir, "state")
 process.env["LOGINOM_AI_AGENT_MODELS_PATH"] = path.join(import.meta.dir, "tool", "fixtures", "models-api.json")
 process.env["LOGINOM_AI_AGENT_EXPERIMENTAL_EVENT_SYSTEM"] = "true"
 process.env["LOGINOM_AI_AGENT_EXPERIMENTAL_WORKSPACES"] = "true"
+// The background plugin install requests a published package; tests must not download it (cold cache timed out).
+process.env["npm_config_offline"] ??= "true"
 
 // Set test home directory to isolate tests from user's actual home directory
 // This prevents tests from picking up real user configs/skills from ~/.claude/skills

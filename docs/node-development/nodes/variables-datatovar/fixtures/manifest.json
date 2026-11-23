@@ -1,0 +1,39 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "decimal_separator": ".",
+  "header": true,
+  "null_marker": "?",
+  "columns": [
+    {
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer"
+    },
+    {
+      "name": "X",
+      "label": "X",
+      "type": "integer"
+    },
+    {
+      "name": "Category",
+      "label": "Category",
+      "type": "string"
+    }
+  ],
+  "files": {
+    "values.csv": {
+      "rows": 3
+    },
+    "replace.csv": {
+      "rows": 2
+    },
+    "null.csv": {
+      "rows": 3
+    },
+    "empty.csv": {
+      "rows": 0
+    }
+  },
+  "source_preparation": "Fresh owned CSV import with explicit types; use only this task account pair. The variables output under test is read directly via W1."
+}

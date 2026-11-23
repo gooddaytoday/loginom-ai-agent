@@ -35,6 +35,15 @@ const application = await launch(profile)
 try {
   const page = await application.firstWindow()
   await page.locator('[data-component="settings-loginom"]').waitFor({ timeout: 120_000 })
+  // The first-launch wizard renders before the app UI, so nothing reaches the
+  // sidecar until a connection is saved. Ask it for an instance explicitly.
+  const backend = await page.evaluate(() => window.api.awaitInitialization())
+  const request = await fetch(`${backend.url}/path?directory=${encodeURIComponent(profile)}`, {
+    headers: {
+      authorization: `Basic ${Buffer.from(`${backend.username ?? "loginom-ai-agent"}:${backend.password}`).toString("base64")}`,
+    },
+  })
+  if (!request.ok) throw new Error(`SIDECAR_REQUEST_FAILED status=${request.status}`)
   const server = await waitFor(async () => {
     const text = await readNamed(join(profile, "desktop", "logs"), "server.log")
     return text.includes("level=") ? text : undefined

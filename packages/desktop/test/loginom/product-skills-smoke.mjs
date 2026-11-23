@@ -26,7 +26,7 @@ await writeFile(join(evidence, "roots.json"), JSON.stringify({ root, home, works
 await mkdir(home, { mode: 0o700 })
 await mkdir(workspace, { mode: 0o700 })
 // Keep the installed acceptance matrix aligned with packages/product/src/skills.ts.
-const productSkillNames = ["loginom-automation", "package-docs", "package-linter"]
+const productSkillNames = ["loginom-automation", "loginom-dashboard", "package-docs", "package-linter"]
 const reservedNames = [...productSkillNames, "package_docs"]
 const expectedProductSkillNames = damage ? [] : [...productSkillNames].sort()
 if (collisions) {

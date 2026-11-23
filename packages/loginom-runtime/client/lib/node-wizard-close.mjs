@@ -57,10 +57,28 @@ export function cancelledWizardReady(state,binding) {
   && state.ui?.dialogs?.length===0 && state.ui?.masks?.length===0;
 }
 
+const closeControl=s=>s.wizard?.status==='observed'
+ &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnClose'&&e.allowed_actions?.includes('click')).length===1;
+// An open combo list of this wizard is read as the sole observation root and
+// hides btnClose. Only options proved by tid and root_ref to belong to it count.
+const ownedListOptions=(s,owner=s.wizard)=>s.wizard?.status==='observed'&&s.wizard.root_ref===owner?.root_ref
+ &&s.wizard.root_tid===owner.root_tid?s.ui.elements.filter(e=>e.wizard_combo?.kind==='option'
+  &&e.wizard_combo.field?.root_ref===owner.root_ref&&e.tid?.startsWith(owner.root_tid+';')
+  &&e.allowed_actions?.includes('press')):[];
+
 export async function closePreparedWizard(channel,{initialObservation}={}) {
- let s=initialObservation??await channel.observe({condition:'prepared wizard can be cancelled',ready:s=>s.wizard?.status==='observed'
-  &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnClose'&&e.allowed_actions.includes('click')).length===1});
+ let s=initialObservation??await channel.observe({condition:'prepared wizard can be cancelled',
+  ready:s=>closeControl(s)||ownedListOptions(s).length>0});
  const binding=wizardCloseBinding(s);
+ if(!closeControl(s)&&ownedListOptions(s,binding).length) {
+  // Dismiss the owned list natively without choosing an option; Close and its
+  // checks below stay unchanged and refuse as before if it remains open.
+  await channel.perform({condition:'dismiss the owned wizard list before Close',initialObservation:s,
+   ready:s=>same(wizardCloseBinding(s),binding)&&ownedListOptions(s,binding).length>0,identity:()=>binding,
+   resolve:s=>({verb:'press',ref:ownedListOptions(s,binding)[0].ref,key:'Escape'})});
+  s=await channel.observe({condition:'owned wizard list dismissed',
+   ready:s=>same(wizardCloseBinding(s),binding)&&(closeControl(s)||ownedListOptions(s,binding).length>0)});
+ }
  if(boundInputMappingConflict(s,binding)) {
   // Cancel only this exact owned mapping warning; neither affirmative answer
   // is a cleanup action, since both continue the unfinished mapping.
@@ -74,7 +92,11 @@ export async function closePreparedWizard(channel,{initialObservation}={}) {
  if(!cancelledWizardReady(s,binding)&&!boundWizardCloseConfirmation(s,binding)) {
  await channel.perform({condition:'close the prepared wizard draft',initialObservation:s,
   ready:s=>same(wizardCloseBinding(s),binding),identity:()=>binding,
-  resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid===binding.root_tid+';btnClose').ref})});
+  resolve:s=>{
+   const controls=s.ui.elements.filter(e=>e.tid===binding.root_tid+';btnClose'&&e.allowed_actions?.includes('click'));
+   requireValue(controls.length===1,'The prepared wizard Close control is unavailable or ambiguous');
+   return {verb:'click',ref:controls[0].ref};
+  }});
  s=await channel.observe({condition:'wizard close confirmation or closed graph',wizardConfirmation:binding,
   ready:s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'||boundWizardCloseConfirmation(s,binding)});
  }

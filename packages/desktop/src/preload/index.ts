@@ -70,8 +70,12 @@ const api: ElectronAPI = {
     },
     check: () => ipcRenderer.invoke("updater-check"),
     install: () => ipcRenderer.invoke("updater-install"),
+    setChannel: (channel) => ipcRenderer.invoke("updater-set-channel", channel),
   },
-  consumeInitialDeepLinks: () => ipcRenderer.invoke("consume-initial-deep-links"),
+  consumeDeepLinks: () => ipcRenderer.invoke("consume-deep-links"),
+  getDashboardTarget: (id) => ipcRenderer.invoke("get-dashboard-target", id),
+  checkDashboardTarget: (id) => ipcRenderer.invoke("check-dashboard-target", id),
+  isDashboardWork: (directory) => ipcRenderer.invoke("is-dashboard-work", directory),
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),
   setDefaultServerUrl: (url) => ipcRenderer.invoke("set-default-server-url", url),
   isFirstLaunchOnboardingPending: () => ipcRenderer.invoke("is-first-launch-onboarding-pending"),
@@ -101,7 +105,7 @@ const api: ElectronAPI = {
     return () => ipcRenderer.removeListener("menu-command", handler)
   },
   onDeepLink: (cb) => {
-    const handler = (_: unknown, urls: string[]) => cb(urls)
+    const handler = () => cb()
     ipcRenderer.on("deep-link", handler)
     return () => ipcRenderer.removeListener("deep-link", handler)
   },
@@ -116,7 +120,7 @@ const api: ElectronAPI = {
   openExternal: (url) => ipcRenderer.send("open-external", url),
   openLocalFile: (url) => ipcRenderer.send("open-local-file", url),
   openPath: (path, app) => ipcRenderer.invoke("open-path", path, app),
-  revealPath: (path) => ipcRenderer.invoke("reveal-path", path),
+  revealPath: (path, options) => ipcRenderer.invoke("reveal-path", path, options),
   readClipboardImage: () => ipcRenderer.invoke("read-clipboard-image"),
   getWindowFocused: () => ipcRenderer.invoke("get-window-focused"),
   getWindowFullscreen: () => ipcRenderer.invoke("get-window-fullscreen"),
@@ -146,6 +150,11 @@ const api: ElectronAPI = {
   runDesktopMenuAction: (action) => ipcRenderer.invoke("run-desktop-menu-action", action),
   setBackgroundColor: (color: string) => ipcRenderer.invoke("set-background-color", color),
   exportDebugLogs: () => ipcRenderer.invoke("export-debug-logs"),
+  diagnostics: {
+    prepare: (request) => ipcRenderer.invoke("diagnostics-prepare", request),
+    preview: (id, name) => ipcRenderer.invoke("diagnostics-preview", id, name),
+    save: (id) => ipcRenderer.invoke("diagnostics-save", id),
+  },
   setForceFocus: (enabled) => ipcRenderer.invoke("set-force-focus", enabled),
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   setNativeTranslations: (bundle) => ipcRenderer.invoke("set-native-translations", bundle),

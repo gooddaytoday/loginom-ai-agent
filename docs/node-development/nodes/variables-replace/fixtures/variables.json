@@ -1,0 +1,12 @@
+[
+  {"name":"Count","label":"Количество","type":"integer","value":2},
+  {"name":"Amount","label":"Сумма","type":"real","value":1.25},
+  {"name":"Color","label":"Цвет","type":"string","value":"red"},
+  {"name":"Case","label":"Регистр","type":"string","value":"Red"},
+  {"name":"Enabled","label":"Включено","type":"boolean","value":true},
+  {"name":"Missing","label":"Нет значения","type":"string","value":null},
+  {"name":"Empty","label":"Пустая строка","type":"string","value":""},
+  {"name":"Zero","label":"Ноль","type":"integer","value":0},
+  {"name":"Untouched","label":"Без изменений","type":"integer","value":7},
+  {"name":"NullInt","label":"Пустое целое","type":"integer","value":null}
+]

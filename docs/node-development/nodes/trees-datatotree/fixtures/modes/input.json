@@ -1,0 +1,18 @@
+{
+  "columns": [
+    {"name":"Group","label":"Группа","type":"string"},
+    {"name":"Code","label":"Код","type":"string"},
+    {"name":"Qty","label":"Количество","type":"integer"},
+    {"name":"When","label":"Момент","type":"datetime"},
+    {"name":"Value","label":"Значение","type":"variant"}
+  ],
+  "csv_null":"?",
+  "datetime":"civil milliseconds, no timezone conversion",
+  "variant_cells":[
+    {"type":"integer","value":"9007199254740993"},
+    {"type":"boolean","value":false},
+    {"type":"string","value":""}
+  ],
+  "delivery":"The own package for this attempt contains TypedInput → TypedSource. TypedSource projects the requested When/Value from rows.csv. Explicit DateTime/Integer/Boolean/String columns followed by native Collapse establish Variant subtypes independently of CSV inference. Verify this source before conversion.",
+  "grouping":"Proposal: group by Group in first-occurrence order; preserve input order within a group. Not a native observation."
+}
