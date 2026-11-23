@@ -258,8 +258,8 @@ export default Plugin.define({
     }
     await ctx.session.hook("context", async (event) => {
       // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
-      // relied on for it: the event subscription above becomes active only some time after `setup` returns, so an
-      // execution that starts as the Location activates (a synthetic wake, a resume) passes unseen (B2.6a2).
+      // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
+      // a resume) publishes it before this plugin's `setup` subscribes; its first step waits for the activation (B2.6a2).
       void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)

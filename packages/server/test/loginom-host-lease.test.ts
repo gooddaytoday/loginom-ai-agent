@@ -298,8 +298,8 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
   )
 
   // A prompt takes the lease when it is admitted (B2.5d); an execution that starts without one — a synthetic message, a
-  // resume after a restart — takes it when it starts. Here it starts as the Location activates, before the plugin's
-  // `session.execution.*` subscription is active, and while the Host is still in its handshake (B2.6a2).
+  // resume after a restart — takes it when it starts. Here it starts while the Location's plugins are still activating,
+  // so the plugin never sees its `session.execution.started`, and while the Host is still in its handshake (B2.6a2).
   it.live(
     "S2 synthetic wake: an execution without a prompt leases when it starts and releases the lease when it succeeds",
     () =>
