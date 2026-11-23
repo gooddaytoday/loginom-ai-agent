@@ -746,7 +746,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 export default setup
 ```
 
-5. **Register it.** A built-in joins both lists under its id, each composed with `compose`. The main list names every built-in, so their ids stay reserved, and adds pairing's main entry:
+5. **Register it.** A built-in joins both lists under its id, each composed with `compose`. The main list names every built-in, so their ids stay reserved, and adds the main entries. Loginom AI Agent leaves pairing and SSH out of both lists and WSL out of the window list (B4.11e), so pairing's entry is not shown:
 
 <!-- source: src/main.ts#builtins -->
 
@@ -761,9 +761,9 @@ export const builtins = compose({
   review,
   details,
   browser: { ...browser, mainEntry: () => import("./browser/main") },
-  pairing: { ...pairing, mainEntry: () => import("./pairing/main") },
+  // Loginom AI Agent (B4.11e): no pairing or ssh, as in 0.4. wsl stays here for now: the window does not load it, so
+  // it has no UI, and its main entry alone bundles node-pty (B4.11e in docs/upstream-sync/oc2-migration-log.md).
   updater: { ...updater, mainEntry: () => import("./updater/main") },
-  ssh: { ...ssh, mainEntry: () => import("./ssh/main") },
   wsl: { ...wsl, mainEntry: () => import("./wsl/main") },
   "microsoft-office": microsoftOffice,
   sources,
@@ -786,10 +786,9 @@ export const builtins = compose({
   review: { ...review, windowEntry: eager(reviewRenderer) },
   details: { ...details, windowEntry: eager(detailsRenderer) },
   browser: { ...browser, windowEntry: eager(browserRenderer) },
-  pairing: { ...pairing, windowEntry: eager(pairingRenderer) },
+  // Loginom AI Agent (B4.11e): no pairing, ssh or wsl, as in 0.4. SSH and WSL install upstream OpenCode on the remote
+  // machine; pairing opens this computer's server to other devices. The folders stay, so upstream updates merge.
   updater: { ...updater, windowEntry: eager(updaterRenderer) },
-  ssh: { ...ssh, windowEntry: eager(sshRenderer) },
-  wsl: { ...wsl, windowEntry: eager(wslRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
