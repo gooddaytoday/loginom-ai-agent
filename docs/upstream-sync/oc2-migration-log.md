@@ -9821,3 +9821,268 @@ Found 558 warnings and 0 errors.                    # у файлов задач
   проверены только фикстурой `loginom-host`.
 - Собранный CLI для этой задачи не пересобирался: проверено из исходников (случай `cli-standalone.test.ts` и проба).
 - Настоящее подключение Loginom и рантайм `<профиль>/loginom/runtime` в выгрузке v2 — только фикстурами `loginom-host`.
+
+## B2.6b Запрет без обрыва хода
+
+22.11.2026. Ветка `b26b-deny-continue` от `oc2-migration` (`e8dc45a3c7`: B2.6a, B2.6a2, B2.6a3), рабочее дерево
+`.claude/worktrees/b26b`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile`: 1600 пакетов, `.husky/_` есть; клиент `packages/loginom-runtime/client` — `npm ci
+--ignore-scripts` Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Основа: В-75,
+В-22, В-30, В-31, решение 12, ux-spec «Разрешения» и «По третьему прогону» (ветка `prototype-source`), находка 2
+`summary-run3.md`, UI-отчёт spike (`origin/stage-b-checks:docs/upstream-sync/oc2-spike-ui-report.md`: «Запретить»
+обрывает весь ход), 0.4 `a080f7725c`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `7ea3af598c` `feat(loginom-agent): a refused call is told to the model and the turn goes on (B2.6b)` | `refusal` и тексты в `packages/loginom-agent/src/permissions.ts`; хуки `execute.before` и `execute.after`, проверка одних правил, набор предложенных модели инструментов — `src/index.ts`; комментарий в `src/local-file.ts`; правка upstream `packages/core/src/tool.ts` (+18 −1), CAT-07 в `catalog.json`; тесты — `packages/loginom-agent/test/permissions.test.ts` (+3), `packages/server/test/loginom-dock-catalog.test.ts` (+5, стенд принимает конфиг и HTTP), `packages/server/test/loginom-permissions.test.ts` (+1), заголовок случая в `loginom-local-file.test.ts` |
+| `a48d9c9f85` `fix(loginom-agent): a refusal is read from its cause; a hidden built-in tool is explained by its action (B2.6b)` | по ревью советника: `refusal` читает только причину (встроенные инструменты её сохраняют — проба ниже), запасной разбор текста `Permission denied: …` убран; `execute.before` записывает вызов в `calls` после проверки скрытого инструмента; в тест встроенных инструментов добавлены `edit`, чтение вне проекта и `write`, скрытый правилом `edit * deny`; `loginom-package-docs.test.ts` ждёт текст продукта |
+| `5606b430eb` `docs(upstream-sync): record B2.6b refusals that do not end the turn` | этот раздел, CAT-05 и CAT-07 в `catalog.md` |
+| следующий | устойчивость новых случаев, необязательность правки ядра для приёмки, уточнения раздела |
+
+### Что было (проба на `e8dc45a3c7`, Host по сценарию, модель по сценарию)
+
+| Отказ | v2.3.0 + плагин B2.6a |
+|---|---|
+| «Отклонить» (`reply: reject` без текста) | `Permission.DeclinedError` — дефект, мимо инструмента; шаг отмечает вызов `aborted` «The user declined this tool call», ответ — `Step interrupted`, исполнение прерывается. Второго запроса к модели нет — ход оборван. У инструмента Promise-плагина (Dock) хук `execute.after` видит `Tool.Error` с отказом внутри, у встроенного (`write`) — не видит вовсе |
+| «Отклонить» с текстом (`message`) | `Permission.CorrectedError` → результат вызова — текст пользователя (`permission.rejected`), ход продолжается. «Сказать иначе» (В-22) в v2 есть |
+| правило `deny` на ресурс (`edit denied.md`, `webfetch https://…/*`) | `Permission.BlockedError` → результат вызова `Permission denied: <действие>`, ход продолжается; кто и почему запретил, модель не знает |
+| правило `deny` на весь инструмент — так «Запрещено» у «Сохранять пакеты в Loginom» (`loginom_dock_action_run * deny`) | ядро не предлагает инструмент модели (`whollyDisabled`, как выключенный терминал). Вызов по имени — `No tool named "loginom_dock_action_run" is currently available…`, `execute.after` не вызывается. Навык `loginom-automation` называет этот инструмент (`SKILL.md`, строка 280), так что модель может его позвать |
+
+0.4: запрет правилом (`PermissionDeniedError`, «The user has specified a rule which prevents you…») ход не обрывал;
+отказ пользователя (`PermissionRejectedError`) обрывал — `session/processor.ts` ставит `blocked`, пока не включён
+`experimental.continue_loop_on_deny`, а продукт его не включал. Задание («как 0.4 не обрывал ход при отказе») с этим
+расходится: для отказа пользователя продукт теперь делает больше 0.4 — по В-75 и плану B2.6b.
+
+### Как устроено
+
+- **Тексты** — `packages/loginom-agent/src/permissions.ts`, функция `refusal(cause)` по причине внутри ошибки вызова:
+  - отказ пользователя (`Permission.DeclinedError` внутри `Tool.Error`) — `LOGINOM_PERMISSION_DECLINED: пользователь
+    отклонил это действие, оно не выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю,
+    что не сделали, и продолжайте задачу без этого действия или спросите, как поступить.`;
+  - запрет правилом вида из таблицы B2.6a (`Permission.BlockedError` без `reason`) — `LOGINOM_PERMISSION_DENIED: «<вид>» (<действие>) запрещено правилами разрешений, действие не
+    выполнено. Не повторяйте его и не обходите другим инструментом. Скажите пользователю, что не сделали и почему;
+    разрешить это пользователь может в «Настройки → Разрешения».`;
+  - всё остальное — без изменений: запрет с собственной причиной (хук: терминал подагента, проверка расписания,
+    `Unattended`; дальше — запрет администратора B2.6c), «сказать иначе», действие вне видов, прочие ошибки.
+- **`execute.after`** (`src/index.ts`): ошибку вызова с таким текстом заменяет новая `Tool.Error` без причины внутри —
+  иначе `toSessionError` показал бы модели текст причины, а отказ внутри снова оборвал бы шаг. Метаданные ошибки
+  сохраняются. Так же уже делает плагин `plan` upstream (`core/src/plugin/plan.ts`, `BlockedError` → свой текст); его
+  хук стоит раньше, и продукт его текст не трогает (причины внутри уже нет).
+- **`execute.before`**: инструмент, который правила запретили целиком, модели не предложен. Плагин запоминает в хуке
+  `context` имена инструментов последнего запроса сессии. Вызов не из них, если его действие (`options.permission` или
+  имя) — вид таблицы с ресурсом `*`, проверяется одними правилами; при запрете вызов отклоняется текстом
+  `LOGINOM_PERMISSION_DENIED`. Без запрета — ничего, дальше ядро.
+- **Проверка одних правил** — `permission.assert` с меткой в `metadata`; хук продукта отвечает на метку `allow` без
+  вопроса, поэтому падает она только на запрете правилом. Ею же `execute.after` отличает отказ пользователя от закрытия
+  location: `LocationLifecycle.shutdown` (перезагрузка конфига, `POST /api/location/reload`) сначала закрывает
+  `Permission`, открытые вопросы падают тем же `DeclinedError`, а `assert` закрытого сервиса умирает отказом. Тогда
+  ошибка остаётся как в OpenCode («Interaction cancelled because the location shut down»), и после перезагрузки модель
+  не считает, что пользователь отказал.
+
+### Правка ядра (CAT-07)
+
+`packages/core/src/tool.ts`, `executeTool` (+18 −1). Встроенный инструмент поднимает отказ пользователя дефектом, и
+хук `execute.after` его не видел — плагином ход для `write`, `edit`, `patch`, `webfetch`, `websearch`, `shell`,
+`external_directory` не спасти. Теперь причина, в которой есть дефект `Permission.DeclinedError` и нет прерываний,
+показывается хуку как `Tool.Error({ message: "The user declined this tool call", error: <отказ> })` — так, как хук уже
+видит отказ инструмента Promise-плагина. Если хук ошибку не заменил, поднимается та же причина (`Effect.failCause`):
+шаг кончается как в OpenCode, в том числе для вложенных вызовов CodeMode и `Tool.check`, которые идут тем же путём.
+`QuestionTool.CancelledError` (закрытый вопрос агента) не трогается. Проверено тестами upstream без плагина продукта:
+`core/test/session-runner.test.ts` («interrupts runner continuation on a decline…»), `tool-shell.test.ts` (отказ —
+дефект `DeclinedError` в причине), `plugin/promise-tool.test.ts`, `plugin/permission-assert.test.ts`,
+`session-step.test.ts` — 103 pass, 23 skip, 0 fail.
+
+### Тесты
+
+`packages/loginom-agent/test/permissions.test.ts`, `describe("refusals (B2.6b)")`, 3 теста: отказ — текст отказа; запрет
+правилом — вид по `BlockedError` (`dock_action_run`, `dock_prepare` с `local_package`, `dock_node_apply` с
+`exports.excel`, `edit`, `external_directory`, `webfetch`, `shell`); остальное без изменений — запрет с причиной (в том
+числе `LOGINOM_TERMINAL_DENIED`), «сказать иначе», выгрузка не того типа, `question`, обычная ошибка и голый текст
+`Permission denied: webfetch` без причины, отсутствие причины.
+
+`packages/server/test/loginom-dock-catalog.test.ts`, `describe("loginom.product refusals that do not end the turn (B2.6b,
+В-75)")` — настоящий сервер, Host и модель по сценарию, как случаи B2.5d и B2.6a; стенд `boot` получил конфиг продукта
+(`config.content`, как пишут его настройки) и HTTP-вызовы location (`call`), а также `question`, `told` (результаты
+неудачных вызовов в последнем запросе к модели) и `answers` (ответы сессии по порядку).
+
+| Тест | Что проверяет |
+|---|---|
+| «Запрещено» у «Сохранять пакеты в Loginom» | конфиг: `deny` на каждую строку вида `save` таблицы. `loginom_dock_action_run` модели не предложен, `loginom_dock_prepare` предложен; модель зовёт оба — оба `error` с текстом `LOGINOM_PERMISSION_DENIED` своего действия, Host не получил ни одного вызова, тот же текст — в запросе к модели, третий шаг — ответ `end`, `finish: stop` |
+| «Отклонить» в вопросе | правило сессии `* * ask` (любая проверка продукта стала бы третьим вопросом); два вопроса — `dock_action_run`, затем `dock_prepare` с локальным пакетом, оба `reject` через `POST …/permission/:id/reply`; второй вопрос приходит после первого отказа (ход шёл дальше); оба вызова — `LOGINOM_PERMISSION_DECLINED`, Host не вызван, модель получила текст, ответ `end` |
+| «сказать иначе» (В-22) | `reject` с `message`: модель получила ровно слова пользователя, Host не вызван, ответ `end` |
+| запрет не пользователя | хук стенда запрещает сохранение с собственным текстом (как будет у администратора, B2.6c): модель получила этот текст без изменений, Host не вызван, ответ `end` |
+| перезагрузка | открытый вопрос сохранения, `POST /api/location/reload`: вызов — «Interaction cancelled because the location shut down», как в OpenCode, а не текст отказа; Host не вызван |
+
+`packages/server/test/loginom-permissions.test.ts`, `describe("loginom.product refusals of built-in tools (B2.6b,
+В-75)")`, 1 тест. Конфиг: `edit denied.md deny`, `edit inside.txt deny`, `external_directory * deny`, `webfetch
+https://denied.example/* deny` — инструменты остаются предложены. Сценарий: `write declined.md` (вопрос `edit`, ответ
+`reject`), `write denied.md`, `edit inside.txt`, `read` файла вне проекта, `webfetch https://denied.example/page`, текст.
+Пять вызовов `error`: отказ (правка ядра) и четыре запрета с видом («Создавать и менять…» дважды, «Читать файлы
+проекта», «Открывать сайты»); те же пять текстов в последнем запросе к модели; файлов нет, `inside.txt` не изменён;
+шесть ответов без ошибки, последний — `stop`. Вторая сессия с правилом `edit * deny`: `write` модели не предложен, вызов
+по имени получает запрет вида «Создавать и менять файлы проекта» — действие инструмента взято из `options.permission`,
+файла нет.
+
+Проба формы ошибок (отладочный вывод в `execute.after`, в коммиты не вошёл): все встроенные инструменты случая
+сохраняют запрет причиной своей ошибки.
+
+```text
+DBG write "The user declined this tool call" Permission.DeclinedError     # правка ядра
+DBG write "Unable to write denied.md" Permission.BlockedError
+DBG edit "Unable to edit inside.txt" Permission.BlockedError
+DBG read "Unable to read /tmp/loginom-permissions-…-outside.txt" Permission.BlockedError
+DBG webfetch "Unable to fetch https://denied.example/page" Permission.BlockedError
+```
+
+Изменённые тесты:
+
+- `loginom-package-docs.test.ts`, «edit denies use the same Location-relative paths…»: модель получает текст продукта
+  `LOGINOM_PERMISSION_DENIED` для `edit`, а не `Permission denied: edit` (прогон пакета на `7ea3af598c` — единственное
+  падение `server`).
+- `loginom-local-file.test.ts`, заголовок «…; a plain rejection stays the decline that ends the step» → «…; a plain
+  rejection stays OpenCode's decline». Сам случай не менялся: функция `authorize` по-прежнему отдаёт `DeclinedError`,
+  текст для модели ставит хук продукта.
+
+### Мутации
+
+Скрипт во временном каталоге: замена строки в файле дерева на `a48d9c9f85`, прогоны `bun test test/permissions.test.ts`
+(`loginom-agent`), `bun test --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t B2.6b`
+(`server`), `bun test --timeout 30000 test/tool-shell.test.ts test/session-runner.test.ts -t "decline|reject|permission"`
+(`core`), возврат исходного текста файла; после последней мутации `git diff HEAD -- packages/` пуст.
+
+```text
+=== M0 none                                  unit 14/0; server 6/0; core 24/0
+=== M1 no rewrite in execute.after           unit 14/0; server 3/3: встроенные, «Запрещено», «Отклонить»
+=== M2 a decline is not told                 unit 13/1 (отказ); server 4/2: встроенные, «Отклонить»
+=== M3 a rule's deny is not told             unit 13/1 (запрет правилом); server 4/2: встроенные, «Запрещено»
+=== M4 a reasoned deny is rewritten          unit 13/1 (остальное без изменений); server 5/1: запрет не пользователя
+=== M5 the replacement keeps the cause       unit 14/0; server 3/3: встроенные, «Запрещено», «Отклонить»
+=== M6 core seam reverted                    unit 14/0; server 5/1: встроенные
+=== M7 an untouched decline not raised again unit 14/0; server 6/0; core 21/3: три случая отказа в tool-shell.test.ts
+=== M8 no reload guard                       unit 14/0; server 5/1: перезагрузка
+=== M9 a hidden tool is not explained        unit 14/0; server 4/2: встроенные (скрытый write), «Запрещено»
+=== M10 the product's check may ask          unit 14/0; server 5/1: «Отклонить»
+=== M11 a hidden tool's own name as action   unit 14/0; server 5/1: встроенные (скрытый write)
+```
+
+M7 — правка ядра без повторного подъёма отказа: прямой вызов всё равно кончает шаг (`model-request` узнаёт отказ внутри
+`Tool.Error`), но тесты upstream `core/test/tool-shell.test.ts`, где отказ должен остаться дефектом, падают: «declarations
+reuse approvals while substitutions retain reject/once/always behavior», «external-directory rejection stops execution
+before a workspace marker is written», «conditional substitutions respect reject».
+
+Устойчивость новых случаев `server`, `a48d9c9f85`:
+
+```text
+$ bun test --rerun-each 20 --timeout 30000 test/loginom-dock-catalog.test.ts test/loginom-permissions.test.ts -t B2.6b
+ 120 pass, 0 fail                                         # 34.8 с
+```
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `a48d9c9f85`, база — отдельное дерево на `e8dc45a3c7` во временном каталоге;
+прогоны баз и итога — в одной очереди после мутаций, рядом шли тесты другого агента (`cli` в его дереве).
+
+| Пакет | База `e8dc45a3c7` | Итог `a48d9c9f85` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 69 pass, 0 fail | 72 pass (+3: `refusals`), 0 fail |
+| `server` (`bun test`) | 263 pass, 3 skip, 0 fail | 269 pass (+6: 5 случаев Dock, 1 встроенных инструментов), 3 skip, 0 fail |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail — те же три | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 443 pass, 9 skip, 0 fail | 443 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | 40 pass, 0 fail |
+
+Промежуточный прогон `server` на `7ea3af598c`: 268 pass, 3 skip, 1 fail — `loginom-package-docs.test.ts`, «edit denies use
+the same Location-relative paths…» ждал `Permission denied: edit`; поправлен в `a48d9c9f85` (см. «Тесты»).
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 455 divergent upstream files       # код 0; база 454: + core/src/tool.ts
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+  CAT-07: 12                                              # было 11
+  CAT-12: 181
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 225 files                             # tsc --noEmit — код 0
+$ cd packages/server && bun run typecheck
+✓ No type errors in 1,638 files across 2 projects
+$ cd packages/core && bun run typecheck
+✓ No type errors in 2,014 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.6a3; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+@loginom-ai-agent/loginom-agent:typecheck: ✓ No type errors in 225 files
+ Tasks:    39 successful, 39 total                        # 32 из кэша turbo
+```
+
+### Где решал сам
+
+- **Отказ пользователя больше не обрывает ход ни у одного инструмента**, а не только у сохранения: В-75 и план говорят
+  об отказе вообще, а у встроенных инструментов без правки ядра ход не спасти. Закрытый вопрос агента
+  (`QuestionTool.CancelledError`) и «Остановить» — как в OpenCode.
+- **Правка ядра — показать отказ хуку, а не менять сам отказ.** Решать, продолжать ли ход, оставлено плагину; без
+  плагина OpenCode ведёт себя как прежде (повторный подъём той же причины), это держат тесты upstream.
+- **Для приёмки задания правка ядра не нужна.** Сохранение в Loginom — инструменты Promise-плагина, их отказ хук видел и
+  без неё (мутация M6: оба случая Dock зелёные, красный только случай встроенных инструментов). Правка нужна, чтобы
+  «Отклонить» не обрывал ход у записи файлов, сайтов, терминала и чтения вне проекта. Если владелец её не примет, её
+  можно откатить отдельно: продукт продолжит ход только для своих инструментов.
+- **Текст для модели — в `execute.after`, по причине ошибки вызова** (`_tag` `DeclinedError` или `BlockedError`), а не по
+  тексту: встроенные инструменты оборачивают запрет своим текстом и хранят его причиной. Инструмент, который потерял бы
+  причину, оставил бы модели текст OpenCode (тест на голый текст — в `permissions.test.ts`).
+- **Запрет с причиной не трогается** — это «запрет без отказа пользователя» задания: тексты хуков продукта и будущий
+  запрет администратора (B2.6c) доходят до модели как есть. Запрет правилом вне видов таблицы тоже не трогается.
+- **Источник запрета текст не утверждает**: «запрещено правилами разрешений», а где менять — «Настройки → Разрешения».
+  Тот же текст получит запрет правилом сессии и собственным правилом агента: подагент `explore` (`* * deny`), который
+  позовёт `edit` по имени, прочтёт подсказку про «Разрешения», хотя дело не в них. Агент `plan` свой запрет записи
+  переписывает сам и раньше — его текст продукт не трогает.
+- **Скрытый инструмент — объяснение только при вызове по имени.** Ядро прячет инструмент, запрещённый целиком, и
+  продукт этого не меняет: показать его модели значило бы показать подагенту `explore` (`* * deny`) инструменты записи
+  и Dock. Подсказку в системный промпт о запрещённых видах не добавлял — это новый контракт (см. «Согласовать»).
+- **Проверка правил и закрытие location — через `permission.assert` с меткой.** Других средств узнать у плагина запрет
+  правилом или закрытие `Permission` нет; метка гарантирует, что проверка не задаёт вопроса (мутация M10).
+- **«Сказать иначе» не оборачивал**: у встроенных инструментов текст пользователя приходит без причины внутри, отличить
+  его от другой ошибки нельзя. Слова доходят до модели как результат вызова (тест).
+- **Задание и 0.4 расходятся** (см. «Что было»): 0.4 обрывал ход при отказе пользователя. Сделано по В-75 и плану.
+
+### Согласовать с владельцем
+
+- **Ход больше не кончается на «Отклонить».** Это видят клиенты, которые отвечают `reject` без текста (по коду: TUI —
+  `tui/src/routes/session/permission.tsx`, `reply("reject")`; ACP — `cli/src/acp/permission.ts`), и будущие кнопки
+  этапа C. Неинтерактивный `run` CLI уже отклоняет с текстом (`PERMISSION_REJECTED_FEEDBACK` в
+  `cli/src/run/noninteractive.ts`, это `CorrectedError`), и ход у него продолжался и раньше — B2.6b его не меняет.
+- **Тип ошибки вызова для клиентов изменился.** Отказ был `aborted` (и ответ `Step interrupted`), запрет —
+  `permission.rejected`; теперь оба — `tool.execution` с текстом продукта. Отличить отказ от сбоя интерфейс этапа C может
+  только по префиксу `LOGINOM_PERMISSION_`. Предложение: признак в метаданных вызова, как `permissionDenied` в 0.4
+  (`session/tools.ts`); не делал.
+- **Тексты для модели** `LOGINOM_PERMISSION_DECLINED` и `LOGINOM_PERMISSION_DENIED` (выше) — новый контракт с моделью,
+  проверить на настоящей модели (этап F).
+- **Правка ядра `core/src/tool.ts`** (CAT-07): `execute.after` теперь вызывается и на отказ встроенного инструмента.
+  Для upstream это изменение контракта хука.
+- **«Запрещено» у вида, который правило запрещает целиком** (сохранение, сайты, правка файлов, терминал): модель
+  инструмента не видит и узнаёт о запрете, только если позовёт его по имени. Строку ленты «Не сделал: … — в
+  «Разрешениях» это запрещено» (ux-spec) при этом даст только такой вызов. Варианты: так и оставить; подсказка модели в
+  системном промпте о запрещённых видах (хук `context`, S); показывать запрещённые инструменты (правка ядра,
+  `whollyDisabled`).
+
+### Найдено, не чинил
+
+- Текст `LOGINOM_FILE_ACCESS_DENIED … Путь: …` из `permissionFailure` (B2.5a) до модели не доходил и до B2.6b:
+  `toSessionError` показывает текст причины внутри `Tool.Error` (`Permission denied: read`), а не текст ошибки (по коду).
+  Теперь у запрета и отказа модель получает текст продукта, тоже без пути.
+- Закрытый вопрос агента (`question`, `CancelledError`) по-прежнему обрывает ход.
+- Вложенный вызов CodeMode не входит в набор инструментов запроса. Если действие его инструмента — вид с ресурсом `*`
+  (например, `worktree_remove` пространства `opencode` с `permission: "edit"`), продукт перед ним проверяет правила — лишний вызов хуков
+  `permission.evaluate`, вопроса нет (по коду).
+
+### Не проверено
+
+- **Настоящая модель.** Объяснение запрета вида, который правило запрещает целиком (сохранение, сайты, правка файлов),
+  модель получает, только если позовёт инструмент, которого ей не предложили; большинство провайдеров такой вызов не
+  сделают. Находка 2 («говорит об этом») доказана только моделью по сценарию — решение за владельцем (см. «Согласовать»).
+  Объясняет ли настоящая модель отказ по тексту продукта — тоже не проверено.
+- Кнопки и строки ленты (этап C), Desktop, CLI, установленная сборка, Windows и macOS.
+- Отказ внутри CodeMode и у подагента — только по коду (тот же путь `Tool.execute` и хуки). `patch`, `websearch`,
+  `glob`, `grep`, MCP — форма ошибки по коду (`toolFailure` и `mapError` хранят причину), тестом не проверены.
+- `dashboard_publish` и `dashboard_delete` (B2.9) — только таблица.

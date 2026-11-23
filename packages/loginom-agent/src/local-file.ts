@@ -348,7 +348,7 @@ export async function localFiles(
 
 /**
  * 0.4 `localFilePermissionFailure`. A deny rule or a rejection with feedback fails with the file's path. A plain
- * rejection stays as it is: OpenCode ends the step on it only while the original error is what the tool throws.
+ * rejection stays as it is: the plugin's `execute.after` recognizes it by the original error and tells the model (B2.6b).
  */
 export function permissionFailure(path: string, error: unknown) {
   if (!(error instanceof Tool.Error)) return error

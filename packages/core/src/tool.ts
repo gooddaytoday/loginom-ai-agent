@@ -5,7 +5,7 @@ export type { Context, Metadata, Namespace, Options, Result } from "@opencode/sc
 import { ToolDefinition, type ToolCall } from "@opencode/ai/effect"
 import type { CodeMode } from "@opencode/codemode"
 import { Tool } from "@opencode/schema/tool"
-import { Context, Effect, Layer, Ref, Result, Schema, SchemaIssue, Types } from "effect"
+import { Cause, Context, Effect, Layer, Ref, Result, Schema, SchemaIssue, Types } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import type { Agent } from "./agent.js"
 import { CodeModeCatalog } from "./codemode/catalog.js"
@@ -145,6 +145,21 @@ const layer = Layer.effect(
       const execution = yield* execute(tool, input, context).pipe(
         Effect.map((value) => ({ value })),
         Effect.catchTag("Tool.Error", (failure) => Effect.succeed({ failure })),
+        // A user's decline is a defect, so the tool cannot turn it into output. `execute.after` still sees it, as it
+        // sees a Promise plugin tool's rethrown decline; unless a hook replaces the error, the decline is raised again.
+        Effect.catchCauseFilter(
+          (cause) => {
+            const decline = cause.reasons.flatMap((reason) =>
+              Cause.isDieReason(reason) && reason.defect instanceof Permission.DeclinedError ? [reason.defect] : [],
+            )[0]
+            return decline && !Cause.hasInterrupts(cause) ? Result.succeed({ cause, decline }) : Result.fail(cause)
+          },
+          (declined) =>
+            Effect.succeed({
+              failure: new Tool.Error({ message: "The user declined this tool call", error: declined.decline }),
+              declined,
+            }),
+        ),
       )
       const base = {
         tool: name,
@@ -161,6 +176,8 @@ const layer = Layer.effect(
           error: execution.failure,
         }
         yield* hooks.trigger("tool", "execute.after", afterEvent)
+        if ("declined" in execution && afterEvent.error === execution.failure)
+          return yield* Effect.failCause(execution.declined.cause)
         return yield* afterEvent.error
       }
       const afterEvent: PluginHooks.Domains["tool"]["execute.after"] = {

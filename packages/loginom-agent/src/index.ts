@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
+import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
@@ -13,7 +14,17 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
-import { classify, grantable, ownRead, settle, withDefaults, type Kind } from "./permissions"
+import {
+  classify,
+  declinedText,
+  grantable,
+  isDecline,
+  ownRead,
+  refusal,
+  settle,
+  withDefaults,
+  type Kind,
+} from "./permissions"
 import { apply, bundled, hub } from "./skills"
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
@@ -39,6 +50,8 @@ const runner = {
 
 // Prompt metadata key that carries the wizard's one-time token to the `prompt` hook; the hook removes it.
 const token = "loginom.runner"
+// Permission request metadata key of the product's own check of the rules (B2.6b).
+const marker = "loginom.permission.probe"
 
 // «Разрешать в этом разговоре» (B2.6a): the answer to one open request that also allows its kind for the rest of the
 // session. The button is stage C.
@@ -120,6 +133,7 @@ export default Plugin.define({
       const current = leases.get(sessionID)
       leases.delete(sessionID)
       refused.delete(sessionID)
+      offered.delete(sessionID)
       dock.forget(sessionID)
       const lease = await current
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
@@ -177,6 +191,8 @@ export default Plugin.define({
     ]
     // The tool behind a running call (`<message> <call>`), so the hook can tell a read from a write.
     const calls = new Map<string, string>()
+    // The tools each session's latest request offered the model (B2.6b).
+    const offered = new Map<string, Set<string>>()
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
@@ -190,7 +206,28 @@ export default Plugin.define({
         })
       })
     })
+    // A check of the rules alone (B2.6b): the hook answers its marker without a question, so only a rule's deny fails it.
+    // Once the Location shuts down, `Permission.assert` dies with a decline instead.
+    const probe = crypto.randomUUID()
+    const rules = (call: { sessionID: string; agent: string; messageID: string; id: string }, action: string) =>
+      ctx.permission
+        .assert({
+          sessionID: call.sessionID,
+          agent: call.agent,
+          action,
+          resources: ["*"],
+          source: { type: "tool", messageID: call.messageID, id: call.id },
+          metadata: { [marker]: probe },
+        })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        )
     await ctx.permission.hook("evaluate", (event) => {
+      if (event.metadata?.[marker] === probe) {
+        event.effect = "allow"
+        return
+      }
       const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
       const settled = settle(
         event,
@@ -263,20 +300,42 @@ export default Plugin.define({
       void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
+      offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
     })
     await ctx.session.hook("compaction", hide)
     await ctx.session.hook("generate", hide)
-    await ctx.tool.hook("execute.before", (event) => {
+    await ctx.tool.hook("execute.before", async (event) => {
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      // OpenCode does not offer a tool whose action the rules deny outright, and fails a call to it as unknown. A model
+      // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b).
+      const offer = offered.get(event.sessionID)
+      const action =
+        offer && !offer.has(event.tool)
+          ? ((await ctx.tool.list()).find((tool) => tool.id === event.tool)?.options?.permission ?? event.tool)
+          : undefined
+      const error =
+        action !== undefined && classify(action, [])?.resource === "*" ? await rules(event, action) : undefined
+      const text = error instanceof Tool.Error ? refusal(error.error) : undefined
+      if (text) throw new Tool.Error({ message: text })
       calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
     await ctx.tool.hook("execute.after", async (event) => {
       calls.delete(`${event.messageID} ${event.id}`)
-      if (event.status !== "completed") return
+      if (event.status === "error") {
+        // The user's «Отклонить» and a rule's deny reach the model as text, so it explains and the turn goes on (B2.6b,
+        // В-75). A Location that shuts down (a reload) cancels its open questions with the same decline; that one stays.
+        const text = refusal(event.error.error)
+        if (!text || (text === declinedText && isDecline(await rules(event, marker)))) return
+        event.error = new Tool.Error({
+          message: text,
+          ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }),
+        })
+        return
+      }
       if (event.tool === "skill") {
         const current = profile(event.sessionID)
         const requested = next(current, (event.input as { id?: unknown } | undefined)?.id)
