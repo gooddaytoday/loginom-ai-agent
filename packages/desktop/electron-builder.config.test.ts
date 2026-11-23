@@ -1,13 +1,14 @@
 import { expect, test } from "bun:test"
 import { statSync } from "node:fs"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { AppInfo, Packager, type Configuration } from "electron-builder"
+import { AppInfo, Arch, Packager, type Configuration } from "electron-builder"
 import { Product } from "@loginom-ai-agent/product"
 import { bundledLanguages, lcid } from "app-builder-lib/out/util/langs"
+import release from "../product/loginom-release.json"
 import { getConfig } from "./electron-builder.config"
 import { CLI_BINARIES, nodePtyPackage } from "./script/utils"
 
@@ -178,7 +179,10 @@ test.each(channels)("macOS bundle for $channel", ({ channel }) => {
   expect(config.mac?.icon).toBe(channel === "prod" ? "resources/icons/icon.icon" : "resources/icons/icon.icns")
   expect(config.dmg?.icon).toBe(channel === "prod" ? "resources/icons/icon.icns" : undefined)
   // The prod override must keep the rest of the shared macOS settings.
-  expect(config.mac?.target).toEqual(["dmg", "zip"])
+  expect(config.mac?.target).toEqual([
+    { target: "dmg", arch: ["arm64"] },
+    { target: "zip", arch: ["arm64"] },
+  ])
 
   for (const key of [
     "NSMicrophoneUsageDescription",
@@ -197,6 +201,140 @@ test("the production Icon Composer package references its bundled artwork", asyn
   const image = icon.groups[0].layers[0]["image-name"]
   expect(await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/Assets", image)).exists()).toBe(true)
 })
+
+// Loginom AI Agent (B4.5b): the 0.4 platform and signing settings, for when electron-builder signs the app itself.
+test.each(channels)(
+  "macOS $channel packages target arm64 macOS 14 and sign with the 0.4 entitlements without rewriting vendor resources",
+  async ({ channel }) => {
+    const config = load(channel)
+    expect(config.mac?.target).toEqual([
+      { target: "dmg", arch: ["arm64"] },
+      { target: "zip", arch: ["arm64"] },
+    ])
+    expect(config.mac?.minimumSystemVersion).toBe("14.0")
+    expect(config.mac?.hardenedRuntime).toBe(true)
+    expect(config.mac?.entitlements).toBe("resources/entitlements.plist")
+    expect(config.mac?.entitlementsInherit).toBe("resources/entitlements.plist")
+
+    // Ad-hoc signing with the hardened runtime needs disable-library-validation, or the app does not launch.
+    const plist = await Bun.file(path.join(import.meta.dirname, String(config.mac?.entitlements))).text()
+    expect([...plist.matchAll(/<key>([^<]+)<\/key>\s*<true\/>/g)].map((match) => match[1])).toEqual([
+      "com.apple.security.cs.allow-jit",
+      "com.apple.security.cs.allow-unsigned-executable-memory",
+      "com.apple.security.cs.disable-executable-page-protection",
+      "com.apple.security.cs.allow-dyld-environment-variables",
+      "com.apple.security.cs.disable-library-validation",
+      "com.apple.security.device.audio-input",
+    ])
+
+    // Node, Chromium, ripgrep and the dashboard kit keep their upstream signatures and resource-manifest hashes.
+    expect(config.mac?.signIgnore).toEqual([
+      "/Contents/Resources/loginom/bin/",
+      "/Contents/Resources/loginom/browsers/",
+      "/Contents/Resources/loginom/ripgrep/",
+      "/Contents/Resources/loginom/dashboard/",
+    ])
+  },
+)
+
+// Loginom AI Agent (B4.5b): the 0.4 Debian dependencies; rpm keeps electron-builder's.
+test.each(channels)("Linux $channel packages declare the 0.4 dependencies and rebuild nothing", ({ channel }) => {
+  const config = load(channel)
+  expect(config.npmRebuild).toBe(false)
+  expect(config.deb?.depends).toEqual([
+    "libgtk-3-0",
+    "libnotify4",
+    "libnss3",
+    "libxss1",
+    "libxtst6",
+    "xdg-utils",
+    "libatspi2.0-0",
+    "libuuid1",
+    "libsecret-1-0",
+    "libgbm1",
+    "libasound2t64 | libasound2 (>= 1.0.16)",
+    "ca-certificates",
+    "fonts-liberation",
+    "libcurl4 | libcurl4t64 | libcurl3-gnutls",
+    "libvulkan1",
+  ])
+  expect(config.rpm?.depends).toBeUndefined()
+})
+
+// Loginom AI Agent (B4.5b): electron-builder writes the launcher and package-type after afterPack with the umask of
+// its process, and FPM keeps those modes in the package.
+test.skipIf(process.platform !== "linux")("Linux packaging resets a private build umask", async () => {
+  const previous = process.umask(0o077)
+
+  try {
+    await import(`./electron-builder.config.ts?umask=${Date.now()}`)
+    expect(process.umask()).toBe(0o022)
+  } finally {
+    process.umask(previous)
+  }
+})
+
+// Loginom AI Agent (B4.5b): FPM makes the payload root-owned, so a private build umask must not reach it.
+test.skipIf(process.platform !== "linux")(
+  "Linux afterPack opens the payload and packaging input modes and restores the pinned Chromium sandbox mode",
+  async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "loginom-afterpack-"))
+    const app = path.join(root, "app")
+    const resources = path.join(app, "resources")
+    const build = path.join(root, "build")
+
+    const sandbox = path.join(
+      resources,
+      `loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
+    )
+
+    const icon = path.join(build, "icons/32x32.png")
+    const metainfo = path.join(build, "com.loginom.aiagent.dev.metainfo.xml")
+    const mode = async (file: string) => (await stat(file)).mode & 0o7777
+
+    try {
+      await mkdir(path.dirname(sandbox), { recursive: true, mode: 0o700 })
+      await mkdir(path.dirname(icon), { recursive: true, mode: 0o700 })
+      await writeFile(sandbox, "fixture", { mode: 0o700 })
+      await writeFile(icon, "fixture", { mode: 0o600 })
+      await writeFile(metainfo, "fixture", { mode: 0o600 })
+
+      // afterPack first checks the bundled CLI: a non-empty x64 ELF image and a non-empty version file.
+      const elf = Buffer.alloc(64)
+      elf.write("\x7fELF", "latin1")
+      elf.set([2, 1, 1], 4)
+      elf.writeUInt16LE(62, 18)
+      elf.writeUInt32LE(1, 20)
+      await writeFile(path.join(resources, "opencode-cli"), elf, { mode: 0o700 })
+      await writeFile(path.join(resources, "opencode-cli.version"), "fixture", { mode: 0o600 })
+
+      // SAFETY: getBase sets afterPack to an async function that reads only these fields of its context.
+      const afterPack = load("dev", "linux-x64").afterPack as (context: {
+        appOutDir: string
+        electronPlatformName: string
+        arch: Arch
+        packager: { buildResourcesDir: string; getResourcesDir: (dir: string) => string }
+      }) => Promise<void>
+
+      await afterPack({
+        appOutDir: app,
+        electronPlatformName: "linux",
+        arch: Arch.x64,
+        packager: { buildResourcesDir: build, getResourcesDir: (dir: string) => path.join(dir, "resources") },
+      })
+      expect(await mode(sandbox)).toBe(0o4755)
+      expect(await mode(path.dirname(sandbox))).toBe(0o755)
+      expect(await mode(path.join(resources, "opencode-cli"))).toBe(0o755)
+      expect(await mode(path.join(resources, "opencode-cli.version"))).toBe(0o644)
+      expect(await mode(app)).toBe(0o755)
+      expect(await mode(path.dirname(icon))).toBe(0o755)
+      expect(await mode(icon)).toBe(0o644)
+      expect(await mode(metainfo)).toBe(0o644)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+)
 
 test("shared packaging defaults", async () => {
   const config = load("dev")
