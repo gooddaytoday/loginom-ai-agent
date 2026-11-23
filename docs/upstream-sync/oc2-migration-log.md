@@ -17842,3 +17842,203 @@ $ df -h /
 `node_modules` клиента `loginom-runtime/client`. `git status --ignored` показывает только `.husky/_`, `node_modules` и
 кэши `.turbo` от `bun run check`. Настоящие `~/.local/share` и `~/.config` не трогались: всё шло в контейнерах с
 собственным домашним каталогом.
+
+## B2.7a7, a10, a12 ACP, тесты ripgrep, метка оболочки
+
+23.11.2026. Задачи B2.7a7, B2.7a10, B2.7a12 одной веткой `b27a7-cli-identity` от `oc2-migration` (`693018ec8b`), рабочее
+дерево `.claude/worktrees/b27a7`. Эталон 0.4 — `v0.4.0` (`a63462dde1`). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` появился;
+`npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` в этом дереве и в дереве базы. Хук `pre-commit`
+(`bun run secrets staged`) — `clean` на каждом коммите. База тестов — отдельное дерево `<scratchpad>/b27a7-base`
+(`693018ec8b`, detached). Тесты пакетов — с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad,
+`LOGINOM_AI_AGENT_TEST_NODE` задан, `LOGINOM_AI_AGENT_RIPGREP_CACHE` — копия архива ripgrep 15.1.0 в scratchpad (SHA256
+совпал с пином), поэтому `stageRipgrep` ничего не скачивал. Модель не вызывалась: `run`, `serve` и `acp` вручную не
+запускались, тесты `cli` поднимают их так же, как на базе. `packages/desktop/test/loginom/*` (B4.14b) не трогал.
+
+Прочитано: этот журнал — B2.7a (нарезка, строки a7, a10, a12; «Не перенесено из 0.4» B2.7a2), B2.7a5–a6 (правило
+`apply-identity`), B2.7d (строки обновлятора правкой); `catalog.md` (CAT-07, CAT-12); `scripts/upstream-sync/apply-identity.py`;
+`scripts/node-acceptance/{required-checks.py,required-checks.md}`; `packages/product/test/repo-paths.test.ts`. 0.4 —
+`v0.4.0:packages/opencode/src/{acp/service.ts,index.ts,node.ts,standalone.ts,cli/standalone-run.ts,cli/cmd/tui.ts,tool/shell.ts}`,
+`opencode/script/build.ts`, `desktop/src/main/{sidecar.ts,proxy-env.ts}`, `core/src/ripgrep/binary.ts`. v2 —
+`cli/src/acp/{service,agent}.ts`, `core/src/{ripgrep.ts,ripgrep/binary.ts,location.ts,effect/app-node-builder.ts}`,
+`core/src/tool/plugin/shell.ts`, `core/test/{ripgrep,tool-shell}.test.ts`, SDK ACP 1.6.0 (`agent()`, `AppOptions.name`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `8c53a24bce` `fix(cli): name the product command in the ACP terminal login (B2.7a7)` | `cli/src/acp/service.ts` (+6 −2); тест `cli/test/acp/session.test.ts` |
+| `a282e035f4` `test: check bundled ripgrep and required-checks fixtures against v2 (B2.7a10)` | `loginom-host/test/bundled-ripgrep.test.ts`, `scripts/node-acceptance/tests/required-checks.test.mjs` |
+| `f31f1f20c1` `test(core): pin the agent shell marker as in 0.4 (B2.7a12)` | `core/test/tool-shell.test.ts` (+4 −3) |
+| следующий | этот раздел; CAT-12 в `catalog.md` |
+
+Файл кода один — `cli/src/acp/service.ts` (предел — пять); остальное — тесты.
+
+### a7 — ACP
+
+| Строка | 0.4 | База | Теперь |
+|---|---|---|---|
+| описание способа входа | ``Run `opencode auth login` in the terminal`` | то же | ``Run `loginom-ai-agent-cli auth login` in the terminal`` |
+| `terminal-auth` | `command: "opencode"`, `args: ["auth", "login"]`, `label: "OpenCode Login"` | `"opencode"`, метка `Loginom AI Agent Login` (B1.4) | `command: "loginom-ai-agent-cli"`, остальное как на базе |
+| `agentInfo.name` | `OpenCode` | `OpenCode` | `OpenCode` — паритет с 0.4 |
+| имя способа `Login with opencode`, id `opencode-login` | то же | то же | не менял — как в 0.4; id — протокол |
+| `agent({ name: "opencode" })` (`agent.ts`) | нет (`AgentSideConnection`) | есть | не менял: SDK 1.6.0 хранит имя только для `describe()` обработчиков, который никто не вызывает, клиенту оно не уходит |
+
+Правка вручную, а не правилом `apply-identity`: правило не дотягивается до `command: "opencode"` (после имени нет
+подкоманды), а `` `opencode auth login` `` в обратных кавычках поймало бы только описание. Правило заняло бы второй файл
+кода (`apply-identity.py`), перевернуло бы ожидание B2.7a5 («`auth` не в списке», M12) и не должно задеть справку
+`opencode auth login [flags]` из исходников (`cli/test/auth.test.ts:33`). Правка — две строки в одном файле. `apply-identity
+--check` — 0 файлов: правило `loginom-ai-agent-cli` не трогает, `` `opencode auth login` `` в `cli`, `tui`, `server` больше нет.
+
+### a10 — встроенный ripgrep
+
+На базе в `loginom-host/test/bundled-ripgrep.test.ts` 4 из 7 проходят, 3 падают:
+
+| Тест | Причина на базе | Теперь |
+|---|---|---|
+| `ripgrep pins match the release the agent would otherwise download…` | `PLATFORM` в `core/src/ripgrep/binary.ts` v2 записан по свойству на строку и с `sha256` | исходник сравнивается со сжатыми пробелами; кроме версии, платформы и расширения (как в 0.4) сверяется и `sha256` пина с `sha256` core |
+| `glob uses the bundled rg without a system rg and without network access` | `Cannot find module …/core/src/effect/layer-node.ts` | скрипт собирает `Ripgrep.node` v2 через `AppNodeBuilder.build` с `Location.node`, заменённым на каталог проекта, как `core/test/ripgrep.test.ts` |
+| `glob without the bundled rg on PATH fails with ripgrep execution failed` | то же | то же; падение — из-за закрытого прокси (`ECONNREFUSED` у загрузки `github.com/BurntSushi/ripgrep/…`), в stderr `ripgrep execution failed`, в изолированных XDG `rg` нет |
+
+Проверяется то же, что в 0.4: пины `loginom-host` совпадают с выпуском, который core скачал бы сам; `glob` core находит
+встроенный `rg` по `PATH` без системного `rg` и без сети; без него — падает и ничего не скачивает. В окружение дочернего
+процесса добавлен `TMPDIR` в корне теста: `Global` v2 создаёт каталог `<tmp>/loginom-ai-agent-dev`, без этого — в
+системном `/tmp`. Файл под `unshare -n` (без сети) — 7 из 7; с сетью — тоже: загрузка упирается в закрытый прокси.
+
+### a10 — `required-checks.test.mjs`
+
+Фикстуры `packages/opencode/src/example.ts` (тесты `approval has no executable command…` и `verify accepts NOT_RUN…`)
+нужны только для строки `main-chat-approval` — теперь `packages/protocol/src/example.ts`, её ловит то же правило.
+`packages/opencode/src/tool.ts` убран из списка `public/agent stop`: проверяемого в v2 нет. Правило RULES
+`packages/opencode/**` в `required-checks.py` на v2 мёртвое — каталога нет, а `packages/core/src/tool.ts` строк не даёт
+вовсе (проба `list`: пусто). Какие пакеты v2 считать «агентом» для остановки — не механический перевод: в 0.4 уже были
+`core`, `cli`, `server`, `tui`, и правило их не называло. Это смена критерия приёмки узлов — вопрос владельцу, ниже.
+Строка `required-checks.test.mjs: packages/opencode` ушла из `repo-paths`.
+
+### a12 — метка «запущено из агента»
+
+0.4 (`v0.4.0`): метку ставил только `opencode/src/index.ts` — `process.env.AGENT = "1"`, `process.env.OPENCODE = "1"` в
+middleware yargs; оболочки получали окружение процесса (`tool/shell.ts`, `...process.env`). `LOGINOM_AI_AGENT=1` в 0.4 нет
+нигде (`git grep` по `packages/`). Итог — «`OPENCODE=1` — оставь»: `core/src/tool/plugin/shell.ts` не менялся, он ставит
+`AGENT=1`, `OPENCODE=1`, `AI_AGENT ||= "opencode"` и `LOGINOM_AI_AGENT_SESSION_ID` каждой команде оболочки.
+
+Тест upstream `identifies agent shell commands without inheriting a stale session ID` уже печатал `$OPENCODE`; в него
+добавлен `$LOGINOM_AI_AGENT` с ожиданием пустой строки — так он ловит и вариант «обе» (M11), которого старая проверка не
+видела (M11 на тесте базы — зелёный).
+
+Расхождение с заданием: по чтению кода 0.4 метку видели оболочки только CLI сборки по умолчанию (вход `index.ts`).
+Входы продукта через этот middleware не шли: CLI продукта — `src/standalone.ts` со своим парсером yargs
+(`standalone-run.ts`), поток TUI получает окружение процесса как есть (`cmd/tui.ts`, `new Worker(…, { env })`); сервер
+Desktop — `src/node.ts` в utility-процессе (`desktop/src/main/sidecar.ts`). Значит, в установленном 0.4 оболочки, скорее
+всего, не видели ни одной метки. В v2 `OPENCODE=1` ставит сам инструмент оболочки — на всех входах. Выбран меньший
+вариант из задания («оставь»); убрать метку — правка upstream и не вариант задания. Запуском 0.4 не проверял.
+
+### Мутации
+
+`<scratchpad>/b27a7-runs/mutate.py`: одна правка в дереве, адресный тест, файл возвращается из `HEAD`. Без мутаций все
+адресные тесты зелёные.
+
+| Мутация | Тест | Итог |
+|---|---|---|
+| M1 описание снова `opencode auth login` | `acp/session` | **1 fail** (`initialize advertises capabilities…`) |
+| M2 `terminal-auth` снова `opencode` | `acp/session` | **1 fail** |
+| M3 `agentInfo.name` → `Loginom AI Agent` | `acp/session` | **1 fail** |
+| M4 другой `sha256` linux-x64 в core | `bundled-ripgrep` | **1 fail** (пины) |
+| M5 core качает `15.0.0` | `bundled-ripgrep` | **1 fail** (пины) |
+| M6 `withBundledRipgrep` не дописывает `PATH` | `bundled-ripgrep` | **2 fail** (`PATH`, `glob uses the bundled rg…`) |
+| M7 core не ищет `rg` в `PATH` | `bundled-ripgrep` | **1 fail** (`glob uses the bundled rg…`) |
+| M8 RULES без `packages/protocol/**` | `required-checks` | **3 fail** (`public/agent stop: packages/protocol…`, оба теста с фикстурой `packages/protocol/src/example.ts`) |
+| M9 без `OPENCODE = "1"` | `tool-shell` | **1 fail** |
+| M10 `OPENCODE` → `LOGINOM_AI_AGENT` | `tool-shell` | **1 fail** |
+| M11 обе метки | `tool-shell` | **1 fail**; на тесте базы — pass |
+
+### Приёмка
+
+Полные прогоны по пакетам (`<scratchpad>/b27a7-runs/suites.sh`): база — `693018ec8b` в `<scratchpad>/b27a7-base`, итог —
+`f31f1f20c1`; `bun test --timeout 60000`, один за другим, база и итог — подряд на той же машине. Падения сравнивались по
+именам.
+
+| Пакет | `693018ec8b` | `f31f1f20c1` |
+|---|---|---|
+| `cli` | 587 pass, 9 skip, 0 fail, 2427 expect | 587 pass, 9 skip, 0 fail, 2427 expect |
+| `core` | 7124 pass, 354 skip, 4 fail, 96311 expect | 7124 pass, 354 skip, 4 fail, 96030 expect; падения те же |
+| `loginom-host` | 543 pass, 13 skip, 5 fail, 3366 expect | 546 pass, 13 skip, 2 fail, 3374 expect |
+
+Падения `core` на обоих: `Core test environment > isolates global home and XDG roots`, `ShellParse > extracts static
+directory targets…`, `util.effect-flock > fails on unwritable lock roots`, `util.flock > fails clearly on unwritable lock
+roots`. `loginom-host` на обоих: `archive verification preserves manifest modes under a private umask`, `actual managed
+entry reads live bridge work and dispatching over private IPC`; на базе ещё три теста ripgrep — их нет. Число `expect`
+у `core` плавает и на базе (B2.7a5: так же у `server`). Новых падений нет.
+
+`repo-paths.test.ts` (`packages/product`): по-прежнему 3 падающих теста из 9 (их держат строки B5.1 и хвоста B2.7c), строка
+`scripts/node-acceptance/tests/required-checks.test.mjs: packages/opencode` ушла; в тесте путей остались
+`.github/workflows/{loginom-windows,windows-native-check}.yml: packages/opencode` и `script/test-windows-profile.ps1:
+packages/opencode`. `required-checks.test.mjs` (`node --test`): база — 66 pass, итог — 65 pass (минус случай
+`packages/opencode/src/tool.ts`), 0 fail.
+
+```text
+$ cd packages/{cli,core,loginom-host} && bun typecheck
+✓ No type errors in 2,224 files across 2 projects      # cli
+✓ No type errors in 2,014 files across 2 projects      # core
+✓ No type errors in 174 files                          # loginom-host
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 609 divergent upstream files                  # как на базе: оба файла upstream уже расходились
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun run check                                     # код 0, на f31f1f20c1 перед коммитом журнала
+Found 905 warnings and 0 errors.                    # предупреждений в изменённых файлах нет
+ Tasks:    39 successful, 39 total                  # 30 из кэша turbo
+```
+
+`prettier --check`: `cli/src/acp/service.ts`, `cli/test/acp/session.test.ts`, `core/test/tool-shell.test.ts` проходят;
+`bundled-ripgrep.test.ts` и `required-checks.test.mjs` не проходили и на базе — не переформатировал. `oxlint` пяти файлов —
+0 предупреждений.
+
+### Каталог
+
+CAT-12, абзац «подпись входа и ошибки ACP»: способ входа ACP называет `loginom-ai-agent-cli auth login` (B2.7a7,
+вручную); `agentInfo.name` и `Login with opencode` — как в 0.4; метка оболочек `OPENCODE=1` — как в 0.4 (B2.7a12), с
+тестом. `catalog.json` не менялся: `cli/src/acp/service.ts` и `core/test/tool-shell.test.ts` уже были в CAT-12 (маска
+`packages/**`), тесты `loginom-host` и `scripts/` — файлы форка.
+
+### Где решал сам
+
+- **a7 — вручную, литералом `loginom-ai-agent-cli`.** Как правило B2.7a5 и правка B2.7d: то же имя, что у сообщений
+  `cli`. `Product.cliExecutable` или define `LOGINOM_AI_AGENT_CLI_NAME` не брал — сообщения CLI названы литералом.
+- **a7 — `Login with opencode` не трогал.** В 0.4 то же; задание называет только команду, `agentInfo.name` и имя агента.
+- **a10 — `sha256` в сверке пинов.** core v2 пинует хэши сам; сверка «тот же выпуск» без хэша пропустила бы расхождение
+  пина `loginom-host` с core (M4).
+- **a10 — `TMPDIR` в окружении теста glob.** Проверка та же; без него тест писал бы в системный `/tmp`.
+- **a10 — правило RULES не переводил.** Только тест-файл; вопрос владельцу ниже.
+- **a10 — `withBundledRipgrep` не подключал.** Задание — переделать три теста; вызов в CLI и Desktop — код продукта
+  (ниже, «Найдено»).
+- **a12 — проверка в тесте upstream,** а не новый файл: окружение сессии и вызов инструмента собраны только в
+  `tool-shell.test.ts`; правка — одна переменная в строке печати.
+
+### Найдено, не чинил
+
+- **`withBundledRipgrep` в v2 никто не вызывает** (в 0.4 — `standalone-run.ts` и Desktop `proxy-env.ts`). Тест проверяет
+  функцию и её связку с core, но не то, что CLI и Desktop v2 кладут встроенный `rg` в `PATH`. Без системного `rg` агент v2
+  скачает `rg` с GitHub в `<cache>/bin` (хэш сверяется), а без сети `glob` и `grep` упадут — это LAB-1094 0.4. Журнал
+  B2.7a2 («Не перенесено из 0.4») называет для переноса B2.7a10 и `core`, но строка нарезки и задание a10 — только тесты;
+  вызов — код CLI продукта и Desktop, нужна своя задача.
+- **Правило `packages/opencode/**` в `required-checks.py` мёртвое** (выше). Изменения `core`, `cli`, `server` узловые
+  агенты v2 делают без остановки `main-chat-approval`.
+- **`AI_AGENT=opencode`** в окружении оболочек — новое в v2, в 0.4 не было; значение — имя upstream. Вне задания.
+- `terminal-auth` запускает `loginom-ai-agent-cli` — имя бинарника standalone-сборки. CLI сборки по умолчанию и из
+  исходников называется `opencode` (корень справки, B2.7a5); там команда из ACP не найдётся.
+
+### Вопрос владельцу
+
+Какие пакеты v2 закрывает остановка `main-chat-approval` вместо `packages/opencode/**` 0.4 в RULES
+`scripts/node-acceptance/required-checks.py`: `core`, `cli`, `server` (и `tui`?) — или правило убрать. После решения —
+строка RULES и фикстура в `public/agent stop`.
+
+Нарезка отмечала a12 как решение владельца. Сделано по заданию — `OPENCODE=1` оставлен; если нужна метка продукта
+(`LOGINOM_AI_AGENT=1`) или метка только на входах продукта, как фактически было в установленном 0.4, — это новое решение.
+
+### Не проверено
+
+- ACP с настоящим клиентом (Zed и т. п.) и запуск `terminal-auth`; собранный standalone-бинарник — не собирался.
+- Метка в оболочках установленного 0.4 — только чтением кода, 0.4 не запускался.
+- Тесты гонялись только на Linux; ветка PowerShell новой проверки `$env:LOGINOM_AI_AGENT` — нет.

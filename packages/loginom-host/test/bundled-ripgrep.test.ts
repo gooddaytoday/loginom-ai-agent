@@ -18,7 +18,10 @@ test("ripgrep pins match the release the agent would otherwise download, for eve
     ["win32-x64", "x64-win32"],
   ] as const) {
     const pin = ripgrepPinForTarget(target)
-    expect(source).toContain(`"${key}": { platform: "${pin.platform}", extension: "${pin.extension}" }`)
+    // core pins each asset's SHA256 too, one property per line.
+    expect(source.replace(/\s+/g, " ")).toContain(
+      `"${key}": { platform: "${pin.platform}", extension: "${pin.extension}", sha256: "${pin.sha256}",`,
+    )
     expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/)
   }
   expect(() => ripgrepPinForTarget("darwin-x64")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
@@ -138,12 +141,17 @@ async function globInIsolatedProfile(input: { bundled: boolean }) {
     await writeFile(
       script,
       [
-        `import { Effect } from ${JSON.stringify(Bun.resolveSync("effect", resolve(import.meta.dir, "../../core/src")))}`,
-        `import { LayerNode } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/effect/layer-node.ts"))}`,
+        `import { Effect, Layer } from ${JSON.stringify(Bun.resolveSync("effect", resolve(import.meta.dir, "../../core/src")))}`,
+        `import { AppNodeBuilder } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/effect/app-node-builder.ts"))}`,
+        `import { Location } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/location.ts"))}`,
         `import { Ripgrep } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/ripgrep.ts"))}`,
+        // Ripgrep is Location-scoped in core v2; the workspace is the Location, as in core's own ripgrep test.
+        `const directory = ${JSON.stringify(workspace)}`,
+        `const location = Location.Service.of({ directory, project: { id: "global", directory, canonical: directory } })`,
         `const files = await Effect.runPromise(Effect.gen(function* () {`,
-        `  return yield* (yield* Ripgrep.Service).glob({ cwd: ${JSON.stringify(workspace)}, pattern: "**/*", limit: 10 })`,
-        `}).pipe(Effect.provide(LayerNode.compile(Ripgrep.node))))`,
+        `  const ripgrep = yield* Ripgrep.Service`,
+        `  return yield* ripgrep.glob({ cwd: directory, pattern: "**/*", limit: 10 })`,
+        `}).pipe(Effect.provide(AppNodeBuilder.build(Ripgrep.node, [Location.node.replace(Layer.succeed(Location.Service, location))]))))`,
         `console.log(JSON.stringify(files.map((file) => file.path)))`,
       ].join("\n"),
     )
@@ -151,6 +159,7 @@ async function globInIsolatedProfile(input: { bundled: boolean }) {
     const isolated = {
       PATH: emptyBin,
       HOME: join(root, "home"),
+      TMPDIR: join(root, "tmp"),
       XDG_CACHE_HOME: join(root, "xdg/cache"),
       XDG_DATA_HOME: join(root, "xdg/data"),
       XDG_CONFIG_HOME: join(root, "xdg/config"),
