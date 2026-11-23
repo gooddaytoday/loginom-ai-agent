@@ -11363,8 +11363,8 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 есть; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. `packages/cli` и `packages/loginom-host`
 не трогал. Окно Desktop не запускалось.
 
-Решение владельца (через координатора): BRAND-01 шлюза B включает About и меню; «сведения об исходных проектах в
-лицензиях допустимы»; настройки не перестраиваются (этап C).
+Основание — сообщение координатора: BRAND-01 шлюза B включает About и меню; «сведения об исходных проектах в
+лицензиях допустимы»; настройки не перестраиваются (этап C). Записи об этом в `decisions.md` нет (последнее — В-98).
 
 ### Коммиты
 
@@ -11458,6 +11458,9 @@ $ PLAYWRIGHT_BROWSERS_PATH=<scratch> PLAYWRIGHT_PORT=3412 bunx playwright test e
   5 passed (33.8s)                         # 2 теста участников, Copied, раскладка desktop и mobile
 # итог ab5295ccdb (и 3b2cd44ea2), тёплый dev-сервер (первый прогон на холодном: `settings-screen` не найден за 30 с)
   4 passed (33.4s)                         # новый тест About, Copied, раскладка desktop и mobile
+$ … bunx playwright test e2e/regression/tabs.spec.ts -g "Windows titlebar menu pastes|Windows menu shares"
+# итог 3b2cd44ea2: стенд меню Windows грузит desktop-menu.ts с импортом Product
+  2 passed (12.4s)
 ```
 
 ### Мутации
