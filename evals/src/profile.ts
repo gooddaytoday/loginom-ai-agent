@@ -392,20 +392,16 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
     return { generation: value.generation, principal_sha256: value.principal_sha256, refresh_required: value.refresh_required }
   }
   if (config.agent.provider?.id === providerId) return
-  // OpenCode 2 keeps provider credentials in the profile's database and imports a 0.4 key file only when it creates the
-  // database (B2.7b). A private server lists them and exits, so no service of the profile outlives the check.
-  const listed = await management(command, ["auth", "list", "--standalone", "--format", "json"])
-  const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
-  if (listed.exitCode !== 0 || !Array.isArray(integrations))
-    throw new EvalFailure(`auth list завершился кодом ${listed.exitCode}:\n${listed.stderr.trim()}`, 2)
-  if (integrations.some((integration) => integration.id === providerId)) return
+  const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
+  const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
+  if (providerId in entries) return
   const envLine = Object.entries(command.env)
     .filter(([key]) => key.startsWith("LOGINOM_AI_AGENT_CLI_"))
     .map(([key, value]) => `${key}=${value}`)
     .join(" ")
   throw new EvalFailure(
     `Нет авторизации провайдера "${providerId}" в eval-профиле ${config.profileDir}.\n` +
-      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} auth login\n` +
+      `Выполните один раз:\n  cd ${command.cwd} && ${envLine} ${command.cmd.join(" ")} providers login\n` +
       "или задайте EVAL_AGENT_PROVIDER_* в evals/.env.",
     2,
   )

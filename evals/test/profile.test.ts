@@ -819,21 +819,13 @@ test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой rese
   await expect(recoverIfNeeded(command, 1)).rejects.toThrow("LOGINOM_DOCK_API_KEY")
 })
 
-// OpenCode 2 keeps provider credentials in the profile's database (B2.7b): `auth list` of the profile is the check.
-test("assertAuth: провайдера нет в auth list профиля — EvalFailure с командой auth login; есть — ок", async () => {
+test("assertAuth: без auth.json — EvalFailure с командой providers login; с записью провайдера — ок", async () => {
   const { config, command, profileDir } = await fakeProfile()
-  const args = path.join(profileDir, "args.json"), integrations = path.join(profileDir, "integrations.json")
-  const listed = { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: args, EVAL_FAKE_INTEGRATIONS_FILE: integrations } }
   const openai = { ...config, agent: { ...config.agent, model: "openai/gpt-5.6-sol" } }
-  await writeFile(integrations, JSON.stringify([{ id: "anthropic", name: "Anthropic", connections: [{ type: "credential" }] }]))
-  await expect(assertAuth(openai, listed)).rejects.toThrow("auth login")
-  expect(await Bun.file(args).json()).toEqual(["auth", "list", "--standalone", "--format", "json"])
-  // A 0.4 auth.json is not read directly: the server imports it into the database when it creates one.
+  await expect(assertAuth(openai, command)).rejects.toThrow("providers login")
   await mkdir(path.join(profileDir, "data"), { recursive: true })
   await writeFile(path.join(profileDir, "data", "auth.json"), JSON.stringify({ openai: { type: "oauth" } }))
-  await expect(assertAuth(openai, listed)).rejects.toThrow("auth login")
-  await writeFile(integrations, JSON.stringify([{ id: "openai", name: "OpenAI", connections: [{ type: "credential" }] }]))
-  await assertAuth(openai, listed)
+  await assertAuth(openai, command)
   const viaProvider = { ...config, agent: { ...config.agent, model: "xiaomi/mimo", provider: { id: "xiaomi", baseUrl: "u", apiKey: "k", modelId: "mimo" } } }
   await assertAuth(viaProvider, command)
 })
