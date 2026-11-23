@@ -120,14 +120,18 @@ export function make(input: {
     initialize: Effect.fnUntraced(function* (params) {
       yield* Ref.set(input.capabilities, ACPCapabilities.parse(params.clientCapabilities))
       const authMethod: AuthMethod = {
-        description: "Run `opencode auth login` in the terminal",
+        description: "Run `loginom-ai-agent-cli auth login` in the terminal",
         name: "Login with opencode",
         id: AuthMethodID,
         ...(params.clientCapabilities?.auth?.terminal ? { type: "terminal" as const, args: ["--login"] } : {}),
       }
       if (params.clientCapabilities?._meta?.["terminal-auth"] === true) {
         authMethod._meta = {
-          "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "Loginom AI Agent Login" },
+          "terminal-auth": {
+            command: "loginom-ai-agent-cli",
+            args: ["auth", "login"],
+            label: "Loginom AI Agent Login",
+          },
         }
       }
       return {

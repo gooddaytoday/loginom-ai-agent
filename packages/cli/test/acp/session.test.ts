@@ -28,16 +28,20 @@ describe("acp session lifecycle over the wire", () => {
       _meta: { steering: { supported: true } },
     })
     expect(plain.authMethods).toEqual([
-      { id: "opencode-login", name: "Login with opencode", description: "Run `opencode auth login` in the terminal" },
+      {
+        id: "opencode-login",
+        name: "Login with opencode",
+        description: "Run `loginom-ai-agent-cli auth login` in the terminal",
+      },
     ])
     expect(terminal.authMethods?.[0]?._meta).toEqual({
-      "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "Loginom AI Agent Login" },
+      "terminal-auth": { command: "loginom-ai-agent-cli", args: ["auth", "login"], label: "Loginom AI Agent Login" },
     })
     expect(standard.authMethods).toEqual([
       {
         id: "opencode-login",
         name: "Login with opencode",
-        description: "Run `opencode auth login` in the terminal",
+        description: "Run `loginom-ai-agent-cli auth login` in the terminal",
         type: "terminal",
         args: ["--login"],
       },
