@@ -13144,3 +13144,253 @@ Found 558 warnings and 0 errors.                                      # как �
   навыком службу запускает (установщика с `--verify-resources` на Linux нет): Host и навыки продукта тогда отказывают
   сами и без сообщения пользователю (B2.3, B2.4). Проверять ли при старте все файлы манифеста (наличие или проверка с
   кешем) — владельцу.
+
+## B4.5b Упаковка Linux и macOS
+
+23.11.2026. Ветка `b45b-linux-mac-pack` от `oc2-migration` (`4bc6438b34`), рабочее дерево `.claude/worktrees/b45b`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, 1600 пакетов, `.husky/_` есть; `npm ci --ignore-scripts --omit=dev` клиента `packages/loginom-runtime/client`;
+`bun run secrets staged` и хук `pre-commit` — `clean` на каждом коммите. База тестов снята в этом же дереве до первой
+правки. `evals` (B2.7b2) не трогал. Эталон 0.4 — `v0.4.0`: `electron-builder.config.ts` с тестом (`afterPack`, `deb`,
+`mac`), `scripts/linux-permissions.ts` с тестом, `resources/entitlements.plist`; требование B1.9 о `signIgnore`
+дашбордов — `d24398a02c`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `b522c0523a` `feat(desktop): package Linux and macOS with the 0.4 settings (B4.5b)` | три файла кода, тесты |
+| следующий | этот раздел; CAT-02 в `catalog.md` |
+
+Файлы кода — три: `electron-builder.config.ts` (+59 −4), `scripts/linux-permissions.ts` и `resources/entitlements.plist`
+(новые, файлы 0.4; в первом только пустые строки для `require-readable-spacing`). Тесты — `electron-builder.config.test.ts`
+(+117 −3) и `scripts/linux-permissions.test.ts` (тест 0.4, одна пустая строка).
+
+План этапа B сверх строки B4.5b таблицы B4.1 требует только `signIgnore` дашбордов (В-99, раздел B2.7 плана);
+`packages/desktop/AGENTS.md` v2 — таблицы каналов в тестах упаковки, без тестов-поисков по исходникам.
+
+### Пункты задания
+
+| № | 0.4 (`v0.4.0`) | v2 (`4bc6438b34`) | Стало |
+|---|---|---|---|
+| 1. `chrome-sandbox` | `afterPack` на Linux: `linuxPermissions(appOutDir)`, затем `/bin/chmod 4755` у `resources/loginom/browsers/chromium-<chromiumRevision>/chrome-linux64/chrome-sandbox` | `afterPack` проверяет встроенный CLI, кладёт ICNS на macOS и node-pty на Windows; про Linux — ничего | то же действие 0.4 на Linux после проверок CLI, до `return` не-Windows; путь — от `getResourcesDir`, ревизия — из `packages/product/loginom-release.json` |
+| 2. `depends` deb | 15 строк | не задан: умолчания electron-builder | список 0.4 (`debDepends`) в `deb` всех трёх каналов; `rpm` — умолчания, как было |
+| 3. `npmRebuild` | `false` | умолчание (`true`) | `false` |
+| 4. `entitlements`, `hardenedRuntime` | `hardenedRuntime: true`, `entitlements` и `entitlementsInherit` — `resources/entitlements.plist` | не заданы: при подписи electron-builder включает hardened runtime по умолчанию и берёт свой шаблон `entitlements.mac.plist` | явно, как в 0.4; файл 0.4 (шесть ключей, в том числе `disable-library-validation`, без которого ad-hoc подпись с hardened runtime не запускается) |
+| 5. `signIgnore` | `/Contents/Resources/loginom/{bin,browsers,ripgrep,dashboard}/` (четвёртый — `d24398a02c`, B1.9) | нет | четыре пути 0.4 с комментариями |
+| 6. arm64 | `mac.target`: `dmg` и `zip` с `arch: ["arm64"]`; Windows — `nsis` x64; Linux — без архитектуры | `mac.target` `["dmg", "zip"]`: архитектура из флагов или хоста | `dmg` и `zip` с `arch: ["arm64"]`, как в 0.4. Linux и Windows не менял: arm64 в 0.4 там не было |
+
+Закрепление arm64 сборки `pack.ts` не трогает: тот передаёт `--mac --<cpu> --dir`, а `computeArchToTargetNamesMap`
+(`app-builder-lib/out/targets/targetFactory.js:11-17`) возвращает карту из командной строки, если в ней есть имена целей,
+и `target` конфига тогда не читает. Без `--dir` (`electron-builder --mac`) собирается только arm64, как в 0.4.
+
+### Уже было в v2 и совпадает с 0.4 (не трогал)
+
+- Linux: `syncDesktopName`, `executableName` — slug, ярлык `Name` и `StartupWMClass`, `packageName` deb, metainfo канала в
+  `fpm`, `productName` — slug для `/opt`, сопровождающий `Loginom` (B4.5a; в 0.4 — `deb.maintainer`, в v2 — `linux`),
+  цели `AppImage` и `deb` (в v2 ещё `rpm`).
+- macOS: `gatekeeperAssess: false` — умолчание electron-builder; `hardenedRuntime` при подписи — тоже умолчание, теперь
+  записан явно (п. 4).
+- Ресурсы Loginom рядом с `app.asar` (B4.8a), имена и схема (B4.5a).
+
+### Отличия от 0.4 вне списка задачи (не трогал)
+
+- macOS: ad-hoc подпись самим electron-builder (`identity: "-"`, `CSC_IDENTITY_AUTO_DISCOVERY=false` на darwin),
+  `notarize: false`, `dmg.sign: false`, `minimumSystemVersion: "14.0"`. В v2 подпись — работа выпуска: тест upstream
+  «shared packaging defaults» держит `mac.sign` и `mac.notarize` неопределёнными, `pack.ts` собирает с `-c.mac.identity=null`.
+- `process.umask(0o022)` в начале конфига на Linux (0.4, тот же коммит `a7d812e4a9`, что `linuxPermissions`): файлы,
+  которые electron-builder пишет после `afterPack`. Как это видно в deb — ниже, «Сборка».
+- Внешняя карта блоков AppImage (`afterAllArtifactBuild`) — для обновлений, B4.12.
+- Категории (`Office` и `public.app-category.productivity` в 0.4, `Development` и `developer-tools` в v2), значки Linux
+  (`resources/icons/linux`) — B4.6; `files` в 0.4 уже (`out/**/*`, `resources/icons/**/*`).
+
+### Тесты
+
+`electron-builder.config.test.ts`, литералы 0.4 в тесте:
+
+- «macOS $channel packages sign arm64 with the 0.4 entitlements without rewriting vendor resources» (новый, ×3): цели
+  arm64, `hardenedRuntime`, `entitlements` и `entitlementsInherit`, ключи `<key>…</key><true/>` файла по пути конфига —
+  шесть ключей 0.4 по порядку, `signIgnore` — четыре пути. Имя — от теста 0.4 «macOS test packages use explicit ad-hoc
+  arm64 signing without rewriting vendor resources» без «explicit ad-hoc»: `identity` не переносился.
+- «macOS bundle for $channel» (upstream): ожидание `target` — цели arm64; проверка, что prod сохраняет общие настройки
+  macOS, теперь держит и подпись.
+- «Linux $channel packages declare the 0.4 dependencies and rebuild nothing» (новый, ×3): `npmRebuild` — `false`,
+  `deb.depends` — список 0.4, `rpm.depends` не задан.
+- «Linux afterPack opens the payload modes and restores the pinned Chromium sandbox mode» (новый, только Linux):
+  настоящий `afterPack` канала `dev` с `LOGINOM_AI_AGENT_TARGET=linux-x64` и `Arch.x64` (от архитектуры хоста не зависит)
+  на каталоге: каталоги `0700`, `chrome-sandbox` `0700`, встроенный CLI — заголовок ELF x64 в 64 байта (его требует
+  `NativeArch.verify`), файл версии `0600`. После: `chrome-sandbox` `4755`, каталоги `0755`, CLI `0755`, версия `0644`.
+  Выполняется в процессе Bun, а не в Node, как в 0.4: Bun 1.4.4 бит setuid в `fs.chmod` сохраняет (проба:
+  `fs.chmod(f, 0o4755)` — `4755` и в Bun, и в Node 24.19.0), а сам хук ставит бит через `/bin/chmod`.
+
+`scripts/linux-permissions.test.ts` — тест 0.4: каталог `0700`, файлы `0600`/`0700` и ссылка наружу; проверка отказывает
+до и после порчи, после — `0755`/`0644`/`0755`, файл за ссылкой не тронут.
+
+```text
+$ cd packages/desktop && bun test electron-builder.config.test.ts scripts/linux-permissions.test.ts
+# база 4bc6438b34 (только конфиг): 17 pass 0 fail      # итог b522c0523a:
+ 25 pass
+ 0 fail
+ 325 expect() calls
+Ran 25 tests across 2 files.
+```
+
+### Мутации
+
+Скрипт `<scratchpad>/b45b-runs/mutate.py`: одна замена в файле, `bun test electron-builder.config.test.ts
+scripts/linux-permissions.test.ts`, `git checkout` файла; после — `git status` чистый.
+
+```text
+=== M0 none: 25 pass / 0 fail
+=== M1 no chmod 4755: 24 pass / 1 fail                              # afterPack
+=== M2 chmod before linuxPermissions: 24 pass / 1 fail              # afterPack
+=== M3 Linux block below the win32 return: 24 pass / 1 fail         # afterPack
+=== M4 no linuxPermissions: 24 pass / 1 fail                        # afterPack
+=== M5 another Chromium revision: 24 pass / 1 fail                  # afterPack (/bin/chmod: нет файла)
+=== M6 beta deb without depends: 24 pass / 1 fail                   # Linux beta
+=== M7 depends without libgbm1: 22 pass / 3 fail                    # Linux ×3
+=== M8 npmRebuild true: 22 pass / 3 fail                            # Linux ×3
+=== M9 hardenedRuntime false: 22 pass / 3 fail                      # macOS signing ×3
+=== M10 no entitlementsInherit: 22 pass / 3 fail                    # macOS signing ×3
+=== M11 entitlements of electron-builder's name: 22 pass / 3 fail   # macOS signing ×3
+=== M12 plist without disable-library-validation: 22 pass / 3 fail  # macOS signing ×3
+=== M13 signIgnore without the dashboard kit: 22 pass / 3 fail      # macOS signing ×3
+=== M14 macOS targets without the arm64 pin: 19 pass / 6 fail       # macOS signing ×3, macOS bundle ×3
+=== M15 prod mac override drops the shared settings: 23 pass / 2 fail  # prod: signing, bundle
+=== M16 linuxPermissions leaves files group-only: 23 pass / 2 fail  # afterPack, linux-permissions
+=== M17 linuxPermissions follows links: 24 pass / 1 fail            # linux-permissions
+```
+
+### Сборка `--linux deb dir`
+
+`<scratchpad>/b45b-runs/build.sh`, канал `dev`, оболочка с `umask 0077`: встроенный CLI —
+`LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun script/build.ts --skip-install --skip-web-ui` в `packages/cli` (19 с);
+`bun run build` в `packages/desktop` с `LOGINOM_AI_AGENT_NODE_SOURCE=<node-v24.19.0-linux-x64>/bin/node` и
+`LOGINOM_AI_AGENT_BROWSER_SOURCE=<каталог с chromium-1246>` (38 с, `Bundled Loginom linux-x64 runtime: 12378 verified
+resource files`); **заглушка до B4.6:** `cp resources/ai.opencode.desktop.dev.metainfo.xml
+resources/com.loginom.aiagent.dev.metainfo.xml` — fpm ставит metainfo по `appId`, а `copy-metainfo.ts` пишет имя upstream;
+затем `bunx electron-builder --linux deb dir --x64 --publish never --config electron-builder.config.ts
+-c.directories.output=<scratchpad>/…` без `-c.npmRebuild` (246 с, из них deb — около 3,5 мин). Все шаги — код 0.
+
+```text
+== electron-builder
+  • skipped dependencies rebuild  reason=npmRebuild is set to false     # значение конфига
+== linux-unpacked
+-rwsr-xr-x 4755 root:root resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
+без o+r: файлов 2 (resources/package-type, resources/apparmor-profile — 600), каталогов без o+rx 0; setuid — только chrome-sandbox
+== deb: loginom-ai-agent-linux-amd64.deb, 542 994 484 байт, 13 606 записей
+Package: loginom-ai-agent-dev
+Version: 2.3.0
+Maintainer: Loginom
+Depends: libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0, libgbm1,
+ libasound2t64 | libasound2 (>= 1.0.16), ca-certificates, fonts-liberation, libcurl4 | libcurl4t64 | libcurl3-gnutls, libvulkan1
+-rwsr-xr-x 0/0  15232 ./opt/loginom-ai-agent-dev/resources/loginom/browsers/chromium-1246/chrome-linux64/chrome-sandbox
+== deb: записи без o+r — 9 из 13 606
+drwx------ 0/0      ./
+-rw------- 0/0      ./opt/loginom-ai-agent-dev/resources/package-type
+-rw------- 0/0      ./opt/loginom-ai-agent-dev/resources/apparmor-profile
+-rw------- 0/0      ./usr/share/metainfo/com.loginom.aiagent.dev.metainfo.xml
+-rw------- 0/0      ./usr/share/applications/com.loginom.aiagent.dev.desktop
+-rw------- 0/0      ./usr/share/doc/loginom-ai-agent-dev/changelog.gz
+-rw------- 0/0      ./usr/share/icons/hicolor/{32x32,64x64,128x128}/apps/loginom-ai-agent-dev.png
+```
+
+Права `chrome-sandbox` (`4755`, владелец `root` в пакете) и `depends` 0.4 — в собранном deb. Всё содержимое `/opt`, кроме
+двух файлов, которые electron-builder пишет после `afterPack`, читается всеми. Девять закрытых записей — «Найдено» ниже.
+
+`--verify-resources` распакованной сборки после `linuxPermissions` и `4755` (root, `xvfb-run -a`, `--no-sandbox`, свои
+`HOME` и `LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT`): `exit=0`, 5,3 с, `resource-verification.json` — 12 378 файлов; процессов
+сборки после прогона нет. Права на хеши не влияют.
+
+Сборка, прогон, `out/`, `resources/{loginom,icons,opencode-cli*,*.metainfo.xml}`, `packages/cli/{dist,.cache}`,
+`packages/dashboard/dist` удалены; `git status --ignored` — только `.husky/_` и `node_modules`.
+
+### Приёмка
+
+`packages/desktop`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0. Падения сравнивались по именам из JUnit.
+
+| Команда | `4bc6438b34` | `b522c0523a` |
+|---|---|---|
+| `bun typecheck` | 3 519 файлов, ошибок нет | 3 519 файлов, ошибок нет |
+| `bun run typecheck:tsc` | код 0 | код 0 |
+| `bun test --timeout 30000` | 558 pass, 4 skip, 0 fail (562 теста, 71 файл) | 566 pass, 4 skip, 0 fail (570, 72): +3 macOS, +3 Linux, +1 `afterPack`, +1 `linux-permissions` |
+
+Конфиг и `scripts/` вне `include` пакета (`src`, `perf`), `bun typecheck` их не видит. Временный `tsconfig` с этими
+четырьмя файлами (`tsc --noEmit`, удалён): две ошибки, те же, что на базе, — `publish` с `provider: string` в `load`
+теста (TS2322) и `script/native-arch.ts` вне `rootDir` (TS6059); в новом коде ошибок нет.
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 483 divergent upstream files                    # как на базе: новые файлы форка не считаются
+  CAT-02: 54
+  CAT-03: 28
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+```
+
+```text
+$ bun run check                                                       # код 0, на b522c0523a с этим разделом
+Found 558 warnings and 0 errors.                                      # как на базе (B4.8a); в файлах B4.5b — ни одного
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+@opencode/desktop:typecheck: ✓ No type errors in 3,519 files across 2 projects
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` и `oxlint` по изменённым и новым TS-файлам — чисто. Тесты `desktop` после сборки в этом дереве — те
+же 566/4/0.
+
+### Каталог
+
+`catalog.json` не менялся: `electron-builder.config*.ts` и `packages/*/scripts/**` — CAT-02, `resources/**` — CAT-03.
+В `catalog.md`, CAT-02: назначение — упаковка Linux и macOS; проверка — новые тесты; «не перенесено» вместо «B4.5b» —
+то, что из упаковки 0.4 не перенесено, с адресами.
+
+### Где решал сам
+
+- **arm64 — закреплён у macOS, как в 0.4.** v2 уже собирала arm64 по `--arm64`, но тест конфига этого не видит; закрепление
+  проверяемо и сборки `pack.ts` (`--dir`) не меняет (выше). x64 macOS по `electron-builder --mac` без `--dir` больше не
+  собирается — как в 0.4; ресурсов Loginom для `darwin-x64` и так нет (`stage-resources.ts`). Linux и Windows arm64 у v2 по флагам остались: «arm64 там, где был в 0.4» их не касается.
+- **Подпись macOS — только ключи из списка.** `identity: "-"`, `notarize: false`, `dmg.sign: false`, `minimumSystemVersion`
+  в списке задачи нет, а `notarize: false` противоречит тесту upstream «shared packaging defaults». Ключи действуют, когда
+  подписывает сам electron-builder (найденная в связке ключей личность или `-c.mac.identity=-`).
+- **`process.umask(0o022)` не перенёс**: его нет в списке; строка при загрузке конфига меняет umask всего процесса
+  `bun test`. Последствие видно в deb (ниже).
+- **Тест ключей `entitlements.plist` — не поиск по исходникам** (`packages/desktop/AGENTS.md`): он читает файл, который
+  конфиг отдаёт `codesign`, и проверяет наличие ключей, а не отсутствие кода.
+- **Заметки об упаковке из `v0.4.0:packages/desktop/AGENTS.md`** (B4.5a отложил их «к B4.5b или B6.3») не переносил:
+  `AGENTS.md` нет в списке файлов задачи, а заметки 0.4 о deb 0.1.2, выпуске и macOS-кандидатах относятся к B4.14b, B5 и
+  этапу G. Перенос раздела — B6.3.
+- **`verifyLinuxPermissions` перенесён вместе с файлом 0.4,** хотя в v2 его зовёт только тест: в 0.4 им пользуется
+  `scripts/release/verify-artifact.ts` (B5).
+- **Тест `afterPack` — в процессе Bun.** Довод 0.4 за Node (Bun 1.3.14 сбрасывал setuid) на Bun 1.4.4 не подтвердился;
+  комментарий в конфиге говорит, почему хук всё равно зовёт `/bin/chmod`.
+- **`entitlements.plist` — по пути 0.4 `resources/`,** поэтому маска `files` upstream `resources/**/*` кладёт его и в
+  `app.asar` (как `installer.nsh` и metainfo); вреда нет, исключение — не в списке.
+- **Сборка deb — с заглушкой metainfo** вместо `dir`: только в deb видны `Depends` и `-rwsr-xr-x 0/0`.
+
+### Найдено, не чинил
+
+- **deb, собранный под umask 077, ставит закрытые файлы** (девять записей выше): ярлык `.desktop`, значки и metainfo
+  `0600` от root — по режимам, обычный пользователь ярлык не прочитает (deb не устанавливал); `resources/package-type`
+  `0600` — его читает electron-updater (`electron-updater/out/main.js:53-57`), чтобы выбрать формат обновления. Ярлык и
+  `package-type` electron-builder пишет после `afterPack` с umask процесса — это и закрывала строка 0.4
+  `process.umask(0o022)`. Значки и metainfo, вероятно, копируются с режимом источника: в дереве после `bun run build` под
+  077 каталог `resources/icons` — `0700`, metainfo — `0600`; тогда строка 0.4 их не лечит. Это вывод по режимам
+  источника: сборку с umask 022 и со строкой 0.4 не делал. Решение — B4.14b или владельцу.
+- **Подпись и `signIgnore` на пути выпуска v2 не действуют.** `pack.ts` собирает macOS с `-c.mac.identity=null`, а
+  `.github/release/sign-desktop-macos.sh` подписывает каждый Mach-O в `Contents` с `.github/release/entitlements/desktop.plist`
+  (только `allow-jit` и `audio-input`, без `disable-library-validation`), в том числе Node, Chromium, ripgrep и бинарники
+  дашбордов в `Resources/loginom` — их подписи upstream и хеши `resource-manifest.json` при этом меняются. Продукт этим
+  скриптом не выпускается — B5.1.
+- Путь `chrome-sandbox` — `chrome-linux64`, как в 0.4. Ресурсы Loginom `stage-resources.ts` собирает только для
+  `linux-x64`, `win32-x64` и `darwin-arm64`, так что сборки Desktop Linux и Windows arm64, которые v2 допускает по флагам,
+  падают раньше, на `bundle-loginom.ts` (`LOGINOM_NATIVE_RESOURCES_UNAVAILABLE`), — по коду, не запускал.
+- Корень архива deb `./` — `drwx------` (временный каталог fpm); что dpkg делает с ним при установке, не проверял.
+
+### Не проверено
+
+- macOS не собиралась: `hardenedRuntime`, `entitlements`, `signIgnore` и цели arm64 — по конфигу, тесту и коду
+  electron-builder 26.15.7 (`MacTargetHelper`).
+- deb не устанавливался (`dpkg -i`, владелец `root` у `chrome-sandbox` после установки, запуск без `--no-sandbox`) — B4.14b;
+  AppImage и rpm не собирались.
+- Сборка — от root; режимы под обычным пользователем и umask 022 не смотрел.
