@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
 import { copyFile, readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -13,6 +14,10 @@ import { linuxPermissions } from "./scripts/linux-permissions"
 import { CLI_BINARIES, getCurrentCli, nodePtyPackage } from "./script/utils"
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
+
+// Loginom AI Agent (B4.5b): FPM also creates desktop entries outside appOutDir; their modes must not inherit a private
+// shell umask.
+if (process.platform === "linux") process.umask(0o022)
 
 // Loginom AI Agent (B4.5b): Electron and the bundled Chromium both link these libraries on all supported distributions.
 const debDepends = [
@@ -155,6 +160,14 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       // fs.chmod cleared it).
       if (context.electronPlatformName === "linux") {
         await linuxPermissions(context.appOutDir)
+        // FPM packs the icons and the metainfo straight from the build resources, with the modes the build gave them.
+        await Promise.all(
+          ["icons", `${appId}.metainfo.xml`].flatMap((name) => {
+            const file = path.join(context.packager.buildResourcesDir, name)
+
+            return existsSync(file) ? [linuxPermissions(file)] : []
+          }),
+        )
         await promisify(execFile)("/bin/chmod", [
           "4755",
           path.join(resources, `loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`),
@@ -200,6 +213,8 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
         NSRemovableVolumesUsageDescription: DESKTOP_NATIVE_ENGLISH["desktop.removableVolumesUsage"],
         NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
       },
+      // Loginom AI Agent (B4.5b): macOS 14 and later, as in 0.4.
+      minimumSystemVersion: "14.0",
       // Loginom AI Agent (B4.5b): the 0.4 signing settings. They apply when electron-builder signs the app itself.
       hardenedRuntime: true,
       entitlements: "resources/entitlements.plist",

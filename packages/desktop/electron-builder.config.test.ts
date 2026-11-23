@@ -202,15 +202,16 @@ test("the production Icon Composer package references its bundled artwork", asyn
   expect(await Bun.file(path.join(import.meta.dirname, "icons/prod/icon.icon/Assets", image)).exists()).toBe(true)
 })
 
-// Loginom AI Agent (B4.5b): the 0.4 signing settings, for when electron-builder signs the app itself.
+// Loginom AI Agent (B4.5b): the 0.4 platform and signing settings, for when electron-builder signs the app itself.
 test.each(channels)(
-  "macOS $channel packages sign arm64 with the 0.4 entitlements without rewriting vendor resources",
+  "macOS $channel packages target arm64 macOS 14 and sign with the 0.4 entitlements without rewriting vendor resources",
   async ({ channel }) => {
     const config = load(channel)
     expect(config.mac?.target).toEqual([
       { target: "dmg", arch: ["arm64"] },
       { target: "zip", arch: ["arm64"] },
     ])
+    expect(config.mac?.minimumSystemVersion).toBe("14.0")
     expect(config.mac?.hardenedRuntime).toBe(true)
     expect(config.mac?.entitlements).toBe("resources/entitlements.plist")
     expect(config.mac?.entitlementsInherit).toBe("resources/entitlements.plist")
@@ -260,23 +261,43 @@ test.each(channels)("Linux $channel packages declare the 0.4 dependencies and re
   expect(config.rpm?.depends).toBeUndefined()
 })
 
+// Loginom AI Agent (B4.5b): electron-builder writes the launcher and package-type after afterPack with the umask of
+// its process, and FPM keeps those modes in the package.
+test.skipIf(process.platform !== "linux")("Linux packaging resets a private build umask", async () => {
+  const previous = process.umask(0o077)
+
+  try {
+    await import(`./electron-builder.config.ts?umask=${Date.now()}`)
+    expect(process.umask()).toBe(0o022)
+  } finally {
+    process.umask(previous)
+  }
+})
+
 // Loginom AI Agent (B4.5b): FPM makes the payload root-owned, so a private build umask must not reach it.
 test.skipIf(process.platform !== "linux")(
-  "Linux afterPack opens the payload modes and restores the pinned Chromium sandbox mode",
+  "Linux afterPack opens the payload and packaging input modes and restores the pinned Chromium sandbox mode",
   async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "loginom-afterpack-"))
-    const resources = path.join(root, "resources")
+    const app = path.join(root, "app")
+    const resources = path.join(app, "resources")
+    const build = path.join(root, "build")
 
     const sandbox = path.join(
       resources,
       `loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`,
     )
 
+    const icon = path.join(build, "icons/32x32.png")
+    const metainfo = path.join(build, "com.loginom.aiagent.dev.metainfo.xml")
     const mode = async (file: string) => (await stat(file)).mode & 0o7777
 
     try {
       await mkdir(path.dirname(sandbox), { recursive: true, mode: 0o700 })
+      await mkdir(path.dirname(icon), { recursive: true, mode: 0o700 })
       await writeFile(sandbox, "fixture", { mode: 0o700 })
+      await writeFile(icon, "fixture", { mode: 0o600 })
+      await writeFile(metainfo, "fixture", { mode: 0o600 })
 
       // afterPack first checks the bundled CLI: a non-empty x64 ELF image and a non-empty version file.
       const elf = Buffer.alloc(64)
@@ -292,20 +313,23 @@ test.skipIf(process.platform !== "linux")(
         appOutDir: string
         electronPlatformName: string
         arch: Arch
-        packager: { getResourcesDir: (dir: string) => string }
+        packager: { buildResourcesDir: string; getResourcesDir: (dir: string) => string }
       }) => Promise<void>
 
       await afterPack({
-        appOutDir: root,
+        appOutDir: app,
         electronPlatformName: "linux",
         arch: Arch.x64,
-        packager: { getResourcesDir: (dir: string) => path.join(dir, "resources") },
+        packager: { buildResourcesDir: build, getResourcesDir: (dir: string) => path.join(dir, "resources") },
       })
       expect(await mode(sandbox)).toBe(0o4755)
       expect(await mode(path.dirname(sandbox))).toBe(0o755)
       expect(await mode(path.join(resources, "opencode-cli"))).toBe(0o755)
       expect(await mode(path.join(resources, "opencode-cli.version"))).toBe(0o644)
-      expect(await mode(root)).toBe(0o755)
+      expect(await mode(app)).toBe(0o755)
+      expect(await mode(path.dirname(icon))).toBe(0o755)
+      expect(await mode(icon)).toBe(0o644)
+      expect(await mode(metainfo)).toBe(0o644)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
