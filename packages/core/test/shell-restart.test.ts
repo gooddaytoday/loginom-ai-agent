@@ -36,6 +36,8 @@ import { permissionLayer } from "./lib/permission"
 
 const it = testEffect(tempGlobalLayer)
 const idleCommand = process.platform === "win32" ? "Start-Sleep -Seconds 60" : "sleep 60"
+// The product plugin turns the terminal off by default (B2.6a); these sessions turn it on.
+const terminal = [{ action: "shell", resource: "*", effect: "allow" as const }]
 
 const model = SessionRunnerModel.node.replace(
   Layer.succeed(SessionRunnerModel.Service, {
@@ -139,6 +141,7 @@ describe("shell commands across a graceful restart", () => {
             location: { directory: AbsolutePath.make(project) },
             agent: Agent.ID.make("build"),
             model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+            permissions: terminal,
           })
           yield* Plugin.Service.use((plugins) => plugins.awaitActivation).pipe(
             Effect.provide(Context.get(one, LocationServiceMap.Service).get(session.location)),
@@ -223,6 +226,7 @@ describe("shell commands across a graceful restart", () => {
             location: { directory: AbsolutePath.make(project) },
             agent: Agent.ID.make("build"),
             model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+            permissions: terminal,
           })
           yield* Plugin.Service.use((plugins) => plugins.awaitActivation).pipe(
             Effect.provide(Context.get(one, LocationServiceMap.Service).get(session.location)),
