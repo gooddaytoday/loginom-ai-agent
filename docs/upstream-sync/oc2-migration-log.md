@@ -9274,3 +9274,97 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Windows и macOS, установленная сборка, Desktop; настоящая модель.
 - `glob` и `grep` в своих каталогах — только юнит-тест `ownRead`; через сервер проверен `read`.
+
+## B2.6a3 Команды без программы
+
+22.11.2026. Ветка `b26a3-shell-noprog` от `oc2-migration` (`6335af35b6`, в нём B2.6a2), рабочее дерево
+`.claude/worktrees/b26a`. Bun 1.4.4 переносной — первым в `PATH` только для своих команд и `git commit`.
+`bun install --frozen-lockfile` — без изменений; клиент `packages/loginom-runtime/client` — `npm ci --ignore-scripts`
+Node 24.19.0; хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Находка B2.6a2: при включённом
+терминале команда агента без программы не спрашивала права и выполнялась (В-31).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `ea6da9b6d0` `fix(core): a shell command that names no program still asks for permission` | `packages/core/src/tool/plugin/shell.ts` (+10 −7), случай в `packages/server/test/loginom-permissions.test.ts`, CAT-07 в `catalog.json` |
+| следующий | этот раздел, CAT-07 в `catalog.md` |
+
+### Правка
+
+`ShellTool.prepare` спрашивал право `shell`, только если `ShellParse.scan` нашёл в команде программы
+(`parsed.commands.length > 0`). Команды не находятся у `X=1`, `export X=1`, `cd src > out` (создаёт и обнуляет файл),
+`[[ -e f ]]`, `for i in 1 2; do X=$i; done`, `(( 1 + 1 ))` (проба B2.6a2). Такая команда выполнялась без вопроса. Хук
+продукта (команда агента всегда `ask`) её не видел. Теперь без найденных программ инструмент спрашивает `shell` всем
+текстом команды; `save` — тот же текст. Так же с B2.6a2 спрашивает проверка расписания (`scanShell` в
+`core/src/schedule/check.ts`).
+
+Общее место — сам `ShellParse.scan` (у него два вызова: инструмент и проверка расписания). Его не трогал: пустой список
+команд для `cd …`, `Set-Location …` и подобных закреплён 13 утверждениями тестов upstream
+(`core/test/shell-parse-compatibility.test.ts` и др.), а каталоги из разбора нужны вызывающим отдельно. Правка — в
+вызывающем, как в `check.ts`.
+
+При выключенном терминале ничего не меняется: правило `shell * deny`, инструмента у модели нет, вызов отклоняется.
+
+**403 с текстом продукта при выключенном терминале — не сделано.** Запрет правилом ядро решает в
+`Permission.evaluateInput` до хуков и без текста (`BlockedError.reason` пуст → `Permission denied: shell`). Текст продукта
+потребовал бы звать хуки и для настроенного запрета или передавать причину из правила. Это больше одной строки и меняет
+общий порядок разрешений. Оставлено, как велит задание.
+
+### Тесты
+
+`packages/server/test/loginom-permissions.test.ts`, новый случай «the terminal on asks for a command that names no program
+too…» (конфиг `shell: ask`, настоящий инструмент `shell`, модель по сценарию):
+
+- `> файл`, `cd . > файл`, `[[ -e inside.txt ]]`, `X=1`, `export X=1` — у каждой открытый вопрос `shell` с ресурсом,
+  равным всей команде; после отказа вызов — `error`, файлов нет. Первая форма спрашивала и раньше (разбор находит в ней
+  команду), остальные четыре — нет;
+- обычная `touch файл` — вопрос с ресурсом-командой, как раньше; после `once` файл есть;
+- выключенный терминал — прежние случаи «умолчания» (модели `shell` не предлагается, вызов ничего не создаёт) и
+  «расписание».
+
+Тесты `core` про оболочку на правке: `tool-shell.test.ts`, `session-shell.test.ts`, `shell-restart.test.ts` — 101 pass,
+23 skip, 0 fail.
+
+### Мутации
+
+Правка `shell.ts` откачена (`if (commands.length > 0)` с `commands = parsed.commands`): новый случай — 0 / 1. Первая
+форма без программы (`cd . > файл`) не открывает вопроса за 20 с (`Timed out waiting for condition`).
+
+### Приёмка
+
+Полные прогоны по одному пакету подряд, из каталога пакета, Node 24.19.0 в `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента
+сделан в обоих деревьях. Итог — это дерево на `ea6da9b6d0`, база — отдельное дерево на `6335af35b6` во временном каталоге.
+
+| Пакет | База `6335af35b6` | Итог `ea6da9b6d0` |
+|---|---|---|
+| `loginom-agent` (`bun test`) | 69 pass, 0 fail | 69 pass, 0 fail (пакет не менялся) |
+| `server` (`bun test`) | 262 pass, 3 skip, 0 fail | 263 pass (+1: команды без программы), 3 skip, 0 fail |
+| `core` (`bun run script/test.ts`) | 7125 pass, 354 skip, 3 fail | 7125 pass, 354 skip, 3 fail — те же под root: `ShellParse > extracts static directory targets…`, `util.effect-flock`, `util.flock` |
+| `cli` (`bun test --timeout 60000`) | 443 pass, 9 skip, 0 fail | 443 pass, 9 skip, 0 fail |
+| `sdk` (`bun run test`) | 40 pass, 0 fail | 40 pass, 0 fail |
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary
+against a6b15d33daf6: 454 divergent upstream files       # код 0; как в базе: shell.ts расходился и раньше (имя от apply-identity)
+  CAT-07: 11                                              # было 10: + core/src/tool/plugin/shell.ts
+  CAT-12: 181                                             # было 182
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                     # код 0
+$ cd packages/core && bun run typecheck
+✓ No type errors in 2,014 files across 2 projects
+$ bun run check                                           # код 0, дерево с этим разделом
+Found 558 warnings and 0 errors.                          # как в B2.6a2; у изменённых файлов предупреждений oxlint нет
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                        # 33 из кэша turbo
+```
+
+### Найдено, не чинил
+
+- Ответ `always` на вопрос команды без программы сохраняет правило с её полным текстом (`save`): на продукт не влияет —
+  команда агента при включённом терминале всё равно спрашивает (B2.6a).
+
+### Не проверено
+
+- Windows (PowerShell): форма без программы у `pwsh` (например, `Set-Location x > out`) — только по коду, общая ветка.
+- Установленная сборка, Desktop, настоящая модель.
