@@ -217,6 +217,8 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       LOGINOM_AI_AGENT_CLI_NAME: JSON.stringify(binary),
       LOGINOM_AI_AGENT_CHANNEL: `'${Script.channel}'`,
       LOGINOM_AI_AGENT_ARTIFACT: `'cli'`,
+      // Loginom AI Agent (B2.7d): `Product.updateFeed`, the only feed the CLI's update notice asks; empty asks none (0.4).
+      LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() ?? ""),
       ...(highlights ? { LOGINOM_AI_AGENT_RELEASE_HIGHLIGHTS: JSON.stringify(highlights) } : {}),
       LOGINOM_AI_AGENT_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "undefined",
       // FFF_LIBC selects the fff native lib variant: "musl" or "gnu".

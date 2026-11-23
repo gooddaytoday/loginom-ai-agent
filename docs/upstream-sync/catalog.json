@@ -26,7 +26,8 @@
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
-        "packages/desktop/src/renderer/platform/notifications.test.ts"
+        "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
+        "packages/cli/test/updater-install.test.ts"
       ]
     },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.5, B2.6, B2.9" },

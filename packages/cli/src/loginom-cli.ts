@@ -4,6 +4,7 @@
 // which keeps the channel directories. Building `loginom-ai-agent-cli` from this entry is B2.7a.
 import { CliProfile } from "./profile"
 import { Standalone } from "./standalone"
+import { UpdateNotifier } from "./update-notifier"
 
 try {
   // Help, version and `diagnostics export` exit here, before the profile is opened (B2.7a3); the `loginom` commands exit
@@ -13,7 +14,9 @@ try {
   const forwarded = Standalone.forward(process.argv.slice(2), process.env.PWD ?? process.cwd())
   process.argv.splice(2, Infinity, ...forwarded.args)
   if (forwarded.directory) process.env.PWD = forwarded.directory
-  CliProfile.apply()
+  const profile = CliProfile.apply()
+  // A new version of the CLI from the product feed, alongside the command (B2.7d), as in 0.4; the CLI's exit ends it.
+  void UpdateNotifier.notify({ data: profile.data, config: profile.config })
 } catch (error) {
   if (!(error instanceof Error && /^(PROFILE_[A-Z_]+$|CLI_ARGUMENT_INVALID:)/.test(error.message))) throw error
   process.stderr.write(`${error.message}\n`)

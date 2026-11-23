@@ -8,6 +8,7 @@ import { parse, type ParseError } from "jsonc-parser"
 import path from "node:path"
 import { stripVTControlCharacters } from "node:util"
 import { RetainedImage } from "./retained-image"
+import { ProductUpdater } from "./product-updater"
 import { action, parseReleaseVersion, type Policy } from "./updater-action"
 import { errorMessage } from "../util/error"
 
@@ -246,7 +247,7 @@ const make = Effect.gen(function* () {
       new UpgradeError({
         title: "Git Bash is required to update OpenCode",
         detail: "The OpenCode installer runs with Git Bash on Windows, and it was not found.",
-        retry: "Install Git for Windows or set LOGINOM_AI_AGENT_GIT_BASH_PATH, then run opencode upgrade again.",
+        retry: "Install Git for Windows or set LOGINOM_AI_AGENT_GIT_BASH_PATH, then run loginom-ai-agent-cli upgrade again.",
       }),
     )
   })
@@ -331,7 +332,7 @@ const make = Effect.gen(function* () {
           {
             title: "Could not check for OpenCode updates",
             detail: errorDetail(cause),
-            retry: "Check your network, then run opencode upgrade again.",
+            retry: "Check your network, then run loginom-ai-agent-cli upgrade again.",
           },
           { cause },
         ),
@@ -378,7 +379,7 @@ const make = Effect.gen(function* () {
           title: "Could not check for OpenCode updates",
           detail,
           command: ["winget", "search", ...wingetArgs].join(" "),
-          retry: "Fix the issue above, then run opencode upgrade again.",
+          retry: "Fix the issue above, then run loginom-ai-agent-cli upgrade again.",
         },
         cause === undefined ? undefined : { cause },
       )
@@ -459,7 +460,7 @@ const make = Effect.gen(function* () {
           title: input.title ?? `${installNames[input.method]} could not install OpenCode`,
           detail,
           command: (input.displayCommand ?? input.command).join(" "),
-          retry: input.retry ?? "Fix the issue above, then run opencode upgrade again.",
+          retry: input.retry ?? "Fix the issue above, then run loginom-ai-agent-cli upgrade again.",
         },
         cause === undefined ? undefined : { cause },
       )
@@ -542,14 +543,14 @@ const make = Effect.gen(function* () {
             command: ["curl", "-fsSL", "-o", installer, "https://opencode.ai/v2/install"],
             displayCommand: ["curl", "-fsSL", "https://opencode.ai/v2/install"],
             title: "Could not download the OpenCode installer",
-            retry: "Check your network, then run opencode upgrade again.",
+            retry: "Check your network, then run loginom-ai-agent-cli upgrade again.",
           })
           return yield* retaining(
             method,
             runUpgrade({
               method,
               command: [bash, installer, "--version", version, "--no-modify-path"],
-              displayCommand: ["opencode", "upgrade", version, "--method", "curl"],
+              displayCommand: ["loginom-ai-agent-cli", "upgrade", version, "--method", "curl"],
               title: "The OpenCode installer failed",
             }),
           )
@@ -581,7 +582,7 @@ const make = Effect.gen(function* () {
               {
                 title: "Could not prepare the OpenCode upgrade",
                 detail: errorDetail(cause),
-                retry: "Fix the issue above, then run opencode upgrade again.",
+                retry: "Fix the issue above, then run loginom-ai-agent-cli upgrade again.",
               },
               { cause },
             ),
@@ -599,7 +600,7 @@ const make = Effect.gen(function* () {
         new UpgradeError({
           title: `${installNames[method]} did not update this copy of OpenCode`,
           detail: `${installNames[method]} reported success, but ${executable} is still version ${installed ?? "unknown"}.`,
-          retry: `Update the copy at ${executable} with the package manager that installed it, then run opencode upgrade again.`,
+          retry: `Update the copy at ${executable} with the package manager that installed it, then run loginom-ai-agent-cli upgrade again.`,
         }),
       )
   })
@@ -707,7 +708,9 @@ const make = Effect.gen(function* () {
   return Service.of({ run, check, apply, method, managed, latest, upgrade, removal })
 })
 
-export const layer = Layer.effect(Service, make)
+export const upstreamLayer = Layer.effect(Service, make)
+// Loginom AI Agent (B2.7d): the product never installs an OpenCode release (`product-updater.ts`).
+export const layer = ProductUpdater.layer({ Service, UpgradeError })
 
 export * as Updater from "./updater"
 export { action, type Action, type Policy } from "./updater-action"
