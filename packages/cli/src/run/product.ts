@@ -92,6 +92,8 @@ export function outcome() {
       }
       // A failed Loginom scenario does not fail the whole run; denials and invalid calls keep their own tool names.
       if (part.tool.startsWith("loginom_")) return
+      // The run cancels every question it cannot ask, and the model goes on without an answer; 0.4 left the tool out.
+      if (part.tool === "question") return
       const key =
         part.tool === "invalid" ? `invalid:${part.id}` : JSON.stringify([part.tool, canonical(part.state.input)])
       if (part.state.status === "error" || part.tool === "invalid" || part.state.metadata?.isError === true) {

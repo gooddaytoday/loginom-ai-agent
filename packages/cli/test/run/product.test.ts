@@ -208,6 +208,20 @@ describe("tool outcome", () => {
     expect(outcome.failed()).toBe(false)
   })
 
+  // OpenCode 2 offers `question` to a run; the run cancels it with a request to go on (`noninteractive.ts`).
+  test("a question the run cancelled does not fail it", () => {
+    const outcome = RunProduct.outcome()
+    outcome.observe(
+      part(
+        "question",
+        { questions: [{ question: "Какой файл?", header: "Файл", options: [] }] },
+        true,
+        "This non-interactive run cannot ask the user questions, so the question was cancelled. Continue without an answer; make reasonable assumptions and state them.",
+      ),
+    )
+    expect(outcome.verdict(undefined)).toEqual({ errors: [], exit: 0 })
+  })
+
   // 0.4 `standalone-preflight` «lazy scenario preparation…» and «a real Help refusal…» by the calls they record: a Help
   // refusal is not a connection failure, an unresolved scenario preparation is.
   test("only unresolved scenario connection admission preserves the lazy preflight failure", () => {

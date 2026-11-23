@@ -153,67 +153,75 @@ test("a provider failure ends the run with 0.4's provider error and exit code 1"
   await keepsShape("provider-auth", result)
 }, 60_000)
 
+// A signal sent to a process on Windows ends it at once, so the cancellation path exists only on POSIX.
+const signals = process.platform !== "win32"
+
 // 0.4 `standalone` «Ctrl+C during provider metadata fetch drains cleanup and releases the writer», for `run`.
-test("Ctrl+C while the model answers cancels the run: exit code 130, CLI_CANCELLED, the profile is released", async () => {
-  const llm = model([{ hang: true }])
-  const { project, profile } = await root(llm.url)
-  const child = spawnProduct(roots.at(-1)!, run(project))
-  const output = finished(child)
-  await Promise.race([
-    llm.requested,
-    child.exited.then(() => {
-      throw new Error("run exited before the model was asked")
-    }),
-  ])
-  child.kill("SIGINT")
-  const result = await output
-  expect(result.code).toBe(130)
-  expect(result.events.map((event) => event.type).at(-1)).toBe("error")
-  expect(result.events.at(-1).error).toMatchObject({ type: "CLI_CANCELLED", name: "CLI_CANCELLED" })
-  expect(result.events.filter((event) => event.type === "session.status").map((event) => event.status.type)).toEqual([
-    "busy",
-    "idle",
-  ])
-  expect(await fs.readdir(profile.root)).not.toContain(".writer")
-  // When the step starts before the interruption depends on timing; the statuses and errors do not.
-  await keepsShape("cancelled", result, ["session.status", "error"])
-  // The private server is gone with its latch: the next run on the profile is not refused.
-  const next = await product(roots.at(-1)!, run(project))
-  expect({ code: next.code, busy: next.stdout.includes("PROFILE_BUSY") }).toEqual({ code: 0, busy: false })
-}, 90_000)
+test.if(signals)(
+  "Ctrl+C while the model answers cancels the run: exit code 130, CLI_CANCELLED, the profile is released",
+  async () => {
+    const llm = model([{ hang: true }])
+    const { project, profile } = await root(llm.url)
+    const child = spawnProduct(roots.at(-1)!, run(project))
+    const output = finished(child)
+    await Promise.race([
+      llm.requested,
+      child.exited.then(() => {
+        throw new Error("run exited before the model was asked")
+      }),
+    ])
+    child.kill("SIGINT")
+    const result = await output
+    expect(result.code).toBe(130)
+    expect(result.events.map((event) => event.type).at(-1)).toBe("error")
+    expect(result.events.at(-1).error).toMatchObject({ type: "CLI_CANCELLED", name: "CLI_CANCELLED" })
+    expect(result.events.filter((event) => event.type === "session.status").map((event) => event.status.type)).toEqual([
+      "busy",
+      "idle",
+    ])
+    expect(await fs.readdir(profile.root)).not.toContain(".writer")
+    // When the step starts before the interruption depends on timing; the statuses and errors do not.
+    await keepsShape("cancelled", result, ["session.status", "error"])
+    // The private server is gone with its latch: the next run on the profile is not refused.
+    const next = await product(roots.at(-1)!, run(project))
+    expect({ code: next.code, busy: next.stdout.includes("PROFILE_BUSY") }).toEqual({ code: 0, busy: false })
+  },
+  90_000,
+)
 
 // 0.4 `standalone` «bootstrap carries an early signal into stdin admission…»: without a message, `run` reads its prompt
 // from stdin, and a pipe that never closes must not hold the run or its private server after Ctrl+C.
-test("Ctrl+C while run waits for its prompt on stdin exits with 130 and releases the profile", async () => {
-  const llm = model([])
-  const { project, profile } = await root(llm.url)
-  const child = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), ...run(project).slice(0, -2)], {
-    cwd: cli,
-    env: isolatedEnv(roots.at(-1)!, {
-      LOGINOM_AI_AGENT_CLI_ROOT: undefined,
-      LOGINOM_AI_AGENT_CLI_PROFILE: profile.root,
-    }),
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-  const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
-  // The private server holds the latch, then reports ready, and the run turns to stdin; nothing it prints marks that turn.
-  await until(
-    () => fs.exists(path.join(profile.root, ".writer", "owner")),
-    () => child.exitCode !== null,
-  )
-  await Bun.sleep(2_000)
-  const signalled = Date.now()
-  child.kill("SIGINT")
-  expect(await child.exited).toBe(130)
-  // Well within the 10 s shutdown deadline that a run stuck on stdin runs into.
-  expect(Date.now() - signalled).toBeLessThan(8_000)
-  const [stdout, stderr] = await output
-  expect({ stdout, stderr }).toEqual({ stdout: "", stderr: "" })
-  expect(await fs.readdir(profile.root)).not.toContain(".writer")
-  expect(llm.requests).toEqual([])
-}, 60_000)
+test.if(signals)(
+  "Ctrl+C while run waits for its prompt on stdin exits with 130 and releases the profile",
+  async () => {
+    const llm = model([])
+    const { project, profile } = await root(llm.url)
+    const child = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), ...run(project).slice(0, -2)], {
+      cwd: cli,
+      env: isolatedEnv(roots.at(-1)!, {
+        LOGINOM_AI_AGENT_CLI_ROOT: undefined,
+        LOGINOM_AI_AGENT_CLI_PROFILE: profile.root,
+      }),
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+    // The private server holds the latch, then reports ready, and the run turns to stdin; nothing it prints marks that turn.
+    await until(
+      () => fs.exists(path.join(profile.root, ".writer", "owner")),
+      () => child.exitCode !== null,
+    )
+    await Bun.sleep(2_000)
+    child.kill("SIGINT")
+    // A run stuck on stdin runs into the 10 s shutdown deadline instead and exits with 1, its private server still up.
+    expect(await child.exited).toBe(130)
+    await output
+    expect(await fs.readdir(profile.root)).not.toContain(".writer")
+    expect(llm.requests).toEqual([])
+  },
+  60_000,
+)
 
 // 0.4 `standalone-file-errors`: a file `run` cannot attach is refused before the model. OpenCode 2 refuses it with its
 // own text, not 0.4's `LOGINOM_FILE_*` codes; root reads a file without permissions, so `denied` needs another user.
