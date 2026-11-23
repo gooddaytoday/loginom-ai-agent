@@ -121,7 +121,7 @@ export function DialogUpdate(props: {
             </Match>
             <Match when={current.type === "installed"}>
               <text fg={theme.text.muted} wrapMode="word">
-                Update successful! Restart closes {Product.name}, then run opencode to use the new version.
+                Update successful! Restart closes {Product.name}, then run loginom-ai-agent-cli to use the new version.
               </text>
             </Match>
             <Match when={current.type === "current"}>

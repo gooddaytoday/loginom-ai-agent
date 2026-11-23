@@ -217,6 +217,64 @@ class ApplyIdentityRules(unittest.TestCase):
         self.assertFalse(self.ai.wants("packages/core/drizzle.config.ts"))   # an upstream developer's home path
 
 
+class ApplyIdentityCommand(unittest.TestCase):
+    """B2.7a5–a6: the CLI, TUI and server tell the user to run loginom-ai-agent-cli, not opencode; each case from its file."""
+
+    CLI = "packages/cli/src/x.ts"
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("apply_identity", HERE / "apply-identity.py")
+        cls.ai = importlib.util.module_from_spec(spec); spec.loader.exec_module(cls.ai)
+
+    def assertRenamed(self, path, *texts):
+        for text in texts:
+            self.assertEqual(self.ai.transform(text, path), text.replace("opencode", "loginom-ai-agent-cli"), text)
+
+    def assertKept(self, path, *texts):
+        for text in texts:
+            self.assertEqual(self.ai.transform(text, path), text)
+
+    def test_the_command_in_messages_is_the_product_command(self):
+        self.assertRenamed("packages/cli/src/services/service-config.ts", "throw new Error(`Usage: opencode service get ${selected}`)",
+                           'throw new Error("Usage: opencode service unset env <key>")')
+        self.assertRenamed("packages/cli/src/commands/handlers/pair.ts", 'run `opencode pair --remote` again to retry.", "run `opencode pair`.")',
+                           "run `opencode service set env HTTPS_PROXY <url>`")
+        self.assertRenamed("packages/cli/src/mini.ts", 'fail("opencode mini requires a TTY stdout")')
+        self.assertRenamed("packages/cli/src/commands/handlers/stats.ts", 'style("opencode stats", primary, options.color)')
+        self.assertRenamed("packages/cli/src/commands/handlers/acp.ts", "process.stderr.write(`opencode acp: ${failure}\\n`)")
+        self.assertRenamed("packages/cli/src/commands/handlers/mcp/auth.ts", "Add one with \\`opencode mcp add\\` or in loginom-ai-agent.json")
+        self.assertRenamed("packages/tui/src/util/presentation.ts", 'row("Continue", `opencode -s ${input.session.sessionID}`)')
+        self.assertRenamed("packages/tui/src/mini/splash.ts", "const command = `opencode mini -s ${meta.session_id}`")
+        self.assertRenamed("packages/tui/src/util/error.ts", '"Try: `opencode models` to list available models",')
+        self.assertRenamed("packages/tui/src/feature-plugins/system/stats.tsx", "          opencode / stats\n")
+        self.assertRenamed("packages/tui/src/component/dialog-update.tsx", "Restart closes {Product.name}, then run opencode to use the new version.")
+        self.assertRenamed("packages/tui/src/util/presentation.ts", "`  ${dim}Run ${reset}${bold}opencode${reset}${dim} to use ${reset}`")
+        self.assertRenamed("packages/server/src/process.ts", 'action: "Run `opencode service restart` after checking the service logs.",')
+        self.assertRenamed("packages/tui/test/util/presentation.test.ts", '["  Loginom AI", "  Run opencode to use 2.0.0"]')
+        # right after an escape, as the names of VARIABLE
+        self.assertRenamed(self.CLI, 'throw new Error("Usage:\\nopencode service get <key>")', '"Done.\\nRun opencode to use 2.0.0"')
+
+    def test_names_that_are_not_the_command_keep_their_spelling(self):
+        self.assertKept(self.CLI, 'import { OpenCode } from "@opencode/client/promise"', "gh attestation verify --repo anomalyco/opencode",
+                        'style("opencode.ai", "2", options.color)', 'openUrl("https://opencode.ai/docs")',
+                        'providerID: "opencode"', 'id: "opencode.stats"', 'const APP = "opencode"', "opencode-pty daemon",
+                        "cli-linux-x64/bin/opencode service start",   # the default build's binary is still named opencode
+                        # the command path and the help of the CLI run from source: its root is opencode without the build define
+                        '[["--server", url, "models"], "opencode models"]', '"opencode mcp auth [flags] [<name>]"', '"opencode mcp list"',
+                        # other tasks: the updater (B2.7d), ACP terminal auth (B2.7a7); subcommands outside the list
+                        "Fix the issue above, then run opencode upgrade again.", "Run `opencode auth login` in the terminal",
+                        "Run `opencode --session ses_1`", "(`service`, `opencode serve`, or `--standalone`)", "opencode pairing code",
+                        "how to spawn opencode.", "Run opencode to finish")
+
+    def test_other_packages_keep_the_words(self):
+        line = "Run `opencode pair` to get a new one; `opencode service set remote`."
+        for path in ("packages/app/src/runtime/i18n/en.ts", "packages/core/src/plugin/skill/opencode.md", "packages/gui-plugins/src/pairing/main.ts",
+                     "packages/cli/script/build.ts", ".github/workflows/test.yml", ""):
+            self.assertKept(path, line)
+        self.assertRenamed("packages/tui/test/x.test.ts", line)
+
+
 class GateCase(FixtureCase):
     """Tests of the acceptance gate: each builds a real Git merge, leaves a result the way a person would, and asserts the verdict."""
 
@@ -266,6 +324,19 @@ class GateNewFiles(GateCase):
         fx = self.seed(); fx.resolve({self.PATH: "export const a = 1\n"}, decisions={self.PATH: ("STANDING-7", "product ships its own version")})
         out = self.assertAccepted(fx)
         self.assertIn(f"- {self.PATH}: upstream-added lines missing", out)
+
+
+class GateCommandName(GateCase):
+    """The oracle applies the command rule by the file's path, as apply-identity --since does during a resolution."""
+    HINT = "export const hint = \"Run `opencode pair` to get a new one.\"\n"
+
+    def test_the_resolution_apply_identity_leaves_is_the_oracle(self):
+        fx = self.fx.start(lambda: self.fx.write("keep.txt", "keep\n"), lambda: self.fx.write("fork.txt", "fork\n"),
+                           lambda: [self.fx.write(p, self.HINT) for p in ("packages/server/src/hint.ts", "packages/app/src/hint.ts")])
+        fx.resolve(hook=lambda: fx.identity("--since", fx.fork))
+        self.assertIn("`loginom-ai-agent-cli pair`", (fx.dir / "packages/server/src/hint.ts").read_text())
+        self.assertEqual((fx.dir / "packages/app/src/hint.ts").read_text(), self.HINT)
+        self.assertAccepted(fx)
 
 
 class GateBothSidesChanged(GateCase):

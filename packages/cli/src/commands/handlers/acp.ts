@@ -52,7 +52,7 @@ export default Runtime.handler(
     )
     // Exit directly: closing the scope would wait on the server's graceful shutdown, and its lease pipe ends it anyway.
     yield* Effect.sync(() => {
-      if (failure) process.stderr.write(`opencode acp: ${failure}\n`)
+      if (failure) process.stderr.write(`loginom-ai-agent-cli acp: ${failure}\n`)
       process.exit(failure ? 1 : 0)
     })
   }),

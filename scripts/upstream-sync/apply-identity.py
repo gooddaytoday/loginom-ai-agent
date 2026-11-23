@@ -7,7 +7,8 @@ Upstream spells the product identity as OPENCODE_* variables, `.opencode` direct
 and tests still carry the upstream spelling; this applies the fork's spelling to them. Third-party provider keys
 (OPENCODE_API_KEY, OPENCODE_GO_API_KEY) are not product names and stay; so do upstream URLs, theme files and the variables
 that only unprocessed code reads (see the constants below). Visible brand text ("OpenCode" in UI strings and
-documents) is a product decision per string and is NOT changed here; see catalog entry CAT-03.
+documents) is a product decision per string and is NOT changed here; see catalog entry CAT-03. One exception: the CLI,
+TUI and server tell the user to run `opencode <subcommand>`, and the product command is loginom-ai-agent-cli (COMMAND).
 
 Usage: apply-identity.py --repo DIR [--since REV] [--check] [PATH ...]
   --since REV  only files that differ from REV in the working tree, staged or not, new or moved (use the pre-merge fork SHA
@@ -38,6 +39,17 @@ VARIABLE = re.compile(r"(?:\b|(?<=\\[nrt]))OPENCODE_[A-Z0-9_]+")
 PATH_NAME = re.compile(r"(?<![\w$.?!)\]])\.opencode(?=[/\s\"'`)\[$]|\\(?!\.)|$)|opencode\.(json|db|settings|updater)")
 # Upstream URLs (`formulae.brew.sh/api/formula/opencode.json`) and theme files (`theme/assets/opencode.json`) keep their names.
 UNTOUCHED = re.compile(r"https?://[^\s\"'`<>]+|\bassets/[\w./-]*")
+# The command the CLI, TUI and server messages tell the user to run: `Usage: opencode service get <key>`, `opencode pair`,
+# `opencode / stats`, `opencode -s <id>`, "run opencode to use the new version". Only these subcommands and only in these
+# packages: elsewhere the same words are other tasks' (app dictionaries, built-in skills, plugin comments). Upstream's
+# `opencode upgrade` and `opencode auth login` are the updater's and ACP's. `models` only in backticks: a bare
+# "opencode models" is the command path of the CLI run from source, whose root keeps the name opencode without the build
+# define. Not after a package scope, path or host (`@opencode/client`, `anomalyco/opencode`, `opencode.ai`); after an escape
+# such as `\n`, as VARIABLE.
+COMMAND_SOURCES = re.compile(r"^packages/(cli|server|tui)/(src|test)/")
+COMMAND = re.compile(r"(?:(?<![\w$./@-])|(?<=\\[nrt]))opencode(?=(?: | / )(?:service|pair|mini|stats|acp|mcp add|-s)\b)|(?<=`)opencode(?= models`)")
+# "Run ${reset}${bold}opencode${reset}${dim} to use 2.0.0": the TUI epilogue styles the command between the words.
+RUN_TO_USE = re.compile(r"((?:\b|(?<=\\[nrt]))[Rr]un (?:\$\{\w+\})*)opencode((?:\$\{\w+\})* to use\b)")
 # Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose; the TUI
 # snapshot test renders sample tool output that names OPENCODE_* variables, and its .snap file (not text here) wraps it;
 # the drizzle-kit config points at an upstream developer's own database, and a changed line would make that path ours.
@@ -50,12 +62,16 @@ def wants(path):
     return not path.startswith(EXCLUDED) and bool(SOURCES.match(path) and TEXT.search(path))
 
 
-def transform(text):
+def transform(text, path=""):
+    """`path` is the file's path in the repository; the command rule applies only under COMMAND_SOURCES."""
     keep = PROVIDER_KEYS + UNPROCESSED_READERS
     text = VARIABLE.sub(lambda m: m.group(0) if m.group(0) in keep else "LOGINOM_AI_AGENT_" + m.group(0)[len("OPENCODE_"):], text)
     untouched = [m.span() for m in UNTOUCHED.finditer(text)]
-    return PATH_NAME.sub(lambda m: m.group(0) if any(a <= m.start() < b for a, b in untouched)
+    text = PATH_NAME.sub(lambda m: m.group(0) if any(a <= m.start() < b for a, b in untouched)
                          else m.group(0).replace("opencode", "loginom-ai-agent"), text)
+    if not COMMAND_SOURCES.match(path):
+        return text
+    return RUN_TO_USE.sub(r"\1loginom-ai-agent-cli\2", COMMAND.sub("loginom-ai-agent-cli", text))
 
 
 def main():
@@ -87,7 +103,7 @@ def main():
             old = open(full, encoding="utf-8", newline="").read()
         except UnicodeDecodeError:
             continue
-        new = transform(old)
+        new = transform(old, os.path.normpath(path))
         if new != old:
             changed.append(path)
             if not a.check:

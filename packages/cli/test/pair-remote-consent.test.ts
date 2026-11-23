@@ -112,7 +112,7 @@ test("pair --remote without a terminal fails before enabling anything, and help 
     [
       "This will expose your Loginom AI Agent server to the internet.",
       "Traffic is end-to-end encrypted, and access requires your server password.",
-      "To pair locally instead, run `opencode pair` without the --remote flag.",
+      "To pair locally instead, run `loginom-ai-agent-cli pair` without the --remote flag.",
       "Run interactively or pass --yes to continue.",
       "",
     ].join(os.EOL),

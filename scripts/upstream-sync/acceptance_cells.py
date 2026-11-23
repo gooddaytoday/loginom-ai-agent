@@ -412,7 +412,7 @@ def build_repo(repo, cells):
         elif fork_entries.get(path) != (mode, sha) and _identity.wants(path) and mode in ("100644", "100755"):
             text = subprocess.run(["git", "-C", repo, "cat-file", "blob", sha], capture_output=True, env=ENV).stdout
             try:
-                mapped = identity(text.decode("utf-8"))
+                mapped = identity(text.decode("utf-8"), path)
             except UnicodeDecodeError:
                 mapped = None
             if mapped is not None and mapped.encode() != text:

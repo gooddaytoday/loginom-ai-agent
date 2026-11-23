@@ -39,7 +39,7 @@ export const ServerHandler = HttpApiBuilder.group(Api, "server.server", (handler
           if (token === undefined) {
             if (!browser) return yield* new UnauthorizedError({ message: "Pairing link expired or already used" })
             return HttpServerResponse.text(
-              "This pairing link expired or was already used. Run `opencode pair` to get a new one.",
+              "This pairing link expired or was already used. Run `loginom-ai-agent-cli pair` to get a new one.",
               { status: 401 },
             )
           }

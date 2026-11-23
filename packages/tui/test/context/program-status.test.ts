@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
+import { Product } from "@loginom-ai-agent/product"
 import type { ProgramStatus } from "@opentui/core"
+import { createTestRenderer } from "@opentui/core/testing"
 import { createRoot, createSignal } from "solid-js"
 import { createProgramStatus, programStatusReports, type PendingSession } from "../../src/context/program-status"
 
@@ -22,15 +24,22 @@ function setup(initial: PendingSession[] = []) {
 
 test("reports a blocked session on the root and its own record", () => {
   const status = setup()
-  expect(status.reports).toEqual([{ state: "idle", app: "opencode" }])
+  expect(status.reports).toEqual([{ state: "idle", app: Product.slug }])
   status.reports.length = 0
 
   status.setSessions([
     { id: "ses_a", title: "Fix\nbuild", state: "blocked", kind: "permission", message: "Allow bash?" },
   ])
   expect(status.reports).toEqual([
-    { state: "blocked", kind: "permission", app: "opencode", title: "Fix build", message: "Allow bash?" },
-    { state: "blocked", kind: "permission", id: "ses_a", app: "opencode", title: "Fix build", message: "Allow bash?" },
+    { state: "blocked", kind: "permission", app: Product.slug, title: "Fix build", message: "Allow bash?" },
+    {
+      state: "blocked",
+      kind: "permission",
+      id: "ses_a",
+      app: Product.slug,
+      title: "Fix build",
+      message: "Allow bash?",
+    },
   ])
   status.dispose()
 })
@@ -41,19 +50,44 @@ test("summarizes several pending sessions and clears resolved ones", () => {
     { id: "ses_b", state: "blocked", kind: "question", message: "Pick one" },
     { id: "ses_c", state: "working" },
   ])
-  expect(status.reports[0]).toEqual({ state: "blocked", app: "opencode", message: "2 sessions need input" })
+  expect(status.reports[0]).toEqual({ state: "blocked", app: Product.slug, message: "2 sessions need input" })
   status.reports.length = 0
 
   status.setSessions([{ id: "ses_c", state: "working" }])
   expect(status.reports).toEqual([
     { state: "clear", id: "ses_a" },
     { state: "clear", id: "ses_b" },
-    { state: "working", app: "opencode" },
+    { state: "working", app: Product.slug },
   ])
   status.reports.length = 0
 
   status.dispose()
   expect(status.reports).toEqual([{ state: "clear" }])
+})
+
+test("names the product in a form the terminal accepts", async () => {
+  // The native session rejects an app name it cannot carry, such as one with spaces, with a NativeError that ends the TUI.
+  const terminal = await createTestRenderer({ width: 40, height: 10 })
+  await terminal.renderer.setupTerminal()
+  const accepted: boolean[] = []
+  const dispose = createRoot((dispose) => {
+    createProgramStatus({
+      renderer: {
+        setProgramStatus(status) {
+          const ok = terminal.renderer.setProgramStatus(status)
+          accepted.push(ok)
+          return ok
+        },
+      },
+      sessions: () => [
+        { id: "ses_a", title: "Fix build", state: "blocked", kind: "permission", message: "Allow bash?" },
+      ],
+    })
+    return dispose
+  })
+  dispose()
+  terminal.renderer.destroy()
+  expect(accepted).toEqual([true, true, true])
 })
 
 test("keeps record IDs within the protocol's name rules", () => {
