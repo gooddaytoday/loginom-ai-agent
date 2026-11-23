@@ -5,15 +5,18 @@ import os from "node:os"
 import path from "node:path"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
+import { copyProductSkillsFixture } from "../../loginom-host/test/fixtures/product-skills"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { LoginomManagement } from "../src/loginom-management"
 import { isolatedEnv } from "./fixture/environment"
+import { productProfile, scriptedModel } from "./fixture/product-run"
 
 // Loginom AI Agent (B2.7b): `loginom setup/status/check/cancel-pending/recover` of the product CLI, the cases of 0.4
 // `test/cli/{loginom-management,standalone-status,standalone-preflight,standalone-startup}.test.ts`
 // (`v0.4.0:packages/opencode`, decision В-99) and the callers of this stage: `scripts/node-acceptance/run-check.py`
-// and `evals`.
+// and `evals`. Then `run` of the product CLI (B2.7a4b): its browser mode, `run --command <skill>` and strict recovery,
+// which 0.4 checked before the model with the Host of its own process and OpenCode 2 asks of its server's Host.
 // Each command runs the product CLI entry from source with the real Node host (`LOGINOM_AI_AGENT_TEST_NODE`) and fixture
 // resources: Help and the browser are stubs, so a fictional Loginom stand answers without Chromium or a network. The
 // cases left behind, and why, are in the migration log (B2.7b).
@@ -28,7 +31,11 @@ const login = {
   password: "fixture-setup-password-b27b",
 }
 
+// Models of the `run` cases.
+const servers: { stop: (force: boolean) => unknown }[] = []
+
 afterAll(async () => {
+  servers.forEach((server) => server.stop(true))
   await Promise.all(roots.map((root) => fs.rm(root, { recursive: true, force: true })))
 })
 
@@ -546,6 +553,234 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       }
     }
   }, 60_000)
+
+  // B2.7a4b. OpenCode 2's server starts the Host (`loginom-agent/src/host.ts`), so the browser mode of `run --headless`
+  // reaches the private server of that run; the fake Host records what its server asked for.
+  test("run --headless reaches the Host of the run's private server, and strict recovery with its variable", async () => {
+    const root = await temporary()
+    const starts = path.join(root, "host-starts.jsonl")
+    const resources = await fakeHost(
+      root,
+      `import { appendFileSync } from "node:fs";
+      process.on("disconnect", () => process.exit(0));
+      process.on("message", m => {
+        if (m.method === "start") {
+          appendFileSync(${JSON.stringify(starts)}, JSON.stringify({ headless: m.input.headless, strictRecovery: m.input.strictRecovery }) + "\\n");
+          process.send({ id: m.id, result: { protocol: 1, ready: true, pid: process.pid } });
+          return;
+        }
+        if (m.method === "close") { process.send({ id: m.id, result: { closed: true } }, () => process.exit(0)); return; }
+        if (m.method === "connection.status") { process.send({ id: m.id, result: { revision: 0, generation: 0, state: "unconfigured" } }); return; }
+        // No Loginom here: a lease or a Dock call fails at once.
+        process.send({ id: m.id, error: "LOGINOM_HOST_NOT_READY" });
+      });`,
+    )
+    const llm = model([])
+    const profile = path.join(root, "profile")
+    await productProfile(profile, llm.url)
+    const fixture = {
+      profile,
+      env: isolatedEnv(root, { LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_RESOURCES: resources }),
+    }
+    for (const [flags, env] of [
+      [["--headless"], {}],
+      [[], {}],
+      [["--no-headless"], {}],
+      [["--headless"], { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }],
+    ] as const) {
+      const result = await run(fixture, [...flags, "--format", "json", "--model", "test/test-model", "--", "hi"], {
+        env,
+      })
+      expect({ flags, code: result.code, stderr: result.stderr }).toEqual({ flags, code: 0, stderr: "" })
+    }
+    expect(await records(starts)).toEqual([
+      { headless: true, strictRecovery: false },
+      { headless: false, strictRecovery: false },
+      { headless: false, strictRecovery: false },
+      { headless: true, strictRecovery: true },
+    ])
+    expect(await fs.readdir(profile)).not.toContain(".writer")
+  }, 120_000)
+
+  // 0.4 `standalone-preflight` «strict recovery still blocks an ordinary request before the model…».
+  test("strict recovery refuses run before the model and keeps its record", async () => {
+    const fixture = await setupFixture()
+    const llm = model([{ text: "Ответ: 4." }])
+    await productProfile(fixture.profile, llm.url)
+    const journal = await recoveryStore(path.join(fixture.profile, "loginom/recovery"), { strict: true })
+    const id = await journal.begin("a".repeat(64), 1)
+    await journal.settle(id, false)
+    const args = ["--format", "json", "--model", "test/test-model", "--dir", fixture.root, "--", "Обычный вопрос"]
+    const strict = await run(fixture, args, { env: { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" } })
+    expect({ code: strict.code, stderr: strict.stderr }).toEqual({ code: 4, stderr: "LOGINOM_RECOVERY_REQUIRED\n" })
+    expect(strict.events).toEqual([
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({
+          name: "LOGINOM_RECOVERY_REQUIRED",
+          data: { message: "LOGINOM_RECOVERY_REQUIRED" },
+        }),
+      }),
+    ])
+    expect(llm.hits.count).toBe(0)
+    expect((await recoveryStore(path.join(fixture.profile, "loginom/recovery"), { strict: true })).pending()).toEqual([
+      id,
+    ])
+    expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+    // Without strict recovery the Host drops the operation of a process that is gone (G4), and the run is answered.
+    const advisory = await run(fixture, args)
+    expect({ code: advisory.code, stderr: advisory.stderr }).toEqual({ code: 0, stderr: "" })
+    expect(advisory.events.filter((event) => event.type === "text").at(-1)?.part.text).toBe("Ответ: 4.")
+    expect((await recoveryStore(path.join(fixture.profile, "loginom/recovery"), { strict: true })).pending()).toEqual(
+      [],
+    )
+  }, 120_000)
+
+  // 0.4 `standalone-status` «actual standalone status…» and `standalone-preflight` «standalone Help preflight stays
+  // independent of the browser»: `--command loginom-automation` needs a saved connection and ready Help, never the
+  // browser, before the model; then the prompt carries the skill, as OpenCode 2 attaches one the user picks.
+  test("run --command loginom-automation checks the connection and Help before the model and attaches the skill", async () => {
+    const fixture = await setupFixture(undefined, true)
+    const llm = model([{ text: "Сценарий готов." }])
+    await productProfile(fixture.profile, llm.url)
+    const project = path.join(fixture.root, "project")
+    await fs.mkdir(project)
+    await fs.writeFile(path.join(project, "input.csv"), "amount\n10\n")
+    // The command line of `evals/script/run-node-selection-attempt.ts`, with the prompt on stdin.
+    const args = [
+      "--headless",
+      "--format",
+      "json",
+      "--model",
+      "test/test-model",
+      "--variant",
+      "default",
+      "--command",
+      "loginom-automation",
+      "--dir",
+      project,
+      "--title",
+      "selection-attempt",
+      "--file",
+      path.join(project, "input.csv"),
+    ]
+    const stdin = "Построй сценарий."
+    // The flags its environment sets for the CLI (lines 127-134); the explicit resources stand in for those of the built
+    // CLI, which a source run does not locate.
+    const env = {
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
+      LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT: "1",
+      LOGINOM_AI_AGENT_DISABLE_EXTERNAL_SKILLS: "1",
+      LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS: "1",
+    }
+    const refused = async (code: string, exit: number) => {
+      const result = await run(fixture, args, { stdin, env })
+      expect({ code: result.code, stderr: result.stderr }).toEqual({ code: exit, stderr: code + "\n" })
+      expect(result.events.at(-1)).toMatchObject({ type: "error", error: { name: code, data: { message: code } } })
+      expect(llm.hits.count).toBe(0)
+      expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+    }
+    await refused("LOGINOM_CONFIG_REQUIRED", 2)
+    expect(
+      await loginom(
+        fixture,
+        ["setup", "--stdin-json", "--format", "json"],
+        JSON.stringify({ url: login.url, username: login.username, password: login.password }),
+      ),
+    ).toMatchObject({ code: 0 })
+    const logins = (await records(fixture.validations)).length
+    await fs.writeFile(path.join(fixture.root, "fail-help"), "")
+    await refused("LOGINOM_CONNECTION_NOT_READY", 1)
+    await fs.rm(path.join(fixture.root, "fail-help"))
+
+    const ready = await run(fixture, args, { stdin, env })
+    expect({ code: ready.code, stderr: ready.stderr }).toEqual({ code: 0, stderr: "" })
+    expect(ready.events.filter((event) => event.type === "text").at(-1)?.part.text).toBe("Сценарий готов.")
+    const first = JSON.stringify(llm.requests[0]?.messages)
+    expect(first).toContain("# Построение сценария Loginom")
+    expect(first).toContain(stdin)
+    // The checks never started the browser.
+    expect((await records(fixture.validations)).length).toBe(logins)
+    expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+    // The skill grants its task the `loginom-automation` profile, which offers no subagent (`loginom-agent/src/access.ts`);
+    // an ordinary run of the same profile offers one.
+    const tools = (index: number) =>
+      (llm.requests[index]?.tools as { function: { name: string } }[]).map((tool) => tool.function.name)
+    expect(tools(0)).not.toContain("subagent")
+    const offered = llm.requests.length
+    expect(
+      (await run(fixture, ["--format", "json", "--model", "test/test-model", "--dir", project, "--", "hi"])).code,
+    ).toBe(0)
+    expect(tools(offered)).toContain("subagent")
+
+    // A skill the catalog lacks fails the run before the model, as an unknown command failed 0.4's.
+    const hits = llm.hits.count
+    const unknown = await run(fixture, ["--format", "json", "--command", "no-such-skill", "--dir", project, "--", "hi"])
+    expect(unknown.code).toBe(1)
+    expect(unknown.events.at(-1)).toMatchObject({
+      type: "error",
+      error: { message: expect.stringContaining("no-such-skill") },
+    })
+    expect(llm.hits.count).toBe(hits)
+  }, 180_000)
+
+  // 0.4 `standalone-status`, phase `cancellation`. Ctrl+C while the Host still checks Help is a case of
+  // `run/product.test.ts`: from outside, the test cannot see that the run already waits for that answer.
+  test.if(process.platform !== "win32")(
+    "Ctrl+C ends run --command while the model answers",
+    async () => {
+      const fixture = await setupFixture(undefined, true)
+      const llm = model([{ hang: true }])
+      await productProfile(fixture.profile, llm.url)
+      expect(
+        await loginom(
+          fixture,
+          ["setup", "--stdin-json", "--format", "json"],
+          JSON.stringify({ url: login.url, username: login.username, password: login.password }),
+        ),
+      ).toMatchObject({ code: 0 })
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "src/loginom-cli.ts",
+          "run",
+          "--format",
+          "json",
+          "--model",
+          "test/test-model",
+          "--command",
+          "loginom-automation",
+          "--dir",
+          fixture.root,
+          "--",
+          "Построй сценарий.",
+        ],
+        {
+          cwd: cli,
+          env: { ...fixture.env, LOGINOM_AI_AGENT_CLI_ROOT: undefined, PWD: cli },
+          stdin: "ignore",
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+      const timer = setTimeout(() => child.kill("SIGKILL"), 60_000)
+      try {
+        await llm.requested
+        child.kill("SIGINT")
+        const code = await child.exited
+        const [stdout, stderr] = await output
+        expect({ code, cancelled: stdout.includes('"name":"CLI_CANCELLED"') }).toEqual({ code: 130, cancelled: true })
+        expect(stdout + stderr).not.toContain(login.password)
+        expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+      } finally {
+        clearTimeout(timer)
+        child.kill()
+      }
+    },
+    120_000,
+  )
 })
 
 function node() {
@@ -562,8 +797,8 @@ async function temporary() {
 
 // Resources with the pinned Node, the built Host entry and a small shipped Help, as `build-cli.ts` lays them out. Help
 // and the browser are stubs: Help records each start, the browser each validation login, and the login succeeds unless
-// `browser` names its refusal.
-async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE") {
+// `browser` names its refusal. `skills` adds the product skills, which the server's product plugin offers.
+async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE", skills = false) {
   const root = await temporary()
   const resources = path.join(root, "resources")
   const starts = path.join(root, "help-starts.jsonl")
@@ -583,8 +818,10 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE") {
         appendFileSync(${JSON.stringify(starts)}, JSON.stringify({ generation: m.input.generation, pid: process.pid }) + "\\n");
         process.send({ id: m.id, result: { protocol: 1, generation: m.input.generation, started: true } });
       }
-      // While the test holds Help, its catalog stays pending: the Host reports the connection as starting.
-      if (m.operation === "list" && !existsSync(${JSON.stringify(path.join(root, "hold-help"))})) process.send({ id: m.id, result: { tools: [] } });
+      // While the test holds Help, its catalog stays pending: the Host reports the connection as starting. A failed Help
+      // refuses its catalog.
+      if (m.operation === "list" && existsSync(${JSON.stringify(path.join(root, "fail-help"))})) process.send({ id: m.id, error: "LOGINOM_KNOWLEDGE_UNAVAILABLE" });
+      else if (m.operation === "list" && !existsSync(${JSON.stringify(path.join(root, "hold-help"))})) process.send({ id: m.id, result: { tools: [] } });
       if (m.operation === "interrupt") process.send({ id: m.id, result: { interrupted: true } });
       if (m.operation === "close") process.send({ id: m.id, result: { closed: true } }, () => process.disconnect());
     });`,
@@ -604,6 +841,7 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE") {
       if (m.operation === "close") process.send({ id: m.id, result: { closed: true } }, () => process.disconnect());
     });`,
   )
+  if (skills) await copyProductSkillsFixture(resources)
   await fs.writeFile(
     path.join(resources, "resource-manifest.json"),
     JSON.stringify({
@@ -677,6 +915,47 @@ async function loginom(
     }
   })()
   return { code, stdout, stderr, json }
+}
+
+function model(steps: Parameters<typeof scriptedModel>[0]) {
+  const llm = scriptedModel(steps)
+  servers.push(llm.server)
+  return llm
+}
+
+// `run <args>` of the product CLI from source in the fixture's profile; stdout is one JSON event per line.
+async function run(
+  fixture: { env: Record<string, string | undefined> },
+  args: string[],
+  options: { stdin?: string; env?: Record<string, string> } = {},
+) {
+  const child = Bun.spawn([process.execPath, "src/loginom-cli.ts", "run", ...args], {
+    cwd: cli,
+    env: { ...fixture.env, LOGINOM_AI_AGENT_CLI_ROOT: undefined, PWD: cli, ...options.env },
+    stdin: options.stdin === undefined ? "ignore" : new Blob([options.stdin]),
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const timer = setTimeout(() => child.kill("SIGKILL"), 90_000)
+  try {
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect(stdout + stderr).not.toContain(login.password)
+    return {
+      code,
+      stdout,
+      stderr,
+      events: stdout
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line)),
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function records(file: string) {

@@ -7,6 +7,8 @@
 export * as RunProduct from "./product"
 
 import path from "node:path"
+import { isRpcError, type LocationRef, type OpenCodeClient } from "@opencode/client/promise"
+import { Option, Schema } from "effect"
 
 type RunError = { type: string; message: string; status?: number }
 
@@ -52,6 +54,71 @@ export function status(
 ) {
   if (value.type !== "retry") return { status: { type: value.type } }
   return { status: { type: "retry", attempt: value.attempt, message: value.error.message, next: value.at } }
+}
+
+/** The skill of `run --command <skill>`, attached to the prompt the way OpenCode 2 attaches a skill the user picks. */
+export function skills() {
+  const id = process.env.LOGINOM_AI_AGENT_RUN_COMMAND
+  return id === undefined ? undefined : [{ id }]
+}
+
+/**
+ * The checks 0.4 made before the model (`v0.4.0:packages/opencode/src/cli/standalone-run.ts`), which the server's Host
+ * answers through the product plugin (`loginom.preflight`, B2.7a4b): with strict recovery
+ * (`LOGINOM_AI_AGENT_STRICT_RECOVERY=1`) an operation the journal keeps refuses any run, exit code 4;
+ * `run --command loginom-automation` needs a saved connection (2) and ready Help (1). Only those runs ask, so an ordinary
+ * one never waits for the Host. A refusal is written as 0.4 wrote it, the error event and the code on stderr. Returns
+ * whether the run goes on.
+ */
+export async function preflight(input: {
+  client: OpenCodeClient
+  location: LocationRef
+  sessionID: string
+  format: "default" | "json"
+  signal: AbortSignal
+}) {
+  const automation = process.env.LOGINOM_AI_AGENT_RUN_COMMAND === "loginom-automation"
+  if (!automation && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY !== "1") return true
+  const refused = await ask(input, automation).catch(() => (input.signal.aborted ? "CLI_CANCELLED" : "CLI_RUN_FAILED"))
+  if (refused === undefined) return true
+  process.exitCode = exits[refused] ?? 1
+  if (input.format === "json")
+    process.stdout.write(
+      JSON.stringify({
+        type: "error",
+        timestamp: Date.now(),
+        sessionID: input.sessionID,
+        error: error(code(refused)),
+      }) + "\n",
+    )
+  process.stderr.write(refused + "\n")
+  return false
+}
+
+const exits: Record<string, number> = { LOGINOM_CONFIG_REQUIRED: 2, LOGINOM_RECOVERY_REQUIRED: 4, CLI_CANCELLED: 130 }
+const decodePreflight = Schema.decodeUnknownOption(Schema.Struct({ code: Schema.optional(Schema.String) }))
+
+// The plugin registers its RPC once the Location's plugins have loaded, and the server does not wait for them.
+async function ask(input: Parameters<typeof preflight>[0], automation: boolean): Promise<string | undefined> {
+  const deadline = Date.now() + 60_000
+  while (true) {
+    const reply = await input.client.rpc
+      .call(
+        {
+          rpcID: "loginom.preflight",
+          method: "check",
+          input: { automation },
+          location: { directory: input.location.directory },
+        },
+        { signal: input.signal },
+      )
+      .catch((failure: unknown) => {
+        if (isRpcError(failure) && failure.type === "rpc.unavailable" && Date.now() < deadline) return undefined
+        throw failure
+      })
+    if (reply) return Option.getOrElse(decodePreflight(reply.output), () => ({ code: "LOGINOM_REPLY_INVALID" })).code
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
 }
 
 const connection = new Set([

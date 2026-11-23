@@ -339,45 +339,62 @@ describe("final state", () => {
 
 describe("flags of the product run", () => {
   test("headless flags are dropped before the CLI parses its arguments, and exclude each other", () => {
-    expect(Standalone.forward(["run", "--headless", "--format", "json", "--", "--headless"], "/work")).toEqual({
+    expect(Standalone.forward(["run", "--headless", "--format", "json", "--", "--headless"], "/work", {})).toEqual({
       args: ["run", "--format", "json", "--", "--headless"],
       directory: undefined,
     })
     expect(Standalone.forward(["--no-headless", "/project"], "/work")).toEqual({ args: ["/project"] })
-    expect(() => Standalone.forward(["run", "--headless", "--no-headless"], "/work")).toThrow("CLI_ARGUMENT_INVALID")
+    expect(() => Standalone.forward(["run", "--headless", "--no-headless"], "/work", {})).toThrow(
+      "CLI_ARGUMENT_INVALID",
+    )
   })
 
   test("run --dir names the project directory against the current one", () => {
-    expect(Standalone.forward(["run", "--dir", "project", "hello"], "/work")).toEqual({
+    expect(Standalone.forward(["run", "--dir", "project", "hello"], "/work", {})).toEqual({
       args: ["run", "hello"],
       directory: "/work/project",
     })
-    expect(Standalone.forward(["run", "--dir=/abs", "hello"], "/work").directory).toBe("/abs")
-    expect(() => Standalone.forward(["run", "--dir"], "/work")).toThrow("CLI_ARGUMENT_INVALID")
+    expect(Standalone.forward(["run", "--dir=/abs", "hello"], "/work", {}).directory).toBe("/abs")
+    expect(() => Standalone.forward(["run", "--dir"], "/work", {})).toThrow("CLI_ARGUMENT_INVALID")
   })
 
   test("run --variant joins --model; the default variant is the model's own", () => {
-    expect(Standalone.forward(["run", "--model", "openai/gpt", "--variant", "medium", "--", "hi"], "/w").args).toEqual([
-      "run",
-      "--model",
-      "openai/gpt#medium",
-      "--",
-      "hi",
-    ])
-    expect(Standalone.forward(["run", "--variant=low", "-m", "openai/gpt"], "/w").args).toEqual([
+    expect(
+      Standalone.forward(["run", "--model", "openai/gpt", "--variant", "medium", "--", "hi"], "/w", {}).args,
+    ).toEqual(["run", "--model", "openai/gpt#medium", "--", "hi"])
+    expect(Standalone.forward(["run", "--variant=low", "-m", "openai/gpt"], "/w", {}).args).toEqual([
       "run",
       "--model",
       "openai/gpt#low",
     ])
-    expect(Standalone.forward(["run", "--model", "openai/gpt", "--variant", "default"], "/w").args).toEqual([
+    expect(Standalone.forward(["run", "--model", "openai/gpt", "--variant", "default"], "/w", {}).args).toEqual([
       "run",
       "--model",
       "openai/gpt",
     ])
-    expect(() => Standalone.forward(["run", "--variant", "low"], "/w")).toThrow("CLI_ARGUMENT_INVALID")
-    expect(() => Standalone.forward(["run", "--model", "openai/gpt#high", "--variant", "low"], "/w")).toThrow(
+    expect(() => Standalone.forward(["run", "--variant", "low"], "/w", {})).toThrow("CLI_ARGUMENT_INVALID")
+    expect(() => Standalone.forward(["run", "--model", "openai/gpt#high", "--variant", "low"], "/w", {})).toThrow(
       "CLI_ARGUMENT_INVALID",
     )
+  })
+
+  // B2.7a4b: the run's private server inherits the browser mode; another command, such as its `serve`, keeps both.
+  test("run records its browser mode and run --command its skill; other commands leave them", () => {
+    const env: NodeJS.ProcessEnv = {}
+    expect(
+      Standalone.forward(["run", "--headless", "--command", "loginom-automation", "--", "--command", "x"], "/w", env),
+    ).toEqual({ args: ["run", "--", "--command", "x"], directory: undefined })
+    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation" })
+    expect(Standalone.forward(["serve", "--stdio"], "/w", env).args).toEqual(["serve", "--stdio"])
+    expect(env).toEqual({ LOGINOM_AI_AGENT_HEADLESS: "1", LOGINOM_AI_AGENT_RUN_COMMAND: "loginom-automation" })
+    expect(Standalone.forward(["run", "--no-headless", "--command=package-docs", "hi"], "/w", env).args).toEqual([
+      "run",
+      "hi",
+    ])
+    expect(env).toEqual({ LOGINOM_AI_AGENT_RUN_COMMAND: "package-docs" })
+    Standalone.forward(["run", "hi"], "/w", env)
+    expect(env).toEqual({})
+    expect(() => Standalone.forward(["run", "--command"], "/w", {})).toThrow("CLI_ARGUMENT_INVALID")
   })
 
   test("other commands keep their own flags", () => {
@@ -498,5 +515,97 @@ describe("the run of the product", () => {
       "CLI_PERMISSION_REJECTED",
     ])
     expect(exit).toBe(1)
+  })
+})
+
+// B2.7a4b: the checks 0.4 made before the model, which the run asks of its server's Host through the product plugin
+// (`loginom.preflight`). The RPC is replaced; `cli-loginom.test.ts` asks the real Host.
+describe("the checks of the product run before the model", () => {
+  afterEach(() => {
+    mock.restore()
+    delete process.env.LOGINOM_AI_AGENT_RUN_COMMAND
+    delete process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY
+    process.exitCode = 0
+  })
+
+  const checks = (sdk: ReturnType<typeof OpenCode.make>, signal = new AbortController().signal) =>
+    RunProduct.preflight({ client: sdk, location: { directory: "/work" }, sessionID: "ses_1", format: "json", signal })
+
+  function output() {
+    const stdout: string[] = []
+    const stderr: string[] = []
+    spyOn(process.stdout, "write").mockImplementation((chunk) => stdout.push(String(chunk)) > 0)
+    spyOn(process.stderr, "write").mockImplementation((chunk) => stderr.push(String(chunk)) > 0)
+    return { stdout, stderr }
+  }
+
+  test("an ordinary run and another skill ask nothing, so they never wait for the Host", async () => {
+    const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const call = spyOn(sdk.rpc, "call")
+    expect(await checks(sdk)).toBe(true)
+    process.env.LOGINOM_AI_AGENT_RUN_COMMAND = "package-docs"
+    expect(await checks(sdk)).toBe(true)
+    expect(call).not.toHaveBeenCalled()
+  })
+
+  test("the RPC is awaited while the Location's plugins load, and its code refuses the run as 0.4 did", async () => {
+    process.env.LOGINOM_AI_AGENT_RUN_COMMAND = "loginom-automation"
+    const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const inputs: unknown[] = []
+    spyOn(sdk.rpc, "call").mockImplementation((input) => {
+      inputs.push(input)
+      if (inputs.length < 3)
+        return Promise.reject({ _tag: "RpcError", type: "rpc.unavailable", message: "RPC is unavailable" })
+      return Promise.resolve({ output: { code: "LOGINOM_CONFIG_REQUIRED" } }) as never
+    })
+    const written = output()
+    const result = await checks(sdk)
+    const exit = process.exitCode
+    mock.restore()
+    expect({ result, exit, stderr: written.stderr }).toEqual({
+      result: false,
+      exit: 2,
+      stderr: ["LOGINOM_CONFIG_REQUIRED\n"],
+    })
+    expect(JSON.parse(written.stdout.join(""))).toMatchObject({
+      type: "error",
+      sessionID: "ses_1",
+      error: { name: "LOGINOM_CONFIG_REQUIRED", data: { message: "LOGINOM_CONFIG_REQUIRED" } },
+    })
+    expect(inputs).toEqual(
+      Array(3).fill({
+        rpcID: "loginom.preflight",
+        method: "check",
+        input: { automation: true },
+        location: { directory: "/work" },
+      }),
+    )
+  })
+
+  test("strict recovery asks without automation, and Ctrl+C while the Host answers cancels the run", async () => {
+    process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY = "1"
+    const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
+    const asked = Promise.withResolvers<unknown>()
+    spyOn(sdk.rpc, "call").mockImplementation((input, options) => {
+      asked.resolve(input)
+      return new Promise((_, reject) =>
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true }),
+      )
+    })
+    const written = output()
+    const controller = new AbortController()
+    const result = checks(sdk, controller.signal)
+    const input = await asked.promise
+    controller.abort()
+    const refused = await result
+    const exit = process.exitCode
+    mock.restore()
+    expect(input).toMatchObject({ input: { automation: false } })
+    expect({ refused, exit, stderr: written.stderr }).toEqual({
+      refused: false,
+      exit: 130,
+      stderr: ["CLI_CANCELLED\n"],
+    })
+    expect(JSON.parse(written.stdout.join(""))).toMatchObject({ type: "error", error: { name: "CLI_CANCELLED" } })
   })
 })

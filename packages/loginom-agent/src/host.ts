@@ -14,7 +14,11 @@ import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
 
 export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
-export type Connection = { port: Port; close(): Promise<void> }
+export type Connection = {
+  port: Port
+  close(): Promise<void>
+  request?: (method: string, input: unknown) => Promise<unknown>
+}
 
 type Started = {
   readonly directory: string
@@ -27,6 +31,9 @@ type Started = {
 const state: { current?: Started } = {}
 const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
+)
+const decodeStatus = Schema.decodeUnknownOption(
+  Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
 
 /**
@@ -75,6 +82,27 @@ export async function start(input: { data: string; resources?: string; connect?:
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
 export function connected() {
   return !!state.current?.connected && !state.current.closing
+}
+
+/**
+ * The checks 0.4's product CLI made before the model (`v0.4.0:packages/opencode/src/cli/standalone-run.ts`), for the
+ * product CLI's `run` (B2.7a4b): an operation the strict recovery journal keeps refuses any request
+ * (`LOGINOM_RECOVERY_REQUIRED`); an automation request needs a saved connection (`LOGINOM_CONFIG_REQUIRED`) and ready
+ * Help (`LOGINOM_CONNECTION_NOT_READY`), not the browser. Waits for the Host's handshake. Without a Host, as in a run
+ * from source without resources, there is no journal to keep anything, and Loginom is not ready.
+ */
+export async function preflight(automation: boolean) {
+  const connection = await state.current?.ready
+  if (!connection?.request) return automation ? "LOGINOM_CONNECTION_NOT_READY" : undefined
+  const status = Option.getOrUndefined(decodeStatus(await connection.request("connection.status", {})))
+  if (!status) return "LOGINOM_REPLY_INVALID"
+  if (status.recoveries?.length) return "LOGINOM_RECOVERY_REQUIRED"
+  if (!automation) return undefined
+  if (!status.generation) return "LOGINOM_CONFIG_REQUIRED"
+  return connection.request("connection.ready", {}).then(
+    () => undefined,
+    () => "LOGINOM_CONNECTION_NOT_READY",
+  )
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */
@@ -140,8 +168,13 @@ function nodeHost(root: string, resources: string) {
       entry: join(resources, "host", "node-host.mjs"),
       root,
       resources,
-      // As the Desktop Host of 0.4: the user sees the browser at work. The CLI's `--headless` is stage B2.7.
-      headless: false,
+      // As the Desktop Host of 0.4, the user sees the browser at work. The product CLI's `run --headless` reaches only the
+      // private server of that run (B2.7a4b): the profile's service started its Host before, for every client. Strict
+      // recovery holds for a server of a CLI profile started with it, as for each process of 0.4's CLI; never for
+      // Desktop's (`loginom-host/AGENTS.md`).
+      headless: process.env.LOGINOM_AI_AGENT_HEADLESS === "1",
+      strictRecovery:
+        process.env.LOGINOM_AI_AGENT_CLI_ROOT !== undefined && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
       environment: process.env,
     })
 }

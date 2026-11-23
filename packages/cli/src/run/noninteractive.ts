@@ -65,6 +65,8 @@ const PERMISSION_REJECTED_FEEDBACK =
  *   any state + abort (SIGINT/SIGTERM) → cancelling → done
  */
 export async function runNonInteractivePrompt(input: Input) {
+  // Loginom AI Agent (B2.7a4b): the product CLI's checks of its Loginom Host, before the model as in 0.4.
+  if (RunProduct.enabled() && !(await RunProduct.preflight(input))) return
   const controller = new AbortController()
   const stream = input.client.event.subscribe({ signal: controller.signal })[Symbol.asyncIterator]()
   if ((await stream.next()).done) throw new Error("Event stream disconnected before prompt admission")
@@ -226,6 +228,8 @@ export async function runNonInteractivePrompt(input: Input) {
       id: messageID,
       text: input.message,
       files: input.files,
+      // Loginom AI Agent (B2.7a4b): the skill of the product CLI's `run --command`.
+      skills: product && RunProduct.skills(),
       delivery: "steer",
     })
     await state.admission
