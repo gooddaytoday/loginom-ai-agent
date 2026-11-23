@@ -13,4 +13,4 @@ def write(name, fields, rows, encoding='utf-8-sig', delimiter=';', header=True, 
         w=csv.writer(f,delimiter=delimiter,lineterminator='\n')
         if header: w.writerow(fields)
         w.writerows(rows)
-(a.out/'orders.json').write_text(json.dumps([{'Region':['North','South','West'][i%3],'Amount':(i*17+25)/100} for i in range(80)],ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+(a.out/'orders.json').write_text(json.dumps([{'Region':['North','South','West'][i%3],'Amount':(i*17+25)/100} for i in range(12)],ensure_ascii=False,separators=(',',':')),encoding='utf-8')

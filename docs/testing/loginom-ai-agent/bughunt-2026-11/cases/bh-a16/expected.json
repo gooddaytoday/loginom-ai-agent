@@ -1,5 +1,18 @@
 {
-  "nodes": [],
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "trees.from_json",
+      "label_any": true
+    },
+    {
+      "type": "trees.to_table",
+      "label_any": true
+    }
+  ],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -21,15 +34,15 @@
       "rows": [
         {
           "Region": "North",
-          "Total": 185.76
+          "Total": 4.06
         },
         {
           "Region": "South",
-          "Total": 190.35
+          "Total": 4.74
         },
         {
           "Region": "West",
-          "Total": 181.09
+          "Total": 5.42
         }
       ]
     }

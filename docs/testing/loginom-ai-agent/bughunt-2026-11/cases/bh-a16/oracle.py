@@ -20,5 +20,5 @@ def grouped(records, keys, value, result='Total'):
     return [dict(zip(keys,k), **{result:float(v)}) for k,v in sorted(sums.items())]
 rows=grouped(json.loads((a.data/'orders.json').read_text()),['Region'],'Amount')
 columns=[('Region', 'string'), ('Total', 'real')]
-expected={'nodes':[{'type':t,'label_any':True} for t in []], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a16-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
+expected={'nodes':[{'type':t,'label_any':True} for t in ['imports.text', 'trees.from_json', 'trees.to_table']], 'outputs':[{'output_node_type':'export_input','export_destination':'bh-a16-result.csv','ordered':True,'column_order':'exact','columns':[{'name':n,'label':n,'type':t} for n,t in columns], 'rows':rows}]}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

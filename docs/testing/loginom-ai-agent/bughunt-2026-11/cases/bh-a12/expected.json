@@ -1,5 +1,10 @@
 {
-  "nodes": [],
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label_any": true
+    }
+  ],
   "outputs": [
     {
       "output_node_type": "export_input",
