@@ -292,6 +292,52 @@ test("the chat is read as one snapshot: a message written meanwhile is not expor
   }
 })
 
+test("the export reads the database through query-only connections that cannot write it", async () => {
+  const profile = await cliProfile()
+  const file = join(profile.paths.data, "loginom-ai-agent.db")
+  // WAL without -wal and -shm, as the CLI leaves the database on exit: here a `readonly` connection of the macOS
+  // system SQLite fails, so the chat and the saved keys are read through read-write connections with `query_only`.
+  const wal = new Database(file)
+  wal.run("PRAGMA journal_mode = WAL")
+  wal.close()
+  // Before its first statement, every connection the export opens tries to write.
+  const writes: string[] = []
+  const connections = new Set<Database>()
+  const query = Database.prototype.query
+  Database.prototype.query = function (this: Database, sql: string) {
+    if (!connections.has(this)) {
+      connections.add(this)
+      writes.push(tryWrite(this))
+    }
+    return query.call(this, sql)
+  } as typeof query
+  try {
+    const output = join(profile.base, "query-only.zip")
+    const result = await run(["diagnostics", "export", "--output", output], profile)
+    expect(result).toMatchObject({ code: 0, stderr: expect.stringContaining("chat: included") })
+    expect((await unpack(output)).manifest).toMatchObject({ chat: "included", knownSecrets: "ok" })
+  } finally {
+    Database.prototype.query = query
+  }
+  // Two connections: the chat (`openSessions`) and the saved keys (`profileSecrets`).
+  expect(writes).toEqual([
+    "SQLiteError: attempt to write a readonly database",
+    "SQLiteError: attempt to write a readonly database",
+  ])
+  const db = new Database(file)
+  expect(db.query("SELECT name FROM sqlite_master WHERE name = 'probe'").get()).toBeNull()
+  db.close()
+})
+
+function tryWrite(db: Database) {
+  try {
+    db.run("CREATE TABLE probe (id TEXT)")
+    return "written"
+  } catch (error) {
+    return String(error)
+  }
+}
+
 test("credentials of an earlier connection are masked in an older chat after switching accounts", async () => {
   const profile = await cliProfile()
   const store = connectionStore(
