@@ -157,83 +157,88 @@ test.each([false, true])(
 // B2.7a3b: what the diagnostics archive of an OpenCode 2 profile carries. A provider key saved the OpenCode 2 way, through
 // `integration.connect.key`, and a prompt that quotes it and a marker: the chat comes from the session tables of
 // OpenCode 2 with the prompt, as in 0.4; the key is replaced everywhere; the CLI log keeps no command line.
-test("diagnostics export carries the chat of the profile, and none of its saved keys or command lines", async () => {
-  const root = await temporary()
-  const project = path.join(root, "project")
-  await fs.mkdir(project)
-  const key = "fixture-saved-provider-value"
-  const marker = "fixture-prompt-marker"
-  const password = "cli-standalone-diagnostics"
-  const llm = model("Ответ: 4.")
-  try {
-    const profile = CliProfile.apply({ LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile") })
-    await Bun.write(
-      path.join(profile.config, "loginom-ai-agent.json"),
-      JSON.stringify({
-        model: "stub/stub-model",
-        providers: {
-          stub: {
-            name: "Stub provider",
-            package: "@opencode/ai/providers/openai-compatible",
-            settings: { baseURL: llm.url },
-            models: {
-              "stub-model": { name: "Stub model", capabilities: { tools: true, input: ["text"], output: ["text"] } },
+// The archive is read with the system `unzip`, which a Windows runner may lack.
+test.skipIf(!Bun.which("unzip"))(
+  "diagnostics export carries the chat of the profile, and none of its saved keys or command lines",
+  async () => {
+    const root = await temporary()
+    const project = path.join(root, "project")
+    await fs.mkdir(project)
+    const key = "fixture-saved-provider-value"
+    const marker = "fixture-prompt-marker"
+    const password = "cli-standalone-diagnostics"
+    const llm = model("Ответ: 4.")
+    try {
+      const profile = CliProfile.apply({ LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile") })
+      await Bun.write(
+        path.join(profile.config, "loginom-ai-agent.json"),
+        JSON.stringify({
+          model: "stub/stub-model",
+          providers: {
+            stub: {
+              name: "Stub provider",
+              package: "@opencode/ai/providers/openai-compatible",
+              settings: { baseURL: llm.url },
+              models: {
+                "stub-model": { name: "Stub model", capabilities: { tools: true, input: ["text"], output: ["text"] } },
+              },
             },
           },
-        },
-      }),
-    )
-    const server = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), "serve", "--port", "0"], {
-      cwd: cli,
-      env: environment(root, { LOGINOM_AI_AGENT_PASSWORD: password }),
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    try {
-      const call = api(await listening(server), project, password)
-      // A one-shot client waits for the plugins of a cold Location itself; the product plugin activates last.
-      await until(async () =>
-        (
-          (await call("GET", `/api/plugin?location[directory]=${encodeURIComponent(project)}`)).data as {
-            id?: string
-          }[]
-        ).some((plugin) => plugin.id === "loginom.product")
-          ? true
-          : undefined,
+        }),
       )
-      await call("POST", "/api/integration/stub/connect/key", { key, location: { directory: project } })
-    } finally {
-      server.kill("SIGTERM")
-      await server.exited
-    }
-    const run = await product(root, ["run", "--format", "json", `${marker}: is ${key} the right value?`], {
-      PWD: project,
-    })
-    expect({ code: run.code, stderr: run.stderr }).toEqual({ code: 0, stderr: "" })
-    expect(llm.authorizations).toContain(`Bearer ${key}`)
-    const sessionID = JSON.parse(run.stdout.trim().split("\n")[0]).sessionID
+      const server = Bun.spawn([process.execPath, path.join(cli, "src/loginom-cli.ts"), "serve", "--port", "0"], {
+        cwd: cli,
+        env: environment(root, { LOGINOM_AI_AGENT_PASSWORD: password }),
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      try {
+        const call = api(await listening(server), project, password)
+        // A one-shot client waits for the plugins of a cold Location itself; the product plugin activates last.
+        await until(async () =>
+          (
+            (await call("GET", `/api/plugin?location[directory]=${encodeURIComponent(project)}`)).data as {
+              id?: string
+            }[]
+          ).some((plugin) => plugin.id === "loginom.product")
+            ? true
+            : undefined,
+        )
+        await call("POST", "/api/integration/stub/connect/key", { key, location: { directory: project } })
+      } finally {
+        server.kill("SIGTERM")
+        await server.exited
+      }
+      const run = await product(root, ["run", "--format", "json", `${marker}: is ${key} the right value?`], {
+        PWD: project,
+      })
+      expect({ code: run.code, stderr: run.stderr }).toEqual({ code: 0, stderr: "" })
+      expect(llm.authorizations).toContain(`Bearer ${key}`)
+      const sessionID = JSON.parse(run.stdout.trim().split("\n")[0]).sessionID
 
-    const output = path.join(root, "diagnostics.zip")
-    const exported = await product(root, ["diagnostics", "export", "--output", output])
-    expect({ code: exported.code, stdout: exported.stdout }).toEqual({ code: 0, stdout: output + "\n" })
-    const files = Bun.spawnSync(["unzip", "-Z1", output]).stdout.toString().trim().split("\n")
-    const entry = (name: string) => Bun.spawnSync(["unzip", "-p", output, name]).stdout.toString()
-    expect(JSON.parse(entry("manifest.json"))).toMatchObject({ knownSecrets: "ok", chat: "included" })
-    const chat = JSON.parse(entry("chat/session.json"))
-    expect(chat.info.id).toBe(sessionID)
-    expect(JSON.stringify(chat)).toContain(marker)
-    expect(JSON.stringify(chat)).toContain("Ответ: 4.")
-    const log = files
-      .filter((name) => name.startsWith("cli/"))
-      .map(entry)
-      .join("\n")
-    expect(log).toContain("args=[redacted]")
-    expect(log).not.toContain(marker)
-    for (const name of files) expect(entry(name)).not.toContain(key)
-  } finally {
-    await llm.server.stop(true)
-  }
-}, 90_000)
+      const output = path.join(root, "diagnostics.zip")
+      const exported = await product(root, ["diagnostics", "export", "--output", output])
+      expect({ code: exported.code, stdout: exported.stdout }).toEqual({ code: 0, stdout: output + "\n" })
+      const files = Bun.spawnSync(["unzip", "-Z1", output]).stdout.toString().trim().split("\n")
+      const entry = (name: string) => Bun.spawnSync(["unzip", "-p", output, name]).stdout.toString()
+      expect(JSON.parse(entry("manifest.json"))).toMatchObject({ knownSecrets: "ok", chat: "included" })
+      const chat = JSON.parse(entry("chat/session.json"))
+      expect(chat.info.id).toBe(sessionID)
+      expect(JSON.stringify(chat)).toContain(marker)
+      expect(JSON.stringify(chat)).toContain("Ответ: 4.")
+      const log = files
+        .filter((name) => name.startsWith("cli/"))
+        .map(entry)
+        .join("\n")
+      expect(log).toContain("args=[redacted]")
+      expect(log).not.toContain(marker)
+      for (const name of files) expect(entry(name)).not.toContain(key)
+    } finally {
+      await llm.server.stop(true)
+    }
+  },
+  90_000,
+)
 
 async function temporary() {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "loginom-cli-standalone-")))

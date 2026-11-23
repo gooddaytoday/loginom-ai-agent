@@ -9674,7 +9674,8 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
 | Коммит | Что | `bun run secrets staged` |
 |---|---|---|
 | `7bf1a9a8ea` `fix(loginom-host): keep saved keys and command lines out of the diagnostics archive, read the chat of OpenCode 2 (B2.7a3b)` | `loginom-host/src/diagnostics-export.ts` (+41 −4), `loginom-host/src/diagnostics-cli.ts` (+8 −8); тесты `loginom-host/test/diagnostics-cli.test.ts`, `cli/test/cli-standalone.test.ts` | `clean` |
-| следующий | этот раздел | |
+| `49ae8da117` `docs(upstream-sync): record the diagnostics archive without saved keys and command lines, with the chat of OpenCode 2 (B2.7a3b)` | этот раздел | `clean` |
+| следующий | комментарии `--no-chat` и «только Bun» в `diagnostics-{cli,export}.ts`, имя теста `--no-chat`, случай `cli` пропускается без `unzip`; дополнения раздела (вызов инструмента, полнота полей) | |
 
 Оба файла кода — файлы форка (`loginom-host`), правок upstream нет, `catalog.json` не менялся. `bun run secrets range
 2762bcbe86 HEAD` — `clean`, 1 коммит: фикстуры — выдуманные значения `fixture-…`.
@@ -9715,7 +9716,19 @@ password in raw log: false in archive: false      # пароль сервера 
 key in log raw file: true                          # в журнале на диске ключ есть (args), в архиве — нет
 ```
 
-У простого ответа текст лежит в `content` сообщения, `session_part` пуст. Поле `firstToken` в `time` ассистента
+У простого ответа текст лежит в `content` сообщения, `session_part` пуст. С вызовом инструмента
+(`<scratchpad>/b27a3-runs/diag-probe-tool.ts`: модель зовёт `read` файла проекта, где записан ключ) вызов, его вход и
+вывод — тоже в `content` ассистента: `{"type":"tool","name":"read","state":{"status":"completed","input":{"path":
+"~/project/notes.txt"},"content":[{"type":"text","text":"…1: the saved value is [redacted]"}]}}`; ключа в чате нет.
+Строки `session_part` пишет только запись с `experimental.part_rows` (`core/src/session/projector.ts`); v2 сам читает их
+в `content` (`session/history.ts`, `withParts`), выгрузка — в `parts` сообщения, как в 0.4. Медиа и файлы инструментов
+лежат в `blob` по ссылке и в архив не идут.
+
+**Полнота полей.** Кто пишет `credential.value` в v2 (`core/src/plugin/provider/*.ts`, `core/src/mcp/oauth.ts`): секреты —
+`key`, `access`, `refresh` и `client_secret` клиента MCP в `metadata.client`; остальное в `metadata` — `accountID`,
+`email`, `orgID`, `instanceUrl`, `clientID`, `scope`, `issuer`, адреса. `id_token` (ChatGPT, OpenAI) только проверяется и
+не хранится. Другие таблицы `core/src/*/sql.ts` (`kv`, `workspace`, `schedule`, `job` и др.) токенов не держат; файл
+регистрации службы с паролем и конфиги в архив не идут. Поле `firstToken` в `time` ассистента
 заменяется на `[redacted]` общим правилом редактора (ключ с `token`) — потеря одной отметки времени, не правил.
 
 ### B2.7a3b: тесты
@@ -9787,6 +9800,11 @@ Found 558 warnings and 0 errors.                    # у файлов задач
 - **Фикстура `loginom-host` — подмножество таблиц v2 с их настоящими колонками**: у `loginom-host` нет зависимости от
   `core` и его миграций. Базу, написанную самим сервером v2, проверяет новый случай `cli-standalone.test.ts`.
 - **Имя базы — `Product.database`** в `diagnostics-export.ts`; `diagnostics-cli.ts` по-прежнему пишет то же имя строкой.
+- **`--no-chat` теперь открывает базу** — только чтобы выучить ключи (`profileSecrets`); чат не читается. Комментарий и
+  имя теста поправлены. Нечитаемая база при `--no-chat` выгрузку не останавливает, но даёт `knownSecrets: unavailable`.
+- **Чтение базы — только под Bun** (`bun:sqlite`, как чат). Модуль по заголовку общий с Desktop; под Node импорт упадёт, и
+  секреты будут `unavailable` — для выгрузки Desktop (B4) это надо решить отдельно.
+- **Случай `cli` читает архив системным `unzip`** и без него пропускается (`test.skipIf`): у `cli` нет `@zip.js/zip.js`.
 
 ### B2.7a3b: найдено, не чинил
 
@@ -9797,6 +9815,9 @@ Found 558 warnings and 0 errors.                    # у файлов задач
 
 ### B2.7a3b: не проверено
 
-- Windows и macOS: тесты не ограничены платформой, запускались на Linux; `cliCredentials` на macOS (Keychain) — по коду.
+- Windows и macOS: тесты не ограничены платформой (кроме `unzip`), запускались на Linux; `cliCredentials` на macOS
+  (Keychain) — по коду.
+- Строки `session_part` с настоящими данными (запись с `experimental.part_rows`): в настоящей базе их не было, части
+  проверены только фикстурой `loginom-host`.
 - Собранный CLI для этой задачи не пересобирался: проверено из исходников (случай `cli-standalone.test.ts` и проба).
 - Настоящее подключение Loginom и рантайм `<профиль>/loginom/runtime` в выгрузке v2 — только фикстурами `loginom-host`.

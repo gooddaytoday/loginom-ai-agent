@@ -65,8 +65,8 @@ export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfi
     let chatReason: string | undefined
     let chat: unknown
     let sessionID = session
-    // --no-chat never opens the chat database. A damaged or incomplete database
-    // leaves the chat unavailable; runtime and logs are exported anyway.
+    // --no-chat reads no chat (the saved keys are still read from the database, `profileSecrets`). A damaged or
+    // incomplete database leaves the chat unavailable; runtime and logs are exported anyway.
     if (!parsed.values["no-chat"]) {
       let store: Awaited<ReturnType<typeof openSessions>>
       try {

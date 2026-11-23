@@ -169,9 +169,9 @@ test("without --session the latest session is used", async () => {
   expect([...files.keys()].some((name) => name.includes(sha("ses_old")))).toBe(false)
 })
 
-test("--no-chat never opens the chat database and leaves the chat out", async () => {
+test("--no-chat leaves the chat out, even when the database cannot be read", async () => {
   const profile = await cliProfile()
-  // A database that cannot be read must not matter when the chat is not requested.
+  // A database that cannot be read must not stop the export when the chat is not requested.
   writeFileSync(join(profile.paths.data, "loginom-ai-agent.db"), "not a database")
   const output = join(profile.base, "nochat.zip")
   const result = await run(["diagnostics", "export", "--no-chat", "--output", output], profile)

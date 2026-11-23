@@ -640,7 +640,8 @@ function collectStrings(value: unknown, out: string[], depth = 0) {
 }
 
 // The credential values (`credential`) and account tokens of an OpenCode 2 database (core/src/{credential,account}/sql.ts),
-// through a read-only connection: the running CLI keeps writing.
+// through a read-only connection: the running CLI keeps writing. Bun only: under Node (Desktop) the import fails and the
+// secrets are reported unavailable.
 async function databaseSecrets(file: string) {
   const { Database } = await import("bun:sqlite")
   const db = new Database(file, { readonly: true })
