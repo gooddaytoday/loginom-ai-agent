@@ -3,7 +3,7 @@
 
 Usage: audit-b.py RUN_DIRECTORY --cases CASE_DIRECTORY
 Output is local diagnostics; raw arguments can contain private server paths.
-Do not commit its output. Node creations are successful create receipts only;
+Do not commit its output. Create attempts retain their receipt status;
 absent native graph evidence is reported as unknown, never guessed.
 """
 import argparse
@@ -36,6 +36,7 @@ def audit(path, budget):
     calls, errors, recoveries, external, forbidden = [], [], [], [], []
     signatures = collections.defaultdict(list)
     creates, deletes, graphs, seen = [], [], [], set()
+    tool_counts = collections.Counter()
     for line, raw in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
         try:
             event = json.loads(raw)
@@ -52,6 +53,7 @@ def audit(path, budget):
             continue
         seen.add(identity)
         tool, request = part.get('tool', ''), state.get('input', {})
+        tool_counts[tool] += 1
         location = f'{path}:{line}'
         entry = dict(location=location, tool=tool, input=request)
         value = receipt(state)
@@ -79,7 +81,8 @@ def audit(path, budget):
         for token in budget.get('forbid', []):
             if token in serialized:
                 forbidden.append(dict(entry, match=token))
-    return dict(file=str(path), loginom_calls=len(calls), error_count=len(errors), errors=errors,
+    return dict(file=str(path), loginom_calls=len(calls), all_tool_counts=dict(tool_counts),
+                error_count=len(errors), errors=errors,
                 recovery=recoveries, exact_repeats=[v for v in signatures.values() if len(v)>1],
                 create_attempts=creates, delete_attempts=deletes, graph_observations=graphs,
                 non_loginom_actions=external, forbidden=forbidden,
