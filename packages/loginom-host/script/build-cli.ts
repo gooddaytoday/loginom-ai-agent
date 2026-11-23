@@ -75,17 +75,17 @@ const sourceEntries = new Map<string, string>()
 const source = await cliSourceSnapshot(repo, sourceEntries)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
 try {
-  await $`${process.execPath} script/build.ts --standalone --single --skip-install ${baseline ? ["--baseline"] : []}`
-    .cwd(join(repo, "packages/opencode"))
+  // The product CLI of OpenCode 2 (B2.7a2). Its build names one target explicitly: `--single --baseline` alone would
+  // also build the native and musl variants. The web interface stays out, as in 0.4.
+  const target = `${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${baseline ? "-baseline" : ""}`
+  await $`${process.execPath} script/build.ts --standalone --single --skip-install --skip-web-ui ${"--outdir=" + join(work, "native")}`
+    .cwd(join(repo, "packages/cli"))
     .env({
       ...process.env,
       LOGINOM_AI_AGENT_CHANNEL: process.env.LOGINOM_AI_AGENT_CHANNEL ?? "dev",
-      LOGINOM_AI_AGENT_BUILD_OUTPUT: join(work, "native"),
+      LOGINOM_AI_AGENT_TARGET: target,
     })
-  const artifact = join(
-    work,
-    `native/loginom-ai-agent-cli-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${baseline ? "-baseline" : ""}`,
-  )
+  const artifact = join(work, `native/cli-${target}`)
   const resources = join(artifact, "resources/loginom")
   if (process.platform === "darwin") {
     // Bun supplies its JSC runtime entitlements. Retain them while signing our
@@ -106,7 +106,7 @@ try {
   await buildPhase("cli-installer", () => buildCliInstaller(artifact, process.platform as "linux" | "darwin" | "win32"))
   await buildPhase("cli-notices", async () =>
     collectBuildNotices(join(artifact, "licenses/bundled-npm"), [
-      { root: join(repo, "packages/opencode"), metafile: await Bun.file(join(artifact, "build-inputs.json")).json() },
+      { root: join(repo, "packages/cli"), metafile: await Bun.file(join(artifact, "build-inputs.json")).json() },
       {
         // Bun's host metafile paths are relative to this caller's working directory.
         root: process.cwd(),
