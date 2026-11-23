@@ -8002,3 +8002,262 @@ Windows убивает её при выключении. Сделано: защ�
 - Мутация «`apply` берёт профиль по умолчанию из `process.env`» не запускалась: тест в процессе тогда создал бы профиль в
   настоящем `~/.config` стенда. Процесс CLI получает то же окружение как `process.env`, поэтому процессные тесты её бы не
   поймали.
+
+## B2.7a CLI продукта
+
+22.11.2026. Ветка `b27a-cli` от `oc2-migration` (`829d9894fe`), рабочее дерево `.claude/worktrees/b27a`. Bun 1.4.4
+переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` —
+код 0, `.husky/_` появился; `npm ci --ignore-scripts` клиента `packages/loginom-runtime/client` в этом дереве и в
+дереве базы (без него сборка CLI падает: `Could not resolve: "yaml"` в `bundled-skill-manifest.mjs`). База тестов —
+отдельное дерево `<scratchpad>/b27a-base` (`829d9894fe`, detached). `packages/loginom-agent` и `packages/core` (B2.6a)
+не трогал. Основа — 0.4 на `a080f7725c`: `opencode/script/build.ts` (`--standalone`), `opencode/src/standalone.ts`,
+восемь файлов `opencode/src/cli/standalone*.ts`, их тесты `opencode/test/cli/standalone*`,
+`loginom-host/script/build-cli.ts`.
+
+### Нарезка
+
+Задачи — не больше пяти файлов кода (тесты и документы не считаются). Строки «—» — работа, которую B2.7a отдаёт другим
+задачам или этапам.
+
+| Задача | Что | Файлы кода | Зависит от | Размер |
+|---|---|---|---|---|
+| **B2.7a1** (сделана, ниже) | `loginom-ai-agent-cli` из входа `cli/src/loginom-cli.ts` (`build.ts --standalone`); код выхода 3 у `PROFILE_BUSY`; причина отказа частного сервера видна клиенту (`run` без службы, `acp`, `--standalone`); BRAND-01 на бинарнике — проверка и список остатка | `cli/script/build.ts`, `cli/src/{profile,index}.ts`, `cli/src/run/run.ts`, `cli/src/services/standalone.ts` | B2.7c | M |
+| **B2.7a2** | Артефакт CLI как в 0.4: `loginom-host/script/build-cli.ts` вызывает `packages/cli/script/build.ts --standalone --single --skip-install --skip-web-ui` (каталог `cli-<os>-<arch>[-baseline]`, `build-inputs.json` уже пишется), раскладывает ресурсы Host (`bin/node`, `host/node-host.mjs`), Chromium, уведомления, манифест, архив. Служба собранного CLI находит `resources/loginom` рядом с бинарником и сверяет манифест (`standalone-bundle.ts` 0.4): сейчас ресурсы читает только `LOGINOM_AI_AGENT_RESOURCES` (`server-process.ts`, `loginom-agent`), и ни один процесс CLI её не задаёт. Уходит строка `build-cli.ts` из `repo-paths` | `loginom-host/script/build-cli.ts`, `cli/src/loginom-cli.ts`, при необходимости `loginom-host/src/cli-manifest.ts` | B2.7a1, B1.6 | M |
+| **B2.7a3** | `standalone`: предварительная проверка `run` (Loginom настроен до приёма промпта, `standalone-preflight`), `diagnostics export`, `--help`/`--version` без открытия профиля (решить: сейчас открывают, и это держит журнал CLI в профиле), хватает ли `auth` и `models` v2 вместо `standalone-models`; перенос тестов `standalone{,-startup,-preflight,-status,-file-errors}.test.ts` | `cli/src/loginom-cli.ts`, файлы форка `cli/src/standalone*.ts` — до пяти | B2.7a2, B2.5d | M |
+| **B2.7a4** | `run --headless --format json`: `--headless`, `--file`, коды выхода §10 (0/1/2/4/130 по итоговому состоянию сессии), отмена SIGINT (`standalone-cancellation`); офлайн-сверка событий с `evals/src/cli.ts` и `scripts/node-acceptance/run-check.py`; режим source `evals` → `packages/cli/src/loginom-cli.ts` (строки `repo-paths` для `evals/src/{cli,profile}.ts`, `evals/test/cli.test.ts`) | `cli/src/run/{run,noninteractive}.ts`, `cli/src/commands/handlers/run.ts`, `evals/src/{cli,profile}.ts` | B2.7a3 | M |
+| **B2.7a5** | Команда продукта в сообщениях `cli` (`opencode service set …`, `opencode pair`, `opencode mini`, `opencode acp:`, `opencode stats`, `opencode mcp add`, `opencode auth login`): имя из define сборки `LOGINOM_AI_AGENT_CLI_NAME`, как у корня справки | `cli/src/{server-process,mini,mini-host}.ts`, `cli/src/services/{service-config,remote-tunnel}.ts`, `cli/src/commands/handlers/{pair,stats,acp,mcp/auth}.ts` — 9 файлов, две задачи; либо правило `apply-identity` (общий инструмент синхронизации — **решение владельца**) | B2.7a1 | S+S |
+| **B2.7a6** | То же в `tui` и `server`: `opencode -s`, `opencode mini -s`, `opencode models`, `opencode service set hostname`, «run opencode to use the new version», `opencode / stats`, `opencode service restart`, `opencode pair`; «Open docs» → `Product.documentation`; `program-status` (`APP = "opencode"`) | `tui/src/util/{presentation,error}.ts`, `tui/src/mini/splash.ts`, `tui/src/component/{dialog-pair,dialog-update}.tsx`, `tui/src/feature-plugins/system/stats.tsx`, `tui/src/app.tsx`, `tui/src/context/program-status.ts`, `server/src/{process,handlers/server}.ts` — две-три задачи | B2.7a5 (тот же способ) | S×3 |
+| **B2.7a7** | ACP: `agentInfo.name` (`OpenCode`; в 0.4 тоже), `terminal-auth` (`opencode auth login`), имя агента `opencode` | `cli/src/acp/{service,agent}.ts` | — | S |
+| **B2.7a8** | Установщик: видимые `OpenCode` и имя бинарника в `install` и `cli/script/postinstall.mjs`. Сначала решить, чем ставится CLI продукта — `build-cli-installer.ts` 0.4 из артефакта B2.7a2 или `install` v2 | `install`, `cli/script/postinstall.mjs` | B2.7a2 | S |
+| **B2.7a9** | `loginom-ai-agent-pty`: справка и сообщения `opencode-pty …` (`process-daemon/src/{client,daemon,daemon/unix,daemon/windows}.rs`). Сборка встраивает бинарник npm `@opencode/pty` (upstream, `cli/script/opencode-pty.ts`), собственный — только через `LOGINOM_AI_AGENT_PTY_BIN`; без этого правки Rust в собранный CLI не попадут | до четырёх `.rs`, `cli/script/opencode-pty.ts` | — | M |
+| **B2.7a10** | 3 теста встроенного ripgrep в `loginom-host` — под внутренности `core` v2; `scripts/node-acceptance/tests/required-checks.test.mjs` (фикстуры с `packages/opencode`, строка `repo-paths`) | тесты: `loginom-host/test/bundled-ripgrep.test.ts`, `required-checks.test.mjs` | — | S |
+| **B2.7a11** | Пользователь Basic-входа `opencode` → `loginom-ai-agent` (так было в 0.4: `LOGINOM_AI_AGENT_SERVER_USERNAME`, по умолчанию `loginom-ai-agent`). Это протокол сервера и всех клиентов: `server/src/{auth,process}.ts`, `client/src/{service-probe,pty-handoff}.ts`, `cli/src/services/{server-connection,standalone}.ts`, Desktop (`sidecar-credentials.ts`, `plugin/host.ts`, `deep-link.ts`), `app`, `gui-plugins` — около 14 файлов, обе стороны разом; её ждёт B4.7 | по пакетам, после решения | **решение владельца** | M |
+| **B2.7a12** | `OPENCODE=1` в окружении дочерних оболочек (`core/src/tool/plugin/shell.ts`) — метка «запущено из агента» для скриптов пользователя; переименовать ли | 1 | B2.6a (`core`), **решение владельца** | S |
+| — | `standalone-dashboard` и `standalone-dashboard-pty.py` | B2.9 (В-85) | | |
+| — | `standalone-proxy`, системный прокси | после шлюза B (В-97, п. 6) | | |
+| — | `loginom setup --stdin-json`, `check`, `status`, `cancel-pending`, `recover` (`standalone-command`) | B2.7b | | |
+| — | ACL Windows профиля (`profile-windows.ts` 0.4), `script/test-windows-profile.ps1` | хвост B2.7c, с B5.1 | | |
+| — | Строки обновлятора (`updater.ts`, «run opencode upgrade again») | B2.7d | | |
+| — | Встроенные навыки `opencode` и `report` (`opencode --version`, `opencode api …`) | B2.4 | | |
+
+Порядок: a1 → a2 → a3 → a4 — цепочка; a5 → a6, a7, a9, a10 — параллельно с ней; a8 — после a2; a11 и a12 — после
+решения владельца. Строки `repo-paths` B2.7a: `build-cli.ts` — a2, `evals` — a4, `required-checks.test.mjs` — a10.
+
+### B2.7a1: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `680d72b851` `feat(cli): build loginom-ai-agent-cli from the product entry (B2.7a)` | `cli/script/build.ts` (+22 −13, CAT-02) | `clean` |
+| `a389928c2c` `fix(cli): exit 3 on PROFILE_BUSY and show why a private server failed (B2.7a)` | файл форка `cli/src/profile.ts`; правки upstream `cli/src/index.ts` (+7 −2), `cli/src/run/run.ts` (+2 −1), `cli/src/services/standalone.ts` (+34 −1); тест `cli/test/cli-profile-service.test.ts` | `clean` |
+| следующий | этот раздел, `catalog.md` (CAT-02, CAT-08, CAT-12), строка G2 в `guarantees.md` | |
+
+### B2.7a1: сборка
+
+`bun run script/build.ts --standalone` в `packages/cli` собирает CLI продукта; без флага сборка прежняя (её берут
+Desktop — `desktop/script/utils.ts`, `release.yml` и `service-smoke.ts`: `cli-<цель>/bin/opencode`).
+
+| Что | Без флага (как на базе) | `--standalone` |
+|---|---|---|
+| Вход | `src/index.ts` (служба Desktop, каталоги канала) | `src/loginom-cli.ts` (профиль CLI, B2.7c) |
+| Бинарник | `cli-<цель>/bin/opencode` | `cli-<цель>/bin/loginom-ai-agent-cli` (`Product.cliExecutable`) |
+| Имя корня справки (`LOGINOM_AI_AGENT_CLI_NAME`) | `opencode` | `loginom-ai-agent-cli` |
+| `--user-agent` | `opencode/<канал>/<версия>/cli` | `loginom-ai-agent/<канал>/<версия>/cli` |
+| `package.json` артефакта | `@opencode/cli-<цель>`, MIT, репозиторий anomalyco | `loginom-ai-agent-cli-<цель>`, версия, `os`, `cpu` |
+| `build-inputs.json` (метаданные Bun для уведомлений артефакта) | нет | есть |
+
+Заглушка Scalar/Swagger в обоих режимах — «not bundled in this build» вместо «in OpenCode». Веб-интерфейс сборка
+включает, если не передан `--skip-web-ui`; 0.4 в standalone его не встраивал — флаг передаст `build-cli.ts` (B2.7a2).
+
+```text
+$ cd packages/cli && LOGINOM_AI_AGENT_CHANNEL=beta bun run script/build.ts --standalone --single --skip-install --skip-web-ui --outdir=<scratchpad>/b27a-build/beta
+building cli-linux-x64                    # 18 с, код 0
+$ ls <out>/cli-linux-x64 <out>/cli-linux-x64/bin
+bin  build-inputs.json  package.json
+loginom-ai-agent-cli
+$ LOGINOM_AI_AGENT_CHANNEL=beta bun run script/build.ts --single --skip-install --skip-web-ui --outdir=<scratchpad>/b27a-build/default
+building cli-linux-x64                    # 17 с, код 0; bin/opencode, @opencode/cli-linux-x64, без build-inputs.json
+```
+
+Канал `beta`: в `dev` и `local` сборка встраивает исходные карты, и строки бинарника не показательны.
+
+### B2.7a1: код 3 и причина отказа
+
+| Путь | База | B2.7a1 |
+|---|---|---|
+| Второй `serve` на профиле | `Error: PROFILE_BUSY: …`, код 1 | то же сообщение, код 3 |
+| `run` с частным сервером (нет службы или `--standalone`) | `Standalone server exited before reporting readiness`, код 1 | `Standalone server exited before reporting readiness (code 3): Error: PROFILE_BUSY: the CLI profile <root> is open in another process (pid N)`, код 3; с `--format json` — событие `error` в stdout |
+| `acp` | то же, код 1 | то же сообщение, код 3 |
+| Служба-соперник при живой службе (M6 B2.7c) | код 0 | код 0 |
+| `service start`, когда защёлку держит частный сервер | — | служба выходит с кодом 3; клиент: `Error: Server process exited with code 3` и её stderr, код 1 (путь `Service.ensure` в `packages/client` не трогал) |
+
+Как:
+- `profile.ts`: `hold` при `Busy` (кроме соперника живой службы) ставит `process.exitCode = 3` и падает, как прежде.
+- `index.ts`: упавшая команда (код 1) сохраняет код, который она поставила (`process.exitCode`). Общий вид: в CLI v2
+  команды сообщают о сбое через `process.exitCode`, а сбой его затирал.
+- `services/standalone.ts`: stderr частного сервера читается всю его жизнь, хранится хвост 4 КиБ. Сервер, вышедший до
+  готовности, отдаёт клиенту код выхода (`process.exitCode`) и хвост stderr без строк стека — после конца stdout, когда
+  известен код и закончился stderr. С `--print-logs` stderr по-прежнему наследуется.
+- `run/run.ts`: `reportRunError` не снижает уже поставленный код (`||= 1`).
+
+### B2.7a1: BRAND-01 на бинарнике
+
+Пустые HOME и XDG, явный профиль (`<scratchpad>/b27a-runs/brand-check.sh`, канал `beta`):
+
+```text
+$ loginom-ai-agent-cli --version
+loginom-ai-agent-cli v0.0.0-beta-202611230205                 # код 0
+$ loginom-ai-agent-cli --help | sed -n 1,5p
+DESCRIPTION
+  Loginom AI Agent command line interface
+
+USAGE
+  loginom-ai-agent-cli <subcommand> [flags] [<directory>]      # код 0
+$ loginom-ai-agent-cli debug paths
+home       <R>/home
+data       <R>/p1/data
+cache      <R>/p1/cache
+config     <R>/p1/config
+state      <R>/p1/state
+tmp        <R>/p1/cache/tmp
+bin        <R>/p1/cache/bin
+log        <R>/p1/data/log
+repos      <R>/p1/data/repos
+db         <R>/p1/data/loginom-ai-agent.db                    # код 0
+$ loginom-ai-agent-cli service start
+http://127.0.0.1:25614                                        # код 0; порт из диапазона beta 25600–26623
+$ cat <R>/p1/.writer/owner; ls <R>/p1/state
+{"pid":3878176,"nonce":"…","service":true}
+service-cli-66de7d75.json
+$ loginom-ai-agent-cli serve --port 0
+Error: PROFILE_BUSY: the CLI profile <R>/p1 is open in another process (pid 3878176)
+    at N (/$bunfs/root/chunk-62279bjp.js:2:1961)              # код 3
+$ loginom-ai-agent-cli run --standalone --format json hello
+{"type":"error",…,"error":{"type":"unknown","message":"Standalone server exited before reporting readiness (code 3): Error: PROFILE_BUSY: the CLI profile <R>/p1 is open in another process (pid 3878176)"}}   # код 3
+$ loginom-ai-agent-cli acp </dev/null
+Error: Standalone server exited before reporting readiness (code 3): Error: PROFILE_BUSY: …   # код 3
+$ loginom-ai-agent-cli service stop                            # код 0
+$ ls -a <R>/p1
+. .. cache cli-profile.json config data loginom state          # защёлки нет
+$ pgrep -f loginom-ai-agent-cli                                # процессов нет
+$ find <R> -iname "*opencode*"                                 # пусто
+```
+
+Без `LOGINOM_AI_AGENT_CLI_PROFILE` (тот же бинарник, пустые XDG) профиль по умолчанию —
+`<XDG_CONFIG_HOME>/com.loginom.aiagent.beta/cli/profiles/default`; `service start`, `service status`, `serve` (код 3),
+`run` через службу (свободная модель ответила «Hello!»), `service stop` — код 0, процессов не осталось.
+
+Справка всех 49 команд и подкоманд (корень, `upgrade` … `serve`, вложенные `debug`, `auth`, `mcp`, `plugin`, `session`,
+`service`): код 0 у всех, `opencode` в выводе — 0 строк (`<scratchpad>/b27a-runs/help-all.txt`).
+
+Строки бинарника (`strings -n 6`): 1057 строк с `opencode` в любом регистре — идентификатор провайдера OpenCode,
+`.git/opencode`, значения протокола (`opencode-pty`, `x-opencode-*`), ссылки и тексты сторонних пакетов. По путям и
+командам:
+
+| Осталось | Где | Почему, куда |
+|---|---|---|
+| `opencode service set/unset/get/status/restart …`, `opencode pair [--remote]`, `opencode mini …`, `opencode acp:`, `opencode stats`, `opencode mcp add/list/auth`, `opencode auth login` | сообщения `cli` | B2.7a5 |
+| `opencode -s <id>`, `opencode mini -s <id>`, `opencode models`, `opencode service set hostname`, `opencode service restart`, `opencode pair` | сообщения `tui`, `server` | B2.7a6 |
+| `opencode upgrade again` | `cli/src/services/updater.ts` | B2.7d |
+| `opencode --version`, `opencode --standalone`, `opencode api …` | навыки `opencode`, `report` (`core/src/plugin/skill/*.md`) | B2.4 |
+| `opencode auth login gitlab` | npm-пакет `gitlab-ai-provider` | текст стороннего пакета, остаётся |
+| `agentInfo.name` `OpenCode`, `terminal-auth` `opencode auth login` | ACP | B2.7a7 |
+| пользователь Basic-входа `opencode` | `server`, `client`, `cli` | B2.7a11, решение владельца |
+| `opencode-pty …`, `OPENCODE_PTY_SOCKET_DIR`, `/opencode/pty` | встроенный бинарник npm `@opencode/pty`; служба запускает его с явным `--runtime-dir` | B2.7a9 |
+| `opencode.gitconfig`, `index.opencode-*`, `.opencode-version` | внутренние файлы хранилища снимков и кэша навыков в каталоге продукта (после сессии с проектом — `data/snapshot/…/opencode.gitconfig`) | решено в B1.4 (Р-14, Р-15), остаются |
+
+Записи в каталоги OpenCode нет: после всех команд выше `find -iname '*opencode*'` по пустому корню пуст (кроме
+`opencode.gitconfig` в хранилище снимков профиля после сессии с проектом).
+
+### B2.7a1: тесты
+
+| Файл | Что |
+|---|---|
+| `cli/test/cli-profile-service.test.ts` | второй `serve` на профиле — код 3 (был 1); `run --standalone --format json` при живой службе — код 3 и событие `error` с причиной частного сервера; `acp` — код 3 и та же причина в stderr; защёлка прежняя |
+
+Мутации (`<scratchpad>/b27a-runs/mutate.sh`: одна правка `sed`, тест, `git checkout` файла; на `a389928c2c`). Без
+мутаций — 2/0.
+
+| Мутация | Итог |
+|---|---|
+| M1 `profile.ts` не ставит код 3 | **1/1**: `serve` — 1 вместо 3 |
+| M2 `index.ts` не сохраняет код упавшей команды | **1/1**: `serve` — 1 |
+| M3 `run.ts` снова `process.exitCode = 1` | **1/1**: `run` — 1 |
+| M4 stderr частного сервера снова `ignore` | **1/1**: в сообщении нет причины |
+| M5 `standalone.ts` не передаёт код сервера | **1/1**: `run` — 1 |
+| M6 строки стека не отбрасываются | **1/1**: в сообщении строка `at N (…)` |
+
+После прогона `git status` — чистое дерево кода.
+
+### B2.7a1: приёмка
+
+Полные прогоны по пакетам: база — `829d9894fe` в `<scratchpad>/b27a-base`, итог — `a389928c2c`; `npm ci` клиента
+`loginom-runtime` в обоих деревьях, `LOGINOM_AI_AGENT_TEST_NODE` задан. Код менялся только в `packages/cli`.
+
+| Пакет | Команда | `829d9894fe` | `a389928c2c` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 430 pass, 9 skip, 0 fail, 1676 expect | 430 pass, 9 skip, 0 fail, 1681 expect (+5 в `cli-profile-service`) |
+| `product` | `bun test` | 60 pass, 3 fail | 60 pass, 3 fail — те же три `repo-paths` (В-95) |
+
+```text
+$ cd packages/cli && bun test --timeout 90000 test/cli-profile-service.test.ts test/cli-profile.test.ts test/standalone.test.ts
+ 10 pass
+ 0 fail
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,191 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc         # код 0
+$ LOGINOM_AI_AGENT_CHANNEL=beta bun run script/build.ts --standalone --single --skip-install --outdir=<scratchpad>/b27a-build/webui
+building cli-linux-x64                             # 47 с, код 0: с веб-интерфейсом тоже собирается
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 451 divergent upstream files                  # было 450: +`cli/src/run/run.ts` (CAT-12)
+  CAT-02: 54
+  CAT-08: 0 (pending: B2.7, B2.8)
+  CAT-12: 183
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+```
+
+`prettier`: мои строки форматированы; `cli/src/index.ts` и до правки не проходил `prettier --check` (длинный импорт
+`LOGINOM_AI_AGENT_*` от `apply-identity`, B1.4).
+
+### B2.7a1: где решал сам
+
+- **Первая часть меньше, чем в задании.** Задание относило к ней сборку, хвосты бренда, код 3 и BRAND-01. Хвосты —
+  около 40 файлов в `cli`, `tui`, `server`, `client`, Desktop и Rust, а задача нарезки — до пяти файлов кода. Взяты строка
+  плана «после B2.7c» (сборка, код 3, ошибка частного сервера) и проверка BRAND-01 на бинарнике; хвосты — B2.7a5…a12.
+- **Ресурсы Host — B2.7a2.** В 0.4 `build.ts --standalone` собирал только бинарник; Node, Chromium, `host/node-host.mjs`,
+  уведомления и манифест раскладывал `build-cli.ts`, а находил их во время работы `standalone-bundle.ts`. В v2 ресурсы
+  читаются только из `LOGINOM_AI_AGENT_RESOURCES`. Раскладка без поиска ничего не даёт, полный прогон `build-cli.ts` с
+  закреплёнными Node и Chromium — отдельная задача. Бинарник B2.7a1 без Host, как любая сборка v2 сейчас.
+- **Флаг `--standalone`, а не новая сборка по умолчанию:** сборку по умолчанию берёт Desktop, его служба остаётся на
+  `index.ts` (B2.7c). Имя флага — как в 0.4: его передаёт `build-cli.ts`. `User-Agent` продукта — только в этом режиме,
+  как в 0.4; встроенный CLI Desktop — B4.7.
+- **Код 3 через `process.exitCode`** — механизм самих команд v2, а не код в типе ошибки: меньше правок. Сообщение у
+  прямого `serve` прежнее (`Error: PROFILE_BUSY: …` и строка стека).
+- **Строки стека в причине у клиента отброшены**; весь stderr частного сервера — с `--print-logs`.
+- **Сообщение не голым кодом.** 0.4 печатал строку `PROFILE_BUSY`, v2 (B2.7c) — `PROFILE_BUSY: the CLI profile … (pid N)`.
+  `evals/src/report.ts` ищет `\bPROFILE_BUSY\b` в stderr и код 3 — совпадает; с `--format json` причина уходит в событие
+  `error` в stdout, а не в stderr. Сверка с потребителями — B2.7a4.
+- **`--help` и `--version` по-прежнему открывают профиль** (так оставил B2.7c). CLI v2 и на справке пишет журнал
+  (`cli starting`); без профиля он лёг бы в каталог канала Desktop — это против G2. Решать в B2.7a3.
+- **Каталог:** правки `cli/src/{index.ts,run/run.ts,services/standalone.ts}` по смыслу — CAT-08, но у неё `pending`
+  (B2.7b, B2.7d, B2.8), и запись с расхождениями её бы сняла. Маска относит их к CAT-12 — там и описаны, в CAT-08 —
+  ссылка, как сделал B2.7c. `catalog.json` не менялся.
+- **В `guarantees.md`** — только строка G2: код 3 и клиент частного сервера в описании теста.
+
+### B2.7a1: найдено, не чинил
+
+- `evals/script/run-node-selection-attempt.ts:208` ждёт `stderr.trim() === "PROFILE_BUSY"` и кода 3 — с сообщением v2 не
+  совпадёт (B2.7a4).
+- Встроенный бинарник терминалов — из npm `@opencode/pty` (upstream): правки Rust `process-daemon` (B1.3b, Р-16) в
+  собранный CLI не попадают. В нём прежние значения по умолчанию (`OPENCODE_PTY_SOCKET_DIR`, `/opencode/pty`); служба
+  запускает его с явным `--runtime-dir`, так что каталоги OpenCode он не трогает (B2.7a9).
+- `service start`, когда защёлку держит частный сервер: служба выходит с кодом 3, клиент — `Server process exited with
+  code 3` и её stderr, но код клиента 1 (`Service.ensure`, `packages/client`).
+- `cli/src/commands/handlers/migrate.ts`: «… is already an OpenCode 2 database» — текст форка с именем upstream.
+
+### B2.7a1: не проверено
+
+- Host и настоящий Loginom в собранном CLI: ресурсов в бинарнике нет (B2.7a2).
+- Windows и macOS, цели `--baseline` и musl: собиралась только linux-x64. TUI собранного бинарника не запускался.
+- Частный сервер, закрывший stdout, но не вышедший: клиент ждёт его выхода. Сервер CLI закрывает потоки прямо перед
+  `process.exit` (`index.ts`), так что окно — по коду.
+- `bun run check` — ниже, на итоговом SHA.
