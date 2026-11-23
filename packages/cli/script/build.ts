@@ -191,7 +191,9 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     format: "esm",
     minify: true,
     bytecode: true,
-    sourcemap: Script.channel === "dev" || Script.channel === "local" ? "inline" : "none",
+    // Loginom AI Agent (B2.7a2b): the product CLI has no source maps in any channel, as in 0.4; with `compile` and
+    // `splitting`, Bun 1.4.4 writes them next to the binary as `bin/chunk-*.js.map`.
+    sourcemap: !standalone && (Script.channel === "dev" || Script.channel === "local") ? "inline" : "none",
     splitting: true,
     compile: {
       autoloadBunfig: false,
