@@ -168,7 +168,8 @@ test("provider coverage requires a complete main session without delegated model
   const parse = (events: unknown[]) => parseEvents(events.map(event => JSON.stringify(event)).join("\n")).limitEvidence.coverage.provider
   expect(parse([busy, text, idle])).toBe("complete")
   for (const events of [[text], [busy, text], [idle, busy], [busy, text, { ...idle, sessionID: "foreign" }],
-    [busy, { type: "tool_use", sessionID: "own", part: { type: "tool", tool: "task" } }, idle]])
+    [busy, { type: "tool_use", sessionID: "own", part: { type: "tool", tool: "task" } }, idle],
+    [busy, { type: "tool_use", sessionID: "own", part: { type: "tool", tool: "subagent" } }, idle]])
     expect(parse(events)).toBe("unavailable")
   expect(parseEvents([JSON.stringify(busy), "broken JSON", JSON.stringify(idle)].join("\n")).limitEvidence.coverage.provider).toBe("unavailable")
 })
@@ -342,11 +343,13 @@ test("agentCommand: из env-override выкидывает LOGINOM_/EVAL_/JUDGE_
   expect(command.env.PATH).toBe("p")
 })
 
-test("agentCommand: source-режим запускает standalone.ts из packages/opencode с bundle", () => {
-  const command = agentCommand(loadConfig([], { LOGINOM_DOCK_API_KEY: "k", EVAL_AGENT_MODEL: "m/x", JUDGE_MODEL: "j" }))
-  expect(command.cmd).toEqual(["bun", "run", "src/standalone.ts"])
-  expect(command.cwd.endsWith(path.join("packages", "opencode"))).toBe(true)
+test("agentCommand: source-режим запускает вход CLI продукта из исходников с bundle", async () => {
+  const config = loadConfig([], { LOGINOM_DOCK_API_KEY: "k", EVAL_AGENT_MODEL: "m/x", JUDGE_MODEL: "j" })
+  const command = agentCommand(config)
+  expect(command.cmd).toEqual(["bun", "run", "src/loginom-cli.ts"])
+  expect(await Bun.file(path.join(command.cwd, "src", "loginom-cli.ts")).exists()).toBe(true)
   expect(command.env.LOGINOM_AI_AGENT_CLI_BUNDLE?.endsWith(".bundle")).toBe(true)
+  expect(command.env.LOGINOM_AI_AGENT_RESOURCES).toBe(config.agent.bundle)
 })
 
 test("runAgent: fake CLI — события на диске, квитанция, код 0", async () => {

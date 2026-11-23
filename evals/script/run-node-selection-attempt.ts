@@ -205,8 +205,10 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     await Bun.write(path.join(attempt.directory, "cli-exit-code.txt"), String(result.cliExitCode) + "\n")
     await save()
     const stderr = await Bun.file(path.join(attempt.directory, "stderr.txt")).text()
-    if (result.cliExitCode === 3 && stderr.trim() === "PROFILE_BUSY") {
-      // This exact bootstrap refusal proves the CLI never acquired the profile or dispatched a model.
+    // The product CLI exits with 3 only when its profile is held by another process (design §10, B2.7a1); on OpenCode 2
+    // the reason goes into an `error` event and the stderr line carries more than the code.
+    if (result.cliExitCode === 3) {
+      // This bootstrap refusal proves the CLI never acquired the profile or dispatched a model.
       result.modelStarted = false
       const incident = path.join(evidence, "cli-rejected")
       await rename(attempt.directory, incident)
