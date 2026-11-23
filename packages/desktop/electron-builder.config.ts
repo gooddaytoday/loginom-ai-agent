@@ -127,6 +127,10 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
         filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
       },
       { from: "resources/loginom", to: "loginom" },
+      // Loginom AI Agent (B4.6b): the window icon that windows/early.ts and windows/appearance.ts read from
+      // process.resourcesPath/icons, as in 0.4. Without dock.png: installed macOS apps keep the bundle ICNS in the
+      // Dock, which 0.4 got by skipping setDockIcon when packaged.
+      { from: "resources/icons", to: "icons", filter: ["**/*", "!dock.png"] },
     ],
     // Loginom AI Agent (B4.5b): the service and the Host run in the bundled CLI and Node. Main-process native
     // dependencies are N-API platform packages that the lockfile already selected, so nothing is rebuilt for Electron.
@@ -251,7 +255,8 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
     linux: {
       // Loginom AI Agent (B4.6): the 0.4 Linux sizes, which script/copy-icons.ts stages in linux/.
       icon: `resources/icons/linux`,
-      category: "Development",
+      // Loginom AI Agent (B4.6b): the 0.4 category.
+      category: "Office",
       // libappimage finds the AppImage's desktop entry by globbing `*.desktop`, so the executable must never
       // end in `.desktop` (anomalyco/opencode#51867). The slug does not.
       executableName: productSlug(channel),
