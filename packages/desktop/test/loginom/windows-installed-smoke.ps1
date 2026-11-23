@@ -175,6 +175,15 @@ function Owned([int]$Main, [int]$Service) {
         [pscustomobject]@{ pid=[int]$_.ProcessId; parent=[int]$_.ParentProcessId; name=$_.Name; path=$_.ExecutablePath; role=(Get-ProcessRole $_ $Service $install) }
     })
 }
+# Lines the service writes when a request, not a signal, starts its shutdown (B2.3b); TerminateProcess logs nothing.
+function Stop-Requests {
+    @(Get-ChildItem -LiteralPath (Join-Path $serviceData 'log') -Filter '*.log' -ErrorAction SilentlyContinue |
+        Select-String -SimpleMatch 'message="shutdown started" reason="service stop"').Count
+}
+function Store-Hashes([string]$Root) {
+    @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction SilentlyContinue | Sort-Object FullName | ForEach-Object {
+        "$($_.FullName.Substring($Root.Length)) $((Get-FileHash -LiteralPath $_.FullName).Hash)" }) -join "`n"
+}
 function Roles($List) {
     $roles = [ordered]@{}
     foreach ($group in @($List | Group-Object role)) { $roles[$group.Name] = $group.Count }
@@ -305,6 +314,7 @@ function Launch([int]$Run, [int]$Previous) {
         $answer = Probe @('service', $registration, $resources, $workspace, [string]$TimeoutSeconds)
         $observation.service.port = [int]$answer.port
         $observation.service.version = $answer.version
+        $observation.sessions = [ordered]@{ count=[int]$answer.sessions; assistantMessages=[int]$answer.assistantMessages }
         $observation.skills = $answer.skills.actual
         $logs = Join-Path $userData 'logs'
         $mainLog = Wait-For {
@@ -314,6 +324,10 @@ function Launch([int]$Run, [int]$Previous) {
         }
         if (-not $mainLog) { throw 'WINDOW_NOT_CONNECTED' }
         $observation.mainLog = $mainLog.FullName
+        if ($Connection) {
+            $moved = [regex]::Match((Get-Content -LiteralPath $mainLog.FullName -Raw), "Loginom connection of 0\.4 for the service \{ state: '(\w+)'(?:, generation: (\d+))?")
+            $observation.connection = [ordered]@{ state=$moved.Groups[1].Value; generation=$moved.Groups[2].Value }
+        }
         # The app revealed its window itself (windows/index.ts), whether or not the window station can display it.
         if ((Get-Content -LiteralPath $mainLog.FullName -Raw) -notmatch '\(main\)\s+main window visible') { throw 'APP_WINDOW_NOT_REVEALED' }
         $observation.renderer = Probe @('renderer', [string]$debug, [string]$TimeoutSeconds)
@@ -328,6 +342,7 @@ function Launch([int]$Run, [int]$Previous) {
         $observation.before = Roles $before
         $observation.processes = @($before | ForEach-Object { "$($_.pid):$($_.role):$($_.name)" })
         if ($Run -eq 1) { $script:firstLaunch = [ordered]@{ before=$before; mainLog=$mainLog.FullName } }
+        $requests = Stop-Requests
         $closing = Get-Date
         if ($CloseMethod -eq 'Window') {
             # WM_CLOSE: the user closes the last window; Electron quits on Windows (window-all-closed).
@@ -343,6 +358,9 @@ function Launch([int]$Run, [int]$Previous) {
             @(Owned 0 0 | Where-Object { $before.pid -notcontains $_.pid }))
         $observation.remaining = @($remaining | ForEach-Object { "$($_.pid):$($_.role)" })
         if ($remaining.Count) { throw ('OWN_PROCESSES_REMAIN: ' + ($observation.remaining -join ' ')) }
+        # Windows has no SIGTERM: without the stop request the client ends the service with TerminateProcess (B4.10).
+        $observation.stopRequests = (Stop-Requests) - $requests
+        if ($observation.stopRequests -ne 1) { throw "SERVICE_NOT_STOPPED_BY_REQUEST: $($observation.stopRequests)" }
         $observation.registration = $(if (Test-Path -LiteralPath $registration) { 'present' } else { 'removed' })
         if (Test-Path -LiteralPath $registration) { throw 'REGISTRATION_REMAINS' }
         $open = @(Listening @($servicePort, $debug))
@@ -392,6 +410,9 @@ try {
     $foreignBefore = @(@((Join-Path $env:USERPROFILE '.local\share\opencode'), (Join-Path $env:USERPROFILE '.config\opencode'),
         (Join-Path $env:APPDATA 'ai.opencode.desktop'), (Join-Path $env:APPDATA 'ai.opencode.desktop.dev'),
         (Join-Path $env:APPDATA 'ai.opencode.desktop.beta'), 'HKCU:\Software\Classes\opencode') | Where-Object { Test-Path -LiteralPath $_ })
+    $store04 = Join-Path $userData 'loginom\connection'
+    $store04Before = Store-Hashes $store04
+    if ($Connection -and -not $store04Before) { throw "No 0.4 connection store in $store04" }
     if (-not $Connection) {
         Check 'clean-profile' (-not (Test-Path -LiteralPath $userData) -and -not (Test-Path -LiteralPath $serviceData)) "$userData; $serviceData"
     }
@@ -492,14 +513,18 @@ try {
             # whose description the build does not set (B4.14c).
             $foreignDescriptions = @($images | Where-Object { $_ -match '^(electron|service)=' -and ($_ -split '\|', 2)[1] -notmatch '^(Loginom|loginom-ai-agent)' })
             $checks.Add([pscustomobject]@{ id='process-descriptions'; status=$(if ($foreignDescriptions.Count) { 'WARN' } else { 'PASS' }); detail=($foreignDescriptions -join '; ') })
-            if ($Connection) {
-                # B4.13: the 0.4 connection moved to the service's store once, with DPAPI; its Host started Help for it.
-                $store = Get-Content -LiteralPath (Join-Path $serviceData 'loginom\connection\connection.json') -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
-                $moved = [regex]::Match($text, "Loginom connection of 0\.4 for the service \{ state: '(\w+)'(?:, generation: (\d+))?")
-                $report.connection = [ordered]@{ log=$moved.Value; generation=$(if ($store) { $store.generation }); protection=$(if ($store) { $store.secrets.protection }) }
-                Check 'connection-moved' ($moved.Groups[1].Value -in @('moved','current') -and $store -and $store.secrets.protection -eq 'dpapi') ($report.connection | ConvertTo-Json -Compress)
-            }
         }
+    }
+    # No launch made the model answer: nothing sends a prompt, and an assistant message is what a model call leaves.
+    $answers = @($launches | ForEach-Object { if ($_.sessions) { $_.sessions.assistantMessages } else { -1 } })
+    Check 'no-model-calls' (-not ($answers -contains -1) -and $(if ($Connection) { @($answers | Sort-Object -Unique).Count -eq 1 } else { @($answers | Where-Object { $_ -ne 0 }).Count -eq 0 })) ("assistant messages per launch: " + ($answers -join ', '))
+    if ($Connection) {
+        # B4.13: the 0.4 connection moves to the service's store once, with DPAPI, and every later launch finds it there;
+        # Help runs on every launch (Launch waits for it).
+        $store = Get-Content -LiteralPath (Join-Path $serviceData 'loginom\connection\connection.json') -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $states = @($launches | ForEach-Object { if ($_.connection) { $_.connection.state } else { '' } })
+        $report.connection = [ordered]@{ states=$states; generation=$(if ($store) { $store.generation }); url=$(if ($store) { $store.url }); protection=$(if ($store) { $store.secrets.protection }) }
+        Check 'connection-moved' ($states[0] -eq 'moved' -and @($states | Select-Object -Skip 1 | Where-Object { $_ -ne 'current' }).Count -eq 0 -and $store -and $store.secrets.protection -eq 'dpapi') ($report.connection | ConvertTo-Json -Compress)
     }
     foreach ($case in @(1..$Runs)) {
         $item = @($launches | Where-Object { $_.run -eq $case })[0]
@@ -526,12 +551,15 @@ try {
             # Decision B-97 p. 2: the installer's own copy in the updater cache (hundreds of MB) goes with the app.
             Check 'updater-cache-removed' (-not (Test-Path -LiteralPath $updaterCache)) $updaterCache
             if ($Mutation -eq 'LockedUpdaterCache') { Remove-Item -LiteralPath $updaterCache -Recurse -Force -ErrorAction SilentlyContinue }
-            Check 'shortcut-removed' ($null -ne $links -and @($links | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0) ($links -join '; ')
+            # The uninstaller can still be deleting shortcuts after its entry and directory are gone.
+            $linksGone = $null -ne $links -and [bool](Wait-For { @($links | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0 } 30)
+            Check 'shortcut-removed' $linksGone ($links -join '; ')
             Check 'preserves-user-data' ((Test-Path -LiteralPath $marker) -and [IO.File]::ReadAllText($marker) -eq $token) "preservesUserData=true: $marker"
             $foreignAfter = @(@((Join-Path $env:USERPROFILE '.local\share\opencode'), (Join-Path $env:USERPROFILE '.config\opencode'),
                 (Join-Path $env:APPDATA 'ai.opencode.desktop'), (Join-Path $env:APPDATA 'ai.opencode.desktop.dev'),
                 (Join-Path $env:APPDATA 'ai.opencode.desktop.beta'), 'HKCU:\Software\Classes\opencode') | Where-Object { Test-Path -LiteralPath $_ })
             Check 'no-opencode-places' (@($foreignAfter | Where-Object { $foreignBefore -notcontains $_ }).Count -eq 0) ($foreignAfter -join '; ')
+            if ($Connection) { Check 'store-04-unchanged' ((Store-Hashes $store04) -eq $store04Before) "$store04 read only (B4.13)" }
             Check 'cleanup' ((Owned 0 0).Count -eq 0 -and -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0) 'No installed files, registration or owned processes'
         } catch {
             if ($cacheLock) { $cacheLock.Dispose() }
@@ -549,9 +577,8 @@ try {
         foreach ($id in @('silent-install','installed-apps','install-path','verify-resources','resource-hashes','bundled-chromium','app-window','renderer-loaded','service-ready','uri-scheme-registered','process-names','silent-uninstall','uri-scheme-removed','updater-cache-removed','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }
-        if (Test-Path -LiteralPath $logs) {
-            Compress-Archive -Path $logs -DestinationPath (Join-Path $RunRoot 'logs.zip') -Force
-        }
+        $evidence = @(@($logs, (Join-Path $serviceData 'log')) | Where-Object { Test-Path -LiteralPath $_ })
+        if ($evidence.Count) { Compress-Archive -Path $evidence -DestinationPath (Join-Path $RunRoot 'logs.zip') -Force }
     }
     if (Test-Path -LiteralPath $marker) { Remove-Item -LiteralPath $marker -Force }
     if ($ownedDataCreated -and (Test-Path -LiteralPath $userData) -and @(Get-ChildItem -LiteralPath $userData -Force).Count -eq 0) {

@@ -94,7 +94,23 @@ const commands = {
       return response.ok && checkBundledSkills(manifest, (await response.json()).data, resources)
     })
 
-    return { pid: service.pid, port: Number(new URL(service.url).port), version: info.version, skills }
+    // An assistant message is what a model call leaves behind; the smoke sends no prompt.
+    const sessions = await pages(service.url, auth, "/api/session?limit=100")
+
+    const messages = await Promise.all(
+      sessions.map((session) => pages(service.url, auth, `/api/session/${session.id}/message?limit=200`)),
+    )
+
+    const assistantMessages = messages.flat().filter((message) => message.type === "assistant").length
+
+    return {
+      pid: service.pid,
+      port: Number(new URL(service.url).port),
+      version: info.version,
+      skills,
+      sessions: sessions.length,
+      assistantMessages,
+    }
   },
 
   async renderer(port, seconds) {
@@ -131,6 +147,20 @@ export function checkBundledSkills(manifest, catalog, resources) {
   )
 
   return { expected, actual }
+}
+
+// Every page of a v2 list, following cursor.next.
+async function pages(base, headers, route, cursor, all = []) {
+  const url = new URL(route, base)
+
+  if (cursor) url.searchParams.set("cursor", cursor)
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) })
+
+  if (!response.ok) throw Error(`${route}: HTTP ${response.status}`)
+  const answer = await response.json()
+  all.push(...answer.data)
+
+  return answer.cursor?.next && answer.data.length ? pages(base, headers, route, answer.cursor.next, all) : all
 }
 
 async function evaluate(port, expression) {
