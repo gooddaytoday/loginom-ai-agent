@@ -8859,3 +8859,167 @@ Found 558 warnings and 0 errors.                    # как на базе (B2.7
   под umask 077 срезает 0755, а без root `tar` не восстановит 4755 у `chrome-sandbox` — проверка, вероятно, не пройдёт, и
   сервер тихо (для службы — только в журнале) останется без Host. В 0.4 так же без установщика; установщик (B2.7a8) режимы
   восстанавливает — не проверял.
+
+## B2.7a2b Отказ неполного артефакта
+
+22.11.2026. Ветка `b27a2b-bundle-refuse` от `oc2-migration` (`dc8785c008`: B2.7a2 и B2.6a), то же рабочее дерево
+`.claude/worktrees/b27a2`. Окружение — как в B2.7a2; база тестов — `<scratchpad>/b27a2b-base` (`dc8785c008`, detached,
+`npm ci` клиента `loginom-runtime`). `packages/loginom-agent` и `packages/core` не трогал.
+
+### B2.7a2b: коммиты
+
+| Коммит | Что | `bun run secrets staged` |
+|---|---|---|
+| `1d12d183d1` `fix(cli): refuse to serve from an incomplete product CLI artifact (B2.7a2b, G5)` | файл форка `cli/src/resources.ts` (отказ вместо предупреждения, причина в сообщении); комментарий в `cli/src/server-process.ts`; `cli/test/cli-resources.test.ts` (+3 теста `serve`) | `clean` |
+| `c5881e8a19` `fix(cli): build the product CLI without source maps in every channel (B2.7a2b)` | `cli/script/build.ts` (+3 −1, CAT-02) | `clean` |
+| следующий | этот раздел, строка G5 в `guarantees.md`, CAT-02 и CAT-07 в `catalog.md` | |
+
+### B2.7a2b: отказ
+
+- **Признак «собранный продукт» — тот же, что в B2.7a2: `process.execPath` не `bun`, не `node`.** Новой проверки нет:
+  собранный бинарник уже проверял манифест, теперь непрошедшая проверка не предупреждение, а отказ. Признак не зависит
+  от того, что лежит рядом: артефакт без каталога ресурсов или без манифеста тоже отказ, как в 0.4
+  (`standalone-bundle.ts` без `LOGINOM_AI_AGENT_CLI_BUNDLE`). Следствие: голый `build.ts --standalone` (B2.7a1, без
+  ресурсов) больше не поднимает сервер — для такого запуска нужна явная `LOGINOM_AI_AGENT_RESOURCES`. Сборка по
+  умолчанию (Desktop, вход `index.ts`) профиля не имеет и проверку не делает.
+- **Где и как.** `CliResources.apply` в `server-process.ts` до прослушивания порта (там же, где в B2.7a2) теперь падает
+  с ошибкой `locate`; сервер выходит с кодом 1, `index.ts` печатает ошибку в stderr, как `PROFILE_BUSY`. Причина —
+  код проверки `verifyCliManifest`: `LOGINOM_MANIFEST_PAYLOAD_MISMATCH` (файл изменён, лишний или пропал),
+  `LOGINOM_MANIFEST_INCOMPLETE` (нет обязательного файла при верном манифесте), `LOGINOM_PRODUCT_SKILLS_INCOMPLETE`,
+  `ENOENT … cli-manifest.json` (нет манифеста). Имени файла в коде проверки нет — `cli-manifest.ts` общий с установщиком,
+  его не менял.
+- **Из исходников** (`bun src/loginom-cli.ts`, тесты) — как прежде: проверки нет, переменная не ставится, сервер без
+  Host. Явная `LOGINOM_AI_AGENT_RESOURCES` — как прежде, используется как есть.
+
+Распакованный архив, root, `tar --same-permissions` (`<scratchpad>/b27a2-runs/accept-b.sh`), в навык продукта дописан
+один байт:
+
+```text
+$ loginom-ai-agent-cli serve --port 0                     # полный артефакт
+server listening on …; Host: <R>/x/resources/loginom/bin/node --use-system-ca <R>/x/resources/loginom/host/node-host.mjs
+$ printf ' ' >> <R>/x/resources/loginom/skills/loginom-automation/SKILL.md
+$ loginom-ai-agent-cli serve --port 0                     # код 1
+Error: LOGINOM_BUNDLE_INCOMPLETE: <R>/x does not match its cli-manifest.json (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI
+    at <anonymous> (/$bunfs/root/chunk-c3b6684b.js:3:5188)
+    at processTicksAndRejections (native:7:39)
+$ loginom-ai-agent-cli service start                      # код 1
+Error: Server process exited with code 1
+Error: LOGINOM_BUNDLE_INCOMPLETE: <R>/x does not match its cli-manifest.json (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI
+    at <anonymous> (/$bunfs/root/chunk-c3b6684b.js:3:5188)
+    … (стек клиента: reap, service.ensure, cli.service.start)
+$ loginom-ai-agent-cli run "Reply with the single word OK"   # службы нет — частный сервер; код 1
+Error: Standalone server exited before reporting readiness (code 1): Error: LOGINOM_BUNDLE_INCOMPLETE: <R>/x does not match its cli-manifest.json (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI
+$ loginom-ai-agent-cli run --standalone --format json "…"   # код 1
+{"type":"error",…,"error":{"type":"unknown","message":"Standalone server exited before reporting readiness (code 1): Error: LOGINOM_BUNDLE_INCOMPLETE: … (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI"}}
+$ loginom-ai-agent-cli --version                          # код 0: команды без сервера работают
+loginom-ai-agent-cli v0.0.0-dev-202611230321
+# процессов артефакта не осталось; байт убран — serve снова слушает, Host есть
+```
+
+### B2.7a2b: карты исходников
+
+`build.ts` v2 собирал с `sourcemap: "inline"` в каналах `dev` и `local`, и Bun 1.4.4 при `compile` со `splitting` клал
+рядом с бинарником `bin/chunk-*.js.map` (668 файлов, 57 МБ в B2.7a2). Теперь режим `--standalone` собирает без карт в
+любом канале (0.4: `sourcemap: "none"` без `--sourcemaps`); сборка по умолчанию (Desktop) прежняя.
+
+```text
+$ for ch in dev local beta prod latest; do LOGINOM_AI_AGENT_CHANNEL=$ch bun run script/build.ts --standalone --single --skip-install --skip-web-ui --outdir=…/$ch; done
+dev exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli          # latest — с LOGINOM_AI_AGENT_VERSION=1.2.3
+local exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
+beta exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
+prod exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
+latest exit 0 bin: 1 files, maps: 0, loginom-ai-agent-cli
+# мутация: строка sourcemap как на базе — dev: maps in bin: 668
+```
+
+Полная сборка артефакта на `c5881e8a19` (`build-cli.ts`, канал `dev`): код 0, 2 мин 1 с, `sourceDirty: false`, архив
+493 МБ (было 521), 13 118 файлов в манифесте (было 13 786), в `bin/` — один бинарник. В артефакте остаются 571 файл `.map`
+внутри npm-пакетов, которые `stage-resources.ts` ставит `npm ci` в `resources/loginom/runtime/client/node_modules` (528:
+`@modelcontextprotocol/sdk` 344, `ajv` 106, `@orama/stemmers` 56, …) и `dashboard/template/node_modules` (43), 16 МБ. Это
+файлы самих пакетов; 0.4 клал их так же — `stage-resources.ts` и lock-файлы рантайма с `a080f7725c` не менялись (пин
+`runtimeLockSha256`). Не трогал: вычищать их — менять содержимое закреплённых пакетов.
+
+### B2.7a2b: распаковка не от root
+
+`labsync` (uid 1000, без sudo, umask входа 0077), каталог `/tmp/b27a2b-lab/<вариант>`, свой HOME, `install.sh` из
+артефакта, под `xvfb-run -a` (`<scratchpad>/b27a2-runs/lab-user.sh`; каталог после проверки удалён):
+
+| Распаковка | Режимы | `install.sh` | Запуск из распакованного каталога |
+|---|---|---|---|
+| `tar -xzf` | `chrome-sandbox` 0700 (setuid снят), бинарник 0700 | `LOGINOM_MANIFEST_PAYLOAD_MISMATCH`, код 1, ничего не поставлено | `serve`: `Error: LOGINOM_BUNDLE_INCOMPLETE: <V>/x does not match its cli-manifest.json (LOGINOM_MANIFEST_PAYLOAD_MISMATCH); reinstall the CLI`, код 1; `service start` — то же у клиента, код 1; `--version` — код 0 |
+| `tar --same-permissions -xzf` | `chrome-sandbox` 4755 владельца `labsync`, бинарник 0755 | манифест сошёлся; смена владельца песочницы — `sudo: a password is required`, `CLI_INSTALL_FAILED`, код 1, лаунчер и каталог установки не созданы | `serve` слушает, Host — дочерний Node host из `resources/loginom`; `service start` — код 0 |
+
+Тихой работы без Host нет ни в одном варианте: либо понятный отказ, либо Host. Установщик без root или sudo продукт не
+ставит (песочница Chromium должна принадлежать root, так и в 0.4). Браузер ни в одном варианте не запускался; песочница
+владельца `labsync` для Chromium не годится (B3.3) — не проверял.
+
+### B2.7a2b: тесты и мутации
+
+`cli/test/cli-resources.test.ts` — 13 тестов (было 10): повреждённые артефакты теперь отказ с ожидаемой причиной
+(`apply` падает, переменная не ставится); запуск из исходников — `apply` без ошибки и без переменной; новый `describe`
+«serve of the product CLI»: `serve --port 0` входа `loginom-cli.ts` в свежем профиле — из исходников слушает; «собранный»
+(Bun, жёсткой ссылкой положенный в `bin/loginom-ai-agent-cli` артефакта-фикстуры: `process.execPath` — бинарник
+артефакта, CLI — из исходников) с полным артефактом слушает, с изменённым навыком — код не 0, в stderr
+`LOGINOM_BUNDLE_INCOMPLETE` и `LOGINOM_MANIFEST_PAYLOAD_MISMATCH`.
+
+Мутации (`<scratchpad>/b27a2-runs/mutate-b.sh`, на `c5881e8a19`; после — `git status` чистый):
+
+| Мутация | `cli-resources.test.ts` |
+|---|---|
+| M0 нет | 13/0 |
+| M8 непрошедшая проверка не останавливает сервер (поведение B2.7a2) | **5/8**: семь повреждённых артефактов и `serve` повреждённого |
+| M9 вызов `CliResources.apply()` убран из `server-process.ts` | **12/1**: `serve` повреждённого артефакта запустился (в B2.7a2 эту мутацию ловила только сборка) |
+| M10 собранный CLI принят за запуск из исходников | **4/9** |
+| M11 запуск из исходников принят за собранный | **11/2**: `locate` из исходников и `serve` из исходников (отказ: рядом с Bun нет манифеста) |
+| M12 явное значение перезаписывается | **12/1** |
+| M1 манифест не требует вход Host | **12/1** |
+| M3 манифест не проверяет навыки продукта | **12/1** |
+| карты: строка `sourcemap` как на базе | сборка `dev`: 668 карт в `bin/` (выше) |
+
+### B2.7a2b: приёмка
+
+Код менялся только в `packages/cli`; база — `dc8785c008` в отдельном дереве, `npm ci` клиента в обоих деревьях.
+
+| Пакет | Команда | `dc8785c008` | `c5881e8a19` |
+|---|---|---|---|
+| `cli` | `bun test --timeout 60000` | 440 pass, 9 skip, 0 fail | первый прогон 442 pass, 9 skip, **1 fail**; второй — 443 pass, 9 skip, 0 fail (+3 `cli-resources`) |
+| `product` | `bun test` | — | 60 pass, 3 fail — те же три `repo-paths` (B2.7a2) |
+
+Падение первого прогона — `cli-profile-service.test.ts` «one server writes a profile: concurrent starts share it…»: из
+двух одновременных `service start` один получил `Server process exited with code 3` / `PROFILE_BUSY: the CLI profile …
+is open in another process` (гонка двух соперников службы за `.writer`, B2.7c). Код этого пути задача не трогает
+(запуск из исходников проверку не делает). Файл отдельно — 5 из 5 зелёных и на ветке, и на базе; второй полный прогон
+ветки — 0 падений. Записываю как нестабильный тест под нагрузкой полного набора, причину не искал.
+
+```text
+$ cd packages/cli && bun typecheck                 # ✓ No type errors in 2,198 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary      # код 0
+against a6b15d33daf6: 453 divergent upstream files                  # как на dc8785c008: build.ts и server-process.ts уже в каталоге
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                               # код 0
+$ bun install --frozen-lockfile                     # Checked 1687 installs across 2060 packages (no changes)
+$ bun run check                                     # код 0, с документами этого коммита
+Found 558 warnings and 0 errors.
+ Tasks:    39 successful, 39 total
+```
+
+### B2.7a2b: где решал сам
+
+- **Признак — исполняемый файл, а не «каталог ресурсов рядом».** Задание предлагало оба. «Каталог рядом» пропускал бы
+  артефакт, у которого пропали и ресурсы, и манифест, — тихо без Host; исполняемый файл уже был признаком в B2.7a2, кода
+  не прибавилось, и так делал 0.4. Цена — голый бинарник `build.ts --standalone` без ресурсов (B2.7a1) сервер не
+  поднимает; это промежуточный вывод `build-cli.ts`, пользователю не поставляется.
+- **Код 1, а не свой.** 0.4 отвечал `LOGINOM_BUNDLE_INCOMPLETE` кодом 1; коды §10 (`run --headless`) — B2.7a4.
+- **Сообщение — через обычный вывод ошибки `index.ts`**, со строками стека, как `PROFILE_BUSY` (B2.7a1). Клиент частного
+  сервера строки стека отбрасывает (B2.7a1), клиент службы показывает stderr службы целиком и свой стек (`packages/client`,
+  не трогал).
+- **Причина — код проверки, без имени файла:** `verifyCliManifest` общий с установщиком и его тестами.
+- **Карты npm-пакетов в ресурсах оставлены** (выше): задание называет карты, которых 0.4 не клал, — это `bin/*.js.map`.
+
+### B2.7a2b: не проверено
+
+- Windows и macOS: отказ и сборка без карт — по коду; `cli-resources.test.ts` — только Linux.
+- Распаковка не от root с sudo (установщик меняет владельца песочницы через `sudo`) и запуск Chromium после такой
+  установки — у `labsync` sudo нет.
+- TUI собранного бинарника при отказе: TUI — клиент службы, путь `Service.ensure` тот же, что у `service start`; глазами
+  не смотрел.
