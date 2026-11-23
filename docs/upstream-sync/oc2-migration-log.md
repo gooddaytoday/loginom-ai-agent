@@ -17008,7 +17008,7 @@ $ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 
 against a6b15d33daf6: 592 divergent upstream files                      # новые файлы форка не считаются
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # код 0
 would change: 0 files
-$ oxlint и prettier --check четырёх файлов                              # 0 warnings, чисто
+$ oxlint и prettier --check трёх файлов JS/TS                          # 0 warnings, чисто; Dockerfile не линтуется
 $ bun run check                                                         # код 0, 25 с, на d9a85023e0
 Found 554 warnings and 0 errors.                                        # как в B4.13 и B4.7b; в test/loginom — ни одного
 sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
@@ -17064,6 +17064,11 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
   AppImage через FUSE, обновление установленной 0.4 пакетом v2 (`dpkg` поверх `/opt/loginom-ai-agent`) — нет.
 - **Каналы prod и beta** не собирались, только dev. Профиль 0.4 — prod-профиль, переименованный в dev.
 - **AppImage** — только PKG-01 и PKG-02, LIFE-01 на нём не гонялся.
+- **Уборка после неудачной сборки** в `run-matrix.ts` не исполнялась: все сборки матрицы прошли. Прерванная вручную сборка
+  (до переименования пользователя) оставила контейнер и два образа, они удалены вручную.
+- **Настоящие каталоги** проверены поиском файлов новее начала задачи: в `~/.local/share/loginom-ai-agent-dev/log` дописан
+  только журнал канала `local` — запуски CLI из исходников (`auth --help`, `session export/import`) в минуты, когда мои шаги
+  шли в контейнерах или не шли вовсе; это тесты `cli` другой задачи. Других следов нет.
 - **macOS и Windows** — B4.14c и этап G.
 
 ### Уборка
