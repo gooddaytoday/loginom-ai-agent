@@ -6,13 +6,16 @@ export function makePreparedOutputPortOpenCode(binding,options) {
 export function makePreparedInputPortOpenCode(binding,options) {
  return makePreparedPortOpenCode(binding,options,'input');
 }
-function makePreparedPortOpenCode(binding,options,direction) {
+export function makePreparedInputPortReconcileCode(binding,options) {
+ return makePreparedPortOpenCode(binding,options,'input',true);
+}
+function makePreparedPortOpenCode(binding,options,direction,reconcileOnly=false) {
  validatePreparedNodeContext(binding);
  if(!options||Object.keys(options).sort().join(',')!=='build,deadline,operation_id,origin,port'
    ||!Number.isInteger(options.port)||options.port<0||options.port>99
    ||typeof options.operation_id!=='string'||! /^[A-Za-z0-9_.:-]{1,160}$/.test(options.operation_id)
    ||!Number.isSafeInteger(options.deadline)||typeof options.origin!=='string'||typeof options.build!=='string')throw Error('Exact bounded output port opening required');
- return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction})},${readPreparedNodeContext.toString()})`;
+ return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction,...(reconcileOnly?{reconcile_only:true}:{})})},${readPreparedNodeContext.toString()})`;
 }
 
 // A local opening receipt retains UI object identity across graph -> port wizard.
@@ -368,6 +371,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
  try {
   remaining();let existing=await inspect('lookup');
+  // Cleanup may reconcile a completed opening failure, but must never open a
+  // port or confirm deactivation. Reuse all native finish ownership checks.
+  if(task.reconcile_only){
+   if(!existing||!['open_issued','deactivation_issued','verified'].includes(existing.phase))throw Error('No issued port opening to reconcile');
+   const result=await finish();
+   return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
+  }
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}
   if(existing){effect=existing.phase!=='reserved';const result=await finish();return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
   const before=await readNode(page,task.binding);
@@ -430,6 +440,6 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()});
   const result=await finish();trace.push({event:direction+'_port_wizard_verified',...result});
   return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
- }catch(error){if(!effect){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+ }catch(error){if(!effect&&!task.reconcile_only){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
   error:String(error.message).slice(0,500),trace};}
 }
