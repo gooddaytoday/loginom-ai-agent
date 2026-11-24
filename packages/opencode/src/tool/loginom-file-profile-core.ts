@@ -8,6 +8,13 @@ import type { XlsxOptions } from "./loginom-file-xlsx"
 const MiB = 1024 * 1024
 const MAX_BYTES = 8 * MiB
 const BLOCK = 256 * 1024
+const SQLITE_HEADER = Buffer.from("SQLite format 3\x00")
+// Include the binary bytes after BGDATA so a text column named BGDATA cannot match.
+const LGD_HEADER = Buffer.from("BGDATA\x03\x00\x02\x01")
+const BINARY_FORMATS = [
+  { header: SQLITE_HEADER, format: "sqlite", import_node_type: "imports.database" },
+  { header: LGD_HEADER, format: "lgd", import_node_type: "imports.lgd" },
+] as const
 // Bun does not ship ICU's windows-1251 decoder; keep the same strict mapping
 // in source and in the Node standalone bundle (0x98 is undefined).
 const CP1251 =
@@ -106,7 +113,7 @@ async function identity(path: string): Promise<Identity> {
   return { canonical_path: canonical, size: s.size, mtime: s.mtimeMs, ctime: s.ctimeMs, file_id: `${s.dev}:${s.ino}` }
 }
 
-async function unchanged(p: Stored) {
+async function unchanged(p: Pick<Stored, "source" | "identity">) {
   const current = await identity(p.source).catch(() => undefined)
   if (JSON.stringify(current) !== JSON.stringify(p.identity)) failure("LOGINOM_FILE_CHANGED", p.source)
 }
@@ -530,25 +537,38 @@ async function* boundaries(path: string) {
 }
 
 export async function profileFile(path: string, dir: string, options: ProfileOptions = {}) {
-  const detected = await identity(resolve(path))
+  const source = resolve(path)
+  const detected = await identity(source)
   if (options.authorized_path && options.authorized_path !== detected.canonical_path)
     failure("LOGINOM_FILE_CHANGED", path)
   const magic = await open(detected.canonical_path, "r")
   try {
     await checkHandle(magic, detected)
-    const bytes = Buffer.alloc(4)
-    await magic.read(bytes, 0, 4, 0)
-    if ([0x04034b50, 0x06054b50, 0x08074b50].includes(bytes.readUInt32LE(0))) {
+    const buffer = Buffer.alloc(SQLITE_HEADER.length)
+    const { bytesRead } = await magic.read(buffer, 0, buffer.length, 0)
+    const bytes = buffer.subarray(0, bytesRead)
+    if (bytes.length >= 4 && [0x04034b50, 0x06054b50, 0x08074b50].includes(bytes.readUInt32LE(0))) {
       const { profileXlsx } = await import("./loginom-file-xlsx")
       return await profileXlsx(path, dir, options)
     }
-    if (bytes.equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0])))
+    if (bytes.subarray(0, 4).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0])))
       failure("LOGINOM_FILE_XLSX_UNSUPPORTED", "encrypted XLSX / legacy OLE workbook")
+    const binary = BINARY_FORMATS.find(({ header }) => bytes.subarray(0, header.length).equals(header))
+    if (binary) {
+      await unchanged({ source, identity: detected })
+      await checkHandle(magic, detected)
+      return {
+        format: binary.format,
+        identity: detected,
+        status: "format_detected" as const,
+        import_node_type: binary.import_node_type,
+        next_step: `Use loginom_file_admit on the original path, then artifact_deliver. Import the delivered file with ${binary.import_node_type}.`,
+      }
+    }
   } finally {
     await magic.close()
   }
   const started = performance.now()
-  const source = resolve(path)
   const original = await identity(source)
   if (options.authorized_path && options.authorized_path !== original.canonical_path)
     failure("LOGINOM_FILE_CHANGED", source)

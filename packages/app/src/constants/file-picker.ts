@@ -2,6 +2,17 @@ export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "im
 
 export const LOGINOM_PACKAGE_MIME = "application/x-loginom-package"
 
+const BINARY_REFERENCE_MIMES = new Map([
+  ["db", "application/octet-stream"],
+  ["lgd", "application/octet-stream"],
+  ["xls", "application/vnd.ms-excel"],
+])
+
+export function binaryReferenceMime(name: string) {
+  const dot = name.lastIndexOf(".")
+  return dot === -1 ? undefined : BINARY_REFERENCE_MIMES.get(name.slice(dot + 1).toLowerCase())
+}
+
 export const ACCEPTED_FILE_TYPES = [
   ...ACCEPTED_IMAGE_TYPES,
   "application/pdf",
@@ -76,14 +87,15 @@ const MIME_EXT = new Map([
 const TEXT_EXT = ["txt", "text", "md", "markdown", "log", "csv"]
 
 export const ACCEPTED_FILE_EXTENSIONS = Array.from(
-  new Set(
-    ACCEPTED_FILE_TYPES.flatMap((item) => {
+  new Set([
+    ...BINARY_REFERENCE_MIMES.keys(),
+    ...ACCEPTED_FILE_TYPES.flatMap((item) => {
       if (item.startsWith(".")) return [item.slice(1)]
       if (item === "text/*") return TEXT_EXT
       const out = MIME_EXT.get(item)
       return out ? [out] : []
     }),
-  ),
+  ]),
 ).sort()
 
 export function filePickerFilters(name: string, ext?: string[]) {
