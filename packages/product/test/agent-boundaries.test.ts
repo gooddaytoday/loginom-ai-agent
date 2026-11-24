@@ -41,3 +41,14 @@ test("Excel card reports the 64-column limit before creating the Import", () => 
   expect(excel).toContain("запрошенный пакет сохрани без этого узла")
   expect(Buffer.byteLength(excel)).toBeLessThanOrEqual(12_000)
 })
+
+// #1290/#1291, bughunt bh-b04/bh-a10/s1 (0.4.1): the agent waited with shell `sleep` (530–705 s per run),
+// unzipped an attached .lgp to read its XML and read or created files outside the working directory.
+test("workflow reference allows waiting only through Loginom tools and keeps files inside the task", () => {
+  expect(boundaries).toMatch(/Ожидай только `loginom_dock_node_wait`[\s\S]*?60 с[\s\S]*?тем же `operation_id`/)
+  expect(boundaries).toContain("`loginom_dock_operation_inspect`")
+  expect(boundaries).toContain("shell `sleep`")
+  expect(boundaries).toMatch(/Приложенный `\.lgp` открывай `loginom_dock_prepare`[\s\S]*?не распаковывай/)
+  expect(boundaries).toMatch(/вне рабочего каталога и вложений[\s\S]*?не читай и не создавай/)
+  expect(boundaries).toContain("справку этого skill")
+})
