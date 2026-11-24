@@ -192,6 +192,11 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const rg = process.platform === "win32" ? "ripgrep/rg.exe" : "ripgrep/rg"
       expect(manifest.files.some((file: { path: string }) => file.path === rg)).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "licenses/ripgrep/LICENSE-MIT")).toBe(true)
+      // The CLI that Desktop and the CLI artifact carry embeds loginom-ai-agent-pty (B2.7a9, B4.7c).
+      expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("licenses/loginom-ai-agent-pty/")
+      const pty = await Bun.file(join(destination, "licenses/loginom-ai-agent-pty/inventory.json")).json()
+      expect(pty.packages.some((pkg: { name: string }) => pkg.name === "loginom-ai-agent-pty")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "licenses/loginom-ai-agent-pty/inventory.json")).toBe(true)
       const version = Bun.spawnSync([join(destination, rg), "--version"]).stdout.toString()
       expect(version).toStartWith(`ripgrep ${ripgrepPins.version}`)
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()

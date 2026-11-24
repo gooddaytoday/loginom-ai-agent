@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cp, mkdir, readFile, realpath, rename, rm, stat } from "node:fs/promises"
+import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises"
+import { homedir } from "node:os"
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
+import { tarEntries } from "./bun-notices"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
@@ -178,6 +180,7 @@ export async function stageResources(input: {
   if (process.platform === "darwin") await buildKeychain(join(staging, "bin"))
   // stageRipgrep has already created licenses/ripgrep.
   await mkdir(join(staging, "licenses"), { recursive: true })
+  await stageCrateNotices({ output: join(staging, "licenses/loginom-ai-agent-pty") })
   const docs = await buildPhase(`${input.flavor}-package-docs`, () =>
     buildPackageDocs(join(staging, "skills/package-docs/scripts")))
   await collectBuildNotices(join(staging, "licenses/package-docs"), [{ root: docs.root, metafile: docs.metafile }])
@@ -196,6 +199,7 @@ export async function stageResources(input: {
   The original copyright/license notices are preserved in licenses/.
   Node.js license and bundled dependency notices are in licenses/Node.txt.
   ripgrep (MIT or Unlicense) is bundled in ripgrep/; its license texts are in licenses/ripgrep/.
+  The CLI embeds the terminal service loginom-ai-agent-pty (MIT); its license and those of the Rust crates it is built from are in licenses/loginom-ai-agent-pty/, listed with what they do not cover yet in its inventory.json.
   Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
   Its emitted npm dependency notices are in licenses/package-docs/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.
@@ -225,6 +229,142 @@ export async function stageResources(input: {
   await rm(destination, { recursive: true, force: true })
   await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+// The CLI that both the CLI artifact and Desktop carry embeds loginom-ai-agent-pty, built from packages/process-daemon
+// (B2.7a9, B4.7c). Its notices take the layout and inventory of collectBuildNotices: the service's own license files
+// and those of every crate its Cargo.lock pins, read from crate archives that match the lock's checksums. The archives
+// come from Cargo's download cache, which building the service fills; one missing there is downloaded from crates.io.
+export async function stageCrateNotices(input: {
+  output: string
+  lock?: string
+  caches?: string[]
+  download?: (url: string) => Promise<Uint8Array<ArrayBuffer>>
+}) {
+  const lock = input.lock ?? resolve(import.meta.dir, "../../process-daemon/Cargo.lock")
+  const caches = input.caches ?? (await cargoCaches())
+  const locked = Bun.TOML.parse(await Bun.file(lock).text()) as {
+    package?: { name: string; version: string; source?: string; checksum?: string }[]
+  }
+  const packages = []
+  for (const [index, pkg] of (locked.package ?? []).entries()) {
+    const notices =
+      pkg.source === undefined
+        ? await localNotices(dirname(lock))
+        : await crateNotices(pkg, caches, input.download ?? downloadCrate)
+    const directory = String(index + 1).padStart(4, "0")
+    const files = []
+    const documentation = []
+    for (const entry of notices.entries) {
+      const path = `${directory}/${entry.path}`
+      await Bun.write(join(input.output, path), entry.data)
+      const record = {
+        path,
+        scope: entry.path.includes("/") ? "nested" : "package",
+        sha256: createHash("sha256").update(entry.data).digest("hex"),
+      }
+      if (entry.readme) documentation.push(record)
+      else files.push(record)
+    }
+    packages.push({
+      name: pkg.name,
+      version: pkg.version,
+      license: notices.license,
+      checksum: pkg.checksum ?? null,
+      files,
+      documentation,
+    })
+  }
+  const inventory = {
+    status: "incomplete",
+    scope:
+      "Package and nested notices of loginom-ai-agent-pty and of every crate in its Cargo.lock, from crate archives " +
+      "matching the lock's checksums; the lock also pins crates of other platforms and of tests",
+    exclusions: ["Ghostty and its Zig dependencies, which build.rs fetches and links in", "The Rust standard library"],
+    packages,
+    missing: packages
+      .filter((pkg) => !pkg.files.some((file) => file.scope === "package"))
+      .map((pkg) => `${pkg.name}@${pkg.version}`),
+  }
+  await Bun.write(join(input.output, "inventory.json"), JSON.stringify(inventory, null, 2) + "\n")
+  return inventory
+}
+
+// The service's own directory holds its build output too, so only its top level is read.
+async function localNotices(directory: string) {
+  const entries = []
+  for (const name of (await readdir(directory, { withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .sort()) {
+    const kind = noticeKind(name)
+    if (kind) entries.push({ path: name, data: await readFile(join(directory, name)), readme: kind === "readme" })
+  }
+  return { entries, license: cargoLicense(await Bun.file(join(directory, "Cargo.toml")).text()) }
+}
+
+async function crateNotices(
+  pkg: { name: string; version: string; source?: string; checksum?: string },
+  caches: string[],
+  download: (url: string) => Promise<Uint8Array<ArrayBuffer>>,
+) {
+  if (
+    pkg.source !== "registry+https://github.com/rust-lang/crates.io-index" ||
+    !/^[0-9a-f]{64}$/.test(pkg.checksum ?? "")
+  )
+    throw new Error(`LOGINOM_CRATE_SOURCE_UNKNOWN: ${pkg.name}`)
+  const file = `${pkg.name}-${pkg.version}.crate`
+  const cached = (
+    await Promise.all(caches.map(async (cache) => ((await Bun.file(join(cache, file)).exists()) ? cache : undefined)))
+  ).find((cache) => cache !== undefined)
+  const data = cached
+    ? await Bun.file(join(cached, file)).bytes()
+    : await download(`https://static.crates.io/crates/${pkg.name}/${file}`)
+  if (createHash("sha256").update(data).digest("hex") !== pkg.checksum)
+    throw new Error(`LOGINOM_CRATE_HASH_MISMATCH: ${file}`)
+  const prefix = `${pkg.name}-${pkg.version}/`
+  const kept = new Map<string, Uint8Array>()
+  for await (const entry of tarEntries(new Blob([data]).stream().pipeThrough(new DecompressionStream("gzip")))) {
+    if (entry.type === "directory") continue
+    if (!entry.path.startsWith(prefix)) throw new Error(`LOGINOM_CRATE_LAYOUT: ${file}`)
+    const path = entry.path.slice(prefix.length)
+    if (entry.type === "file" && (path === "Cargo.toml" || noticeKind(path))) kept.set(path, entry.data)
+  }
+  const manifest = kept.get("Cargo.toml")
+  return {
+    entries: [...kept]
+      .filter(([path]) => noticeKind(path))
+      .map(([path, data]) => ({ path, data, readme: noticeKind(path) === "readme" }))
+      .sort((a, b) => a.path.localeCompare(b.path)),
+    license: manifest ? cargoLicense(new TextDecoder().decode(manifest)) : null,
+  }
+}
+
+// The names collectBuildNotices copies from npm packages, Rust sources aside. A top-level README is documentation: its
+// presence alone supplies no license text.
+function noticeKind(path: string) {
+  const segments = path.split("/")
+  const name = segments.at(-1) ?? ""
+  if (segments.some((segment) => segment === "node_modules" || segment === ".git")) return undefined
+  if (segments.length === 1 && /^readme(?:\.|$)/i.test(name)) return "readme"
+  if (/^(license|licence|notice|copying|copyright)/i.test(name) && !/\.(?:[cm]?[jt]sx?|json|map|rs)$/i.test(name))
+    return "notice"
+  return undefined
+}
+
+function cargoLicense(manifest: string) {
+  return (Bun.TOML.parse(manifest) as { package?: { license?: string } }).package?.license ?? null
+}
+
+async function cargoCaches() {
+  const registry = join(process.env.CARGO_HOME ?? join(homedir(), ".cargo"), "registry/cache")
+  return (await readdir(registry).catch(() => [])).map((index) => join(registry, index))
+}
+
+async function downloadCrate(url: string) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(120_000) })
+  if (!response.ok) throw new Error(`LOGINOM_CRATE_DOWNLOAD_FAILED: ${url}: HTTP ${response.status}`)
+  return new Uint8Array(await response.arrayBuffer())
 }
 
 // Chromium refuses to start unless this helper is mode 4755. Ownership is applied later, at install or package time.

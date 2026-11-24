@@ -21221,3 +21221,301 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Профиль 0.4 с настоящим `loginom-ai-agent.settings` и сохранённым сервером WSL — запись собрана по коду 0.4.
 - Переименование `OPENCODE_ZIG_CPU` не пробовалось; сборка `process-daemon` (cargo, Zig) не запускалась — правка только в
   тесте.
+
+## Хвосты выпуска: npm, журнал, уведомления pty
+
+23.11.2026. Ветка `btails1-release-safety` от `oc2-migration` (`ed7e816b82`), рабочее дерево `.claude/worktrees/btails1`.
+Эталон 0.4 — `v0.4.0`. Bun 1.4.4 переносной, Node 24.19.0 и `gitleaks` 8.30.1 (`~/.local/bin`) — первыми в `PATH` только
+для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci
+--ignore-scripts` клиента `packages/loginom-runtime/client`; Electron 44.9.1 для тестов `desktop` распакован его
+`install.js` из кэша `~/.cache/electron` под `unshare -n`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на
+каждом прошедшем коммите; две остановки хука — в «Найдено». Тесты, мутации и пробы — под `unshare -n` (поднят только `lo`) с временными `HOME`, `TMPDIR`, `XDG_*`. С сетью —
+только `npm ci` (клиент и полный тест `stage-resources`, ниже). Crates.io не вызывался: все 57 архивов крейтов были в кэше
+Cargo `~/.cargo` настоящего пользователя (читался, не писался; `CARGO_HOME` задан явно, потому что `HOME` временный). Модель не вызывалась:
+ни один тест и ни одна проба не отправляли промпт. База для сравнения — отдельное дерево на `ed7e816b82` в scratchpad
+(`git worktree add --detach`, своё `bun install`, `npm ci` клиента, Electron из кэша).
+
+Прочитано: этот журнал — B2.7a3b (журнал CLI с секретами), B2.7a9 и B4.7c (свой pty, `dev`/`beta` и npm);
+`v0.4.0:packages/desktop/scripts/{prebuild,predev,prepare,utils}.ts`; `desktop/script/{build,dev,utils,pack}.ts`,
+`electron-builder.config.ts`, `desktop/src/main/service/desktop-cli.ts`; `cli/src/index.ts`; `loginom-host/script/{
+collect-build-notices,build-cli,stage-resources,ripgrep-resource,bun-notices}.ts`; `process-daemon/{Cargo.toml,Cargo.lock,
+build.rs}`; `catalog.md` (CAT-02, CAT-12).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `4c1cad89ce` `fix(desktop): bundle only the CLI built from packages/cli in every channel` | `desktop/script/{utils,build,dev}.ts`, `desktop/README.md`, тест `desktop/script/bundled-cli.test.ts` |
+| `a70d477c5b` `fix(cli): keep command lines out of the CLI log` | `cli/src/index.ts`, тест `cli/test/cli-standalone.test.ts` (новый случай и правка имеющегося) |
+| `2bc1efc14c` `feat(loginom-host): stage the notices of loginom-ai-agent-pty and its crates` | `loginom-host/script/stage-resources.ts`, тесты `loginom-host/test/pty-notices.test.ts` (новый), `stage-resources.test.ts` (+5 строк в полном случае) |
+| `9ee821c2a1` `docs(upstream-sync): describe the CLI-only Desktop build and the CLI log without command lines in the catalog` | `catalog.md`: CAT-02, CAT-12 |
+| `897903b537` `docs(upstream-sync): record the stage B release tails: …` | этот раздел, первая редакция |
+| следующий | тесты: `cli-standalone.test.ts` (сырой журнал в случае выгрузки; новый случай — один процесс без сервера), комментарий пропуска в `bundled-cli.test.ts`; правки раздела |
+
+Файлы кода — пять (предел — пять), тесты не считаются:
+
+| Файл | Строк | Каталог |
+|---|---|---|
+| `desktop/script/utils.ts` | +9 −22 | CAT-02 (`packages/*/script/**`) |
+| `desktop/script/build.ts` | +3 −12 | CAT-02 |
+| `desktop/script/dev.ts` | +10 −26 | CAT-02 |
+| `cli/src/index.ts` | +2 −5 | CAT-12 |
+| `loginom-host/script/stage-resources.ts` | +141 −1 | файл форка |
+
+Четыре файла upstream расходились и до задачи, поэтому `catalog.json` не менялся: `catalog-check` — 609 расходящихся
+файлов, как на базе. В `catalog.md` поправлена ставшая ложной фраза CAT-02 («`script/dev.ts` называет копии режима
+разработки `loginom-ai-agent-cli-dev` и …») и дописаны обе правки.
+
+### 1. Сборка Desktop не скачивает CLI OpenCode
+
+Было: `desktop/script/build.ts` брал CLI из `packages/cli/dist`, а без него `dev` (и `local`, пустой, неизвестный канал)
+скачивал `@opencode/cli-<цель>@dev` из npm, `beta` — `@beta` (`downloadCliToResources` в `utils.ts`: `bun install
+--no-save` во временный каталог); `prod` падал. `bun dev --download-server <версия>` скачивал так же копию
+`resources/loginom-ai-agent-cli-dev`. Это CLI OpenCode: его бинарник npm `@opencode/pty` и сокеты `/tmp/opencode-pty-<uid>`.
+
+**В 0.4 Desktop ничего не скачивал**: `prebuild.ts` и `predev.ts` собирали службу из исходников (`opencode/script/
+build-node.ts`) в любом канале, и для сборки, и для разработки. Поэтому для разработки сделано так же.
+
+Стало:
+
+- `copyBuiltCliToResources` (`utils.ts`) проверяет каталог сборки цели и без него падает:
+  `Desktop bundles the CLI built from packages/cli, and <…>/packages/cli/dist/cli-linux-x64-baseline is missing. Build it
+  first: LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun run --cwd packages/cli build`. `downloadCliToResources` и
+  `CLI_VERSION` удалены;
+- `build.ts` зовёт её безусловно, ветки по каналу больше нет;
+- `dev.ts`: режим `--download-server` убран, на флаг — отказ до любых действий (`--download-server is not supported: bun
+  dev runs the CLI from packages/cli`, код 1, `resources/` не тронут); `--build-server` по-прежнему принимается и ничего не
+  меняет; служба всегда из исходников (`LOGINOM_AI_AGENT_DESKTOP_CLI_DEV`), как и раньше по умолчанию.
+
+Других путей к CLI из npm в `packages/desktop` нет: `git grep` по `@opencode/cli`, `bun install`, `download` в `script/`,
+`scripts/`, `src/main`, `electron-builder.config.ts`; `perf/startup.bench.ts` берёт только `@opencode/client/service`.
+
+### 2. Журнал CLI на диске без командной строки
+
+Было: `cli/src/index.ts` писал `args=[…]` в двух записях — `cli starting` (каждая команда) и `cli process failed` (упавшая
+команда, в том числе ошибка разбора флагов). Выгрузка диагностики (B2.7a3b) маскирует их в архиве, файл на диске — нет.
+
+Стало — как в 0.4, меньший из двух вариантов задания: поля `args` нет ни в одной записи; маскировать нечего. Маска
+выгрузки (`args=[redacted]`) в `loginom-host` осталась: журналы, написанные до правки, лежат в профилях.
+
+Проба `<scratchpad>/btails1/probe-log.ts` (вход продукта из исходников, временный профиль, `unshare -n`; ключ
+`fixture-probe-cli-log-value` в argv; команды `debug paths`, `auth login openai --method key --answer key=<ключ>`,
+`debug paths --bogus=<ключ>`, `models --provider=<ключ>`):
+
+```text
+### база ed7e816b82
+--- loginom-ai-agent-local.log: 3867 bytes, key: true
+    … message="cli starting" … args="[\"auth\",\"login\",\"openai\",\"--method\",\"key\",\"--answer\",\"key=<KEY>\"]" role=cli
+    … message="cli process failed" cause="Cause([Fail(~effect/cli/CliError/ShowHelp: Help requested)])" args="[\"debug\",\"paths\",\"--bogus=<KEY>\"]" role=cli
+files under root with the key: [ "profile/data/log/loginom-ai-agent-local.log" ]
+### итог
+--- loginom-ai-agent-local.log: 3521 bytes, key: false
+    … message="cli starting" version=local channel=local local=true role=cli                     # ×5, плюс частный сервер auth
+    … message="cli process failed" cause="Cause([Fail(~effect/cli/CliError/ShowHelp: Help requested)])" role=cli   # ×2
+files under root with the key: []
+```
+
+Ключа нет ни в одном файле временного корня (весь корень, включая базу профиля). Причина в `cause` ключа не содержит.
+`auth login` с этим ответом падает на форме («Unknown form field: key») до подключения: ключ никуда не уходит.
+
+Ключ, **сохранённый** через `POST /api/integration/stub/connect/key`, и промпт `run`, где он и метка (случай выгрузки
+B2.7a3b), в сыром журнале на диске теперь тоже не встречаются — проверка добавлена в тот же случай. Строка B2.7a3b «key in
+log raw file: true» объяснялась `args`: других писателей ключа в журнал нет.
+
+### 3. Уведомления о лицензиях своего pty
+
+**Где лежит pty.** Встроен в исполняемый файл CLI обеих сборок (B2.7a9 — `--standalone`, B4.7c — по умолчанию): в
+артефакте CLI — `bin/loginom-ai-agent-cli`, в Desktop — `resources/loginom-ai-agent-cli`. Значит, уведомления нужны обоим.
+У обоих есть общий шаг — `stageResources` (`loginom-host/script/stage-resources.ts`): `build-cli.ts` (вид `cli`) и
+`desktop/scripts/bundle-loginom.ts` (вид `desktop`) пишут им `resources/loginom` с `licenses/` и `THIRD_PARTY_NOTICES.md`.
+Туда и положены уведомления: `resources/loginom/licenses/loginom-ai-agent-pty/`, строка в `THIRD_PARTY_NOTICES.md`,
+файлы — в `resource-manifest.json` (и в `cli-manifest.json` артефакта).
+
+**Механизм.** `stageCrateNotices` — раскладка и опись `collectBuildNotices` (`licenses/bundled-npm`): каталог `NNNN` на
+пакет, тексты `license|licence|notice|copying|copyright…` с путём внутри пакета (`package` — верхний уровень, `nested` —
+вложенные), README верхнего уровня — `documentation`, sha256 каждого файла, `license` — выражение из `Cargo.toml` пакета,
+`missing` — пакеты без текста лицензии, `status: incomplete`, `exclusions`. Пины — `checksum` из
+`packages/process-daemon/Cargo.lock`, как sha256 у `stageRipgrep`: архив `<имя>-<версия>.crate` берётся из кэша загрузок
+Cargo (`$CARGO_HOME/registry/cache/*/`, его наполняет `cargo build`, который запускает сборка CLI), иначе — с
+`https://static.crates.io/crates/<имя>/<файл>`, и в обоих случаях сверяется с lock; несовпадение —
+`LOGINOM_CRATE_HASH_MISMATCH`, источник не crates.io — `LOGINOM_CRATE_SOURCE_UNKNOWN`. Архив читается в памяти
+(`tarEntries` из `bun-notices.ts`), на диск не распаковывается. Сам сервис (пакет без `source`) — `LICENSE` верхнего
+уровня `packages/process-daemon` (MIT); каталог не обходится вглубь: там бывает `target/`.
+
+**Сеть.** Нужна, только если архива нет в кэше Cargo: сборка CLI с готовым `LOGINOM_AI_AGENT_PTY_BIN` на машине без
+`cargo build` или с чистым кэшем. Тогда — `static.crates.io`, по архиву на крейт (57 архивов, 13,7 МБ сжатыми, из них `windows-sys` — 2,5 МБ).
+Здесь кэш был полон: сеть не понадобилась.
+
+Опись на настоящем lock (`<scratchpad>/btails1/real-notices.ts`, `unshare -n`, загрузка запрещена):
+
+```text
+58 packages; missing: [ "r-efi@5.3.0", "winapi-i686-pc-windows-gnu@0.4.0", "winapi-x86_64-pc-windows-gnu@0.4.0" ]
+anyhow 1.0.104 MIT OR Apache-2.0 LICENSE-APACHE LICENSE-MIT | doc: 1
+…
+loginom-ai-agent-pty 0.5.2 MIT LICENSE | doc: 1
+memchr 2.8.3 Unlicense OR MIT COPYING LICENSE-MIT | doc: 1
+portable-pty 0.9.0 MIT LICENSE.md | doc: 0
+…
+windows-sys 0.61.2 MIT OR Apache-2.0 license-apache-2.0 license-mit | doc: 1
+real 0m1.263s                                         # 1,5 МБ на диске вместе с README
+```
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `desktop/script/bundled-cli.test.ts`, «the %s channel without a built CLI fails and downloads nothing» (таблица `dev`, `beta`, `prod`; не Windows) | `copyBuiltCliToResources` в отдельном процессе Bun с `LOGINOM_AI_AGENT_CHANNEL` и подставным `bun` первым в `PATH`, который записывает вызовы: подставной `bun` не вызывался, код не 0, ошибка называет каталог и команду сборки, `resources/` не создан |
+| там же, «a built CLI is bundled with its version» (Linux) | собранный CLI копируется в `resources/loginom-ai-agent-cli` с файлом версии — отказ не шире нужного |
+| `cli/test/cli-standalone.test.ts`, «the CLI log on disk keeps no command line, of a command or of its failure» (новый) | вход продукта из исходников, один процесс без сервера: `auth login --answer key=<ключ> --unknown-flag` — код 1, «Unrecognized flag» (ошибка разбора пишет и `cli process failed`); файлы `<профиль>/data/log`: есть `cli starting` и `cli process failed`, нет ключа и нет `args=`. Ключ — `fixture-cli-log-answer-value`, ~1 с |
+| там же, «diagnostics export carries the chat … none of its saved keys or command lines» (правка) | было `toContain("args=[redacted]")` — в журнале теперь нет `args=` совсем: `toContain('message="cli starting"')` и `not.toContain("args=")`; плюс каждый файл `<профиль>/data/log` на диске — без сохранённого ключа и без метки промпта |
+| `loginom-host/test/pty-notices.test.ts`, «the notices name the service and every crate of its Cargo.lock…» (пропуск, если архивов нет в кэше Cargo) | настоящий lock: пакеты описи — все 58 пакетов lock по порядку; `loginom-ai-agent-pty` — `MIT`, единственный файл `LICENSE` байт в байт `process-daemon/LICENSE`; у 13 прямых зависимостей `Cargo.toml` (всех платформ) есть текст верхнего уровня; sha256 каждого файла; `inventory.json` на диске = возвращённой описи. Загрузка запрещена |
+| там же, «crate archives must match the lock, cached or downloaded; a crate without license text is missing» | lock и `.crate` собраны в тесте (`ustar`, `gzip`): архив из второго каталога кэша, второй — загрузкой (ровно один URL `static.crates.io`), свой `LICENSE` сервиса, `target/…/LICENSE` не читается, `src/license.rs` не текст лицензии, `vendor/COPYING` — `nested`, README — `documentation`, крейт без текста — в `missing`; архив, не совпавший с lock, из кэша и из загрузки — `LOGINOM_CRATE_HASH_MISMATCH`, описи нет |
+| `loginom-host/test/stage-resources.test.ts`, «full resource staging…» (+5 строк; нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`) | после настоящего `stageResources` (вид `desktop`): строка в `THIRD_PARTY_NOTICES.md`, опись с `loginom-ai-agent-pty`, файл описи в `resource-manifest.json` |
+
+Полный случай `stage-resources` наборы пропускают (нет `LOGINOM_AI_AGENT_TEST_BROWSERS`); запущен отдельно, с сетью для
+`npm ci`, закреплённым Chromium из общего каталога браузеров машины (sha256 `1e0652a3…` = `browserSha256`) и Node 24.19.0:
+
+```text
+$ LOGINOM_AI_AGENT_TEST_NODE=… LOGINOM_AI_AGENT_TEST_BROWSERS=<каталог с chromium-1246> CARGO_HOME=~/.cargo \
+    bun test test/stage-resources.test.ts -t "full resource staging"
+(pass) full resource staging inventories product skills and a buildable dashboard kit [21985.25ms]
+ 1 pass, 13 filtered out, 0 fail, 50 expect() calls
+```
+
+### Мутации
+
+`<scratchpad>/btails1/mutate.py`: одна точная замена, тесты файла под `unshare -n` с временными каталогами, файл
+возвращается; после — `git status` тот же. Тесты `cli` — `-t "command line"` (новый случай и случай выгрузки).
+
+```text
+=== MD0 no mutation: 4 pass / 0 fail
+=== MD1 a missing build falls back to OpenCode's CLI from npm (before the task, dev): 1 pass / 3 fail     # подставной bun вызван: bun-calls есть
+=== MD2 only prod refuses; dev and beta download from npm (before the task): 2 pass / 2 fail             # dev и beta
+=== MD3 no check: a missing build fails on copyFile, without naming the build: 1 pass / 3 fail          # ENOENT вместо ошибки со сборкой
+=== ML0 no mutation: 2 pass / 0 fail
+=== ML1 cli starting logs the command line again: 0 pass / 2 fail          # ключ в сыром журнале; в архиве args=[redacted]
+=== ML2 cli process failed logs the command line again: 1 pass / 1 fail    # ключ из auth login --answer … --unknown-flag
+=== MP0 no mutation: 2 pass / 0 fail
+=== MP1 the service's own license is left out: 0 pass / 2 fail
+=== MP2 crate archives are not checked against the lock: 1 pass / 1 fail
+=== MP3 nested notices of a crate are dropped: 1 pass / 1 fail
+=== MP4 Cargo's download cache is ignored: every crate is downloaded: 0 pass / 2 fail
+=== MP5 only the service, none of the locked crates: 0 pass / 2 fail
+=== MP6 a crate without a license text is not listed as missing: 1 pass / 1 fail
+```
+
+Вызов `stageCrateNotices` из `stageResources` наборы не видят (полный случай пропускается). Его краснит полный случай:
+строка вызова удалена, тот же запуск — `0 pass / 1 fail`, `ENOENT … resources/licenses/loginom-ai-agent-pty/inventory.json`;
+файл возвращён. Вызов `copyBuiltCliToResources` в `build.ts` и отказ `dev.ts` — сценарии верхнего уровня, тестом не
+покрыты: `build.ts` при запуске пишет `resources/` дерева. Отказ `dev.ts` проверен запуском: `bun script/dev.ts
+--download-server 1.2.3` — код 1 с текстом выше, `git status` пакета чистый.
+
+### Приёмка
+
+База — отдельное дерево на `ed7e816b82`, итог — `9ee821c2a1`; наборы — `<scratchpad>/btails1/suite.sh`: `bun test
+--timeout 60000` под `unshare -n`, свежие временные `HOME`/`TMPDIR`/`XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` — Node
+24.19.0, `LOGINOM_AI_AGENT_RIPGREP_CACHE` и `CARGO_HOME` — общие кэши машины (только чтение), `loginom-host` — под
+`xvfb-run -a`; падения сравнивались по именам из JUnit.
+
+| Набор | `ed7e816b82` | `9ee821c2a1` |
+|---|---|---|
+| `desktop` | 612 pass, 4 skip, 0 fail (616 тестов, 79 файлов) | 616 pass, 4 skip, 0 fail (620, 80): +4 `bundled-cli` |
+| `cli` | 606 pass, 9 skip, 0 fail (615, 79) | 607 pass, 9 skip, 0 fail (616, 79): +1 «the CLI log on disk keeps no command line…» |
+| `loginom-host` | 547 pass, 12 skip, 2 fail (561, 66) | 549 pass, 12 skip, 2 fail (563, 67): +2 `pty-notices`; те же падения — «archive verification preserves manifest modes under a private umask» и «actual managed entry reads live bridge work…» (`managed-work-entry`), как в B2.7a3b |
+
+Два случая `stage-resources` с путём дерева в имени различаются только путём. Наборы шли на `9ee821c2a1`; после правки
+тестов `cli-standalone.test.ts` файл прогнан целиком тем же `suite.sh` — 10 pass, 0 fail (40 с), мутации ML — заново
+(выше). Новые случаи — `--rerun-each 5` без падений: `bundled-cli` и `bundle-loginom` (25), `pty-notices` (10), новый
+случай `cli` (5).
+
+Без `CARGO_HOME` (временный `HOME`, кэша Cargo нет) и без сети `pty-notices.test.ts` и `stage-resources.test.ts`: 14 pass,
+2 skip (случай на настоящем lock и полный случай), 0 fail — в crates.io ничего не идёт.
+
+```text
+$ cd packages/desktop && bun typecheck            # ✓ No type errors in 3,370 files across 2 projects
+$ cd packages/desktop && bun run typecheck:tsc    # код 0
+$ cd packages/cli && bun typecheck                # ✓ No type errors in 2,232 files across 2 projects
+$ cd packages/loginom-host && bun typecheck       # ✓ No type errors in 175 files
+$ cd packages/loginom-host && bun run typecheck:tsc   # код 0
+$ oxlint <8 изменённых и новых файлов кода и тестов>
+Found 0 warnings and 0 errors.
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 609 divergent upstream files                    # как на базе
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+$ bun run secrets range ed7e816b82 HEAD           # и после коммита раздела: "commits":5, clean
+{"status":"clean","commits":4,…}
+$ bun run check                                   # код 0, с этим разделом в дереве (после 9ee821c2a1 — только он)
+Found 905 warnings and 0 errors.                  # как в B4.7c; в изменённых и новых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+После правки тестов (`cli-standalone.test.ts`, `bundled-cli.test.ts`) полный `bun run check` не повторялся: `oxlint` и
+`prettier --check` обоих файлов — 0 замечаний, `bun run typecheck:tsc` пакета `cli` — код 0.
+
+`prettier --check`: новые тесты, `cli-standalone.test.ts`, `desktop/script/*.ts` и `README.md` проходят; `cli/src/index.ts`
+и `stage-resources.ts` не проходили и на базе (длинные строки upstream и `apply-identity`), мои строки — в форме
+prettier.
+
+### Где решал сам
+
+- **Пять файлов кода: уведомления pty — целиком в `stage-resources.ts`.** Буквальный путь (функция в
+  `collect-build-notices.ts`, вызов в `build-cli.ts` и отдельно для Desktop) — три файла, с п. 1 (три) и п. 2 (один) — семь.
+  `stageResources` — общий шаг артефакта CLI и Desktop, где уже собраны уведомления других не-npm компонентов (ripgrep,
+  Node, Dock, Golos), поэтому один вызов покрывает оба продукта. Цена: правила имён текстов повторяют `noticePaths` из
+  `collect-build-notices.ts` (функция не экспортируется, экспорт — шестой файл), плюс исключены исходники `.rs`;
+  уведомления лежат в `resources/loginom/licenses/`, а не в корневом `licenses/` артефакта рядом с `bundled-npm`.
+  Корневой `licenses/README.md` артефакта (`build-cli.ts`) их не называет; называет `THIRD_PARTY_NOTICES.md`, на который он
+  ссылается.
+- **П. 1 — три файла, а не одна точка отказа в `downloadCliToResources`.** Функция с именем «download», которая только
+  отказывает, и живой флаг `--download-server`, который всегда падает, хуже удаления; бюджет это позволил за счёт п. 3.
+- **Тест п. 1 — через функцию, в отдельном процессе.** `build.ts` и `dev.ts` пишут `resources/` дерева. Подставной `bun`
+  в `PATH` ловит именно установку пакета, а не только текст ошибки; каналы — переменной процесса-потомка, без правки
+  окружения теста.
+- **Весь lock, а не граф сборки.** `Cargo.lock` не различает обычные, build- и dev-зависимости и платформы: опись —
+  надмножество (Windows-крейты `windows-sys`, `winapi*`, WASI `wasip2` и `wit-bindgen`, UEFI `r-efi`, крейты proc-macro, которые работают только при сборке). `cargo metadata`
+  точнее, но требует cargo и сети там, где pty пришёл готовым. Записано в `scope` описи.
+- **Без текста — в `missing`, текст не сочинялся.** У `r-efi` 5.3.0 в архиве только README, у `winapi-*-pc-windows-gnu`
+  0.4.0 — ни одного файла лицензии; выражение лицензии из их `Cargo.toml` записано.
+- **README — в `documentation`, как у npm**, хотя для крейтов они почти не несут атрибуции: так одинаково с
+  `bundled-npm`.
+- **Командная строка не пишется совсем**, а не маскируется (задание: «выбери меньшее»). Видно, какая команда шла, по
+  соседним записям; так же было в 0.4.
+
+### Найдено, не чинил
+
+- **Ghostty и Rust std не описаны.** Ghostty (MIT) и его зависимости Zig `build.rs` скачивает с GitHub и линкует в
+  `loginom-ai-agent-pty`; стандартная библиотека Rust линкуется статически. В `Cargo.lock` их нет; в описи они названы в
+  `exclusions`, `status: incomplete`. Дополнять — задача лицензий выпуска (B5).
+- **У CLI Desktop нет описи `bundled-npm` вообще**: сборка по умолчанию не пишет metafile (`build-inputs.json` — только
+  при `--standalone`), а Desktop копирует один бинарник. Так было и до задачи; pty теперь описан, npm-входы CLI Desktop —
+  нет.
+- **`desktop-cli.ts` по-прежнему ищет `resources/loginom-ai-agent-cli-dev`** при `LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER=1`
+  без `LOGINOM_AI_AGENT_DESKTOP_CLI_DEV`. Писал этот файл только `--download-server`; `bun dev` всегда задаёт `CLI_DEV`,
+  так что путь мёртвый. Не трогал (CAT-09, предел файлов).
+- **Сборка Desktop без `packages/cli/dist` теперь падает в `dev` и `beta` — и в CI это заметно.** Раньше эти места молча
+  встраивали CLI OpenCode из npm: `loginom-windows.yml`, задание `build-package-test` (`script/build-windows.ps1
+  -Product Both -Channel dev` собирает Desktop до CLI, а CLI — через `build-cli.ts` в другой каталог), и задание
+  `updater-mirror-linux` (`bun run build` в `packages/desktop` без сборки CLI). `build-windows.ps1 -Product Desktop
+  -Channel prod` (`updater-fixtures`) падал и раньше. `release.yml` кладёт артефакт `build-cli` в `packages/cli/dist` —
+  ему правка не мешает. Чинить — B5.1: собрать CLI до Desktop (ему после B4.7c нужны `cargo` и Zig или
+  `LOGINOM_AI_AGENT_PTY_BIN`). `loginom-macos.yml` зовёт `packages/desktop/scripts/build-macos.ts`, которого в v2 нет.
+- **Новая зависимость сборки — кэш Cargo или `static.crates.io`.** Без кэша (`CARGO_HOME` пуст, pty пришёл готовым)
+  сборка артефакта CLI и Desktop скачивает 57 архивов без повторов: сбой сети — сбой сборки.
+- **Хук `pre-commit` дважды остановил коммит, оба раза по делу:** без `~/.local/bin` в `PATH` нет `gitleaks` (первый коммит), и черновик этого раздела содержал личный домашний путь машины (`personal-home-path`) — путь заменён описанием. Хуки не обходились.
+- **`bun run secrets staged` печатает `"current_files":0`** при файлах в индексе — как в разделе B2.8. Не разбирался.
+- **Хук agent-kit ложно сработал** на команду `python3` с текстом `process.env.` в heredoc (похоже на `.env`). Файлов с
+  секретами не читал; по совету хука правил `dev.ts` через Edit. Записываю, чтобы владелец оценил.
+
+### Не проверено
+
+- Windows и macOS: всё на Linux. Таблица п. 1 на Windows пропускается (подставной `bun` — сценарий `sh`); путь `.exe` и
+  `codesign` на macOS — по коду.
+- Настоящая сборка Desktop (`bun run build`) и артефакта CLI (`build-cli.ts`) не запускалась: отказ `build.ts` проверен
+  функцией, уведомления — полным случаем `stage-resources` вида `desktop`; вид `cli` идёт тем же кодом, отдельно не
+  запускался.
+- Загрузка крейтов с `static.crates.io` — только подставной функцией; настоящая сеть к crates.io не вызывалась.
+- Без кэша Cargo (как на раннерах CI) случай на настоящем lock пропускается: тогда «сервис и его крейты» проверяет только
+  фикстура, а полный случай `stage-resources` пропускается без `LOGINOM_AI_AGENT_TEST_BROWSERS`.
+- `bun dev` целиком (Electron, служба из исходников) не запускался — только отказ на `--download-server`.

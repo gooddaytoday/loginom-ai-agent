@@ -4,23 +4,18 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Product } from "@loginom-ai-agent/product"
 import { prepareDevElectron } from "./dev-electron"
-import { downloadCliToResources, windowsify } from "./utils"
-
-type ServerSource = { type: "build" } | { type: "download"; version: string }
-
-type DevOptions = { server: ServerSource; electron: string[] }
 
 async function main() {
   process.env.LOGINOM_AI_AGENT_CHANNEL = "local"
   process.env.LOGINOM_AI_AGENT_VERSION ??= `2.0.0-local-${Date.now()}`
   process.env.LOGINOM_AI_AGENT_DISABLE_CHANNEL_DB = "0"
-  const options = selectOptions()
+  const electron = selectElectronArgs()
 
-  if (options.server.type === "build") process.env.LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL = "local"
+  process.env.LOGINOM_AI_AGENT_DESKTOP_SERVER_CHANNEL = "local"
   process.env.LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER ??= "1"
   await prepareDesktop()
-  await prepareServer(options.server)
-  await startDesktop(options.electron)
+  await prepareServer()
+  await startDesktop(electron)
 }
 
 async function prepareDesktop() {
@@ -32,28 +27,17 @@ async function prepareDesktop() {
   if (process.platform === "darwin") process.env.ELECTRON_EXEC_PATH = await prepareDevElectron()
 }
 
-function selectOptions(): DevOptions {
+// Loginom AI Agent: development runs the CLI from packages/cli, as 0.4 did; none is downloaded from npm.
+function selectElectronArgs() {
   const args = process.argv.slice(2)
-  const build = args.indexOf("--build-server")
-  const download = args.indexOf("--download-server")
 
-  if (build >= 0 && download >= 0) {
-    throw new Error("--build-server and --download-server cannot be used together")
-  }
+  if (args.includes("--download-server"))
+    throw new Error("--download-server is not supported: bun dev runs the CLI from packages/cli")
 
-  if (download >= 0 && !args[download + 1]) throw new Error("--download-server requires a version")
-  const consumed = new Set([build, download, download >= 0 ? download + 1 : -1])
-
-  return {
-    server: download >= 0 ? { type: "download", version: args[download + 1] } : { type: "build" },
-    electron: args.filter((_, index) => !consumed.has(index)),
-  }
+  return args.filter((arg) => arg !== "--build-server")
 }
 
-async function prepareServer(source: ServerSource) {
-  // Loginom AI Agent (B4.7): development copies of the CLI are named like the bundled one.
-  if (source.type === "download")
-    return downloadCliToResources(source.version, windowsify(`resources/${Product.cliExecutable}-dev`))
+async function prepareServer() {
   buildWebUi()
   process.env.LOGINOM_AI_AGENT_DESKTOP_CLI_DEV = join(import.meta.dirname, "../../cli")
 
