@@ -1,8 +1,11 @@
 import type { Buffer } from 'node:buffer'
+import type { BigIntStats } from 'node:fs'
 
-export type FileIdentity = { canonical_path: string; size: number; mtime: number; ctime: number; mtime_ns: string; ctime_ns: string; file_id: string }
+export type FileStatIdentity = { size: number; mtime: number; ctime: number; file_id: string }
+export type FileIdentity = FileStatIdentity & { canonical_path: string; mtime_ns: string; ctime_ns: string }
 export type ReferenceSnapshot = FileIdentity & { sha256: string | null }
 export type FileReference = { grant: string; chat: string; userMessage: string; generation: number; name: string; snapshot: ReferenceSnapshot }
+export function fileStatIdentity(stat: BigIntStats): FileStatIdentity
 export function referenceUploadBudget(size: number): number
 export function inspectReferenceFile(path: string): Promise<FileIdentity>
 export function openReferenceFile(snapshot: ReferenceSnapshot, options?: { signal?: AbortSignal }): Promise<{
