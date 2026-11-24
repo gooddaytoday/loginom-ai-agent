@@ -27,7 +27,8 @@ async function budgetRefusalFixture() {
   const budgetSha256 = (await pin(budgetFile)).sha256, manifestHash = "b".repeat(64)
   await write(entryFile, { manifestHash, job: job.id, binding })
   await write(intentFile, { manifestHash, job: job.id, unit: job.unit, resultsDir: job.resultsDir })
-  const sourceRevision = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: path.dirname(evalsRoot) }).stdout.toString().trim()
+  // Replay the refusal with the reviewed sources that the historical receipt identifies.
+  const sourceRevision = "371c862066499d9d9213a9c246df52a1fa792b05"
   const sourceFile = path.join(root, "source-pins.json"), metadataFile = path.join(root, "original-metadata.json"),
     journalFile = path.join(root, "journal.jsonl")
   await write(sourceFile, { sourceRevision, manifestSha256: manifestHash, pins: { resourceBudgetSha256: budgetSha256 } })
