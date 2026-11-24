@@ -1,0 +1,1 @@
+В sales.csv содержатся ProductID и Amount, в products.xlsx — справочник ProductID и Category на листе Products. Соедините продажи со справочником по ProductID, включив только совпавшие товары. Рассчитайте сумму Amount по Category. Итоговые поля Category и Total (вещественное), порядок по Category по возрастанию.
