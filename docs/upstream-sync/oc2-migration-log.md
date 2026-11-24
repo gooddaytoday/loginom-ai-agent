@@ -22179,3 +22179,269 @@ $ bun typecheck   # core, server, cli — по пакету
   шага), тестом не покрыт.
 - Как клиенты показывают итоги во входящих до продолжения — этап C (кнопка «Продолжить», В-105).
 - Перезапуск, когда демон команд умер вместе со службой, — как в B2.3c, только по коду.
+
+## B2.9f dashboard_publish
+
+24.11.2026. Задача B2.9f (вне шлюза B), ветка `b29f-dashboard-publish` от `oc2-migration` (`6326c11837`), рабочее дерево
+`.claude/worktrees/b29f`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template` (кэш npm —
+`/root/.npm`) — в этом дереве и в дереве базы `<scratchpad>/b29f/base` (`6326c11837`, detached), все четыре — код 0. Хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации, проба CLI и прогоны пакетов — под
+`unshare -n` (поднят только `lo`), со свежими временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и
+`LOGINOM_AI_AGENT_TEST_NODE`. **Модель не вызывалась:** в тестах сервера — `TestLLM`, в пробе CLI — `--model
+test/test-model` на подставном сервере `127.0.0.1`; сети нет. Прочитано: решение В-102; этот журнал — B2.9a (строка B2.9f,
+вопрос 1), B2.9b…e, B2.6a, B2.6b, B2.6c; 0.4 — `tool/dashboard.ts`, `product/dashboard-session.ts`, тесты
+`tool/dashboard.test.ts` и `product/dashboard-session.test.ts`; пакет `dashboard` — `agent/{publish,folder}.ts`;
+`loginom-host/src/{adapter,host-port,task-scope,session-v1}.ts`; v2 — `core/src/permission.ts`, `core/src/plugin/host.ts`
+(`permission.assert`), `plugin/src/promise/{adapter,permission,tool}.ts`, `core/src/session/runner/step.ts` (остановка
+инструментов); `cli/src/run/noninteractive.ts` (`--auto`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `41da822271` `feat(loginom-agent): dashboard_publish asks by the save kind and sends only the chat's draft (B2.9f)` | код: `packages/loginom-agent/src/dashboard-tools.ts` (+126 −3: инструмент, вопрос, снятие вопроса при остановке, запрос Host на своём прогоне), `index.ts` (+4 −4: регистрация, `permission` и `bound` в инструменты); тесты: 7 новых в `packages/loginom-agent/test/dashboard-tools.test.ts`, новый `packages/server/test/loginom-dashboard-publish.test.ts` (8), фикстуры `server/test/fixture/loginom-dock-host.ts` (хранилище публикаций) и `loginom-agent/test/fixture/dashboard-folder.ts` (стенд, повторная подготовка), список профиля в `server/test/loginom-access.test.ts` |
+| `332935061c` `test(loginom-agent): a stopped call or a chat off its draft publishes nothing (B2.9f)` | 3 юнит-теста: ответ после остановки, сверка черновика после сборки и после вопроса |
+| `6137491019` `test(loginom-agent): a stop withdraws only the call's own question (B2.9f)` | юнит-тест снятия вопроса (по ревью советника: путь `withdraw` и фильтр по вызову юнит-тестом не покрывались) |
+| `8852e2f071` `docs(loginom-agent): name what the publication question shows (B2.9f)` | только комментарий в `dashboard-tools.ts` |
+| следующий | этот раздел |
+
+Файлов кода два (предел — пять), оба — пакета форка: `git diff 6326c11837 8852e2f071 --numstat -- packages/loginom-agent/src`
+— `dashboard-tools.ts` +127 −3, `index.ts` +4 −4. Файлов upstream не правил, `catalog.json` не менялся; `bun install
+--frozen-lockfile` — «no changes».
+
+### Как устроено
+
+- **Инструмент** — `dashboardTools(directory, resources, session).publish` в `packages/loginom-agent/src/dashboard-tools.ts`,
+  перенос 0.4 `DashboardPublishTool`. Имя, описание, вход без аргументов и текст результата — как в 0.4
+  (`<статус>: <текст>` через `outputText`, не больше 8 192 байт целыми символами). Регистрируется рядом с
+  `dashboard_draft` только в Location дашборда, с `codemode: false` (`index.ts`, +4 −4). Порядок — как в 0.4:
+  1. сборка в стадии `withDashboardStage` → `preparePublish`, с сигналом вызова; неудача — `failed: …`, без вопроса и
+     без Host;
+  2. сверка черновика чата (`bound` из `index.ts`, хранилище B2.9d): 0.4 сравнивал захваченный черновик с маркером
+     сессии;
+  3. последняя версия на стенде — `dashboardRead`;
+  4. вопрос `dashboard_publish` (`ctx.permission.assert`). Ресурсы — узел и путь пакета (0.4 `patterns`), metadata —
+     `sourceHash` и, если версия на стенде не та, с которой начат черновик, `dashboardConflict: { base, latest }`.
+     `save` нет — «always» ничего не сохраняет (0.4 `always: []`);
+  5. после ответа: остановлен ли вызов, затем снова сверка черновика (папку могли пересоздать, пока пользователь
+     отвечал);
+  6. `finishPublish` с `expected` из шага 3, затем ожидание сборки на стенде (`/dashboard/lookup`). Ошибка Host здесь —
+     `failed: <текст hostErrorText>`, без повтора.
+- **Host.** Каждый запрос — на своём прогоне Host: `ServiceHost.acquire(<сессия>)` (запись аренды, B2.3) →
+  `scope bind { taskMessageID: <сообщение вызова>, profile: "loginom-dashboard" }` → запрос → `ServiceHost.release`, как
+  0.4 `dashboardOperation`. Аренды исполнения у сессии дашборда нет (`hold`, B2.9b), и пока пользователь отвечает, Host не
+  занят. Без Host — `LOGINOM_HOST_NOT_READY`.
+- **Разрешение (В-102).** Вопрос идёт через правила и хуки, как у любого инструмента; `permissions.ts` не менялся —
+  `dashboard_publish` уже был в виде «Сохранять пакеты в Loginom» со значением «спрашивать» (B2.6a):
+  - «Спрашивать» (умолчание) — вопрос с узлом, пакетом и конфликтом;
+  - «Разрешено» (`permissions` конфига) и «в этом разговоре» (RPC `loginom.permission.conversation`, вид `save`) — без
+    вопроса (`settle`);
+  - «Запрещено» — ядро не предлагает инструмент модели; вызов по имени отклоняет `execute.before` до сборки текстом
+    `LOGINOM_PERMISSION_DENIED`, `permissionRefusal: "denied"`, ход продолжается (B2.6b);
+  - «Отклонить» — `LOGINOM_PERMISSION_DECLINED`, `permissionRefusal: "declined"`, ход продолжается (B2.6b);
+  - запрет администратора (`tool.use` `dashboard_publish:*`) — хук политики, а не правило: инструмент предложен, вопрос
+    после сборки и чтения Host получает запрет, вызов — `LOGINOM_POLICY_DENIED`, `permissionRefusal: "policy"`, ход
+    продолжается; «Разрешено» и «в этом разговоре» его не снимают (B2.6c).
+
+  Отказ `assert` инструмент не перехватывает: ошибка доходит до `execute.after` как есть, и тексты B2.6b/B2.6c
+  ставит общий код.
+- **Остановка.** 0.4 гонял вопрос наперегонки с отменой вызова. `assert` плагина не знает сигнала вызова и переживает
+  остановленный вызов: вопрос остался бы открытым, а поздний ответ «один раз» отправил бы публикацию. Поэтому по сигналу
+  вызова инструмент снимает свой открытый вопрос (`permission.list` по `source` вызова → `reply: reject`; вопрос, ещё не
+  созданный хуками, ловится повтором раз в 50 мс, пока `assert` не завершится), а после ответа проверяет сигнал ещё раз.
+  Сборка получает тот же сигнал; стадию убирает `withDashboardStage` в `finally`, так что вызов кончается, когда сборка
+  остановлена и стадии нет (0.4: `uninterruptible`).
+
+### Тесты
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test/…`) | На v2 |
+|---|---|
+| `tool/dashboard.test.ts` «publishing with a global allow still asks once for the bound node and package: reject / abort / once» | `packages/server/test/loginom-dashboard-publish.test.ts`, ««Спрашивать» asks once for the bound node and package before anything is sent: reject / stop / once / conversation» — при умолчании, а не при общем `allow` (ниже). Сервер, модель по сценарию, Host по сценарию, стенд подтверждения: вопрос один, ресурсы — узел и путь пакета, `sourceHash` есть, конфликта нет; до ответа Host видел только `acquire, scope, dashboardRead, release`, папок `.stage-`/`.publish-` нет. `reject` — `LOGINOM_PERMISSION_DECLINED`, `declined`, ход дошёл до ответа модели; `stop` — `session.interrupt`: вызов кончается текстом `The operation was aborted.`, открытых вопросов не осталось, публикации нет; `once` и `conversation` — `published: Dashboard опубликован.`, одна запись, один запрос стенда с привязкой и именем публикации, образец удалён; после `conversation` вопрос того же вида — `allow` |
+| `product/dashboard-session.test.ts` «dashboard publication requires confirmation after user rules are merged» | по В-102 наоборот: там же ««Разрешено» publishes without a question» — вид «Сохранять пакеты в Loginom» разрешён в `permissions` конфига, клиент отвечает `once` на каждый вопрос (как `run --auto`), вопросов не было, публикация одна |
+| `tool/dashboard.test.ts` «a publication confirmation cannot send the old draft after recreation» | там же, то же имя: папку удалили и подготовили заново для того же узла, пока вопрос открыт; ответ `once` — `LOGINOM_SCOPE_DENIED` (текст B2.9d), записи и запроса стенда нет |
+| — | там же, ««Запрещено» refuses without a question, builds and sends nothing, and the turn goes on»: инструмент не предложен (`dashboard_draft` предложен), вызов по имени — `LOGINOM_PERMISSION_DENIED` «Сохранять пакеты в Loginom» (`dashboard_publish`), `denied`, к Host ни одного запроса, образец на месте, ход продолжился |
+| — | там же, «the administrator's deny wins over «Разрешено»…»: `policies` системного каталога `tool.use dashboard_publish:*` deny при разрешённом виде — `LOGINOM_POLICY_DENIED`, `policy`, вопросов нет, записи нет, ход продолжился |
+| `tool/dashboard.test.ts` «interruption joins an active publication build before removing its operation» | `packages/loginom-agent/test/dashboard-tools.test.ts`, то же имя, на самом инструменте: сигнал вызова отменён, когда в стадии появилась `.build-`; когда вызов кончился, стадии нет, черновик не выложен, образец на месте |
+| «publication limits the complete model output to whole UTF-8 code points» | там же, то же имя: данные образца в `src/` — `failed: Сборка не удалась.` … `публичной.`, не больше 8 192 байт, конец — целый `🟢`, без `�`; вопроса нет |
+| «host failure preserves the draft and its specific reason without retry» ×4 (`DASHBOARD_ACCESS_DENIED`, `DASHBOARD_VERSION_EXISTS`, `DASHBOARD_WRITE_UNKNOWN`, `LOGINOM_RUNTIME_CLEANUP_FAILED`) | там же, те же имена; Host — `ServiceHost` с Host по сценарию: `failed:` с кодом и текстом, одна запись, исходники и образец на месте |
+| «a changed server version requires new confirmation and preserves edited sources» | там же, то же имя: в вопросе — узел, пакет и `dashboardConflict { base: null, latest }`; пока вопрос открыт, исходник правится и на стенде появляется новая версия — `needs-confirmation:`, одна запись с `expected` = прежняя версия, хэш содержимого = одобренный `sourceHash`, в записи — исходник до правки; плюс: каждый запрос Host — на своём прогоне с `scope loginom-dashboard` и `release` |
+| — | там же, «an approval that arrives once the call was stopped sends nothing»: ответ приходит после отмены сигнала — записи нет |
+| — | там же, «a chat that no longer belongs to its draft sends nothing: after the build / after the question» — сверка черновика после сборки (Host не тронут) и после вопроса (только чтение) |
+| — | там же, «a stop withdraws the call's own question once it is open, and no other»: остановка приходит, пока вопрос ещё считается; первый список вопросов пуст, во втором — вопрос этого вызова и чужой; ответ `reject` — только своему, записи нет |
+
+0.4-тест «write/apply_patch approval belongs to the draft that requested permission» — о записи файлов (B2.9d, там
+сверка в `permission.evaluate` и `execute.after`); для публикации то же свойство закрывают «…cannot send the old draft
+after recreation» и «…after the question».
+
+Изменены: `packages/server/test/loginom-access.test.ts` (B2.9b) — в списке инструментов профиля дашборда
+`dashboard_publish`; без этого 2 случая красные, как в B2.9e. Фикстуры: Host по сценарию
+(`server/test/fixture/loginom-dock-host.ts`) отвечает на запросы хранилища публикаций только прогону с профилем
+`loginom-dashboard`, как `host-port.ts`, а `publications()` — перенос 0.4 `publicationHost`; папка дашборда
+(`loginom-agent/test/fixture/dashboard-folder.ts`) принимает адрес стенда и умеет подготовить ту же привязку заново.
+
+### Мутации
+
+Каждая — точечная правка в `packages/loginom-agent/src` на `332935061c`, прогон `bun test test/dashboard-tools.test.ts`
+в `loginom-agent` и `bun test test/loginom-dashboard-publish.test.ts` в `server`, затем `git checkout`
+(`<scratchpad>/b29f/scripts/{mutations.sh,mutate.py}`; правка применяется, только если строка найдена ровно один раз).
+Без мутаций — 13/0 и 8/0. Случай, который ждёт вопроса и не дожидается, падает по таймауту 60 с. Тест снятия вопроса
+(`6137491019`) появился после этого прогона: его мутации — отдельно, сначала в дереве `<scratchpad>/b29f/probe` одним
+случаем (`-t withdraws`), затем «снимаются все» — на `8852e2f071` целиком (14 юнит-тестов и сервер).
+
+| Мутация | `dashboard-tools` | `dashboard-publish` | Красные |
+|---|---|---|---|
+| инструмент не зарегистрирован в дашборде (`index.ts`) | 13/0 | **1/7** | все, кроме «Запрещено»: вызов незарегистрированного имени отклоняет тот же `execute.before` по действию (B2.6b) |
+| публикация вне вида: строки `dashboard_publish` в таблице нет (`permissions.ts`) | 13/0 | **1/7** | все, кроме «Разрешено»: без строки публикацию решает общее `* * allow` OpenCode — вопроса нет, «Запрещено» вида её не запрещает, а отказ политики модель читает текстом ядра, без `LOGINOM_POLICY_DENIED` |
+| 0.4: вопрос и при «Разрешено» или «в этом разговоре» (`settle` превращает `allow` в `ask`, `permissions.ts`) | 13/0 | **6/2** | «Разрешено» — вопрос задан; `conversation` — после разрешения вид снова спрашивает |
+| продукт снимает запрет администратора (`settle`: пришедший `deny` → `allow`, `permissions.ts`) | 13/0 | **7/1** | запрет администратора — публикация уходит |
+| вопроса нет (`ask` сразу выходит) | **9/4** | **2/6** | «Спрашивать» ×4, пересоздание, запрет администратора; юнит — «a changed server version…» по таймауту (запись ушла, стенда нет), за ним три случая каскадом: Host упавшего случая не закрыт |
+| отказ вопроса проглатывается | 13/0 | **6/2** | «Отклонить», запрет администратора — публикация уходит; юнит-тесты отказа не дают |
+| остановка не снимает вопрос | 13/0; снятие (`probe`) — **0/1** | **7/1** | `stop`: вопрос остаётся открытым; юнит снятия — по таймауту 120 с: вопрос ждёт ответа вечно (процесс теста после таймаута не вышел, снят `kill`) |
+| снимаются все открытые вопросы сессии, а не только свой | **13/1** (на `8852e2f071`; `probe` — **0/1**) | 8/0 | юнит снятия: `reject` и чужому вопросу; на сервере открыт один вопрос |
+| ответ после остановки не проверяется | **12/1** | 8/0 | «an approval that arrives once the call was stopped…»; на сервере остановка снимает вопрос раньше любого ответа |
+| нет сверки черновика после сборки | **11/2** | 8/0 | обе сверки юнит-теста (вторая становится первой); на сервере папку пересоздают во время вопроса, это ловит вторая |
+| нет сверки черновика после вопроса | **12/1** | **7/1** | «…after the question»; пересоздание — старый черновик отправлен |
+| прогон Host не привязан к профилю дашборда (`scope bind` нет) | **7/6** | **1/7** | всё, что доходит до Host: Host по сценарию, как `host-port.ts`, отвечает `LOGINOM_SCOPE_DENIED` |
+| прогон Host не освобождается | **11/2** | **1/7** | порядок запросов Host (нет `release`) |
+| `expected` не передаётся в запись | **12/1** | 8/0 | «a changed server version…»; на сервере версии на стенде нет, `expected` и так `null` |
+| в вопросе нет конфликта | **12/1** | 8/0 | «a changed server version…» |
+| ресурсы вопроса — `*`, а не узел и пакет | **12/1** | **4/4** | «Спрашивать» ×4; юнит — «a changed server version…» |
+| результат без предела `outputText` | **12/1** | 8/0 | предел UTF-8 |
+
+Три случая, где красный только один набор: «Запрещено» зелёное без регистрации инструмента (отказ по действию — в
+`execute.before`, до реестра); ответ после остановки ловит только юнит (на сервере вопрос снимается раньше ответа);
+проглоченный отказ и неснятый вопрос ловит только сервер (юнит-тесты не отвечают отказом и, кроме теста снятия, не
+останавливают вызов при открытом вопросе). На `8852e2f071` без мутаций — 14/0 и 8/0. После всех мутаций `git status`
+чистый; папки, ресурсы и данные Host случаев — во временных каталогах, удалены вместе с ними.
+
+### Проба CLI
+
+`run --headless --auto --format json --dir <папка> --model test/test-model -- "Опубликуй дашборд."` продукта из
+исходников (`<scratchpad>/b29f/scripts/cli-probe.ts` на фикстурах `cli/test/fixture/product-run.ts`, дерево
+`<scratchpad>/b29f/probe` на `332935061c`). Папка дашборда подготовлена пакетом `dashboard` под данными профиля CLI
+(`<профиль>/data/dashboards`). Ресурсы установки (`LOGINOM_AI_AGENT_RESOURCES`) — шаблон, Node и Host по сценарию:
+`host/node-host.mjs` отвечает на рукопожатие, аренды, `scope` и хранилище публикаций и пишет каждый запрос в файл, как
+`fakeHost` в `cli/test/cli-loginom.test.ts`. Стенд подтверждения — `Bun.serve` пробы. Модель по сценарию:
+`dashboard_publish`, затем ответ. Контроль — тот же прогон без `--auto`.
+
+```text
+{"auto":true,"code":0,"stderr":"","requests":2,"offered":true,"results":["\"published: Dashboard опубликован. В Studio с автообновлением …\""],"host":["start","acquire","scope","dashboardRead","release","acquire","scope","dashboardPublish","release"],"publications":1,"lookups":1,"sample":false}
+{"auto":false,"code":1,"stderr":"! permission requested: dashboard_publish (Заказы, /fixture/orders.lgp); auto-rejecting","requests":2,"offered":true,"results":["…permission.rejected…This non-interactive run cannot ask the user for permission…"],"host":["start","acquire","scope","dashboardRead","release"],"publications":0,"lookups":0,"sample":true}
+```
+
+С `--auto` Host получил одну публикацию, стенд — один запрос, прогон — код 0; вопрос назвал узел и пакет. Без `--auto`
+`run` отклоняет вопрос (`noninteractive.ts`, текст отказа CLI — B2.9j), записи нет.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29f/scripts/suites.sh`): база — `6326c11837` в `<scratchpad>/b29f/base`, итог —
+`332935061c` в `<scratchpad>/b29f/probe` (detached; дальше в коде — только тест снятия вопроса и комментарий, поэтому
+`loginom-agent` повторён на `8852e2f071`, а `product` — на коммите с этим разделом). По пакетам подряд, каждый под
+`unshare -n` со свежими временными `HOME`/`TMPDIR`/`XDG_*`, `npm ci` клиента `loginom-runtime` и шаблона `dashboard` и
+`LOGINOM_AI_AGENT_TEST_NODE` заданы. `loginom-agent`, `server`, `loginom-host`, `product` — `bun test`; `dashboard` —
+`bun run test`, затем `node --test test/agent/draft.test.mjs`.
+
+| Пакет | `6326c11837` | итог |
+|---|---|---|
+| `loginom-agent` | 93 pass, 0 fail | 103 pass (+10) на `332935061c`; 104 pass (+11), 0 fail на `8852e2f071` |
+| `server` | 295 pass, 3 skip, 0 fail | 303 pass (+8), 3 skip, 0 fail |
+| `dashboard`, `bun run test` | `test:coverage` — 50 и 36 pass, 0 fail; узловой набор — 91 pass, 3 fail, 2 skip: «a partial source copy is retried completely for new and known projects» и его «new project», «known project» | то же, те же имена |
+| `dashboard`, `draft.test.mjs` | 8 pass, 2 fail: «a prepared folder builds and serves its coherent sample using one shared server», «draft reports at most twenty console errors from the built app» — ждут Chromium ревизии 1246 (B2.9e) | то же, те же имена |
+| `loginom-host` | 547 pass, 14 skip, 2 fail | 547 pass, 14 skip, 2 fail — те же имена (ниже, «Найдено») |
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же три (и на `332935061c`, и с этим разделом) |
+
+`loginom-host` — с архивом ripgrep в кэше прогона; без него (первый прогон) — 545 pass, 14 skip, 4 fail и на базе, и в
+итоге, те же имена.
+
+Повторы (навык `unit-tests`) на `332935061c`, под нагрузкой параллельных прогонов: `dashboard-tools.test.ts
+--rerun-each 3` — 39 pass, 0 fail; `loginom-dashboard-publish.test.ts --rerun-each 3` — 24 pass, 0 fail.
+`loginom-access`, `loginom-dashboard-files`, `loginom-dashboard-draft`, `loginom-dashboard-publish`, `loginom-permissions`
+вместе — 50 pass, 0 fail. Список профиля в `loginom-access` без `dashboard_publish` — 10 pass, 2 fail (два случая
+профиля дашборда), с ним — зелёный.
+
+Изоляция (`<scratchpad>/b29f/scripts/real-xdg.sh`, как в B2.9b): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad, корень данных тогда `$HOME/.local/share/loginom-ai-agent-dev`; после прогона пусто и там, и во временном
+каталоге прогона:
+
+```text
+probe loginom-agent exit=0 xdg-vars=0  13 pass  0 fail       # test/dashboard-tools.test.ts, 332935061c
+probe loginom-agent after: [] data: []
+probe loginom-agent tmp left: []
+probe server exit=0 xdg-vars=0  8 pass  0 fail               # test/loginom-dashboard-publish.test.ts
+probe server after: [] data: []
+probe server tmp left: []
+```
+
+```text
+$ cd packages/loginom-agent && bun run typecheck && tsc --noEmit        # на 8852e2f071
+✓ No type errors in 250 files                                          # tsc — код 0
+$ cd packages/server && bun typecheck                                   # server, core, cli — на 332935061c
+✓ No type errors in 1,672 files across 2 projects
+$ cd packages/core && bun typecheck
+✓ No type errors in 2,032 files across 2 projects
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,251 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0, вывод тот же, что на базе
+against a6b15d33daf6: 612 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                        # код 0
+$ bun run check                                              # код 0, под unshare -n, с этим разделом
+Found 905 warnings and 0 errors.                             # как в B2.9e
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                           # 32 из кэша turbo
+```
+
+`prettier --check` и `oxlint` новых и изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **`permissions.ts` не менялся**, хотя строка нарезки его называет. В-102 («по виду «Сохранять пакеты в Loginom»») уже
+  выполняет таблица B2.6a: `dashboard_publish` — вид `save`, «спрашивать»; «Разрешено», «в этом разговоре», «Запрещено»,
+  «Отклонить» и запрет администратора работают общим кодом B2.6a…c.
+- **Остановка снимает открытый вопрос ответом `reject`.** Своего ID у запроса плагин задать не может (`AssertInput` его
+  не принимает), поэтому вопрос ищется по `source` вызова. Ответ `reject` ядро распространяет на все открытые вопросы
+  сессии (`Permission.reply`) — при остановке пользователем все инструменты шага и так останавливаются. Ответ `once`
+  трогал бы только свой вопрос, но клиенты увидели бы «разрешено».
+- **Запрет администратора — после сборки и чтения Host.** Политика — хук `permission.evaluate`, а не правило: ядро
+  инструмент предлагает, и запрет приходит на вопрос. До записи ничего не уходит. Проверять политику до сборки
+  (проверка правил `rules` из `execute.before`) — лишний запрос на каждый вызов; не делал.
+- **Сверка черновика — дважды, как в 0.4.** После сборки (0.4 сравнивал захваченный `draftId` с маркером сессии; здесь
+  `binding.refusal`, который сравнивает привязку с текущим черновиком папки) и после вопроса. Хук `permission.evaluate`
+  сверяет черновик и на самом вопросе (B2.9d).
+- **Повторной проверки `PublicationSource` нет.** 0.4 разбирал ответ `dashboardRead` ещё раз с `onExcessProperty: "error"`
+  после разбора в адаптере Host (`loginom-host/src/adapter.ts`, тот же), который лишние поля уже отбросил: проверка ничего
+  не ловила. Используется только `version`.
+- **Без заголовка и `truncated`** — как в B2.9e: в `Tool.Result` v2 заголовка нет.
+- **Тест 0.4 «… with a global allow still asks …» перенесён при умолчании.** По В-102 общий `allow` (как и «Разрешено»
+  вида) снимает вопрос; ответы `reject`/`stop`/`once` проверены при «Спрашивать», а «Разрешено» — отдельным случаем.
+  `abort` 0.4 (отмена вызова AI SDK) на сервере v2 — `session.interrupt`.
+- **Фикстура Host — общая с тестами `server`.** Юнит-тесты `loginom-agent` берут `scriptedHost` и `publications` из
+  `server/test/fixture/loginom-dock-host.ts` (тест `server` B2.9e так же берёт папку из `loginom-agent/test/fixture`).
+
+### Найдено, не чинил
+
+- `loginom-host` под `unshare -n` падает одинаково на базе и в итоге. Первый прогон — 4 падения; два из них, случаи
+  ripgrep, — обвязка прогона, а не код: кэш `LOGINOM_AI_AGENT_RIPGREP_CACHE` был пуст, а сети нет
+  (`LOGINOM_RIPGREP_DOWNLOAD_FAILED`, `getaddrinfo EAI_AGAIN github.com`). С архивом ripgrep 15.1.0 в кэше (тот же
+  sha256, что в `/root/.cache/loginom-bootstrap/ripgrep`) — 547 pass, 14 skip, 2 fail и там и там: «archive verification
+  preserves manifest modes under a private umask» и «actual managed entry reads live bridge work and dispatching over
+  private IPC»; их не разбирал.
+- Ответ `reject` ядра отклоняет все открытые вопросы сессии, а не только свой (`Permission.reply`): у плагина нет ответа
+  «снять один вопрос». Остановка задевает их и так; для B2.9g (удаление спрашивает на каждый набор) это то же поведение.
+
+### Не проверено
+
+- Настоящий Host и стенд Loginom: Host — по сценарию (в тестах и в пробе CLI), стенд подтверждения — локальный
+  `Bun.serve`; настоящих `dashboardRead`/`dashboardPublish` хранилища (`loginom-runtime/src/dashboard-storage.mjs`) и
+  сборки на стенде не было. Сборка шаблона — настоящая (`tsc` и Vite закреплённым Node).
+- Остановка, когда вопрос ещё не создан (хуки `permission.evaluate` ещё считают), — только юнит-тестом с подставными
+  `assert`/`list`/`reply`; на сервере — остановка при открытом вопросе. Остановка, при которой сборка не кончилась за
+  5 с (ядро тогда прерывает вызов, а сборка доживает и убирает стадию сама), — по коду.
+- Перезагрузка Location с открытым вопросом публикации: `Permission.close` отвечает отказом, и `execute.after` оставляет
+  текст ядра (B2.6b) — по коду.
+- Публикация из Desktop (ВШ-6, B4) и показ вопроса с узлом, пакетом и конфликтом (этап C); `run` без `--auto` — отказ CLI
+  (B2.9j).
+- Windows и macOS, настоящая модель.
