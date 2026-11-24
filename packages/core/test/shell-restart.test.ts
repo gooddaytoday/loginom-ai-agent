@@ -12,6 +12,7 @@ import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNodePlatform } from "@opencode/core/effect/app-node-platform"
 import { Watcher } from "@opencode/core/filesystem/watcher"
+import { Job } from "@opencode/core/job"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Model } from "@opencode/core/model"
 import { Permission } from "@opencode/core/permission"
@@ -83,6 +84,7 @@ const world = Effect.gen(function* () {
           Session.node,
           LocationServiceMap.node,
           SessionRestart.node,
+          Job.node,
         ]),
         [
           Global.node.replace(global),
@@ -204,17 +206,21 @@ describe("shell commands across a graceful restart", () => {
         }),
     )
 
-  // `resumeTurns: false` (the Loginom AI Agent server, В-100): the command is recovered as above, but the turn is left to
-  // the user: no restart notice, no model request, the session ends interrupted until a prompt continues it.
-  it.live("watches the command but leaves the turn interrupted when turns do not resume", () =>
+  // `resumeTurns: false` (the Loginom AI Agent server, В-100, В-104): the command is recovered as above, but the turn is
+  // left to the user: no restart notice, no model request, the session ends interrupted until a prompt continues it. The
+  // command's end is kept in the inbox without a wake; a command started after the user continues wakes as usual.
+  it.live("watches the command but leaves the turn and its notice to the user when turns do not resume", () =>
     Effect.gen(function* () {
       const { daemon, llm, project, server } = yield* world
+      const backgroundCommand = process.platform === "win32" ? "Start-Sleep -Seconds 61" : "sleep 61"
       let turns = 0
-      yield* llm.serve((request) =>
-        request.tools.some((tool) => tool.name === "shell") && turns++ === 0
-          ? TestLLM.toolCall("call-left", "shell", { command: idleCommand })
-          : TestLLM.text("Done", "done"),
-      )
+      yield* llm.serve((request) => {
+        if (!request.tools.some((tool) => tool.name === "shell")) return TestLLM.text("Done", "done")
+        turns++
+        if (turns === 1) return TestLLM.toolCall("call-left", "shell", { command: idleCommand })
+        if (turns === 2) return TestLLM.toolCall("call-new", "shell", { command: backgroundCommand, background: true })
+        return TestLLM.text("Done", "done")
+      })
 
       const first = yield* Scope.make()
       const one = yield* server(first)
@@ -238,6 +244,7 @@ describe("shell commands across a graceful restart", () => {
       yield* Effect.addFinalizer(() => Scope.close(second, Exit.void))
       const two = yield* server(second, { resumeTurns: false })
       const left = Context.get(two, Session.Service)
+      const jobs = Context.get(two, Job.Service)
       yield* Context.get(two, SessionRestart.Service).resumeSuspendedSessions
 
       // The call is settled as moved to the background and the command is watched again, as with resumed turns.
@@ -254,6 +261,7 @@ describe("shell commands across a graceful restart", () => {
           },
         },
       ])
+      expect(yield* jobs.pendingBackground).toMatchObject([{ recovery: { kind: "shell", shellID } }])
       // The turn is not continued: one model request, no restart notice, the session is interrupted.
       expect(turns).toBe(1)
       expect((yield* left.get(session.id)).outcome).toBe("interrupted")
@@ -263,21 +271,41 @@ describe("shell commands across a graceful restart", () => {
       ).toEqual([])
       expect(messages.at(-1)).toMatchObject({ type: "idle", outcome: "interrupted" })
 
-      // The user continues it.
-      yield* left.prompt({ sessionID: session.id, text: "continue" })
-      yield* until(() => turns >= 2)
-      yield* left.wait(session.id)
-      expect((yield* left.get(session.id)).outcome).toBe("succeeded")
-
-      // The watched command still reports its end to the session, which wakes it as in OpenCode 2.
+      // The recovered command ends before the user is back: its notice is kept in the inbox and wakes nothing. The job
+      // row is completed only after the notice (and any wake) went out, so the session is idle for good once it is gone.
       daemon.exit(command.id, 0)
-      const notices = Effect.map(left.context(session.id), (messages) =>
-        messages.filter((message) => message.type === "synthetic" && message.metadata?.source === "shell"),
-      )
-      while ((yield* notices).length === 0) yield* Effect.sleep(5)
-      expect((yield* notices)[0]).toMatchObject({ metadata: { shellID, state: "completed" } })
+      while ((yield* jobs.pendingBackground).length > 0) yield* Effect.sleep(5)
+      yield* left.wait(session.id)
+      expect(turns).toBe(1)
+      expect(yield* left.inbox(session.id)).toMatchObject([
+        { type: "synthetic", payload: { metadata: { source: "shell", shellID, state: "completed" } } },
+      ])
+
+      // The user continues it; the kept notice reaches the model with the prompt.
+      yield* left.prompt({ sessionID: session.id, text: "continue" })
       yield* until(() => turns >= 3)
       yield* left.wait(session.id)
+      expect((yield* left.get(session.id)).outcome).toBe("succeeded")
+      expect(
+        (yield* left.context(session.id)).filter(
+          (message) => message.type === "synthetic" && message.metadata?.source === "shell",
+        ),
+      ).toMatchObject([{ metadata: { shellID, state: "completed" } }])
+
+      // The command the continued turn started in the background wakes the session as in OpenCode 2.
+      const started = daemon.processes.find((item) => item.id !== command.id)
+      if (!started) return yield* Effect.die(new Error("the continued turn started no command"))
+      daemon.exit(started.id, 0)
+      yield* until(() => turns >= 4)
+      yield* left.wait(session.id)
+      expect(
+        (yield* left.context(session.id)).filter(
+          (message) => message.type === "synthetic" && message.metadata?.source === "shell",
+        ),
+      ).toMatchObject([
+        { metadata: { shellID, state: "completed" } },
+        { metadata: { shellID: String(started.pipe?.metadata.id), state: "completed" } },
+      ])
     }),
   )
 
