@@ -46,7 +46,8 @@ export async function prepareImportBinding(options,ctx,config,settings){
  try{return await readImportBindingSource(options,ctx,config,settings);}
  catch(error){
   const op=options.operation,r=op.parameters;
-  if(/^BINDING_/.test(error.message)&&!op.targetPhase&&!op.transportUncertain&&op.cleanupConfirmed!==false){
+  if(/^BINDING_/.test(error.message)&&!op.targetPhase&&!op.transportUncertain
+    &&op.nodeEffectPossible!==true&&op.cleanupConfirmed!==false){
    const graph=await op.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
    if(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id)
     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
@@ -58,20 +59,29 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
- const links=r.variable_inputs?.length?r.variable_inputs.filter(l=>l.kind==='variables'&&l.input===0)
-  :(graph.variable_links??[]).filter(l=>l.target===r.target.ref?.node_id&&l.kind==='variables'&&l.input===0);
+ const incoming=(graph.variable_links??[]).filter(l=>l.target===r.target.ref?.node_id&&l.kind==='variables'&&l.input===0);
+ const links=r.variable_inputs?.length?r.variable_inputs.filter(l=>l.kind==='variables'&&l.input===0):incoming;
  if(!links.length&&saved)return null;
  need(links.length===1,'BINDING_PORT_MISMATCH');
  const link=links[0];
- const nodes=graph.nodes.filter(n=>n.ref.node_id===(link.source?.node_id??link.source));
+ const sourceId=link.source?.node_id??link.source;
+ const nodes=graph.nodes.filter(n=>n.ref.node_id===sourceId);
  if(saved&&(nodes.length!==1||nodes[0].type!=='variables.user'||link.output!==4))return null;
  let mapping,name=r.bindings?.[0]?.variable.name;
  if(r.target.kind==='existing'&&!saved){
+  const targets=graph.nodes.filter(n=>n.ref.node_id===r.target.ref.node_id);
+  need(targets.length===1&&targets[0].type===r.target.type
+   &&incoming.length<=1&&incoming.every(e=>e.source===sourceId&&e.output===link.output),'BINDING_PORT_MISMATCH');
+ }
+ need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
+ // A link requested on a disconnected Import has no connected layout yet.
+ // Verify the source by name now and read the native mapping after linking.
+ if(r.target.kind==='existing'&&!saved&&incoming.length){
+  options.operation.preTargetGraph=structuredClone(graph);
   const target=importBindingChannel(options,ctx,config,r.target.ref);
   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
   need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
  }
- need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
  const sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
  let proof=sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;

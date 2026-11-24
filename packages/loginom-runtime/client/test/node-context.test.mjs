@@ -149,12 +149,16 @@ test('D52 input breadcrumb binding requires the exact native node, port and open
  }
 });
 
-for(const icon of ['exporttextfile','exportexcelfile'])test(icon+' context retains the diagram port and its separate wizard index',async()=>{
+for(const icon of ['exporttextfile','exportexcelfile','importtextfile'])test(icon+' context retains the diagram port and its separate wizard index',async()=>{
  const f=fixture(),p=f.enterInputBreadcrumbs();
  p.opening.node.FIconCls='bg-vendor-icon-'+icon;
  p.opening.port.FPortIndex=0;
  p.opening.wizardIndex=1;
  p.portTree.FIndex=1;
+ if(icon.startsWith('import')){
+  p.opening.kind='variables';p.opening.port.FType=0;p.opening.port.FSubType=3;
+  p.portTree.FIndex=null;
+ }
  const collection={FParentNode:p.group,FItems:[{},p.portTree]};
  p.group.FSubNodes=collection;p.portTree.FCollection=collection;p.opening.portCollection=collection;
  p.group.ParentNode.FInputPortsRootNode=p.group;

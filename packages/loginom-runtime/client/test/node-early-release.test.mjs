@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {releaseNodeTarget} from '../lib/node-target.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {settleImportMappingRead} from '../lib/node-pending-release.mjs';
 import {createHash} from 'node:crypto';
 import {runInNewContext} from 'node:vm';
 
@@ -31,8 +32,13 @@ function fixture(phase='target',type='imports.text'){
       ...(type==='programming.javascript'?{releasePendingPhases:['input_mapping','open','configure'],
         releasePending:async()=>{throw Error('Early target must use its graph release verifier');}}:{}),
       verifySource:async()=>{if(phase==='source')throw Error('Injected source failure');return ok();},
-      ...(['target_before_create','target_source_child','target_release_hook'].includes(phase)?{beforeTarget:async()=>{
+      ...(['target_before_create','target_source_child','target_release_hook','target_import_read'].includes(phase)?{beforeTarget:async()=>{
         if(phase==='target_release_hook'){operation.nodeEffectPossible=true;operation.cleanupConfirmed=false;}
+        if(phase==='target_import_read'){
+          operation.preTargetGraph=structuredClone(graph);
+          operation.nodeEffectPossible=true;operation.cleanupConfirmed=false;
+          operation.lastReceipt={id:'apply:n1',operation_id:'apply:n1',action_key:'node.variables.variable_mapping_read.internal',signature:'signature'};
+        }
         if(phase==='target_source_child'){
           state.preflightCalls=(state.preflightCalls??0)+1;
           assert.ok(events.find(e=>e.phase==='node_target_checkpoint'&&e.target_state.last_graph));
@@ -47,6 +53,13 @@ function fixture(phase='target',type='imports.text'){
         if(!state.allowChildRelease)throw Error('child still unsettled');
         operation.preTargetGraph=structuredClone(graph);operation.cleanupConfirmed=true;
       }}:{}),
+      ...(phase==='target_import_read'?{settleBeforeTarget:receipt=>settleImportMappingRead({operation,receipt,channel:{
+        async releaseImportMappingRead(opening){
+          state.mappingReadReleases=(state.mappingReadReleases??0)+1;
+          if(state.blocked)throw Error('Wizard is still open');
+          return {verified:true,cleanup_complete:true,opening_operation_id:opening.opening_operation_id,port_guid:opening.port_guid};
+        },
+      }})}:{}),
       openWizard:async()=>{throw Error('No wizard should open');},mapPorts:async()=>ok(),verifyContinuation:async()=>true,
       finish:async()=>ok(),waitExecution:async()=>ok(),readOutput:async()=>ok()};},
     onRecord:async event=>{
@@ -340,6 +353,42 @@ test('target preflight refusal before creation releases without inventing a targ
   const result=await release(f);
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.original_outcome.output.node,null);
   assert.match(result.output.original_outcome.output.next_step.instruction,/did not create/);
+  assert.deepEqual(f.calls,[]);
+});
+
+for(const fault of ['none','wizard','running','foreign-owner','changed-graph'])test('existing Import mapping read releases only with its child receipt and original graph: '+fault,async()=>{
+  const f=fixture('target_import_read');
+  f.request.target={kind:'existing',type:'imports.text',ref:node};
+  f.state.graph.nodes.push({ref:node,type:'imports.text',label:'Target',inputs:[],outputs:[0],position:{x:320,y:280},locked:false});
+  const job=await stop(f);
+  assert.equal(job.outcome.status,'AMBIGUOUS');
+  assert.equal(job.outcome.output.pending_phase,'target');
+  f.state.receiptResult={state:fault==='running'?'running':'completed',receipt:{action_key:'node.variables.variable_mapping_read.internal',
+    operation_id:'apply:n1',action_revision:'1',status:'AMBIGUOUS',phase:'variable_mapping_read',effect_possible:true,cleanup_complete:false,
+    trace:[],error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:'Opened port wizard owner differs'},output:{verified:false,cleanup_complete:false,
+      read_opening:{node:fault==='foreign-owner'?{...node,node_id:'foreign'}:node,opening_operation_id:'apply:n1:port',port_guid:'import-input'}}}};
+  if(fault==='wizard')f.state.blocked=true;
+  if(fault==='changed-graph')f.state.graph.nodes[0].label='Changed';
+  const result=await release(f);
+  if(fault==='none'){
+    assert.equal(result.status,'SUCCEEDED',result.error?.message);
+    assert.equal(result.output.original_outcome.status,'FAILED');
+    assert.equal(result.output.original_outcome.effect_possible,true);
+    assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+  }else{
+    assert.equal(result.error.code,'NODE_RELEASE_REFUSED');
+    assert.throws(()=>f.runtime.assertPreparationAllowed());
+    if(fault==='wizard'){
+      assert.equal(result.output.next_step.tool,'dock_browser_recovery');
+      const basis=f.runtime.browserRecoveryBasis('apply');
+      assert.equal((await f.runtime.browserRecoveryHandoff('apply')).stopped,true);
+      f.state.blocked=false;
+      const verified=await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{}});
+      assert.equal(verified.status,'continuable',verified.reason);
+      assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+    }
+  }
+  assert.equal(f.state.mappingReadReleases??0,fault==='wizard'?2:['running','foreign-owner'].includes(fault)?0:1);
   assert.deepEqual(f.calls,[]);
 });
 
