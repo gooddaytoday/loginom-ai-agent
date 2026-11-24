@@ -194,12 +194,13 @@ test('native input ancestry binds each exact indexed opening with the same compo
  }
 });
 
-test('LGD variable wizard context rechecks the retained input collection and slot',async()=>{
+for(const [name,icon] of [['Excel','exportexcelfile'],['Text','exporttextfile'],['LGD','exportnative'],['REST','restclient']])
+test(name+' variable wizard context rechecks the retained input collection and slot',async()=>{
  const f=fixture(),p=f.enterPortWizard(true);
  const collection={FParentNode:p.group,FItems:[p.portTree,{}]};
  p.group.FSubNodes=collection;p.portTree.FCollection=collection;
  p.group.ParentNode.FInputPortsRootNode=p.group;
- p.opening.node.FIconCls='bg-vendor-icon-exportnative';
+ p.opening.node.FIconCls='bg-vendor-icon-'+icon;
  Object.assign(p.opening.port,{FType:0,FSubType:3,FPortIndex:1});
  p.portTree.FIndex=null;
  Object.assign(p.opening,{kind:'variables',nativeIndex:1,wizardIndex:0,portCollection:collection});

@@ -41,7 +41,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const fail=m=>{throw Error(m);},exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
   if(location.origin!==task.origin||app?.Version!==task.build||p?.document!==document||p.id!==b.document_id)fail('Port opening document changed');
   const receipts=input?(p.inputPortOpenReceipts??=new Map()):(p.outputPortOpenReceipts??=new Map()),r=receipts.get(task.operation_id);
-  if(r&&r.request!==JSON.stringify(b)+':'+task.port)fail('Port opening operation reused with another target');
+  if(r&&(r.request!==JSON.stringify(b)+':'+task.port||variables!==(r.kind==='variables')))fail('Port opening operation reused with another target');
   if(mode==='release_reserved'){if(r?.phase==='reserved')receipts.delete(task.operation_id);return null;}
   const records=[...p.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id);
   const prepared=records.find(r=>r.nodeTargetWorkflowNode);
@@ -216,6 +216,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(!r||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode)fail('Port opening receipt missing or changed');
   if(r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
     ||r.port.parent!==r.node||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Retained port identity changed');
+  if(variables&&input&&(r.port.FType!==0||r.port.FSubType!==3))fail('Variable input native kind changed');
   if(mode==='release_read') {
    const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    const roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -353,11 +354,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // CollectionItem.FIndex is a lazy cache: SetCollection/Index can leave it
    // null until the Index getter materializes it. Read the exact owned slot
    // instead, without calling that getter or a data proxy.
-   const collectionInput=input&&!control&&r.portIndex===0&&(variables
-    ?r.kind==='variables'&&r.port.FType===0&&r.port.FSubType===3
-      &&(r.nativeIndex===0&&r.node.FIconCls==='bg-vendor-icon-importtextfile'
-        ||r.nativeIndex===1&&r.node.FIconCls==='bg-vendor-icon-exportnative')
-    :r.nativeIndex===0&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls));
+   const collectionInput=input&&!control&&(variables||r.portIndex===0&&r.nativeIndex===0
+    &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls));
    const cachedWizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
    const wizardIndex=collectionInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;

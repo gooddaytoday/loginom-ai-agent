@@ -557,15 +557,16 @@ for(const [name,icon] of [['Excel','bg-vendor-icon-exportexcelfile'],['LGD','bg-
   }else assert.equal(result.status,'AMBIGUOUS');
  });
 
-for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree'])
- test('LGD variable input with an empty FIndex requires its own collection slot: '+fault,async()=>{
+for(const [name,icon] of [['Excel','exportexcelfile'],['Text','exporttextfile'],['LGD','exportnative'],['REST','restclient']])
+ for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree'])
+ test(name+' variable input requires its own collection slot: '+fault,async()=>{
   const f=textExportFixture(),group=f.portTree.ParentNode,items=group.FSubNodes.FItems;
-  f.node.FIconCls='bg-vendor-icon-exportnative';
+  f.node.FIconCls='bg-vendor-icon-'+icon;
   f.task.kind='variables';
   f.portDom.tid=f.portDom.tid.replace('Input_Data-0','Input_Var-1');
   f.portDom.getAttribute=()=>f.portDom.tid;
   Object.assign(f.port,{FType:0,FSubType:3,FPortIndex:1});
-  f.portTree.FIndex=null;
+  f.portTree.FIndex=fault==='none'?null:1;
   items.push({FModelNodePort:{}});
   if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
   if(fault==='foreign-collection')f.portTree.FCollection={};
