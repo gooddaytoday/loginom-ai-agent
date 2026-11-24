@@ -1,5 +1,5 @@
-// LAB-1943: observed compact Loginom 7.4.2 RPC runtime for DataSource71.
-// Canonical evidence keys are mapped to exact observed slots by collectNativeRuntime.
+// LAB-1943: observed compact Loginom 7.4.2 RPC runtime (first seen on DataSource71).
+// Canonical evidence keys are mapped to the build's own slots by collectNativeRuntime.
 export const directNativeRuntimePins=Object.freeze({
   "functions": {
     "session.DispatchMessageAsync": "fd47e6c9ec09f0c804fefcc3aeba620305fcf222cf87b0b3869c275437caf35f",
