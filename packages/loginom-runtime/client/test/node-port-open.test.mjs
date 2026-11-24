@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {makePreparedInputPortOpenCode,openPreparedOutputPort} from '../lib/node-port-open.mjs';
+import {makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode,openPreparedOutputPort} from '../lib/node-port-open.mjs';
 
 for(const direction of ['input','output'])for(const fault of ['none','mf','foreign-store','foreign-node','no-owned-node','running','duplicate','foreign-close','disabled','covered-close','foreign-window','mask','changed-port','persistent','lost-reply','deadline','changed-before-close'])test(direction+' port recovers only its native completed graph console: '+fault,async()=>{
  const f=fixture(direction);await f.page.evaluate(()=>{globalThis.innerWidth=1280;},null);
@@ -105,6 +105,64 @@ test('port opening binds menu and wizard native identities and replays without a
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port_guid,'port');
  assert.equal(f.gestures.length,2);assert.equal(r.trace.at(-1).event,'output_port_wizard_verified');
  const again=await f.run();assert.equal(again.status,'SUCCEEDED',again.error);assert.equal(again.replayed,true);assert.equal(f.gestures.length,2);
+});
+
+for(const fault of ['none','missing','reserved','menu','foreign-port','foreign-node','foreign-workflow','foreign-root','changed-data','dialog'])
+ test('reconcile a stopped input opening without issuing any gesture: '+fault,async()=>{
+  const f=fixture('input');assert.equal((await f.run()).status,'SUCCEEDED');
+  const opening=f.prep.inputPortOpenReceipts.get('open');
+  opening.phase='open_issued';
+  delete opening.wizard;delete opening.enginePort;delete opening.portTree;delete opening.nodeTree;
+  if(fault==='missing')f.prep.inputPortOpenReceipts.clear();
+  if(fault==='reserved')opening.phase='reserved';
+  if(fault==='menu')opening.phase='menu_issued';
+  if(fault==='foreign-port')f.portTree.FModelNodePort={};
+  if(fault==='foreign-node')f.portTree.ParentNode.ParentNode.FGuid='foreign';
+  if(fault==='foreign-workflow')f.portTree.ParentNode.ParentNode.ParentNode={};
+  if(fault==='foreign-root')f.wizard.FView.el.dom={};
+  if(fault==='changed-data')f.port.data={};
+  if(fault==='dialog')f.dialog.visible=true;
+  if(fault==='dialog')f.task.deadline=Date.now()+100;
+  const gestures=f.gestures.length;
+  const result=await openPreparedOutputPort(f.page,{...f.task,reconcile_only:true},f.readNode);
+  assert.equal(f.gestures.length,gestures);
+  if(fault==='none'){
+   assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.verified,true);
+   assert.equal(result.opening_operation_id,'open');assert.equal(opening.phase,'verified');
+  }else assert.notEqual(result.status,'SUCCEEDED',JSON.stringify(result));
+  if(fault==='reserved')assert.equal(f.prep.inputPortOpenReceipts.get('open'),opening);
+ });
+
+test('serialized input reconciliation verifies the retained opening without using the opening path',async()=>{
+ const f=fixture('input'),ref=f.task.binding.workflow_ref;
+ ref.tab_tid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
+ [...f.prep.receipts.values()][0].tab.tid=ref.tab_tid;
+ ref.navigation_path=[{tid:ref.prefix+';cnrNaviMode;b.s_Workflow',label:'Workflow'}];
+ assert.equal((await f.run()).status,'SUCCEEDED');
+ const opening=f.prep.inputPortOpenReceipts.get('open');opening.phase='open_issued';
+ const {binding,direction,...options}=f.task;
+ const result=await vm.runInNewContext('('+makePreparedInputPortReconcileCode(binding,options)+')',{Date})(f.page);
+ assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(opening.phase,'verified');
+ assert.equal(result.opening_operation_id,'open');assert.equal(f.gestures.length,2);
+});
+
+test('an input opening deadline after the click can be reconciled for cleanup without another click',async()=>{
+ const f=fixture('input'),locator=f.page.locator;
+ f.page.locator=selector=>{
+  const control=locator(selector),click=control.click;
+  control.click=async options=>{
+   await click(options);
+   if(selector.includes('mniConfigurePort')&&!options?.trial)f.task.deadline=Date.now()-1;
+  };
+  return control;
+ };
+ const failed=await f.run();
+ assert.equal(failed.status,'AMBIGUOUS');assert.equal(failed.cleanup_complete,false);
+ assert.ok(failed.trace.some(e=>e.event==='input_port_open_returned'));
+ assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'open_issued');
+ const reconciled=await openPreparedOutputPort(f.page,{...f.task,deadline:Date.now()+10000,reconcile_only:true},f.readNode);
+ assert.equal(reconciled.status,'SUCCEEDED',reconciled.error);assert.equal(reconciled.opening_operation_id,'open');
+ assert.equal(f.gestures.length,2);assert.equal(failed.cleanup_complete,false);
 });
 
 for(const fault of ['none','nonempty','foreign-type','foreign-column'])test('empty JS input admits only its disabled native delete header '+fault,async()=>{
@@ -476,6 +534,25 @@ function textExportFixture(wizardIndex=0) {
  nodeTree.FInputPortsRootNode=group;
  return f;
 }
+
+for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree','unbounded','non-array'])
+ test('Excel export binds its distinct owned input tree slot: '+fault,async()=>{
+  const f=textExportFixture(1),group=f.portTree.ParentNode;
+  f.node.FIconCls='bg-vendor-icon-exportexcelfile';
+  if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
+  if(fault==='foreign-collection')f.portTree.FCollection={};
+  if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
+  if(fault==='missing-tree')group.FSubNodes.FItems[1]={FModelNodePort:{}};
+  if(fault==='duplicate-port')group.FSubNodes.FItems[0].FModelNodePort=f.port.data;
+  if(fault==='duplicate-tree')group.FSubNodes.FItems[0]=f.portTree;
+  if(fault==='unbounded')group.FSubNodes.FItems.length=101;
+  if(fault==='non-array')group.FSubNodes.FItems={0:f.portTree,length:1};
+  const result=await f.run();
+  if(fault==='none'){
+   assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.native_index,0);assert.equal(result.wizard_index,1);
+   assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,2);
+  }else assert.equal(result.status,'AMBIGUOUS');
+ });
 
 for(const index of [0,1])test('text export confirms its owned slot without materializing lazy FIndex '+index,async()=>{
  const f=textExportFixture(index);f.portTree.FIndex=null;

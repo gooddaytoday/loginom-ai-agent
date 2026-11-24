@@ -1,4 +1,4 @@
-import {nodeOutputPortSchema} from './node-result-schema.mjs';
+import {nodeOutputPortSchema,replacedLinksSchema} from './node-result-schema.mjs';
 import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
@@ -14,7 +14,7 @@ export const userResultSchema = {
     effect_possible: { type: 'boolean' }, cleanup_complete: { type: 'boolean' },
     node: { anyOf: [{ type: 'null' }, { type: 'object', required: ['document_id', 'workflow_id', 'node_id'], additionalProperties: false,
       properties: { document_id: { type: 'string' }, workflow_id: { type: 'string' }, node_id: { type: 'string' } } }] },
-    configuration: { type: 'object' },
+    configuration: { type: 'object' }, replaced_links:replacedLinksSchema,
     execution: { type: ['object', 'null'] }, package_saved: { type: 'boolean' }, browser_recovery: { type: 'object' }, output: { type: 'object', properties:{ports:{type:'array',items:{type:'object',allOf:[{if:{anyOf:['exact_table','read_coverage','read_consistency','cell_precision','binding'].map(k=>({required:[k]}))},then:{...nodeOutputPortSchema,required:[...nodeOutputPortSchema.required,'exact_table','read_coverage','read_consistency','cell_precision','binding']}}]}}}, additionalProperties:true },
     error: { type: ['object', 'null'] }, limitations: { type: 'array', items: { type: 'string' } },
   },
@@ -109,7 +109,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
     result_version: 'user-v1', ...pick(result, ['operation_id', 'attempt', 'state', 'cancel_requested', 'server_stop_requested']),
     ...(result.progress&&(result.state === 'running'||result.outcome==null) ? { progress: result.progress } : {}),
     ...pick(outcome, ['status', 'action_key', 'phase', 'effect_possible', 'cleanup_complete']),
-    ...pick(node, ['node', 'execution', 'package_saved', 'configuration', 'browser_recovery']), output,
+    ...pick(node, ['node', 'execution', 'package_saved', 'configuration', 'browser_recovery', 'replaced_links']), output,
     error: result.error ?? outcome?.error ?? null,
     limitations,
     ...(next?{next_step:next}:{}),

@@ -94,7 +94,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
- let settleWizard,beforeSettlement,openingConfirmation,draftReceipt=false,variableDraft=false;
+ let settleWizard,beforeSettlement,openingConfirmation,portOpening,draftReceipt=false,variableDraft=false;
  if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
   'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
@@ -121,7 +121,16 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
    &&['wizard_step','set_wizard_field'].includes(gestures[0].verb)
    &&['WIZARD_STEP_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code);
   variableDraft=calculatorVariableMappingRefusal(operation,r);
-  const draft=restDraft||exportDraft||wizardDraft||variableDraft;
+  const ref=operation.lastReceipt,portTrace=r?.trace??[];
+  const inputOpening=state.pending.phase==='input_mapping'&&['exports.text','exports.excel','exports.lgd'].includes(state.request.target?.type)
+   &&ref.action_key==='node.input_port.open.internal'&&ref.id===ref.operation_id&&typeof ref.operation_id==='string'
+   &&ref.operation_id.startsWith(operation.id+':n')&&r?.operation_id===ref.operation_id&&r.action_key===ref.action_key
+   &&r.phase==='port_open'&&r.status==='AMBIGUOUS'&&r.effect_possible===true&&r.cleanup_complete===false
+   &&r.output?.verified===false&&r.output.cleanup_complete===false&&r.error?.code==='OUTPUT_PORT_OPEN_UNCONFIRMED'
+   &&portTrace.filter(e=>e.event==='input_port_reserved'&&e.native_index===0&&typeof e.port_guid==='string'&&e.port_guid).length===1
+   &&portTrace.filter(e=>e.event==='input_port_open_issued').length===1
+   &&portTrace.filter(e=>e.event==='input_port_open_returned').length===1;
+  const draft=restDraft||exportDraft||wizardDraft||variableDraft||inputOpening;
   draftReceipt=draft;
   requireValue(response?.state==='completed'&&(r?.cleanup_complete===true||draft),
    'The last browser gesture of this operation has no confirmed cleanup');
@@ -134,6 +143,11 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(draft){
    requireValue(typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id,
     'The completed draft receipt identity changed');
+  }
+  if(inputOpening){
+   portOpening=await channel.reconcileInputPortOpening(ref);
+   requireValue(portOpening.port_guid===portTrace.find(e=>e.event==='input_port_reserved').port_guid,
+    'The stopped input opening port identity changed');
   }
   const graphReturn=n?.surface==='graph'&&w?.status==='absent'
     &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
@@ -176,6 +190,11 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   &&current.prepared_node_context?.input_port?.node_icon_class==='bg-vendor-icon-calcdata'
   &&current.prepared_node_context.input_port.opening_operation_id===operation.lastReceipt.operation_id+':port',
   'The stopped Calculator variable port owner changed');
+ if(portOpening)requireValue(current.wizard?.status==='observed'&&current.wizard.stage==='input_mapping'
+  &&sameNode(current.prepared_node_context,node)&&current.prepared_node_context.surface==='wizard'
+  &&['direction','port','native_index','port_guid','opening_operation_id'].every(key=>
+   current.prepared_node_context.input_port?.[key]===(key==='direction'?'input':portOpening[key])),
+  'The stopped export input port owner changed');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

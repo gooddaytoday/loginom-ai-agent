@@ -26,6 +26,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;
  const sevenFiles=process.env.LOGINOM_TEST_SEVEN_FILES==='1';
  const smoothingHp=process.env.LOGINOM_TEST_SMOOTHING_HP==='1',fullWorkspace=openPackage||smoothingHp||sevenFiles;
+ const describeBatch=process.env.LOGINOM_TEST_DESCRIBE_BATCH==='1',applied=[];
  const account=(smoothingHp?'lab111-3-reviewer-':'lab-66-monkey-')+'a'.repeat(36),documentId='d'.repeat(36),operationId=smoothingHp?'prepare':'o'.repeat(36);
  let packageArtifact;
  const workflow=()=>({tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-2',prefix:'MF;TF-2',
@@ -81,7 +82,8 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const nodeApi=await import('../../lib/node-api.mjs');
  mock.module('../../lib/node-api.mjs',{namedExports:{...nodeApi,
   dispatchNodeApi:async(runtime,name,args,options)=>['dock_node_wait','dock_node_status'].includes(name)
-   ?worker:nodeApi.dispatchNodeApi(runtime,name,args,options)}});
+   ?worker:describeBatch&&name==='dock_node_apply'
+     ?(applied.push(args),{...worker,operation_id:args.operation_id}):nodeApi.dispatchNodeApi(runtime,name,args,options)}});
  const inspection={operation_id:worker.operation_id,status:'SUCCEEDED',action_key:'operation.inspect',effect_possible:false,
   output:{state:'resolved',cleanup_confirmed:true,effect_state:'verified',outcome:worker.outcome}};
  const executor=await import('../../lib/executor.mjs');
@@ -117,6 +119,41 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const inventory=await call('dock_action_describe');
   assert.ok(parse(inventory).available_node_types.includes('programming.javascript'));
   assert.equal(browserCalls,0);
+
+  if(describeBatch){
+   const prepared=parse(await call('dock_prepare'));
+   assert.equal(prepared.prepared,true);
+   const before=browserCalls;
+   const apply=type=>call('dock_node_apply',{operation_id:'apply-'+applied.length,contract_revision:'1.0.0',
+    document_id:'fixture-document',workflow_ref:{workflow_id:'fixture-workflow'},target:{kind:'new',type},
+    inputs:[],mode:type==='transform.sorting'?'keys':'expression',parameters:{},finish:'execute'});
+   await call('dock_action_describe',{node_types:['transform.sorting'],modes:['keys']});
+   assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
+   assert.equal(applied.length,1);
+   const args={node_types:['imports.text','programming.javascript','integration.rest_request','transform.calculator'],
+    modes:['delimited','script','request','expression']};
+   const refused=await call('dock_action_describe',args);
+   assert.equal(refused.isError,true);
+   assert.equal(parse(refused).error.code,'USER_RESPONSE_BUDGET');
+   assert.equal(parse(await apply('transform.calculator')).error.code,'NODE_TYPE_NOT_DESCRIBED');
+   assert.equal(applied.length,1,'refused cards must not authorize node application');
+   assert.equal(parse(await apply('transform.sorting')).status,'SUCCEEDED');
+   assert.equal(applied.length,2,'earlier descriptions survive a later delivery refusal');
+   const next=parse(refused).next_step;
+   assert.deepEqual([next.arguments,...next.remaining_requests],args.node_types.map((type,index)=>({node_types:[type],modes:[args.modes[index]]})));
+   for(const request of [next.arguments,...next.remaining_requests]){
+    const delivered=await call(next.tool,request);
+    assert.notEqual(delivered.isError,true,JSON.stringify(delivered));
+    assert.ok(size(delivered)<=46000);
+    assert.equal(parse(delivered).node_types[0].type,request.node_types[0]);
+    assert.ok(parse(delivered).node_types[0].parameter_schema);
+    assert.ok(parse(delivered).node_types[0].guidance);
+   }
+   assert.equal(parse(await apply('transform.calculator')).status,'SUCCEEDED');
+   assert.equal(applied.length,3);
+   assert.equal(browserCalls,before);
+   return;
+  }
 
   if(sevenFiles){
    const sourcePath=join(directory,'source.csv');await writeFile(sourcePath,'Branch,Amount\nA,1\n');
