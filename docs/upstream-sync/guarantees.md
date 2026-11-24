@@ -59,8 +59,6 @@ scripts/upstream-sync/selftest.sh
 - `npm ci` шаблона `packages/dashboard/template` закреплённым Node — до тестов дашбордов. Без него на точке отсечения было 17 ложных падений (B1.1); на дереве v2 — 19 в `test:coverage:workers`, и скрипт `test` дальше не идёт (B1.7).
 - `LOGINOM_AI_AGENT_TEST_NODE` — путь к `bin/node` Node 24.19.0 для `loginom-host`, `dashboard`, `packages/server/test/loginom-package-docs.test.ts` (встроенный Node исполнителя, B2.5c) и `packages/server/test/loginom-host-lease.test.ts` (Node host, B2.3). Без неё `loginom-host` на дереве v2 даёт 205 падений вместо 38 (B1.5). В 0.4 то же требовалось набору пакета `opencode`: без неё 66 падений вместо 6 (B1.1); при переносе кода туда, где тесты запускают Node, переменную берут с собой.
 
-Профиль дашборда (B2.9b) плагин узнаёт по папке под каталогом данных сервера (`Global.Path.data`, из `XDG_DATA_HOME`), поэтому его тесты в `loginom-agent` и `loginom-access.test.ts` создают и удаляют папку `<data>/dashboards/<временная>/work` там. Запускать их с временными `HOME` и `XDG_*`, иначе это настоящий каталог данных продукта.
-
 `bun turbo test` переменную не передаёт: задачи `turbo.json` с `passThroughEnv` для пакетов форка на дереве v2 ещё нет (B5.1). Поэтому `loginom-host` и `dashboard` запускают из каталога пакета, как выше.
 
 ## Базовые падения стенда

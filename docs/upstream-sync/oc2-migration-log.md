@@ -20201,7 +20201,9 @@ Found 905 warnings and 0 errors.                                       # как 
 |---|---|
 | `0acedddf40` `feat(loginom-agent): dashboard session profile (B2.9b)` | код: `packages/loginom-agent/src/dashboard.ts` (новый, 23 строки), `access.ts` (+24 −4), `index.ts` (+17 −2); тесты: `packages/loginom-agent/test/dashboard.test.ts` (новый, 5), `access.test.ts` (+4), `describe` B2.9b в `packages/server/test/loginom-access.test.ts` (+3) и его фикстура `packages/server/test/fixture/mcp-guide.cjs` (новый) |
 | `09fa69fe04` `docs(upstream-sync): record B2.9b dashboard profile and its G1 mutations` | этот раздел, строка G1, строка 7 и «Как запускать» в `guarantees.md` |
-| следующий | уточнения этого раздела: область MCP, `product` в приёмке, защёлка в «Не проверено» |
+| `5e19c57964` `docs(upstream-sync): B2.9b MCP scope, product suite and the latch to confirm` | уточнения этого раздела: область MCP, `product` в приёмке, защёлка в «Не проверено» |
+| `4b913b031c` `test(loginom-agent): dashboard tests use a data directory of their own (B2.9b)` | доработка по приёмке: новый `packages/loginom-agent/test/fixture/temporary-data.ts`, его вызов в `dashboard.test.ts` и в `boot` `loginom-access.test.ts` |
+| следующий | раздел «Доработка», `guarantees.md` без примечания о временных `XDG_*` |
 
 Файлов кода три (предел — пять), все — пакета форка; файлов upstream не правил, `catalog.json` не менялся.
 
@@ -20327,8 +20329,7 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - **Инструменты дашборда — поимённо, не `dashboard_*`.** Задание называет префикс; 0.4 перечислял три имени. Имя
   MCP-инструмента — `<сервер>_<инструмент>`, и сервер `dashboard` прошёл бы префикс. Выбран меньший список — имена 0.4.
-- **Защёлка вместо постоянной при старте плагина — подтвердить владельцу** (AGENTS.md: усложнение ради редкого случая
-  безопасности). Постоянная, по коду, открывает дыру: после перезапуска старый чат удалённого дашборда активирует
+- **Защёлка вместо постоянной при старте плагина** — оркестратор принял её как техническое решение, без владельца. Постоянная, по коду, открывает дыру: после перезапуска старый чат удалённого дашборда активирует
   Location при отсутствующей папке (`false`), пересоздание того же дашборда возвращает папку по тому же пути — и новый
   чат в этой Location получает обычный профиль. Сценарий выведен из кода, запуском не проверен (ниже, «Не проверено»);
   цена защёлки — три строки и несколько системных вызовов на проверку, пока папка не найдена. Проверка при каждом
@@ -20354,10 +20355,10 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 ### Найдено, не чинил
 
-- Тесты пакета `server` и `loginom-agent`, которые пишут в каталог данных плагина (`Global.Path.data`: профили файлов
-  B2.5b1, теперь папки дашбордов), без временных `XDG_*` пишут в настоящий `~/.local/share/loginom-ai-agent-dev`:
-  preload с изоляцией, как у `core/script/test.ts`, у этих пакетов нет. Записал в «Как запускать» `guarantees.md`; для
-  CI на дереве v2 (B5.1) это нужно решить там же — временными `XDG_*` в шаге или preload пакета.
+- Прежние тесты, которые пишут в каталог данных плагина (`Global.Path.data`) вне `loginom-access.test.ts`, —
+  `loginom-local-file.test.ts` (профили файлов B2.5b1), `loginom-permissions.test.ts` (`tool-output`), — без временных
+  `XDG_*` пишут в каталог данных запускающего: preload с изоляцией, как у `core/script/test.ts`, у пакета `server` нет.
+  Новые тесты B2.9b изолируют себя сами (ниже, «Доработка»); прежние не трогал — для CI на дереве v2 это вопрос B5.1.
 - `ServiceHost` — один на процесс. Тест сервера, упавший по таймауту, не закрывает его, и следующий тест с Host в том же
   файле падает на `LOGINOM_HOST_ALREADY_STARTED`, а папки дашбордов остаются (так было в первом прогоне мутаций, пока
   сценарий звал терминал). В своих тестах убрал причину таймаута; общий механизм не трогал.
@@ -20372,3 +20373,55 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Несколько Location одного сервера и MCP — только по коду (выше, «Без MCP»).
 - Windows и macOS (junction, регистр путей) — только в объёме тестов 0.4, на Linux.
 - Desktop: Location окна дашборда — B4 (ВШ-6).
+
+### Доработка: тесты изолируют себя сами
+
+По приёмке оркестратора новые тесты больше не полагаются на окружение запускающего.
+
+- **Почему не переменные окружения в тесте.** Плагин берёт корень дашбордов из `Global.Path.data`, а
+  `@opencode/util/global` вычисляет его один раз, при первом импорте, из `XDG_DATA_HOME` (без неё — из `HOME`). В одном
+  процессе `bun test` модуль уже загружен другими файлами, поэтому `XDG_DATA_HOME`, заданная в тесте, корень не сдвинет.
+  Остальные пути новых тестов уже свои: ядро сервера получает `home`, `config`, `data` и прочие через `Global.layerWith`
+  (`boot`), Host — `data` случая, модель — `TestLLM`; `Global.Path.home` плагин читает только как путь без записи.
+- **Помощник** `packages/loginom-agent/test/fixture/temporary-data.ts` (`temporaryData`): на время случая ставит
+  `Global.Path.data` на свой каталог в системном временном и возвращает прежнее значение, каталог удаляет. Его зовут
+  `dashboardFolder` в `loginom-agent/test/dashboard.test.ts` и `boot` в `server/test/loginom-access.test.ts` — для всех
+  случаев файла: каталог данных плагина там теперь у каждого случая свой.
+- `guarantees.md`, «Как запускать»: примечание о временных `XDG_*` для тестов профиля дашборда снято.
+
+Проверка — `<scratchpad>/b29b/scripts/real-xdg.sh`: окружение запускающего без единой `XDG_*`, как у пользователя без
+этих переменных, корень данных тогда — `$HOME/.local/share/loginom-ai-agent-dev`. Настоящий `HOME` не трогал (общее
+правило задания): `HOME` — свежий каталог в scratchpad, разрешение путей то же. Перечень
+`$HOME/.local/share/loginom-ai-agent*/dashboards*` до и после полного прогона пакета, под `unshare -n`:
+
+```text
+$ real-xdg.sh <дерево> head loginom-agent         # 4b913b031c, полный bun test пакета
+head loginom-agent before: []
+head loginom-agent exit=0 xdg-vars=0  85 pass  0 fail
+head loginom-agent after: [] data: []
+$ real-xdg.sh <дерево> head server                # полный bun test пакета, 223 с
+head server before: []
+head server exit=0 xdg-vars=0  280 pass  3 skip  0 fail
+head server after: [] data: [loginom-ai-agent-dev ]
+```
+
+Контроль: без присваивания `Global.Path.data` в помощнике (прежнее поведение) те же тесты в том же окружении оставляют
+каталог `dashboards`:
+
+```text
+$ real-xdg.sh <дерево> control loginom-agent test/dashboard.test.ts
+control loginom-agent exit=0 xdg-vars=0  5 pass  0 fail
+control loginom-agent after: [$HOME/.local/share/loginom-ai-agent-dev/dashboards ]
+$ real-xdg.sh <дерево> control server test/loginom-access.test.ts
+control server exit=0 xdg-vars=0  12 pass  0 fail
+control server after: [$HOME/.local/share/loginom-ai-agent-dev/dashboards ]
+```
+
+Каталог `loginom-ai-agent-dev` после полного прогона `server` — от прежних тестов, не B2.9b: в нём `tool-output`, `repos`,
+`log`, `artifacts`, `shell`, папки `dashboards` нет. Поэтому прогон с настоящим `HOME` и был бы записью в настоящий
+каталог данных.
+
+Приёмка на коммите доработки `4b913b031c`: `loginom-agent` 85 pass, 0 fail и `server` 280 pass, 3 skip, 0 fail (выше; на
+базе `5fd8e2f598` — 76/0 и 277/3/0); мутации раздела повторены — те же числа; `catalog-check.py` код 0 (609 файлов),
+`apply-identity --check` — 0 файлов, `bun run check` — код 0 (905 предупреждений, 0 ошибок, 39 из 39 задач), под
+`unshare -n`.
