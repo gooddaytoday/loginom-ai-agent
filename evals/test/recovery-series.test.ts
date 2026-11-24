@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
@@ -58,7 +58,7 @@ test("held-out ledger preserves planned, missing-result and retried attempts und
   const report = await audit(...args)
   expect(report).toMatchObject({ purpose: "held-out", preflights: 2,
     keys: [{ ...key, attempts: [{ commandId: first.journal.commandId, result: null },
-      { commandId: second.journal.commandId, result: { status: "completed" }, initial: { status: "infra_error" },
+      { commandId: second.journal.commandId, result: { status: "completed" }, initial: { status: "infra_error", recovery: { requested: null, gaps: expect.arrayContaining(["cli:missing"]) } },
         accounted: { counted: true, pass: true, score: 95, cleanupConfirmed: false } }] }, { round: 2, attempts: [] }] })
   const damaged = path.join(first.run, "double/1/result.json")
   await Bun.write(damaged, "{")
@@ -99,4 +99,152 @@ test("a missing journal is a gap and an old manifest does not relabel its retain
   expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missingNativeAdmissions: 1, source: journalFile })
   await rm(path.dirname(f.run), { recursive: true })
   expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missing: path.dirname(f.run) })
+})
+
+const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex")
+const session = "synthetic-session", operation = "synthetic-operation"
+const start = { action: "start", operation_id: operation }, finish = { ...start, action: "finish" }
+const native = (phase: string, data = {}) => ({ phase: "browser_recovery_" + phase, operation_id: operation, attempt_id: "episode", ...data })
+const tool = (id: string, name: string, input: object, output: object, status = "completed") => ({
+  type: "tool_use", sessionID: session, part: { type: "tool", sessionID: session, callID: id, messageID: "message-" + id,
+    tool: "loginom_" + name, state: { status, input, [status === "error" ? "error" : "output"]: JSON.stringify(output) } },
+})
+async function episode(cli: unknown[], records?: unknown[], prepare?: (dir: string, run: string) => Promise<void>) {
+  const f = await pilot(), dir = path.join(f.run, "double/1")
+  await write(path.join(dir, "result.json"), { task_id: "double", attempt: 1, slot_id: "slot-a", session_id: session,
+    exit_code: 1, judge_status: "no_artifact", pass: false, score: 0, environment_cleanup: { status: "confirmed" } })
+  const jsonl = (rows: unknown[]) => rows.map(row => JSON.stringify(row)).join("\n") + "\n"
+  await Bun.write(path.join(dir, "events.jsonl"), jsonl([...cli, { type: "step_finish", sessionID: session, part: { reason: "stop" } }]))
+  if (records) {
+    const source = `loginom/runtime/generations/g/chats/${hash(session)}/attempts/r/execution-events.jsonl`
+    const archive = "diagnostics/1-execution-events.jsonl", text = jsonl(records)
+    await Bun.write(path.join(dir, archive), text)
+    await write(path.join(dir, "diagnostics/manifest.json"), { version: 1, runtime_directories: [path.dirname(source)],
+      files: [{ archive, source, bytes: Buffer.byteLength(text), sha256: hash(text) }] })
+  }
+  await prepare?.(dir, f.run)
+  return (await audit("--run", f.run, "--purpose", "pilot", "--assignment", "ticket")).keys[0].attempts[0]
+}
+const control = "dock_browser_recovery"
+const begin = tool("c1", control, start, { phase: "browser", operation_id: operation })
+const opened = [native("started"), native("handoff", { stopped: true })]
+test("continuable joins the executor receipt and three actions while the original operation remains FAILED", async () => {
+  const names = ["browser_snapshot", "browser_click", "browser_find"]
+  const verification = { status: "continuable", receipt_id: "receipt", original_operation: { operation_id: operation,
+    status: "FAILED", configuration: { status: "unknown" }, execution: { status: "unknown" } } }
+  const evidence = await episode([begin, ...names.map((name, i) => tool("a" + i, name, { depth: i }, {})),
+    tool("c2", control, finish, { phase: "dock", operation_id: operation, verification })],
+    [...opened, ...names.map((name, i) => native("action", { tool: name, arguments_sha256: hash(JSON.stringify({ depth: i })),
+      page: { ok: true }, is_error: false, transport_error: null })), native("attested"),
+    { phase: "browser_recovery_receipt", operation_id: operation, receipt: { id: "receipt" } },
+    native("verified", { status: "continuable", receipt_id: "receipt" })])
+  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ operation, nativeAttempt: "episode", handoff: true,
+    verified: "continuable", receipt: "receipt", original: "FAILED", configuration: "unknown", execution: "unknown" }] })
+  expect(evidence.recovery.episodes[0].actions.map((a: {nativeLine: number}) => a.nativeLine)).toEqual([3, 4, 5])
+})
+
+test("unresolved and stopped survive a missing native journal alongside the independent verdict", async () => {
+  const stopped = { code: "model_stopped", cleanup: { state: "retained" } }
+  const evidence = await episode([begin, tool("a1", "browser_snapshot", {}, {}), tool("a2", "browser_snapshot", { depth: 3 }, {}),
+    tool("f", control, finish, { operation_id: operation, phase: "browser", verification: { status: "unresolved", uncertain: false } }),
+    tool("s", control, { ...start, action: "stop" }, { operation_id: operation, phase: "stopped", stopped })])
+  expect(evidence).toMatchObject({ result: { exitCode: 1, score: 0, pass: false, judgeStatus: "no_artifact", cleanup: "confirmed" },
+    recovery: { gaps: expect.arrayContaining(["native:missing"]), episodes: [{ nativeAttempt: null, verified: null,
+      cliVerification: "unresolved", stop: "model_stopped", cleanup: "retained", actions: [{ nativeLine: null }, { nativeLine: null }] }] } })
+})
+
+test("a recorded unknown browser effect and retained cleanup are complete evidence of a failed action", async () => {
+  const stopped = { code: "browser_unavailable", cleanup: { state: "retained_uncertain" } }
+  const evidence = await episode([begin, tool("act", "browser_click", {}, { phase: "stopped", stopped })], [...opened,
+    native("action", { tool: "browser_click", arguments_sha256: hash("{}"), transport_error: "private transport text", is_error: null, page: { ok: true } }),
+    native("stopped", stopped)])
+  expect(evidence.recovery).toMatchObject({ requested: true, gaps: [], episodes: [{ nativeStop: "browser_unavailable", nativeCleanup: "retained_uncertain",
+    actions: [{ nativeLine: 3, isError: null, transportError: true, pageOk: true }] }] })
+  expect(JSON.stringify(evidence)).not.toContain("private transport text")
+})
+
+test("a refused start before handoff is an observed non-execution", async () => {
+  const evidence = await episode([tool("c", control, start, { refused: "private reason" }, "error")], [{ phase: "session_open" }])
+  expect(evidence.recovery).toMatchObject({ requested: true, gaps: [], episodes: [{ started: false, actions: [], handoff: null }] })
+  expect(JSON.stringify(evidence)).not.toContain("private reason")
+})
+
+test("a confirmed native close after handoff explains a started episode without actions", async () => {
+  const evidence = await episode([begin], [...opened, native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })])
+  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ started: true, handoff: true, actions: [], nativeStop: "runtime_closed" }] })
+  const interrupted = await episode([begin], opened)
+  expect(interrupted.recovery).toMatchObject({ gaps: ["episode:outcome"], episodes: [{ started: true, handoff: true, actions: [], verified: null }] })
+})
+
+test("the observed ordinary run distinguishes zero recovery from unavailable evidence", async () => {
+  const calls = [tool("ordinary", "dock_prepare", {}, {})]
+  expect((await episode(calls, [{ phase: "prepared" }])).recovery).toMatchObject({ requested: false, nativePhases: 0, gaps: [], episodes: [] })
+  expect((await episode(calls)).recovery).toMatchObject({ requested: false, nativePhases: null, gaps: ["native:missing"] })
+  expect((await episode([{ broken: "evidence" }], [{ phase: "browser_recovery_handoff" }])).recovery)
+    .toMatchObject({ requested: null, nativePhases: 1, gaps: expect.arrayContaining(["cli:unmatched-native"]) })
+})
+
+test("the closed profile supplies the native source and links only this action's private text", async () => {
+  const action = native("action", { tool: "browser_snapshot", arguments_sha256: hash("{}"), is_error: false, transport_error: null,
+    page: { ok: true }, budget: { calls_left: 29 }, content: [{ type: "text", bytes: 7 }] })
+  const evidence = await episode([begin, tool("act", "browser_snapshot", {}, {})], undefined, async (dir, run) => {
+    const profileDir = path.join(run, "profile"), archive = profileDir + ".history/closed"
+    await mkdir(profileDir)
+    await write(path.join(dir, "cleanup.json"), { profileDir, archive, processes: { status: "confirmed", capture_complete: true, unknownProcesses: [] },
+      serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true })
+    const config = path.join(run, "config.json")
+    await write(config, { ...await Bun.file(config).json(), profileDir })
+    const attempt = path.join(archive, "loginom/runtime/generations/g/chats", hash(session), "attempts/r")
+    await Bun.write(path.join(attempt, "execution-events.jsonl"), [...opened, action, native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })]
+      .map(r => JSON.stringify(r)).join("\n"))
+    await Bun.write(path.join(attempt, "browser-recovery-text.jsonl"), [
+      { attempt_id: "someone-else", calls_left: 29, text_blocks: ["private earlier text"] },
+      { attempt_id: "episode", calls_left: 29, text_blocks: ["private"] }].map(r => JSON.stringify(r)).join("\n"))
+  })
+  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ actions: [{ nativeLine: 3, text: { line: 2, blocks: 1 } }] }] })
+  expect(JSON.stringify(evidence)).not.toContain("private")
+})
+
+test("an unmatched native action and a mismatched executor receipt leave the CLI outcome intact", async () => {
+  const evidence = await episode([begin, tool("f", control, finish, { operation_id: operation, phase: "dock",
+    verification: { status: "completed", receipt_id: "claimed" } })], [...opened,
+    native("action", { tool: "browser_find", arguments_sha256: hash("{}") }), native("attested"),
+    { phase: "browser_recovery_receipt", operation_id: operation, receipt: { id: "another" } },
+    native("verified", { status: "completed", receipt_id: "claimed" })])
+  expect(evidence.recovery).toMatchObject({ gaps: expect.arrayContaining(["cli:unmatched-action", "native:receipt"]),
+    episodes: [{ cliVerification: "completed", verified: "completed", receipt: null }] })
+})
+
+test("foreign finish cannot verify this operation even when its reported status matches", async () => {
+  const evidence = await episode([begin, tool("finish", control, { action: "finish", operation_id: "other" },
+    { operation_id: "other", verification: { status: "completed", original_operation: { operation_id: "other", status: "SUCCEEDED" } } })],
+    [...opened, native("attested"), native("verified", { status: "completed" })])
+  expect(evidence.recovery).toMatchObject({ gaps: expect.arrayContaining(["cli:operation"]),
+    episodes: [{ cliVerification: null, original: null, verified: "completed" }] })
+})
+
+test("a truncated native action stays linked, with an explicit gap for its outcome", async () => {
+  const evidence = await episode([begin, tool("act", "browser_click", {}, {})], [...opened,
+    native("action", { tool: "browser_click", arguments_sha256: hash("{}") }),
+    native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })])
+  expect(evidence.recovery).toMatchObject({ gaps: ["native:action-outcome"], episodes: [{ actions: [
+    { nativeLine: 3, pageOk: null, transportError: null, isError: null }] }] })
+})
+
+test("a screenshot links source file IDs and image digests without claiming provider delivery", async () => {
+  const shot = tool("image-call", "browser_take_screenshot", {}, {})
+  const image = { partID: "file-part", sha256: hash("pixels"), bytes: 6, mime: "image/png" }
+  const evidence = await episode([begin, { ...shot, part: { ...shot.part, state: { ...shot.part.state, metadata: { screenshotFiles: [image] } } } }],
+    [...opened, native("action", { tool: "browser_take_screenshot", arguments_sha256: hash("{}"), is_error: false, transport_error: null,
+      page: { ok: true }, content: [{ type: "image", mime_type: "image/png", bytes: 6, sha256: hash("base64 text") }] }),
+    native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })])
+  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ actions: [{ call: "image-call", files: [image] }] }] })
+})
+
+test("a changed diagnostic file cannot supply a native conclusion", async () => {
+  const evidence = await episode([begin], opened, async dir => {
+    await Bun.write(path.join(dir, "diagnostics/1-execution-events.jsonl"), JSON.stringify(native("verified", { status: "completed" })))
+  })
+  expect(evidence).toMatchObject({ result: { score: 0, cleanup: "confirmed" }, recovery: {
+    gaps: expect.arrayContaining(["native:digest"]), nativePhases: null, requested: true, episodes: [{ handoff: null, verified: null }] } })
 })

@@ -3,6 +3,7 @@ import path from "node:path"
 import { readdir } from "node:fs/promises"
 import { parseArgs } from "node:util"
 import type { CampaignJournal, CampaignManifest } from "./run-campaign"
+import { recoveryEpisode } from "../src/recovery-episode"
 import type { AttemptResult } from "../src/report"
 
 const options = { type: "string" } as const
@@ -14,7 +15,8 @@ type Key = Pick<CampaignManifest["keys"][number], "taskId" | "round" | "experime
 type Admission = { purpose: "preflight" | "measurement"; attempt: number; taskId: string; slotId: string }
 type Entry = {
   commandId: string; sourceCommit: string | null; slot: string; resultFile: string
-  result: ReturnType<typeof outcome> | null; initial?: ReturnType<typeof outcome>
+  recovery: Awaited<ReturnType<typeof recoveryEpisode>>
+  result: ReturnType<typeof outcome> | null; initial?: ReturnType<typeof outcome> & { recovery: Entry["recovery"] }
   cold: Awaited<ReturnType<typeof coldOutcome>> | null; accounted?: ReturnType<typeof accounting>
 }
 const keyId = (k: Key) => JSON.stringify([k.corpus, k.taskId, k.round])
@@ -39,6 +41,7 @@ async function readRun(runDir: string, keys: Key[], ledger?: CampaignJournal) {
   if (native.version !== 2 || native.kind !== "unactivated-preparation" || native.runDir !== runDir ||
       !native.commandId || path.basename(config.commandJournal) !== `run-command-${native.commandId}.json`) throw Error("Native admission identity mismatch")
   if (!Array.isArray(native.attempts)) { gaps.push({ missing: config.commandJournal + "#attempts" }); return }
+  const slots = config.slotsFile ? await Bun.file(config.slotsFile).json().catch(() => null) : null
   for (const entry of native.attempts as Admission[]) {
     if (entry.purpose === "preflight") { preflights++; continue }
     const matches = keys.filter(key => key.taskId === entry.taskId)
@@ -50,9 +53,13 @@ async function readRun(runDir: string, keys: Key[], ledger?: CampaignJournal) {
     const result = await readResult(resultFile, row.taskId, entry.slotId)
     const accounted = ledger?.attempts.find(item => item.resultFile === resultFile)
     if (accounted && keyId(accounted.key) !== keyId(row)) throw Error("Ledger result identity mismatch")
+    const slot = Array.isArray(slots?.slots) ? slots.slots.find((s: { id: string }) => s?.id === entry.slotId) : undefined
+    const profile = slot ?? (!config.slotsFile && config.profileDir ? { profileDir: config.profileDir } : undefined)
     row.attempts.push({ commandId: native.commandId, sourceCommit: config.source_commit ?? null, slot: entry.slotId, resultFile, result: result && outcome(result),
+      recovery: await recoveryEpisode(path.dirname(resultFile), result?.session_id, profile),
       cold: values.cold ? await coldOutcome(path.dirname(resultFile), values.cold).catch(() => ({ source: values.cold!, gap: "unavailable" })) : null,
-      ...(result?.infra_retry ? { initial: outcome(result.infra_retry.initial) } : {}),
+      ...(result?.infra_retry ? { initial: { ...outcome(result.infra_retry.initial),
+        recovery: await recoveryEpisode(path.join(path.dirname(resultFile), "infra-error"), result.infra_retry.initial.session_id, profile) } } : {}),
       ...(accounted ? { accounted: accounting(accounted) } : {}) })
   }
 }
