@@ -674,14 +674,16 @@ test("runAttempt: исключение записи cleanup не стирает 
   await mkdir(path.join(out, "cleanup.json"), { recursive: true })
   const run = await runAttempt({ config, command: agentCommand(config),
     source: { kind: "dir", dir: path.join(evalsRoot, "fixtures/storage") }, task,
-    attempt: 1, runId: "write-error", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: false })
+    expectedSkillDigest: "a".repeat(64), attempt: 1, runId: "write-error", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: false })
   expect(run.result.status).toBe("no_artifact")
   expect(run.result.tokens.input).toBe(400)
   expect(run.result.session_id).toBe("ses_fixture03")
   expect(run.result.environment_cleanup?.status).toBe("failed")
   expect(run.stop).toBe(true)
   expect(await Bun.file(path.join(out, "run.json")).exists()).toBe(true)
-  expect(await Bun.file(path.join(out, "result.json")).json()).toEqual(run.result)
+  const saved = await Bun.file(path.join(out, "result.json")).json()
+  expect(saved.skill_audit).toBe("not_observed")
+  expect(saved).toEqual(run.result)
 })
 
 test("main: summary фиксирует переданный variant и эффективный лимит задачи", async () => {
