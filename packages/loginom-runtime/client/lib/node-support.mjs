@@ -104,7 +104,6 @@ export function createCandidateNodeSupport(config) {
  const variables0={variables:[0]},control0={control:true},noVariableInputs={};
  const variableInputsByType=new Map([
   ['transform.calculator',variables0],
-  ['programming.javascript',variables0],
   ['imports.text',variables0],
   ['imports.excel',variables0],
   ['imports.lgd',variables0],
@@ -122,7 +121,7 @@ export function createCandidateNodeSupport(config) {
   ['control.condition',{variables:[0],modes:['variable_branch']}],
  ]);
  for(const [type,handler] of nodeApplyHandlers)
-  nodeApplyHandlers.set(type,{...handler,variable_inputs:variableInputsByType.get(type)??noVariableInputs});
+  nodeApplyHandlers.set(type,{...handler,variable_inputs:handler.variable_inputs??variableInputsByType.get(type)??noVariableInputs});
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||nodeApplyHandlers.get(type)?.unchangedExecution?.(options.operation.parameters)===true||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));

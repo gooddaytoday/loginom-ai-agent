@@ -217,35 +217,40 @@ test('LGD export requires the matching variables link for a new destination bind
  const settings={compression:'lz4',checksum:'none',overwrite:'reject'};
  const r=admissionRequest('exports.lgd','native',{lgd_export:{...settings,bindings:{destination:{variable:'Path'}}}});
  const link={source:inputSource,output:0,kind:'variables',input:0};
- for(const variable_inputs of [undefined,[],[{...link,kind:'control'}],[{...link,input:1}]]){
-  const candidate=variable_inputs===undefined?r:{...r,variable_inputs};
+ for(const candidate of [r,{...r,variable_inputs:[]}]){
   await assertAdmissionRefusal(candidate,/destination binding requires variables input 0/);
  }
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers));
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers));
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,kind:'control'}]},
+  /Invalid parameters\.variable_inputs: Unsupported control input 0/);
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,input:1}]},
+  /Invalid parameters\.variable_inputs: Unsupported variables input 1/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers,{fresh:true}));
  const literal={lgd_export:{...settings,destination:'/test-2/output.lgd'}};
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers,{fresh:true}));
 });
 
 for(const [operator,operand] of [['>','value'],['in','values']])test('new filter requires a control link for a variable '+operand+' before target',async()=>{
  const condition={field:{kind:'input_field',name:'Amount'},type:'integer',operator,[operand]:{kind:'variable',name:'Limit'}};
  const r=admissionRequest('transform.filter_data','conditions',{groups:[[condition]]});
  const link={source:inputSource,output:0,kind:'control',input:0};
- for(const variant of [r,{...r,variable_inputs:[],bindings:[]},{...r,variable_inputs:[{...link,kind:'variables'}]}]){
+ for(const variant of [r,{...r,variable_inputs:[],bindings:[]}]){
   await assertAdmissionRefusal(variant,/filter variable operands require control input 0/);
  }
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers));
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers));
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,finish:'close'},admissionHandlers));
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,kind:'variables'}]},
+  /Invalid parameters\.variable_inputs: Unsupported variables input 0/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,finish:'close'},admissionHandlers,{fresh:true}));
  const literal={groups:[[{...condition,[operand]:operand==='value'?5:[5]}]]};
- assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers,{fresh:true}));
 });
 
 test('new filter with explicit bindings remains admissible with a control link',()=>{
  const r=admissionRequest('transform.filter_data','conditions',{groups:[[{field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>'}]]});
  r.bindings=[{parameter:'/groups/0/0/value',variable:{kind:'control',input:0,name:'Limit'}}];
  r.variable_inputs=[{source:inputSource,output:0,kind:'control',input:0}];
- assert.doesNotThrow(()=>validateNodeApplyRequest(r,admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,admissionHandlers,{fresh:true}));
 });
 
 for(const [type,mode,parameters] of [
