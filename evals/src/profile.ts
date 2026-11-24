@@ -18,7 +18,10 @@ const passwordMatches = (view: View, expected?: boolean) => view.hasPassword ===
 const connectionConfigured = (view: View, expected?: boolean) => passwordMatches(view, expected) &&
   (typeof view.hasPassword === "boolean" || view.hasApiKey === true)
 
+const migrationMarker = "loginom/connection/v040-migration.json"
+
 const retainedProfileFiles = new Set([
+  migrationMarker,
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
   "config/config.json", "config/.gitignore", "loginom/connection/connection.json", "cache/models.json", "state/model.json",
 ])
@@ -30,6 +33,8 @@ export async function profileHistory(profile: string, directory = profile): Prom
     const relative = path.relative(profile, file)
     if (retainedProfileFiles.has(relative)) {
       if (!entry.isFile() || entry.isSymbolicLink()) throw new EvalFailure("Постоянный файл профиля не является обычным файлом", 2)
+      if (relative === migrationMarker && (await Bun.file(file).json())?.state !== "complete")
+        throw new EvalFailure("Профиль имеет незавершённую миграцию; перенос/admission запрещён", 2)
       return []
     }
     if ([...retainedProfileFiles].some((name) => name.startsWith(relative + "/"))) {

@@ -10,6 +10,7 @@ import { agentCommand } from "../src/cli"
 import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, setupProfile, verifyProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
+import { connectionStore } from "../../packages/loginom-host/src/connection/connection-store"
 import { Database } from "bun:sqlite"
 
 test("management: binary commands explicitly select headless execution", async () => {
@@ -161,6 +162,41 @@ async function sharedAuthFixture() {
   const base = agentCommand(config, { PATH: process.env.PATH })
   return { root, config, receipt, calls, command: { ...base, env: { ...base.env, EVAL_FAKE_SHARED_AUTH_RECEIPT: receipt, EVAL_FAKE_SHARED_AUTH_CALLS_FILE: calls } } }
 }
+
+test("archiveProfileHistory: reopening a migrated profile preserves the explicit connection", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-migrated-"))
+  const profile = path.join(dir, "profile")
+  const directory = path.join(profile, "loginom/connection")
+  try {
+    const store = connectionStore(directory)
+    const record = { generation: 1, revision: 1, url: "https://fixture.example/app/", urlSource: "explicit" as const,
+      username: "fixture", apiKey: "", password: "" }
+    await store.stage(record)
+    await store.activate(1)
+    const archive = await archiveProfileHistory(profile, "attempt")
+    const reopened = connectionStore(directory)
+    await reopened.initialize()
+    expect(await reopened.read()).toEqual(record)
+    expect(await Bun.file(path.join(archive, "loginom/connection/generations/1.json")).exists()).toBe(true)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("archiveProfileHistory: interrupted migration finishes removing the old generation before archiving", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-resetting-"))
+  const profile = path.join(dir, "profile")
+  const directory = path.join(profile, "loginom/connection")
+  try {
+    const store = connectionStore(directory)
+    await store.stage({ generation: 1, revision: 1, url: "https://old.example/app/", username: "fixture", apiKey: "", password: "" })
+    await writeFile(path.join(directory, "v040-migration.json"), JSON.stringify({ state: "resetting" }))
+    await expect(archiveProfileHistory(profile, "blocked")).rejects.toThrow("незавершён")
+    expect(await store.staged(1)).toBeDefined()
+    const reopened = connectionStore(directory)
+    await reopened.initialize()
+    expect(await reopened.staged(1)).toBeUndefined()
+    await archiveProfileHistory(profile, "complete")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
 
 test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
