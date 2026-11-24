@@ -8,7 +8,7 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
-import {importBindingSchema,prepareImportBinding,settleImportBindingBeforeTarget} from '../lib/import-bindings.mjs';
+import {prepareImportBinding,settleImportBindingBeforeTarget} from '../lib/import-bindings.mjs';
 import {actions} from './support/executor-fixture.mjs';
 import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -696,7 +696,7 @@ for(const changedGraph of [false,true])test('inactive Import binding source afte
   return {...drivers,beforeTarget:ctx=>prepareImportBinding(importOptions,ctx,config),
    settleBeforeTarget:(receipt,ctx)=>settleImportBindingBeforeTarget(importOptions,ctx,config,receipt)};
  }});
- f.handler.binding_schema=importBindingSchema;
+ f.handlers.set('imports.text',admissionHandlers.get('imports.text'));
  f.graph.interaction_ready=true;
  f.graph.nodes.push({ref:source,type:'variables.user',inputs:[],outputs:[],locked:false,
   variable_outputs:[{kind:'variables',port:4,port_guid:'vars-out'}]});
@@ -704,6 +704,14 @@ for(const changedGraph of [false,true])test('inactive Import binding source afte
  f.adapter.verifyWorkflow=async()=>({...ownedWorkflow,effect_possible:false});
  f.adapter.activateWorkflow=async()=>({...ownedWorkflow,effect_possible:true});
  const r={...request(),variable_inputs:[{source,kind:'variables',input:0,output:4}],
+  parameters:{
+   source:{kind:'verified_delivery',artifact_id:'registry',upload_operation_id:'registry-upload'},
+   settings:{
+    source:{encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+    format:{delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},
+    columns:[{name:'Id',label:'Id',type:'integer',data_kind:'Непрерывный',used:true}],
+   },
+  },
   bindings:[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'RegistryPath'}}]};
  await f.runtime.startNodeApply(r);
  const job=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});

@@ -38,6 +38,8 @@ for(const [name,args,path,hint] of [
   {variable_inputs:[variable()]}),'variable_inputs',/control input 0/],
  ['variable input on a table-only node',request('transform.reform_columns','scalar',{changes:[]},
   {variable_inputs:[variable()]}),'variable_inputs',/accepts no variable inputs/],
+ ['database import with a variable input',request('imports.database','table',{},
+  {inputs:[],variable_inputs:[variable()]}),'variable_inputs',/accepts no variable inputs/],
  ['unsupported mapping port',calculator({mappings:[mapping('variables',1)]}),'mappings',/variables input 0/],
  ['new mapping without its connection',calculator({mappings:[mapping()]}),'mappings',/Add.*variable_inputs.*variables input 0/],
  ['handler refusal for typed mapping',request('variables.replace','exact',{},{
@@ -107,7 +109,25 @@ for(const [name,args] of [
  ['REST variable header',request('integration.rest_request','request',{
   connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[],headers:[{name:'X-Case',value:{variable:'Header'}}],
  },{finish:'execute',variable_inputs:[variable()],mappings:[mapping()]})],
- ['import path binding',boundText],
+ ['text import path binding',boundText],
+ ['Excel import path binding',request('imports.excel','xlsx',{
+  source:{kind:'storage',server_source_ref:'workbook'},
+  excel:{header_rows:1,columns:[{name:'Id',label:'Id',type:'integer'}]},
+ },{inputs:[],bindings:[{...pathBinding,parameter:'/excel/source_path'}],variable_inputs:[variable()]})],
+ ['LGD import path binding',request('imports.lgd','native',{
+  source:{kind:'storage',server_source_ref:'lgd-file'},
+  lgd_import:{checksum:'verify',bindings:{source_path:{variable:'Path'}}},
+ },{inputs:[],variable_inputs:[variable()]})],
+ ['text export filename binding',request('exports.text','delimited',{
+  file_name_variable:{kind:'variable',name:'Path'},encoding:'UTF-8',delimiter:';',header:'names',
+  bom:false,line_ending:'LF',decimal_separator:'.',null_marker:'',text_qualifier:'"',
+ },{variable_inputs:[variable()]})],
+ ['Excel export workbook and sheet bindings',request('exports.excel','xlsx',{
+  excel_export:{header:'names',overwrite:'reject',bindings:{destination:{variable:'Path'},sheet_name:{variable:'Sheet'}}},
+ },{variable_inputs:[variable()]})],
+ ['LGD export destination binding',request('exports.lgd','native',{
+  lgd_export:{compression:'lz4',checksum:'none',overwrite:'reject',bindings:{destination:{variable:'Path'}}},
+ },{variable_inputs:[variable()]})],
  ['filter control port',request('transform.filter_data','conditions',{
   groups:[[{field:field('Id'),operator:'>',type:'integer',value:{kind:'variable',name:'Limit'}}]],
  },{variable_inputs:[variable('control')],mappings:[mapping('control')]})],
