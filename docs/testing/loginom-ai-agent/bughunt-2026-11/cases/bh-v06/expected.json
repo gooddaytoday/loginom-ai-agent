@@ -1,0 +1,65 @@
+{
+  "nodes": [
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "imports.text"
+    }
+  ],
+  "binding_inventory": [
+    {
+      "node": {
+        "type": "imports.text"
+      },
+      "parameter": "/settings/source/source_path",
+      "mode": "variable",
+      "variable": {
+        "kind": "variables",
+        "input": 0,
+        "name": "RegistryPath",
+        "type": "string",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.user",
+        "output": 4
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "export_destination": "bh-v06-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Ticket",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Ticket": 103,
+          "Amount": 5
+        },
+        {
+          "Ticket": 101,
+          "Amount": 11
+        },
+        {
+          "Ticket": 104,
+          "Amount": 0
+        }
+      ]
+    }
+  ]
+}

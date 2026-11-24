@@ -1,0 +1,15 @@
+{
+  "budget": {
+    "max_tool_calls": 45,
+    "max_errors": 3,
+    "max_nodes": 4,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "pandas",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Минимум создаваемых узлов с выгрузкой CSV: 4. Минимум включает обработку JSON-ответа. В HTTP-запросе только синтетические тестовые данные."
+}

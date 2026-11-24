@@ -1,0 +1,97 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "transform.calculator"
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "Surcharge",
+            "type": "integer",
+            "value": 7,
+            "label_any": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.calculator"
+        },
+        "input": 0,
+        "kind": "variables"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.calculator",
+      "output_port": 0,
+      "export_destination": "bh-v01-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Ticket",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Payable",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Ticket": 103,
+          "Amount": 5,
+          "Payable": 12
+        },
+        {
+          "Ticket": 101,
+          "Amount": 11,
+          "Payable": 18
+        },
+        {
+          "Ticket": 104,
+          "Amount": 0,
+          "Payable": 7
+        },
+        {
+          "Ticket": 102,
+          "Amount": 8,
+          "Payable": 15
+        },
+        {
+          "Ticket": 105,
+          "Amount": 6,
+          "Payable": 13
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "budget": {
+    "max_tool_calls": 45,
+    "max_errors": 3,
+    "max_nodes": 3,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "pandas",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Минимум создаваемых узлов с выгрузкой CSV: 3."
+}
