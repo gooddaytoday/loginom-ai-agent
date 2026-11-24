@@ -699,3 +699,31 @@ for(const fault of ['lost','node_id','covered'])test('A2 a failure after viewpor
  await assert.rejects(openManagedJavascriptExistingWizard(f.args),error=>{assert.equal(error.nodePhaseRefusal,undefined);return true;});
  assert.ok(f.calls.includes('reveal'));
 });
+
+// Review of #1318: viewport navigation is a gesture. After a successful reveal,
+// a later capture, body-code or pre-click body refusal never reports an
+// opening with no effect; the same refusals of a visible node still do.
+for(const offscreen of [true,false])for(const fault of ['capture','bodyCode','bodyRefused'])
+test('reveal before a '+fault+' refusal '+(offscreen?'keeps the opening uncertain':'of a visible node has no effect'),async()=>{
+ const calls=[],tid='MF;TF-1;Graph;JS';let navigated=!offscreen;
+ const channel={
+  observe:async({ready})=>{calls.push('observe');
+   const state={prepared_node_context:{...node,verified:true,surface:'graph',tid,locked:false},wizard:{status:'absent'},
+    ui:{elements:[{tid,graph_node:{part:'body'},interaction:navigated?{state:'point_observed',point:{x:500,y:250}}:{state:'outside_viewport',point:null}}]}};
+   assert.ok(ready(state));return state;},
+  revealGraphNode:async()=>{calls.push('reveal');navigated=true;}};
+ const modes=[],refused=bodyRefusalExecute({modes});
+ const execute=async code=>{
+  const mode=code.match(/"mode":"(\w+)"/)?.[1];
+  if(mode==='capture'&&fault==='capture'){modes.push('capture');throw Error('lost capture reply');}
+  if(mode==='capture'&&fault==='bodyCode'){modes.push('capture');return {ready:false,blocked:true,node_tid:tid,dom_replacements:0};}
+  return refused(code);
+ };
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',channel,execute,
+  record:async e=>e,receiptOptions:()=>({})}),error=>{
+   if(offscreen)assert.equal(error.nodePhaseRefusal,undefined);
+   else assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+   return true;});
+ assert.deepEqual(calls,offscreen?['observe','reveal','observe']:['observe']);
+ assert.deepEqual(modes,{capture:['capture'],bodyCode:['capture','dispose'],bodyRefused:['capture','body','dispose']}[fault]);
+});

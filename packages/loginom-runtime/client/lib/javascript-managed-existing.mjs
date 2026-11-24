@@ -16,8 +16,11 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     owner: {document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id},
     workflow_ref: {tab_tid: prepared.workflow_ref.tab_tid, prefix: prepared.workflow_ref.prefix},
     targetOrigin, targetBuild: '7.4.2', deadline};
+  // Viewport navigation is a gesture: once it ran, no later refusal of this
+  // opening can claim that it had no effect.
+  let navigated = false;
   const noEffect = error => {
-    error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+    if (!navigated) error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
     return error;
   };
   let graph, context;
@@ -33,6 +36,7 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
   } catch(error) { throw noEffect(error); }
   const body=graph.ui?.elements?.filter(element=>element.tid===context.tid&&element.graph_node?.part==='body')??[];
   if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+    navigated = true;
     await channel.revealGraphNode();
     if(Date.now()>=deadline)throw Error('Managed JavaScript existing opening deadline expired');
     const revealed=await channel.observe({condition:'owned existing JavaScript graph revealed before capture',
