@@ -4294,6 +4294,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 && operation.targetPhase?.effect_possible===false && !operation.targetPhase?.pending){
                 if(preflight?.effect_possible!==true)
                   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+                else if(preflight.verified===true&&preflight.cleanup_complete===true&&preflight.settings_changed===false
+                  &&typeof operation.nodeApplyDrivers.refuseUnappliedTarget==='function')
+                  await operation.nodeApplyDrivers.refuseUnappliedTarget(ctx,error.message);
                 else if(preflight.verified===true && preflight.cleanup_complete===true && preflight.settings_changed===false
                   && ['missing_values_preflight_completed','crosstable_preflight_completed'].includes(preflight.target_refusal?.verification))
                   // Source inspection has a known activity effect, but no

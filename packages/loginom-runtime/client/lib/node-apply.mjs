@@ -345,9 +345,15 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
+      if(name==='target'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===false
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&!operation.transportUncertain
+        &&verifiedJavascriptExistingSchemaRefusal(refusal,request)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+      }
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
-          ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending
-          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal||regressionRefusal)
+          ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
+          ||replacementRefusal||regressionRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
       ){
@@ -668,7 +674,8 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         :{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The original operation remains unsuccessful. Correct the request and use a NEW operation_id with target:'
           +JSON.stringify(proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target)
-          +'. '+(proof.node?'The partial target was found; do not recreate it. Supply complete intended settings and complete intended inputs, preserving all observed existing links.':'This operation did not create its target.')
+          +'. '+(proof.node&&request.target.type==='programming.javascript'?javascriptDraftRecoveryInstruction(request)
+            :proof.node?'The partial target was found; do not recreate it. Supply complete intended settings and complete intended inputs, preserving all observed existing links.':'This operation did not create its target.')
           +' Source/preflight effects are not undone; no settings, output or package persistence are verified by release.'}};
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
       phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
@@ -723,7 +730,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       :{tool:'dock_node_apply',original_operation_id:operation.id,
       instruction:'Configuration: '+configuration.status+'. Execution: '+execution.status+'. Do not recreate the node and do not resume this released operation. To continue with this node, submit a NEW operation_id with target:'
         +JSON.stringify({kind:'existing',type:request.target.type,ref:state.node})
-        +(request.target.type==='transform.cross_table'
+        +(javascriptDraft?'. '+javascriptDraftRecoveryInstruction(request):request.target.type==='transform.cross_table'
           ?' and inputs:'+JSON.stringify(request.inputs)+(request.inputs.length
             ?' (reuse the same input-zero source/output), supplying the complete intended CrossTable settings'
             :' and parameters:{} to execute the retained CrossTable configuration. To change roles or facts, supply complete settings and one explicit input zero from the observed source/output')
@@ -743,4 +750,9 @@ function correctNodeRequest(request,node,exportConflict=false) {
       +JSON.stringify({kind:'existing',type:request.target.type,ref:node})
       +'. Preserve the existing graph and source receipts. Do not recreate the node or inspect an unknown effect: no effect is unresolved.'
       +(exportConflict?' The existing destination file was preserved by overwrite:"reject". Choose parameters.destination allowed by the task, or use parameters.overwrite:"replace" with an explicit destination ONLY if the user authorized replacement of that file. Otherwise retain reject and report the path conflict; do not invent a different required path. finish:"done" still checks destination conflicts and does not verify file export. Do not restore an older destination unless the task requires it.':'')};
+}
+
+function javascriptDraftRecoveryInstruction(request) {
+  return 'Inspect the saved source with dock_node_read kind:"source" on this node. To replace the source, send source_text and the verified expected_source_sha256. For an unconfigured JavaScript node, supply the intended schema_mode and all columns in declared mode. Keep mappings:[] and retain the original input_state when supplied. Keep existing table links with inputs:[] or supply the intended input if still missing.'
+    +(request.variable_inputs?.length?' For an unconfigured variable-only node, identify the same variable source and port with variable_inputs:'+JSON.stringify(request.variable_inputs)+'.':'');
 }
