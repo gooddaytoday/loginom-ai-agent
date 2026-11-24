@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 50,
+    "max_errors": 4,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "convert ",
+      "curl ",
+      "wget ",
+      "expected.json",
+      "oracle.py"
+    ]
+  },
+  "notes": "Минимум узлов с итоговым экспортом: 1. Гипотеза текста ошибки Timeout; при расхождении отличить ошибку oracle от дефекта продукта. Нативный REST может вернуть ошибку строки, а не ошибку узла."
+}
