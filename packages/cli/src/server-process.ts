@@ -171,6 +171,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           },
           // Loginom AI Agent loads built-in server plugins only (В-80); there is no switch.
           pluginPackages: false,
+          // Loginom AI Agent (В-100): as in 0.4, a turn cut off by a crash or a stop is not continued at start; the
+          // user continues it. Background shell commands and subagents still recover as in OpenCode 2.
+          resumeTurns: false,
           fs: {
             filewatcher: !truthy(process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER),
             fff:

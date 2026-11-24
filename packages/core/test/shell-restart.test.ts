@@ -74,7 +74,7 @@ const world = Effect.gen(function* () {
   const spawns: ChildProcess.Command[] = []
   // A server: the whole app on the shared pieces, torn down when its scope closes. The daemon comes first, as in the
   // server's routes, so it is released after the sessions and jobs.
-  const server = (scope: Scope.Scope) =>
+  const server = (scope: Scope.Scope, restart?: SessionRestart.Options) =>
     Layer.buildWithScope(
       AppNodeBuilder.build(
         LayerNode.group([
@@ -94,6 +94,7 @@ const world = Effect.gen(function* () {
           Watcher.node.replace(Watcher.configured({ enabled: false })),
           offlineModels,
           model,
+          SessionRestart.node.replace(SessionRestart.configured(restart)),
         ],
       ),
       scope,
@@ -202,6 +203,83 @@ describe("shell commands across a graceful restart", () => {
           yield* resumed.wait(session.id)
         }),
     )
+
+  // `resumeTurns: false` (the Loginom AI Agent server, В-100): the command is recovered as above, but the turn is left to
+  // the user: no restart notice, no model request, the session ends interrupted until a prompt continues it.
+  it.live("watches the command but leaves the turn interrupted when turns do not resume", () =>
+    Effect.gen(function* () {
+      const { daemon, llm, project, server } = yield* world
+      let turns = 0
+      yield* llm.serve((request) =>
+        request.tools.some((tool) => tool.name === "shell") && turns++ === 0
+          ? TestLLM.toolCall("call-left", "shell", { command: idleCommand })
+          : TestLLM.text("Done", "done"),
+      )
+
+      const first = yield* Scope.make()
+      const one = yield* server(first)
+      const sessions = Context.get(one, Session.Service)
+      const session = yield* sessions.create({
+        location: { directory: AbsolutePath.make(project) },
+        agent: Agent.ID.make("build"),
+        model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+        permissions: terminal,
+      })
+      yield* Plugin.Service.use((plugins) => plugins.awaitActivation).pipe(
+        Effect.provide(Context.get(one, LocationServiceMap.Service).get(session.location)),
+      )
+      yield* sessions.prompt({ sessionID: session.id, text: "run it" })
+      yield* until(() => daemon.processes.length === 1 && daemon.waiters(daemon.processes[0]!.id) > 0)
+      const command = daemon.processes[0]!
+      expect(yield* Context.get(one, PersistentPty.Service).handoff()).not.toBeNull()
+      yield* Scope.close(first, Exit.void)
+
+      const second = yield* Scope.make()
+      yield* Effect.addFinalizer(() => Scope.close(second, Exit.void))
+      const two = yield* server(second, { resumeTurns: false })
+      const left = Context.get(two, Session.Service)
+      yield* Context.get(two, SessionRestart.Service).resumeSuspendedSessions
+
+      // The call is settled as moved to the background and the command is watched again, as with resumed turns.
+      const shellID = String(command.pipe?.metadata.id)
+      expect(yield* shellCall(left, session.id)).toMatchObject([
+        {
+          id: "call-left",
+          state: {
+            status: "completed",
+            content: [
+              { type: "text", text: expect.stringContaining(`Command moved to the background (shell ID: ${shellID})`) },
+              {},
+            ],
+          },
+        },
+      ])
+      // The turn is not continued: one model request, no restart notice, the session is interrupted.
+      expect(turns).toBe(1)
+      expect((yield* left.get(session.id)).outcome).toBe("interrupted")
+      const messages = yield* left.context(session.id)
+      expect(
+        messages.filter((message) => message.type === "synthetic" && message.metadata?.notice === "restart"),
+      ).toEqual([])
+      expect(messages.at(-1)).toMatchObject({ type: "idle", outcome: "interrupted" })
+
+      // The user continues it.
+      yield* left.prompt({ sessionID: session.id, text: "continue" })
+      yield* until(() => turns >= 2)
+      yield* left.wait(session.id)
+      expect((yield* left.get(session.id)).outcome).toBe("succeeded")
+
+      // The watched command still reports its end to the session, which wakes it as in OpenCode 2.
+      daemon.exit(command.id, 0)
+      const notices = Effect.map(left.context(session.id), (messages) =>
+        messages.filter((message) => message.type === "synthetic" && message.metadata?.source === "shell"),
+      )
+      while ((yield* notices).length === 0) yield* Effect.sleep(5)
+      expect((yield* notices)[0]).toMatchObject({ metadata: { shellID, state: "completed" } })
+      yield* until(() => turns >= 3)
+      yield* left.wait(session.id)
+    }),
+  )
 
   // Without a handoff nothing takes the commands over: the shutdown stops them, while the daemon is still reachable.
   for (const starting of [false, true])
