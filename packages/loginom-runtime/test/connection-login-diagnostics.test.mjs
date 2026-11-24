@@ -26,7 +26,7 @@ test("successful login separates network, form, credentials and server response 
     assert.ok(!JSON.stringify(phases).includes(secret))
 })
 
-function fixture(failure, error, authenticated = false) {
+function fixture(failure, error, authenticated = false, rejected = false) {
   const calls = []
   let loggedIn = authenticated
   const run = async (phase, action, value) => {
@@ -48,6 +48,12 @@ function fixture(failure, error, authenticated = false) {
     waitFor: async options => { assert.deepEqual(options, {state:"visible",timeout:30000}); await run("submit", "wait") },
   }
   const page = {
+    waitForFunction: async (_fn, arg, options) => {
+      assert.equal(arg, null)
+      assert.deepEqual(options, {timeout:30000})
+      if (!rejected) await run("submit", "wait")
+      return { jsonValue: async () => rejected ? "rejected" : "authenticated", dispose: async () => {} }
+    },
     goto: async (url, options) => { assert.equal(url, "https://example.test/app/?opaque=private-query&testable=true#private-fragment")
       assert.deepEqual(options, {waitUntil:"domcontentloaded",timeout:60000}); await run("goto", "navigate") },
     locator: selector => selector.includes("btnAvatar") ? avatar : field(selector),
@@ -62,7 +68,7 @@ function fixture(failure, error, authenticated = false) {
 for (const [failure, code] of [
   ["goto:navigate", "LOGINOM_LOGIN_UNAVAILABLE"], ["form:wait", "LOGINOM_LOGIN_UNAVAILABLE"],
   ["form:visible", "LOGINOM_LOGIN_UNAVAILABLE"], ["submit:fill", "LOGINOM_LOGIN_UNAVAILABLE"],
-  ["submit:click", "LOGINOM_LOGIN_UNAVAILABLE"], ["submit:wait", "LOGINOM_LOGIN_REJECTED"],
+  ["submit:click", "LOGINOM_LOGIN_UNAVAILABLE"], ["submit:wait", "LOGINOM_LOGIN_UNAVAILABLE"],
   ["identity:read", "LOGINOM_LOGIN_UNAVAILABLE"], ["identity:mismatch", "LOGINOM_ACCOUNT_MISMATCH"],
 ]) test("login diagnostic retains the failed phase without retry: " + failure, async () => {
   const original = Object.assign(Error("socket failed net::ERR_CONNECTION_RESET"), { name:"TimeoutError", code:"ECONNRESET" })
@@ -84,6 +90,16 @@ for (const [failure, code] of [
   assert.equal(f.calls.filter(call => call.phase === "goto").length, 1)
   assert.ok(f.calls.filter(call => call.action === "click").length <= 1)
   assert.ok(f.calls.every(call => ["goto","form","submit","identity"].indexOf(call.phase) <= ["goto","form","submit","identity"].indexOf(failure.split(":")[0])))
+})
+
+test("an observed login form error remains rejected without retaining its text", async () => {
+  const f = fixture("submit:wait", Object.assign(Error("avatar timeout"), { name: "TimeoutError" }), false, true)
+  await assert.rejects(loginPage(f.page, candidate), error => {
+    assert.equal(error.message, "LOGINOM_LOGIN_REJECTED")
+    assert.equal(error.cause.login.phase, "submit")
+    assert.equal(error.cause.login.original_name, "Error")
+    return true
+  })
 })
 
 test("login failure strips query, fragment, userinfo, credentials and authorization before retaining text", async () => {
