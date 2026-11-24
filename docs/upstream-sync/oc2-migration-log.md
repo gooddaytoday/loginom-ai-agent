@@ -18886,12 +18886,14 @@ skill/index.ts}`. v2 — `cli/src/{server-process,update-notifier}.ts`, `cli/src
 
 | Коммит | Что |
 |---|---|
-| `e342c69f17` `feat(cli): built-in product defaults and network mode of the server (B2.8)` | `cli/src/server-process.ts` (+10 −6), новый файл форка `cli/src/network-mode.ts` (+31), `cli/src/update-notifier.ts` (+3); тесты `cli/test/network-mode.test.ts` (новый), `cli/test/update-notifier.test.ts` (+18) |
+| `e342c69f17` `feat(cli): built-in product defaults and network mode of the server (B2.8)` | `cli/src/server-process.ts` (+10 −6; с `f947dc0ce8` — +12 −6), новый файл форка `cli/src/network-mode.ts` (+31), `cli/src/update-notifier.ts` (+3); тесты `cli/test/network-mode.test.ts` (новый), `cli/test/update-notifier.test.ts` (+18) |
 | `d3381ff11a` `docs(upstream-sync): describe the built-in product defaults in the catalog (B2.8)` | `catalog.json`: CAT-08 `pending` — `B2.7` вместо `B2.7, B2.8`; `catalog.md`: CAT-07 (компоненты, проверка, политика), CAT-08 |
 | `2d35baa09b` `test(cli): check .claude skills in both network mode cases and spawn one server less (B2.8)` | проверка `.claude` перенесена в оба случая с каталогом, отдельный сервер для неё убран (skill `unit-tests`: один-два подпроцесса на файл); в случае S6 — проверка результата `todowrite` |
-| следующий | этот раздел |
+| `75b1258634` `docs(upstream-sync): record the built-in product config and network mode (B2.8)` | этот раздел (первая версия) |
+| `f947dc0ce8` `fix(cli): read the network mode from the config directory the server reads (B2.8)` | `server-process.ts` (+5 −3): режим читается из каталога `LOGINOM_AI_AGENT_CONFIG_DIR` после сохранённого окружения службы — ниже, «Служба» |
+| следующий | этот раздел: служба, итоговые прогоны; CAT-07 — +12 −6 |
 
-Файлов кода три (предел — пять); правка upstream одна — `server-process.ts`, он уже в CAT-07.
+Файлов кода три (предел — пять); правка upstream одна — `server-process.ts` (итого +12 −6), он уже в CAT-07.
 
 ### Что было в 0.4
 
@@ -18920,9 +18922,10 @@ skill/index.ts}`. v2 — `cli/src/{server-process,update-notifier}.ts`, `cli/src
   равнозначно `LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE=1`. `.agents` по-прежнему читается (B2.4, В-41). Умолчание библиотеки
   `@opencode/server` не менялось: S3 в `server/test/loginom-access.test.ts` по-прежнему проверяет самозванцев в `.claude`
   через опции сервера.
-- **Режим сети — ключ `network` глобального конфига продукта**: `<global.config>/loginom-ai-agent.json(c)`. Это тот же
+- **Режим сети — ключ `network` глобального конфига продукта**: `<каталог конфига>/loginom-ai-agent.json(c)`. Это тот же
   файл, который ядро читает как глобальный конфиг пользователя и пишут настройки: у службы Desktop —
-  `$XDG_CONFIG_HOME/loginom-ai-agent[-канал]`, у профиля CLI — `<профиль>/config`. Значения взяты из плана A:
+  `$XDG_CONFIG_HOME/loginom-ai-agent[-канал]`, у профиля CLI — `<профиль>/config`. Каталог — тот, что получает сервер:
+  `LOGINOM_AI_AGENT_CONFIG_DIR` после сохранённого окружения службы, иначе `global.config` (`f947dc0ce8`, ниже). Значения взяты из плана A:
   `"online"` — «Интернет», по умолчанию (В-32); `"device"` — «Только этот компьютер». Ключ читает файл форка
   `cli/src/network-mode.ts`, так же как обновлятор CLI читает `update` (`services/updater.ts`, `decodePolicy`: настройка
   машины без графа конфига location). Ядро чужой ключ молча отбрасывает (`config/normalize.ts`,
@@ -19019,6 +19022,9 @@ $ … bun test --timeout 60000 test/update-notifier.test.ts
 tree clean
 ```
 
+На `f947dc0ce8` M1–M4 повторены: те же 2 pass / 2 fail с теми же именами; после прогона в `git status` только этот
+раздел и `catalog.md`. Возврат `f947dc0ce8` (режим снова из `global.config`) тесты не ловят — только проба службы выше.
+
 На первой версии теста M6 остался зелёным: битый `.jsonc` лежал поверх `.json` со значением `device`, и `findLast`
 давал тот же ответ. Случай переписан (`.json` — `online`), M6 краснит.
 
@@ -19051,6 +19057,26 @@ $ unshare -n sh -c '. toolchain.sh && ip link set lo up && (bun scripts/s6.ts de
 0); доказательство для `device` — 0 DNS-запросов против 24 в контроле. Короткий прогон (простой 5 с) дал то же: `device` —
 0 и 0, `online` — `models.opencode.ai` × 12.
 
+**Служба.** Тесты и прогон выше запускают `serve --port 0` (передний план). Тот же S6 повторён как служба:
+`serve --service` из исходников, без Desktop, пароль — из `service-local.json` службы, простой 5 с, каждый прогон в своём
+`unshare -n`. Третий вариант — сохранённое окружение службы (`env` в `service-local.json`) переносит
+`LOGINOM_AI_AGENT_CONFIG_DIR` в другой каталог, где и лежит ключ `network`. На `2d35baa09b` этот вариант открывал сеть:
+`server-process.ts` читал режим из `global.config`, собранного до подстановки сохранённого окружения, а сервер и ядро —
+из нового каталога. Исправлено в `f947dc0ce8`: режим читается из того же каталога, что получает сервер.
+
+| Запуск | Код | Режим | Соединения вне loopback | DNS-запросы | Модели `opencode/*` |
+|---|---|---|---|---|---|
+| `serve --service` | `2d35baa09b` | `device` | 0 | 0 | 0 |
+| `serve --service` | `2d35baa09b` | `online` | 0 | `models.opencode.ai` × 12 | 9 |
+| служба, ключ в каталоге из сохранённого окружения | `2d35baa09b` | `device` | 0 | `models.opencode.ai` × 12 | 9 — **утечка** |
+| служба, ключ в каталоге из сохранённого окружения | `f947dc0ce8` | `device` | 0 | 0 | 0 |
+| служба, ключ в каталоге из сохранённого окружения | `f947dc0ce8` | `online` | 0 | `models.opencode.ai` × 12 | 9 |
+| `serve --service` | `f947dc0ce8` | `device` | 0 | 0 | 0 |
+
+Во всех шести прогонах ход прошёл (`todowrite` в истории), выход — `exited 143`. Случай с сохранённым окружением
+проверен только пробой: автоматического теста нет (служба в тесте — фиксированный порт и файл регистрации, это ещё один
+тяжёлый подпроцесс).
+
 ### Приёмка
 
 Полные прогоны (`<scratchpad>/b28/scripts/suites.sh`): база — `2138b90108` в `<scratchpad>/b28/base`, итог — это дерево на
@@ -19070,6 +19096,9 @@ $ unshare -n sh -c '. toolchain.sh && ip link set lo up && (bun scripts/s6.ts de
 на обоих — `ShellParse > extracts static directory targets…`, `util.effect-flock > fails on unwritable lock roots`,
 `util.flock > fails clearly on unwritable lock roots` (прогон под root), как в прежних разделах.
 После `2d35baa09b` (менялся только тест) `cli` повторён целиком: 601 pass (+6 новых: 4 в `network-mode`, 2 в `update-notifier`), 9 skip, 0 fail.
+После `f947dc0ce8` (одно выражение в `server-process.ts`) `cli` повторён целиком ещё раз: 601 pass, 9 skip, 0 fail;
+`bun typecheck` `cli` — 0 ошибок; `bun run check` — код 0 (ниже — этот прогон). `server`, `core`, `loginom-agent` от
+`server-process.ts` не зависят и после правки не повторялись.
 
 ```text
 $ cd packages/cli && bun typecheck
@@ -19080,7 +19109,7 @@ against a6b15d33daf6: 609 divergent upstream files                    # как �
   CAT-08: 0 (pending: B2.7)
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                                 # код 0
-$ bun run check                                   # код 0, на 2d35baa09b, под unshare -n
+$ bun run check                                   # код 0, на f947dc0ce8 (и на 2d35baa09b), под unshare -n
 Found 905 warnings and 0 errors.                  # как в B2.7a10b; в изменённых файлах предупреждений нет
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total
@@ -19124,11 +19153,16 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (`LOGINOM_AI_AGENT_DISABLE_…`) вместо `process.env.`, во втором — по совету хука записал скрипт через Write и
   переименовал свой скрипт в `toolchain.sh`. Записываю, чтобы владелец оценил, не обход ли это.
 - `bun run secrets staged` на каждом коммите печатает `"current_files":0`, хотя в индексе есть файлы. Не разбирался.
+- Во время мутаций я сделал `git stash` и `git stash apply` в этом дереве (лишний шаг), затем удалил свою запись
+  `stash@{0}` — список stash у деревьев общий; перед удалением проверил, что запись одна и моя.
 
 ### Не проверено
 
 - Установленные сборки (Desktop, CLI), Windows и macOS: только Linux из исходников. Полное доказательство на установленных
   сборках — этап F (по плану).
-- Служба, запущенная самим Desktop: путь тот же `serve --service`, но запуск из Desktop не проверял.
+- Тесты — только `serve --port 0`; служба (`serve --service`) — пробой S6 из исходников (выше). Служба, которую
+  запускает сам Desktop, и сохранённое окружение, которое пишет Desktop, не проверялись.
 - Ответ настоящей бесплатной модели (B6, с согласия владельца); `run` и TUI с режимом.
-- Простой в S6 — 6 минут, а не 19–30, как в spike: один цикл обновления каталога.
+- Простой в S6 — 6 минут на переднем плане и 5 с у службы, а не 19–30 минут, как в spike: один цикл обновления каталога.
+- Полные наборы `loginom-host`, `evals`, `tui` после закрытия `.claude` не запускались (задание называет `cli`, `server`,
+  `core`, `loginom-agent`).
