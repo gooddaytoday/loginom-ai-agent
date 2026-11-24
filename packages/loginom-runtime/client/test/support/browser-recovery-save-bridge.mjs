@@ -43,7 +43,7 @@ class ExternalClient {
 class ExternalTransport{}
 mock.module(new URL('../../lib/execution-journal.mjs',import.meta.url).href,{namedExports:{journalCopy,createExecutionJournal:options=>{
   const record=createExecutionJournal(options);
-  return (event,...args)=>f.markerFailure&&event.phase==='acceptance_fault_triggered'
+  return (event,...args)=>f.failedPhase&&event.phase===f.failedPhase
     ?Promise.reject(Object.assign(Error('No space left'),{code:'ENOSPC'})):record(event,...args);
 }}});
 mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
@@ -69,11 +69,12 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 })}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const scenario of ['P5','external failure','foreign package','foreign receipt','marker write failure','control'])
+for(const scenario of ['P5','external failure','foreign package','foreign receipt','marker write failure','observation write failure','control'])
 test('a confirmed Save followed by an independent read: '+scenario,async t=>{
   const modified=scenario==='external failure';
   f.stateReads=0;f.modified=modified;f.lost=false;f.externalFailure=modified;
-  f.foreignReceipt=scenario==='foreign receipt';f.markerFailure=scenario==='marker write failure';f.page=linkPage();f.engine=runtime(f.page);
+  f.foreignReceipt=scenario==='foreign receipt';f.page=linkPage();f.engine=runtime(f.page);
+  f.failedPhase=scenario==='marker write failure'?'acceptance_fault_triggered':scenario==='observation write failure'?'saved_package_state_observed':undefined;
   const saves=t.mock.method(f.page,'save');
   const directory=await mkdtemp(join(tmpdir(),'recovery-save-bridge-'));
   const resources=await createBundledSkillFixture(t);f.catalog=await createActionCatalogFixture(target);
@@ -83,7 +84,7 @@ test('a confirmed Save followed by an independent read: '+scenario,async t=>{
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:f.catalog.manifestUri,actionManifestSha256:f.catalog.manifestSha256,
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
     loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true,
-    acceptanceSaveReadPackage:scenario==='P5'||f.foreignReceipt||f.markerFailure?path:scenario==='foreign package'?'/user/other.lgp':undefined},session,{browserTransport:new ExternalTransport()});
+    acceptanceSaveReadPackage:scenario==='P5'||f.foreignReceipt||scenario==='marker write failure'?path:scenario==='foreign package'?'/user/other.lgp':undefined},session,{browserTransport:new ExternalTransport()});
   const client=new AgentClient({name:'recovery-save',version:'1'});
   try{
     const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
@@ -91,7 +92,13 @@ test('a confirmed Save followed by an independent read: '+scenario,async t=>{
     const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
     const advice=saved.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}}).find(v=>v.kind==='dock_saved_package_state');
     assert.equal(saves.mock.callCount(),1);assert.ok(f.page.storage.has(path));
-    if(scenario==='foreign package'||f.foreignReceipt||f.markerFailure||scenario==='control'){
+    if(scenario==='observation write failure'){
+      assert.deepEqual([advice.save_operation_id,advice.package_path,advice.modified],['own-save',path,false]);
+      assert.equal(advice.next_step,undefined);assert.equal(f.stateReads,1);
+      const start=await client.callTool({name:'dock_browser_recovery',arguments:{action:'start',operation_id:'own-save'}});
+      assert.equal(start.isError,true);return;
+    }
+    if(scenario==='foreign package'||f.foreignReceipt||scenario==='marker write failure'||scenario==='control'){
       assert.equal(advice.modified,false);assert.equal(f.stateReads,1);return;
     }
     assert.equal(advice.state,'unavailable');

@@ -660,8 +660,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
+              const path=savedOutcome.output.package_ref.path;
+              let observation;
               try{
-                const path=savedOutcome.output.package_ref.path;
                 if(acceptanceSaveReadPackage===path && savedOutcome.action_key==='package.save_checkpoint'
                   && savedOutcome.output.save_completed===true && lastSavedPackage?.operation_id===operationId
                   && savedOutcome.operation_id===operationId && lastSavedPackage.path===path
@@ -670,9 +671,8 @@ export async function createBridge(config, session, { browserTransport: managedB
                   const recorded=await recordExecution({phase:'acceptance_fault_triggered',condition:'P5',operation_id:operationId,package_path:path}).catch(()=>null);
                   if(recorded)throw Error('Saved package state read failed');
                 }
-                const state=await readSavedState({path}),advice=savedPackageStateAdvice(state,savedOutcome);
-                await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
-                reply.content.push({type:'text',text:JSON.stringify(advice)});
+                const state=await readSavedState({path});
+                observation={state,advice:savedPackageStateAdvice(state,savedOutcome)};
               }catch{
                 // A read failure must not erase the completed save or invite
                 // a retry of an uncertain save gesture.
@@ -683,6 +683,11 @@ export async function createBridge(config, session, { browserTransport: managedB
                   instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
                   ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:savedOutcome.operation_id},
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
+              }
+              if(observation){
+                await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,...observation})
+                  .catch(()=>console.error('Loginom Dock could not record saved_package_state_observed.'));
+                reply.content.push({type:'text',text:JSON.stringify(observation.advice)});
               }
             }
             try {
