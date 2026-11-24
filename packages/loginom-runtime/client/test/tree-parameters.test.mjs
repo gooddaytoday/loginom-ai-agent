@@ -511,3 +511,18 @@ test('existing JSON tree with explicit json_field keeps the exact-field prefligh
  await assert.rejects(existingJsonPreflight([['Name','string',doc]],{json_field:'Document'}),/one non-NULL JSON string row in the exact input field/);
  assert.equal((await jsonConfigure(implementation,'Document',{json_field:'Document'},request)).verified,true);
 });
+
+test('a single JSON string containing a root object array reaches native tree inference',async()=>{
+ const text='[{"Region":"A","Amount":1.25},{"Region":"B","Amount":0}]';
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ assert.equal((await jsonPreflight([text])).verified,true);
+ const schema=[{path:'',name:'Root',is_container:true,is_array:true},
+  {path:'/Region',name:'Region',type:'string',is_container:false,is_array:false},
+  {path:'/Amount',name:'Amount',type:'real',is_container:false,is_array:false}];
+ assert.equal(validateJsonTreeSchema(schema),true);
+ assert.equal(validateSelectedTreePaths(schema,['/Region','/Amount']),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/0/Region']));
+ assert.throws(()=>validateSelectedTreePaths([...schema,{path:'/items',name:'items',is_container:true,is_array:true}]));
+ for(const unsupported of ['[]','[1,2]','[null,{"Region":"A"}]','[{"v":1},2]','[[{"v":1}]]','[{"v":9223372036854775808}]'])
+  assert.throws(()=>validateTreeJsonScope(unsupported),unsupported);
+});
