@@ -5,17 +5,23 @@ const usageCounters = new Set(['input_tokens', 'output_tokens', 'prompt_tokens',
   'cache_read_tokens', 'cache_write_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens', 'cached_tokens', 'reasoning_tokens']);
 const secretField = key => sensitiveKey.test(key.replace(/([a-z])([A-Z])/g, '$1_$2'));
 
+function maskKnown(value, known) {
+  for (const secret of [...known].sort((a, b) => b.length - a.length)) {
+    for (const variant of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)])) {
+      value = value.replaceAll(variant, marker);
+    }
+  }
+  return value;
+}
+
 export function createRedactor(knownValues = []) {
-  const known = new Set(knownValues.filter(value => typeof value === 'string' && value.length >= 4));
+  return withKnown(new Set(knownValues.filter(value => typeof value === 'string' && value.length >= 4)));
+}
+
+function withKnown(known) {
   const scalar = value => JSON.isRawJSON(value) ? JSON.parse(value.rawJSON) : value;
   function text(raw) {
-    let value = raw;
-    for (const secret of [...known].sort((a, b) => b.length - a.length)) {
-      for (const variant of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)])) {
-        value = value.replaceAll(variant, marker);
-      }
-    }
-    value = value.replace(/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z ]+ )?PRIVATE KEY-----/g, marker)
+    return maskKnown(raw, known).replace(/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z ]+ )?PRIVATE KEY-----/g, marker)
       .replace(/\b(?:sk-(?:or-v1-|proj-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{12,})\b/g, marker)
       .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_=.-]+/gi, marker)
       .replace(/(?:пароль|токен|секретный ключ)\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;}&]+)/gi,
@@ -35,7 +41,6 @@ export function createRedactor(knownValues = []) {
         } catch { return '[URL omitted: invalid]'; }
       })
       .replace(/data:(?:image|audio|video|application)\/[^\s"']+/gi, '[binary omitted]');
-    return value;
   }
   function collect(value, depth = 0) {
     if (depth > 40) throw new Error('Redaction nesting limit');
@@ -97,5 +102,17 @@ export function createRedactor(knownValues = []) {
   return { redact(value, {preserveJsonText = false} = {}) {
     try { collect(value); return clean(value, new Set(), 0, preserveJsonText); }
     catch { return { type: 'redaction_failure', omitted: true, reason: 'Content omitted because redaction could not complete' }; }
+  }, browserTextRedactor(credentials) {
+    const local = new Set(known);
+    const isolated = withKnown(local);
+    return blocks => {
+      // Page content can learn credentials across actions without changing other journal ACKs.
+      for (const value of known) local.add(value);
+      const cleaned = isolated.redact(blocks, { preserveJsonText: true });
+      if (!Array.isArray(cleaned)) return cleaned;
+      // Short credentials may match JSON names or numbers. Mask the serialized text last.
+      const values = new Set([...local, ...credentials.filter(value => typeof value === 'string' && value)]);
+      return cleaned.map(block => maskKnown(block, values));
+    };
   }, prime(value) { collect(value); }, text };
 }

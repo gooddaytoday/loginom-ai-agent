@@ -92,7 +92,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, browserSecrets = [] } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -163,7 +163,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   let recoveryContext = null;
   const redactor=createRedactor([config.apiKey]);
   const recordExecution = createExecutionJournal({ directory: session.directory,
-    metadata: session.metadata, redactor });
+    metadata: session.metadata, redactor, knownSecrets: [config.apiKey, ...browserSecrets] });
   const startup = catalogStartup(startupOptions);
   try {
     // The product ships Loginom Help and the action catalog; only diagnostic Dock setups name a knowledge endpoint.

@@ -1,5 +1,6 @@
 export function createRedactor(knownValues?: string[]): {
   redact(value: unknown, options?: { preserveJsonText?: boolean }): unknown
+  browserTextRedactor(credentials: string[]): (blocks: string[]) => unknown
   prime(value: unknown): void
   text(raw: string): string
 }

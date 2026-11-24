@@ -179,7 +179,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       await journal({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
         arguments_sha256: sha256(JSON.stringify(args)), is_error: response.error ? null : response.value?.isError === true,
         transport_error: response.error ? String(response.error.message) : null, page,
-        content: describeContent(response.value?.content), budget: remaining(current.budget) });
+        content: describeContent(response.value?.content), budget: remaining(current.budget) },
+        page.ok === true ? response.value?.content?.filter(block => block.type === 'text').map(block => block.text) : undefined);
       return { ...response, page };
     }));
     if (outcome.refused) return outcome.refused;
@@ -272,8 +273,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   }
 
   // Evidence that cannot be written leaves the outcome unproven: it blocks like an unknown effect.
-  async function journal(event) {
-    try { return await record(event); }
+  async function journal(event, textBlocks) {
+    try { return await record(event, textBlocks); }
     catch (error) {
       uncertain ??= { operation_id: event.operation_id, tool: null, reason: 'Journal write failed: ' + String(error.message).slice(0, 400) };
       throw error;

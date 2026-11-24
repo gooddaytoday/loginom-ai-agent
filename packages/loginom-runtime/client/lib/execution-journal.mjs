@@ -15,7 +15,8 @@ export function journalCopy(event){
 export function createExecutionJournal({ directory, metadata, knownSecrets = [], redactor = createRedactor(knownSecrets) }) {
   const path = join(directory, 'execution-events.jsonl');
   let pending = Promise.resolve();
-  return async record => {
+  let redactBrowserText;
+  return async (record, textBlocks) => {
     const write = async () => {
       const cleaned = redactor.redact({
         recorded_at: new Date().toISOString(), session_id: metadata.sessionId,
@@ -23,17 +24,31 @@ export function createExecutionJournal({ directory, metadata, knownSecrets = [],
         manifest_sha256: metadata.actionManifestDigest,
         target: metadata.targetIdentity ?? null, ...record,
       }, {preserveJsonText:true});
-      const handle = await open(path,
-        constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o600);
-      try {
-        await handle.writeFile(JSON.stringify(cleaned) + '\n');
-        await handle.sync();
-      } finally { await handle.close(); }
+      await appendRecord(path, cleaned);
       if (cleaned.type === 'redaction_failure') throw new Error('Execution evidence could not be redacted');
+      if (cleaned.phase === 'browser_recovery_action' && textBlocks?.length) {
+        try {
+          redactBrowserText ??= redactor.browserTextRedactor(knownSecrets);
+          await appendRecord(join(directory, 'browser-recovery-text.jsonl'), {
+            attempt_id: cleaned.attempt_id, calls_left: cleaned.budget.calls_left, text_blocks: redactBrowserText(textBlocks),
+          });
+        } catch {
+          // An action without matching text is an evidence gap. Its durable ACK still stands.
+        }
+      }
       return cleaned;
     };
     const next = pending.then(write);
     pending = next.catch(() => {});
     return next;
   };
+}
+
+async function appendRecord(path, record) {
+  const handle = await open(path,
+    constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o600);
+  try {
+    await handle.writeFile(JSON.stringify(record) + '\n');
+    await handle.sync();
+  } finally { await handle.close(); }
 }

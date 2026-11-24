@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createSerialGate } from '../lib/clipboard.mjs';
 import { createBrowserRecovery, parseRecoveryPageProbe, recoveryBrowserTools } from '../lib/browser-recovery.mjs';
+import { createExecutionJournal } from '../lib/execution-journal.mjs';
+import { createRedactor } from '../lib/redact.mjs';
 
 const step = { key: 'doc|wf|node-1|mapping', document_id: 'doc', workflow_id: 'wf', node_id: 'node-1', phase: 'mapping' };
 const catalog = [...recoveryBrowserTools, 'browser_navigate', 'browser_run_code_unsafe', 'browser_evaluate', 'browser_tabs']
@@ -116,17 +121,73 @@ test('text output is bounded while images are not counted against the text budge
   assert.match(reply.content[2].text, /Output truncated/);
 });
 
+test('the private action journal retains redacted text beyond the model limit', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'browser-recovery-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'session' },
+    redactor: createRedactor(), knownSecrets: ['Ø!'] });
+  const first = 'я'.repeat(23_000);
+  const last = 'after-limit Ø! ' + encodeURIComponent('Ø!') + ' synthetic-label';
+  const content = [
+    { type: 'text', text: first }, { type: 'text', text: last },
+    { type: 'image', mimeType: 'image/png', data: Buffer.from('fixture pixels').toString('base64') },
+    { type: 'text', text: '{"password":"synthetic-label"}' },
+  ];
+  const h = harness({ record, callTool: async ({ name }) => ({
+    content: name === 'browser_find' ? [{ type: 'text', text: 'again synthetic-label' }] : content,
+  }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const reply = await h.recovery.call('browser_snapshot', {});
+  assert.equal(reply.content[0].text, first);
+  assert.equal(reply.content[1].text, '');
+  assert.equal(reply.content[2].type, 'image');
+  assert.match(reply.content[4].text, /Output truncated/);
+  await h.recovery.call('browser_find', {});
+
+  const journal = await readFile(join(directory, 'execution-events.jsonl'), 'utf8');
+  const actions = journal.trim().split('\n').map(JSON.parse).filter(row => row.phase === 'browser_recovery_action');
+  assert.doesNotMatch(journal, /after-limit/);
+  const evidence = await readFile(join(directory, 'browser-recovery-text.jsonl'), 'utf8');
+  const [snapshot, find] = evidence.trim().split('\n').map(JSON.parse);
+  assert.deepEqual([snapshot, find].map(row => [row.attempt_id, row.calls_left]),
+    actions.map(row => [row.attempt_id, row.budget.calls_left]));
+  assert.equal(snapshot.text_blocks[1], 'after-limit [redacted] [redacted] [redacted]');
+  assert.equal(snapshot.text_blocks[0], first);
+  assert.equal(snapshot.text_blocks[2], '{"password":"[redacted]"}');
+  assert.equal(find.text_blocks[0], 'again [redacted]');
+  assert.doesNotMatch(evidence, /Ø!|%C3%98!|synthetic-label/);
+  assert.equal(evidence.includes(reply.content[2].data), false);
+  const next = await record({ phase: 'node_target_reconciled', operation_id: 'synthetic-label-Ø!' });
+  assert.equal(next.operation_id, 'synthetic-label-Ø!');
+});
+
 test('a changed page, origin or document stops the attempt and closes the step', async () => {
   let probes = 0;
-  const h = harness({ probe: () => (++probes > 1 ? { ok: false, reason: 'origin changed' } : { ok: true }) });
+  const actions = [];
+  const h = harness({ probe: () => (++probes > 1 ? { ok: false, reason: 'origin changed' } : { ok: true }),
+    record: async (event, text) => { if (event.phase === 'browser_recovery_action') actions.push({ page: event.page, text }); return event; } });
   await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
   const stopped = body(await h.recovery.call('browser_click', { target: 'e1' }));
   assert.equal(stopped.phase, 'stopped');
   assert.equal(stopped.stopped.code, 'page_changed');
+  assert.deepEqual(actions, [{ page: { ok: false, reason: 'origin changed' }, text: undefined }]);
   assert.equal(h.stops.length, 1);
   assert.equal(h.recovery.refusesDock('dock_node_apply'), false);
   const again = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' });
   assert.equal(again.isError, true);
+});
+
+test('a private text write failure preserves the action and its ordinary reply', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'browser-recovery-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, 'browser-recovery-text.jsonl'));
+  const h = harness({ record: createExecutionJournal({ directory, metadata: { sessionId: 'session' } }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const reply = await h.recovery.call('browser_snapshot', {});
+  assert.equal(reply.content[0].text, 'ok browser_snapshot');
+  const action = (await readFile(join(directory, 'execution-events.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse).at(-1);
+  assert.equal(action.phase, 'browser_recovery_action');
+  assert.equal(action.budget.calls_left, 29);
 });
 
 test('the call and time budget is shared by the step across operation IDs and re-entries', async () => {
