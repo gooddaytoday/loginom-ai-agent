@@ -801,10 +801,11 @@ for(const intent of ['new_draft','open_package'])for(const owner of ['native','f
 
 // Loginom 7.4.2 restore prompt, observed on app.loginom.ai (LAB-1960 1943/a-3).
 function sessionRestoreFixture(intent,{fault='none'}={}){
- const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll,getCmp=c.Ext.getCmp,locator=f.page.locator;
+ const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll,getCmp=c.Ext.getCmp,locator=f.page.locator,evaluate=f.page.evaluate;
  const connection=c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection,form=c.bg.app.Application.FInstance.FMainForm;
  if(fault!=='no baseline'){connection.FSession={};connection.FRemoteSession={};}
  form.FReconnecting=false;
+ const state={shown:false,restores:0,cfg:{},fault,disconnectOnGesture:true,disconnectOnVerify:false,connected:false};
  const text=value=>({isConnected:true,innerText:value,getAttribute:()=>null,parentElement:null,
   getBoundingClientRect:()=>({width:100,height:20}),matches:()=>false,closest:()=>null});
  const title=text('Восстановление сессии'),body=text(fault==='retry text'?'Ошибка при попытке восстановить сессию Восстановить сессию?':'Обнаружен разрыв связи. Восстановить сессию?');
@@ -812,20 +813,38 @@ function sessionRestoreFixture(intent,{fault='none'}={}){
  yes.getAttribute=k=>k==='data-tid'?'msgbox;tlb;yes':null;no.getAttribute=k=>k==='data-tid'?'msgbox;tlb;no':null;
  const box={...text('Восстановление сессии Обнаружен разрыв связи. Восстановить сессию? Восстановить Закрыть'),id:'messagebox-1001',
   getAttribute:k=>k==='class'?'x-window x-message-box x-layer':null,contains:e=>[title,body,yes,no].includes(e),querySelector:()=>null,querySelectorAll:()=>[yes,no]};
+ const second={...box,id:'messagebox-1002'};
  const mask={...text(''),id:'mf-mask',getAttribute:k=>k==='data-tid'?'MF':k==='class'?'x-body x-container bg-mask-message':null,matches:q=>q.includes('mask')};
- const native={$className:'Ext.window.MessageBox',el:{dom:box},hidden:false,header:{titleCmp:{textEl:{dom:title}}},body:{dom:body},msg:{el:{dom:body}}};
- const state={shown:false,restores:0,cfg:{}};
- c.Ext.getCmp=id=>id===box.id?native:getCmp(id);c.Ext.Msg={get cfg(){return state.cfg;}};
- c.document.querySelectorAll=q=>state.shown&&q.startsWith('[role=')?[mask,box]:query(q);
+ const native={$className:'Ext.window.MessageBox',el:{dom:box},hidden:false,header:{titleCmp:{textEl:{dom:title}}},body:{dom:body},msg:{el:{dom:body}},get cfg(){return state.cfg;}};
+ const secondNative={...native,el:{dom:second}};
+ c.Ext.getCmp=id=>id===box.id?native:id===second.id?secondNative:getCmp(id);
+ c.Ext.Msg=fault==='foreign message box'?{el:{dom:box},cfg:state.cfg}:native;
+ c.document.querySelectorAll=q=>q==='[data-tid="msgbox;tlb;yes"]'?(state.shown?[yes]:[])
+  :state.shown&&q.startsWith('[role=')?(state.fault==='second window'?[mask,box,second]:[mask,box]):query(q);
  c.document.createTreeWalker=e=>{let read=false;return {nextNode:()=>read?null:(read=true,{textContent:e.innerText,parentElement:e})};};
- const disconnect=()=>{state.shown=true;connection.Connected=false;form.FReconnecting=true;};
- state.reconnect=()=>{connection.Connected=true;form.FReconnecting=false;if(fault==='replaced session')connection.FSession={};};
+ // A shown prompt over a still connected session is an unproven state.
+ const disconnect=()=>{state.shown=true;if(state.connected)return;connection.Connected=false;form.FReconnecting=true;};
+ state.reconnect=()=>{connection.Connected=true;form.FReconnecting=false;
+  if(state.fault==='replaced session')connection.FSession={};if(state.fault==='replaced account')connection.UserName='other-account';};
+ // Loginom swaps the first prompt for its retry error with the same buttons.
+ state.retryPrompt=()=>{body.innerText='Ошибка при попытке восстановить сессию Восстановить сессию?';state.cfg={};};
  f.page.locator=q=>{
-  if(q==='[data-tid="msgbox;tlb;yes"]')return {count:async()=>state.shown?1:0,isVisible:async()=>state.shown,innerText:async()=>'Восстановить',
-   click:async()=>{state.restores++;state.shown=false;if(fault!=='lost reconnect')state.reconnect();}};
+  if(q==='[data-tid="msgbox;tlb;yes"]')return {count:async()=>state.shown?1:0,isVisible:async()=>state.shown&&state.fault!=='yes hidden',
+   innerText:async()=>{if(state.fault==='prompt swapped at click')state.retryPrompt();return 'Восстановить';},
+   click:async()=>{if(state.fault==='click lost')throw Error('click reply lost');
+    state.restores++;state.shown=false;if(state.fault!=='lost reconnect')state.reconnect();}};
   const l=locator(q),click=l.click;
-  l.click=async(...args)=>{await click(...args);if(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen'))disconnect();};return l;
+  l.click=async(...args)=>{
+   // A silent native session/account swap after this gesture was reserved.
+   if(q.includes('btnPackagesMenu')&&state.fault==='session swapped after reserve')connection.FSession={};
+   if(q.includes('btnPackagesMenu')&&state.fault==='account swapped after reserve')connection.UserName='other-account';
+   await click(...args);
+   if(state.disconnectOnGesture&&(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen')))disconnect();
+   if(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen'))
+    if(state.fault==='guard answered')(c.__loginomDockPreparationV1.connectionGuard??=new Map()).set('standalone',{pending:true,prompt:state.cfg});
+  };return l;
  };
+ f.page.evaluate=async(fn,args)=>{if(args?.mode==='verify'&&state.disconnectOnVerify){state.disconnectOnVerify=false;disconnect();}return evaluate(fn,args);};
  f.page.waitForFunction=async fn=>{if(!runInContext('('+fn.toString()+')()',c))throw Error('timeout');};
  let elapsed=0;class Clock extends Date{static now(){return elapsed;}}
  c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;};
@@ -881,5 +900,72 @@ test('restore diagnostics survive the production preparation parser',async()=>{
   assert.equal(parsed.status,status);
   if(status==='READY')assert.ok(parsed.trace.some(t=>t.condition==='connection_restored'));
   else{assert.equal(parsed.connection_restore,'owner_unbound');assert.equal(parsed.next_step.tool,'dock_prepare');assert.match(parsed.message,/Восстановление сессии/);}
+ }
+});
+// Review of #1280: the restore baseline belongs to the gesture receipt, its
+// reservation sits right before the click, and each refusal tells the truth.
+for(const intent of ['new_draft','open_package'])for(const fault of ['session swapped after reserve','account swapped after reserve'])test('restore compares the prompt with the gesture receipt, not the latest connected session: '+intent+' '+fault,async()=>{
+ const s=sessionRestoreFixture(intent,{fault});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'owner_unbound');
+ assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);assert.match(r.message,/did not press/);
+});
+for(const intent of ['new_draft','open_package'])test('a restore onto another account settles as session_replaced: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'replaced account'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'session_replaced');assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+for(const intent of ['new_draft','open_package'])test('session_replaced asks for reload and a new operation, and does not block it: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'replaced session'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'session_replaced');assert.match(r.message,/reload the Loginom page/);assert.match(r.message,/NEW operation_id/);
+ assert.equal(r.next_step.new_operation_id_required,true);assert.equal(r.next_step.same_operation_id,undefined);
+ const same=await s.run({recoverOnly:true});
+ assert.equal(same.connection_restore,'session_replaced');assert.equal(same.next_step.new_operation_id_required,true);
+ s.state.fault='none';s.state.disconnectOnGesture=false;
+ const next=await s.run({operationId:'prepare-after-reload'});
+ assert.equal(next.status,'READY',JSON.stringify(next));assert.equal(next.connection_restore,undefined);assert.equal(s.state.restores,1);
+});
+for(const intent of ['new_draft','open_package'])test('a restore refused before the click reserves nothing and a later call may press it once: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'yes hidden'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'dialog');assert.equal(s.state.restores,0);
+ assert.match(r.message,/did not press/);assert.doesNotMatch(r.message,/already pressed/);assert.match(r.message,/package gesture may have taken effect/);
+ s.state.fault='none';
+ const again=await s.run({recoverOnly:true});
+ assert.equal(again.status,'READY',JSON.stringify(again));assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+for(const intent of ['new_draft','open_package'])test('an unconfirmed restore click is reported as tried and never repeated: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'click lost'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'gesture_unconfirmed');assert.match(r.message,/tried to press/);assert.doesNotMatch(r.message,/did not press/);
+ s.state.fault='none';
+ const again=await s.run({recoverOnly:true});
+ assert.equal(again.connection_restore,'attempted');assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);
+});
+for(const intent of ['new_draft','open_package'])for(const fault of ['prompt swapped at click','foreign message box','second window','guard answered'])test('restore rechecks the exact Ext.Msg prompt and its other owners before the click: '+intent+' '+fault,async()=>{
+ const s=sessionRestoreFixture(intent,{fault});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+ assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);
+ if(fault==='prompt swapped at click')assert.equal(r.connection_restore,'dialog');
+ if(fault==='guard answered')assert.equal(r.connection_restore,'attempted');
+});
+for(const intent of ['new_draft','open_package'])test('a restore prompt over a connected session is state_unproven: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent);s.state.connected=true;
+ const r=await s.run();
+ assert.equal(r.connection_restore,'state_unproven');assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);
+});
+test('a restore refusal without a package gesture does not claim one',async()=>{
+ for(const intent of ['open_package','existing_workflow']){
+  const s=sessionRestoreFixture(intent==='open_package'?'open_package':'new_draft');s.state.disconnectOnGesture=false;
+  const first=await s.run();assert.equal(first.status,'READY',JSON.stringify(first));
+  s.state.connected=true;s.state.disconnectOnVerify=true;
+  const r=await s.run(intent==='open_package'?{operationId:'prepare-open-again'}
+   :{intent,operationId:'prepare-workflow',workflowRef:{...first.workflow_ref,document_id:first.document_id}});
+  assert.equal(r.status,'NOT_READY',JSON.stringify(r));assert.equal(r.connection_restore,'state_unproven');assert.equal(s.state.restores,0);
+  assert.doesNotMatch(r.message,/may have taken effect/);
+  if(intent==='open_package'){assert.equal(r.effect_possible,false);assert.match(r.message,/No package gesture/);}
+  else assert.doesNotMatch(r.message,/package gesture/);
  }
 });

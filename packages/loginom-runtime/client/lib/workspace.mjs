@@ -24,13 +24,28 @@ async function prepareWorkspace(page, options) {
       await page.waitForTimeout(Math.min(100, remaining()));
     }
   };
-  let connectionRestore = null;
-  const restoreRefusal = reason => ({connection_restore:reason,
-    message:'Loginom lost its server connection ("Восстановление сессии"). '+(reason==='attempted'||reason==='awaiting_original_attempt'
-      ?'The runtime already pressed "Восстановить" once for this prompt and the original session is not confirmed. '
-      :'The runtime did not restore it: the original native session is not proven ('+reason+'). ')
-      +'Ask the user to restore the Loginom session, then call dock_prepare with the SAME operation_id to reconcile. The package gesture may have taken effect; do not repeat it or dismiss the dialog.',
-    next_step:{tool:'dock_prepare',same_operation_id:true,after:'loginom_session_restored'}});
+  let connectionRestore = null, packageGesture = false;
+  // Each refusal says exactly what the runtime did to the restore prompt.
+  const restoreRefusal = reason => {
+    const replaced=reason==='session_replaced';
+    const done={attempted:'The runtime has already pressed (or tried to press) "Восстановить" for this prompt and will not press it again; the original session is not confirmed. ',
+      awaiting_original_attempt:'The runtime pressed "Восстановить" once; Loginom has not finished reconnecting the original session. Do not press it again. ',
+      gesture_unconfirmed:'The runtime tried to press "Восстановить" once, but the click was not confirmed; it will not press it again for this prompt. ',
+      session_replaced:'Loginom reconnected with a different native session or account, so this preparation cannot be confirmed and its operation_id can no longer be reconciled. ',
+      owner_unbound:'The runtime did not press "Восстановить": the native session is not the one this preparation started on. ',
+      state_unproven:'The runtime did not press "Восстановить": the disconnected state is not proven. ',
+      dialog:'The runtime did not press "Восстановить": the prompt changed or could not be verified at the moment of the click. '}[reason]
+      ??'The runtime did not press "Восстановить" ('+reason+'). ';
+    return {connection_restore:reason,
+      message:'Loginom lost its server connection ("Восстановление сессии"). '+done
+        +(replaced?'Ask the user to reload the Loginom page, then call dock_prepare with a NEW operation_id. '
+          :'Ask the user to restore the Loginom session, then call dock_prepare with the SAME operation_id to reconcile. ')
+        +(packageGesture?(replaced?'The earlier package gesture may have taken effect in the lost session. ':'The package gesture may have taken effect; do not repeat it. ')
+          :options.intent==='existing_workflow'?'':'No package gesture was made by this preparation. ')
+        +'Do not dismiss the dialog.',
+      next_step:replaced?{tool:'dock_prepare',new_operation_id_required:true,after:'loginom_page_reloaded'}
+        :{tool:'dock_prepare',same_operation_id:true,after:'loginom_session_restored'}};
+  };
   const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
     authenticated, created_draft: createdDraft, effect_possible: effectPossible,
     operation_id: options.operationId, session_id: options.sessionId, trace,
@@ -124,19 +139,7 @@ async function prepareWorkspace(page, options) {
     const hardBlocked = blockers.some(e=>!e.matches('.bg-mask-message,.x-mask-msg'));
     const openErrors = [...document.querySelectorAll('.bg-error-messages')].filter(visible);
     const app = globalThis.bg?.app;
-    // Session-restore baseline: the native handles of the last connected,
-    // settled session. Restore is accepted only if Loginom keeps exactly them.
     const mainForm=app?.Application?.FInstance?.FMainForm,serverConnection=mainForm?.FMapTree?.FServerConnection;
-    // A restore whose reconnect outlived its wait settles only on the same handles.
-    if(state.connectionRestore?.pending&&serverConnection?.Connected===true&&mainForm.FReconnecting===false){
-      const owner=state.connectionOwner;
-      if(!(owner&&owner.connection===serverConnection&&owner.remote===serverConnection.FRemoteSession
-        &&owner.session===serverConnection.FSession&&owner.account===serverConnection.UserName))
-        return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'session_replaced'};
-      state.connectionRestore.pending=false;
-    }
-    if(serverConnection?.Connected===true&&mainForm.FReconnecting!==true&&serverConnection.FSession&&serverConnection.FRemoteSession&&!state.connectionRestore?.pending)
-      state.connectionOwner={connection:serverConnection,remote:serverConnection.FRemoteSession,session:serverConnection.FSession,account:serverConnection.UserName};
     if(options.storageBinding && (state.id!==options.storageBinding.document_id
       ||location.origin!==options.storageBinding.origin||app?.Version!==options.storageBinding.loginom_build
       ||app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName!==options.storageBinding.loginom_account))
@@ -180,9 +183,64 @@ async function prepareWorkspace(page, options) {
         packageInventoryBefore:app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count,
         openConnection:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection,
         openServerSession:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.Session,
-        openAccount:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName});
+        openAccount:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName,
+        // Session-restore baseline of this gesture: the connected, settled
+        // native session it started on. A restore must keep exactly these.
+        openConnected:serverConnection?.Connected===true&&mainForm?.FReconnecting!==true,
+        openRemoteSession:serverConnection?.FRemoteSession,openLocalSession:serverConnection?.FSession});
     }
     const current = state.receipts.get(options.operationId);
+    const baselineKept=()=>!!current&&current.openConnected===true&&!!current.openRemoteSession&&!!current.openLocalSession
+      &&typeof current.openAccount==='string'&&current.openAccount.length>0&&!!serverConnection
+      &&serverConnection===current.openConnection&&serverConnection.FRemoteSession===current.openRemoteSession
+      &&serverConnection.FSession===current.openLocalSession&&serverConnection.UserName===current.openAccount;
+    // A pressed restore settles only once, on this operation's own baseline.
+    const settleRestore=()=>{
+      const restore=current?.restore;
+      if(!restore)return null;
+      if(restore.replaced)return 'replaced';
+      if(!restore.pending)return null;
+      if(serverConnection?.Connected!==true||mainForm.FReconnecting!==false)return 'waiting';
+      restore.pending=false;
+      if(!baselineKept()){restore.replaced=true;return 'replaced';}
+      return 'settled';
+    };
+    // Loginom 7.4.2 "Восстановление сессии" after a lost server connection:
+    // the only non-mask window, owned by Ext.Msg itself, with exact text.
+    const restorePrompt=()=>{
+      const msg=globalThis.Ext?.Msg;
+      const prompts=(blockingWindows?.windows??[]).map((w,i)=>[w,blockers[i]])
+        .filter(([w])=>!/(?:^|\s)(?:bg-mask-message|x-mask-msg)(?:\s|$)/.test(w.class_name??''));
+      if(prompts.length!==1||blockers.length>12)return null;
+      const [w,element]=prompts[0],box=w.message_box;
+      if(!box||!msg||w.native_owner.class_name!=='Ext.window.MessageBox'||w.native_owner.exact_dom!==true
+        ||globalThis.Ext.getCmp?.(element.id)!==msg||msg.el?.dom!==element
+        ||box.title!=='Восстановление сессии'||box.text!=='Обнаружен разрыв связи. Восстановить сессию?'
+        ||box.title_truncated||box.text_truncated||box.buttons_truncated
+        ||JSON.stringify(box.buttons.map(b=>[b.tid,b.label,b.label_truncated]))!==JSON.stringify([['msgbox;tlb;yes','Восстановить',false],['msgbox;tlb;no','Закрыть',false]]))return null;
+      return {element,prompt:msg.cfg};
+    };
+    // One gesture per Ext.Msg configuration across preparations and the
+    // per-call connection guard, including a pending or lost click.
+    const restoreRefused=prompt=>!baselineKept()?'owner_unbound'
+      :serverConnection.Connected!==false||!prompt||typeof prompt!=='object'?'state_unproven'
+      :current.restore?.pending||[...state.receipts.values()].some(r=>r.restore?.prompt===prompt)
+        ||[state.connectionGuard,state.downloadConnectionGuard].some(m=>typeof m?.values==='function'&&[...m.values()].some(a=>a?.prompt===prompt))?'attempted':null;
+    if(mode==='restore_reserve'){
+      // Reserve immediately before the click, on the prompt verify observed.
+      const match=restorePrompt(),yes=exact('msgbox;tlb;yes');
+      if(!current||!match||match.prompt!==current.restoreCandidate||yes.length!==1||!match.element.contains(yes[0])||!visible(yes[0]))
+        return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'dialog'};
+      const refused=restoreRefused(match.prompt);
+      if(refused)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:refused};
+      current.restore={prompt:match.prompt,pending:true};
+      return {reserved:true};
+    }
+    if(mode==='restore_settle'){
+      const settled=settleRestore();
+      return settled==='settled'?{restored:true}:{error:'NATIVE_MESSAGE_BOX_BLOCKED',
+        connection_restore:settled==='waiting'?'awaiting_original_attempt':'session_replaced'};
+    }
     if(mode==='open_dialog') {
       const roots=exact('OpenDialogForm'),element=roots.length===1?roots[0]:null;
       const component=element&&globalThis.Ext?.getCmp?.(element.id);
@@ -229,6 +287,7 @@ async function prepareWorkspace(page, options) {
     }
     if (mode==='effect') {
       current.phase='effect_possible';
+      if(options.intent!=='existing_workflow')current.packageGesture=true;
       if(options.intent==='new_draft') {
         current.draftSubmitted=true;
         current.openErrorBefore=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance?.FErrorMessageInfo??null;
@@ -241,11 +300,14 @@ async function prepareWorkspace(page, options) {
         ? {missing:true,document_id:state.id,loginom_account:receipt.missing.account} : {error:'WORKSPACE_CHANGED'};
       if (receipt.tab) {
         if (!tabs.includes(receipt.tab)) return {error:'WORKFLOW_LOST'};
-        return {exists:true,tab_tid:receipt.tab.getAttribute('data-tid'),phase:receipt.phase};
+        return {exists:true,tab_tid:receipt.tab.getAttribute('data-tid'),phase:receipt.phase,package_gesture:receipt.packageGesture===true};
       }
-      return {exists:true,phase:receipt.phase};
+      return {exists:true,phase:receipt.phase,package_gesture:receipt.packageGesture===true};
     }
     if (mode==='verify') {
+      // A restore whose reconnect outlived its wait settles on later calls.
+      const settled=settleRestore();
+      if(settled==='replaced')return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'session_replaced',blocking_windows:blockingWindows};
       if (options.intent==='existing_workflow' && (!knownWorkflow || packageNode!==knownWorkflow.packageNode || tab!==knownWorkflow.tab
           || state.id!==options.workflowRef.document_id || tabTid!==options.workflowRef.tab_tid
           || crumbs.length!==options.workflowRef.navigation_path.length
@@ -264,24 +326,16 @@ async function prepareWorkspace(page, options) {
           current.openError={instance,message,root,messages,info:instance.FErrorMessageInfo,element:openErrors[0]};
         return {error:options.intent==='new_draft'?'NATIVE_MESSAGE_BOX_BLOCKED':'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError,blocking_windows:blockingWindows};
       }
-      // Loginom 7.4.2 "Восстановление сессии" after a lost server connection.
-      // Only this exact first prompt over the same native session may receive
-      // one restore gesture per Ext.Msg configuration; masks are its backdrop.
-      const prompts=blockingWindows?.windows.filter(w=>!/(?:^|\s)(?:bg-mask-message|x-mask-msg)(?:\s|$)/.test(w.class_name??''))??[];
-      const box=prompts.length===1&&blockers.length<=12?prompts[0].message_box:null;
-      if(mode==='verify'&&box&&prompts[0].native_owner.class_name==='Ext.window.MessageBox'&&prompts[0].native_owner.exact_dom===true
-        &&box.title==='Восстановление сессии'&&box.text==='Обнаружен разрыв связи. Восстановить сессию?'
-        &&!box.title_truncated&&!box.text_truncated&&!box.buttons_truncated
-        &&JSON.stringify(box.buttons.map(b=>[b.tid,b.label,b.label_truncated]))===JSON.stringify([['msgbox;tlb;yes','Восстановить',false],['msgbox;tlb;no','Закрыть',false]])) {
-        const owner=state.connectionOwner,prompt=globalThis.Ext?.Msg?.cfg;
-        const same=!!owner&&owner.connection===serverConnection&&owner.remote===serverConnection?.FRemoteSession
-          &&owner.session===serverConnection?.FSession&&owner.account===serverConnection?.UserName;
-        const refused=!same?'owner_unbound':serverConnection.Connected!==false||!prompt||typeof prompt!=='object'?'state_unproven'
-          :state.connectionRestore?.prompt===prompt?'attempted':null;
+      // Only the exact first prompt over this operation's own native session
+      // may receive one restore gesture; masks are its backdrop.
+      const match=restorePrompt();
+      if(match){
+        const refused=restoreRefused(match.prompt);
         if(refused)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:refused,blocking_windows:blockingWindows};
-        state.connectionRestore={prompt,pending:true};
+        current.restoreCandidate=match.prompt;
         return {session_restore:true,blocking_windows:blockingWindows};
       }
+      if(settled==='waiting')return {pending:true,connection_restore:'awaiting_original_attempt',blocking_windows:blockingWindows};
       // Buttonless native progress windows may settle on their own.
       if(blockingWindows?.windows.some(w=>w.message_box?.buttons.length>0))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
@@ -354,6 +408,7 @@ async function prepareWorkspace(page, options) {
     }
     const old=await inspect('lookup');
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
+    packageGesture=old.package_gesture===true;
     if (old.missing) return missingPackage(old);
     // A confirmed pre-open refusal may continue without replacing its original receipt.
     if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
@@ -387,7 +442,7 @@ async function prepareWorkspace(page, options) {
       await tid('MF;cntMain;tlbMainToolbar;btnPackagesMenu').click({timeout:remaining()});
       const button=tid('MF;MainMenuForm;'+(options.intent==='new_draft'?'btnCreateUnsavedPackage':'btnOpenPackage'));
       await wait('package_menu_ready',()=>button.isVisible());
-      const effect=await inspect('effect');if(effect.error)return result('NOT_READY',effect.error,{authenticated:true});effectPossible=true;
+      const effect=await inspect('effect');if(effect.error)return result('NOT_READY',effect.error,{authenticated:true});effectPossible=true;packageGesture=true;
       await button.click({timeout:remaining()});
       if (options.intent==='new_draft') createdDraft=true;
       else {
@@ -409,20 +464,17 @@ async function prepareWorkspace(page, options) {
       const yes=tid('msgbox;tlb;yes');
       try{
         if(await yes.count()!==1||!await yes.isVisible()||(await yes.innerText()).trim()!=='Восстановить')return failed('dialog');
-        await yes.click({timeout:Math.min(3000,remaining())});
-      }catch(error){if(error.message==='DEADLINE')throw error;return failed('gesture_unconfirmed');}
+      }catch(error){if(error.message==='DEADLINE')throw error;return failed('dialog');}
+      // The reservation rechecks the exact prompt; a refusal leaves no gesture.
+      const reserved=await inspect('restore_reserve');
+      if(reserved?.reserved!==true)return failed(reserved?.connection_restore??'dialog');
+      try{await yes.click({timeout:Math.min(3000,remaining())});}
+      catch(error){if(error.message==='DEADLINE')throw error;return failed('gesture_unconfirmed');}
       try{await page.waitForFunction(()=>{const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
         return f?.FMapTree?.FServerConnection?.Connected===true&&f.FReconnecting===false;},null,{timeout:Math.min(10000,remaining())});}
       catch(error){if(error.message==='DEADLINE')throw error;return failed('awaiting_original_attempt');}
-      const bound=await page.evaluate(()=>{
-        const state=globalThis.__loginomDockPreparationV1,owner=state?.connectionOwner;
-        const c=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
-        const same=state?.document===document&&!!owner&&owner.connection===c&&owner.remote===c?.FRemoteSession
-          &&owner.session===c?.FSession&&owner.account===c?.UserName&&c.Connected===true;
-        if(same)state.connectionRestore.pending=false;
-        return same;
-      });
-      if(!bound)return failed('session_replaced');
+      const settled=await inspect('restore_settle');
+      if(settled?.restored!==true)return failed(settled?.connection_restore??'session_replaced');
       trace.push({condition:'connection_restored',satisfied:true});
       return {pending:true,blocking_windows:observed.blocking_windows};
     };
