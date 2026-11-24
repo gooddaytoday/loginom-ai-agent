@@ -20181,3 +20181,181 @@ Found 905 warnings and 0 errors.                                       # как 
   перенесённых сессий видел только в коде миграции.
 - Шаблон дашбордов в артефакте CLI — по описи B2.7a2, заново не проверял.
 - Windows и macOS (`realpath`, ссылки, регистр путей) — только в объёме тестов 0.4.
+
+## B2.9b Профиль дашборда
+
+23.11.2026. Задача B2.9b (шлюз B, G1), ветка `b29b-dashboard-profile` от `oc2-migration` (`5fd8e2f598`), рабочее дерево
+`.claude/worktrees/b29b`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть;
+`npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` в этом дереве и в дереве базы
+`<scratchpad>/b29b/base` (`5fd8e2f598`, detached). Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом
+коммите. Тесты, мутации, проба CLI и полные прогоны — под `unshare -n` (поднят только `lo`), с временными `HOME`,
+`TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`. **Модель не вызывалась:** в тестах сервера — `TestLLM`,
+в пробе CLI — `--model test/test-model` на подставном сервере `127.0.0.1`; сети нет. Решение оркестратора по разрешениям
+(запись в `src/` без вопроса, публикация и удаление — каждый раз, запрет администратора сильнее всего) — для B2.9c, f, g;
+здесь профиль только не мешает ему.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `0acedddf40` `feat(loginom-agent): dashboard session profile (B2.9b)` | код: `packages/loginom-agent/src/dashboard.ts` (новый, 23 строки), `access.ts` (+24 −4), `index.ts` (+17 −2); тесты: `packages/loginom-agent/test/dashboard.test.ts` (новый, 5), `access.test.ts` (+4), `describe` B2.9b в `packages/server/test/loginom-access.test.ts` (+3) и его фикстура `packages/server/test/fixture/mcp-guide.cjs` (новый) |
+| следующий | этот раздел, строка G1 и «Как запускать» в `guarantees.md` |
+
+Файлов кода три (предел — пять), все — пакета форка; файлов upstream не правил, `catalog.json` не менялся.
+
+### Как устроено
+
+- **Признак — папка Location.** `Dashboard.isWork(directory)` — `isDashboardWorkDirectory` пакета `product` под
+  `Dashboard.root()` = `Global.Path.data/dashboards`, корнем сервера (B2.9a, «Где решал сам»): реальный путь каталога —
+  папка `work`, а её родитель лежит прямо в корне. Плагин живёт в каждой Location, поэтому базовый профиль задаёт
+  `ctx.location.directory`, как в 0.4 его задавал каталог сессии; модель на него не влияет.
+- **Защёлка.** `Dashboard.latch(directory)` проверяет папку при каждом обращении, пока она не окажется рабочей папкой
+  дашборда, и после этого «да» не снимает. Ниже, «Где решал сам».
+- **База сильнее допуска.** `profile(sessionID)` в `index.ts` в Location дашборда отвечает `loginom-dashboard`, не глядя
+  на допуски: навык (агент или вложение пользователя) и мастер (`loginom.runner.start`) пишут допуск, но он не
+  читается. Подсессия и форк создаются в Location родителя (`core/src/session.ts:296`), поэтому база действует и там.
+  `next` из `loginom-dashboard` не выходит (это уже делал `HostTaskScope.permits`); ID `loginom-dashboard` ничего не даёт
+  (`Grant` его не включает).
+- **`permits`** профиля `loginom-dashboard` — только `read`, `glob`, `grep`, `edit`, `write`, `patch`, `skill` и
+  `dashboard_draft`, `dashboard_publish`, `dashboard_delete`; локальной справки Loginom тоже нет, в отличие от остальных
+  профилей (0.4 `permitsLoginom`). Три инструмента дашборда добавлены в `profileTools`: в других профилях их нет, и
+  преобразование CodeMode помечает их `codemode: false`, когда они появятся (B2.9e…g).
+- **Без аренды Host.** `hold` в Location дашборда сразу отвечает `undefined`. Это одна проверка на всех четырёх
+  вызывающих (`session.execution.started`, хук `context`, `loginom_file_admit`, каталог Dock): без аренды `dock.refresh`
+  не читает каталог, а `dock.system` не даёт подсказок Loginom, — `dock.ts` не менялся.
+- **Без MCP.** Преобразование `ctx.mcp.transform` убирает в Location дашборда все серверы: с ними уходят инструменты,
+  ресурсы, prompts и инструкции серверов в контексте модели.
+- **Вложение агента** в промпте Location дашборда — `LOGINOM_SCOPE_DENIED` из хука `prompt` до записи сообщения и до
+  модели.
+- `permissions.ts`, правила и `settle` не менялись: разрешения дашборда — B2.9c, f, g, а запрет администратора приходит
+  из хука OpenCode раньше хука продукта (B2.6c) и профилем не затронут.
+
+### Тесты
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test`) | На v2 |
+|---|---|
+| `product/tool-policy.test.ts` «loginom-dashboard exposes only its built-in tools without MCP or Loginom» | `loginom-agent/test/access.test.ts`, то же имя. Признака `origin` в v2 нет; вместо «external» — имена MCP-инструментов `dashboard_lookup`, `read_file` (сервер `dashboard`, `read`); `allowsMcp` — преобразование MCP, проверяется на сервере |
+| `product/tool-policy.test.ts` «dashboard built-ins stay unavailable in ordinary and other product profiles» | там же, то же имя |
+| `session/task-scope.test.ts` «a genuine task in a dashboard session starts in its immutable base profile», «persisted activations and subsequent requests cannot change a dashboard base» | там же: «a task in a dashboard session keeps its base…» (`next` из базы при любом допуске) и «nothing grants the dashboard profile…». `TaskScope.derive` в v2 нет: задачу начинает хук `prompt`, саму базу проверяет сервер |
+| `product/dashboard-session.test.ts`: признак папки, 4 случая | `loginom-agent/test/dashboard.test.ts`: те же 4 на `Dashboard.isWork` и новый — защёлка. Из первого случая убрано сравнение с `dashboardDataRoot(process.env)` пакета `product`: корень — у сервера (B2.9a), а `dashboardDataRoot` по умолчанию берёт канал `prod`, запуск из исходников — `dev` |
+| `product/turn-lifecycle.test.ts` «a dashboard run never acquires a connected Loginom Host or advertises its instructions»; `session/profile-tools.test.ts` «a dashboard directory selects its real builtin whitelist before any activation», «a folder prepared by Desktop resolves dashboard tools without bash»; `session/prompt.test.ts` «the first dashboard prompt advertises only dashboard builtins to the provider» | `server/test/loginom-access.test.ts` «a dashboard Location offers only its tools before any grant, leases no Host, sees no MCP server; skills, attachments and the wizard keep its base»: Host по сценарию (`ServiceHost.start`), конфиг проекта включает терминал и называет MCP-сервер с инструкциями (`fixture/mcp-guide.cjs`). Каждый запрос — только инструменты профиля, без подсказки Loginom и инструкций MCP; вызовы `subagent` и `loginom_probe` до и после навыка `loginom-automation` — `LOGINOM_SCOPE_DENIED`, подсессий нет; навык во вложении и мастер ничего не дают; в журнале Host ни одного запроса |
+| — | «control: an ordinary Location of the same config leases the Host and offers the terminal, subagents and the MCP server» — новый: без него «нет терминала, MCP и аренды» доказывали бы только настройки по умолчанию |
+| `session/prompt.test.ts` «a dashboard directory rejects a persisted subtask without an activation grant» | «a dashboard Location refuses an attached agent before the model; its subsessions and forks keep the profile»: вложение агента — отказ с `LOGINOM_SCOPE_DENIED`, сообщений, запросов к модели и подсессий нет; затем подсессия (`create` с `parentID`) и форк — только инструменты профиля, `loginom_probe` — отказ |
+
+Не перенесено из этих тестов: запись в `src/` из `profile-tools` (без вопроса — B2.9c по решению оркестратора; сейчас
+`edit` спрашивает, как везде, B2.6a), чтение после удаления папки — `LOGINOM_SCOPE_DENIED` (B2.9d), `json_schema` (в v2
+нет, B2.9a). Терминал в сценариях не вызывается: включённый, он спрашивает перед каждой командой (В-31), и мутация
+«база не применяется» висела бы на вопросе 30 с, а следующий тест падал бы на уже запущенном Host. Его отсутствие
+проверяет список инструментов, а контроль показывает, что конфиг его включает. `patch` вместо `edit` и `write` OpenCode
+предлагает не всем моделям (как 0.4 `apply_patch`); тестовой модели — `edit` и `write`, их и требует тест.
+
+### Мутации
+
+Каждая — точечная правка в `packages/loginom-agent/src`, прогон `bun test test/access.test.ts test/dashboard.test.ts`
+в `loginom-agent` и `bun test test/loginom-access.test.ts` в `server`, затем `git checkout`
+(`<scratchpad>/b29b/scripts/mutations.sh`). Без мутаций — 15/0 и 12/0.
+
+| Мутация | `access` + `dashboard` | `loginom-access` | Красные |
+|---|---|---|---|
+| база не применяется: `profile` без проверки папки | 15/0 | **10/2** | основной случай дашборда, вложение агента и подсессии |
+| `hold` берёт аренду в дашборде | 15/0 | **11/1** | основной случай (запросы в журнале Host) |
+| MCP-серверы не убираются | 15/0 | **11/1** | основной случай (инструкции MCP в запросе) |
+| вложение агента принимается | 15/0 | **11/1** | вложение агента |
+| у `loginom-dashboard` нет своего списка: ветка в `permits` удалена | **14/1** | **10/2** | «exposes only its built-in tools»; на сервере — как «база не применяется» |
+| инструменты дашборда не зарезервированы: `profileTools` без них | **14/1** | 12/0 | «dashboard built-ins stay unavailable…» (самих инструментов ещё нет) |
+| без защёлки: `latch` проверяет папку каждый раз | **14/1** | 12/0 | случай защёлки |
+
+После всех мутаций дерево чистое, корень `<data>/dashboards` пуст.
+
+### Проверка из CLI
+
+`run --headless --format json --dir <папка> --model test/test-model -- "Покажи суммы."` продукта из исходников
+(`<scratchpad>/b29b/scripts/cli-probe.ts` на фикстурах `cli/test/fixture/product-run.ts`), в конфиге профиля — терминал
+`allow` и MCP-сервер `fixture/mcp-guide.cjs`. Папка дашборда — `<профиль>/data/dashboards/fixture/work`, контроль —
+проект профиля:
+
+```text
+{"kind":"dashboard","code":0,"stderr":"","requests":1,"tools":[["edit","glob","grep","read","skill","write"]],"mcpInstructions":[false],"loginomHint":[false],"leases":"no directory"}
+{"kind":"ordinary","code":0,"stderr":"","requests":1,"tools":[["edit","glob","grep","question","read","shell","skill","subagent","todowrite","webfetch","websearch","write","execute"]],"mcpInstructions":[true],"loginomHint":[false],"leases":"no directory"}
+```
+
+В запросе дашборда нет `shell`, `subagent`, `execute`, `loginom_*` и инструкций MCP; в контроле `shell`, `subagent` и
+инструкции есть. Записей аренды нет в обоих: у запуска из исходников без ресурсов Host нет вовсе. Отсутствие аренды при
+готовом Host проверено только на сервере (Host по сценарию, выше).
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29b/scripts/suites.sh`): база — `5fd8e2f598` в `<scratchpad>/b29b/base`, итог — это
+дерево на `0acedddf40`; по пакетам подряд, `bun test` из каталога пакета, каждый под `unshare -n` со свежими временными
+`HOME`/`TMPDIR`/`XDG_*`.
+
+| Пакет | `5fd8e2f598` | `0acedddf40` |
+|---|---|---|
+| `loginom-agent` | 76 pass, 0 fail | 85 pass (+9 новых), 0 fail |
+| `server` | 277 pass, 3 skip, 0 fail | 280 pass (+3 новых), 3 skip, 0 fail |
+
+`loginom-access.test.ts` отдельно — 12 pass, 0 fail; с `--rerun-each 3` — 36 pass, 0 fail (25 с).
+
+```text
+$ cd packages/loginom-agent && bun typecheck
+✓ No type errors in 227 files
+$ cd packages/server && bun typecheck
+✓ No type errors in 1,645 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0, как на базе
+against a6b15d33daf6: 609 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+$ bun run check                                   # код 0, под unshare -n, на 0acedddf40
+Found 905 warnings and 0 errors.                  # как в B2.8
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check` и `oxlint` новых и изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **Инструменты дашборда — поимённо, не `dashboard_*`.** Задание называет префикс; 0.4 перечислял три имени. Имя
+  MCP-инструмента — `<сервер>_<инструмент>`, и сервер `dashboard` прошёл бы префикс. Выбран меньший список — имена 0.4.
+- **Защёлка вместо постоянной при старте плагина.** Постоянная открывает дыру: после перезапуска старый чат удалённого
+  дашборда активирует Location при отсутствующей папке (`false`), пересоздание того же дашборда возвращает папку по тому
+  же пути — и новый чат в этой Location получает обычный профиль. Проверка при каждом обращении без защёлки освобождает
+  сессию, когда папку удалили. Защёлка: папка, появившаяся позже, ограничивает сессии сразу; исчезнувшая не освобождает
+  их до выгрузки плагина. Остаётся: после перезапуска чат, чья папка исчезла, получает обычный профиль, пока папки нет, —
+  это закрывает привязка B2.9d (`LOGINOM_SCOPE_DENIED` старому чату).
+- **MCP при поздней папке.** Преобразование MCP смотрит на защёлку, когда реестр серверов собирается. Если папка
+  появилась после активации Location, серверы останутся до следующей перезагрузки MCP: их инструменты скрывает
+  `permits`, но инструкции серверов останутся в контексте. Перезагрузку MCP по срабатыванию защёлки не добавлял — путь
+  редкий (тот же, что выше), записываю для B2.9d.
+- **Вложение агента отклоняется, хотя в v2 оно ничего не запускает.** Ядро v2 только хранит `agents` промпта: модели
+  они не передаются (`core/src/session/runner/to-llm-message.ts:262-264` — только `skills` и `files`), подзадачу никто не
+  создаёт. Отказ сделан, как велит строка нарезки, — это охрана контракта 0.4, а не закрытая дыра. Хук промпта Promise
+  API бросает исключение, ядро получает дефект (`Effect.promise`, `plugin/src/promise/adapter.ts:632`): по HTTP это,
+  вероятно, ответ 500, как дефект `Effect.die(Error("LOGINOM_SCOPE_DENIED"))` в 0.4. Настоящий аналог «сохранённой
+  подзадачи» 0.4 в v2 — команда конфига с `subagent: true`: она создаёт подсессию без инструмента `subagent`
+  (`core/src/config/plugin/command.ts:74-96`). Команды в дашборде не запрещал (0.4 их тоже пускал): подсессия живёт в
+  той же Location, и база её ограничивает — это и проверяет тест.
+- **Мастер в дашборде отвечает `{ granted: true }`**, хотя профиль не меняется: база проверяется раньше допусков. RPC не
+  отклоняю — кнопки мастера в окне дашборда нет, интерфейс — этап C.
+- **Тип `granted` расширен до `Profile`**: `next` возвращает `Profile`, а сужать его до `Grant` пришлось бы проверкой,
+  которая ничего не охраняет — база всё равно читается первой.
+
+### Найдено, не чинил
+
+- Тесты пакета `server` и `loginom-agent`, которые пишут в каталог данных плагина (`Global.Path.data`: профили файлов
+  B2.5b1, теперь папки дашбордов), без временных `XDG_*` пишут в настоящий `~/.local/share/loginom-ai-agent-dev`:
+  preload с изоляцией, как у `core/script/test.ts`, у этих пакетов нет. Записал в «Как запускать» `guarantees.md`.
+- `ServiceHost` — один на процесс. Тест сервера, упавший по таймауту, не закрывает его, и следующий тест с Host в том же
+  файле падает на `LOGINOM_HOST_ALREADY_STARTED`, а папки дашбордов остаются (так было в первом прогоне мутаций, пока
+  сценарий звал терминал). В своих тестах убрал причину таймаута; общий механизм не трогал.
+
+### Не проверено
+
+- Отсутствие аренды из CLI: у запуска из исходников Host нет, записи аренды не появляются ни в дашборде, ни в контроле.
+  С готовым Host — только тест сервера на Host по сценарию; настоящий Node host не запускал.
+- Ответ HTTP на вложение агента (вероятно, 500) — проверен только вызов в процессе.
+- Поздняя папка и MCP (выше) — тестом не покрыто.
+- Windows и macOS (junction, регистр путей) — только в объёме тестов 0.4, на Linux.
+- Desktop: Location окна дашборда — B4 (ВШ-6).
