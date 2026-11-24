@@ -52,7 +52,7 @@ export function draft(directory: string) {
  *   chat is refused in its dashboard, and a fork of a chat moved out of its dashboard is refused there too.
  * - In a dashboard, a session without a binding takes one when first seen: a session moved in from elsewhere none
  *   (refused here, still free elsewhere), any other the current draft — it has had no input yet, or it is a row 0.4
- *   kept without a marker, which 0.4 adopted too.
+ *   kept without a marker (0.4 adopted one only in a folder older than draft IDs).
  */
 export function binding(plugin: Pick<Plugin.Context, "location" | "session" | "storage">, dashboard: () => boolean) {
   const directory = plugin.location.directory
