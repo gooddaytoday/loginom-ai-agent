@@ -42,6 +42,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     ||tabs.length!==1||tabs[0]!==prepared.tab||!tabs[0].classList.contains('x-tab-active'))fail('Port opening workflow changed');
   const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card?.Controller?.FController;
   const calculatorInput=input&&!control&&!variables&&model?.FDiagram?.FNodes?.FCollection?.some(n=>n.FGuid===b.node.node_id&&n.FIconCls==='bg-vendor-icon-calcdata');
+  // REST variables input follows its data input mapping Done on the same graph (LAB-1963).
+  const restVariablesInput=variables&&input&&model?.FDiagram?.FNodes?.FCollection?.some(n=>n.FGuid===b.node.node_id&&n.FIconCls==='bg-vendor-icon-restclient');
   const ownGroupingGraphMask=e=>{
    const roots=exact(b.workflow_ref.prefix+';ModelForm'),diagrams=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    const nodes=model?.FDiagram?.FNodes?.FCollection?.filter(n=>n.FGuid===b.node.node_id);
@@ -51,7 +53,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&diagrams.length===1&&model.FDiagram.FmxGraph.container===diagrams[0]&&e.contains(diagrams[0])
     &&e.classList?.contains('bg-mask-message')===true&&!e.classList.contains('x-mask')&&!e.classList.contains('x-mask-msg')
     &&e.getAttribute('role')!=='dialog'&&nodes?.length===1&&nodes[0].FLocked===false
-    &&(calculatorInput||variables&&input&&['bg-vendor-icon-importtextfile','bg-vendor-icon-importexcelfile'].includes(nodes[0].FIconCls)
+    &&(calculatorInput||variables&&input&&['bg-vendor-icon-importtextfile','bg-vendor-icon-importexcelfile','bg-vendor-icon-restclient'].includes(nodes[0].FIconCls)
       ||(user?nodes[0].FIconCls==='bg-vendor-icon-modelvariables':['bg-vendor-icon-quality','bg-vendor-icon-groupdata'].includes(nodes[0].FIconCls)))
     &&(!r||r.graph===model&&r.workflow===prepared.nodeTargetWorkflowNode&&r.packageNode===prepared.packageNode
       &&r.node===nodes[0]&&r.node.data===r.nodeData&&r.port.parent===r.node&&r.port.data===r.portData&&r.port.FGuid===r.portGuid
@@ -144,7 +146,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   // Grouping/rename, Calculator input mapping or user-variable Done can leave its native graph busy. Wait
   // for this exact surface to settle; never issue a port gesture through it.
-  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput?{sample_limit:150}:{})};
+  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput||restVariablesInput?{sample_limit:150}:{})};
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');
