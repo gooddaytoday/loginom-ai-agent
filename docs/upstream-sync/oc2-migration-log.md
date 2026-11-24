@@ -19250,3 +19250,326 @@ freeGB: 45.5 -> 45.4
 `node_modules`. В настоящих `~/.local/share` и `~/.config` за время работы изменился только журнал канала `local` в
 `~/.local/share/loginom-ai-agent-dev/log`. Записи в нём в 21:07–21:12 и 22:44–22:58 UTC. В это время на Linux шли
 только мои прогоны на стенде, так что это запуски CLI из исходников другой задачи, как в B4.14b.
+
+## B4.7c Свой pty в Desktop и имя exe
+
+23.11.2026. Ветка `b47c-desktop-pty-brand` от `oc2-migration` (`22ed63e68a`), рабочее дерево `.claude/worktrees/b47c`.
+Эталон 0.4 — `v0.4.0`. Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`;
+`bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci --ignore-scripts` клиента
+`packages/loginom-runtime/client`; Electron 44.9.1 для тестов `desktop` распакован его `install.js` из кэша
+`~/.cache/electron` (архив там уже был, кэш не изменился). Хук `pre-commit` (`bun run secrets staged`) — `clean` на
+каждом коммите. Rust — `rustup`, пин пакета 1.90.0, Zig 0.16.0 из scratchpad, `CARGO_TARGET_DIR` — в scratchpad. Тесты и
+мутации — под `unshare -n` (поднят только `lo`) с временными `HOME`, `TMPDIR`, `XDG_*`. С сетью — только `npm ci`,
+`cargo` (Ghostty), загрузки среды Bun для Windows (GitHub) и трёх пакетов npm Windows для кросс-сборки (во временный кэш
+Bun). Модель не вызывалась: Desktop поднимал службу и терминал без единой подсказки, тесты `cli` — с подставными
+моделями, как на базе. Стенд Windows не трогал. База для сравнения — отдельное временное дерево на `22ed63e68a` в
+scratchpad (удалено).
+
+Прочитано: этот журнал — B2.7a9, B4.7, B4.14c (BRAND-01 «Диспетчер задач»: служба `loginom-ai-agent-cli.exe` —
+**«Bun»**); BRAND-01 в `docs/testing/loginom-ai-agent/README.md`; `cli/script/{build,opencode-pty,node-assets}.ts`,
+`core/src/persistent-pty/{binary.bun,pty-binding}.ts`, `desktop/script/{build,utils}.ts`, `script/native-arch.ts`,
+`process-daemon/build.rs`, `release-process-daemon.yml`, `check-test.yml`, `release.yml`, `script/build-windows.ps1`;
+документация Bun 1.4.4 (`bun-types/docs/bundler/executables.mdx`, `docs/snippets/cli/build.mdx`);
+`.opencode/skills/unit-tests`.
+
+### Что было в 0.4
+
+- **Описание exe.** Сборка CLI 0.4 передавала Bun пустое `windows: {}` (`v0.4.0:packages/opencode/script/build.ts:202`,
+  так же `packages/cli/script/build.ts:83`); `--windows-title`, `--windows-publisher`, `--windows-version`,
+  `--windows-description`, rcedit, resedit — нигде (`git grep` по `v0.4.0`). У исполняемого файла CLI 0.4 был ресурс
+  версии самого Bun, и в Диспетчере задач процесс назывался **«Bun»** — по коду: отчётов 0.4 с этим именем нет.
+- **pty.** Своего pty в 0.4 не было (B2.7a9): `bun-pty` в процессе сервера, без сокетов.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `a446ee6bad` `feat(cli): embed loginom-ai-agent-pty in the CLI that Desktop bundles (B4.7c)` | `cli/script/{build,opencode-pty}.ts`, тест `cli/test/product-pty.test.ts` (+3 случая) |
+| `d3e65bf9cf` `feat(cli): name the product in the Windows version resource of the CLI executable (B4.7c)` | `cli/script/build.ts`, файл форка `cli/script/windows-resource.ts`, `product/src/index.ts`, тест `cli/test/windows-resource.test.ts` |
+| `461e462ef4` `docs(upstream-sync): describe Desktop's own pty and the Windows version resource of the CLI in the catalog (B4.7c)` | `catalog.md`: CAT-02, CAT-13 |
+| следующий | этот раздел |
+
+Файлы кода — четыре (предел — пять):
+
+| Файл | Строк | Каталог |
+|---|---|---|
+| `cli/script/build.ts` | +12 −5 | CAT-12 по маске (описание — CAT-02) |
+| `cli/script/opencode-pty.ts` | +37 −11 | CAT-12 по маске (описание — CAT-13) |
+| `cli/script/windows-resource.ts` | +60, новый | файл форка |
+| `product/src/index.ts` | +3 | пакет форка |
+
+`catalog.json` не менялся: оба файла upstream расходились и до задачи, `catalog-check` — 609 расходящихся файлов, как на
+базе. `cli/package.json`, `bun.lock` и файлы B2.8 (`cli/src/*`, CAT-07, CAT-08) не тронуты.
+
+### Часть 1: свой pty у CLI Desktop
+
+Было: `build.ts` звал `resolveProductPty` только при `--standalone`; сборка по умолчанию — та, что берёт Desktop
+(`desktop/script/build.ts` копирует `cli/dist/cli-<цель>/bin/opencode` в `resources/loginom-ai-agent-cli`, B4.7), —
+`resolveOpencodePty`, бинарник npm `@opencode/pty-<платформа>` со своими сокетами в `/tmp/opencode-pty-<uid>`.
+
+Стало (`a446ee6bad`):
+
+- обе сборки зовут `resolveProductPty`, правила B2.7a9: `cargo build --locked --release` в `packages/process-daemon` или
+  готовый из `LOGINOM_AI_AGENT_PTY_BIN`, проверка `--version` (`loginom-ai-agent-pty <версия> (protocol N)`), без отката
+  на npm;
+- **цель другой платформы, архитектуры или musl** — только `LOGINOM_AI_AGENT_PTY_BIN` (без него — прежняя ошибка «for this
+  machine only», теперь с подсказкой про переменную). Запустить `.exe` на Linux нельзя, поэтому сборка читает файл:
+  первый образ — PE, ELF или Mach-O цели и её архитектуры (`NativeArch.images`), внутри есть строка
+  `loginom-ai-agent-pty`. Бинарник npm называет себя только `opencode-pty`: в Linux-бинарнике npm 0.5.2 строка
+  `loginom-ai-agent-pty` встречается 0 раз, `opencode-pty` — 10; в своей сборке `loginom-ai-agent-pty` — 8 раз. Версия
+  (имя каталога кэша рядом с хешем) — из `packages/process-daemon/Cargo.toml`;
+- сборка Node (`node-assets.ts`) не менялась: бинарник npm, как раньше.
+
+**Выпуск Windows собирается на Windows (B5.1):** `build.rs` знает для Windows только цели `*-windows-msvc`, выпуск
+upstream собирает их на раннерах Windows (`release-process-daemon.yml`, `build-windows`). Там `build.ts` сам запускает
+`cargo` (`+crt-static`, B2.7a9). Кросс-сборка Windows на Linux — только с готовым `loginom-ai-agent-pty.exe` в
+`LOGINOM_AI_AGENT_PTY_BIN`.
+
+### Часть 2: ресурс версии exe
+
+**Факт Bun 1.4.4: `compile.windows` при кросс-сборке не работает.** Документация: «Except for `hideConsole`, you can't
+use these flags when cross-compiling because they depend on Windows APIs». Проба на Linux (`hi.ts`, цель
+`bun-windows-x64-baseline`):
+
+```text
+$ bun build --compile --target=bun-windows-x64-baseline --windows-title "Loginom AI Agent Dev" … hi.ts
+error: Using --windows-title is only available when compiling on Windows
+# Bun.build({ compile: { windows: { title, publisher, version, description, copyright } } }) — success, без ошибки:
+$ pefile hi.exe
+FileDescription "Bun", ProductName "Bun", CompanyName "Oven", FileVersion "1.4.4", InternalName "bun", OriginalFilename "bun.exe"
+```
+
+resedit (редактор ресурсов PE, им electron-builder пишет ресурс exe Desktop) готовый exe Bun не берёт: «After Resource
+section, sections except for relocation are not supported» — Bun кладёт свой раздел `.bun` после `.rsrc` и `.reloc`. У
+самой среды Bun (`bun-windows-x64-baseline-v1.4.4`) после `.rsrc` только `.reloc`, и resedit её правит; Bun затем
+добавляет `.bun` к среде с ресурсом продукта (`compile.executablePath`). Сравнение разделов пробы — exe из исходной
+среды и из правленой: `.text`, `.rdata`, `.data`, `.pdata`, `.bunblt`, `.tls`, `.reloc` — те же хеши и адреса;
+различаются содержимое `.rsrc` (новый ресурс уместился в прежний раздел, `.reloc` не сдвинулся), размер каталога
+ресурсов и раздела `.rsrc` в заголовках, контрольная сумма заголовка и `.bun` на один байт (имя выходного файла пробы
+`hi` и `hi3`); подпись Authenticode среды снимается (Bun снимает её и сам).
+
+Стало (`d3e65bf9cf`), для обеих сборок, только у целей `win32`:
+
+- `windowsResource(канал, версия)` (`windows-resource.ts`): `title` и `description` — `productName(productChannel(…))`
+  (`latest` → prod, как `util/src/global.ts`), то есть «Loginom AI Agent», «… Beta», «… Dev»; `publisher` —
+  `Product.publisher` (новое поле, «Loginom»: тот же издатель, что у exe Desktop из `author` его `package.json`);
+  `version` — четыре числа из `x.y.z` версии сборки (`0.5.1` → `0.5.1.0`, `0.0.0-dev-…` → `0.0.0.0`), иначе ошибка;
+- `build.ts` передаёт это в `compile.windows` — так ресурс пишет Bun, когда собирает на Windows;
+- на другой машине `compileExecutable` для цели Windows скачивает среду Bun (если нет `BUN_COMPILE_RELEASE` — выпуск
+  запущенного Bun, `bun-v1.4.4`; тот же путь upstream: GitHub, `SHASUMS256.txt`) и записывает в неё ресурс
+  (`brandWindowsRuntime`: `ProductName`, `FileDescription`, `CompanyName`, `FileVersion`, `ProductVersion` и числовые
+  версии во всех языках ресурса). resedit берётся из `app-builder-lib` Desktop через `createRequire`, как `@opencode/pty`
+  из `core`: зависимость CLI не добавлялась.
+
+`InternalName` «bun», `OriginalFilename` «bun.exe» и `LegalCopyright` (ссылка на лицензию Bun) остаются: у
+`compile.windows` для них полей нет, и сборка на Windows их тоже не меняет — поля одинаковы на обеих машинах.
+
+#### Кросс-сборка Windows CLI на Linux
+
+`<scratchpad>/b47c/build-win.sh`: `LOGINOM_AI_AGENT_TARGET=windows-x64-baseline`, канал `dev`, обе сборки (по умолчанию
+и `--standalone`), `--skip-install --skip-web-ui`, `BUN_INSTALL_CACHE_DIR` — временный. Нативные пакеты Windows, которые
+разрешает бандл (`@opentui/core-win32-x64` 0.8.4, `@parcel/watcher-win32-x64` 2.5.1, `@ff-labs/fff-bin-win32-x64`
+0.10.5), — `bun install --os=win32 --cpu=x64` во временный каталог и ссылки в `node_modules` дерева на время сборки
+(убраны). **pty — заглушка:** своего `loginom-ai-agent-pty.exe` здесь нет (`build.rs` — только MSVC), поэтому
+`LOGINOM_AI_AGENT_PTY_BIN` — 121-байтный файл из `standin-pty.ts`: заголовок PE x64 и строка с именем продукта, не
+программа. Этот CLI терминал не откроет; он нужен только для ресурса версии.
+
+```text
+building cli-windows-x64-baseline
+default build 22.34 s
+building cli-windows-x64-baseline
+standalone build 24.65 s
+$ pefile default/cli-windows-x64-baseline/bin/opencode.exe            # то, что Desktop копирует в loginom-ai-agent-cli.exe
+FileDescription "Loginom AI Agent Dev", ProductName "Loginom AI Agent Dev", CompanyName "Loginom",
+FileVersion "0.0.0.0", ProductVersion "0.0.0.0", FixedFileVersion 0.0.0.0, InternalName "bun", OriginalFilename "bun.exe"
+$ pefile standalone/cli-windows-x64-baseline/bin/loginom-ai-agent-cli.exe
+FileDescription "Loginom AI Agent Dev", ProductName "Loginom AI Agent Dev", CompanyName "Loginom", FileVersion "0.0.0.0" …
+sha256 90e7d5a3…a2ddfa (по умолчанию), b2bf0906…5b67e3 (standalone); заглушка pty встроена в оба
+```
+
+Чтение — Python `pefile` 2024.8.26 во временном venv (`peinfo.py`: `StringFileInfo` и `VS_FIXEDFILEINFO`). Сборки,
+среда Bun, venv, временный кэш и пакеты Windows удалены.
+
+### Часть 3: сборка `--linux dir` и терминал в сессии
+
+Сборка — `<scratchpad>/b47c/build.sh`, как B4.7: встроенный CLI `LOGINOM_AI_AGENT_TARGET=linux-x64-baseline bun
+script/build.ts --skip-install --skip-web-ui` (с `cargo` и Zig в `PATH`, `LOGINOM_AI_AGENT_PTY_BIN` снята), `bun run
+build` Desktop (`LOGINOM_AI_AGENT_NODE_SOURCE`, `LOGINOM_AI_AGENT_BROWSER_SOURCE`, B4.8a), `electron-builder --linux dir
+--x64`. Канал `dev`: 19 + 34 + 28 с, все — код 0.
+
+```text
+    Finished `release` profile [optimized] target(s) in 0.19s      # cargo из build.ts; первая сборка release — 121 с
+building cli-linux-x64-baseline
+$ target/release/loginom-ai-agent-pty --version && sha256sum …
+loginom-ai-agent-pty 0.5.2 (protocol 8)
+c0f9b903763a1ed8af84542d74f633dd78c901494e100091c72585d7c3966e0d
+$ cat resources/loginom-ai-agent-cli.version
+0.0.0-dev-202611240006
+# resources/loginom-ai-agent-cli: своя служба встроена байт в байт — да; бинарник npm opencode-pty — нет
+```
+
+Приёмка — `<scratchpad>/b47c/accept.sh`: root, `xvfb-run -a`, `--no-sandbox`, свой
+`LOGINOM_AI_AGENT_DESKTOP_TEST_ROOT` и `HOME`, **свой `/tmp`**: прогон идёт в своём пространстве монтирования с tmpfs на
+`/tmp` (scratchpad возвращён bind-монтированием), потому что `/tmp/opencode-pty-0` на этой машине пишут тесты соседних
+агентов с бинарником npm (mtime каталога менялся во время задачи). Так содержимое `/tmp` после прогона — ровно то, что
+создали этот Desktop и его служба. Терминал — `probe-terminal.ts`: адрес и пароль из `service-desktop.json`,
+`POST /api/experimental/session/<id>/terminal`, как в B2.7a9, без модели. Окно закрывается через CDP (B4.10).
+
+```text
+private /tmp before the run: []
+registration: <run>/state/loginom-ai-agent-dev/service-desktop.json, service pid 3094477, http://127.0.0.1:28290
+service exe: <run>/desktop/cli-stages/0.0.0-dev-202611240006-x64/loginom-ai-agent-cli
+  terminal: pty_persistent_8381467572892401 status=running
+  snapshot: "pty-probe:<run>/work"                                   # строка перенесена по ширине экрана, сокращено
+  pty service.json: runtime=<run>/state/loginom-ai-agent-dev/pty/a1ecce80-… pid=3094588 protocol=8 socket=/tmp/loginom-ai-agent-pty-0/b4f699f5bb1ab07e178c33256d072008.sock
+  socket exists: true
+  daemon exe: <run>/cache/loginom-ai-agent-dev/bin/loginom-ai-agent-pty/0.5.2-c0f9b903763a1ed8/loginom-ai-agent-pty
+  daemon args: daemon --runtime-dir <run>/state/loginom-ai-agent-dev/pty --name a1ecce80-…
+  daemon parent: 3094477 (Desktop service pid 3094477)
+  daemon --version: loginom-ai-agent-pty 0.5.2 (protocol 8)
+  daemon sha256: c0f9b903763a1ed8af84542d74f633dd78c901494e100091c72585d7c3966e0d = cargo build
+  listening unix sockets of the daemon: /tmp/loginom-ai-agent-pty-0/b4f699f5bb1ab07e178c33256d072008.sock
+  terminal deleted
+private /tmp with the service running: [.X11-unix .X99-lock .bun-0-….so .bun-0-….node loginom-ai-agent-dev loginom-ai-agent-pty-0 org.chromium.Chromium.scoped_dir.… scoped_dir… xvfb-run.… ]
+  /tmp/loginom-ai-agent-pty-0: b4f699f5bb1ab07e178c33256d072008.sock
+closed 1 page(s): oc://renderer/index.html
+app exit: code 0
+5 s later: service alive: [], pty daemons: []
+registration exists: no
+private /tmp after the run: [.X11-unix .bun-0-….so .bun-0-….node loginom-ai-agent-dev loginom-ai-agent-pty-0 ]
+  /tmp/loginom-ai-agent-pty-0: []                                    # служба вышла с окном и убрала сокет
+opencode-pty anywhere in private /tmp: []
+opencode anywhere in the run root: []
+left (by this build or run path): []
+```
+
+Сборка, прогон, `packages/desktop/{out,resources/…}`, `packages/cli/{dist,.cache}` удалены.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `cli/test/product-pty.test.ts`, «takes a prebuilt LOGINOM_AI_AGENT_PTY_BIN for another platform only when it is ours and for that target» (новый) | цель `win32-x64`, `cargo` падает: PE x64 со строкой `loginom-ai-agent-pty` принят, версия — из `Cargo.toml`, sha256 файла; PE x64 со строкой `opencode-pty` — «is not loginom-ai-agent-pty»; PE arm64 и ELF x64 со строкой продукта — «is not a PE executable for win32-x64» |
+| там же, «the default build, which Desktop bundles, embeds no other terminal service» (новый) | настоящий `script/build.ts --single --skip-install --skip-web-ui` в отдельном процессе Bun, выход во временный каталог, `LOGINOM_AI_AGENT_PTY_BIN` отвечает как npm: код 1, «is not loginom-ai-agent-pty from packages/process-daemon», выход пуст; без сети, ~1 с. Каталог `packages/cli/.cache`, который сборка пишет до целей, убирается, если его не было |
+| там же, «is built only for the machine that builds the CLI» (+1 проверка) | `win32-x64` без переменной — ошибка с подсказкой про `LOGINOM_AI_AGENT_PTY_BIN` |
+| `cli/test/windows-resource.test.ts` (новый, 2 случая) | значения по каналам (`latest`, `prod`, `beta`, `dev`, `local`, имя ветки) и версиям, нечисловая версия — ошибка; `brandWindowsRuntime` на маленьком exe с ресурсом Bun 1.4.4 (собран resedit в тесте): строки и числовые версии продукта для `dev` и для выпуска `1.2.3`, поля без аналога в `compile.windows` — как у Bun |
+
+Заглушка вместо настоящей среды Bun (110 МБ) — exe из `NtExecutable.createEmpty` с ресурсом Bun; настоящая среда и
+собранный CLI проверены выше `pefile`.
+
+### Мутации
+
+Юнит (`<scratchpad>/b47c/mutate.py`: одна точная замена, тесты `product-pty.test.ts` и `windows-resource.test.ts`
+под `unshare -n` с временными каталогами, файл возвращается; после — `git status` чистый):
+
+```text
+=== M0 no mutation: 8 pass / 0 fail
+=== PD1 the default build (Desktop's) embeds the upstream npm binary again: 5 pass / 1 fail     # сборка дошла до конца за 18,8 с, код 0 вместо 1
+=== PF1 a prebuilt binary for another platform is taken unread: 5 pass / 1 fail
+=== PF2 the product's name is not looked for in a binary for another platform: 5 pass / 1 fail
+=== PF3 the format and architecture of a binary for another platform are not checked: 5 pass / 1 fail
+=== PF4 cargo builds for any target when no binary is given: 5 pass / 1 fail
+=== WR1 the stable channel (latest) is named Dev: 0 pass / 2 fail
+=== WR2 the version is Bun's free text, not four numbers: 1 pass / 1 fail
+=== WR3 the description stays Bun's: 1 pass / 1 fail
+=== WR4 the fixed file and product version keep Bun's numbers: 1 pass / 1 fail
+=== WR5 the publisher is not the product's: 0 pass / 2 fail                                     # Product.publisher = "Oven"
+```
+
+Шов ресурса в `build.ts` (скачать среду и записать в неё ресурс) юнит-тест не видит: без сети среды нет. Его краснит
+собранный exe (`<scratchpad>/b47c/mutate-win.py`: замена в `build.ts`, кросс-сборка CLI по умолчанию для
+`windows-x64-baseline`, `pefile`, возврат файла):
+
+```text
+=== MW1 the downloaded Windows runtime is not branded: build exit 0; FileDescription='Bun' ProductName='Bun' CompanyName='Oven'
+=== MW2 a cross-build lets Bun fetch its own runtime (no download to brand): build exit 0; FileDescription='Bun' ProductName='Bun' CompanyName='Oven'
+```
+
+В обеих `compile.windows` с именем продукта по-прежнему передаётся Bun — и не действует: это и есть ограничение
+кросс-сборки.
+
+### Приёмка
+
+База — то же дерево на `22ed63e68a` во временном каталоге (своё `bun install --frozen-lockfile`, `npm ci` клиента
+`loginom-runtime`, Electron из кэша); наборы — `<scratchpad>/b47c/suite.sh`: `bun test --timeout 60000` под `unshare -n`,
+свежие временные `HOME`/`TMPDIR`/`XDG_*`, `LOGINOM_AI_AGENT_TEST_NODE` — Node 24.19.0; падения сравнивались по именам
+из JUnit.
+
+| Набор | `22ed63e68a` | итог (`461e462ef4`) |
+|---|---|---|
+| `cli` `bun test` | 592 pass, 9 skip, 1 fail (602 теста, 77 файлов). Падение — `bundled ripgrep of the server`: без сети и без кэша rg тест скачивает rg; с кэшем rg из B2.7a9 (`LOGINOM_AI_AGENT_RIPGREP_CACHE`) на базе — 3 pass | с тем же кэшем: 599 pass, 9 skip, 0 fail (608, 78): +2 `product-pty`, +2 `windows-resource`, ripgrep — 3 теста вместо одного упавшего |
+| `desktop` `bun test` | 612 pass, 4 skip, 0 fail (616, 79) | 612 pass, 4 skip, 0 fail (616, 79), имена те же |
+| `product` `bun test` | 59 pass, 4 fail (63) | 59 pass, 4 fail (63): те же тесты и те же тексты падений (ниже, «Найдено») |
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,230 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc                           # код 0
+$ cd packages/product && bun typecheck                               # tsgo --noEmit, код 0
+$ oxlint <6 изменённых файлов>
+Found 0 warnings and 0 errors.
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 609 divergent upstream files                    # как на базе
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                                 # код 0
+$ bun install --frozen-lockfile
+Checked 1694 installs across 2084 packages (no changes)
+$ bun run secrets range 22ed63e68a HEAD
+{"status":"clean","commits":3,…}
+$ bun run check                                                       # код 0, на 461e462ef4 (после него — только этот раздел)
+Found 905 warnings and 0 errors.                                      # как в B2.7a9; в изменённых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+`prettier --check`: новые и изменённые строки форматированы; `opencode-pty.ts` не проходил и на базе (длинная строка
+после `apply-identity`, B1.4a).
+
+### Где решал сам
+
+- **Сборка по умолчанию целиком на своём pty, а не новый режим для Desktop.** В продукте сборку по умолчанию берёт только
+  Desktop; задание требует «без тихого отката на npm». Поэтому её требования теперь как у standalone: `cargo` и Zig или
+  `LOGINOM_AI_AGENT_PTY_BIN` (что это ломает — ниже).
+- **Готовый pty для чужой платформы читается, а не запускается.** Не просили, но без проверки
+  `LOGINOM_AI_AGENT_PTY_BIN` с бинарником npm для Windows тихо вернул бы `/tmp/opencode-pty-<uid>` и канал upstream.
+  Версия — из `Cargo.toml`: из чужого бинарника её надёжно не достать, а она называет только каталог кэша рядом с хешем.
+- **Ресурс версии на Linux — через среду Bun, не через флаги.** Задание ждало флаги `bun build --compile`; на Linux Bun их
+  не применяет (выше). Меньший вариант — только `compile.windows` — проверить здесь нельзя вообще, и кросс-сборка
+  (стенд B4.14c собирал так) осталась бы «Bun». Правка среды до компиляции работает на любой машине и читается `pefile`;
+  на Windows ресурс пишет сам Bun теми же значениями, а среда без `BUN_COMPILE_RELEASE` не скачивается.
+- **`FileDescription` = `ProductName` = имя продукта канала.** Задание: «в Диспетчере задач процесс службы — имя
+  продукта». Так же у exe Desktop (B4.14c: «Loginom AI Agent Dev»). Отдельного «… CLI» не вводил.
+- **`Product.publisher` — новое поле.** Задание требует значения из `packages/product`, а издателя там не было: Desktop
+  берёт «Loginom» из `author` своего `package.json`. Desktop на поле не переводил.
+- **Версия — `x.y.z.0`.** Windows хранит четыре 16-битных числа; суффикс сборки (`-dev-202611240006`) в них не
+  помещается и отбрасывается, в том числе в строковых `FileVersion`/`ProductVersion`, чтобы обе машины писали одно.
+- **`LegalCopyright` не задавал.** Не просили; остаётся ссылка Bun на его лицензию (сведения об исходных проектах
+  BRAND-01 допускает).
+- **resedit — транзитивная зависимость Desktop**, без правки `cli/package.json` и `bun.lock` (файлы пакета B2.8).
+
+### Найдено, не чинил
+
+- **Сборка по умолчанию теперь требует `cargo` 1.90.0, Zig 0.16.0 и сеть (Ghostty) или `LOGINOM_AI_AGENT_PTY_BIN`.**
+  Без них упадут: `check-test.yml` («Verify compiled service lifecycle», Linux и Windows), `release.yml` `build-cli`
+  (`bun run build` — 12 целей на одном Linux, у чужих целей нет своего pty, одна переменная на все цели не годится),
+  `nix/opencode.nix`, шаг `build-cli` в `procedure.md`, сборка CLI для WSL в `desktop/script/dev.ts`. Пути выпуска —
+  B5.1.
+- **Desktop без собранного `cli/dist` по-прежнему берёт CLI upstream.** `desktop/script/build.ts` в каналах `dev` и `beta`
+  скачивает `@opencode/cli-<цель>` из npm (`downloadCliToResources`) — это CLI OpenCode с бинарником npm и сокетами в
+  `/tmp/opencode-pty-<uid>`; `prod` без `cli/dist` падает. Не менял: задание — про сборку CLI.
+- **Сборка Node** (`node-assets.ts`) встраивает бинарник npm.
+- **Порог glibc** своей службы (B2.7a9, «Найдено») теперь касается и CLI Desktop.
+- **Проверка готового pty для musl** не отличает musl от glibc: оба — ELF x64.
+- **`InternalName` «bun», `OriginalFilename` «bun.exe»** остаются в ресурсе (видны в свойствах файла, не в Диспетчере
+  задач); у Bun для них нет параметров.
+- **Тест `product` на базе — 4 падения** (`OPENCODE_*` в исходниках, `--filter` в CI, фильтры путей CI, пути в сценариях
+  сборки) — те же и после задачи, к ней не относятся.
+
+### Не проверено
+
+- **Windows.** Ни один exe не запускался: wine здесь нет, стенд не трогал. Работает ли CLI из правленой среды Bun —
+  по сравнению разделов (выше), не запуском; как Bun на Windows пишет `compile.windows` (в том числе версию `0.0.0.0`) — по
+  документации. Имя службы в Диспетчере задач проверит B5.1 или повтор B4.14c.
+- **Настоящий `loginom-ai-agent-pty.exe`** в кросс-сборке — нет, только заглушка; собрать его на Linux нельзя (MSVC).
+- **macOS** и цели arm64, musl — не собирались.
+- **deb, rpm, AppImage** и установленный Desktop — нет, только `--linux dir` от root с `--no-sandbox`.
