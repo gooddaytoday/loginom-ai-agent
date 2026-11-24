@@ -77,6 +77,43 @@ describe("product defaults of the server", () => {
     }
   }, 60_000)
 
+  // A service applies the saved environment of its config (`env`) before it starts the server. When that moves
+  // LOGINOM_AI_AGENT_CONFIG_DIR, the mode comes from the directory the server then reads, not from the one it started with.
+  test("«Только этот компьютер» in a config dir moved by the saved service environment keeps the service offline", async () => {
+    const root = await temporary("cli-network-service-")
+    const project = path.join(root, "project")
+    const saved = path.join(root, "saved-config")
+    await fs.mkdir(project)
+    await Bun.write(
+      path.join(saved, "loginom-ai-agent.json"),
+      JSON.stringify({ network: "device", providers: stub("http://127.0.0.1:9/v1") }),
+    )
+    const free = net.createServer()
+    await new Promise<void>((resolve) => free.listen(0, "127.0.0.1", resolve))
+    const port = (free.address() as net.AddressInfo).port
+    await new Promise((resolve) => free.close(resolve))
+    await Bun.write(
+      path.join(root, "config", "service-local.json"),
+      JSON.stringify({ port, env: { LOGINOM_AI_AGENT_CONFIG_DIR: saved } }),
+    )
+    const result = await serve(
+      root,
+      async (call) => {
+        await active(call, project)
+        const models = (await call("GET", `/api/model?location[directory]=${encodeURIComponent(project)}`)).data as {
+          providerID: string
+        }[]
+        return models.map((item) => item.providerID)
+      },
+      {},
+      ["--service"],
+    )
+    expect(result.requests).toEqual([])
+    // The server read the moved config (its provider is listed) and offers no free model.
+    expect(result.value).toContain("stub")
+    expect(result.value).not.toContain("opencode")
+  }, 60_000)
+
   test("«Интернет» by default asks the model catalog and answers with OpenCode's free model", async () => {
     const free = await freeModel()
     try {
@@ -213,11 +250,12 @@ function stub(url: string) {
 
 type Call = ReturnType<typeof api>
 
-// `serve --port 0` in an isolated home with a recording proxy stub; `run` drives it, then the server stops.
+// `serve --port 0` (or `args`) in an isolated home with a recording proxy stub; `run` drives it, then the server stops.
 async function serve<A>(
   root: string,
   run: (call: Call) => Promise<A>,
   overrides: Record<string, string | undefined> = {},
+  args = ["--port", "0"],
 ) {
   const requests: string[] = []
   const proxy = net.createServer((socket) =>
@@ -228,7 +266,7 @@ async function serve<A>(
   )
   await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve))
   const address = `http://127.0.0.1:${(proxy.address() as net.AddressInfo).port}`
-  const child = Bun.spawn([process.execPath, path.join(cli, "src/index.ts"), "serve", "--port", "0"], {
+  const child = Bun.spawn([process.execPath, path.join(cli, "src/index.ts"), "serve", ...args], {
     // The CLI entry needs the preload from this package's bunfig.toml.
     cwd: cli,
     env: isolatedEnv(root, {
@@ -240,6 +278,8 @@ async function serve<A>(
       LOGINOM_AI_AGENT_MODELS_URL: undefined,
       LOGINOM_AI_AGENT_MODELS_PATH: undefined,
       LOGINOM_AI_AGENT_PASSWORD: password,
+      LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
+      LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
       OPENCODE_API_KEY: undefined,
       HTTPS_PROXY: address,
       HTTP_PROXY: address,
@@ -255,7 +295,12 @@ async function serve<A>(
     stderr: "pipe",
   })
   try {
-    const value = await run(api(await listening(child)))
+    const url = await listening(child)
+    // A service keeps its password in its config file, written before it listens.
+    const secret = args.includes("--service")
+      ? (await Bun.file(path.join(root, "config", "service-local.json")).json()).password
+      : password
+    const value = await run(api(url, secret))
     return { value, requests }
   } finally {
     child.kill("SIGTERM")
@@ -290,12 +335,12 @@ async function listening(child: Bun.Subprocess<"ignore", "pipe", "pipe">) {
   throw new Error(`serve exited with ${await child.exited}: ${await stderr}`)
 }
 
-function api(base: string) {
+function api(base: string, secret: string) {
   return async (method: string, route: string, body?: unknown) => {
     const response = await fetch(new URL(route, base), {
       method,
       headers: {
-        authorization: `Basic ${btoa(`loginom-ai-agent:${password}`)}`,
+        authorization: `Basic ${btoa(`loginom-ai-agent:${secret}`)}`,
         "content-type": "application/json",
       },
       body: body === undefined ? undefined : JSON.stringify(body),
