@@ -22673,11 +22673,12 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и полные прогоны — под `unshare -n`
 (поднят только `lo`), со свежими временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`.
 **Модель не вызывалась:** в тестах сервера — `TestLLM`, сети нет. Прочитано: решение В-102 (и В-31); этот журнал — B2.9a
-(строка B2.9g, вопрос 1, «Где решал сам»), B2.9f, B2.6a…c; 0.4 — `tool/dashboard.ts` (`DashboardDeleteTool`),
-`permission/index.ts`, `session/prompt.ts` (конец хода), тесты `tool/dashboard.test.ts` и `session/prompt.test.ts`; пакет
-`dashboard` — `agent/{folder,draft}.ts`, `draft/server.ts`; `loginom-host/src/{adapter,dashboard,errors}.ts`; v2 —
-`core/src/permission.ts`, `core/src/config/plugin/policy.ts`, `core/src/session/model-request.ts`,
-`core/src/session/runner/publish-llm-event.ts` (`progress`), `plugin/src/promise/{adapter,tool}.ts`.
+(строка B2.9g, вопрос 1, «Где решал сам»), B2.9f, B2.6a…c («Где решал сам», «Найдено»); план этапа B — строки о В-102;
+0.4 — `tool/dashboard.ts` (`DashboardDeleteTool`), `permission/index.ts`, `session/prompt.ts` (конец хода), тесты
+`tool/dashboard.test.ts` и `session/prompt.test.ts`; пакет `dashboard` — `agent/{folder,draft}.ts`, `draft/server.ts`;
+`loginom-host/src/{adapter,dashboard,errors}.ts`; v2 — `core/src/permission.ts`, `core/src/config/plugin/policy.ts`,
+`core/src/session/model-request.ts`, `core/src/session/runner/publish-llm-event.ts` (`progress`),
+`plugin/src/promise/{adapter,tool}.ts`.
 
 ### Коммиты
 
@@ -22712,6 +22713,8 @@ packages/loginom-agent/src`. Файлов upstream не правил, `catalog.j
     становится вопросом; `deny` остаётся;
   - `grantable` ложно: RPC `loginom.permission.conversation` на вопросе удаления — `not_grantable`, разрешение вида в
     разговоре его не снимает и открытый вопрос удаления не отвечает.
+
+  Это закрывает находку B2.6a («`dashboard_delete` отнесён к сохранению: при «Разрешено» удалит без вопроса»).
 
   «Запрещено» — инструмент не предложен, вызов по имени отклоняет `execute.before` (`LOGINOM_PERMISSION_DENIED`,
   `denied`), ход продолжается (B2.6b). «Отклонить» — `LOGINOM_PERMISSION_DECLINED`, `declined`, ход продолжается; если до
@@ -22816,7 +22819,7 @@ test`, затем `node --test test/agent/draft.test.mjs`. База прогон
 | `dashboard`, `bun run test` | `test:coverage` — 50 и 36 pass; узловой набор — 91 pass, 3 fail, 2 skip: «a partial source copy is retried completely for new and known projects» и его «new project», «known project» | то же, те же имена |
 | `dashboard`, `draft.test.mjs` | 8 pass, 2 fail: «a prepared folder builds and serves its coherent sample using one shared server», «draft reports at most twenty console errors from the built app» (Chromium ревизии 1246, B2.9e) | то же, те же имена |
 | `loginom-host` | 547 pass, 14 skip, 2 fail: «archive verification preserves manifest modes under a private umask», «actual managed entry reads live bridge work and dispatching over private IPC» | то же, те же имена |
-| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же три |
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же три (и на `bda4a270e3` с этим разделом) |
 
 `fetch.test.ts` отдельно, `--rerun-each 3`: база и итог — 39 pass, 0 fail. Повторы новых случаев: `loginom-dashboard-delete`
 `--rerun-each 3` — 27 pass, 0 fail; `dashboard-tools.test.ts -t delet --rerun-each 3` — 33 pass, 0 fail. Вместе с
@@ -22902,6 +22905,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (`loginom-runtime/src/dashboard-storage.mjs`) не было.
 - Запрос без инструментов при истории с вызовами инструментов — только на подставной модели (маршрут OpenAI Chat).
   Провайдеры, которым нужны определения инструментов при `tool_use` в истории, не проверялись.
+- Промпт, принятый (steer) пока шло удаление: он попадает в то же исполнение, и после удаления модель ответит на него
+  без инструментов, а не отказом `LOGINOM_SCOPE_DENIED` — по коду (метка конца хода проверяется, а не снимается).
 - Удаление из CLI (`run` без терминала — отказ, ввод фразы — B2.9j) и из Desktop (ВШ-6, B4); показ вопроса без «always» и
   прогресса (этап C).
 - Остановка посреди `dashboardDelete` и удаление папки во время сборки черновика — по коду (тот же `interrupt` Host и
