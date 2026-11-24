@@ -303,7 +303,7 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
 // The new phase ends at the configured format page. Mapping, finish and run
 // belong to the enclosing node operation; no wizard reopen occurs here.
 export const configureTextImportFields=(channel,parameters,owner,{boundSource=false}={})=>configureImport(channel,parameters,owner,true,undefined,boundSource);
-export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false,boundSource=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema},boundSource);
+export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false,boundSource=false,captureOutputLayout}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema,captureOutputLayout},boundSource);
 export const configureTextImportDraft=(channel,parameters,owner)=>configureImport(channel,parameters,owner,false);
 
 export function bindImportSourceColumns(requested,observed) {
@@ -577,7 +577,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   };
   // Read the existing schema before changing parsing options: Loginom may
   // regenerate definitions when the source, header or delimiter changes.
-  if(patch&&Object.keys(parameters.source).length) {
+  const replacingSource=patch&&!patch.preserveSchema&&!boundSource&&parameters.source.source_path!==undefined
+    &&parameters.source.source_path!==sourceBaseline.fields.source_path.value;
+  if(patch&&Object.keys(parameters.source).length&&!replacingSource) {
     await next('text_import_file','text_import_format');
     await capturePatchSchema();
     await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner:currentOwner,read,ready:isTextImportSourceReady});
@@ -642,6 +644,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       throw new ImportInitialSettingsError('Format parameters are incomplete');
   }
   if(patch&&!columnBaseline)await capturePatchSchema();
+  // Capture the retained output layout only after the verified replacement
+  // file can be parsed, before applying format/type/column changes.
+  if(patch?.captureOutputLayout)await patch.captureOutputLayout();
   const formatRequested=k=>Object.hasOwn(parameters.format,k)||k==='analysis_rows'&&parameters.analysis?.rows!==undefined;
   let delimiterChanged=false;
   // The mode is chosen after parsing settings; analysis and refresh follow it.
