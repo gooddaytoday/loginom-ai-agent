@@ -401,14 +401,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
-   const interfaceId=value(identity,'$I');
-   need(identity&&(target.kind==='tree'?interfaceId===141:interfaceId===116||interfaceId===71)
+   const interfaceId=value(identity,'$I'),treeInterface=target.kind==='tree'?bg.IBGDataTree:null,treeInterfaceId=value(treeInterface,'__riid');
+   // RPC interface IDs belong to the loaded Loginom implementation, not the build label.
+   need(identity&&(target.kind==='tree'?Number.isInteger(treeInterfaceId)&&treeInterfaceId>0&&interfaceId===treeInterfaceId:interfaceId===116||interfaceId===71)
     &&(target.kind==='tree'||helper&&value(helper,'FBaseProxy')===dataSource),'source_binding');
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
    const batchProxy=interfaceId===71?bg.rpc?.TIBGDataSourceRpcCachedInternal_Proxy:null;
    const getValueAsString=interfaceId===71?bg.rpc?.TIBGDataSource_Proxy?.prototype?.GetValueAsString:null;
-   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
+   return {helper,identity,interfaceId,treeInterface,treeInterfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
   const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {

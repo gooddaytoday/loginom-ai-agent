@@ -24,7 +24,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
   AsVariant:async(row,col)=>{rpcCalls.push([row,col]);helper.$FCacheInitialized=true;helper.$FData??={};return rows[row][col];}});helper.FBaseProxy=dataSource;
  if(batch)dataSource.$.$I=71;
  if(treeOutput){
-  dataSource.$.$I=141;
+  dataSource.$.$I=83;
   const scalar=proxy('leaf',{get_Name:async()=> 'flag',get_DisplayName:async()=> 'Flag',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>1});
   const children=proxy('treeChildren',{get_Count:async()=>1,getItem:async()=>scalar});
   const treeRoot=proxy('treeRoot',{get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>false,get_SubNodes:async()=>children});
@@ -44,7 +44,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{__riid:83},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -56,6 +56,20 @@ test('tree_io serialized reader retains completed-port ownership and disposes ev
  assert.equal(result.output.freshness_basis,'completed_execution_port_source');assert.equal(result.output.tree.complete,true);
  assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
  assert.equal(Object.hasOwn(result.output,'row_count'),false);assert.deepEqual(f.rpcCalls,[]);
+});
+for(const interfaceId of [141,71,116,undefined])test('tree source rejects an interface other than the requested native tree '+interfaceId,async()=>{
+ const f=fixture({treeOutput:true});f.dataSource.$.$I=interfaceId;
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+ assert.equal(result.verified,false);assert.equal(result.reason,'source_binding');assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.disposed.sort(),['dataSource','output']);
+});
+test('tree source keeps session identity and the latest completed execution bound throughout reading',async()=>{
+ for(const [change,cleanup] of [[f=>{f.dataSource.$S={};},true],[f=>{f.dataSource.$.$O++;},true],[f=>{f.child.data.Status=2;},false],[f=>{f.child.data.ModelNode={};},false]]){
+  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
+  f.dataSource.get_RootNodeDef=async()=>{const root=await get();change(f);return root;};
+  const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+  assert.equal(result.verified,false);assert.equal(result.cleanup_complete,cleanup);assert.equal(Object.hasOwn(result,'output'),false);
+ }
 });
 test('tree_io native schema RPC failure retains server text privately behind its bounded stage',async()=>{
  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
