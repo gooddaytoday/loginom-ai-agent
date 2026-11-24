@@ -5,18 +5,23 @@ import {mock} from 'node:test';
 import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
 const fault=process.argv[2]??'safe',events=[],calls=[];
+const variableSource=fault==='declared-variable-source';
 const guarded=fault.startsWith('effects-'),declared=fault.startsWith('declared-'),sourceExecution=['source-execute','source-reapply'].includes(fault)||declared||guarded,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
 const columns=[{name:'Key',label:'Key',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}];
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
+const variables={...node,node_id:'variables'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
 const source=(fault.includes('late')?'/*'+'padding '.repeat(700)+'*/\n':'')
- +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared?'import * as fs from "builtIn/FS";\n':'')+'import {OutputTable} from "builtIn/Data";\n';
+ +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared&&!variableSource?'import * as fs from "builtIn/FS";\n':'')
+ +(variableSource?'import {InputVariables,OutputTable} from "builtIn/Data";\nconst count=InputVariables.Items.Count.Value;\n':'import {OutputTable} from "builtIn/Data";\n');
 const callback=Promise.withResolvers();
 let wizard=false,stopped=false,operation,sourceAdapter;
 const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[
  {ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
 let graphReads=0;
 if(sourceExecution)graph.nodes=[];
+if(variableSource)graph.nodes.push({ref:variables,type:'variables.user',label:'Scenario variables',
+ position:{x:64,y:64},inputs:[],outputs:[],variable_outputs:[{kind:'variables',port:4}]});
 if(guarded&&fault.includes('existing'))graph.nodes=[{ref:node,type:'programming.javascript',label:'Existing',position:{x:320,y:280},inputs:[0],outputs:[0]}];
 const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped&&fault==='owner'?'foreign':'js',verified:true,
  surface:wizard?'wizard':'graph',locked:stopped&&fault==='locked'},wizard:wizard?{status:'observed',root_ref:'wizard',root_tid:'W',
@@ -80,6 +85,7 @@ const request={operation_id:'apply-js',contract_revision:'1.0.0',document_id:'do
 if(fault==='callback-active')request.budgets={configure_ms:500,execute_ms:500,total_ms:500};
 if(sourceExecution){request.inputs=[];request.parameters.input_state='unconnected';request.read.ports=[0];}
 if(declared){request.parameters.schema_mode='declared';request.parameters.columns=columns;}
+if(variableSource)request.variable_inputs=[{source:variables,output:4,input:0,kind:'variables'}];
 if(['declared-done-downstream','declared-stale-output'].includes(fault))request.read.ports=[];
 if(fault==='declared-done-downstream')request.finish='done';
 if(guarded&&fault.includes('existing')){
@@ -91,8 +97,11 @@ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map()
  nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   operation=options.operation;return support.nodeApplyDriverFactory(options);},
  nodeTargetAdapterFactory:()=>({preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
-  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0]});
-   else if(e.kind==='connect')graph.links.push(e.parameters.edge);else assert.fail('Unexpected graph mutation '+e.kind);
+  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0],
+   ...(variableSource?{variable_inputs:[{kind:'variables',port:0}]}:{})});
+   else if(e.kind==='connect'&&e.parameters.edge.kind==='variables'){
+    graph.variable_links=[{...e.parameters.edge,source_port_guid:'count-output',target_port_guid:'js-variable-input'}];
+   }else if(e.kind==='connect')graph.links.push(e.parameters.edge);else assert.fail('Unexpected graph mutation '+e.kind);
    return {status:'SUCCEEDED',cleanup_complete:true};},observe:async()=>{
   const g=structuredClone(graph);if(stopped&&fault==='graph'&&graphReads++)g.nodes[0].label='foreign edit';return g;},
   verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow})}),
@@ -142,6 +151,12 @@ if(sourceExecution){
  assert.equal(job.outcome.output.execution.execution_id,'execution-'+count);
  if(declared)assert.equal(calls.at(-1),'Execute','No source/mapping wizard may reopen after the sole execution');
  assert.equal(job.outcome.output.configuration.readback.input_state,'unconnected');
+ if(variableSource){
+  const mapping=job.outcome.output.configuration.readback.input_mapping;
+  assert.equal(mapping.no_incoming_links_verified,true);
+  assert.deepEqual(mapping.fields,[]);
+  assert.deepEqual(operation.targetPhase.result.variable_links,graph.variable_links);
+ }
  if(['source-reapply','declared-reapply'].includes(fault)){
   const second={...request,operation_id:'reapply-js',target:{kind:'existing',type:'programming.javascript',ref:node},
    parameters:{...request.parameters,expected_source_sha256:createHash('sha256').update(source).digest('hex')}};

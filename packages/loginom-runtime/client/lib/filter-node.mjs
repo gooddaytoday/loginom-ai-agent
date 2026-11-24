@@ -23,6 +23,9 @@ export function validateFilterParameters(p,mode,r){
  need(mode==='conditions','Filter supports conditions mode, including row_number operands');
  if(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0)need(r.target.kind==='existing','New filter requires explicit conditions');
  else validateFilterConditions(p);
+ if(r.target.kind==='new'&&r.finish!=='close'&&!r.bindings?.length&&p.groups.some(group=>group.some(c=>isFilterVariable(c.value??c.values)))){
+  need(r.variable_inputs?.some(i=>i.kind==='control'&&i.input===0),'BINDING_PORT_MISMATCH: filter variable operands require control input 0');
+ }
  need(r.target.kind==='existing'||r.inputs.length===1,'New filter requires one explicit input');
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Filter has one table input');
  need(r.read.ports.every(p=>p===0||p===1),'Filter has two table outputs');
