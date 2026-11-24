@@ -1,7 +1,7 @@
 import {createLoopNodeSupport} from './loop-node.mjs';
 import {createSupernodeNodeSupport,createSupernodeOutputNodeSupport} from './supernode-node.mjs';
 import {createDatabaseImportNodeSupport} from './imports-database-node.mjs';
-import {prepareImportBinding,importBindingChannel,readImportBindings} from './import-bindings.mjs';
+import {prepareImportBinding,importBindingChannel,readImportBindings,settleImportBindingBeforeTarget} from './import-bindings.mjs';
 import {createVariablesReplaceNodeSupport} from './variables-replace-node.mjs';
 import {createConditionNodeSupport} from './control-condition-node.mjs';
 import {createVariablesColumnUnionNodeSupport} from './variables-coluniondatavar-node.mjs';
@@ -165,7 +165,10 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,...(['imports.text','imports.excel'].includes(type)&&readOnly&&options.operation.parameters.finish==='execute'
+  const fileImport=['imports.text','imports.excel'].includes(type);
+  return {...drivers,...(fileImport?{settleBeforeTarget(receipt,ctx){
+   return settleImportBindingBeforeTarget(options,ctx,config,receipt);
+  }}:{}),...(fileImport&&readOnly&&options.operation.parameters.finish==='execute'
     ?{async beforeTarget(ctx){
    const value=await drivers.beforeTarget?.(ctx);
    const prepared=await prepareImportBinding(options,ctx,config,{saved:true,...(type==='imports.excel'?excelBindingHooks:{})});

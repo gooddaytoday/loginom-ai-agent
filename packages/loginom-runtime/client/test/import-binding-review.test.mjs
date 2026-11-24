@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createTextImportNodeSupport} from '../lib/text-import-node.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from '../lib/node-import-continuation.mjs';
+import {releaseNodeTarget} from '../lib/node-target.mjs';
 
 function savedImport(kind='bound',active=true,pathOverride){
  const node={document_id:'doc',workflow_id:'wf',node_id:'import'},source={...node,node_id:'vars'};
@@ -24,26 +25,55 @@ function savedImport(kind='bound',active=true,pathOverride){
   ui:{dialogs:[],masks:[],truncated:{masks:false,dialogs:false},elements:opened?[{ref:'ui-cancel',tid:'W;btnClose',allowed_actions:['click']}]:[
    {ref:'ui-settings',tid:'N;Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:workflow.navigation_path}}]}});
  operation.nodeTargetAdapter={observe:async()=>structuredClone(graph)};
- const options={operation,now:Date.now,receiptOptions:()=>({}),isBoundFileInput:p=>p.startsWith('/own/inputs/'),
+ const options={operation,now:Date.now,receiptOptions:(id,action_key,signature)=>{
+  operation.lastReceipt={id,operation_id:id,action_key,signature};
+  return {};
+ },isBoundFileInput:p=>p.startsWith('/own/inputs/'),
   resolveBoundFileSource:async p=>{witnesses++;if(!available)throw Error('BINDING_SOURCE_UNVERIFIED: fresh witness required');return {kind:'storage',verified:true,destination:p};},
   onRecord:async event=>{if(event.phase==='node_step_prepared')pending=event;return structuredClone(event);},
   execute:async()=>{
    if(!pending)return {status:'SUCCEEDED',output:state()};
    const step=pending;pending=null;const action=step.action;actions.push(action.verb);
    if(action.verb.startsWith('user_')||action.verb==='variable_mapping_read'){
-    const output={verified:true,cleanup_complete:true,effect_possible:false,independent_readback:true,
-     node_context:action.verb==='variable_mapping_read'?node:source,
-     ...(action.verb==='variable_mapping_read'?{mapping}:{source_active:active,variables:structuredClone(variables)})};
+    const readingMapping=action.verb==='variable_mapping_read';
+    const output={verified:true,cleanup_complete:true,effect_possible:readingMapping,independent_readback:true,
+     node_context:{...(readingMapping?node:source),verified:true,surface:'graph',locked:false},
+     ...(readingMapping?{mapping}:{source_active:active,variables:structuredClone(variables)})};
     if(action.verb==='user_runtime_read'&&!active){output.independent_readback=false;delete output.variables;}
-    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'node.variables.'+action.verb+'.internal',cleanup_complete:true,effect_possible:false,output};
+    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'node.variables.'+action.verb+'.internal',
+     action_revision:'1',phase:action.verb,cleanup_complete:true,effect_possible:output.effect_possible,output};
    }
    if(action.verb==='begin_wizard')opened=true;else if(action.verb==='click'&&action.ref==='ui-cancel')opened=false;else assert.fail('Unexpected mutation '+JSON.stringify(action));
    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,error:null,trace:[]};
   }};
  const ctx={document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000};
  const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
- return {options,operation,r,actions,ctx,mapping,variables,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
+ return {options,operation,r,graph,actions,ctx,mapping,variables,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
 }
+
+for(const incoming of ['absent','matching','foreign'])test('preflight binds an existing text import with '+incoming+' variable link',async()=>{
+ const f=savedImport();
+ f.allowWitness();
+ f.r.finish='done';
+ f.r.bindings=[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'CsvPath'}}];
+ f.r.variable_inputs=[{source:f.graph.nodes[0].ref,kind:'variables',input:0,output:4}];
+ f.graph.nodes.push({ref:f.r.target.ref,type:'imports.text',locked:false,
+  variable_inputs:[{kind:'variables',port:0,port_guid:'input'}]});
+ if(incoming==='absent')f.graph.variable_links=[];
+ if(incoming==='foreign')f.graph.variable_links[0].source='foreign';
+ const preflight=f.driver().beforeTarget(f.ctx);
+ if(incoming==='foreign'){
+  await assert.rejects(preflight,error=>error.nodePhaseRefusal?.status==='NOT_APPLIED'&&/BINDING_PORT_MISMATCH/.test(error.message));
+  assert.deepEqual(f.actions,[]);
+ }else{
+  await preflight;
+  assert.deepEqual(f.actions,incoming==='absent'?['user_runtime_read']:['variable_mapping_read','user_runtime_read']);
+  assert.equal(f.operation.importBinding.file.destination,'/own/inputs/a.csv');
+  assert.deepEqual(f.operation.preTargetGraph,f.graph);
+  assert.equal(f.operation.preTargetImportRead.port_guid,'source-port');
+  assert.deepEqual(f.operation.preTargetImportRead.reference,f.operation.lastReceipt);
+ }
+});
 
 for(const kind of ['no-variables','literal','other-source','outside'])test('saved '+kind+' keeps legacy Execute without a Files witness',async()=>{
  const f=savedImport(kind);await f.driver().beforeTarget?.(f.ctx);
@@ -93,6 +123,47 @@ for(const active of [true,false])for(const bindings of [undefined,[]])test('our 
  await f.driver().beforeTarget(f.ctx);assert.equal(f.witnesses(),2);
  assert.equal(f.operation.importBindingInventory[0].variable.name,'CsvPath');
  if(active)assert.ok(!f.actions.includes('user_values'));
+});
+
+for(const fault of ['missing witness','changed inventory'])test('saved Execute releases after '+fault+' following a completed mapping read',async()=>{
+ const f=savedImport(),{operation,ctx,r}=f;
+ f.graph.interaction_ready=true;
+ f.graph.nodes[0].locked=false;
+ f.graph.nodes.push({ref:r.target.ref,type:'imports.text',locked:false});
+ const adapter=operation.nodeTargetAdapter;
+ adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:r.document_id,workflow_ref:r.workflow_ref});
+ if(fault==='changed inventory')f.allowWitness();
+ const execute=f.options.execute;
+ let lastRead,reads=0;
+ f.options.execute=async()=>{
+  const receipt=await execute();
+  if(receipt.phase==='variable_mapping_read'){
+   reads++;
+   if(reads===2){
+    receipt.output.mapping=structuredClone(receipt.output.mapping);
+    receipt.output.mapping.fields[0].source.id++;
+   }
+   lastRead=receipt;
+  }
+  return receipt;
+ };
+ const driver=f.driver();
+ await assert.rejects(driver.beforeTarget(ctx),fault==='missing witness'?/fresh witness required/:/BINDING_SOURCE_UNVERIFIED/);
+ assert.equal(reads,fault==='missing witness'?1:2);
+ assert.equal(operation.nodeEffectPossible,true);
+ operation.nodeApply={request:r,pending:{phase:'target'}};
+ operation.cleanupConfirmed=false; // The enclosing operation stopped before target.
+ const actions=[...f.actions];
+ const result=await releaseNodeTarget({operation,adapter,deadline:ctx.deadline,record:async event=>event,
+  settleChild:driver.settleBeforeTarget,readReceipt:async reference=>{
+   assert.equal(reference.operation_id,lastRead.operation_id);
+   return {state:'completed',receipt:lastRead};
+  }});
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(result.child_cleanup.operation_id,lastRead.operation_id);
+ assert.deepEqual(result.node,r.target.ref);
+ assert.deepEqual(f.actions,actions);
 });
 
 for(const value of [null,''])test('explicit new string binding refuses '+(value===null?'NULL':'empty')+' before Execute',async()=>{
