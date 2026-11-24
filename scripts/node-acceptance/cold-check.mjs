@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -127,6 +127,8 @@ const record = createExecutionJournal({
   knownSecrets: [config.api_key, loginPassword].filter(Boolean),
 })
 const state = { prepared: undefined, closed: false, cleanupAttempted: false }
+// Any dispatched cold Execute dirties the owned package; a failed check then discards it.
+const runColdExecution=options=>{state.executionDispatched=true;return runOwnedColdExecution(options)}
 let context, page
 const rawExecute = (code) => new Function("page", `return (${code})(page)`)(page)
 const execute = (code) => {
@@ -318,6 +320,7 @@ page = context.pages()[0]
   for (const want of expected.nodes) {
     if(want.alternative_types!==undefined){
       if(expected.n18_javascript_step!==true)throw Error('COLD_NODE_ALTERNATIVE_UNSUPPORTED');
+      state.executionDispatched=true;
       const proof=await verifyN18JavascriptStep({graph,requirement:want,load,channelFor});
       await record({phase:'n18_saved_javascript_step',...proof});
     }else if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
@@ -735,10 +738,11 @@ page = context.pages()[0]
         diagnosticReadOnly: readOnly,
         // Cancellation has no complete persisted-change inventory proving
         // Table-only changes. Never turn package ownership into discard proof.
-        // Failed checks also preserve their dirty state for diagnosis.
-        // Clean packages close normally; dirty/unknown ones retain BLOCKED.
-        diagnosticDiscard: !readOnly && !state.cancelled && !state.failure,
-        diagnosticWaitForIdle: !readOnly && !state.cancelled && !state.failure,
+        // A check failed before any cold Execute preserves its dirty state for
+        // diagnosis. After an Execute it discards without save and logs out, so
+        // the account's lock cannot make the next cold Open readonly.
+        diagnosticDiscard: !readOnly && !state.cancelled && (!state.failure || state.executionDispatched === true),
+        diagnosticWaitForIdle: !readOnly && !state.cancelled && (!state.failure || state.executionDispatched === true),
       }),
     )
       .then(async (result) => {
