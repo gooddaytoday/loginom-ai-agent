@@ -503,14 +503,15 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       // A materialization launch may settle before its process identity can
       // be read. Release proves cleanup only, never completion or a replay.
       // The retained REST child also uses the independently settled Done.
-      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
+      releasePendingPhases:['target','input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
         const afterDone=['node_finish','materialization_start','finish'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
           &&(state.pending.phase==='node_finish'||state.pending.phase==='materialization_start'&&materializationSettled
             ||state.pending.phase==='finish'&&finalExecutionSettled)
           &&adapter?.active===false&&adapter.uncertain===false
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
-        need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,
+        need(['input_mapping','open','configure'].includes(state.pending?.phase)
+          ||state.pending?.phase==='target'&&state.pending.boundary_settled===true||afterDone,
           'Only a stopped JavaScript draft or settled Done with no unresolved source opening can be released here');
         const deadline=now()+NODE_RELEASE_BUDGET_MS;
         enter({signal:releaseSignal,deadline,document_id:state.request.document_id,

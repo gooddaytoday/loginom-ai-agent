@@ -105,12 +105,12 @@ test('declared single execution lifecycle: '+fault,()=>{
  if(outcome){const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(outcome);assert.equal(validation.valid,true,JSON.stringify(validation));}
 });
 
-for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
+for(const point of ['read','replace','open-ack'])test('JavaScript cancellation during '+point+' retains a releasable phase',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});
  assert.equal(result.error,undefined,String(result.error));
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
- const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,'configure');
+ const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,point==='open-ack'?'open':'configure');
 });
 
 for(const fault of ['effects-new-fs','effects-new-fetch','effects-existing-fs','effects-existing-fetch','effects-existing-fs-replace','effects-existing-late-fs'])

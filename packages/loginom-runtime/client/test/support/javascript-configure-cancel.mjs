@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import {mock} from 'node:test';
 import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
-import {applyNode} from '../../lib/node-apply.mjs';
+import {applyNode,releaseNodeApply} from '../../lib/node-apply.mjs';
 
-const point=process.argv[2];assert.ok(['read','replace'].includes(point));
+const point=process.argv[2];assert.ok(['read','replace','open-ack'].includes(point));
 const calls=[],events=[],controller=new AbortController();
 const entered=Promise.withResolvers(),returned=Promise.withResolvers();
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
@@ -30,7 +30,10 @@ mock.module(new URL('../../lib/node-procedure.mjs',import.meta.url),{namedExport
   perform:async({resolve,initialObservation})=>{assert.deepEqual(resolve(initialObservation),{verb:'click',ref:'close'});wizard=false;}})}});
 const managed=await import('../../lib/javascript-managed-source-adapter.mjs');
 mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.meta.url),{namedExports:{...managed,
- createJavascriptManagedSourceAdapter:()=>({open:async()=>({settings:{generation:true},schema:{}}),
+ createJavascriptManagedSourceAdapter:()=>({open:async()=>{
+  if(point==='open-ack')wizard=true;
+  return {settings:{generation:true},schema:{}};
+ },
   read:async()=>{calls.push('read');if(point==='read'){entered.resolve();await returned.promise;}return {source};},
   replace:async()=>{calls.push('replace');if(point==='replace'){entered.resolve();await returned.promise;}
    return {draft_exact:true,source_sha256:createHash('sha256').update(source).digest('hex')};}})}});
@@ -39,13 +42,29 @@ const support=createJavascriptCodeNodeSupport({targetOrigin:'http://test',target
 const graph={complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,inputs:[0],outputs:[0]}],links:[],foreign_links:[]};
 const operation={id:request.operation_id,parameters:request,nodeTargetAdapter:{observe:async()=>graph}};
-const record=async e=>{events.push(e);return e;};
+const record=async e=>{
+ events.push(e);
+ if(point==='open-ack'&&e.phase==='node_phase_completed'&&e.receipt.phase==='open')
+  controller.abort(Error('cancel after verified open'));
+ return e;
+};
 const driver=support.nodeApplyDriverFactory({operation,execute:async()=>assert.fail('Unexpected browser transport'),
  onRecord:record,now:Date.now,receiptOptions:()=>({})});
-const result=applyNode({request,operation,handlers:support.nodeApplyHandlers,signal:controller.signal,record,
- drivers:{...driver,prepareTarget:async(_,ctx)=>{await driver.beforeTarget(ctx);return {verified:true,cleanup_complete:true,node};},
-  finish:async()=>{calls.push('Done');assert.fail('Cancelled configure must not reach Done');},
-  finishGraph:async()=>assert.fail('Cancelled configure must not reach graph finish')}});
+const drivers={...driver,prepareTarget:async(_,ctx)=>{await driver.beforeTarget(ctx);return {verified:true,cleanup_complete:true,node};},
+ finish:async()=>{calls.push('Done');assert.fail('Cancelled configure must not reach Done');},
+ finishGraph:async()=>assert.fail('Cancelled configure must not reach graph finish')};
+const result=applyNode({request,operation,handlers:support.nodeApplyHandlers,signal:controller.signal,record,drivers});
+if(point==='open-ack'){
+ const stopped=await result;
+ assert.equal(stopped.status,'AMBIGUOUS');assert.equal(stopped.pending_phase,'open');
+ assert.equal(stopped.cleanup_complete,false);
+ const released=await releaseNodeApply({operation,handlers:support.nodeApplyHandlers,drivers,record});
+ assert.equal(released.status,'FAILED');assert.equal(released.pending_phase,null);
+ assert.equal(released.cleanup_complete,true);assert.deepEqual(released.node,node);
+ assert.match(released.next_step.instruction,/kind":"existing/);
+ assert.equal(wizard,false);assert.deepEqual(calls,[]);
+ console.log(JSON.stringify({pending_phase:stopped.pending_phase}));process.exit(0);
+}
 await entered.promise;
 assert.equal(operation.nodeApply.pending.phase,'configure');
 assert.equal(operation.nodeApply.phases.some(p=>p.phase==='configure'),false);

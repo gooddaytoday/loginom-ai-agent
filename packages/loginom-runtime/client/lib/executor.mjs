@@ -2562,7 +2562,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
       }finally{running=false;}
     }
-    if(operation.nodeApply?.pending?.phase==='target' && operation.targetPhase){
+    if(operation.nodeApply?.pending?.phase==='target'&&!operation.nodeApply.pending.boundary_settled&&operation.targetPhase){
       running=true;
       try{
         const state=operation.nodeApply;

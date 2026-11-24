@@ -581,6 +581,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    const boundary=state.phases.at(-1);
+    const draftDeadline=Math.min(state.deadline,state.configure_deadline??state.deadline);
+    if(request.target.type==='programming.javascript'&&request.mode==='script'
+      &&!state.pending&&state.cleanup_complete&&!operation.transportUncertain
+      &&['target','input_mapping','open','configure'].includes(boundary?.phase)
+      &&(signal?.aborted&&error===signal.reason||now()>=draftDeadline)){
+      // The last receipt proves the phase settled, but a JS wizard may still
+      // hold an uncommitted draft. Retain its owner for the normal release.
+      const node=state.node??boundary.value.node;
+      const receipt={phase:boundary.phase,receipt_id:boundary.receipt_id,deadline:draftDeadline,
+        effect_possible:false,before_node:structuredClone(node),boundary_settled:true};
+      await acknowledge({phase:'node_draft_cleanup_required',signature,receipt});
+      state.node=node;state.pending=receipt;state.cleanup_complete=false;
+    }
     if(calculatorVariableMappingRefusal(operation,error.receipt)||restVariableMappingNoEffectRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
       ||variablesCalculatorDeactivationRefusal(operation,error.receipt)){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
@@ -700,7 +714,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
-    &&['input_mapping','open','configure','node_finish'].includes(pending.phase);
+    &&(pending.boundary_settled===true||['input_mapping','open','configure','node_finish'].includes(pending.phase));
   const configuration=readingOnly?{status:'not_requested'}:exportRelease||javascriptDraft?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
