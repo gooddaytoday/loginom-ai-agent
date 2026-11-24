@@ -23,7 +23,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -3101,7 +3101,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         ||['workflow','target'].includes(phase))return;
       if(nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
     },
-    validate:request=>{const h=validateNodeApplyRequest(request,nodeApplyHandlers).handler;return h.output_wizard==='separate'?JSON.stringify({revision:h.revision,output_wizard:'separate'}):h.revision;},
+    validate:(request,{fresh})=>{
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:fresh&&!operations.has(request.operation_id)});
+      return handler.output_wizard==='separate'?JSON.stringify({revision:handler.revision,output_wizard:'separate'}):handler.revision;
+    },
     progress:id=>{
       const state=operations.get(id)?.nodeApply;
       return state?structuredClone({node:state.node,execution:state.execution,
@@ -3456,7 +3459,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { action: structuredClone(action), session_manifest: structuredClone(pinned.pins) };
     },
     requestFailure(error) {
-      return { status: pending ? 'AMBIGUOUS' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
+      const variableError=error?.cause instanceof NodeVariableInputError?error.cause:error;
+      const variableInputRefusal=!pending&&!nodeJobs.active&&variableError instanceof NodeVariableInputError;
+      return { status: pending ? 'AMBIGUOUS' : variableInputRefusal ? 'NOT_APPLIED' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
         output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
@@ -3464,6 +3469,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         ...(!pending&&!nodeJobs.active&&error?.message==='Choose a single action or a batch description'
           ?{next_step:{tool:'dock_action_describe',instruction:'Use action_key alone for one action, OR action_keys:[...] with optional node_types:[...] for a batch. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text","transform.join_data","exports.text"]}. Remove action_key from the batch request; do not combine it with action_keys or node_types. This is a description request; no browser mutation or recovery is needed.'}}:{}),
+        ...(variableInputRefusal?{cleanup_complete:true,next_step:variableError.nextStep}:{}),
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
     inspect,
@@ -4077,14 +4083,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // phases own the same runtime gate; they cannot re-enter public run/act.
     async runNodeApply(request,{signal,stopSignal,resume=false,scanReceipt}={}) {
       request=structuredClone(request);
-      signal?.throwIfAborted();checkId(request.operation_id);
-      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
+      signal?.throwIfAborted();
+      const operationId=request.operation_id;
+      checkId(operationId);
+      let operation=operations.get(operationId);
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:!operation&&!resume});
       if(typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.apply',{request,handler_revision:handler.revision,...(handler.output_wizard==='separate'?{output_wizard:'separate'}:{})});
-      const operationId=request.operation_id;
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
-      let operation=operations.get(operationId);
       if(operation&&operation.signature!==signature)throw new Error('operation_id was already used with different parameters or handler');
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume)return inspectApply(operation);

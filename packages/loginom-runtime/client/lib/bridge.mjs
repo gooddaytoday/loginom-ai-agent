@@ -763,7 +763,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           return {isError:true,content:[{type:'text',text:JSON.stringify({code:'UNKNOWN_PREPARED_WORKFLOW',message,next_step})}]};
         }
         if (owner === 'action') {
-          const failure=actionRuntime.requestFailure(new Error(message));
+          const failure=actionRuntime.requestFailure(new Error(message,{cause:error}));
           if(userProfile)failure.output=userActionInventory(failure.output);
           if(userProfile&&isNodeApiTool(request.params.name)){
             const result=compactNodeRequestFailure(failure,request.params.arguments);
