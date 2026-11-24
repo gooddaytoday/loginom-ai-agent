@@ -90,10 +90,18 @@ export async function answer(
     template,
     defer: input.defer,
     signal,
-  }).catch((error: unknown) => {
-    const code = error instanceof Error && codes.test(error.message) ? error.message : hostError(error)
-    return { code, message: code === hostError(error) ? hostErrorText(error) : code }
   })
+    .then((target) => ({
+      ...target,
+      // A failed build Studio gave no reason for has `error: undefined`, which the output schema refuses.
+      ...(target.notice && {
+        notice: Object.fromEntries(Object.entries(target.notice).filter((entry) => entry[1] !== undefined)),
+      }),
+    }))
+    .catch((error: unknown) => {
+      const code = error instanceof Error && codes.test(error.message) ? error.message : hostError(error)
+      return { code, message: code === hostError(error) ? hostErrorText(error) : code }
+    })
 }
 
 const codes =

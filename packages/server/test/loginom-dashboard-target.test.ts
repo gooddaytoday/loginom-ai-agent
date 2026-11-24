@@ -63,9 +63,11 @@ const boot = Effect.gen(function* () {
       }),
   )
 
-  // Studio gives each snapshot once, as Studio does; `seen` lists the paths it was asked.
+  // Studio gives each snapshot once, as Studio does, and answers a publication's lookup with `lookup.body` when there is
+  // one; `seen` lists the paths it was asked.
   const snapshots = new Map<string, ReturnType<typeof snapshot>>()
   const seen: string[] = []
+  const lookup = { body: undefined as unknown }
   const studio = yield* Effect.acquireRelease(
     Effect.sync(() =>
       Bun.serve({
@@ -74,6 +76,7 @@ const boot = Effect.gen(function* () {
         fetch: (request) => {
           const url = new URL(request.url)
           seen.push(url.pathname)
+          if (url.pathname === "/dashboard/lookup" && lookup.body) return Response.json(lookup.body)
           const id = url.pathname.match(/^\/dashboard\/snapshots\/(.+)$/)?.[1]
           const found = id ? snapshots.get(id) : undefined
           if (!id || !found) return new Response(null, { status: 404 })
@@ -169,7 +172,7 @@ const boot = Effect.gen(function* () {
     snapshots.set(value.id, value)
     return value
   }
-  return { send, call, offer, script, seen, origin, resources }
+  return { send, call, offer, script, seen, lookup, origin, resources }
 })
 
 const methods = (log: { method: string }[]) => log.map((entry) => entry.method)
@@ -224,6 +227,36 @@ describe("loginom.dashboard (B2.9h)", () => {
           notice: { kind: "publication-check-unavailable" },
         })
         expect(methods(test.script.log)).toEqual(["connection.status", "connection.ready"])
+
+        // Its latest version failed to build in Studio: the notice names it, without the reason Studio did not give.
+        test.script.ready = undefined
+        const version = { name: "20261124T120000Z.json", sourceHash: "b".repeat(64) }
+        test.script.read = () => ({ version, content: "{}" })
+        test.lookup.body = {
+          key: "fixture",
+          exists: true,
+          hash: null,
+          appOrigin: test.origin,
+          mode: "normal",
+          cliButton: false,
+          currentVersion: null,
+          latest: null,
+          publication: { name: version.name, sourceHash: version.sourceHash, status: "failed" },
+        }
+        const failed = test.offer(true)
+        failed.binding = desktop.binding
+        expect(yield* test.call("prepare", { id: failed.id, defer: true })).toEqual({
+          status: 200,
+          body: {
+            output: {
+              directory,
+              nodeName: "Заказы",
+              action: "edit",
+              fresh: false,
+              notice: { kind: "latest-build-failed", latest: version.name },
+            },
+          },
+        })
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
@@ -262,6 +295,14 @@ describe("loginom.dashboard (B2.9h)", () => {
         expect(yield* prepare(waiting.id)).toEqual([
           200,
           { code: "DASHBOARD_SNAPSHOT_UNAVAILABLE", message: "DASHBOARD_SNAPSHOT_UNAVAILABLE" },
+        ])
+
+        // A Host reply that is not a publication; nothing is created.
+        test.script.read = () => ({ version: { name: "20261124T120000Z.json" } })
+        const malformed = test.offer(true)
+        expect(yield* prepare(malformed.id)).toEqual([
+          200,
+          { code: "LOGINOM_REPLY_INVALID", message: "LOGINOM_REPLY_INVALID" },
         ])
 
         // The Host refuses a generation that is gone; nothing is created without a local draft to fall back to.

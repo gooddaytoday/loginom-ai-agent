@@ -3,7 +3,7 @@ import { readDashboardSnapshot, updatePublicationBase } from "@loginom-ai-agent/
 import { createHash } from "node:crypto"
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join, resolve, sep } from "node:path"
 import { DashboardTarget } from "../src/dashboard-target"
 
 // The 9 tests of 0.4 Desktop's `v0.4.0:packages/desktop/src/main/dashboard-target.test.ts` on the plugin's port (B2.9h).
@@ -60,7 +60,7 @@ test("creates a dashboard from the one-time snapshot without signing in to Studi
     const options = { redirect: "error" as const, signal: undefined }
     expect(requests).toEqual([[snapshotURL + id, options]])
     expect(target).toMatchObject({ nodeName: snapshot.nodeName, action: "create", fresh: true })
-    expect(target.directory.startsWith(join(root, "dashboards") + "/")).toBe(true)
+    expect(target.directory.startsWith(join(root, "dashboards") + sep)).toBe(true)
     expect(JSON.parse(await readFile(join(target.directory, "sample.json"), "utf8"))).toEqual(snapshot.sample)
     expect(calls).toEqual([])
     expect(target.notice).toBeUndefined()
