@@ -54,7 +54,7 @@ import {makeGroupingContextCode} from './grouping-context.mjs';
 import {makeDataToVarContextCode} from './variables-datatovar-context.mjs';
 import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
-import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode} from './node-port-open.mjs';
+import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode,makeImportVariableInputReleaseCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
 import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
@@ -401,6 +401,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureUserVariables(variables,finish,remove) {return crossTableOwnedStep('user_values',{variables,finish,...(remove?.length?{remove}:{})},makeUserVariablesConfigureCode);},
     async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readVariablePortMapping(mapping){return crossTableOwnedStep('variable_mapping_read',{mapping,read_only:true},makeVariablePortMappingCode);},
+    async releaseImportMappingRead(opening){
+      checkBudget();
+      if(!preparedNodeContext||!['document_id','workflow_id','node_id'].every(k=>opening.node?.[k]===preparedNodeContext.node[k]))
+        throw Error('Import mapping read owner changed');
+      const {opening_operation_id,port_guid}=opening;
+      const code=makeImportVariableInputReleaseCode(preparedNodeContext,{operation_id:opening_operation_id,port_guid,
+        origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
+      const proof=await execute(code,{timeout:Math.max(1,operation.deadline-now())});
+      checkBudget();
+      if(proof?.status!=='SUCCEEDED'||proof.verified!==true||proof.cleanup_complete!==true
+        ||proof.opening_operation_id!==opening_operation_id||proof.port_guid!==port_guid)
+        throw Error(proof?.error??'Original Import mapping read has no confirmed graph return');
+      return proof;
+    },
     async readBuiltinVariablesPreview({port_guid}) {return crossTableOwnedStep('user_runtime_read',{port:4,port_guid},makeBuiltinVariablesPreviewCode);},
     async readExcelImportSource() {return crossTableOwnedStep('excel_source_read',{},makeExcelSourceReadCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
@@ -1284,6 +1298,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
+        ...(action.verb==='execute_graph_node'?{deadline_at:operation.deadline}:{}),
         ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),...(variablesUnionInputChange?{variables_union_input_change:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
@@ -1339,7 +1354,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
-      let binding, intent, bodyRefreshes = 0;
+      let binding, intent, bodyRefreshes = 0, launchGeometryRefreshed = false;
       const quietConsole=settleProcessConsole&&launchConfirmed;
       const initialPage=initialObservation?.wizard?.import_columns?.page;
       const initialOutputPage=initialObservation?.wizard?.output_columns?.page;
@@ -1434,7 +1449,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         try { return await channel.act(action,processControl,{preserveJoinMapping,variablesUnionInputChange}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
-          if (r?.status !== 'NOT_APPLIED'
+          if (launchGeometryRefreshed || r?.status !== 'NOT_APPLIED'
             || r.effect_possible !== false || r.cleanup_complete !== true
             || r.trace?.some(e => ['ui_preconditions_verified','ui_gesture_applied'].includes(e.event))
             || !Array.isArray(r.trace)) throw error;
@@ -1445,6 +1460,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const launchGeometryRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
+            &&r.error?.code==='UI_REFERENCE_STALE'&&r.error.message==='Observed control geometry changed';
           const nodeChanges=r.trace.filter(e=>['prepared_node_context_changed_before_gesture','prepared_node_surface_mismatch'].includes(e.event));
           const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
           // The strict pre-gesture guard did not dispatch. Only a lock-only
@@ -1487,8 +1504,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
             &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
           if(busyRefusal)assertContext(masked,true);
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal&&!graphBusyRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!launchGeometryRefusal&&!nodeLockRefusal&&!busyRefusal&&!graphBusyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
+          launchGeometryRefreshed=launchGeometryRefusal;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
             rejected_operation_id: r.operation_id, retry: attempt + 1,
@@ -1498,6 +1516,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(launchGeometryRefusal?{reason:'graph_execution_geometry_changed'}:{}),
             ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
             ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
             ...(graphBusyRefusal?{reason:'owned_graph_busy_mask'}:{}),

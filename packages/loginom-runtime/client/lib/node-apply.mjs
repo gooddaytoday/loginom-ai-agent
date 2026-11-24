@@ -19,10 +19,46 @@ const object = (v, keys) => requireValue(v && typeof v === 'object' && !Array.is
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v,k)), 'Invalid node.apply contract');
 const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 
+export class NodeVariableInputError extends Error {
+  constructor(request, capabilities, path, message, correction) {
+    const prefix='Invalid parameters.'+path+': ';
+    const reason=String(message);
+    super(reason.startsWith(prefix)?reason:prefix+reason);
+    const ports=(capabilities.variables??[]).map(port=>'variables input '+port);
+    if(capabilities.control)ports.push('control input 0');
+    const supported=request.target.type+' ('+request.mode+') '
+      +(ports.length?'accepts '+ports.join(', ')+'.':'accepts no variable inputs.');
+    this.nextStep={tool:'dock_node_apply',original_operation_id:request.operation_id,
+      instruction:supported+' '+correction+' Submit the complete corrected request with a NEW operation_id.'};
+  }
+}
+
+function variableInputCapabilities(handler,mode) {
+  const supported=handler.variable_inputs;
+  return !supported?.modes||supported.modes.includes(mode)?supported??{}:{};
+}
+
+function validateFreshVariableInputs(request,capabilities,mappings) {
+  const inputs=request.variable_inputs??[];
+  const supports=(kind,port)=>kind==='control'?capabilities.control===true&&port===0:capabilities.variables?.includes(port);
+  for(const {kind,input} of inputs) {
+    if(!supports(kind,input))throw new NodeVariableInputError(request,capabilities,'variable_inputs',
+      'Unsupported '+kind+' input '+input,'Remove the unsupported connection.');
+  }
+  for(const {kind,port} of mappings) {
+    const label=kind+' input '+port;
+    if(!supports(kind,port))throw new NodeVariableInputError(request,capabilities,'mappings',
+      'Unsupported mapping for '+label,'Remove the unsupported mapping.');
+    if(request.target.kind==='new'&&!inputs.some(input=>input.kind===kind&&input.input===port))
+      throw new NodeVariableInputError(request,capabilities,'mappings','Missing connection for '+label,
+        'Add a matching variable_inputs connection for '+label+' or remove its mapping.');
+  }
+}
+
 /** This shell is private until every required live driver and audit is admitted.
  * It does not interpret recipes and never invokes another executor or a model.
  */
-export function validateNodeApplyRequest(request, handlers) {
+export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
     'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[]),...(Object.hasOwn(request??{},'bindings')?['bindings']:[])]);
   validateVariableBindings(request.bindings,request.target?.type);
@@ -39,14 +75,15 @@ export function validateNodeApplyRequest(request, handlers) {
   requireValue(handler.modes.includes(request.mode), 'Unsupported node configuration mode');
   requireValue(['done','execute','close'].includes(request.finish), 'Choose Done, Execute or Close explicitly');
   requireValue(Array.isArray(request.mappings) && request.mappings.length <= 16, 'Bounded port mappings required');
-  if(request.target.type==='variables.column_union')requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
+  const hasVariableMappings=request.mappings.some(m=>m?.kind!==undefined);
+  if(request.target.type==='variables.column_union'&&(!fresh||!hasVariableMappings))requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
       && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
-    if(mapping.kind!==undefined){validateVariablePortMapping(mapping);requireValue(request.mode!==NODE_READ_MODE&&request.target.type!=='variables.user'&&request.finish!=='close','Variable mapping cannot configure a builtin, reread or cancelled draft');}
+    if(mapping.kind!==undefined)validateVariablePortMapping(mapping);
     const key = (mapping.kind??'table')+':'+mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
@@ -95,9 +132,25 @@ export function validateNodeApplyRequest(request, handlers) {
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
-  // A handler rejects unsupported mapping/read modes and parameters here, before
-  // even the target phase can create a node. Validation must be pure.
-  handler.validate(request.parameters, request.mode, request.mappings.some(m=>m.kind!==undefined)?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request);
+  const legacyRequest=hasVariableMappings?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request;
+  const capabilities=variableInputCapabilities(handler,request.mode);
+  if(fresh)validateFreshVariableInputs(request,capabilities,request.mappings.filter(m=>m.kind!==undefined));
+  if(hasVariableMappings&&(request.mode===NODE_READ_MODE||request.target.type==='variables.user'||request.finish==='close')){
+    const message='Variable mapping cannot configure a builtin, reread or cancelled draft';
+    if(fresh)throw new NodeVariableInputError(request,capabilities,'mappings',message,
+      'Remove the variable mapping, or use Done or Execute to configure a supported node.');
+    throw Error(message);
+  }
+  // Saved checkpoints were admitted with table-only handler validation. Keep
+  // that path for replay and recovery, and pass the complete request at admission.
+  try {
+    handler.validate(request.parameters,request.mode,fresh?request:legacyRequest);
+  } catch(error) {
+    if(!fresh||!hasVariableMappings)throw error;
+    handler.validate(request.parameters,request.mode,legacyRequest);
+    throw new NodeVariableInputError(request,capabilities,'mappings',error.message,
+      'Remove or correct the variable mapping according to the handler error.');
+  }
   return {graph,handler};
 }
 
@@ -345,9 +398,15 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
+      if(name==='target'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&!operation.transportUncertain
+        &&verifiedJavascriptExistingSchemaRefusal(refusal,request)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+      }
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
-          ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending
-          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal||regressionRefusal)
+          ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
+          ||replacementRefusal||regressionRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
       ){
@@ -359,7 +418,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
         && refusal?.phase===name && refusal.status==='NOT_APPLIED'
         && refusal.effect_possible===false && refusal.cleanup_complete===true){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
-        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
+        state.effect_possible=previousEffect;state.cleanup_complete=true;
+        // A preceding gesture can leave the operation ambiguous even though
+        // this phase was refused. Keep its boundary available for release.
+        if(!previousEffect)state.pending=null;
         if(effectsOutputRefusal)state.javascript_declared_output_required=true;
       }
       const pause=error.nodeExecutionWaitPause;
@@ -575,6 +637,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
+    const boundary=state.phases.at(-1);
+    const draftDeadline=Math.min(state.deadline,state.configure_deadline??state.deadline);
+    if(request.target.type==='programming.javascript'&&request.mode==='script'
+      &&!state.pending&&state.cleanup_complete&&!operation.transportUncertain
+      &&['target','input_mapping','open','configure'].includes(boundary?.phase)
+      &&(signal?.aborted&&error===signal.reason||now()>=draftDeadline)){
+      // The last receipt proves the phase settled, but a JS wizard may still
+      // hold an uncommitted draft. Retain its owner for the normal release.
+      const node=state.node??boundary.value.node;
+      const receipt={phase:boundary.phase,receipt_id:boundary.receipt_id,deadline:draftDeadline,
+        effect_possible:false,before_node:structuredClone(node),boundary_settled:true};
+      await acknowledge({phase:'node_draft_cleanup_required',signature,receipt});
+      state.node=node;state.pending=receipt;state.cleanup_complete=false;
+    }
     if(calculatorVariableMappingRefusal(operation,error.receipt)||restVariableMappingNoEffectRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
       ||variablesCalculatorDeactivationRefusal(operation,error.receipt)){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
@@ -668,7 +744,8 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         :{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The original operation remains unsuccessful. Correct the request and use a NEW operation_id with target:'
           +JSON.stringify(proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target)
-          +'. '+(proof.node?'The partial target was found; do not recreate it. Supply complete intended settings and complete intended inputs, preserving all observed existing links.':'This operation did not create its target.')
+          +'. '+(proof.node&&request.target.type==='programming.javascript'?javascriptDraftRecoveryInstruction(request)
+            :proof.node?'The partial target was found; do not recreate it. Supply complete intended settings and complete intended inputs, preserving all observed existing links.':'This operation did not create its target.')
           +' Source/preflight effects are not undone; no settings, output or package persistence are verified by release.'}};
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
       phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
@@ -693,7 +770,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
-    &&['input_mapping','open','configure','node_finish'].includes(pending.phase);
+    &&(pending.boundary_settled===true||['input_mapping','open','configure','node_finish'].includes(pending.phase));
   const configuration=readingOnly?{status:'not_requested'}:exportRelease||javascriptDraft?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
@@ -723,7 +800,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       :{tool:'dock_node_apply',original_operation_id:operation.id,
       instruction:'Configuration: '+configuration.status+'. Execution: '+execution.status+'. Do not recreate the node and do not resume this released operation. To continue with this node, submit a NEW operation_id with target:'
         +JSON.stringify({kind:'existing',type:request.target.type,ref:state.node})
-        +(request.target.type==='transform.cross_table'
+        +(javascriptDraft?'. '+javascriptDraftRecoveryInstruction(request):request.target.type==='transform.cross_table'
           ?' and inputs:'+JSON.stringify(request.inputs)+(request.inputs.length
             ?' (reuse the same input-zero source/output), supplying the complete intended CrossTable settings'
             :' and parameters:{} to execute the retained CrossTable configuration. To change roles or facts, supply complete settings and one explicit input zero from the observed source/output')
@@ -743,4 +820,9 @@ function correctNodeRequest(request,node,exportConflict=false) {
       +JSON.stringify({kind:'existing',type:request.target.type,ref:node})
       +'. Preserve the existing graph and source receipts. Do not recreate the node or inspect an unknown effect: no effect is unresolved.'
       +(exportConflict?' The existing destination file was preserved by overwrite:"reject". Choose parameters.destination allowed by the task, or use parameters.overwrite:"replace" with an explicit destination ONLY if the user authorized replacement of that file. Otherwise retain reject and report the path conflict; do not invent a different required path. finish:"done" still checks destination conflicts and does not verify file export. Do not restore an older destination unless the task requires it.':'')};
+}
+
+function javascriptDraftRecoveryInstruction(request) {
+  return 'Inspect the saved source with dock_node_read kind:"source" on this node. To replace the source, send source_text and the verified expected_source_sha256. For an unconfigured JavaScript node, supply the intended schema_mode and all columns in declared mode. Keep mappings:[] and retain the original input_state when supplied. Keep existing table links with inputs:[] or supply the intended input if still missing.'
+    +(request.variable_inputs?.length?' For an unconfigured variable-only node, identify the same variable source and port with variable_inputs:'+JSON.stringify(request.variable_inputs)+'.':'');
 }

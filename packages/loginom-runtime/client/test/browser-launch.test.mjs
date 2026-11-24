@@ -5,6 +5,7 @@ import {browserLaunch} from '../lib/browser-launch.mjs';
 test('acceptance viewport is explicit, bounded and headless only',()=>{
  assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1024x633'}).viewport,{width:1024,height:633});
  assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1366x633'}).viewport,{width:1366,height:633});
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1366x768'}).viewport,{width:1366,height:768});
  assert.equal(browserLaunch(false,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1366x633'}).viewport,null);
  assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1920x945'}).viewport,{width:1920,height:945});
  assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1280x800'}).viewport,{width:1280,height:800});

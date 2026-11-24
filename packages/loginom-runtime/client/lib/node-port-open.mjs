@@ -9,6 +9,14 @@ export function makePreparedInputPortOpenCode(binding,options) {
 export function makePreparedInputPortReconcileCode(binding,options) {
  return makePreparedPortOpenCode(binding,options,'input',true);
 }
+export function makeImportVariableInputReleaseCode(binding,{operation_id,port_guid,origin,build,deadline}) {
+ validatePreparedNodeContext(binding);
+ if(typeof operation_id!=='string'||!/^[A-Za-z0-9_.:-]{1,160}$/.test(operation_id)
+   ||typeof port_guid!=='string'||!port_guid||!Number.isSafeInteger(deadline)
+   ||typeof origin!=='string'||typeof build!=='string')throw Error('Exact Import input opening required');
+ const task={binding,operation_id,port_guid,origin,build,deadline,direction:'input',kind:'variables',port:0,release_read:true};
+ return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify(task)},${readPreparedNodeContext.toString()})`;
+}
 function makePreparedPortOpenCode(binding,options,direction,reconcileOnly=false) {
  validatePreparedNodeContext(binding);
  if(!options||Object.keys(options).sort().join(',')!=='build,deadline,operation_id,origin,port'
@@ -33,7 +41,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   const fail=m=>{throw Error(m);},exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
   if(location.origin!==task.origin||app?.Version!==task.build||p?.document!==document||p.id!==b.document_id)fail('Port opening document changed');
   const receipts=input?(p.inputPortOpenReceipts??=new Map()):(p.outputPortOpenReceipts??=new Map()),r=receipts.get(task.operation_id);
-  if(r&&r.request!==JSON.stringify(b)+':'+task.port)fail('Port opening operation reused with another target');
+  if(r&&(r.request!==JSON.stringify(b)+':'+task.port||variables!==(r.kind==='variables')))fail('Port opening operation reused with another target');
   if(mode==='release_reserved'){if(r?.phase==='reserved')receipts.delete(task.operation_id);return null;}
   const records=[...p.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id);
   const prepared=records.find(r=>r.nodeTargetWorkflowNode);
@@ -146,11 +154,11 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   }
   // Grouping/rename, Calculator input mapping or user-variable Done can leave its native graph busy. Wait
   // for this exact surface to settle; never issue a port gesture through it.
-  if(blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput||restVariablesInput?{sample_limit:150}:{})};
+  if(mode!=='release_read'&&blockers.some(ownGroupingGraphMask))return {pending:true,reason:'port_graph_busy',...(calculatorInput||restVariablesInput?{sample_limit:150}:{})};
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
    if(receipts.size>=128)fail('Port opening receipt bound exceeded');
-   const pending=[...(p.inputPortOpenReceipts?.values()??[]),...(p.outputPortOpenReceipts?.values()??[])].some(v=>v.workflow===prepared.nodeTargetWorkflowNode&&v.phase!=='verified');
+   const pending=[...(p.inputPortOpenReceipts?.values()??[]),...(p.outputPortOpenReceipts?.values()??[])].some(v=>v.workflow===prepared.nodeTargetWorkflowNode&&!['verified','released'].includes(v.phase));
    if(pending)fail('Another output port opening is unresolved');
    const d=model?.FDiagram,roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
    if(!(model instanceof app.ModelForm)||roots.length!==1||d?.FmxGraph?.container!==roots[0])fail('Port opening graph unavailable');
@@ -201,12 +209,29 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const rec={direction,...(variables?{kind:'variables'}:{}),request:JSON.stringify(b)+':'+task.port,phase:'reserved',graph:model,node,nodeData:node.data,
     port:target.port,portData:target.port.data,portGuid:target.port.FGuid,portDom:target.dom,
     portTid:target.tid,nativeIndex:target.nativeIndex,portIndex:task.port,workflow:prepared.nodeTargetWorkflowNode,packageNode:prepared.packageNode,
-    document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,operation_id:task.operation_id};
+    document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,operation_id:task.operation_id,
+    mappingRead:input&&variables&&task.read_only===true};
    receipts.set(task.operation_id,rec);return {phase:rec.phase,port_tid:rec.portTid,port_guid:rec.port.FGuid,native_index:rec.nativeIndex};
   }
   if(!r||r.workflow!==prepared.nodeTargetWorkflowNode||r.packageNode!==prepared.packageNode)fail('Port opening receipt missing or changed');
   if(r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
     ||r.port.parent!==r.node||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Retained port identity changed');
+  if(variables&&input&&(r.port.FType!==0||r.port.FSubType!==3))fail('Variable input native kind changed');
+  if(mode==='release_read') {
+   const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+   const roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
+   if(blockers.length||!input||!variables||r.kind!=='variables'||!r.mappingRead||r.portIndex!==0||r.nativeIndex!==0||r.portGuid!==task.port_guid
+    ||r.port.FType!==0||r.port.FSubType!==3||!['bg-vendor-icon-importtextfile','bg-vendor-icon-importexcelfile'].includes(r.node.FIconCls)
+    ||!['menu_issued','open_issued','deactivation_issued','verified','released'].includes(r.phase)
+    ||model!==r.graph||card.Controller.Node?.data?.node!==r.workflow||r.node.FLocked!==false
+    ||model.FDiagram.FNodes.FCollection.filter(n=>n.FGuid===r.node_id).length!==1||!model.FDiagram.FNodes.FCollection.includes(r.node)
+    ||roots.length!==1||model.FDiagram.FmxGraph.container!==roots[0]
+    ||!r.node.FPorts.some(group=>group.FCollection.includes(r.port))
+    ||exact(b.workflow_ref.prefix+';WizrdMCF').some(visible)||exact('mn').some(visible)
+    ||[...document.querySelectorAll('.x-window,.x-menu')].some(visible))fail('Original Import input is not on its quiet graph');
+   r.phase='released';
+   return {verified:true,opening_operation_id:r.operation_id,port_guid:r.portGuid};
+  }
   if(mode==='console_closed') {
    if(r.phase!=='console_close_issued'||model!==r.graph||r.node.FLocked===true)fail('Console recovery owner changed');
    const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(exact).filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
@@ -329,14 +354,15 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // CollectionItem.FIndex is a lazy cache: SetCollection/Index can leave it
    // null until the Index getter materializes it. Read the exact owned slot
    // instead, without calling that getter or a data proxy.
-   const exportInput=input&&!control&&!variables&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile'].includes(r.node.FIconCls)&&r.portIndex===0&&r.nativeIndex===0;
+   const collectionInput=input&&!control&&(variables||r.portIndex===0&&r.nativeIndex===0
+    &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls));
    const cachedWizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
-   const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
-   const collectionOwned=exportInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
-    &&portTree.FCollection===portCollection&&Array.isArray(items)&&items.length<=100
+   const wizardIndex=collectionInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
+   const collectionOwned=collectionInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
+    &&portTree?.FCollection===portCollection&&Array.isArray(items)&&items.length<=100
     &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1;
-   const indexOwned=exportInput
+   const indexOwned=collectionInput
     ?collectionOwned&&Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100&&items[wizardIndex]===portTree
     :wizardIndex===r.nativeIndex;
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
@@ -352,9 +378,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      wizard:model?.constructor?.name==='WizardModelComponentForm',root:roots.length===1&&model?.FView?.el?.dom===roots[0]}));
    if(r.wizard&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
     ||r.portTree!==portTree||r.nodeTree!==nodeTree||r.phase==='verified'&&(r.wizardIndex??r.nativeIndex)!==wizardIndex
-    ||exportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
+    ||r.portCollection!==(collectionInput?portCollection:undefined)))fail('Port wizard receipt became stale');
    r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;
-   if(exportInput)r.portCollection=portCollection;
+   if(collectionInput)r.portCollection=portCollection;
    r.wizardIndex=wizardIndex;r.phase='verified';
    return {phase:r.phase,verified:true,document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,wizard_index:wizardIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
@@ -372,6 +398,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  };
  const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
  try {
+  if(task.release_read){
+   remaining();
+   const graph=await readNode(page,task.binding);
+   if(graph?.verified!==true||graph.surface!=='graph'||graph.locked!==false)throw Error('Original Import input is not on its quiet graph');
+   remaining();
+   return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:false,...await inspect('release_read')};
+  }
   remaining();let existing=await inspect('lookup');
   // Cleanup may reconcile a completed opening failure, but must never open a
   // port or confirm deactivation. Reuse all native finish ownership checks.
@@ -381,6 +414,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
   }
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}
+  if(existing?.phase==='released')throw Error('Port opening was released');
   if(existing){effect=existing.phase!=='reserved';const result=await finish();return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
   const before=await readNode(page,task.binding);
   if(before?.verified!==true||before.surface!=='graph'||before.locked!==false)throw Error('Prepared unlocked graph required for port opening');
@@ -442,6 +476,6 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()});
   const result=await finish();trace.push({event:direction+'_port_wizard_verified',...result});
   return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
- }catch(error){if(!effect&&!task.reconcile_only){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+ }catch(error){if(!effect&&!task.reconcile_only&&!task.release_read){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
   error:String(error.message).slice(0,500),trace};}
 }

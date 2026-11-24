@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
+import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
+import {prepareImportBinding,settleImportBindingBeforeTarget} from '../lib/import-bindings.mjs';
 import {actions} from './support/executor-fixture.mjs';
 import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -75,6 +78,50 @@ for(const variant of ['absent','opened','missing-node','unknown-receipt','change
   assert.throws(()=>f.runtime.assertPreparationAllowed());
  }
 });
+for(const action of ['resume','release'])test('inspect and '+action+' a retained variable mapping under stricter admission',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'saved'};
+ let opens=0;
+ const f=fixture({wrapDrivers:(_context,drivers)=>({...drivers,
+  async openWizard(){
+   if(++opens===1)throw Error('original opening reply lost');
+   return {verified:true,cleanup_complete:true};
+  },
+  async verifyPendingOpen(){
+   return {wizard_open:false,verified:true,cleanup_complete:true,effect_possible:false};
+  },
+  async releasePending(){
+   return {verified:true,cleanup_complete:true,node_context:node,cleanup:{wizard_closed:true}};
+  },
+ })});
+ f.graph.nodes.push({ref:node,type:'imports.text',label:'Saved',inputs:[],outputs:[0]});
+ f.handler.variable_inputs={variables:[0]};
+ const r={...request(),target:{kind:'existing',type:'imports.text',ref:node},
+  mappings:[{kind:'variables',direction:'input',port:0}]};
+ f.runtime.startNodeApply(r);
+ const stopped=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assert.equal(stopped.outcome.output.pending_phase,'open');
+
+ // Model a stored request whose mapping was accepted before tighter admission.
+ f.handler.variable_inputs={};
+ f.handler.validate=(_parameters,_mode,req)=>assert.deepEqual(req.mappings,[]);
+ assert.throws(()=>f.runtime.startNodeApply({...r,operation_id:'fresh'}),/Unsupported mapping/);
+ const inspected=await f.runtime.inspect({operationId:r.operation_id});
+ assert.equal(inspected.output.state,'pending');
+ if(action==='resume'){
+  f.runtime.startNodeApply({operation_id:r.operation_id},{resume:true});
+  const resumed=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+  assert.equal(resumed.outcome.status,'SUCCEEDED',JSON.stringify(resumed.error??resumed.outcome.error));
+  assert.equal(opens,2);
+ }else{
+  const released=await f.runtime.recover(r.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
+  assert.equal(released.status,'SUCCEEDED');
+  assert.equal(released.output.original_outcome.error.code,'NODE_OPERATION_RELEASED');
+  assert.equal(released.output.original_outcome.cleanup_complete,true);
+  assert.equal(opens,1);
+ }
+ assert.ok(!f.calls.includes('create'));
+});
+
 test('node drivers carry plain observations and typed outcomes through the real bridge parser',async()=>{
  let observed;
  const f=fixture({execute:async code=>{
@@ -151,6 +198,83 @@ test('validation and missing drivers cannot create a graph or journal effects',a
  const f=fixture();f.handler.validate=()=>{throw Error('unsupported schema')};await assert.rejects(f.runtime.runNodeApply(request()),/unsupported/);
  assert.equal(f.events.length,0);assert.equal(f.calls.length,0);
 });
+
+const admissionHandlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+const inputSource={document_id:'doc',workflow_id:'wf',node_id:'source'};
+const targetRef={...inputSource,node_id:'existing'};
+const admissionRequest=(type,mode,parameters)=>({
+ ...request(),target:{kind:'new',type},mode,parameters,inputs:[{source:inputSource,output:0,input:0}],
+});
+async function assertAdmissionRefusal(r,error){
+ const f=fixture();
+ f.handlers.set(r.target.type,admissionHandlers.get(r.target.type));
+ await assert.rejects(f.runtime.runNodeApply(r),error);
+ assert.deepEqual(f.events,[]);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph.nodes,[]);
+}
+
+test('LGD export requires the matching variables link for a new destination binding before target',async()=>{
+ const settings={compression:'lz4',checksum:'none',overwrite:'reject'};
+ const r=admissionRequest('exports.lgd','native',{lgd_export:{...settings,bindings:{destination:{variable:'Path'}}}});
+ const link={source:inputSource,output:0,kind:'variables',input:0};
+ for(const candidate of [r,{...r,variable_inputs:[]}]){
+  await assertAdmissionRefusal(candidate,/destination binding requires variables input 0/);
+ }
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,kind:'control'}]},
+  /Invalid parameters\.variable_inputs: Unsupported control input 0/);
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,input:1}]},
+  /Invalid parameters\.variable_inputs: Unsupported variables input 1/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers,{fresh:true}));
+ const literal={lgd_export:{...settings,destination:'/test-2/output.lgd'}};
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers,{fresh:true}));
+});
+
+for(const [operator,operand] of [['>','value'],['in','values']])test('new filter requires a control link for a variable '+operand+' before target',async()=>{
+ const condition={field:{kind:'input_field',name:'Amount'},type:'integer',operator,[operand]:{kind:'variable',name:'Limit'}};
+ const r=admissionRequest('transform.filter_data','conditions',{groups:[[condition]]});
+ const link={source:inputSource,output:0,kind:'control',input:0};
+ for(const variant of [r,{...r,variable_inputs:[],bindings:[]}]){
+  await assertAdmissionRefusal(variant,/filter variable operands require control input 0/);
+ }
+ await assertAdmissionRefusal({...r,variable_inputs:[{...link,kind:'variables'}]},
+  /Invalid parameters\.variable_inputs: Unsupported variables input 0/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers,{fresh:true}));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,finish:'close'},admissionHandlers,{fresh:true}));
+ const literal={groups:[[{...condition,[operand]:operand==='value'?5:[5]}]]};
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers,{fresh:true}));
+});
+
+test('new filter with explicit bindings remains admissible with a control link',()=>{
+ const r=admissionRequest('transform.filter_data','conditions',{groups:[[{field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>'}]]});
+ r.bindings=[{parameter:'/groups/0/0/value',variable:{kind:'control',input:0,name:'Limit'}}];
+ r.variable_inputs=[{source:inputSource,output:0,kind:'control',input:0}];
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,admissionHandlers,{fresh:true}));
+});
+
+for(const [type,mode,parameters] of [
+ ['transform.date_time','calendar',{fields:[{field:{kind:'input_field',name:'A'},transformations:[{operation:'year',name:'Year',label:'Year'}]}]}],
+ ['transform.sliding_window','lag',{windows:[{field:'A',history:1,horizon:0}],incomplete_records:'keep_incomplete'}],
+ ['preprocessing.smoothing','hodrick_prescott',{smoothing:[{field:'A',lambda:1}]}],
+ ['preprocessing.sampling','sequential',{count:5,position:'first'}],
+ ['preprocessing.data_partition','sequential',{train_count:5,test_count:3,allocation_order:'test_train_unused'}],
+])test(type+' refuses Close with a table input mapping before target',async()=>{
+ const r=admissionRequest(type,mode,parameters);
+ const mappings=[{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'A'},name:'Renamed'}]}];
+ const close={...r,finish:'close',mappings};
+ await assertAdmissionRefusal(close,/Close cannot commit input mappings/);
+ const existing={...close,target:{kind:'existing',type,ref:targetRef},parameters:{},inputs:[]};
+ await assertAdmissionRefusal(existing,/Close cannot commit input mappings/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...close,mappings:[]},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,mappings},admissionHandlers));
+ if(type.startsWith('transform.')||type==='preprocessing.smoothing'){
+  const output=[{direction:'output',port:0,autosync:false}];
+  assert.doesNotThrow(()=>validateNodeApplyRequest({...close,mappings:output},admissionHandlers));
+ }
+});
+
 test('same ID cannot be shared with graph operation or changed handler',async()=>{
  const f=fixture();await f.runtime.runNodeApply(request());
  const {document_id,workflow_ref,target,inputs}=request();
@@ -549,6 +673,70 @@ test('verified unchanged workflow followed by typed preflight refusal frees the 
  f.adapter.activateWorkflow=f.adapter.verifyWorkflow;
  const refused=await f.runtime.runNodeApply(request());assert.equal(refused.status,'NOT_APPLIED');assert.equal(refused.effect_possible,false);assert.equal(refused.cleanup_complete,true);assert.equal(refused.output.node,null);assert.equal(f.graph.nodes.length,0);
  invalid=false;const corrected=await f.runtime.runNodeApply({...request(),operation_id:'corrected'});assert.equal(corrected.status,'SUCCEEDED');assert.equal(f.graph.nodes.length,1);
+});
+
+for(const changedGraph of [false,true])test('inactive Import binding source after workflow activation keeps release available; changed graph='+changedGraph,async()=>{
+ const source={document_id:'doc',workflow_id:'wf',node_id:'vars'};
+ const config={targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'};
+ let previewReceipt;
+ const f=fixture({execute:async code=>{
+  assert.match(code,/"receipt_read":true/);
+  return {status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'receipt',
+   effect_possible:false,error:null,trace:[],output:{state:'completed',receipt:previewReceipt}};
+ },wrapDrivers:(options,drivers)=>{
+  const importOptions={...options,execute:async()=>{
+   const step=f.events.findLast(event=>event.phase==='node_step_prepared');
+   assert.equal(step.action.verb,'user_runtime_read');
+   previewReceipt={status:'SUCCEEDED',action_key:'node.variables.user_runtime_read.internal',action_revision:'1',
+    operation_id:step.internal_operation_id,phase:'user_runtime_read',effect_possible:false,cleanup_complete:true,error:null,trace:[],
+    output:{verified:true,cleanup_complete:true,effect_possible:false,source_active:false,independent_readback:false,
+     node_context:{...source,verified:true,surface:'graph',locked:false}}};
+   return previewReceipt;
+  }};
+  return {...drivers,beforeTarget:ctx=>prepareImportBinding(importOptions,ctx,config),
+   settleBeforeTarget:(receipt,ctx)=>settleImportBindingBeforeTarget(importOptions,ctx,config,receipt)};
+ }});
+ f.handlers.set('imports.text',admissionHandlers.get('imports.text'));
+ f.graph.interaction_ready=true;
+ f.graph.nodes.push({ref:source,type:'variables.user',inputs:[],outputs:[],locked:false,
+  variable_outputs:[{kind:'variables',port:4,port_guid:'vars-out'}]});
+ const ownedWorkflow={status:'SUCCEEDED',verified:true,document_id:'doc',workflow_ref:workflow,cleanup_complete:true};
+ f.adapter.verifyWorkflow=async()=>({...ownedWorkflow,effect_possible:false});
+ f.adapter.activateWorkflow=async()=>({...ownedWorkflow,effect_possible:true});
+ const r={...request(),variable_inputs:[{source,kind:'variables',input:0,output:4}],
+  parameters:{
+   source:{kind:'verified_delivery',artifact_id:'registry',upload_operation_id:'registry-upload'},
+   settings:{
+    source:{encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+    format:{delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},
+    columns:[{name:'Id',label:'Id',type:'integer',data_kind:'Непрерывный',used:true}],
+   },
+  },
+  bindings:[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'RegistryPath'}}]};
+ await f.runtime.startNodeApply(r);
+ const job=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assertJob(job);
+ assert.equal(job.outcome.error.code,'BINDING_SOURCE_UNVERIFIED');
+ assert.equal(job.outcome.status,'AMBIGUOUS');
+ assert.equal(job.outcome.effect_possible,true);
+ assert.equal(job.outcome.output.pending_phase,'target');
+ assert.deepEqual((await f.runtime.inspect({operationId:r.operation_id})).output.recovery_options,['abandon_operation']);
+ if(changedGraph)f.graph.nodes[0].label='Changed';
+ const released=await f.runtime.recover(r.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
+ if(changedGraph){
+  assert.equal(released.error.code,'NODE_RELEASE_REFUSED');
+  assert.match(released.error.message,/Pre-target graph differs/);
+  assert.throws(()=>f.runtime.assertPreparationAllowed());
+ }else{
+  assert.equal(released.status,'SUCCEEDED',released.error?.message);
+  const original=released.output.original_outcome;
+  assert.equal(original.status,'FAILED');
+  assert.equal(original.effect_possible,true);
+  assert.equal(original.output.pending_phase,null);
+  assert.equal(original.output.node,null);
+  f.runtime.assertPreparationAllowed();
+ }
+ assert.deepEqual(f.calls,['source']);
 });
 
 for(const fault of ['denied_port','lost_observation'])test('Calculator source preflight preserves the actual pre-gesture boundary: '+fault,async()=>{

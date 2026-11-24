@@ -5,6 +5,7 @@ export function validateSlidingWindowParameters(p,mode,request){
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['windows','incomplete_records'].includes(k)),'only windows and incomplete_records are supported; no variable bindings');
  need(request.target.kind!=='new'||Array.isArray(p.windows)&&p.incomplete_records!==undefined,'new node requires windows and incomplete_records');
  need(request.mappings.every(m=>(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'mappings require configured fields; input exclusions unsupported');
+ need(request.finish!=='close'||request.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
  if(p.incomplete_records!==undefined)need(Object.hasOwn(SLIDING_WINDOW_POLICIES,p.incomplete_records),'choose keep_incomplete, drop_added or drop_all_incomplete');
  if(p.windows===undefined)return;
  need(Array.isArray(p.windows)&&p.windows.length<=128,'windows must be an array of at most 128 fields');

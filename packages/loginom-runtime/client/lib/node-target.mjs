@@ -554,20 +554,27 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
 
 // A pre-target release observes only. In particular, it cannot finish creation,
 // repair links, cancel a foreign draft or infer a target from its label.
-export async function releaseNodeTarget({operation,adapter,record,readReceipt,deadline,signal,now=Date.now}) {
+export async function releaseNodeTarget({operation,adapter,record,readReceipt,settleChild,deadline,signal,now=Date.now}) {
   const state=operation.nodeApply,request=state.request;
   const phase=state.pending?.phase??(state.target_reconciled?'target':null);
   if(state.node||state.result||!['source','workflow','target'].includes(phase)||operation.transportUncertain)
     throw Error('Pre-target release boundary is unavailable');
-  if(!operation.targetPhase&&operation.nodeEffectPossible===true&&operation.cleanupConfirmed!==true)
-    throw Error('Pre-target child effects have no settled checkpoint');
   const check=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Pre-target release deadline elapsed');};
   check();
+  let childCleanup;
   if(operation.lastReceipt){
     const response=await readReceipt(operation.lastReceipt);
-    if(response?.state!=='completed'||response.receipt?.cleanup_complete!==true)
+    check();
+    if(response?.state==='completed'&&response.receipt
+      &&phase==='target'&&!operation.targetPhase&&operation.preTargetGraph&&settleChild){
+      const proof=await settleChild(response.receipt,{deadline,signal});
+      if(proof?.verified===true&&proof.cleanup_complete===true)childCleanup=proof;
+    }
+    if(response?.state!=='completed'||response.receipt?.cleanup_complete!==true&&!childCleanup)
       throw Error('Pre-target release requires confirmed browser completion and cleanup');
   }
+  if(!operation.targetPhase&&operation.nodeEffectPossible===true&&operation.cleanupConfirmed!==true&&!childCleanup)
+    throw Error('Pre-target child effects have no settled checkpoint');
   check();
   const ctx={deadline,signal};
   const value={document_id:request.document_id,workflow_ref:request.workflow_ref};
@@ -605,7 +612,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   const second=await adapter.observe(value,deadline,signal);
   check();
   if(!quiet(second)||!same(first,second))throw Error('Graph changed during pre-target release');
-  return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,
+  return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,...(childCleanup?{child_cleanup:childCleanup}:{}),
     target_state:id?'found':'not_created',warnings:operation.preTargetWarnings??[],cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
 }
 

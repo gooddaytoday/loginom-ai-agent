@@ -22,8 +22,9 @@ export function validateSortingParameters(p,mode,r){
  }
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Sorting accepts one input');
  need(r.read.ports.every(i=>i===0),'Sorting has one output');
- need(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Sorting has one input/output mapping');
- for(const m of r.mappings)if(m.fields||m.changes){const src=new Set(),out=new Set();for(const f of m.fields??m.changes){
+ const tableMappings=r.mappings.filter(m=>m.kind===undefined);
+ need(tableMappings.length<=2&&tableMappings.every(m=>m.port===0),'Sorting has one input/output mapping');
+ for(const m of tableMappings)if(m.fields||m.changes){const src=new Set(),out=new Set();for(const f of m.fields??m.changes){
   need(f.source?.kind==='configured_field'&&name(f.source.name)&&!src.has(f.source.name.toLowerCase()),'Unique configured mapping fields required');src.add(f.source.name.toLowerCase());
   const n=f.name??f.source.name;need(name(n)&&!out.has(n.toLowerCase()),'Unique mapping output names required');out.add(n.toLowerCase());
   need(m.direction==='output'||f.excluded!==true,'Input exclusions are unsupported');

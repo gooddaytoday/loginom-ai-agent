@@ -18,13 +18,14 @@ export function readLgdExportBrowser({prefix,fields,variableMapping=null}){
  for(const [key,[card,id]]of Object.entries(fields)){
   const tid=base+card+';'+id,c=cmp(tid+';ValueControl'),sw=cmp(tid+';SwitchButton'),value=c?.getValue?.();
   if(key==='destination'&&sw?.pressed===true){
-   const v=cmp(tid+';VariableControl'),rows=v?.getStore?.()?.getData?.()?.items,selected=v?.getValue?.();
-   const matches=Array.isArray(rows)?rows.filter(r=>r.data.field1===selected):[];
+   const v=cmp(tid+';VariableControl'),store=v?.getStore?.(),rows=store?.getData?.()?.items,selected=v?.getValue?.();
+   const matches=Array.isArray(rows)&&!store.isLoading?.()&&selected!=null?rows.filter(r=>r.data.field1===selected):[];
    const caption=matches.length===1&&matches[0].data.field2;
+   if(typeof caption!=='string'||rows.filter(r=>r.data.field2===caption).length!==1)return fail('lgd_export_destination_variable');
    const fields=variableMapping?.kind==='variables'&&variableMapping.direction==='input'&&variableMapping.port===0?variableMapping.fields:[];
    // Native captions include a formatted value. Match the whole caption to
    // the independently read string; never parse a path out of UI text.
-   const source=typeof caption==='string'&&Array.isArray(fields)?fields.filter(f=>f.source&&f.type===5&&!f.is_null&&typeof f.value==='string'&&caption===f.name+' ( '+f.value+' )'):[];
+   const source=Array.isArray(fields)?fields.filter(f=>f.source&&f.type===5&&!f.is_null&&typeof f.value==='string'&&caption===(f.label??f.name)+' ( '+f.value+' )'):[];
    if(source.length!==1||typeof source[0].value!=='string'||source[0].value.length>512||source[0].value.includes('\0'))return fail('lgd_export_destination_variable');
    values[key]={value:source[0].value,display:caption,tid:tid+';VariableControl',variable:true,variable_name:source[0].name};continue;
   }

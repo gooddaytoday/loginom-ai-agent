@@ -1,5 +1,8 @@
 .DS_Store
 node_modules
+__pycache__/
+*.pyc
+.pytest_cache/
 .worktrees
 .sst
 .env

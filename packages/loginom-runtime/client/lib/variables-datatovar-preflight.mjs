@@ -28,9 +28,13 @@ export async function preflightExecutedDataToVarSource(options,ctx,{channel,bind
  const before=await options.execute(makeJavascriptManagedSelectionReadCode({...task,mode:'capture'}));
  try{
   if(before.ready!==true){
-   options.operation.cleanupConfirmed=false;let selected;
-   try{selected=await dispatchManagedJavascriptBody({task,before,execute:options.execute,record:options.onRecord,receiptOptions:options.receiptOptions});}
-   catch(error){options.operation.transportUncertain=true;options.operation.nodeEffectPossible=true;throw error;}
+   const cleanupBefore=options.operation.cleanupConfirmed;options.operation.cleanupConfirmed=false;let selected,journaled=false;
+   try{selected=await dispatchManagedJavascriptBody({task,before,execute:options.execute,
+    record:event=>{journaled=true;return options.onRecord(event);},receiptOptions:options.receiptOptions});}
+   catch(error){
+    // Refused before its journal: no click can exist, so release the read lease.
+    if(!journaled){options.operation.cleanupConfirmed=cleanupBefore;error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+    options.operation.transportUncertain=true;options.operation.nodeEffectPossible=true;throw error;}
    options.operation.nodeEffectPossible ||= selected.effect_possible===true;
    options.operation.cleanupConfirmed=selected.cleanup_complete===true;
    requireRead(selected.status==='SUCCEEDED'&&selected.output?.selection?.ready===true,'owned source selection unconfirmed');
