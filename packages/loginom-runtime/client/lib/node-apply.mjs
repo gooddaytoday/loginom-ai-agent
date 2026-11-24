@@ -365,7 +365,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
         && refusal?.phase===name && refusal.status==='NOT_APPLIED'
         && refusal.effect_possible===false && refusal.cleanup_complete===true){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
-        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
+        state.effect_possible=previousEffect;state.cleanup_complete=true;
+        // A preceding gesture can leave the operation ambiguous even though
+        // this phase was refused. Keep its boundary available for release.
+        if(!previousEffect)state.pending=null;
         if(effectsOutputRefusal)state.javascript_declared_output_required=true;
       }
       const pause=error.nodeExecutionWaitPause;

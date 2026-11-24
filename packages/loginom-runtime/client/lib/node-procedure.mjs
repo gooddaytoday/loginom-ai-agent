@@ -54,7 +54,7 @@ import {makeGroupingContextCode} from './grouping-context.mjs';
 import {makeDataToVarContextCode} from './variables-datatovar-context.mjs';
 import {makeCalculatorContextCode} from './calculator-context.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
-import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode} from './node-port-open.mjs';
+import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode,makePreparedInputPortReconcileCode,makeImportVariableInputReleaseCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
 import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
@@ -401,6 +401,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureUserVariables(variables,finish,remove) {return crossTableOwnedStep('user_values',{variables,finish,...(remove?.length?{remove}:{})},makeUserVariablesConfigureCode);},
     async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readVariablePortMapping(mapping){return crossTableOwnedStep('variable_mapping_read',{mapping,read_only:true},makeVariablePortMappingCode);},
+    async releaseImportMappingRead(opening){
+      checkBudget();
+      if(!preparedNodeContext||!['document_id','workflow_id','node_id'].every(k=>opening.node?.[k]===preparedNodeContext.node[k]))
+        throw Error('Import mapping read owner changed');
+      const {opening_operation_id,port_guid}=opening;
+      const code=makeImportVariableInputReleaseCode(preparedNodeContext,{operation_id:opening_operation_id,port_guid,
+        origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
+      const proof=await execute(code,{timeout:Math.max(1,operation.deadline-now())});
+      checkBudget();
+      if(proof?.status!=='SUCCEEDED'||proof.verified!==true||proof.cleanup_complete!==true
+        ||proof.opening_operation_id!==opening_operation_id||proof.port_guid!==port_guid)
+        throw Error(proof?.error??'Original Import mapping read has no confirmed graph return');
+      return proof;
+    },
     async readBuiltinVariablesPreview({port_guid}) {return crossTableOwnedStep('user_runtime_read',{port:4,port_guid},makeBuiltinVariablesPreviewCode);},
     async readExcelImportSource() {return crossTableOwnedStep('excel_source_read',{},makeExcelSourceReadCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
