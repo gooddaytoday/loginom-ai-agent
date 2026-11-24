@@ -173,7 +173,8 @@ if(recovering||refusing){
  }else{
   const receipt=events.find(event=>event.phase==='node_phase_refused')?.receipt;
   assert.equal(receipt?.settings_unchanged,true);
-  assert.equal(receipt?.effect_possible,false);
+  assert.equal(receipt?.effect_possible,true);
+  assert.equal(result.effect_possible,true);
   assert.deepEqual(calls,['Open-preserve']);
   assert.equal(graph.links.length,0);
  }

@@ -345,11 +345,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
-      if(name==='target'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===false
+      if(name==='target'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
         &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&!operation.transportUncertain
         &&verifiedJavascriptExistingSchemaRefusal(refusal,request)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
-        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed','crosstable_preflight_completed'].includes(refusal?.verification)
           ||refusal?.verification==='node_move_position_mismatch'&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)

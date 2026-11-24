@@ -44,7 +44,8 @@ export async function refuseJavascriptExistingTarget({receipt,snapshot,baseline,
     source_read_discard_verified:true,settings_unchanged:true,editor_mutation_started:false,explicit_execute_requested:false};
   await journalManagedJavascriptError({record,deadline},{phase,operation_id:owner.operation_id,proof});
   const error=Error(message??messages[reason]);
-  error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:false,cleanup_complete:true,
+  // The owned read and discard can affect the UI while preserving settings.
+  error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
     settings_unchanged:true,verification:phase,proof};
   throw error;
 }

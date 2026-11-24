@@ -22,7 +22,7 @@ async function fixture(mode,{close=true}={}) {
 for(const mode of ['code','declared'])test('actual owned admission/discard produces one acknowledged mode refusal '+mode,async()=>{
  const f=await fixture(mode);let error;
  try{await admitJavascriptExistingSchema(f);}catch(value){error=value;}
- assert.equal(error.nodePhaseRefusal.cleanup_complete,true);assert.equal(error.nodePhaseRefusal.effect_possible,false);
+ assert.equal(error.nodePhaseRefusal.cleanup_complete,true);assert.equal(error.nodePhaseRefusal.effect_possible,true);
  const proof=error.nodePhaseRefusal.proof,node=proof.node;
  for(const finish of ['done','close','execute']){
   const request={operation_id:owner.operation_id,contract_revision:'1.0.0',document_id:owner.document_id,
@@ -34,7 +34,7 @@ for(const mode of ['code','declared'])test('actual owned admission/discard produ
    handlers:new Map([['programming.javascript',{revision:'test',modes:['script'],validate(){},configure(){assert.fail('Must not configure');}}]]),
    drivers:{verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),prepareTarget:async()=>{throw error;}}});
   assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
-  assert.equal(result.effect_possible,false);
+  assert.equal(result.effect_possible,true);
   const foreign=structuredClone(error.nodePhaseRefusal);foreign.proof.owner.node_id='foreign';
   assert.equal(verifiedJavascriptExistingSchemaRefusal(foreign,request),false);
  }

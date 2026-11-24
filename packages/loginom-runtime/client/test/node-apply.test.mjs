@@ -897,7 +897,7 @@ for(const failure of [null,'owner','operation','mode','settings','digest','close
  f.handlers.set('programming.javascript',{...f.handlers.get('imports.text'),modes:['script']});
  f.drivers.prepareTarget=async()=>{
   const e=Error('JavaScript existing lifecycle preserves observed schema');
-  e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:false,cleanup_complete:true,settings_unchanged:true,verification:'javascript_existing_schema_mode_refused',proof:{
+  e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'javascript_existing_schema_mode_refused',proof:{
    node:p.target.ref,owner:{...p.target.ref,operation_id:p.operation_id,ui_epoch:1},admission_id:'00000000-0000-4000-8000-000000000000',observed_schema_mode:'code',requested_schema_mode:'declared',
    unconfigured:false,reason:'configured_schema_preserved',
    source_identity:{source_sha256:'a'.repeat(64),source_utf8_bytes:0,source_lf_lines:1},settings:{generation:true,grids:[]},settings_sha256:javascriptSourceSettingsDigest({generation:true,grids:[]}),
@@ -918,7 +918,7 @@ for(const failure of [null,'owner','operation','mode','settings','digest','close
  const r=await f.run(p);
  if(failure){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);assert.equal(r.pending_phase,'target');return;}
  assert.equal(r.status,'FAILED');assert.equal(r.cleanup_complete,true);assert.equal(r.pending_phase,null);
- assert.equal(r.effect_possible,false);assert.equal(r.execution.status,'not_requested');assert.deepEqual(f.calls,['source']);
+ assert.equal(r.effect_possible,true);assert.equal(r.execution.status,'not_requested');assert.deepEqual(f.calls,['source']);
 });
 
 
