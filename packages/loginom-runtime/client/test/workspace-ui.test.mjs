@@ -7447,15 +7447,16 @@ test('initial wrong-delimiter layout can be ready without accepting an overlong 
  assert.equal(pending.output.wizard.import_columns.initial_layout.status,'unverified');
 });
 
-function bufferedMappingFixture(fault) {
- const page=new Page(),c=mappingCoverageFixture(page,20);
- const records=c.rows.map((row,i)=>{row.attrs['data-recordid']=String(100+i);return {isModel:true,internalId:100+i,
-  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}};});
+function bufferedMappingFixture(fault,{clock,count=20}={}) {
+ const page=new Page({clock}),c=mappingCoverageFixture(page,20);
+ const records=Array.from({length:count},(_,i)=>({isModel:true,internalId:100+i,
+  data:{Index:i,Name:'Field'+i,DisplayName:'Field'+i,DataType:4,DataKind:1,DefaultUsageType:0}}));
+ c.rows.forEach((row,i)=>{row.attrs['data-recordid']=String(records[i].internalId);});
  for(const row of c.rows.slice(12))row.remove();c.container.box.height=12*25;
  const source={items:records},collection={items:records,getSource:()=>source};
- const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>20,getTotalCount:()=>20};
+ const store={$className:'Ext.data.Store',isLoading:()=>false,getData:()=>collection,getCount:()=>count,getTotalCount:()=>count};
  page.context.Ext={getCmp:()=>({el:{dom:c.body},getStore:()=>store})};
- const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:'MF;TF-1;WizrdMCF'}:arg);
+ const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>evaluate(fn,arg&&Object.hasOwn(arg,'mappingPage')?{...arg,definitionPrefix:arg.definitionPrefix??'MF;TF-1'}:arg);
  if(fault==='missing_source')c.rows[2].children[2].remove();
  if(fault==='foreign_record')c.rows[2].attrs['data-recordid']='999';
  if(fault==='name_mismatch')records[2].data.Name='Different';
@@ -7480,6 +7481,60 @@ for(const fault of ['foreign_record','name_mismatch','filtered_store','incomplet
   const {page}=bufferedMappingFixture(fault),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
   assert.equal(r.output.wizard.output_columns.page.status,'unverified_definition_page');
  });
+
+for(const cost of ['hit tests','descendant selectors','buffered row refs'])test('wide text import keeps output paging within budget for '+cost,async()=>{
+ const clock=fixtureClock(),{page,c}=bufferedMappingFixture(null,{clock:clock.Date,count:1000});
+ const root=c.form.getAttribute('data-tid');
+ page.add('div',root+';ImportTextFileParamsWizard','',undefined,c.form).attrs.class='x-hidden-offsets';
+ c.body.box.height=c.body.clientHeight=150;
+ c.body.scrollHeight=25000;c.body.style.overflowY='auto';
+ page.add('div','Overlay','',{x:100,y:200,width:100,height:25});
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{
+   if(x>=100&&x<300&&y>=350&&y<400){if(cost==='hit tests')clock.advance(24);return c.form;}
+   return hit(x,y);
+ };
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+   async()=>({verified:true,surface:'wizard',node_id:'node',tid:root}));
+ const roots=await read({discover_roots:true});
+ assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+ const request={root_ref:roots.output.wizard.root_ref,output_column_page:{offset:0,limit:8}};
+ if(cost==='descendant selectors'){
+   const query=page.document.querySelectorAll.bind(page.document);
+   page.document.querySelectorAll=selector=>{
+     if(selector.includes('] [data-tid]'))clock.advance(501);
+     return query(selector);
+   };
+ }
+ if(cost==='buffered row refs'){
+   const initial=await read(request);
+   assert.equal(initial.status,'SUCCEEDED');
+   const state=vm.runInContext("globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]",page.context);
+   const rootRef=state.refs.get(request.root_ref);
+   state.refs.delete(request.root_ref);
+   state.refs.delete(initial.output.wizard.output_columns.auto_sync.ref);
+   state.refs=new Map([[request.root_ref,rootRef],...state.refs]);
+   // Model the cached refs of rows from earlier windows. The next scan
+   // allocates a ref after observing the root, then a fresh read needs it.
+   for(let i=state.refs.size;i<4096;i++)state.refs.set('buffered-'+i,rootRef);
+   assert.equal((await read(request)).status,'SUCCEEDED');
+ }
+ const result=await read(request);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.trace));
+ const cols=result.output.wizard.output_columns;
+ assert.equal(cols.page.status,'complete_definition_page');
+ assert.equal(cols.page.total_columns,1000);
+ const control=ref=>result.output.ui.elements.find(e=>e.ref===ref);
+ assert.ok(control(cols.definition_scroll_ref).allowed_actions.includes('scroll'));
+ assert.ok(control(cols.fields[1].name_ref).allowed_actions.includes('click'));
+ for(const field of [cols.fields[0],cols.fields[7]]) {
+   const cell=control(field.name_ref);
+   assert.equal(cell.interaction.state,'point_not_observed');
+   assert.deepEqual(Array.from(cell.allowed_actions),[]);
+ }
+});
 
 for(const property of ['name','label'])for(const scoped of [false,true])test('import text editor separates the hidden original from the uncommitted draft: '+property+' (scoped='+scoped+')',async()=>{
  const page=new Page(),c=importCoverageFixture(page,3),row=property==='name'?0:1,cell=c.cols[0].cells[row];
