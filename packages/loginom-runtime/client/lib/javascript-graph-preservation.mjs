@@ -1,19 +1,22 @@
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
 
-export function verifyJavascriptUnconnectedInput(graph,node){
+export function verifyJavascriptUnconnectedInput(graph,node,ownedVariableLinks=[]){
+  const variableLinks=graph?.variable_links??[];
   need(graph?.complete===true&&graph.document_id===node.document_id
     &&graph.workflow_ref?.workflow_id===node.workflow_id&&Array.isArray(graph.nodes)
     &&graph.nodes.filter(item=>same(item.ref,node)).length===1
     &&Array.isArray(graph.links)&&Array.isArray(graph.foreign_links)&&graph.foreign_links.length===0
-    &&[graph.links,graph.variable_links??[],graph.service_links??[]].every(edges=>Array.isArray(edges)
-      &&edges.every(edge=>typeof edge.target==='string'&&edge.target!==node.node_id)),
-  'JavaScript unconnected input requires a complete owned graph without incoming links');
+    &&[graph.links,graph.service_links??[],graph.rest_connection_links??[]].every(edges=>Array.isArray(edges)
+      &&edges.every(edge=>typeof edge?.target==='string'&&edge.target!==node.node_id))
+    &&Array.isArray(variableLinks)&&variableLinks.every(edge=>typeof edge?.target==='string')
+    &&same(variableLinks.filter(edge=>edge.target===node.node_id),ownedVariableLinks),
+  'JavaScript unconnected input requires a complete owned graph without incoming table, service or unowned variable links');
   return true;
 }
 
-export function javascriptUnconnectedInputMapping(mapping,graph,node){
-  verifyJavascriptUnconnectedInput(graph,node);
+export function javascriptUnconnectedInputMapping(mapping,graph,node,ownedVariableLinks){
+  verifyJavascriptUnconnectedInput(graph,node,ownedVariableLinks);
   const context=mapping?.node_context,port=context?.input_port;
   need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
     &&mapping.state_source==='cached_mapping_stores'&&mapping.mapping_wizard==='TuneDataSourceMappingWizard'
@@ -29,7 +32,8 @@ export function javascriptUnconnectedInputMapping(mapping,graph,node){
 
 export function verifyJavascriptMappingGraph(before,after,node){
   const domain=value=>({document_id:value.document_id,workflow_ref:value.workflow_ref,
-    nodes:value.nodes.map(({dom_epoch,...item})=>item),links:value.links,foreign_links:value.foreign_links});
+    nodes:value.nodes.map(({dom_epoch,...item})=>item),links:value.links,foreign_links:value.foreign_links,
+    variable_links:value.variable_links??[],service_links:value.service_links??[],rest_connection_links:value.rest_connection_links??[]});
   need(before?.complete===true&&after?.complete===true&&before.document_id===node.document_id
     &&after.document_id===node.document_id&&before.workflow_ref.workflow_id===node.workflow_id
     &&after.workflow_ref.workflow_id===node.workflow_id,'JavaScript mapping graph owner changed');

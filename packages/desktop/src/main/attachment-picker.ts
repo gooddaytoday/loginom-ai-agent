@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import { binaryReferenceMime } from "@opencode-ai/app/file-picker"
 import { basename } from "node:path"
 import { stat } from "node:fs/promises"
 import { open } from "node:fs/promises"
@@ -34,13 +35,19 @@ export function createPickedFileAuthorizations(
   }
 }
 
+export async function referenceAttachment(path: string, expected?: { size: number; lastModified: number }) {
+  const reference = await createAttachmentReceipt(path, expected)
+  return { ...reference, mime: binaryReferenceMime(reference.filename) ?? reference.mime }
+}
+
 export async function describePickedFiles(paths: string[]) {
   return Promise.all(
     paths.map(async (path) => {
       const info = await stat(path)
-      if (info.size > 16 * 1024 * 1024 && !path.toLowerCase().endsWith(".lgp"))
-        return { path, name: basename(path), ...(await createAttachmentReceipt(path)) }
-      return { path, name: basename(path), size: info.size }
+      const name = basename(path)
+      if (binaryReferenceMime(name) || (info.size > 16 * 1024 * 1024 && !name.toLowerCase().endsWith(".lgp")))
+        return { path, name, ...(await referenceAttachment(path)) }
+      return { path, name, size: info.size }
     }),
   )
 }

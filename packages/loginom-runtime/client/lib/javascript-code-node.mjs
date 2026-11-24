@@ -33,6 +33,11 @@ export function validateJavascriptCodeRequest(parameters,mode,request) {
     &&request.mappings.length===0,'JavaScript lifecycle requires preserved port mappings');
   need(request.finish==='execute'||request.read?.ports?.length===0&&request.read.coverage===undefined,
     'JavaScript Done/Close cannot request output reading');
+  if(parameters.input_state==='unconnected'&&request.variable_inputs?.length){
+    const [input]=request.variable_inputs;
+    need(request.target.kind==='new'&&request.variable_inputs.length===1&&input.kind==='variables'&&input.input===0,
+      'JavaScript unconnected variable input requires a new node and the variable port 0');
+  }
   if(request.target.kind==='new'){
     need(request.finish!=='close','JavaScript new Close cannot discard committed target/input effects');
     need(['code','declared'].includes(parameters.schema_mode),'JavaScript new schema mode unavailable');
@@ -148,6 +153,20 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings,
       ...(request.finish==='execute'?{requireDeclaredOutput:()=>request.target.kind==='new'
         ?request.parameters.schema_mode==='code':sourceSnapshot?.settings?.generation}:{})});
+    const ownedVariableLinks=node=>{
+      const [input]=request.variable_inputs??[];
+      if(!input)return [];
+      // The target checkpoint witnesses new-node creation and the requested
+      // native edge, including both port GUIDs. A graph observation alone does not.
+      const {completed,pending,result}=operation.targetPhase??{};
+      const links=result?.variable_links,link=links?.[0];
+      need(completed===true&&!pending&&result?.status==='SUCCEEDED'&&result.created===true
+        &&same(result.node?.ref,node)&&Array.isArray(links)&&links.length===1&&link?.target===node.node_id
+        &&link.source===input.source.node_id&&link.output===input.output&&link.input===input.input&&link.kind===input.kind
+        &&[link.source_port_guid,link.target_port_guid].every(guid=>typeof guid==='string'&&guid.length>0),
+        'JavaScript unconnected variable input ownership unconfirmed');
+      return links;
+    };
     const graph=async ctx=>{
       need(typeof operation.nodeTargetAdapter?.observe==='function','JavaScript complete graph observer unavailable');
       const value=await operation.nodeTargetAdapter.observe({document_id:request.document_id,
@@ -155,7 +174,10 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       need(value?.complete===true&&value.document_id===ctx.document_id&&same(value.workflow_ref,ctx.workflow_ref)
         &&Array.isArray(value.nodes)&&Array.isArray(value.links)&&Array.isArray(value.foreign_links),
       'JavaScript complete graph owner changed');
-      if(request.parameters.input_state==='unconnected'&&ctx.node)verifyJavascriptUnconnectedInput(value,nodeRef(owner));
+      if(request.parameters.input_state==='unconnected'&&ctx.node){
+        const node=nodeRef(owner);
+        verifyJavascriptUnconnectedInput(value,node,ownedVariableLinks(node));
+      }
       return value;
     };
     const readMapping=async(direction,ctx)=>{
@@ -164,9 +186,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       const state=await channel.observe({condition:'complete owned JavaScript '+direction+' mapping',readMappings:true,
         ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true
           &&s.node_mapping.source_identity_verified===true&&s.prepared_node_context?.verified===true});
-      const mapping=state.node_mapping;
+      const node=nodeRef(owner);
       const unconnected=direction==='input'&&request.parameters.input_state==='unconnected';
-      if(unconnected)javascriptUnconnectedInputMapping(mapping,before,nodeRef(owner));
+      const mapping=unconnected?javascriptUnconnectedInputMapping(state.node_mapping,before,node,ownedVariableLinks(node)):state.node_mapping;
       need(mapping.state_source==='cached_mapping_stores'&&mapping.settings_applied===false&&mapping.package_saved===false
         &&typeof mapping.autosync==='boolean'&&mapping.node_context?.surface==='wizard'
         &&['document_id','workflow_id','node_id'].every(key=>mapping.node_context[key]===owner[key])
@@ -174,17 +196,18 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         &&mapping.node_context[direction+'_port'].port===0
         &&(unconnected||mapping.source_fields.length>0&&mapping.target_fields.length>0),
         'JavaScript materialized mapping unavailable');
-      await closeJavascriptPortMapping({reader:channel,direction,reference:nodeRef(owner),record:onRecord,
+      await closeJavascriptPortMapping({reader:channel,direction,reference:node,record:onRecord,
         deadline:ctx.deadline,allowOwnedUnlock:true,verifyGraph:async()=>{
           const after=await graph(ctx);
-          verifyJavascriptMappingGraph(before,after,nodeRef(owner));
-          await onRecord({phase:'javascript_mapping_graph_verified',direction,node:nodeRef(owner),before,after});
+          verifyJavascriptMappingGraph(before,after,node);
+          await onRecord({phase:'javascript_mapping_graph_verified',direction,node,before,after});
         }});
-      return unconnected?javascriptUnconnectedInputMapping(mapping,before,nodeRef(owner)):mapping;
+      return mapping;
     };
     const launch=async ctx=>{
-      if(request.parameters.input_state==='unconnected')verifyJavascriptUnconnectedInput(await graph(ctx),nodeRef(owner));
-      enter(ctx);need(committed?.owned_done_settled===true
+      enter(ctx);
+      if(request.parameters.input_state==='unconnected')await graph(ctx);
+      need(committed?.owned_done_settled===true
         &&(configured?.phase==='configured'||configured?.phase==='admitted'
           &&configured.kind==='existing'&&configured.intent==='preserve'),
         'JavaScript source commit must precede execution');

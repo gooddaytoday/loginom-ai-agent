@@ -1,4 +1,3 @@
-import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename, isAbsolute, join } from "node:path"
@@ -11,7 +10,12 @@ import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai
 import type { FatalRendererError, PendingDeepLinks, ServerReadyData, TitlebarTheme } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
-import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
+import {
+  assertAttachmentBudget,
+  createPickedFileAuthorizations,
+  describePickedFiles,
+  referenceAttachment,
+} from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
 import { SYSTEM_PROXY_ENABLED_KEY } from "./store-keys"
 import { currentSystemProxyStatus, publishSystemProxyStatus } from "./system-proxy"
@@ -223,7 +227,7 @@ export function registerIpcHandlers(deps: Deps) {
   )
 
   ipcMain.handle("reference-attachment", (_event, path: string, expected: { size: number; lastModified: number }) =>
-    createAttachmentReceipt(path, expected),
+    referenceAttachment(path, expected),
   )
 
   ipcMain.handle("read-picked-file", async (event: IpcMainInvokeEvent, token: string, filePath: string) => {

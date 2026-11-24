@@ -145,8 +145,9 @@ test('an unverified deletion stays ambiguous and is never repeated',async()=>{
 });
 
 // Native gesture: select exactly the node cell, toolbar Delete, confirm.
-function page({selected=true,text='Удалить выделенный узел?',locked=false,extraEdges=0}={}) {
- let graph=chain(),selection=[],clicks=[],dialog=false;
+function page({selected=true,alreadySelected=false,text='Удалить выделенный узел?',locked=false,extraEdges=0,
+ toolbarHidden=false,toolbarCovered=false,toolbarDisabled=false,toolbarForeign=false,graphFocused=true,advanceClock=()=>{}}={}) {
+ let graph=chain(),selection=alreadySelected?['b']:[],clicks=[],dialog=false;
  const value={graph:()=>graph,clicks,
   evaluate:async(fn,arg)=>{
    const source=fn.toString();
@@ -154,21 +155,40 @@ function page({selected=true,text='Удалить выделенный узел?
    if(source.includes('Native node body hit unavailable')){
     if(locked)throw Error('Exact unlocked node to delete required');
     if(arg.known+extraEdges!==arg.known)throw Error('Node to delete has a connection Dock cannot verify ('+(arg.known+extraEdges)+' native, '+arg.known+' recognized); nothing was deleted');
-    assert.equal(arg.known,2);return {x:200,y:120};}
+    assert.equal(arg.known,2);
+    if(selection.length===1&&selection[0]===arg.id){
+     if(source.includes('g.getSelectionCells()'))return null;
+     throw Error('Native node body hit unavailable');
+    }
+    return {x:200,y:120};}
    if(source.includes('getSelectionCells'))return selection.length===1&&selection[0]===arg&&graph.nodes.some(n=>n.ref.node_id===arg);
    throw Error('Unexpected evaluate '+source.slice(0,80));
   },
-  locator:selector=>{const box=selector.includes('msgbox;');return {locator:child=>value.locator(child),count:async()=>!box||dialog?1:0,isVisible:async()=>!box||dialog,isEnabled:async()=>true,
-   evaluate:async()=>({x:10,y:10}),waitFor:async()=>{},textContent:async()=>text,
-   click:async()=>{clicks.push(selector);if(selector.includes('btnRemoveSelected'))dialog=true;if(selector.includes('msgbox;tlb;'))dialog=false;if(selector.includes('msgbox;tlb;yes'))graph=remove(graph,'b');}};},
+  locator:selector=>{
+   const box=selector.includes('msgbox;'),removeButton=selector.includes('btnRemoveSelected'),canvas=selector.includes('cmpDiagram');
+   return {locator:child=>value.locator(child),count:async()=>!box||dialog?1:0,
+    isVisible:async()=>removeButton?!(toolbarHidden&&selection.length===1):!box||dialog,isEnabled:async()=>true,
+    evaluate:async(fn,arg)=>{
+     if(canvas){const element={ownerDocument:{}};element.ownerDocument.activeElement=graphFocused?element:null;return fn(element);}
+     if(removeButton&&arg){
+      const toolbar={},ownerDocument={querySelectorAll:selector=>selector.includes('MF;TF-1;ModelForm;tlbModel')?[toolbar]:[]};
+      return fn({ownerDocument,parentElement:{closest:()=>toolbarForeign?null:toolbar},matches:selector=>selector.startsWith('a.')||toolbarDisabled,
+       getAttribute:()=> 'Удалить выбранное... (Delete)',getBoundingClientRect:()=>({width:0,height:0})},arg);
+     }
+     if(removeButton&&toolbarCovered)throw Error('Target is covered');
+     return {x:10,y:10};
+    },waitFor:async()=>{},textContent:async()=>text,
+    press:async key=>{assert.ok(canvas);assert.equal(key,'Delete');clicks.push('diagram:Delete');dialog=true;},
+    click:async()=>{clicks.push(selector);if(removeButton)dialog=true;if(selector.includes('msgbox;tlb;'))dialog=false;if(selector.includes('msgbox;tlb;yes'))graph=remove(graph,'b');}};
+  },
   mouse:{click:async()=>{clicks.push('body');if(selected)selection=['b'];},move:async()=>{}},
-  keyboard:{press:async()=>{}},waitForTimeout:async()=>{},
+  keyboard:{press:async()=>{}},waitForTimeout:async ms=>advanceClock(ms),
  };
  return value;
 }
 const gesture=async options=>{
  const p=page(options),before=chain();
- const task={effect:{id:'delete:graph:0',kind:'delete_node',parameters:{ref:ref('b')},before},deadline:Date.now()+20000,
+ const task={effect:{id:'delete:graph:0',kind:'delete_node',parameters:{ref:ref('b')},before},deadline:Date.now()+(options?.budget??20000),
   request:{document_id:'doc',workflow_ref:workflow}};
  const strip=g=>JSON.stringify({...g,nodes:g.nodes.map(({dom_epoch,...n})=>n)});
  const receipt=await mutateGraph(p,task,async()=>structuredClone(p.graph()),null,null,null,async()=>({fully_visible:true}),(a,b)=>strip(a)===strip(b));
@@ -180,6 +200,26 @@ test('native deletion selects the owned node body and confirms once',async()=>{
  assert.deepEqual(clicks,['body','[data-tid="MF;TF-1;ModelForm;btnRemoveSelected"]','[data-tid="msgbox;tlb;yes"]']);
  assert.equal(receipt.deletion.confirmation_text,'Удалить выделенный узел?');
  assert.ok(verifyNodeTargetEffect({kind:'delete_node',parameters:{ref:ref('b')},before},graph));
+});
+test('native deletion does not re-click an already selected node whose body hit is unavailable',async()=>{
+ const {receipt,clicks,graph,before}=await gesture({alreadySelected:true});
+ assert.equal(receipt.status,'SUCCEEDED',receipt.error);
+ assert.deepEqual(clicks,['[data-tid="MF;TF-1;ModelForm;btnRemoveSelected"]','[data-tid="msgbox;tlb;yes"]']);
+ assert.ok(verifyNodeTargetEffect({kind:'delete_node',parameters:{ref:ref('b')},before},graph));
+});
+test('hidden owned delete command uses Delete on the focused diagram and confirms once',async()=>{
+ const {receipt,clicks,graph,before}=await gesture({toolbarHidden:true,budget:1500});
+ assert.equal(receipt.status,'SUCCEEDED',receipt.error);
+ assert.deepEqual(clicks,['body','diagram:Delete','[data-tid="msgbox;tlb;yes"]']);
+ assert.equal(receipt.deletion.confirmation_text,'Удалить выделенный узел?');
+ assert.ok(verifyNodeTargetEffect({kind:'delete_node',parameters:{ref:ref('b')},before},graph));
+});
+for(const fault of [{toolbarCovered:true},{toolbarHidden:true,toolbarDisabled:true},
+ {toolbarHidden:true,toolbarForeign:true},{toolbarHidden:true,graphFocused:false}])test('native deletion refuses unreachable command '+JSON.stringify(fault),async context=>{
+ context.mock.timers.enable({apis:['Date']});
+ const {receipt,clicks,graph}=await gesture({...fault,alreadySelected:true,advanceClock:ms=>context.mock.timers.tick(ms)});
+ assert.equal(receipt.status,'NOT_APPLIED');assert.equal(receipt.effect_possible,false);
+ assert.match(receipt.error,/single_node_delete_toolbar_reachable/);assert.deepEqual(clicks,[]);assert.equal(graph.nodes.length,4);
 });
 test('native deletion never presses Delete without the exact single-node selection',async()=>{
  const {receipt,clicks}=await gesture({selected:false});
@@ -195,8 +235,8 @@ for(const text of ['Сохранить изменения?','Не удалось
  assert.match(receipt.error,/confirmation unavailable/);assert.ok(clicks.includes('[data-tid="msgbox;tlb;no"]'));
  assert.ok(!clicks.includes('[data-tid="msgbox;tlb;yes"]'));assert.equal(graph.nodes.length,4);
 });
-test('an unrecognized native connection is refused before any click',async()=>{
- const {receipt,clicks,graph}=await gesture({extraEdges:1});
+for(const alreadySelected of [false,true])test('an unrecognized native connection is refused before any click: already selected='+alreadySelected,async()=>{
+ const {receipt,clicks,graph}=await gesture({alreadySelected,extraEdges:1});
  assert.equal(receipt.status,'NOT_APPLIED');assert.equal(receipt.effect_possible,false);
  assert.match(receipt.error,/connection Dock cannot verify \(3 native, 2 recognized\)/);assert.deepEqual(clicks,[]);assert.equal(graph.nodes.length,4);
 });
