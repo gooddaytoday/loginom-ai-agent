@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 90,
+    "max_errors": 0,
+    "max_nodes": 4,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Minimum 4 nodes including the requested disposable control calculation. No sorting is required."
+}
