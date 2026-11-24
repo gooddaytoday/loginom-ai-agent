@@ -38,5 +38,6 @@ test("workflow reference defines Loginom-only results, standard recovery and con
 test("Excel card reports the 64-column limit before creating the Import", () => {
   expect(excel).toContain("«Excel runtime supports 1–64 columns»")
   expect(excel).toContain("до `node_apply`: Import не создавай, книгу без согласия не конвертируй")
+  expect(excel).toContain("запрошенный пакет сохрани без этого узла")
   expect(Buffer.byteLength(excel)).toBeLessThanOrEqual(12_000)
 })
