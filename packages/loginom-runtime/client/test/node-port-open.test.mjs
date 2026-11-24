@@ -535,6 +535,25 @@ function textExportFixture(wizardIndex=0) {
  return f;
 }
 
+for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree','unbounded','non-array'])
+ test('Excel export binds its distinct owned input tree slot: '+fault,async()=>{
+  const f=textExportFixture(1),group=f.portTree.ParentNode;
+  f.node.FIconCls='bg-vendor-icon-exportexcelfile';
+  if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
+  if(fault==='foreign-collection')f.portTree.FCollection={};
+  if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
+  if(fault==='missing-tree')group.FSubNodes.FItems[1]={FModelNodePort:{}};
+  if(fault==='duplicate-port')group.FSubNodes.FItems[0].FModelNodePort=f.port.data;
+  if(fault==='duplicate-tree')group.FSubNodes.FItems[0]=f.portTree;
+  if(fault==='unbounded')group.FSubNodes.FItems.length=101;
+  if(fault==='non-array')group.FSubNodes.FItems={0:f.portTree,length:1};
+  const result=await f.run();
+  if(fault==='none'){
+   assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.native_index,0);assert.equal(result.wizard_index,1);
+   assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,2);
+  }else assert.equal(result.status,'AMBIGUOUS');
+ });
+
 for(const index of [0,1])test('text export confirms its owned slot without materializing lazy FIndex '+index,async()=>{
  const f=textExportFixture(index);f.portTree.FIndex=null;
  f.task.deadline=Date.now()+150;
