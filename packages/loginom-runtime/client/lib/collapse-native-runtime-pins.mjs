@@ -1,3 +1,4 @@
+import {directNativeRuntimePins} from './direct-source-native-pins.mjs';
 // Observed Loginom 7.4.2 critical implementations; hashes of loaded functions, not refetched files.
 export const nativeRuntimePins=Object.freeze({
   "functions": {
@@ -81,4 +82,20 @@ export const nativeVariablePins=Object.freeze({
 export const nativeTreePins=Object.freeze({
  get_reader:'ca82cebf714d2854aeb1adc60dfc0678e7d19844348760303937e4a6d41cd730',
  get_as_variant:'29323b4c72312231cd0781a87aafba588ada0fa952f84770fc376617f37db36e',
+});
+
+// LAB-1943, Loginom 7.4.2: direct DataSource71 AsVariant166 (row, column).
+// Getter observed on the compact build only.
+export const nativeDataSourcePins=Object.freeze({
+ as_variant:'cbad2c6d75a8fa3b54bc73acc3002172622c8ac329b5be6f505e4440294f855a',
+});
+
+// Complete pin set per loaded 7.4.2 build; collectNativeRuntime detects the build.
+export const nativeRuntimeProfiles=Object.freeze({
+ canonical:Object.freeze({functions:nativeRuntimePins.functions,constants:nativeRuntimePins.constants,datetime:Object.freeze({
+  from_oadate:'e35fbf955d5d95bd97724063fb6e40fbdbc6235e4cb34b00860d9611ff75949c',
+  add_bias:'bbabbc4e121b32ea7f93ff900a4fb7cf47ec5853be1a200fc86b993e62262d19'})}),
+ compact:Object.freeze({functions:directNativeRuntimePins.functions,constants:directNativeRuntimePins.constants,datetime:Object.freeze({
+  from_oadate:'14292d68490bb88f1854f21afa81b1e59ec81176f80c2f7abd37adf722c52ce8',
+  add_bias:'7b799065c792dfb45686d73a8a751a0a0de4ed564827860fa1fa8b2d69fd4486'})}),
 });

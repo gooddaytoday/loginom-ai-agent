@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 0,
+    "max_nodes": 12,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Two different supernodes and variable condition require graph audit; native nested graph is not proven by CSV alone."
+}

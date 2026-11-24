@@ -121,6 +121,10 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
   return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);tab.files=element('MF;TF-'+(tabs.length+1)+';FileStorageForm');tab.filesForm=new FileStorageForm(tab.files);}, page: {
     url: () => url,
     async goto(value) { url = value;context.location={origin:new URL(value).origin,pathname:new URL(value).pathname};events.push('navigate'); },
+    async waitForFunction() {
+      assert.equal(authenticated, true);
+      return { jsonValue: async () => 'authenticated', dispose: async () => {} };
+    },
     async evaluate(fn,args) {context.args=args;return runInContext(`(${fn.toString()})(args)`,context);},
     locator, async waitForTimeout() {entryDelay=Math.max(0,entryDelay-1);busyTicks=Math.max(0,busyTicks-1);},
   } };
