@@ -329,13 +329,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // CollectionItem.FIndex is a lazy cache: SetCollection/Index can leave it
    // null until the Index getter materializes it. Read the exact owned slot
    // instead, without calling that getter or a data proxy.
-   const exportInput=input&&!control&&!variables&&r.portIndex===0&&r.nativeIndex===0
-    &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls);
+   const exportInput=input&&!control&&r.portIndex===0&&(variables
+    ?r.nativeIndex===1&&r.kind==='variables'&&r.node.FIconCls==='bg-vendor-icon-exportnative'
+    :r.nativeIndex===0&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls));
    const cachedWizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
    const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
    const collectionOwned=exportInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
-    &&portTree.FCollection===portCollection&&Array.isArray(items)&&items.length<=100
+    &&portTree?.FCollection===portCollection&&Array.isArray(items)&&items.length<=100
     &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1;
    const indexOwned=exportInput
     ?collectionOwned&&Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100&&items[wizardIndex]===portTree
@@ -353,7 +354,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      wizard:model?.constructor?.name==='WizardModelComponentForm',root:roots.length===1&&model?.FView?.el?.dom===roots[0]}));
    if(r.wizard&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
     ||r.portTree!==portTree||r.nodeTree!==nodeTree||r.phase==='verified'&&(r.wizardIndex??r.nativeIndex)!==wizardIndex
-    ||exportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
+    ||r.portCollection!==(exportInput?portCollection:undefined)))fail('Port wizard receipt became stale');
    r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;
    if(exportInput)r.portCollection=portCollection;
    r.wizardIndex=wizardIndex;r.phase='verified';

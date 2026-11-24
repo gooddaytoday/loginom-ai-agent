@@ -78,8 +78,10 @@ export async function readPreparedNodeContext(page, binding) {
           &&o.document_id===b.document_id&&o.workflow_id===b.workflow_ref.workflow_id&&o.node_id===b.node.node_id
           &&o.wizard===model&&o.nodeTree===nodeTree&&o.portTree===portTree);
         const o=openings[0],input=o?.direction==='input',groupType=input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode,roots=exact(b.workflow_ref.prefix+';WizrdMCF');
-        const exportInput=input&&o.kind!=='variables'&&o.portIndex===0&&o.nativeIndex===0
-          &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(o.node.FIconCls);
+        const exportInput=input&&o.portIndex===0&&(o.kind==='variables'
+          ?o.nativeIndex===1&&o.node.FIconCls==='bg-vendor-icon-exportnative'
+          :o.nativeIndex===0&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(o.node.FIconCls));
+        if(o?.portCollection&&!exportInput)return reject('wizard_model');
         const portCollection=group?.FSubNodes,items=portCollection?.FItems;
         const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):(o?.wizardIndex??o?.nativeIndex);
         if(exportInput&&(!Number.isInteger(wizardIndex)||wizardIndex<0||wizardIndex>=100
