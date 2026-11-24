@@ -1,6 +1,6 @@
 import {validateVariableBindings} from './variable-binding-parameters.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
-import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
+import {calculatorVariableMappingRefusal,restVariableMappingNoEffectRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
 import {journalCopy} from './execution-journal.mjs';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
@@ -573,7 +573,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
-    if(calculatorVariableMappingRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
+    if(calculatorVariableMappingRefusal(operation,error.receipt)||restVariableMappingNoEffectRefusal(operation,error.receipt)||unionWizardOpeningRefusal(operation,error.receipt)
       ||variablesCalculatorDeactivationRefusal(operation,error.receipt)){
       try{return await releaseNodeApply({operation,handlers,drivers,record,signal,
         failure:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}});}

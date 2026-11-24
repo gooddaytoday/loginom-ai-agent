@@ -23,6 +23,18 @@ export function calculatorVariableMappingRefusal(operation,receipt){
   &&/(?:^|Error: )(?:Foreign variable mapping mask|Unique connected variable source required:|Complete connected field layout required;|Requested variable names collide)/.test(receipt.error.message??'');
 }
 
+// A REST variable-port refusal completed before any gesture (LAB-1963):
+// no wizard draft exists, so only the existing proof-based release applies.
+export function restVariableMappingNoEffectRefusal(operation,receipt){
+ const state=operation.nodeApply,ref=operation.lastReceipt;
+ return !operation.transportUncertain&&state?.request?.target?.type==='integration.rest_request'&&state.pending?.phase==='input_mapping'
+  &&ref?.action_key==='node.variables.variable_mapping.internal'&&typeof ref.operation_id==='string'
+  &&receipt?.operation_id===ref.operation_id&&receipt.action_key===ref.action_key&&receipt.phase==='variable_mapping'
+  &&receipt.status==='NOT_APPLIED'&&receipt.effect_possible===false&&receipt.cleanup_complete===true
+  &&receipt.output?.status==='NOT_APPLIED'&&receipt.output.verified===false&&receipt.output.effect_possible===false&&receipt.output.cleanup_complete===true
+  &&receipt.error?.code==='CROSSTABLE_VARIABLE_STEP_UNCONFIRMED';
+}
+
 // Only a completed single opening click may settle into this node's own
 // union wizard for cancellation. It never permits configure/Done/Execute.
 export function unionWizardOpeningRefusal(operation,receipt){
