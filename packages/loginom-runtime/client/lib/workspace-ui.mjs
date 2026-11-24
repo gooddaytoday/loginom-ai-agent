@@ -421,17 +421,21 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // cannot be preempted; charge immediately after each native operation.
       const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
       // Checking all ~570 parts against every document element took 114 of
-      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
-      // matches only that element or its descendant: prefilter those once,
-      // keep other parts verbatim, then apply the full list to candidates.
-      // Same elements, same document order.
-      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
-      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
+      // 306 ms per Files read (LAB-1188 profile). Broaden the wizard tid,
+      // but retain the descendant's selector so preview cells aren't candidates.
+      const guardParts=guardSelector.split(','),wizardTid='[data-tid*="WizrdMCF"]';
+      const guardCandidate=part=>{
+        const leading=/^\[data-tid[\^$*]?="[^"\\]*WizrdMCF[^"\\]*"\]/.exec(part);
+        if(!leading)return part;
+        const tail=part.slice(leading[0].length);
+        if(/^(?:\[data-tid[\^$*]?="[^"\\]*"\])*$/.test(tail))return wizardTid;
+        return /^ [a-z.#][\w.#-]*$/i.test(tail)?wizardTid+tail:part;
+      };
       const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
-        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
-          .filter(element=>element.matches(guardSelector))
-        : document.querySelectorAll(guardSelector);
-      charge();for (const element of guards)if(addressedImportField(element))include(element);
+        ? [...document.querySelectorAll([...new Set(guardParts.map(guardCandidate))].join(','))]
+          .filter(element=>addressedImportField(element)&&element.matches(guardSelector))
+        : [...document.querySelectorAll(guardSelector)].filter(addressedImportField);
+      charge();for (const element of guards)include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
       const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');

@@ -8100,6 +8100,39 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  assert.equal((await read(0)).output.wizard.import_columns.page.status,'unverified');
 });
 
+test('wide import configuration and recovery avoid checking the full guards on preview cells',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),fixture=importCoverageFixture(page,400);
+ const preview=page.add('div',fixture.base.replace(/;grdSettings;.*/,';grdData'),'',undefined,fixture.form);
+ for(let row=0;row<12;row++)for(let column=0;column<400;column++){
+  const cell=page.add('div',null,'',undefined,preview);page.add('span',null,'1',undefined,cell);
+ }
+ const close=page.add('button','MF;TF-1;WizrdMCF;btnClose','Закрыть',undefined,fixture.form);
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const read=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+  async()=>({verified:true,surface:'wizard',node_id:'node'}));
+ const matches=Element.prototype.matches;
+ Element.prototype.matches=function(selector){
+  if(selector.startsWith('[data-tid*=";WizrdMCF;PythonColumnsWizard;')&&selector.includes('[role="alert"]'))clock.advance(0.08);
+  return matches.call(this,selector);
+ };
+ try {
+  const roots=await read({discover_roots:true});
+  assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.trace));
+  const root_ref=roots.output.wizard.root_ref;
+  const configured=await read({root_ref,import_column_page:{offset:392,limit:8}});
+  assert.equal(configured.status,'SUCCEEDED',JSON.stringify(configured.trace));
+  assert.equal(configured.output.wizard.settings.fields.null_marker.value,'old');
+  assert.equal(configured.output.wizard.import_columns.page.total_columns,400);
+  const recovery=await read({root_ref});
+  assert.equal(recovery.status,'SUCCEEDED',JSON.stringify(recovery.trace));
+  assert.ok(recovery.output.ui.elements.some(element=>element.tid===close.attrs['data-tid']&&element.allowed_actions.includes('click')));
+  const blocker=page.add('div',null,'Warning',undefined,preview);blocker.attrs.role='dialog';blocker.attrs['aria-label']='Warning';
+  const blocked=await read({root_ref});
+  assert.equal(blocked.status,'SUCCEEDED');assert.deepEqual(Array.from(blocked.output.ui.dialogs,dialog=>dialog.title),['Warning']);
+ } finally {Element.prototype.matches=matches;}
+});
+
 test('a populated console scans nested cell wrappers without quadratic work',async()=>{
  const page=new Page({clock:fixtureClock().Date});page.context.innerWidth=1440;page.context.innerHeight=1000;
  const panel=page.add('div','ConsoleForm','',{x:0,y:0,width:1400,height:950});
