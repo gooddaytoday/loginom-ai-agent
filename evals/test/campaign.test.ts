@@ -308,12 +308,24 @@ test("campaign durably records a batch before exposing its parameters and reuses
     const config = { stateDir: root, controllerLock: path.join(root, "controller.lock"), harnessRoot: path.join(root, "harness"), slotsFile: path.join(root, "slots.json"),
       batchEnvFile: path.join(root, "batch.env"), resourceBudgetFile: path.join(root, "budget.json"),
       corpora: { ordinary: { entrypoint: "src/run.ts", tasks: "tasks" } } }
+    const legacy = { ...config, stateDir: path.join(root, "legacy"), batchEnvFile: path.join(root, "legacy", "batch.env") }
+    await prepareCampaignBatch(manifest, structuredClone(state), manifest.keys, "old-unit", legacy)
+    expect(loadConfig(["--skip-judge", "--dry-run"], parseEnv(await Bun.file(legacy.batchEnvFile).text())).campaign?.control?.probeTasks).toBeUndefined()
     manifest.keys.push({ corpus: "ordinary", taskId: "second", round: 1, experiment: {
       family: "save", pair: "test", arm: "before", order: 1, condition: "P5" } })
     manifest.keys.push({ corpus: "ordinary", taskId: "export", round: 1, experiment: {
       family: "execute", pair: "test", arm: "before", order: 1, condition: "P3" } })
     manifest.keys.push({ corpus: "ordinary", taskId: "import", round: 1, experiment: {
       family: "import", pair: "test", arm: "before", order: 1, condition: "P1" } })
+    const before = structuredClone(state)
+    for (const seriesPurpose of ["corpus", undefined, "unknown"]) {
+      const unassigned = JSON.parse(JSON.stringify({ ...manifest, seriesPurpose }))
+      await expect(prepareCampaignBatch(unassigned, state, manifest.keys, "old-unit", config)).rejects.toThrow("CAMPAIGN_PROBE_SERIES_PURPOSE")
+      expect(state).toEqual(before)
+      expect(await Bun.file(path.join(root, "journal.json")).exists()).toBe(false)
+      expect(await Bun.file(config.batchEnvFile).exists()).toBe(false)
+    }
+    manifest.seriesPurpose = "controlled"
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
@@ -340,7 +352,8 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(env).toContain(`EVAL_CAMPAIGN_JOURNAL=${JSON.stringify(path.join(root, "journal.json"))}`)
     expect(env).toContain(`EVAL_CAMPAIGN_LOCK=${JSON.stringify(config.controllerLock)}`)
     expect(env).toContain(`EVAL_CAMPAIGN_MANIFEST_HASH=${JSON.stringify(state.manifestHash)}`)
-    expect((await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).id).toBe(batch.id)
+    for (const seriesPurpose of ["pilot", "held-out"] as const)
+      expect((await prepareCampaignBatch({ ...manifest, seriesPurpose }, state, manifest.keys, "old-unit", config)).id).toBe(batch.id)
     expect(state.batches).toHaveLength(1)
     config.corpora.ordinary.entrypoint = "/old/harness/src/run.ts"
     await expect(prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).rejects.toThrow("CAMPAIGN_CORPUS_PATH")
