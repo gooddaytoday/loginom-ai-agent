@@ -233,7 +233,9 @@ export async function readTreePortSource(source,call,track,decode,native) {
  const instance=async(index,row,path,depth,arrayItem=false)=>{
   const def=schema[index];count(depth);
   if(def.is_array&&!arrayItem){
-   const start={$:0},size={$:0};await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
+   // The root has no parent row: GetRowCount is its complete native range.
+   const start={$:0},size={$:rows};
+   if(index!==0)await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
    need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
     &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
    const children=[];
@@ -254,7 +256,8 @@ export async function readTreePortSource(source,call,track,decode,native) {
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(rows===1,'tree_document_count');
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});
+ need(schema[0].is_array?Number.isSafeInteger(rows)&&rows>=0:rows===1,'tree_document_count');
  const document=await instance(0,0,'',0);
  const instances=[];
  const flatten=(node,parent)=>{
