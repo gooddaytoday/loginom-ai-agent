@@ -7,7 +7,9 @@
       "sqlite3",
       "convert ",
       "curl ",
-      "wget "
+      "wget ",
+      "expected.json",
+      "oracle.py"
     ]
   },
   "notes": "Минимум узлов с итоговым экспортом: 7. После прогона вручную сверить GUID REST и граф с первым ходом (#1235).",

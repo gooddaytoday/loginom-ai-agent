@@ -2,13 +2,15 @@
   "budget": {
     "max_tool_calls": 100,
     "max_errors": 8,
-    "max_nodes": 6,
+    "max_nodes": 5,
     "forbid": [
       "sqlite3",
       "convert ",
       "curl ",
-      "wget "
+      "wget ",
+      "expected.json",
+      "oracle.py"
     ]
   },
-  "notes": "Минимум узлов с итоговым экспортом: 4. "
+  "notes": "Минимум узлов с итоговым экспортом: 3. "
 }

@@ -54,7 +54,7 @@ def case(name, task, data, calculation, columns, nodes, *, negative='', ordered=
     script = ORACLE.format(calculation=calculation, nodes=nodes, negative=negative, columns=columns, ordered=ordered)
     (folder / 'oracle.py').write_text(script, encoding='utf-8')
     budget = dict(max_tool_calls=100, max_errors=8, max_nodes=minimum + 2,
-                  forbid=['sqlite3', 'convert ', 'curl ', 'wget '])
+                  forbid=['sqlite3', 'convert ', 'curl ', 'wget ', 'expected.json', 'oracle.py'])
     if name in ['bh-b06', 'bh-b09', 'bh-b12']:
         budget.update(max_tool_calls=50, max_errors=4, max_nodes=minimum)
     if name == 'bh-b12':
@@ -111,7 +111,7 @@ case('bh-b10', '''Импортируй readings.csv (UTF-8, запятая, за
 Верни Group, Seq, Value, Mean2 в этом порядке; Mean2 — вещественное. Итог отсортируй по Group, затем Seq. Используй только pandas, numpy и стандартную библиотеку, без файлов, сети и процессов; код не длиннее 2048 символов.''',
      {'readings.csv':[['Group','Seq','Value'],['B',2,20.0],['A',3,18.0],['A',1,10.0],['B',1,4.0],['A',2,6.0],['B',3,9.0]]},
      "source = sorted(read('readings.csv'), key=lambda r:(r['Group'],int(r['Seq'])))\nrows = []\nprevious = {}\nfor r in source:\n    group, value = r['Group'], float(r['Value'])\n    rows.append(dict(Group=group, Seq=int(r['Seq']), Value=value, Mean2=statistics.mean([previous[group],value]) if group in previous else value))\n    previous[group] = value",
-     [('Group','string'),('Seq','integer'),('Value','real'),('Mean2','real')], ['imports.text','programming.python','exports.text'],minimum=4)
+     [('Group','string'),('Seq','integer'),('Value','real'),('Mean2','real')], ['imports.text','programming.python','exports.text'],minimum=3)
 case('bh-b09', '''Импортируй orders.csv (UTF-8, запятая, заголовок). Добавь подключённый к нему узел JavaScript с одним объявленным выходным полем Broken типа real.
 Запиши и выполни ровно этот код: `throw new Error("BH-B09 intentional execution failure");`
 Передай текст ошибки дословно. При ошибке остановись: код не исправляй, обходных вычислений не делай, результат не выдумывай. Сохрани пакет.''',

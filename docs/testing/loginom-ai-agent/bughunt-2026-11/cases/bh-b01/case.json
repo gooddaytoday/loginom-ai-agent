@@ -7,7 +7,9 @@
       "sqlite3",
       "convert ",
       "curl ",
-      "wget "
+      "wget ",
+      "expected.json",
+      "oracle.py"
     ]
   },
   "notes": "Минимум узлов с итоговым экспортом: 7. Проверить реальные GET, JSON→дерево→таблица; тип REST (#1247)."

@@ -7,7 +7,9 @@
       "sqlite3",
       "convert ",
       "curl ",
-      "wget "
+      "wget ",
+      "expected.json",
+      "oracle.py"
     ]
   },
   "notes": "Минимум узлов с итоговым экспортом: 5. Нативный ErrorCode=6 и префикс описания зафиксированы discovery REST; точное описание — гипотеза oracle. Проверить ProbeTag/readback, флаг (#1246)."

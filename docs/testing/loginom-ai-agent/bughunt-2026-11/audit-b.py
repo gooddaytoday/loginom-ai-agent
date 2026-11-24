@@ -33,10 +33,11 @@ def receipt(state):
 
 
 def audit(path, budget):
-    calls, errors, recoveries, external, forbidden = [], [], [], [], []
+    calls, errors, recoveries, external, forbidden, oracle_access = [], [], [], [], [], []
     signatures = collections.defaultdict(list)
     creates, deletes, graphs, seen = [], [], [], set()
     tool_counts = collections.Counter()
+    settled = {}
     for line, raw in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
         try:
             event = json.loads(raw)
@@ -57,12 +58,16 @@ def audit(path, budget):
         location = f'{path}:{line}'
         entry = dict(location=location, tool=tool, input=request)
         value = receipt(state)
-        codes = sorted({obj['error']['code'] for obj in objects(value)
-                        if isinstance(obj.get('error'), dict) and isinstance(obj['error'].get('code'), str)})
+        # Inspect/recovery may quote an earlier failure inside a successful reply.
+        # Count the current top-level error once, not that historical outcome.
+        error = value.get('error') if isinstance(value, dict) else None
+        codes = [error['code']] if isinstance(error, dict) and isinstance(error.get('code'), str) else []
         if codes or state.get('status') == 'error':
             errors.append(dict(entry, codes=codes or ['TOOL_ERROR']))
         if tool.startswith('loginom_'):
             calls.append(entry)
+            if isinstance(value, dict) and tool.endswith(('node_wait', 'node_apply', 'node_status')) and value.get('status'):
+                settled[value.get('operation_id')] = dict(status=value['status'], node=value.get('node'), location=location)
             normalized = {k:v for k,v in request.items() if k != 'operation_id'}
             signatures[json.dumps([tool,normalized], sort_keys=True, ensure_ascii=False)].append(location)
             if 'operation_recover' in tool or 'browser_recovery' in tool:
@@ -78,16 +83,25 @@ def audit(path, budget):
         elif tool not in ['skill', 'read', 'glob', 'grep', 'list', 'todowrite', 'todoread']:
             external.append(entry)
         serialized = tool + ' ' + json.dumps(request, ensure_ascii=False)
+        if any(token in serialized for token in ['expected.json', 'oracle.py']):
+            oracle_access.append(entry)
         for token in budget.get('forbid', []):
             if token in serialized:
                 forbidden.append(dict(entry, match=token))
+    for creation in creates:
+        creation['settled'] = settled.get(creation['input'].get('operation_id'))
+    confirmed = {c['settled']['node']['node_id']: c['input']['target']['type'] for c in creates
+                 if c.get('settled') and isinstance(c['settled'].get('node'), dict) and c['settled']['node'].get('node_id')}
+    exceeded = [name for name,value in [('max_tool_calls',len(calls)),('max_errors',len(errors)),('max_nodes',len(confirmed))]
+                if name in budget and value>budget[name]]
     return dict(file=str(path), loginom_calls=len(calls), all_tool_counts=dict(tool_counts),
                 error_count=len(errors), errors=errors,
+                error_code_counts=dict(collections.Counter(code for error in errors for code in error['codes'])),
                 recovery=recoveries, exact_repeats=[v for v in signatures.values() if len(v)>1],
                 create_attempts=creates, delete_attempts=deletes, graph_observations=graphs,
-                non_loginom_actions=external, forbidden=forbidden,
-                budget_exceeded=[name for name,value in [('max_tool_calls',len(calls)),('max_errors',len(errors))]
-                                 if name in budget and value>budget[name]],
+                non_loginom_actions=external, forbidden=forbidden, oracle_access=oracle_access,
+                confirmed_created_nodes=confirmed,
+                budget_exceeded=exceeded, audit_pass=not (exceeded or forbidden or oracle_access),
                 nodes_budget='manual: compare saved native graph and create/delete receipts')
 
 
