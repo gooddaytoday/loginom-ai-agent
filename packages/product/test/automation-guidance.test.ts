@@ -3,6 +3,15 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("input replacement requires an explicit user request and preserves the downstream node", async () => {
+  const canvas = await Bun.file(new URL("../skills/loginom-automation/references/canvas.md", import.meta.url)).text()
+  expect(skill).toContain("вставка узла и замена входа")
+  for (const rule of ["inputs[].replace_existing:true", "только по прямой просьбе пользователя",
+    "Отказ занятого входа", "Создай новый фильтр с входом от прежнего источника",
+    'target.kind:"existing"', "Не пересоздавай группировку или Export", "только связи на указанном табличном",
+    "переменные и деревья не поддержаны", "replaced_links", "При `AMBIGUOUS` не повторяй"]) expect(canvas).toContain(rule)
+})
+
 test("frequent recoverable mistakes have concrete preventive forms within the entry budget", () => {
   for (const hint of [
     'node_types:["imports.text"],modes:["delimited"]',

@@ -7,6 +7,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Schema } from "effect"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { pathToFileURL } from "node:url"
+import { attachmentReceiptID } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
 import { testProviderConfig } from "../../lib/test-provider"
@@ -75,6 +76,55 @@ describe("opencode run (non-interactive subprocess)", () => {
       )
     }
   }
+
+  cliIt.live(
+    "keeps small binary data attachments out of provider requests using owned local references",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        const files = ["Продажи %#.XLS", "source.db", "dataset.lgd"]
+        const bytes = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0, 0xff, 0x80])
+        for (const name of files) yield* Effect.promise(() => Bun.write(`${home}/${name}`, bytes))
+        yield* llm.text("data references received")
+        const env = {
+          LOGINOM_AI_AGENT_CLI_ROOT: `${home}/profile`,
+          LOGINOM_AI_AGENT_DB: `${home}/binary-test.sqlite`,
+        }
+        const result = yield* opencode.run("inspect the attached data", {
+          format: "json",
+          extraArgs: [...files.flatMap((name) => ["--file", `${home}/${name}`]), "--"],
+          env,
+        })
+        opencode.expectExit(result, 0)
+        const sessionID = opencode.parseJsonEvents(result.stdout)[0]?.sessionID
+        if (typeof sessionID !== "string") throw Error("CLI did not emit a session ID")
+        const exported = yield* opencode.spawn(["export", sessionID], { env })
+        opencode.expectExit(exported, 0)
+        const transcript = Schema.decodeUnknownSync(Schema.Struct({ messages: Schema.Array(SessionV1.WithParts) }))(
+          Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(exported.stdout),
+        )
+        const attachments = transcript.messages
+          .filter((message) => message.info.role === "user")
+          .flatMap((message) => message.parts)
+          .filter((part) => part.type === "file")
+        expect(attachments).toHaveLength(files.length)
+        const inputs = JSON.stringify(yield* llm.inputs)
+        for (const [index, part] of attachments.entries()) {
+          const file = `${home}/${files[index]}`
+          expect(part.url).toBe(pathToFileURL(file).href)
+          expect(part.mime).toBe("text/plain")
+          const id = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
+          if (!id) throw Error("Missing original attachment receipt")
+          const owner = yield* Effect.promise(() =>
+            Bun.file(`${home}/.local/state/loginom-ai-agent/attachment-receipts-v1/${id}.owner`).json(),
+          )
+          expect(owner).toEqual({ session: sessionID, message: part.messageID })
+          expect(inputs).toContain(`Attached local data reference: ${file}`)
+        }
+        expect(inputs).not.toContain(bytes.toString("base64"))
+        expect(inputs).not.toContain("data:application/")
+      }),
+    60_000,
+  )
 
   cliIt.live(
     "forwards --file attachments when running a command",

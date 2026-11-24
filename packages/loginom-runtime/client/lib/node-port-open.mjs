@@ -6,13 +6,16 @@ export function makePreparedOutputPortOpenCode(binding,options) {
 export function makePreparedInputPortOpenCode(binding,options) {
  return makePreparedPortOpenCode(binding,options,'input');
 }
-function makePreparedPortOpenCode(binding,options,direction) {
+export function makePreparedInputPortReconcileCode(binding,options) {
+ return makePreparedPortOpenCode(binding,options,'input',true);
+}
+function makePreparedPortOpenCode(binding,options,direction,reconcileOnly=false) {
  validatePreparedNodeContext(binding);
  if(!options||Object.keys(options).sort().join(',')!=='build,deadline,operation_id,origin,port'
    ||!Number.isInteger(options.port)||options.port<0||options.port>99
    ||typeof options.operation_id!=='string'||! /^[A-Za-z0-9_.:-]{1,160}$/.test(options.operation_id)
    ||!Number.isSafeInteger(options.deadline)||typeof options.origin!=='string'||typeof options.build!=='string')throw Error('Exact bounded output port opening required');
- return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction})},${readPreparedNodeContext.toString()})`;
+ return `async page=>(${openPreparedOutputPort.toString()})(page,${JSON.stringify({binding,...options,direction,...(reconcileOnly?{reconcile_only:true}:{})})},${readPreparedNodeContext.toString()})`;
 }
 
 // A local opening receipt retains UI object identity across graph -> port wizard.
@@ -324,14 +327,14 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // CollectionItem.FIndex is a lazy cache: SetCollection/Index can leave it
    // null until the Index getter materializes it. Read the exact owned slot
    // instead, without calling that getter or a data proxy.
-   const textExportInput=input&&!control&&!variables&&r.node.FIconCls==='bg-vendor-icon-exporttextfile'&&r.portIndex===0&&r.nativeIndex===0;
+   const exportInput=input&&!control&&!variables&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile'].includes(r.node.FIconCls)&&r.portIndex===0&&r.nativeIndex===0;
    const cachedWizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
-   const wizardIndex=textExportInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
-   const collectionOwned=textExportInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
+   const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
+   const collectionOwned=exportInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
     &&portTree.FCollection===portCollection&&Array.isArray(items)&&items.length<=100
     &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1;
-   const indexOwned=textExportInput
+   const indexOwned=exportInput
     ?collectionOwned&&Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100&&items[wizardIndex]===portTree
     :wizardIndex===r.nativeIndex;
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
@@ -347,9 +350,9 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
      wizard:model?.constructor?.name==='WizardModelComponentForm',root:roots.length===1&&model?.FView?.el?.dom===roots[0]}));
    if(r.wizard&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
     ||r.portTree!==portTree||r.nodeTree!==nodeTree||r.phase==='verified'&&(r.wizardIndex??r.nativeIndex)!==wizardIndex
-    ||textExportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
+    ||exportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
    r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;
-   if(textExportInput)r.portCollection=portCollection;
+   if(exportInput)r.portCollection=portCollection;
    r.wizardIndex=wizardIndex;r.phase='verified';
    return {phase:r.phase,verified:true,document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,wizard_index:wizardIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
@@ -368,6 +371,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
  const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
  try {
   remaining();let existing=await inspect('lookup');
+  // Cleanup may reconcile a completed opening failure, but must never open a
+  // port or confirm deactivation. Reuse all native finish ownership checks.
+  if(task.reconcile_only){
+   if(!existing||!['open_issued','deactivation_issued','verified'].includes(existing.phase))throw Error('No issued port opening to reconcile');
+   const result=await finish();
+   return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,trace};
+  }
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}
   if(existing){effect=existing.phase!=='reserved';const result=await finish();return {status:'SUCCEEDED',...result,effect_possible:false,cleanup_complete:true,replayed:true,trace};}
   const before=await readNode(page,task.binding);
@@ -430,6 +440,6 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await at(task.binding.workflow_ref.prefix+';WizrdMCF').waitFor({state:'visible',timeout:remaining()});
   const result=await finish();trace.push({event:direction+'_port_wizard_verified',...result});
   return {status:'SUCCEEDED',...result,effect_possible:true,cleanup_complete:true,replayed:false,trace};
- }catch(error){if(!effect){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+ }catch(error){if(!effect&&!task.reconcile_only){try{await inspect('release_reserved');}catch{}}return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
   error:String(error.message).slice(0,500),trace};}
 }

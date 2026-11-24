@@ -559,7 +559,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               }
               const delivered=userProfile?userActionInventory(description):description;
               const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
-              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe'}):content;
+              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes:args.modes}):content;
               if(userProfile&&reply.isError!==true&&description.node_types?.length){
                 await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
                   skill_revision:(await skill.prepare()).detail.revision});
