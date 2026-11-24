@@ -15,6 +15,7 @@ import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
+import { initGit } from "../../core/test/fixture/git"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { Dashboard } from "../../loginom-agent/src/dashboard"
@@ -114,7 +115,7 @@ const boot = (options: Options = {}) =>
         await Bun.write(file, text)
       }
       await fs.mkdir(path.join(global, "config"), { recursive: true })
-      if (options.git) expect(Bun.spawnSync(["git", "init", "-q", root]).exitCode).toBe(0)
+      if (options.git) await initGit(root)
       if (options.at === "alias") await fs.symlink(work, path.join(dir, "alias"), "dir")
       return { root, work, control }
     })
@@ -316,6 +317,8 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
             { tool: "edit", input: { path: "../control/missing.json", oldString: "x", newString: "y" } },
             no(Dashboard.srcOnly),
           ],
+          // A path under a file outside: the same refusal, not the file system's `ENOTDIR`.
+          [{ tool: "write", input: { path: "../control/binding.json/x", content: "x" } }, no(Dashboard.srcOnly)],
           [{ tool: "glob", input: { pattern: "*", path: ".." } }, no(Dashboard.outside)],
           [{ tool: "glob", input: { pattern: "../control/*" } }, no(Dashboard.outside)],
           [{ tool: "glob", input: { pattern: "*", path: "src/link" } }, no(Dashboard.outside)],
@@ -573,6 +576,7 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
             ])
         }
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    // Three server Locations, and Prettier runs as a child process in the control.
     60_000,
   )
 })

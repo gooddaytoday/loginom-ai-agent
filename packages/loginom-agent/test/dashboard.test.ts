@@ -105,6 +105,9 @@ test("dashboard paths stay within work for reading and src for writing, includin
       "/etc/hostname",
       Global.Path.data,
       join(folder.work, "src/link/binding.json"),
+      // Under a regular file: the same answer as for any path outside, not the file system's `ENOTDIR`.
+      join(folder.root, "control/binding.json/x"),
+      "/etc/hostname/x",
     ])
       expect([target, Dashboard.pathError(folder.work, target)]).toEqual([target, Dashboard.outside])
     for (const target of [join(folder.work, "src/main.tsx"), join(folder.work, "src/a/b.ts")])
@@ -118,6 +121,8 @@ test("dashboard paths stay within work for reading and src for writing, includin
       "src/../sample.json",
       "src/link/x.json",
       "src/link/binding.json",
+      "../control/binding.json/x",
+      "sample.json/x",
     ])
       expect([target, Dashboard.pathError(folder.work, resolve(folder.work, target), true)]).toEqual([
         target,

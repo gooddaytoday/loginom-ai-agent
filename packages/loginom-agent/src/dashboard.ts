@@ -104,7 +104,15 @@ export const fileLink = "Сессия dashboard: запись в символь�
 export const dangling = "Сессия dashboard: путь ведёт в недоступную ссылку"
 export const gone = "Сессия dashboard: рабочей папки больше нет"
 
-const entry = (path: string) => lstatSync(path, { throwIfNoEntry: false })
+// Any failure counts as no entry — `ENOTDIR` under a regular file, `ELOOP`, no access: the error would tell the model
+// what lies at a path outside, and the nearest ancestor that exists decides instead.
+const entry = (path: string) => {
+  try {
+    return lstatSync(path, { throwIfNoEntry: false })
+  } catch {
+    return undefined
+  }
+}
 // The path itself or its nearest ancestor that exists, as a link or otherwise.
 const nearest = (path: string): string => (entry(path) || dirname(path) === path ? path : nearest(dirname(path)))
 const home = (value: string) =>
