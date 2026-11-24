@@ -20425,3 +20425,272 @@ control server after: [$HOME/.local/share/loginom-ai-agent-dev/dashboards ]
 базе `5fd8e2f598` — 76/0 и 277/3/0); мутации раздела повторены — те же числа; `catalog-check.py` код 0 (609 файлов),
 `apply-identity --check` — 0 файлов, `bun run check` — код 0 (905 предупреждений, 0 ошибок, 39 из 39 задач), под
 `unshare -n`.
+
+## B2.9c Пути дашборда
+
+23.11.2026. Задача B2.9c (шлюз B, G1), ветка `b29c-dashboard-paths` от `oc2-migration` (`3dc7c49de6`), рабочее дерево
+`.claude/worktrees/b29c`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` в этом дереве и в дереве базы `<scratchpad>/b29c/base`
+(`3dc7c49de6`, detached). Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации, пробы и
+полные прогоны — под `unshare -n` (поднят только `lo`), с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и
+`LOGINOM_AI_AGENT_TEST_NODE`. **Модель не вызывалась:** в тестах сервера — `TestLLM`, в пробе CLI — `--model
+test/test-model` на подставном сервере `127.0.0.1`; сети нет. Разрешения — решение оркестратора по паритету с 0.4: запись
+в `work/src/` без вопроса, выход за пределы — отказ без вопроса (`external_directory` в дашборде — запрет), запрет
+администратора сильнее.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `dbd5bbc3a6` `feat(loginom-agent): dashboard paths stay in the work folder (B2.9c)` | код: `packages/loginom-agent/src/dashboard.ts` (`settle`, `pathError`, проверка `glob`/`grep`, тексты), `index.ts` (хуки `permission.evaluate` и `execute.before`); тесты: три новых в `packages/loginom-agent/test/dashboard.test.ts`, новый `packages/server/test/loginom-dashboard-files.test.ts` (8) |
+| `809fe6e281` `docs(upstream-sync): record B2.9c dashboard paths and their G1 mutations` | первая версия этого раздела, строка G1, строка 7 и «Как запускать» в `guarantees.md` |
+| `ee2f34a61d` `fix(loginom-agent): check dashboard write targets before the call (B2.9c)` | по ревью советника: `edit` и `patch` читают цель до вопроса `edit`, и отказ только на вопросе выдавал, есть ли файл снаружи и есть ли в нём строка (ниже, «Доработка»). `Dashboard.callError` вместо проверки одного поиска: цели `write`, `edit`, `patch` — тоже до вызова; отказ до вызова несёт `permissionDenied: true`. Тесты: случаи в обоих файлах, загрузка навыка дашборда, проверка признака отказа |
+| `3eca88bcb8` `docs(upstream-sync): B2.9c write targets checked before the call, mutations repeated` | этот раздел и строка G1 — по `ee2f34a61d` |
+| `27f690e3e4` `fix(loginom-agent): a dashboard path check never surfaces a file system error (B2.9c)` | по второму ревью советника: `lstat` под обычным файлом бросает `ENOTDIR` (проверено: Bun 1.4.4, `lstatSync("/etc/hostname/x", { throwIfNoEntry: false })`), и проверка до вызова пути `../control/binding.json/x` отвечала бы системной ошибкой вместо отказа — тоже знак, что файл есть. Любой сбой `lstat` теперь — «нет записи», решает ближайший существующий предок. Тесты: такие пути в обоих файлах; `git init` случаев сервера — `initGit` из `core/test/fixture/git.ts` (навык `unit-tests`) |
+| `fc9e391f85` `test(server): B2.9c dashboard files test names its step count` | комментарий в шапке теста (число шагов), кода нет |
+| следующий | этот раздел и строка G1 — по `27f690e3e4` |
+
+Файлов кода два (предел — пять), оба — пакета форка; файлов upstream не правил, `catalog.json` не менялся. Итог —
+`git diff 3dc7c49de6 27f690e3e4 -- packages/loginom-agent/src`: `dashboard.ts` +101 −1, `index.ts` +13.
+
+### Как устроено
+
+- **Проверка пути** — `Dashboard.pathError(directory, target, write)`, перенос 0.4 `dashboardPathError`: реальный путь
+  рабочей папки Location (`realpath` её каталога, псевдоним тоже) — граница чтения, его `src` — граница записи. Путь цели
+  берётся у ближайшего существующего предка (`lstat`), его `realpath` и остаток пути: так ловятся ссылка наружу (в том
+  числе в `control` рядом с `work`), висячая ссылка («путь ведёт в недоступную ссылку») и запись в файловую ссылку, даже
+  если она ведёт в `src` («запись в символьную ссылку запрещена»). Тексты причин — 0.4. Рабочей папки больше нет — отказ
+  всему (в 0.4 — `LOGINOM_SCOPE_DENIED`; сверку старого чата делает B2.9d).
+- **`permission.evaluate`** (`Dashboard.settle`, хук продукта в `index.ts`): в Location дашборда, после ответа на метку
+  проверки правил (B2.6b) и до `settle` продукта —
+  - `external_directory` — запрет без вопроса. До `settle`, иначе `ownRead` (B2.6a2) пускал бы читать `<data>/tool-output`
+    и файлы встроенных навыков; в 0.4 сессия дашборда их тоже не читала;
+  - `read` и `edit` (`write`, `edit`, `patch` — все цели `patch` одним запросом, включая перенос и удаление): каждый ресурс
+    разрешается от каталога Location, как его разрешило ядро (внутри Location или git-репозитория — относительный, в том
+    числе с `..`; снаружи — абсолютный), и проходит `pathError`. Одна цель вне границы — запрет всего вызова. Ресурс
+    `skill://…` (файл навыка) не путь, его не проверяю;
+  - `edit` внутри `src` — `allow` без вопроса;
+  - запрет, который пришёл в хук, — это политика администратора (запрет правилом ядро решает раньше хуков, B2.6c): ветка
+    дашборда его не трогает, текст `LOGINOM_POLICY_DENIED` остаётся. Запрет настройкой пользователя до хука не доходит
+    вовсе и тоже сильнее.
+- **`execute.before`** (`Dashboard.callError`) — проверка до вызова, пути разрешены так же, как в ядре
+  (`FileAccess.resolvePath`: `~`, `~/`):
+  - `path` у `glob` и `grep` — не ресурс их запроса (ресурс — шаблон), он приходит в `permission.evaluate` только в
+    metadata и вопросом `external_directory`, а этого вопроса нет, когда каталог данных лежит в git-репозитории или путь
+    идёт через ссылку внутри `work`. Шаблон `glob` и `include` у `grep` не могут подниматься через `..`; `pattern` у
+    `grep` — регулярное выражение, его не трогаю;
+  - цель `write` и `edit`, все пути `patch` (разбор тем же `Patch.parse`, что у ядра, вместе с `Move to`) — как запись.
+    `edit` и `patch` читают цель до вопроса `edit`, и отказ только на вопросе выдал бы, что лежит снаружи (ниже,
+    «Доработка»). Хук `permission.evaluate` остаётся вторым рубежом на путях, которые разрешило само ядро, и даёт `allow`
+    записи в `src`;
+  - отказ до вызова несёт в metadata `permissionDenied: true` (ключ 0.4 и B2.6b2): клиент считает его отклонённым
+    разрешением, как запрет из хука (`permission.rejected`), — `run` CLI кончает такой прогон `CLI_PERMISSION_REJECTED`
+    (`cli/src/run/product.ts`, `denied`).
+- **Отказ не обрывает ход.** Запрет из хука со своим текстом — типизированный `Permission.BlockedError` с причиной: вызов
+  падает с ней, `refusal` (B2.6b) такой текст не переписывает, ход идёт дальше. Ошибка из `execute.before` — так же, как
+  отказ скрытого инструмента в B2.6b. Модель читает `LOGINOM_DASHBOARD_PATH_DENIED: <причина 0.4>. Действие не выполнено. В
+  сессии дашборда читать можно только рабочую папку, менять — только файлы в её src/. Не обходите это другим путём или
+  инструментом; если задаче нужно другое, скажите об этом пользователю.`
+- **`..` через ссылку.** Ядро v2 разрешает путь лексически до любой проверки (`FileAccess.resolve` → `path.resolve`) и
+  открывает именно его: `src/link/../x` — это `src/x`. Хук проверяет тот же путь, что ядро откроет, поэтому шаг сегментов
+  0.4 («`..` после ссылки — отказ») здесь ничего бы не ловил и не перенесён. Случай 0.4 стал контрактным тестом: файл
+  снаружи не прочитан и не записан, прочитан и записан файл в `src`.
+
+### Тесты
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test`) | На v2 |
+|---|---|
+| `product/dashboard-session.test.ts` «dashboard paths stay within work for reading and src for writing, including inside a git repository» | `loginom-agent/test/dashboard.test.ts`, то же имя, на `Dashboard.pathError`: те же цели чтения и записи, дважды — второй раз с `git init` в каталоге данных; добавлены `src/link/binding.json` (чтение), `loginom-ai-agent.json` в корне `work` (запись), висячая ссылка в середине пути, пути под обычным файлом снаружи и внутри (`…/binding.json/x`, `/etc/hostname/x`, `sample.json/x`). Проверка 0.4 «обычный каталог ничего не ограничивает» заменена: хук спрашивает `pathError` только в Location дашборда (контрольный случай сервера), а исчезнувшая рабочая папка отказывает всему |
+| — | там же, новые: `settle` (что запрещено, что пропущено без вопроса, что оставлено правилам: `glob`/`grep` с шаблоном, `skill`, `dashboard_publish`, файл навыка) и `callError` (`path` поиска через ссылку и `..`, `~` и `~/`, абсолютный путь снаружи, `..` в шаблоне и в `include`, регулярное выражение с `\.\.` — не шаблон; цели `write` и `edit`, пути `patch` с переносом и удалением, неразборчивый патч оставлен ядру) |
+| `tool/dashboard-guard.test.ts`: «write refuses control files before asking», «write allows src but refuses workspace data without asking», «edit cannot change sample data», «glob/grep rejects parent searches without permission questions», «write refuses file symlinks even when their target is in src», «read rejects dangling links as permission denial» | `server/test/loginom-dashboard-files.test.ts`, первый случай: одна сессия, 29 вызовов `write`, `edit`, `read`, `glob`, `grep`, `skill` модели по сценарию в дашборде внутри git-репозитория — там `..` и `control` ядро считает своими и `external_directory` не спрашивает, стоит только проверка плагина. Разрешённое выполнено без вопроса (и навык `loginom-dashboard` из проверенного встроенного каталога загружается), отказы — текст `LOGINOM_DASHBOARD_PATH_DENIED` с причиной 0.4, тот же текст в последнем запросе к модели, каждый отказ для клиента — отклонённое разрешение, ход дошёл до ответа `stop`. `edit` файла в `control` с неверной строкой и несуществующего файла там же, `write` пути под файлом `control/binding.json` — тот же отказ. Файлы `control`, `sample.json`, корень `work` не изменены; ничего из `control` в результаты вызовов не попало |
+| «dashboard patches cannot delete protected data», «…validate move destinations before changing any file» | второй случай, модель `gpt-5-…` (ей ядро предлагает `patch` вместо `edit` и `write`), 7 патчей: удаление `snapshot.json`, перенос в `sample.json`, патч с одной целью в `control`, обновление через ссылку, обновление файла в `control` с неверной строкой, удаление несуществующего там файла — один и тот же отказ всего патча до записи; добавление в `src` проходит |
+| — | третий, новый: без git чтение снаружи останавливает уже `external_directory` — запретом без вопроса, в том числе `<data>/tool-output`, который в обычной Location продукт читает без вопроса (B2.6a2); запись и правка снаружи — отказ до вызова |
+| «dashboard reads work through an outside alias, while git and internal bypass cannot expose control» | четвёртый: Location открыта через внешний псевдоним, `git init` в папке дашборда; чтение по псевдониму и по настоящему пути, запись по псевдониму — без вопроса; `control` — отказ. `bypassCwdCheck` в v2 нет |
+| «dashboard read refuses an absolute symlink followed by parent traversal» | пятый, контрактный: `..` после ссылки ядро разрешает лексически (выше), файл снаружи не прочитан и не записан |
+| — | шестой, новый: запрет администратора (`tool.use` `edit:src/locked.tsx`) и настройка пользователя (`edit src/settings.tsx deny`) сильнее записи в `src` без вопроса |
+| «ordinary sessions retain writes outside src and external-directory permission for all file tools» | седьмой, контроль: в обычной Location та же запись спрашивает `edit`, чтение снаружи, `glob` и `grep` с `..` — `external_directory`; клиент отвечает «один раз», всё выполнено |
+| «dashboard write/edit/apply_patch does not execute source Prettier configuration» (4) | восьмой: форматтер пользователя (Prettier с `$FILE`) и `src/.prettierrc.cjs` модели, который оставил бы метку вне рабочей папки. С `formatter: false` в конфиге корня `work` (его пишет подготовка B2.9h) метки нет после `write`, `edit` и `patch`; без него — метка есть. «edit create» не перенесён: `edit` v2 не создаёт файл |
+
+Не перенесены: два случая LSP (в файловых инструментах v2 LSP нет, B2.9a) и два случая привязки — «expired dashboard
+context», «cannot capture a replacement draft» (B2.9d). Во всех случаях, кроме контроля, клиент отвечает «один раз» на
+каждый вопрос сессии, как `run --auto`, и записывает спрошенное; список пуст — значит, вопросов не было и с `--auto`.
+
+### Мутации
+
+Каждая — точечная правка в `packages/loginom-agent/src` на `27f690e3e4`, прогон `bun test test/access.test.ts
+test/dashboard.test.ts` в `loginom-agent` и `bun test test/loginom-dashboard-files.test.ts test/loginom-access.test.ts` в
+`server`, затем `git checkout` (`<scratchpad>/b29c/scripts/{mutations.sh,mutate.py}`). Без мутаций — 18/0 и 20/0.
+`loginom-access.test.ts` (12, B2.9b) зелёный во всех строках; красные — только новые случаи. Прежние прогоны: на
+`dbd5bbc3a6` — 13 мутаций без строк «до вызова» и `lstat`, на `ee2f34a61d` — 16 без `lstat`, с теми же числами в общих
+строках; каждая мутация была красной хотя бы в одном наборе.
+
+| Мутация | `access` + `dashboard` | `dashboard-files` + `access` | Красные |
+|---|---|---|---|
+| проверка пути всегда пропускает | **15/3** | **16/4** | три новых юнит-теста; git-репозиторий, патчи, «без git», псевдоним |
+| граница по лексическому пути, не по реальному | **16/2** | **17/3** | путь, до вызова; git-репозиторий, патчи, псевдоним |
+| запись везде, где чтение | **15/3** | **17/3** | путь, ответ хука, до вызова; git-репозиторий, патчи, псевдоним |
+| запись через файловую ссылку пропускается | **17/1** | **19/1** | путь; git-репозиторий |
+| висячая ссылка не распознаётся | **17/1** | **19/1** | путь; git-репозиторий (ошибка `ENOENT` вместо текста) |
+| `external_directory` оставлен правилам (спрашивает) | **17/1** | **19/1** | ответ хука; «без git» (клиент получил вопросы) |
+| запись в `src` спрашивает | **17/1** | **14/6** | ответ хука; все случаи с записью |
+| ветка дашборда переписывает пришедший запрет | 18/0 | **19/1** | запрет администратора (файл записан) |
+| ничего не проверяется до вызова | 18/0 | **17/3** | git-репозиторий, патчи, «без git» |
+| `write` и `edit` не проверяются до вызова | **17/1** | **18/2** | до вызова; git-репозиторий («File not found»), «без git» (запрет `external_directory` вместо отказа записи) |
+| `patch` не проверяется до вызова | **17/1** | **19/1** | до вызова; патчи («Failed to find expected lines», «file does not exist») |
+| отказ до вызова без `permissionDenied` | 18/0 | **16/4** | git-репозиторий, патчи, «без git», псевдоним (признак отказа) |
+| `..` в шаблоне пропускается | **17/1** | **19/1** | до вызова; git-репозиторий |
+| `~` не разворачивается | **17/1** | 20/0 | до вызова; на сервере путь в домашний каталог останавливает `external_directory` |
+| проверки во всех Location | 18/0 | **19/1** | контроль — обычная Location |
+| сбой `lstat` доходит до модели | **17/1** | **19/1** | путь; git-репозиторий (`ENOTDIR` вместо отказа) |
+| исчезнувшая рабочая папка пропускает всё | **17/1** | 20/0 | путь |
+
+Код базы (`git checkout 3dc7c49de6 -- packages/loginom-agent/src`, тесты `27f690e3e4`): `dashboard.test.ts` **5/3**,
+`loginom-dashboard-files.test.ts` **1/7** — зелёный только контроль обычной Location.
+
+После всех мутаций `git status packages/loginom-agent/src` чистый, корень `<data>/dashboards` случаев — во временных
+каталогах, удалены вместе с ними.
+
+### Проверка из CLI
+
+`run --headless --format json --dir <work> --model test/test-model -- "Покажи суммы."` продукта из исходников
+(`<scratchpad>/b29c/scripts/cli-probe.ts` на фикстурах `cli/test/fixture/product-run.ts`), без `--auto` и с ним. Папка —
+`<профиль>/data/dashboards/fixture/{work/src,control/binding.json}`, без git. Модель по сценарию: `read
+../control/binding.json`, `write notes.txt`, `write src/App.tsx`, ответ.
+
+```text
+# ee2f34a61d; на 27f690e3e4 — то же
+{"auto": false, "code": 1, "requests": 4, "results": ["{\"error\":{\"type\":\"permission.rejected\",\"message\":\"LOGINOM_DASHBOARD_PATH_DENIED:…", "{\"error\":{\"type\":\"tool.execution\",\"message\":\"LOGINOM_DASHBOARD_PATH_DENIED: Сесс…", "Created file successfully: src/App.tsx"], "errors": ["CLI_PERMISSION_REJECTED"], "permissionEvents": 0, "sawControl": false, "notes": false, "app": true, "binding": "control synthetic\n"}
+{"auto": true,  "code": 1, "requests": 4, "results": [то же], "errors": ["CLI_PERMISSION_REJECTED"], "permissionEvents": 0, "sawControl": false, "notes": false, "app": true, "binding": "control synthetic\n"}
+```
+
+Оба отказа — без вопроса: чтение — запретом `external_directory` (`permission.rejected`), запись — до вызова
+(`tool.execution` с `permissionDenied: true`; на `dbd5bbc3a6` и она была `permission.rejected`). Ход дошёл до
+`src/App.tsx` и ответа (4 запроса), содержимое `control` к модели не попало, `notes.txt` нет. Код 1 и
+`CLI_PERMISSION_REJECTED` — правило `run` продукта (B2.7a4, «design §10»): отклонённое разрешение кончает прогон кодом 1.
+В 0.4 отказ пути — `PermissionV1.DeniedError`; чем кончал такой прогон `run` 0.4, не проверял.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29c/scripts/suites.sh`): база — `3dc7c49de6` в `<scratchpad>/b29c/base` (после приёмки
+удалено), итог — это дерево на `27f690e3e4` (на `dbd5bbc3a6` и `ee2f34a61d` — те же числа); по пакетам подряд,
+`bun test` из каталога пакета, каждый под `unshare -n` со свежими временными `HOME`/`TMPDIR`/`XDG_*`.
+
+| Пакет | `3dc7c49de6` | `27f690e3e4` |
+|---|---|---|
+| `loginom-agent` | 85 pass, 0 fail | 88 pass (+3 новых), 0 fail |
+| `server` | 280 pass, 3 skip, 0 fail | 288 pass (+8 новых), 3 skip, 0 fail |
+| `product` (`repo-paths` сверяет пути `guarantees.md`) | 59 pass, 4 fail | 59 pass, 4 fail — те же, что в B2.9b: `names.test.ts` (`OPENCODE_*`) и три `repo-paths.test.ts` (`--filter`, фильтры путей workflows, пути `packages/<имя>`); старше задачи, не чинил |
+
+Первый полный прогон `server` на `27f690e3e4` — 287 pass, 3 skip, 1 fail: upstream `fetch.test.ts` «routes pending
+requests through the Session's instance» получил `deny` вместо `ask` на запрос `shell` в обычной Location (по виду —
+гонка установки правил агента при активации плагинов, не разбирал; ветка дашборда там не включается — защёлка ложна). Отдельно с `--rerun-each 5` —
+5/0, повтор полного прогона — 288/3/0 (в таблице). На базе и на прежних коммитах не падал; записываю как нестабильный, не
+чинил.
+
+Повторы (навык `unit-tests`: `--rerun-each 10`) на `27f690e3e4`: `dashboard.test.ts` — 80 pass, 0 fail;
+`loginom-dashboard-files.test.ts` — 80 pass, 0 fail (на `dbd5bbc3a6` и `ee2f34a61d` — `--rerun-each 3`, 24/0).
+
+Изоляция (`<scratchpad>/b29c/scripts/real-xdg.sh`, как в B2.9b): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad, корень данных тогда `$HOME/.local/share/loginom-ai-agent-dev`. После `dashboard.test.ts` и
+`loginom-dashboard-files.test.ts` в `$HOME/.local/share` нет ничего:
+
+```text
+head loginom-agent exit=0 xdg-vars=0  8 pass  0 fail
+head loginom-agent after: [] data: []
+head server exit=0 xdg-vars=0  8 pass  0 fail
+head server after: [] data: []
+```
+
+```text
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc   # на 27f690e3e4
+✓ No type errors in 231 files                                  # tsc --noEmit — код 0
+$ cd packages/server && bun typecheck
+✓ No type errors in 1,649 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary     # код 0, как на базе
+against a6b15d33daf6: 609 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                          # код 0
+$ bun run check                                                 # код 0, под unshare -n, 27f690e3e4 с этим разделом
+Found 905 warnings and 0 errors.                                # как в B2.9b; до доработки — то же
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                              # 32 из кэша turbo
+```
+
+`prettier --check` и `oxlint` новых и изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **Форматтер — без кода в этой задаче, закрывает B2.9h.** Строка нарезки называет форматтер, задание оркестратора — нет;
+  выбран меньший вариант. Проба на базе подтвердила угрозу: при форматтере в конфиге пользователя (Prettier с `$FILE`)
+  запись `src/main.tsx` запускает `src/.prettierrc.cjs`, который модель записала сама, — исполнение кода без терминала.
+  Конфиг `formatter: false` в корне `work` её снимает: документ проекта старше глобального (`core/src/config.ts`, порядок
+  загрузки), а писать в корень `work` модель теперь не может (случай «git-репозиторий»: `loginom-ai-agent.json` —
+  отказ). Это первый способ B2.9a; запрет имён конфигов в `src/` отвергнут — Prettier читает и `package.json`,
+  `.editorconfig`, а JSON-конфиг подключает плагины-скрипты. Восьмой тест закрепляет приоритет конфига и показывает
+  угрозу без него. **Пока B2.9h не пишет этот конфиг, пользователь, который сам включил форматтер, уязвим в окне дашборда.**
+  Встроенный конфиг продукта (B2.8) ключа `formatter` не задаёт — по умолчанию форматтеров нет.
+- **`..` через ссылку — без своей проверки** (выше, «Как устроено»): ядро открывает лексический путь, и шаг сегментов 0.4
+  здесь ничего бы не ловил; проверки до вызова тоже разрешают путь лексически, как ядро.
+- **`external_directory` в дашборде — запрет всегда**, по решению оркестратора, в том числе для каталогов продукта, которые
+  `ownRead` в обычной Location пускает без вопроса: полный текст урезанного результата (`<data>/tool-output`) и файлы рядом
+  со `SKILL.md` встроенных навыков. Так было и в 0.4 (читать — только рабочая папка). У навыка `loginom-dashboard` других
+  файлов нет. Псевдоним этому не мешает: проба показала, что настоящий путь рабочей папки из Location-псевдонима ядро
+  считает своим (проект — `realpath` каталога), вопроса `external_directory` нет.
+- **Ответ хука — запрет со своим текстом**, без `permissionRefusal` B2.6b2 (`declined`, `denied`, `policy`): это не отказ
+  пользователя, не настройка и не администратор. Клиент видит тип `permission.rejected` (проба CLI) или, у отказа до
+  вызова, `permissionDenied: true`, и префикс `LOGINOM_DASHBOARD_PATH_DENIED`.
+- **Сбой `lstat` в проверке** (`ENOTDIR` под обычным файлом, `ELOOP`, нет доступа) — «нет записи», решает ближайший
+  существующий предок (`27f690e3e4`): системная ошибка сказала бы модели, что лежит по пути снаружи. `realpath`
+  существующего предка не перехватываю: упасть он может только в гонке, а ошибка, брошенная в хуке, роняет вызов с её
+  текстом и ход продолжается (проба на базе) — отказ закрытый.
+- **Отказы «ссылка» и «висячая ссылка» звучат раньше проверки границы**, поэтому выдают, что путь снаружи — ссылка
+  (`write` в файловую ссылку, чтение висячей). Так же было в 0.4 (`dashboardPathError`), не менял.
+- **Исчезнувшая рабочая папка** — отказ всему с текстом «рабочей папки больше нет»; `LOGINOM_SCOPE_DENIED` старому чату —
+  B2.9d.
+- **`skill://`** в ресурсах `read` — не путь, не проверяю. На Linux он и так разрешился бы внутрь `work`, но на Windows
+  `skill:` в пути — имя потока NTFS; мутацией эта строка не проверена.
+- **«Шаблон с `..`»** строки нарезки — `pattern` у `glob` и `include` у `grep`: `pattern` у `grep` — регулярное выражение, где
+  `..` законно. ripgrep сопоставляет шаблон с путями внутри корня поиска, так что `..` наружу и без проверки не ведёт;
+  проверка — явный отказ вместо пустого ответа, как просит строка.
+
+### Найдено, не чинил
+
+- В ядре v2 `write`, `edit` и `patch` читают цель до вопроса `edit` (`FileWrite.write` — для показа изменения, `edit` —
+  исходный текст, `patch` — обновляемые и удаляемые файлы) и отвечают «File not found», «Failed to find expected lines» до
+  него. В дашборде это закрыто проверкой до вызова; в обычной Location так задумано upstream — там решает сам вопрос.
+- Форматтер с конфигом из папки записываемого файла (Prettier) исполняет скрипты в любой Location, если пользователь
+  включил `formatter`; для дашборда — B2.9h, для обычных проектов так задумано upstream.
+- Проверка и ввод-вывод разнесены во времени: ссылку, подменённую между ними, проверка не увидит. Создать ссылку модель
+  не может (терминала и подзадач нет), только внешний процесс.
+
+### Доработка: проверка записи до вызова
+
+Ревью советника после первой версии: «`edit` и `patch` читают цель до вопроса — отказ только на вопросе может быть
+оракулом». Проба на `809fe6e281` (случаи «git-репозиторий» и «патчи» с новыми шагами) подтвердила:
+
+```text
+edit ../control/missing.json                          → "File not found: ../control/missing.json"
+patch Update ../control/binding.json (-wrong guess)   → "patch verification failed: Failed to find expected lines in ../control/binding.json:\nwrong guess"
+patch Delete ../control/missing.json                  → "patch verification failed: Failed to delete ../control/missing.json: file does not exist"
+edit ../control/binding.json (неверная oldString)     → отказ продукта: `edit` спрашивает раньше, чем ищет строку
+```
+
+Модель узнавала, есть ли файл снаружи (`edit`, `patch`), и есть ли в нём строка целиком (`patch`), — там, где ядро не
+спрашивает `external_directory`: в git-репозитории и через ссылку. В 0.4 путь проверялся до чтения. Теперь цели
+`write`, `edit` и все пути `patch` проверяются в `execute.before` (`ee2f34a61d`, выше), и все четыре шага получают тот же
+отказ, что и совпавшая строка.
+
+### Не проверено
+
+- Windows и macOS: junction, регистр, `\` в ресурсах; нормализацию `FSUtil.windowsPath` (`/c/…`) `callError` не
+  повторяет.
+- Восстановление имени файла у `read` (второй `read` соседнего файла) и чтение `AGENTS.md` после `read` — тот же хук, по
+  коду, без теста.
+- Отказ до вызова в CLI проверен пробой только у `write`; у `edit`, `patch`, `glob`, `grep` — по признаку в тесте сервера и
+  коду `run/product.ts`.
+- `patch` у моделей с freeform-инструментами (настоящие GPT): провайдер шлёт сырой текст, но вызов приходит к хукам тем же
+  `{ patchText }` (`ai/src/protocols/openai-freeform.ts`: «Calls keep the normal `{ field: raw }` input everywhere else»)
+  — по коду; тестовая модель freeform не объявляет.
+- Настоящая модель, Desktop.
