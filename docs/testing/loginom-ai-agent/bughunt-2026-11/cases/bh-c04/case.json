@@ -1,0 +1,19 @@
+{
+  "budget": {
+    "max_tool_calls": 65,
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Zero new nodes this turn; retain the grouping GUID and calculator. Mean and median deliberately differ for Center/Office.",
+  "base": "bh-c01",
+  "input_files": []
+}
