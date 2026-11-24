@@ -25,14 +25,14 @@ for(const kind of ['new','existing'])test('bound Import observes its input mappi
  await assert.rejects(driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000}),/STOP_AFTER_READ_ONLY_MAPPING/);
 });
 
-function coveredImport({existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={},operation,onRecord,receiptOptions}={}) {
- const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
+function coveredImport({nodeId='node',existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={},operation,onRecord,receiptOptions}={}) {
+ const node={document_id:'doc',workflow_id:'flow',node_id:nodeId},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const actions=[],records=[],receipts=new Map();let covered=!repaint,opened=false,pending,generation=0,stage='text_import_file';
  const graphTid='MF;TF-1;Graph;Import';
  const state=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,graph_identity:{status:'observed',container_ref:'graph'},dom_epoch:{document:'dom',revision:1},scan:{complete:true},
   prepared_node_context:{...node,node_id:foreign&&!covered?'foreign':node.node_id,verified:true,surface:opened?'wizard':'graph',tid:graphTid,locked:false},
   wizard:opened?{status:'observed',stage,root_tid:'wizard',root_ref:'wizard',
-   owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:'node',label:'Import'},{tid:'wizard',label:'Wizard'}]},
+   owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:node.node_id,label:'Import'},{tid:'wizard',label:'Wizard'}]},
    import_source:{fields:Object.fromEntries(Object.entries({source_path:'',connection:'file',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}).map(([k,value])=>[k,{status:'observed',value}]))}}:{status:'absent'},
   ui:{masks:[],dialogs:[],truncated:{masks:false,dialogs:false},elements:[
    ...(opened?[{tid:'wizard;btnClose',ref:'ui-close',allowed_actions:['click']},{tid:'wizard;btnDone',ref:'ui-done',allowed_actions:['finish_wizard']}]:[]),
@@ -60,18 +60,20 @@ function coveredImport({existing=false,foreign=false,unknown=false,repaint=false
   }});
  return {actions,records,node,workflow,driver,configured:()=>{assert.ok(opened);stage='done';},run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
 }
-test('P1 stops after opening the assigned import and releases that node before any execution baseline',async()=>{
+test('P1 and P2 stop the assigned import before baseline and continue only after release',async()=>{
  const {node,workflow}=coveredImport(),inputSha256=uploaded().artifact.sha256;
- for(const assignedHash of [undefined,'b'.repeat(64),inputSha256]){
+ for(const [condition,assignedHash,missingRelease] of [[undefined,undefined],['P1','b'.repeat(64)],['P1',inputSha256],['P2',inputSha256],['P2',inputSha256,true]]){
   const stopped=assignedHash===inputSha256;
   const events=[],pages=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,
    nodes:[{ref:node,type:'imports.text',label:'Import',position:{x:100,y:100},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
   const ok=async()=>({verified:true,cleanup_complete:true});
-  const app=runtime(new Page(),{now:Date.now,acceptanceProbe:assignedHash?{condition:'P1',packagePath:'/test/task.lgp',inputSha256:assignedHash}:undefined,
-   onRecord:async e=>{events.push(e);return e;},nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true}),
+  const app=runtime(new Page(),{now:Date.now,acceptanceProbe:assignedHash?{condition,packagePath:'/test/task.lgp',inputSha256:assignedHash}:undefined,
+   onRecord:async e=>{if(missingRelease&&e.phase==='recovery_completed')throw Error('release journal unavailable');events.push(e);return e;},nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true,
+    mutate:async effect=>{assert.equal(effect.kind,'create');graph.nodes.push({...graph.nodes[0],ref:{...node,node_id:'created'},position:effect.parameters.position});
+     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};}}),
    nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:validateTextImportNodeParameters,
     configure:async()=>{pages.at(-1).configured();return ok();}}]]),
-   nodeApplyDriverFactory:o=>{const page=coveredImport({existing:true,operation:o.operation,onRecord:o.onRecord,receiptOptions:o.receiptOptions});
+   nodeApplyDriverFactory:o=>{const page=coveredImport({existing:true,nodeId:o.operation.parameters.target.ref?.node_id??'created',operation:o.operation,onRecord:o.onRecord,receiptOptions:o.receiptOptions});
     pages.push(page);return {...page.driver,mapPorts:ok};}});
   const r={...request(),operation_id:'import',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
    target:{kind:'existing',type:'imports.text',ref:node},mode:'delimited',parameters:params(),read:{ports:[],sample_rows:0,require_exact_numbers:false},
@@ -83,19 +85,50 @@ test('P1 stops after opening the assigned import and releases that node before a
    assert.equal((await app.inspect({operationId:'import'})).output.state,'pending');
    assert.equal(job.outcome.output.pending_phase,'open');
    assert.equal(job.outcome.output.execution.status,'not_requested');
-   const released=await app.recover('import',{strategy:'abandon_operation',recoveryOperationId:'release'});
+   if(condition==='P2'){
+    app.startNodeApply(r);
+    assert.equal((await app.waitNodeApply('import',{timeoutMs:2000})).outcome.status,'AMBIGUOUS');
+    assert.equal(pages.flatMap(p=>p.actions).filter(a=>a.ref==='ui-settings').length,1);
+   }
+   const release=app.recover('import',{strategy:'abandon_operation',recoveryOperationId:'release'});
+   if(missingRelease){
+    await assert.rejects(release,/release journal unavailable/);
+    app.startNodeApply({...r,operation_id:'unconfirmed'});
+    assert.equal((await app.waitNodeApply('unconfirmed',{timeoutMs:2000})).outcome.status,'SUCCEEDED');
+    assert.equal(events.filter(e=>e.phase==='acceptance_fault_triggered').length,1);continue;
+   }
+   const released=await release;
    assert.equal(released.output.resolution,'released_after_proof',JSON.stringify(released));
    assert.deepEqual(released.output.original_outcome.output.node,node);
    assert.equal(pages[0].actions.filter(a=>a.ref==='ui-close').length,1);
+   if(condition==='P2'){
+    app.startNodeApply({...r,operation_id:'new',target:{type:'imports.text',kind:'new',position:{x:400,y:100}}});
+    const created=await app.waitNodeApply('new',{timeoutMs:2000});
+    assert.equal(created.outcome.status,'SUCCEEDED',JSON.stringify(created.outcome.error));
+    const sibling=created.outcome.output.node;assert.notEqual(sibling.node_id,node.node_id);
+    app.startNodeApply({...r,operation_id:'sibling',target:{...r.target,ref:sibling}});
+    assert.equal((await app.waitNodeApply('sibling',{timeoutMs:2000})).outcome.status,'SUCCEEDED');
+   }
    app.startNodeApply({...r,operation_id:'continued'});job=await app.waitNodeApply('continued',{timeoutMs:2000});
+   if(condition==='P2'){
+    assert.equal(job.outcome?.status,'AMBIGUOUS',JSON.stringify(job.outcome?.error));
+    assert.equal(job.outcome.output.pending_phase,'open');
+    const marks=events.filter(e=>e.phase==='acceptance_fault_triggered'),second=marks[1];
+    assert.equal(second.step_key,marks[0].step_key);assert.equal(second.code,marks[0].code);
+    assert.equal(second.previous_operation_id,'import');assert.equal(second.recovery_operation_id,released.recovery_operation_id);
+    const receipt=events.findIndex(e=>e.phase==='recovery_completed'&&e.operation_id==='release');
+    assert.ok(receipt>=0&&receipt<events.indexOf(second));
+    assert.equal((await app.recover('continued',{strategy:'abandon_operation',recoveryOperationId:'again'})).output.resolution,'released_after_proof');
+    app.startNodeApply({...r,operation_id:'final'});job=await app.waitNodeApply('final',{timeoutMs:2000});
+   }
    assert.equal(job.outcome?.status,'SUCCEEDED',JSON.stringify(job.outcome?.error));
   }
-  assert.equal((await app.inspect({operationId:stopped?'continued':'import'})).output.state,'resolved');
+  assert.equal((await app.inspect({operationId:job.outcome.operation_id})).output.state,'resolved');
   assert.deepEqual(job.outcome.output.node,node);
-  assert.equal(pages.flatMap(p=>p.actions).filter(a=>a.verb==='finish_wizard').length,1);
-  assert.equal(events.filter(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='configure').length,1);
+  assert.equal(pages.filter(p=>p.node.node_id===node.node_id).flatMap(p=>p.actions).filter(a=>a.verb==='finish_wizard').length,1);
+  assert.equal(events.filter(e=>!['sibling','new'].includes(e.operation_id)&&e.phase==='node_phase_completed'&&e.receipt.phase==='configure').length,1);
   assert.equal(events.some(e=>e.readiness?.condition?.includes('process console')),false);
-  assert.deepEqual(events.filter(e=>e.phase==='acceptance_fault_triggered').map(e=>[e.operation_id,e.receipt_id,e.node,e.input_sha256]),stopped?[['import','import:open',node,inputSha256]]:[]);
+  assert.deepEqual(events.filter(e=>e.phase==='acceptance_fault_triggered').map(e=>[e.operation_id,e.receipt_id,e.node,e.input_sha256]),(condition==='P2'?['import','continued']:stopped?['import']:[]).map(id=>[id,id+':open',node,inputSha256]));
  }
 });
 

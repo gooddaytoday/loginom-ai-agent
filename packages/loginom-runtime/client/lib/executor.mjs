@@ -2809,6 +2809,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       kind: 'node', document_id: state.node.document_id, workflow_id: state.node.workflow_id, node_id: state.node.node_id,
       node_type: state.request.target.type, phase: state.pending.phase };
   };
+  function importProbeStep(operation) {
+    const step=nodeRecoveryStep(operation);
+    if(step?.kind!=='node'||step.phase!=='open'||step.node_type!=='imports.text')return;
+    if(operation.id===probe.operationId)return !probe.attempted?{step_key:step.key}:undefined;
+    const state=operation.nodeApply;
+    if(probe.firstStep!==step.key||state.request.target.kind!=='existing'||state.request.finish!=='done'
+      ||state.phases.find(p=>p.phase==='source')?.value.source?.sha256!==probe.inputSha256)return;
+    for(const [id,{outcome}] of auxiliary){
+      if(outcome?.action_key!=='operation.recover')continue;
+      const original=outcome.output?.original_outcome;
+      if(outcome.status==='SUCCEEDED'&&outcome.output?.resolution==='released_after_proof'
+        &&outcome.operation_id===probe.operationId&&outcome.recovery_operation_id===id&&original?.output.released_phase===step.phase
+        &&['document_id','workflow_id','node_id'].every(k=>original.output.node?.[k]===step[k]))
+        return {step_key:step.key,previous_operation_id:probe.operationId,recovery_operation_id:id};
+    }
+  }
   const failureCode = operation => operation?.outcome?.error?.cause?.code ?? operation?.outcome?.error?.code ?? null;
   function exportRecoveryTrigger(operation) {
     const state = operation?.nodeApply;
@@ -4277,7 +4293,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,probe});}
+          record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,probe,importProbeStep});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.

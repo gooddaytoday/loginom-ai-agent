@@ -62,7 +62,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   if (campaignControl.some(value => value !== undefined) && (campaignValues[0] === undefined ||
     !campaignControl.slice(0, 2).every(value => typeof value === "string" && path.isAbsolute(value)) || !/^[a-f0-9]{64}$/.test(campaignControl[2] ?? "")))
     throw new EvalFailure("EVAL_CAMPAIGN_CONTROL: требуются journal/lock с абсолютными путями, manifest SHA-256 и состояние admissions", 2)
-  const probeTasks = new Map((["P1", "P3", "P5"] as const).flatMap(condition =>
+  const probeTasks = new Map((["P1", "P2", "P3", "P5"] as const).flatMap(condition =>
     (env[`EVAL_CAMPAIGN_${condition}_TASKS`] || "").split(",").filter(Boolean).map(task => [task, condition] as const)))
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   return {

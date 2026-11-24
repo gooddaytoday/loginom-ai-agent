@@ -44,7 +44,7 @@ export function validateStartInput(input) {
 
 export function validAcceptanceProbe(value) {
   if (!value || !validAcceptancePackage(value.packagePath)) return false
-  if (value.condition === "P1") return Object.keys(value).length === 3 && typeof value.inputSha256 === "string" && /^[a-f0-9]{64}$/.test(value.inputSha256)
+  if (value.condition === "P1" || value.condition === "P2") return Object.keys(value).length === 3 && typeof value.inputSha256 === "string" && /^[a-f0-9]{64}$/.test(value.inputSha256)
   return Object.keys(value).length === 2 && ["P3", "P5"].includes(value.condition)
 }
 

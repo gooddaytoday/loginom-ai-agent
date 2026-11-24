@@ -135,7 +135,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, probe}) {
+  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, probe, importProbeStep}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -381,16 +381,19 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     requireValue(value?.verified===true && value.cleanup_complete===true, 'Node phase did not verify '+name);
     verify(value);
-    if(probe?.operationId===operation.id&&!probe.attempted){
+    const step=probe?.condition==='P2'&&name==='open'?importProbeStep(operation):null;
+    if(probe?.operationId===operation.id&&!probe.attempted||step?.recovery_operation_id){
       const stop=async details=>{
         probe.attempted=true;
+        if(step?.recovery_operation_id)delete probe.firstStep;
         const ack=await acknowledge({phase:'acceptance_fault_triggered',condition:probe.condition,target_phase:name,
           receipt_id:pending.receipt_id,node:state.node,...details}).catch(()=>null);
+        if(ack&&step&&!step.recovery_operation_id)probe.firstStep=step.step_key;
         if(ack)throw Error(name==='finish'?'The export execution acknowledgement was unavailable':'The wizard opening acknowledgement was unavailable');
       };
-      if(probe.condition==='P1'&&name==='open'&&value.node_context?.verified===true&&value.node_context.surface==='wizard'
+      if((probe.condition==='P1'||step)&&name==='open'&&value.node_context?.verified===true&&value.node_context.surface==='wizard'
         &&['document_id','workflow_id','node_id'].every(k=>value.node_context[k]===state.node[k]))
-        await stop({input_sha256:probe.inputSha256,code:'NODE_APPLY_STOPPED'});
+        await stop({input_sha256:probe.inputSha256,code:'NODE_APPLY_STOPPED',...step});
       if(probe.condition==='P3'&&name==='finish'&&value.execution_started===true&&value.execution_group?.execution_id===value.execution_id
         &&['document_id','workflow_id','node_id'].every(k=>value.execution_group.node?.[k]===state.node[k])){
         const configuration=state.phases.find(p=>p.phase==='configure')?.value.configuration;
@@ -465,7 +468,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // same filename cannot inherit this assignment if the first stops early.
     if(probe?.condition==='P3'&&!probe.operationId&&request.target.type==='exports.text'&&request.finish==='execute'
       &&request.parameters.destination===probe.packagePath.slice(0,-4)+'.result.csv')probe.operationId=operation.id;
-    if(probe?.condition==='P1'&&!probe.operationId&&request.target.type==='imports.text'&&request.finish==='done'
+    if((probe?.condition==='P1'||probe?.condition==='P2')&&!probe.operationId&&request.target.type==='imports.text'&&request.finish==='done'
       &&source.source?.sha256===probe.inputSha256)probe.operationId=operation.id;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));

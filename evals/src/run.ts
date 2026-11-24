@@ -209,7 +209,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
 
 export async function campaignProbe(condition: string | undefined, packagePath: string, files: string[]) {
   if (!condition) return
-  if (condition !== "P1") return { condition, packagePath }
+  if (condition !== "P1" && condition !== "P2") return { condition, packagePath }
   const csv = files.filter(file => /\.csv$/i.test(file))
   if (csv.length !== 1) throw new EvalFailure("Для назначенной пробы текстового импорта нужен однозначный входной CSV", 2)
   const inputSha256 = new Bun.CryptoHasher("sha256").update(await Bun.file(csv[0]!).bytes()).digest("hex")
