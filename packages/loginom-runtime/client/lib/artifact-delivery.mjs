@@ -348,7 +348,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
     ...(submitted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
       instruction:job.verificationStarted
-       ? 'Inspect and finalize the original upload with its original operation_id, a new resume_id and budget_ms; do not upload or download again.'
+       ? 'Inspect and finalize the original upload with its original operation_id, a new resume_id and budget_ms; do not upload or download again. '
+        +'If resume answers that the existing verification remains unresolved, the delivery stays unconfirmed: do not call deliver or resume again; report it as a blocker.'
        : 'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
     ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
      instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};

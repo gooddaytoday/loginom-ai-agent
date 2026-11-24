@@ -2696,7 +2696,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
-    if(strategy!=='abandon_operation')throw new Error('Use the enclosing node procedure to resume this internal phase; only abandon_operation can release a stopped node operation');
+    if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
     if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
     running=true;
@@ -2886,7 +2886,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return { tool: 'dock_browser_recovery', arguments: { action: 'start', operation_id: operation.id },
       reason: trigger.reason, step: structuredClone(trigger.step),
       instruction: 'Dock recovery for this step is exhausted. Start browser recovery for this operation and complete only this '
-        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface.' };
+        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface. If '
+        + 'dock_browser_recovery refuses start for this step, the operation stays blocked: do not repeat dock_operation_recover or start; '
+        + 'report it as a blocker.' };
   }
   const browserRecoveryApi = {
     browserRecoveryBasis(operationId) {
