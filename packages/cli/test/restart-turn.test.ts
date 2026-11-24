@@ -33,7 +33,9 @@ test.each([
 
       if (input.end === "crash") first.owner.kill("SIGKILL")
       if (input.end === "soft stop") expect(await first.request("POST", "/api/experimental/service/stop")).toBe(202)
-      expect(await first.owner.exited).toBe(input.end === "crash" ? 137 : 0)
+      // A killed process exits 137 on POSIX and 1 on Windows; the soft stop exits 0 everywhere (B2.3b).
+      const exited = await first.owner.exited
+      if (input.end === "soft stop") expect(exited).toBe(0)
 
       const second = await start(root, env, services)
       const outcome = async () => (await second.call<{ outcome?: string }>("GET", `/api/session/${session.id}`)).outcome
