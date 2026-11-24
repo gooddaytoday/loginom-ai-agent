@@ -610,3 +610,90 @@ test('bh-v11 source read refused before the body gesture leaves the read registr
  assert.equal(registry.busy,false);assert.equal(registry.unsettled,false);
  assert.deepEqual(modes,['type','capture','dispose']);
 });
+
+// LAB-1998 A1: a blocker appears between capture and the body pre-click check.
+// The settled body receipt reports NOT_APPLIED without a click, so the read-only
+// lease is disposed and the opening has no effect. A lost dispose reply or a
+// returned click keeps the opening closed.
+const graphState={prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}};
+function bodyRefusalExecute({modes,bodyStatus='NOT_APPLIED',disposeFails=false}){
+ return async code=>{
+  if(code.includes('runManagedJavascriptSelectionBody')){
+   modes.push('body');const gesture_id=code.match(/"gesture_id":"([^"]+)"/)[1];
+   return bodyStatus==='NOT_APPLIED'
+    ?{status:'NOT_APPLIED',phase:'preflight',effect_possible:false,cleanup_complete:true,action_key:'javascript.selection.body',
+     action_revision:'1',operation_id:gesture_id,output:{},error:{code:'SELECTION_SNAPSHOT_CHANGED',message:'Selection snapshot changed'},trace:[]}
+    :{status:'SUCCEEDED',phase:'gesture_returned',effect_possible:true,cleanup_complete:true,action_key:'javascript.selection.body',
+     action_revision:'1',operation_id:gesture_id,output:{body_gesture_returned:true},error:null,trace:[]};
+  }
+  const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode??'type');
+  if(!mode)return {verified:true,node_id:'node',icon_class:'bg-vendor-icon-javascript'};
+  if(mode==='capture')return {ready:false,node_selected:false,body_point:{x:10,y:20},node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='inspect')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='dispose'){if(disposeFails)throw Error('lost reply');return {disposed:true};}
+  throw Error('unexpected browser call '+mode);
+ };
+}
+for(const [name,variant] of Object.entries({refused:{},disposeFails:{disposeFails:true},clicked:{bodyStatus:'SUCCEEDED'}}))
+test('A1 body gesture refused before its click releases the lease: '+name,async()=>{
+ const modes=[],events=[];
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
+  channel:{observe:async()=>graphState},execute:bodyRefusalExecute({modes,...variant}),
+  record:async e=>{events.push(e.phase);return e;},receiptOptions:()=>({})}),error=>{
+   if(name==='refused'){assert.match(error.message,/body gesture refused before its click: SELECTION_SNAPSHOT_CHANGED/);
+    assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});}
+   else assert.equal(error.nodePhaseRefusal,undefined);
+   if(name==='disposeFails')assert.equal(error.message,'lost reply');
+   if(name==='clicked')assert.match(error.message,/blocked after gesture/);
+   return true;
+  });
+ assert.deepEqual(modes,name==='clicked'?['capture','body','inspect']:['capture','body','dispose']);
+ assert.deepEqual(events,['javascript_managed_body_prepared','javascript_managed_body_returned']);
+});
+
+const sourceRegistry=async(execute,observe)=>{
+ const {createJavascriptSourceReadRegistry}=await import('../lib/javascript-source-read-registry.mjs');
+ const {createJavascriptSourceReadSession}=await import('../lib/javascript-source-read-session.mjs');
+ return createJavascriptSourceReadRegistry({openSession:async req=>{
+  const sessionDeadline=Date.now()+300000;
+  const adapter=createJavascriptManagedSourceAdapter({page:{},prepared,node,uiEpoch:9,deadline:sessionDeadline,
+   targetOrigin:'http://test',execute,record:async e=>e,receiptOptions:()=>({}),channel:()=>({observe})});
+  return createJavascriptSourceReadSession({request:req,uiEpoch:9,deadline:sessionDeadline,adapter,
+   redactor:createRedactor(),record:async e=>e});
+ }});
+};
+const readRequest={kind:'source',operation_id:'read-source',document_id:'document',workflow_ref:prepared.workflow_ref,node};
+
+for(const name of ['refused','disposeFails'])test('A1 source read with a body refused before its click settles the read registry: '+name,async()=>{
+ const modes=[],registry=await sourceRegistry(bodyRefusalExecute({modes,disposeFails:name==='disposeFails'}),async()=>graphState);
+ await assert.rejects(registry.read(readRequest),name==='refused'?/refused before its click/:/lost reply/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,name==='disposeFails');
+ assert.deepEqual(modes,['type','capture','body','dispose']);
+});
+
+// LAB-1998 A2: observing or verifying the owner before capture only reads;
+// no lease, journal or gesture exists yet. Viewport navigation is a gesture
+// and is not covered.
+for(const fault of ['observe','owner','tid','wizard'])test('A2 owner check before capture is an opening with no effect: '+fault,async()=>{
+ const modes=[];
+ const observe=async()=>{
+  if(fault==='observe')throw Error('observe transport lost');
+  const state=structuredClone(graphState);
+  if(fault==='owner')state.prepared_node_context.node_id='foreign';
+  if(fault==='tid')state.prepared_node_context.tid='MF;TF-2;Graph;JS';
+  if(fault==='wizard')state.wizard.status='present';
+  return state;
+ };
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',channel:{observe},
+  execute:async()=>assert.fail('no browser call'),record:async()=>assert.fail('no journal'),receiptOptions:()=>({})}),error=>{
+   assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;});
+ const registry=await sourceRegistry(bodyRefusalExecute({modes}),observe);
+ await assert.rejects(registry.read(readRequest),/observe transport lost|graph owner unavailable/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,false);assert.deepEqual(modes,['type']);
+});
+
+for(const fault of ['lost','node_id','covered'])test('A2 a failure after viewport navigation keeps the opening uncertain: '+fault,async()=>{
+ const f=openingFixture({fault});
+ await assert.rejects(openManagedJavascriptExistingWizard(f.args),error=>{assert.equal(error.nodePhaseRefusal,undefined);return true;});
+ assert.ok(f.calls.includes('reveal'));
+});
