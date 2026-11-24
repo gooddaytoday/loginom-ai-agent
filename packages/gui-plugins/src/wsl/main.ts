@@ -89,7 +89,9 @@ const setup: Plugin.MainSetup = (ctx) => {
   ctx.onCleanup(controller.subscribe(() => provider.changed()))
   // Finalizers run in reverse: the servers stop before the state stops being published.
   ctx.onCleanup(() => controller.stopServers())
-  controller.startConfiguredServers()
+  // Loginom AI Agent: the product window does not load WSL (src/renderer.ts), so main starts none of the saved servers;
+  // 0.4 saved them under `wslServers` too. The records stay. Call `controller.startConfiguredServers()` here again when
+  // the window loads WSL.
 }
 
 export default setup
