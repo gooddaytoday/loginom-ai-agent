@@ -59,7 +59,10 @@ async function prepareWorkspace(page, options) {
   // Never execute or mutate a package through native methods here.
   const inspect = async mode => {
     const value = await inspectPage(mode);
-    if (value?.connection_restore) connectionRestore = value.connection_restore;
+    // Each verify sample reports the current restore state; a settled restore
+    // leaves no stale diagnostic on a later unrelated refusal.
+    if (mode === 'verify') connectionRestore = value?.connection_restore ?? null;
+    else if (value?.connection_restore) connectionRestore = value.connection_restore;
     return value;
   };
   const inspectPage = async mode => page.evaluate(async ({ mode, options, deadline }) => {
@@ -335,9 +338,10 @@ async function prepareWorkspace(page, options) {
         current.restoreCandidate=match.prompt;
         return {session_restore:true,blocking_windows:blockingWindows};
       }
-      if(settled==='waiting')return {pending:true,connection_restore:'awaiting_original_attempt',blocking_windows:blockingWindows};
       // Buttonless native progress windows may settle on their own.
-      if(blockingWindows?.windows.some(w=>w.message_box?.buttons.length>0))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',blocking_windows:blockingWindows};
+      if(blockingWindows?.windows.some(w=>w.message_box?.buttons.length>0))return {error:'NATIVE_MESSAGE_BOX_BLOCKED',
+        ...(settled==='waiting'?{connection_restore:'attempted'}:{}),blocking_windows:blockingWindows};
+      if(settled==='waiting')return {pending:true,connection_restore:'awaiting_original_attempt',blocking_windows:blockingWindows};
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};
@@ -760,8 +764,12 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
       && previous.state?.status === 'NOT_READY' && (previous.state.reason === 'WORKFLOW_LOST' || missingWithoutEffect || request?.intent === 'open_package')
       && previous.state.effect_possible === false && previous.state.created_draft === false
       && previous.state.authenticated === true;
+    // The page proved that Loginom replaced the native session this attempt
+    // started on; that operation can never be reconciled, so a NEW ID may start.
+    const sessionReplaced = previous.state?.status === 'NOT_READY' && previous.state.reason === 'NATIVE_MESSAGE_BOX_BLOCKED'
+      && previous.state.connection_restore === 'session_replaced' && previous.state.authenticated === true;
     if (previous.operation_id === request?.operation_id
-        || !replaceRefusal && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
+        || !replaceRefusal && !sessionReplaced && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
       throw new Error('Preparation operation conflict: reconcile the existing request first');
     }
     previous = null;

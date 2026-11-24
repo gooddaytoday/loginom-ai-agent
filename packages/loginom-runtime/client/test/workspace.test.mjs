@@ -820,7 +820,8 @@ function sessionRestoreFixture(intent,{fault='none'}={}){
  c.Ext.getCmp=id=>id===box.id?native:id===second.id?secondNative:getCmp(id);
  c.Ext.Msg=fault==='foreign message box'?{el:{dom:box},cfg:state.cfg}:native;
  c.document.querySelectorAll=q=>q==='[data-tid="msgbox;tlb;yes"]'?(state.shown?[yes]:[])
-  :state.shown&&q.startsWith('[role=')?(state.fault==='second window'?[mask,box,second]:[mask,box]):query(q);
+  :state.shown&&q.startsWith('[role=')?(state.fault==='second window'?[mask,box,second]:[mask,box])
+  :state.busy&&q.startsWith('[role=')?[mask]:query(q);
  c.document.createTreeWalker=e=>{let read=false;return {nextNode:()=>read?null:(read=true,{textContent:e.innerText,parentElement:e})};};
  // A shown prompt over a still connected session is an unproven state.
  const disconnect=()=>{state.shown=true;if(state.connected)return;connection.Connected=false;form.FReconnecting=true;};
@@ -847,9 +848,9 @@ function sessionRestoreFixture(intent,{fault='none'}={}){
  f.page.evaluate=async(fn,args)=>{if(args?.mode==='verify'&&state.disconnectOnVerify){state.disconnectOnVerify=false;disconnect();}return evaluate(fn,args);};
  f.page.waitForFunction=async fn=>{if(!runInContext('('+fn.toString()+')()',c))throw Error('timeout');};
  let elapsed=0;class Clock extends Date{static now(){return elapsed;}}
- c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;};
+ c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;state.onTick?.();};
  const run=(extra={})=>execute(f,{intent,...(intent==='open_package'?{packagePath:'/user/test.lgp'}:{}),timeoutMs:2000,...extra},Clock);
- return {f,state,connection,run,gestures:()=>f.events.filter(e=>e==='create_draft'||e==='open_package').length};
+ return {f,state,elapsed:()=>elapsed,connection,run,gestures:()=>f.events.filter(e=>e==='create_draft'||e==='open_package').length};
 }
 for(const intent of ['new_draft','open_package'])test('preparation restores the original session from the exact native restore prompt and verifies again: '+intent,async()=>{
  const s=sessionRestoreFixture(intent);
@@ -968,4 +969,43 @@ test('a restore refusal without a package gesture does not claim one',async()=>{
   if(intent==='open_package'){assert.equal(r.effect_possible,false);assert.match(r.message,/No package gesture/);}
   else assert.doesNotMatch(r.message,/package gesture/);
  }
+});
+for(const intent of ['new_draft','open_package'])test('a retry prompt during a pending restore is reported at once without a second click: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'lost reconnect'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'awaiting_original_attempt');assert.equal(s.state.restores,1);
+ s.state.retryPrompt();s.state.shown=true;
+ const start=s.elapsed(),again=await s.run({recoverOnly:true});
+ assert.equal(again.status,'NOT_READY');assert.equal(again.reason,'NATIVE_MESSAGE_BOX_BLOCKED');assert.equal(again.connection_restore,'attempted');
+ assert.ok(s.elapsed()-start<1000,'must not wait for the deadline');assert.ok(again.trace.some(t=>t.blocking_windows));
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+for(const intent of ['new_draft','open_package'])test('a settled restore leaves no stale restore diagnostic on a later refusal: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'lost reconnect'});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'awaiting_original_attempt');
+ s.state.busy=true;s.state.onTick=()=>{s.state.onTick=null;s.state.reconnect();};
+ const again=await s.run({recoverOnly:true});
+ assert.equal(again.status,'NOT_READY');assert.equal(again.reason,'DEADLINE');
+ assert.equal(again.connection_restore,undefined);assert.equal(again.next_step,undefined);assert.equal(s.state.restores,1);
+});
+test('the session accepts a NEW operation_id only after a proven session_replaced',async()=>{
+ const s=sessionRestoreFixture('new_draft',{fault:'replaced session'});
+ const metadata={skillRevision:'skill'},calls=[];
+ const prepareWith=(operation_id,run)=>prepareWorkspaceSession({metadata,request:{operation_id,intent:'new_draft',package_path:null,workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},
+  async prepare({recoverOnly}){calls.push([operation_id,recoverOnly]);return run({operationId:operation_id,recoverOnly});}});
+ const replaced=await prepareWith('first',s.run);
+ assert.equal(replaced.connection_restore,'session_replaced');assert.equal(replaced.effect_possible,true);
+ assert.equal((await prepareWith('first',s.run)).connection_restore,'session_replaced');
+ s.state.fault='none';s.state.disconnectOnGesture=false;
+ const next=await prepareWith('after-reload',s.run);
+ assert.equal(next.status,'READY',JSON.stringify(next));
+ assert.deepEqual(calls,[['first',false],['first',true],['after-reload',false]]);
+ // An unsettled restore keeps its operation: a new ID is still a conflict.
+ const pending=sessionRestoreFixture('new_draft',{fault:'lost reconnect'}),other={skillRevision:'skill'};
+ const attempt=(operation_id)=>prepareWorkspaceSession({metadata:other,request:{operation_id,intent:'new_draft',package_path:null,workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},async prepare({recoverOnly}){return pending.run({operationId:operation_id,recoverOnly});}});
+ assert.equal((await attempt('first')).connection_restore,'awaiting_original_attempt');
+ await assert.rejects(attempt('second'),/operation conflict/);
 });
