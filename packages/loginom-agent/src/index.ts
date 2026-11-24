@@ -274,6 +274,15 @@ export default Plugin.define({
         if (event.effect !== "deny") event.effect = "allow"
         return
       }
+      // A dashboard session reaches nothing outside its work folder and writes only in `src`, without a question
+      // (B2.9c). It is settled before `settle`, whose own directories (`ownRead`) are outside. A deny that arrives here
+      // is the administrator's policy (B2.6c), and it stays.
+      const word = dashboard() && event.effect !== "deny" ? Dashboard.settle(ctx.location.directory, event) : undefined
+      if (word) {
+        event.effect = word.effect
+        if ("message" in word) event.message = word.message
+        return
+      }
       const tool = event.source ? calls.get(`${event.source.messageID} ${event.source.id}`) : undefined
       const settled = settle(
         event,
@@ -358,6 +367,9 @@ export default Plugin.define({
     await ctx.tool.hook("execute.before", async (event) => {
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
+      // A dashboard session searches only its work folder (B2.9c).
+      const searched = dashboard() ? Dashboard.searchError(ctx.location.directory, event.tool, event.input) : undefined
+      if (searched) throw new Tool.Error({ message: Dashboard.deniedText(searched) })
       // OpenCode does not offer a tool whose action the rules deny outright, and fails a call to it as unknown. A model
       // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b).
       const offer = offered.get(event.sessionID)
