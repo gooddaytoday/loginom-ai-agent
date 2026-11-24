@@ -98,22 +98,43 @@ const exportSearchBudget=scroll=>Math.min(EXPORT_SEARCH_SCROLLS,3*Math.ceil(Math
 // 0 inversions over 2361 observed names). It only picks the first direction;
 // absence still needs both directions from the kept scroll position.
 const NATIVE_FILE_ORDER=new Intl.Collator('ru',{numeric:true});
-export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
+export async function findNativeStorageRow({name,read,roots,ready,act,guard,folder}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
  let binding=null,owner=null,lastTop=null,direction=null,reversed=false,budget=null;
  const exhausted=()=>Object.assign(Error('Export file search scroll budget exhausted'),{code:'EXPORT_SEARCH_BUDGET_EXHAUSTED'});
  const unavailable=(s,reason)=>Object.assign(new Error('Storage entry is unavailable in the observed folder: '+JSON.stringify(name)+' in '+JSON.stringify(s.file_storage.directory)),
   {code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name,directory:s.file_storage.directory,reason}});
- const bind=s=>{
+ const bind=(s,detail=true)=>{
+  if(folder){
+   guard();
+   // A remounted Files tab has a new DOM ref but keeps its logical workspace.
+   need(s.dom_epoch?.document===folder.dom_epoch.document&&JSON.stringify(s.workflow_ref)===JSON.stringify(folder.workflow_ref),'Export search workspace changed');
+   if(detail)need(s.active_tab_ref&&JSON.stringify(s.package_identity)===JSON.stringify(folder.package_identity)
+    &&s.file_storage?.directory===folder.file_storage.directory,'Export search folder changed');
+  }
+  if(!detail)return;
   need(s.file_storage?.status==='observed','Export search folder unavailable');
   const value=JSON.stringify({workflow:s.workflow_ref,directory:s.file_storage.directory});
   if(binding===null)binding=value;else need(value===binding,'Export search folder changed');
  };
- const table=()=>ready(async()=>{const r=await roots();const es=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl');need(es.length<=1,'Export table ambiguous');return es.length?read({root_ref:es[0].ref}):r;},s=>s.file_storage?.status==='observed');
- guard();
- const initial=await read({discover_roots:true,storage_name:name});
- const issued=initial.ui.elements.filter(e=>e.tid===initial.workflow_ref?.prefix+suffix);need(issued.length<=1,'Export file row is ambiguous');
- if(issued.length){const found=await read({root_ref:issued[0].ref,storage_name:name});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
+ const lookup=async()=>{
+  const r=await read({discover_roots:true,storage_name:name});bind(r,false);
+  const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
+  need(matches.length<=1,'Export file row is ambiguous');if(!matches.length)return;
+  const found=await read({root_ref:matches[0].ref,storage_name:name});bind(found);
+  need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;
+ };
+ const table=()=>ready(async()=>{
+  if(folder)guard();const r=await roots();bind(r,false);
+  const es=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl');
+  need(es.length<=1,'Export table ambiguous');if(!es.length)return r;
+  // The name scopes the cached-file check. The table itself is an unfiltered root.
+  const view=await read({root_ref:es[0].ref,...(folder?{storage_name:name}:{})},null);
+  if(folder&&view.file_storage?.status==='observed')bind(view);
+  return view;
+ },s=>s.file_storage?.status==='observed'&&(!folder||s.file_storage.requested_file_cached!==true
+  ||s.ui.elements.some(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_'))));
+ guard();const initial=await lookup();if(initial)return initial;
  let s=await table();bind(s);
  // Loginom 7.4.2 Files has no name filter (LAB-1872). Approach the target's
  // native place without the per-step row lookup: each gesture is issued from
@@ -148,10 +169,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  // The operation deadline still bounds the whole search through guard().
  for(let step=jumps;step<=EXPORT_SEARCH_SCROLLS;step++){
   guard();
-  const r=await read({discover_roots:true,storage_name:name});
-  const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
-  need(matches.length<=1,'Export file row is ambiguous');
-  if(matches.length){const found=await read({root_ref:matches[0].ref,storage_name:name});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
+  const found=await lookup();if(found)return found;
   s=await table();bind(s);
   const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
   if(!anchors.length)throw unavailable(s,'no_scroll_owner');
@@ -196,11 +214,11 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const searchGuard=()=>{guard();if(Date.now()>=ctx.deadline-reserve)throw Object.assign(Error('Export file search time exhausted'),{code:'EXPORT_SEARCH_TIME_EXHAUSTED'});};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
- const read=async options=>{
+ const read=async(options,rootName=options.storage_name)=>{
   for(let attempt=0;attempt<3;attempt++){
    guard();
    if(attempt&&options.root_ref){
-    const roots=await read({discover_roots:true,...(options.storage_name?{storage_name:options.storage_name}:{})});
+    const roots=await read({discover_roots:true,...(rootName?{storage_name:rootName}:{})});
     const matches=roots.ui.elements.filter(e=>e.ref===options.root_ref);
     need(matches.length===1&&roots.ui.elements.filter(e=>e.tid===matches[0].tid).length===1,'Export observation root changed during scan refresh');
    }
@@ -281,7 +299,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const inDirectory=(expected,previous)=>ready(async()=>{const r=await roots(),e=r.ui.elements.find(e=>e.tid===r.workflow_ref?.prefix+';NavigationBar;NavigationPanel');return e?read({root_ref:e.ref}):r;},s=>s.file_storage?.status==='observed'
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
- const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard:searchGuard});
+ const row=(name,folder)=>findNativeStorageRow({name,folder,read,roots,ready,act,guard:searchGuard});
  const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
   readStep='return_node_context';
   const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
@@ -360,12 +378,12 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    await navigateExportDirectory({directory,inDirectory,row,act});
    await record('export_file_directory_refreshed',{directory,via:'native_directory_navigation'});
   }else await act(details,refresh);
-  await inDirectory(directory);
+  const folder=await inDirectory(directory);
   if(ctx.refuseAssignedExportRow&&await ctx.refuseAssignedExportRow(fileBinding)){
    readStep='file_row_observation';
    throw Object.assign(Error('Export file row observation unavailable'),{code:'EXPORT_FILE_ROW_UNAVAILABLE'});
   }
-  s=await row(name);need(s.file_storage?.directory===directory,'Export file directory differs');
+  s=await row(name,folder);need(s.file_storage?.directory===directory,'Export file directory differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
   let id;

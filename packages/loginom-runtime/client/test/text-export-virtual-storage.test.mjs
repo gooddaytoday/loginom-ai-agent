@@ -11,6 +11,18 @@ function fixture({start=0,at=1500,end=3000,stuck=false,changeFolder=false,change
  const read=async o=>o.discover_roots?snapshot(reached()?[{...target(),label:''}]:[]):snapshot(o.root_ref==='target'?[target()]:[anchor(),...(reached()?[target()]:[])]);
  return {trace,args:{name:'wanted.csv',read,roots:async()=>snapshot([{ref:'table',tid:workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'}]),ready:async fn=>fn(),guard:()=>{},act:async(s,e,v,extra)=>{assert.equal(v,'scroll');assert.ok(Math.abs(extra.delta_y)<=1000);trace.push(extra.delta_y);moves++;if(!stuck)top+=extra.delta_y;}}};
 }
+test('a persistently empty original export folder refuses without a gesture',async()=>{
+ const f=fixture(),base=await f.args.roots();
+ const folder={...base,dom_epoch:{document:'doc'},package_identity:null,active_tab_ref:'ui-files'};
+ const state=elements=>({...folder,ui:{elements}});
+ let tables=0;
+ const args={...f.args,folder,roots:async()=>state(base.ui.elements),read:async options=>{
+  if(options.root_ref)assert.ok(++tables<=2,'do not poll without a native record for the requested file');
+  return state([]);
+ }};
+ await assert.rejects(findNativeStorageRow(args),{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name:'wanted.csv',directory:'/test-2',reason:'no_scroll_owner'}});
+ assert.deepEqual(f.trace,[]);
+});
 test('virtual file search renders a missing row with bounded scrolling',async()=>{const f=fixture();const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.deepEqual(f.trace,[1000,1000]);});
 test('already rendered exact file needs no gesture',async()=>{const f=fixture({at:0});await findNativeStorageRow(f.args);assert.deepEqual(f.trace,[]);});
 test('search resets an existing scroll before traversing',async()=>{const f=fixture({start:500,at:1500});await findNativeStorageRow(f.args);assert.deepEqual(f.trace,[-500,1000,1000]);});

@@ -95,17 +95,17 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const kind of ['success','P4','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
+for(const kind of ['success','late_file_rows','late_file_scan_retry','late_file_package','late_file_folder','late_file_workflow','late_file_tab','late_file_document','late_file_cancelled','late_file_deadline','P4','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
  'return_tabs_active','return_tabs_package','return_tabs_deadline','return_tabs_cancelled',
  'observation_initial','observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name','observation_time_exhausted','observation_work','observation_elements','observation_traversal','observation_missing_trace','observation_mixed_limits','observation_action','observation_phase','observation_gesture','observation_incomplete','observation_ambiguous','observation_unclean','observation_preconditions','observation_transport','observation_deadline','observation_cancelled',
  'verified_return_observation','retain_failure','retain_private','offscreen_refresh','offscreen_refresh_refused','offscreen_refresh_duplicate'])test('native export read and real save: '+kind,async()=>{
- const success=['success','return_tabs_stale','observation_time','offscreen_refresh'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
+ const success=['success','late_file_rows','late_file_scan_retry','return_tabs_stale','observation_time','offscreen_refresh'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
  const downloadSucceeded=kind==='P4'||success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted','return_tabs_deadline','return_tabs_cancelled','observation_deadline','observation_cancelled','observation_document'].includes(kind);
- let observationAttempts=0,outputRowSearches=0;
+ let observationAttempts=0,outputRowSearches=0,emptyTableReads=0;
  let files=false,downloads=0,releases=0,retained=0,failed=false,tabReads=0,freshRoots=0;const gestures=[],records=[];
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
@@ -180,7 +180,8 @@ for(const kind of ['success','P4','download_refusal','ambiguous_download','downl
     if(tid===workflow.tab_tid){files=false;if(kind==='return_tab_observation')return {status:'AMBIGUOUS',action_key:'ui.act',cleanup_complete:false,error:{code:'UI_SCAN_LIMIT'}};}
     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
    }
-   if(kind==='observation_initial'&&observationAttempts===0||files&&kind.startsWith('observation_')&&task.root_ref==='ui-csv'&&downloads===0){
+   if(kind==='observation_initial'&&observationAttempts===0||files&&kind.startsWith('observation_')&&task.root_ref==='ui-csv'&&downloads===0
+    ||kind==='late_file_scan_retry'&&task.root_ref==='ui-file-table'&&observationAttempts===0){
     observationAttempts++;
     if(kind==='observation_transport')throw Error('transport unavailable');
     if(!['observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name'].includes(kind)||observationAttempts===1){
@@ -213,6 +214,21 @@ for(const kind of ['success','P4','download_refusal','ambiguous_download','downl
    }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
+   if(kind.startsWith('late_file_')&&files&&emptyTableReads<2){
+    output.ui.elements=output.ui.elements.filter(e=>e.ref!=='ui-csv');
+    if(task.root_ref==='ui-file-table'){emptyTableReads++;if(task.storage_name==='task.result.csv')output.file_storage.requested_file_cached=true;}
+   }
+   if(kind==='late_file_scan_retry'&&task.discover_roots&&task.storage_name)output.ui.elements=output.ui.elements.filter(e=>e.ref==='ui-csv');
+   if(files&&emptyTableReads){
+    if(kind==='late_file_rows')output.active_tab_ref='ui-remounted-files-tab';
+    if(kind==='late_file_package')output.package_identity={name:'other'};
+    if(kind==='late_file_folder')output.file_storage.directory='/other';
+    if(kind==='late_file_workflow')output.workflow_ref.prefix='MF;TF-other';
+    if(kind==='late_file_tab')output.workflow_ref.tab_tid='other-tab';
+    if(kind==='late_file_document')output.dom_epoch.document='other-document';
+    if(kind==='late_file_cancelled')cancellation.abort(Error('caller stopped'));
+    if(kind==='late_file_deadline'&&ctx.deadline>Date.now()+4000)ctx.deadline=Date.now()+3000;
+   }
    if(files&&observationAttempts&&kind==='observation_document')output.dom_epoch.document='foreign-browser';
    if(files&&observationAttempts&&kind==='observation_duplicate')output.ui.elements.push({...output.ui.elements.find(e=>e.ref==='ui-csv'),ref:'ui-duplicate'});
    if(files&&observationAttempts&&kind==='observation_root')output.ui.elements=output.ui.elements.filter(e=>e.ref!=='ui-csv');
@@ -252,6 +268,17 @@ for(const kind of ['success','P4','download_refusal','ambiguous_download','downl
   assert.equal((await read(ctx)).artifact_id,'artifact');assert.equal(outputRowSearches,1);assert.equal(downloads,1);assert.equal(retained,1);return;
  }
  const result=await read(ctx).catch(e=>e);
+ if(kind.startsWith('late_file_')&&!success){
+  assert.equal(downloads,0);assert.equal(retained,0);assert.ok(result instanceof Error);
+  if(kind==='late_file_deadline'){assert.equal(result.nodePhaseRefusal?.proof.failure.code,'EXPORT_SEARCH_TIME_EXHAUSTED');assert.equal(files,false);assert.equal(releases,1);}
+  assert.ok(gestures.every(tid=>tid.endsWith('btnFilestorage')||tid.endsWith('btnRefresh')||tid===workflow.tab_tid));return;
+ }
+ if(kind.startsWith('late_file_')&&success){
+  assert.deepEqual([result.destination,result.execution_id,result.bytes,result.sha256],
+   [binding.destination,binding.execution_id,57,'a'.repeat(64)],JSON.stringify(result.nodePhaseRefusal?.proof.failure));
+  assert.equal(downloads,1);
+  assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage',filesWorkflow.prefix+';FileStorageForm;btnRefresh',workflow.tab_tid]);
+ }
  if(success){assert.equal(result.artifact_id,'artifact',String(result.stack));assert.equal(retained,1);assert.equal(releases,0);}
  else if(blocked){assert.ok(result instanceof Error);assert.equal(result.nodePhaseRefusal,undefined);assert.equal(retained,0);
   if(['mutating','unknown_gesture'].includes(kind)){assert.equal(releases,0);assert.equal(gestures.includes(workflow.tab_tid),false);}

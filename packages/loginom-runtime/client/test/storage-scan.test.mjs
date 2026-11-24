@@ -82,3 +82,30 @@ test('storage inventory rechecks count after obtaining each native row record',a
   assert.equal(files.length,58);
   assert.ok(files.every(e=>e.storage_entry.kind==='unknown'&&e.storage_entry.bytes===undefined));
 });
+
+test('a named table observation recognizes its cached file before DOM rows mount',async()=>{
+  const f=storageFixture();
+  f.rows.forEach(row=>row.remove());
+  const bar=f.page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+  for(const [i,label] of ['Файлы','user'].entries()){
+    const button=f.page.add('div','MF;TF-1;cnrNaviMode;b.s_'+i,'',undefined,bar);
+    f.page.add('span',null,label,undefined,button).attrs.class='x-btn-inner-default-toolbar-small';
+  }
+  const roots=(await f.page.execute({mode:'observe',discover_roots:true})).output.ui.elements;
+  const ref=tid=>roots.find(e=>e.tid===tid).ref;
+  const read=async(name,root=ref(f.table.attrs['data-tid']))=>(await f.page.execute({mode:'observe',root_ref:root,storage_name:name})).output.file_storage;
+  const name='export-0.csv',data=f.records[0].data;
+  assert.equal((await read(name)).requested_file_cached,true);
+  assert.equal((await read('missing.csv')).requested_file_cached,undefined);
+  assert.equal((await read(name,ref(bar.attrs['data-tid']))).requested_file_cached,undefined);
+  for(const fault of [{FileName:'other.csv'},{id:'/other/'+name},{FilePath:'/other/'+name},{Type:1}]){
+    const original={...data};Object.assign(data,fault);
+    assert.equal((await read(name)).requested_file_cached,undefined,JSON.stringify(fault));Object.assign(data,original);
+  }
+  f.loading(true);assert.equal((await read(name)).requested_file_cached,undefined);f.loading(false);
+  f.view.el.dom=f.page.add('div',null,'',undefined,f.table.parentElement);
+  assert.equal((await read(name)).requested_file_cached,undefined);
+  f.view.el.dom=f.table;
+  f.page.add('div',f.table.attrs['data-tid'],'',undefined,f.table.parentElement);
+  assert.equal((await read(name)).requested_file_cached,undefined);
+});

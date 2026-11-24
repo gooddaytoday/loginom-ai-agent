@@ -3956,6 +3956,24 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    // A cached file can precede its DOM row. This only justifies waiting for
+    // that row; its byte identity and download still require the rendered cell.
+    const tableTid=storagePrefix+'pnlFileStorage;tbl';
+    if(storageName!==null&&fileStorage.status==='observed'&&getTid(selectedRoot)===tableTid
+      &&!elements.some(e=>e.tid?.startsWith(storagePrefix+'colName_'))&&storagePeers(tableTid).length===1){
+      const gridTid=storagePrefix+'pnlFileStorage',grid=selectedRoot.closest('[data-tid='+JSON.stringify(gridTid)+']');
+      const inventory=grid&&storageInventory(grid,gridTid),view=inventory?.view.el.dom;
+      if(view&&(selectedRoot.contains(view)||view.contains(selectedRoot))){
+        const path=(fileStorage.directory==='/'?'':fileStorage.directory)+'/'+storageName;
+        for(const record of inventory.records){
+          charge();const data=record?.data;
+          if(record?.isModel===true&&data?.Type===0&&data.FileName===storageName&&data.FilePath===path&&data.id===path
+            &&inventory.store.getCount()===inventory.count&&inventory.store.isLoading()===false){
+            fileStorage.requested_file_cached=true;break;
+          }
+        }
+      }
+    }
     // Candidate: observed Table settings only, never result/execution acceptance.
     let tableSettings={status:'unobserved',settings_applied:false,result_complete:false,execution_verified:false};
     if(workflow) {
