@@ -127,7 +127,11 @@ export async function prepareGitHubSkill(source: string, home: string, options: 
       )
       if (!skills.length) throw Error("No SKILL.md found in the selected GitHub directory.")
       if (skills.length > 1) {
-        const alternatives = await Promise.all(skills.map(async ([path, entry]) => {
+        const standalone = skills.filter(([path]) => {
+          const folder = posix.dirname(path)
+          return folder !== "." && !skills.some(([other]) => other !== path && other.startsWith(folder + "/"))
+        })
+        const alternatives = await Promise.all(standalone.map(async ([path, entry]) => {
           const directory = posix.dirname(path)
           const info = entry.uncompressedSize <= 256 * 1024 && (mode(entry) & 0o170000) !== 0o120000
             ? readSkillHeader(await entry.getData!(new TextWriter(), { signal: options.signal, checkSignature: true }))

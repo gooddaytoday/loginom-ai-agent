@@ -115,7 +115,7 @@ const add = Effect.fnUntraced(function* (
   if (!match || state.paths.has(match)) return
   state.paths.add(match)
   const md = yield* Effect.tryPromise({
-    try: () => ConfigMarkdown.parse(match),
+    try: async () => await skillSource.portable(match) ?? ConfigMarkdown.parse(match),
     catch: (err) => err,
   }).pipe(
     Effect.catch(

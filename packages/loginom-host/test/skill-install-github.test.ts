@@ -69,6 +69,7 @@ test("returns choices pinned to the default branch revision and refuses ambiguou
   const home = await mkdtemp(join(tmpdir(), "loginom-github-choices-"))
   const writer = new ZipWriter(new BlobWriter())
   await writer.add("owner-repo-a/skills/columns/SKILL.md", new TextReader(header("columns")))
+  await writer.add("owner-repo-a/SKILL.md", new TextReader(header("all-skills")))
   await writer.add("owner-repo-a/skills/rows/SKILL.md", new TextReader(header("rows")))
   const archive = await writer.close()
   const server = Bun.serve({

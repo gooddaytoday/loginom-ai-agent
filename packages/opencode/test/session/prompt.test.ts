@@ -1350,7 +1350,7 @@ for (const scenario of [
         if (scenario.literalArguments) {
           const fs = yield* FSUtil.Service
           expect(yield* fs.exists(argumentFile)).toBe(false)
-          expect(body?.type === "text" && body.text).toContain(literalArguments)
+          expect(user?.parts.some((part) => part.type === "text" && part.text === literalArguments)).toBe(true)
         }
         if (scenario.failure) {
           expect(Exit.isFailure(result)).toBe(true)

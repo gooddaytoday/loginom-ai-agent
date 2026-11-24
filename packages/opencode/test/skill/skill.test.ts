@@ -603,6 +603,8 @@ catalog.live("refreshes already warm skill, command and agent catalogs after hom
     const directory = path.join(Global.Path.home, ".agents/skills", name)
     const location = path.join(directory, "SKILL.md")
     const resource = path.join(directory, "references/columns.md")
+    const broken = path.join(path.dirname(directory), "broken-link-fixture")
+    yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(broken, { recursive: true, force: true })))
     yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(directory, { recursive: true, force: true })))
     const check = () => skill.refresh(Effect.andThen(command.invalidate(), agent.invalidate()))
     const display = (description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n${description}\n`
@@ -616,6 +618,10 @@ catalog.live("refreshes already warm skill, command and agent catalogs after hom
     yield* Effect.promise(async () => {
       await Bun.write(location, display("First revision."))
       await Bun.write(resource, "sku, warehouse")
+      if (process.platform !== "win32") {
+        await fs.mkdir(broken)
+        await fs.symlink("missing", path.join(broken, "SKILL.md"))
+      }
     })
     yield* check()
     expect((yield* skill.require(name)).description).toBe("First revision.")
@@ -637,5 +643,15 @@ catalog.live("refreshes already warm skill, command and agent catalogs after hom
     yield* check()
     expect(yield* command.get(name)).toBeUndefined()
     expect(Permission.evaluate("external_directory", resource, (yield* agent.get("build"))!.permission).action).not.toBe("allow")
+  })),
+)
+
+
+it.live("discovery agrees with portable validation on date-like YAML strings", () =>
+  provideTmpdirInstance((directory) => Effect.gen(function* () {
+    const skills = yield* Skill.Service
+    yield* Effect.promise(() => Bun.write(path.join(directory, ".agents/skills/2026-11-24/SKILL.md"),
+      "---\nname: 2026-11-24\ndescription: 2026-11-25\n---\n# Daily check"))
+    expect((yield* skills.get("2026-11-24"))?.description).toBe("2026-11-25")
   })),
 )

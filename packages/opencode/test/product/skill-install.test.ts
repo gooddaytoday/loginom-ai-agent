@@ -92,6 +92,16 @@ it.live("the chat validates with read permissions and only publishes after one-t
       expect(yield* Effect.promise(() => Bun.file(join(installed, "references/columns.md")).text())).toBe("id, amount")
       expect(JSON.parse((yield* tool!.execute(installation, ctx)).output)).toMatchObject({ status: "already-installed" })
 
+      const destinationReadRefused = yield* Effect.exit(tool!.execute(installation, {
+        ...ctx,
+        ask: (request) => permissions.ask({ ...request, sessionID, ruleset: [
+          { permission: "*", pattern: "*", action: "allow" },
+          { permission: "read", pattern: relative(instance.worktree, join(installed, "references/columns.md")), action: "deny" },
+        ] }).pipe(Effect.orDie),
+      }))
+      expect(destinationReadRefused._tag).toBe("Failure")
+      expect(yield* permissions.list()).toEqual([])
+
       yield* Effect.promise(() => Bun.write(resource, "id, amount, version-two"))
       const declinedUpdate = yield* Effect.forkChild(Effect.exit(tool!.execute(installation, ctx)))
       const replacement = yield* pending

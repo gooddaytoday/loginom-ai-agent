@@ -192,6 +192,11 @@ export function readSkillHeader(content) {
   return skillHeader(content)?.data;
 }
 
+export function readSkillDocument(content) {
+  const header = skillHeader(content);
+  if (header) return { data: header.data, content: content.slice(header.bodyStart) };
+}
+
 function parseMetadata(header) {
   const document = parseDocument(header, { stringKeys: true });
   if (document.errors.length || document.warnings.length) return;

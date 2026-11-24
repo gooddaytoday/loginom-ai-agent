@@ -70,6 +70,11 @@ export const SkillInstallTool = Tool.define(
             signal: ctx.abort,
             lock: <T>(name: string, control: string, run: () => Promise<T>) =>
               Flock.withLock("skill-install:" + name, run, { dir: control, signal: ctx.abort }),
+            authorizeInstalled: (path: string, resources: string[]) =>
+              bridge.promise(Effect.gen(function* () {
+                yield* assertExternalDirectoryEffect(ctx, path, { kind: "directory" })
+                yield* askPaths("read", resources, path)
+              })).then(() => ctx.abort.throwIfAborted()),
           }
           return yield* Effect.acquireUseRelease(
             Effect.tryPromise({
@@ -82,7 +87,7 @@ export const SkillInstallTool = Tool.define(
               const candidate = prepared.candidate
               if (!candidate) return {
                 title: "Choose a skill",
-                output: JSON.stringify({ status: "choose", sha: prepared.sha, candidates: prepared.alternatives }),
+                output: JSON.stringify({ status: "choose", sha: prepared.sha, candidates: prepared.alternatives, message: "Choose a self-contained folder. A parent with nested skills cannot be installed as one skill." }),
                 metadata: {},
               }
               const active = yield* skills.get(candidate.name)

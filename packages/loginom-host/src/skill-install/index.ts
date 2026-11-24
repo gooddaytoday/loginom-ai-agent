@@ -50,9 +50,16 @@ async function tree(root: string, signal?: AbortSignal, omitGit = false) {
   }
 }
 
-async function revision(root: string, signal?: AbortSignal) {
+class InstalledPathsChanged extends Error {}
+
+const readPaths = (root: string, entries: Awaited<ReturnType<typeof tree>>) =>
+  [...new Set([root, ...[...entries.values()].flatMap((item) => [item.absolute, item.canonical])])]
+
+async function revision(root: string, signal?: AbortSignal, admitted?: Set<string>) {
   const hash = createHash("sha256")
   const entries = await tree(root, signal)
+  if (admitted && readPaths(root, entries).some((path) => !admitted.has(path)))
+    throw new InstalledPathsChanged("The installed skill changed while checking read access. Retry the installation.")
   for (const name of [...entries.keys()].sort()) {
     const resource = entries.get(name)!
     const mode = resource.kind === "file" ? (await lstat(resource.absolute)).mode & 0o111 : 0
@@ -73,6 +80,7 @@ export async function prepareLocalSkill(
     lock: <T>(name: string, control: string, run: () => Promise<T>) => Promise<T>
     signal?: AbortSignal
     move?: typeof rename
+    authorizeInstalled?: (path: string, resources: string[]) => Promise<void>
   },
 ) {
   const signal = options.signal
@@ -122,35 +130,63 @@ export async function prepareLocalSkill(
       if (await realpath(control) !== control) throw Error("The installation directory changed.")
       return options.lock(key, control, run)
     }
-    const current = async () => {
+    const current = async (admitted: Set<string>) => {
       if (!(await directory(skills))) return
       const other = (await readdir(skills)).find((entry) =>
         entry !== name && entry.normalize().toLowerCase() === name.normalize().toLowerCase(),
       )
       if (other) throw Error("Ambiguous skill installation path: " + other)
       if (!(await directory(path))) return
-      return revision(path, signal)
+      return revision(path, signal, admitted)
     }
-    const recover = async () => {
-      if (!(await directory(agents)) || !(await directory(control))) throw Error("The installation directory changed.")
-      const existing = await current()
-      if (!(await directory(recovery))) return existing
+    const findBackup = async () => {
+      if (!(await directory(recovery))) return
       const backups = await readdir(recovery)
-      if (!backups.length) return existing
+      if (!backups.length) return
       if (backups.length !== 1 || !/^[a-f0-9]{64}$/.test(backups[0]))
         throw Error("Ambiguous skill replacement recovery; the saved versions were kept.")
       const backup = join(recovery, backups[0])
       if (!(await directory(backup))) throw Error("The previous skill copy is unavailable.")
-      if (!existing) {
-        await move(backup, path)
-        return current()
+      return backup
+    }
+    const admitted = new Set<string>()
+    const authorizeCurrent = async () => {
+      if (!(await directory(agents)) || !(await directory(control))) throw Error("The installation directory changed.")
+      const existing = (await directory(skills)) && (await directory(path)) ? path : await findBackup()
+      if (!existing) return
+      const required = readPaths(existing, await tree(existing, signal))
+        .map((resource) => join(path, relative(existing, resource)))
+        .filter((resource) => !admitted.has(resource))
+      if (!required.length) return
+      await options.authorizeInstalled?.(path, required)
+      required.forEach((resource) => admitted.add(resource))
+    }
+    const withCurrentAccess = async <T>(run: () => Promise<T>) => {
+      await authorizeCurrent()
+      try {
+        return await locked(run)
+      } catch (error) {
+        if (!(error instanceof InstalledPathsChanged)) throw error
       }
-      if (existing.digest !== backups[0])
+      await authorizeCurrent()
+      return locked(run)
+    }
+    const recover = async () => {
+      if (!(await directory(agents)) || !(await directory(control))) throw Error("The installation directory changed.")
+      const existing = await current(admitted)
+      const backup = await findBackup()
+      if (!backup) return existing
+      if (!existing) {
+        await directory(skills, true)
+        await move(backup, path)
+        return current(admitted)
+      }
+      if (existing.digest !== basename(backup))
         throw Error("An interrupted replacement and a different installed version both exist; the versions were kept.")
       await rm(backup, { recursive: true })
       return existing
     }
-    const previous = await locked(recover)
+    const previous = await withCurrentAccess(recover)
     return {
       id: randomUUID(),
       source,
@@ -171,7 +207,7 @@ export async function prepareLocalSkill(
       previous,
       dispose,
       publish(approved: typeof previous) {
-        return locked(async () => {
+        return withCurrentAccess(async () => {
           signal?.throwIfAborted()
           const existing = await recover()
           if (existing?.digest === digest) return "already-installed" as const

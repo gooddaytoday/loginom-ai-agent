@@ -1,9 +1,9 @@
 // Host owns the installed-skill contract; the Node-compatible implementation is
 // also staged with the runtime so classic/diagnostic bridges cannot weaken it.
-import { inspectSkillFolder, verifyBundledSkills } from "../../loginom-runtime/client/lib/bundled-skill-manifest.mjs"
+import { inspectSkillFolder, readSkillDocument, verifyBundledSkills } from "../../loginom-runtime/client/lib/bundled-skill-manifest.mjs"
 import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 
-export { verifyBundledSkills }
+export { readSkillDocument, verifyBundledSkills }
 
 export async function verifyProductSkills(resources: string) {
   const skills = await verifyBundledSkills(resources)

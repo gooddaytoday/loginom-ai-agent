@@ -27,3 +27,5 @@ export function inspectSkillFolder(directory: string, options?: {
 }>
 
 export function readSkillHeader(content: string): SkillMetadata | undefined
+
+export function readSkillDocument(content: string): { data: SkillMetadata; content: string } | undefined

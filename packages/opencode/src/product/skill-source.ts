@@ -1,4 +1,4 @@
-import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { readSkillDocument, verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect } from "effect"
@@ -21,6 +21,7 @@ const reportError = Effect.fnUntraced(function* (events: Events, message: string
 export const skillSource = {
   agentsDirectory,
   externalPattern,
+  portable: async (location: string) => readSkillDocument(await readFile(location, "utf8")),
 
   revision: Effect.fnUntraced(function* (home: string) {
     return yield* Effect.tryPromise(async () => {
@@ -34,8 +35,9 @@ export const skillSource = {
         cwd: root, absolute: true, include: "file", symlink: true, dot: true,
       })
       for (const file of matches.toSorted()) {
-        const resolved = await realpath(file)
-        digest.update(JSON.stringify([file, resolved, createHash("sha256").update(await readFile(resolved)).digest("hex")]))
+        const resolved = await realpath(file).catch(() => undefined)
+        const bytes = resolved && await readFile(resolved).catch(() => undefined)
+        if (bytes) digest.update(JSON.stringify([file, resolved, createHash("sha256").update(bytes).digest("hex")]))
       }
       return digest.digest("hex")
     }).pipe(
