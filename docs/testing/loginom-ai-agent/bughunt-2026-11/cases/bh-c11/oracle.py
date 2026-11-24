@@ -16,6 +16,9 @@ def read(path):
 source = read(ROOT / "data/quality.csv")
 unique = list({tuple(row.items()): row for row in source}.values())
 fill = median(Decimal(row["Amount"]) for row in unique if row["Amount"])
+assert median(Decimal(row['Amount']) for row in source if row['Amount']) != fill
+assert median(Decimal(row['Amount']) for row in unique
+              if row['Amount'] and 0 <= Decimal(row['Amount']) <= 100) != fill
 rows = []
 for row in unique:
     amount = Decimal(row["Amount"]) if row["Amount"] else fill
