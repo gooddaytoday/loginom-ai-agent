@@ -36,7 +36,7 @@ import { pluginsLoaded } from "./fixture/routes"
 
 type Step = { tool: string; input?: unknown } | { text: string }
 const script = (...steps: Step[]) => `SCRIPT<${JSON.stringify(steps)}>SCRIPT`
-// Each case boots one or more server Locations and runs up to 28 scripted steps.
+// Each case boots one or more server Locations and runs up to 30 scripted steps.
 const timeout = 30_000
 const ok = "completed"
 const no = Dashboard.deniedText
