@@ -220,3 +220,18 @@ test('NW1 same operation never repeats a completed navigation; foreign/stale ref
   assert.equal(stale.status,'NOT_READY');assert.equal(stale.effect_possible,false);
   assert.equal(f.clicks(),1);
 });
+
+// Review 2 of #1280: graph navigation is a NEW operation too. Behind another
+// operation's pending or replaced session restore it makes no gesture and
+// asks for a reload, like dock_prepare's reserve.
+for(const restore of [{pending:true},{pending:false,replaced:true}])test('NW1 graph navigation is refused behind an unresolved session restore: '+JSON.stringify(restore),async()=>{
+  const f=fixture({entryOnSelection:true});
+  f.preparation.receipts.set('restoring',{phase:'reserved',restore:{prompt:{},...restore}});
+  const refused=await f.navigate(f.ref);
+  assert.equal(refused.status,'NOT_READY',JSON.stringify(refused));assert.equal(refused.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(refused.connection_restore,'restore_unresolved');assert.equal(refused.effect_possible,false);
+  assert.equal(refused.next_step.new_operation_id_required,true);assert.match(refused.message,/reload the Loginom page/);
+  assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+  f.preparation.receipts.get('restoring').restore={prompt:{},pending:false};
+  assert.equal((await f.navigate(f.ref,'enter','after-settle')).status,'READY');
+});

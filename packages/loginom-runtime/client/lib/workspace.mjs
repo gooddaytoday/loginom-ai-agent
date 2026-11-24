@@ -526,6 +526,9 @@ async function navigatePreparedGraph(page, options) {
     const request=JSON.stringify({session:options.sessionId,ref,navigation:options.graphNavigation});
     const existing=p.receipts.get(options.operationId);
     if(existing&&existing.request!==request)fail('OPERATION_CONFLICT');
+    // As in dock_prepare's reserve: a new operation never starts over another
+    // operation's pending or replaced session restore; only a reload clears it.
+    if(!existing&&[...p.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced)))fail('SESSION_RESTORE_UNRESOLVED');
     if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true};
     const source=existing?.navigationSource??[...p.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===ref.workflow_id);
     if(!source?.packageNode||!source.tab)fail('Prepared workflow changed');
@@ -682,7 +685,12 @@ async function navigatePreparedGraph(page, options) {
       }
       await page.waitForTimeout(Math.min(100,remaining()));
     }
-  }catch(error){return result('NOT_READY',String(error.message).slice(0,500),{verification_required:effectPossible});}
+  }catch(error){
+    if(error.message==='SESSION_RESTORE_UNRESOLVED'&&!effectPossible)return result('NOT_READY','NATIVE_MESSAGE_BOX_BLOCKED',{connection_restore:'restore_unresolved',
+      message:'Loginom lost its server connection ("Восстановление сессии"). Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; the runtime made no gesture for this navigation. Ask the user to reload the Loginom page, then call dock_prepare with a NEW operation_id. Do not dismiss the dialog.',
+      next_step:{tool:'dock_prepare',new_operation_id_required:true,after:'loginom_page_reloaded'}});
+    return result('NOT_READY',String(error.message).slice(0,500),{verification_required:effectPossible});
+  }
 }
 
 export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
