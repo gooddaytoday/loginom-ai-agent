@@ -557,6 +557,40 @@ for(const [name,icon] of [['Excel','bg-vendor-icon-exportexcelfile'],['LGD','bg-
   }else assert.equal(result.status,'AMBIGUOUS');
  });
 
+for(const [name,icon] of [['Excel','exportexcelfile'],['Text','exporttextfile'],['LGD','exportnative'],['REST','restclient']])
+ for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree'])
+ test(name+' variable input requires its own collection slot: '+fault,async()=>{
+  const f=textExportFixture(),group=f.portTree.ParentNode,items=group.FSubNodes.FItems;
+  f.node.FIconCls='bg-vendor-icon-'+icon;
+  f.task.kind='variables';
+  f.portDom.tid=f.portDom.tid.replace('Input_Data-0','Input_Var-1');
+  f.portDom.getAttribute=()=>f.portDom.tid;
+  Object.assign(f.port,{FType:0,FSubType:3,FPortIndex:1});
+  f.portTree.FIndex=fault==='none'?null:1;
+  items.push({FModelNodePort:{}});
+  if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
+  if(fault==='foreign-collection')f.portTree.FCollection={};
+  if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
+  if(fault==='missing-tree')items[0]={FModelNodePort:f.port.data};
+  if(fault==='duplicate-port')items[1].FModelNodePort=f.port.data;
+  if(fault==='duplicate-tree')items[1]=f.portTree;
+  const result=await f.run();
+  if(fault==='none'){
+   assert.equal(result.status,'SUCCEEDED',result.error);
+   assert.equal(result.port,0);assert.equal(result.native_index,1);assert.equal(result.wizard_index,0);
+   assert.equal(f.portTree.FIndex,null);
+   assert.equal((await f.run()).replayed,true);
+   f.port.FSubType=4;
+   f.portTree.FIndex=1;
+   assert.equal((await f.run()).status,'AMBIGUOUS');
+   f.port.FSubType=3;
+   f.portTree.FIndex=null;
+   items.reverse();
+   assert.equal((await f.run()).status,'AMBIGUOUS');
+  }else assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(f.gestures.length,2);
+ });
+
 for(const index of [0,1])test('text export confirms its owned slot without materializing lazy FIndex '+index,async()=>{
  const f=textExportFixture(index);f.portTree.FIndex=null;
  f.task.deadline=Date.now()+150;

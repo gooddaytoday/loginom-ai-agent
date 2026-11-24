@@ -78,9 +78,11 @@ export async function readPreparedNodeContext(page, binding) {
           &&o.document_id===b.document_id&&o.workflow_id===b.workflow_ref.workflow_id&&o.node_id===b.node.node_id
           &&o.wizard===model&&o.nodeTree===nodeTree&&o.portTree===portTree);
         const o=openings[0],input=o?.direction==='input',groupType=input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode,roots=exact(b.workflow_ref.prefix+';WizrdMCF');
-        const collectionInput=input&&o.portIndex===0&&o.nativeIndex===0
-          &&(o.kind==='variables'?o.node.FIconCls==='bg-vendor-icon-importtextfile'&&o.port.FType===0&&o.port.FSubType===3
-            :['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(o.node.FIconCls));
+        const variableInput=input&&o.kind==='variables';
+        if(variableInput&&(o.port.FType!==0||o.port.FSubType!==3))return reject('wizard_model');
+        const collectionInput=input&&(variableInput||o.portIndex===0&&o.nativeIndex===0
+          &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(o.node.FIconCls));
+        if(o?.portCollection&&!collectionInput)return reject('wizard_model');
         const portCollection=group?.FSubNodes,items=portCollection?.FItems;
         const wizardIndex=collectionInput?(Array.isArray(items)?items.indexOf(portTree):-1):(o?.wizardIndex??o?.nativeIndex);
         if(collectionInput&&(!Number.isInteger(wizardIndex)||wizardIndex<0||wizardIndex>=100
