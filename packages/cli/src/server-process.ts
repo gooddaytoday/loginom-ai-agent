@@ -99,9 +99,11 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       if (process.env.LOGINOM_AI_AGENT_RESOURCES)
         withBundledRipgrep(process.env, process.env.LOGINOM_AI_AGENT_RESOURCES)
       // Loginom AI Agent (B2.8, U4): the network mode comes from the product's global config, not from Desktop's
-      // environment. "device" closes the model catalog and OpenCode's free models, whose switch core reads from the
-      // environment only.
-      const network = yield* Effect.promise(() => NetworkMode.read(global.config))
+      // environment: the directory the server below reads, which a saved service environment may move. "device" closes
+      // the model catalog and OpenCode's free models, whose switch core reads from the environment only.
+      const network = yield* Effect.promise(() =>
+        NetworkMode.read(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? global.config),
+      )
       if (network === "device") process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS = "1"
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
