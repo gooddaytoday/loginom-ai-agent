@@ -175,8 +175,9 @@ async function prepareWorkspace(page, options) {
     // operation, or a reload starts a new document, no other operation may
     // take the current (possibly replaced) native session as its baseline.
     // This holds for a replay or verification of an earlier operation too:
-    // only the operation that pressed "Восстановить" may settle it.
-    const restoreUnresolved=[...state.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced));
+    // only the operation that pressed "Восстановить" may settle it. Storage
+    // identity never settles a restore, so it is refused for that operation too.
+    const restoreUnresolved=[...state.receipts].some(([id,r])=>(mode==='identity'||id!==options.operationId)&&(r?.restore?.pending||r?.restore?.replaced));
     if(['identity','reserve','lookup','verify','restore_reserve'].includes(mode)&&restoreUnresolved){
       const own=state.receipts.get(options.operationId);
       return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'restore_unresolved',...(own?{package_gesture:own.packageGesture===true}:{})};
@@ -704,7 +705,8 @@ async function navigatePreparedGraph(page, options) {
       await page.waitForTimeout(Math.min(100,remaining()));
     }
   }catch(error){
-    if(error.message==='SESSION_RESTORE_UNRESOLVED')return result('NOT_READY','NATIVE_MESSAGE_BOX_BLOCKED',{connection_restore:'restore_unresolved',
+    // Playwright prefixes errors thrown inside page.evaluate ("page.evaluate: Error: ...").
+    if(/\bSESSION_RESTORE_UNRESOLVED\b/.test(String(error?.message??'')))return result('NOT_READY','NATIVE_MESSAGE_BOX_BLOCKED',{connection_restore:'restore_unresolved',
       message:'Loginom lost its server connection ("Восстановление сессии"). Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; '
         +(effectPossible?'the earlier navigation gesture of this operation may have taken effect in the lost session. ':'the runtime made no gesture for this navigation. ')
         +'Ask the user to reload the Loginom page, then call dock_prepare with a NEW operation_id. Do not dismiss the dialog.',

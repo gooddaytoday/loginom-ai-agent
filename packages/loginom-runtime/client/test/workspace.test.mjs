@@ -1042,6 +1042,31 @@ test('storage identity binding is refused behind an unresolved restore',async()=
  const after=await s.run({operationId:'identity-after-reload',identityOnly:true});
  assert.equal(after.status,'BOUND',JSON.stringify(after));
 });
+// Review 4 of #1280: the operation that pressed "Восстановить" never binds
+// storage identity on its own replaced session either.
+for(const fault of ['replaced session','replaced account'])test('the restoring operation itself is refused storage identity behind its unresolved restore: '+fault,async()=>{
+ const s=sessionRestoreFixture('new_draft',{fault});
+ const metadata={skillRevision:'skill'};
+ const prepareWith=operation_id=>prepareWorkspaceSession({metadata,request:{operation_id,intent:'new_draft',package_path:null,workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},
+  async prepare({recoverOnly}){return s.run({operationId:operation_id,recoverOnly});}});
+ assert.equal((await prepareWith('X')).connection_restore,'session_replaced');
+ s.state.fault='none';s.state.disconnectOnGesture=false;
+ const z=await prepareWith('Z');
+ assert.equal(z.connection_restore,'restore_unresolved');assert.equal(z.effect_possible,false);
+ // The session rule admits X again, now with no previous receipt to reconcile.
+ assert.equal((await prepareWith('X')).connection_restore,'session_replaced');
+ const bound=await s.run({operationId:'X',identityOnly:true});
+ assert.equal(bound.status,'NOT_READY',JSON.stringify(bound));assert.equal(bound.connection_restore,'restore_unresolved');
+ assert.equal(bound.loginom_account,undefined);assert.equal(bound.effect_possible,false);
+ const pending=sessionRestoreFixture('new_draft',{fault:'lost reconnect'});
+ assert.equal((await pending.run({operationId:'X'})).connection_restore,'awaiting_original_attempt');
+ const waiting=await pending.run({operationId:'X',identityOnly:true});
+ assert.equal(waiting.status,'NOT_READY',JSON.stringify(waiting));assert.equal(waiting.connection_restore,'restore_unresolved');
+ assert.equal(waiting.loginom_account,undefined);
+ s.reload();
+ assert.equal((await s.run({operationId:'X',identityOnly:true})).status,'BOUND');
+});
 test('a NEW operation_id never passes an unresolved restore of a gesture-free open_package',async()=>{
  const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
  const metadata={skillRevision:'skill'};
