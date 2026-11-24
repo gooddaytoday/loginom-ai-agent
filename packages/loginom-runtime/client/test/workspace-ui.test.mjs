@@ -5961,14 +5961,17 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
-test('restored text Export input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+for(const [icon,wizardIndex] of [['exporttextfile',0],['exportexcelfile',1],['exportnative',1]])
+test(icon+' input0/native0 retains guarded Done with overflowing ancestry',async()=>{
  for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
   const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
-  opening.nativeIndex=opening.portTree.FIndex=opening.port.FPortIndex=0;
-  opening.node.FIconCls='bg-vendor-icon-exporttextfile';
-  crumbs[5].children[0].attrs.class='bg-vendor-icon-exporttextfile';
+  opening.nativeIndex=opening.port.FPortIndex=0;
+  opening.wizardIndex=wizardIndex;
+  opening.portTree.FIndex=null;
+  opening.node.FIconCls='bg-vendor-icon-'+icon;
+  crumbs[5].children[0].attrs.class=opening.node.FIconCls;
   const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
-  const collection={FParentNode:group,FItems:[opening.portTree]};
+  const collection={FParentNode:group,FItems:wizardIndex===0?[opening.portTree]:[{FModelNodePort:{}},opening.portTree]};
   group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
   opening.nodeTree.FInputPortsRootNode=group;
   const components=new Map(crumbs.slice(5).map((e,i)=>{
@@ -6004,6 +6007,7 @@ test('restored text Export input0/native0 retains guarded Done with overflowing 
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
   assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  if(fault==='valid')assert.equal(result.output.prepared_node_context.input_port.wizard_index,wizardIndex);
   assert.deepEqual(page.events,[]);
  }
 });
