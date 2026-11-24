@@ -8087,7 +8087,7 @@ test('prepared 1000-column import keeps page refs and rejects hidden or sensitiv
  const first=await read(0),last=await read(992);
  assert.equal(first.status,'SUCCEEDED');assert.equal(last.status,'SUCCEEDED');
  assert.equal(first.output.wizard.import_columns.page.total_columns,1000);assert.equal(last.output.wizard.import_columns.page.status,'complete_definition_page');
- assert.equal(last.output.scan.max_ms,3500);
+ assert.equal(last.output.scan.max_ms,4500);
  assert.equal(first.output.wizard.import_columns.page.schema_id,last.output.wizard.import_columns.page.schema_id);
  assert.deepEqual(last.output.wizard.import_columns.fields.map(f=>f.index),[992,993,994,995,996,997,998,999]);
  assert.ok(last.output.scan.visited_elements<6000);
@@ -8134,6 +8134,13 @@ test('wide import configuration and recovery avoid checking the full guards on p
   const recovery=await read({root_ref});
   assert.equal(recovery.status,'SUCCEEDED',JSON.stringify(recovery.trace));
   assert.ok(recovery.output.ui.elements.some(element=>element.tid===close.attrs['data-tid']&&element.allowed_actions.includes('click')));
+  const hit=page.document.elementFromPoint.bind(page.document);
+  page.document.elementFromPoint=(x,y)=>x===close.box.x+close.box.width/2&&y===close.box.y+close.box.height/2
+    ?fixture.form:hit(x,y);
+  const coveredCenter=await read({root_ref});
+  assert.equal(coveredCenter.status,'SUCCEEDED');
+  assert.equal(coveredCenter.output.ui.elements.find(element=>element.tid===close.attrs['data-tid']).interaction.state,'point_not_observed');
+  page.document.elementFromPoint=hit;
   const blocker=page.add('div',null,'Warning',undefined,preview);blocker.attrs.role='dialog';blocker.attrs['aria-label']='Warning';
   const blocked=await read({root_ref});
   assert.equal(blocked.status,'SUCCEEDED');assert.deepEqual(Array.from(blocked.output.ui.dialogs,dialog=>dialog.title),['Warning']);
@@ -8151,7 +8158,7 @@ test('paged import probes native points only inside the rendered definition view
  fixture.body.style.overflowY='hidden';
  const hit=page.document.elementFromPoint.bind(page.document);
  page.document.elementFromPoint=(x,y)=>{
-  if(x>=100&&y>=275&&y<350){clock.advance(16);return fixture.form;}
+  if(x>=100&&y>=275&&y<350){clock.advance(24);return fixture.form;}
   return hit(x,y);
  };
  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};

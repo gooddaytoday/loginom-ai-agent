@@ -2396,8 +2396,8 @@ function readRenderedInputMapping(observation) {
         const error=new Error('Import definition inventory exceeds 1000 fields');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error;
       }
       // Native hit-testing also scales with the rendered preview. Allow up
-      // to 3 ms per field; generic time and the element/work limits stay fixed.
-      if(importFieldBase===columnBase)maxMs+=3*Math.ceil(definitionElements.length/6);
+      // to 4 ms per field; generic time and the element/work limits stay fixed.
+      if(importFieldBase===columnBase)maxMs+=4*Math.ceil(definitionElements.length/6);
       const definitionTids=new Map();
       for(const element of definitionElements) {
         const tid=getTid(element),matches=definitionTids.get(tid)??[];matches.push(element);definitionTids.set(tid,matches);
@@ -3510,7 +3510,7 @@ function readRenderedInputMapping(observation) {
       return {left:clipsX?Math.max(bounds.left,box.x):bounds.left,right:clipsX?Math.min(bounds.right,box.x+box.width):bounds.right,
         top:clipsY?Math.max(bounds.top,box.y):bounds.top,bottom:clipsY?Math.min(bounds.bottom,box.y+box.height):bounds.bottom};
     });
-    const interactionOf = (element, accept, clip) => {
+    const interactionOf = (element, accept, clip, centerOnly=false) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
@@ -3519,9 +3519,12 @@ function readRenderedInputMapping(observation) {
         top=Math.max(0,box.y,clip?.top??0),bottom=Math.min(height,box.y+box.height,clip?.bottom??height);
       if(clip&&(left>=right||top>=bottom))return {state:'point_not_observed',point:null,covering:[]};
       const covering=[],seenCovering=new Set();
-      for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
+      const fractions=centerOnly?[0.5]:[0.5,0.25,0.75];
+      for (const y of fractions) for (const x of fractions) {
         charge();
-        const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
+        const point=centerOnly?{x:box.x+box.width/2,y:box.y+box.height/2}:{x:left+(right-left)*x,y:top+(bottom-top)*y};
+        if(centerOnly&&(point.x<0||point.x>=width||point.y<0||point.y>=height))break;
+        const hit=document.elementFromPoint(point.x,point.y);
         if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
@@ -3629,6 +3632,7 @@ function readRenderedInputMapping(observation) {
         ||preparedGraphTid&&getTid(element)?.startsWith(preparedGraphTid+';')
           &&/^(?:Input|Output)_(?:Data|Var)-[0-9]+$/.test(getTid(element).slice(preparedGraphTid.length+1))).slice(0,240):[]);
     const retainedControls=new Set([...requiredControls,...controls.filter(element=>!requiredControls.has(element)).slice(0,240-requiredControls.size)]);
+    const wideImport=preparedNodeWizard&&wizard.stage==='text_import_format'&&wizard.import_columns?.truncated===true;
     const elements = controls.filter(element=>retainedControls.has(element)).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
@@ -3640,8 +3644,9 @@ function readRenderedInputMapping(observation) {
       const horizontalScroll=horizontalScrollOf(element);
       // A date string-format cell also holds the flag checkbox image: never
       // choose a point on that image, it would toggle the flag instead of editing.
+      const importCell=preparedNodeWizard&&importColumnCellRefs.has(state.ids.get(element));
       const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined,
-        preparedNodeWizard&&importColumnCellRefs.has(state.ids.get(element))?importHitBounds(element.parentElement):undefined);
+        importCell?importHitBounds(element.parentElement):undefined,wideImport&&!importCell&&wizardForms[0].contains(element));
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
