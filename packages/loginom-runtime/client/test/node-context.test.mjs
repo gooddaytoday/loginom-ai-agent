@@ -155,15 +155,27 @@ test('text export context retains the diagram port and its separate wizard index
  p.opening.port.FPortIndex=0;
  p.opening.wizardIndex=1;
  p.portTree.FIndex=1;
+ const collection={FParentNode:p.group,FItems:[{},p.portTree]};
+ p.group.FSubNodes=collection;p.portTree.FCollection=collection;p.opening.portCollection=collection;
+ p.group.ParentNode.FInputPortsRootNode=p.group;
  const result=await readPreparedNodeContext(f.page,f.binding);
  assert.equal(result.verified,true);
  assert.equal(result.input_port.port,0);
- assert.equal(result.input_port.native_index,1);
+ assert.equal(result.input_port.native_index,0);
+ assert.equal(result.input_port.wizard_index,1);
 
+ p.group.FSubNodes={...collection};
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ p.group.FSubNodes=collection;
+ collection.FItems[0]={FModelNodePort:p.opening.portData};
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ collection.FItems[0]={};
  p.opening.port.FPortIndex=1;
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
  p.opening.port.FPortIndex=0;
  p.portTree.FIndex=0;
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);
+ collection.FItems.reverse();
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
 });
 

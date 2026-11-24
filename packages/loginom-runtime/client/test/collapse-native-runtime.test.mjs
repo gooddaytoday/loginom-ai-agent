@@ -28,3 +28,28 @@ test('document guard binds actual session, socket, functions and message methods
  f.s.$T.$FSocket.readyState=3;assert.throws(()=>g.check(f.s),/transport/);f.s.$T.$FSocket.readyState=1;
  f.s.$T.$FSocket={readyState:1};assert.throws(()=>g.check(f.s),/objects/);
 });
+
+test('compact build is detected from the loaded runtime: all 53 canonical keys bind to its own slots and actual socket',()=>{
+ const f=fixture();f.ctx.session=f.s;
+ const read=()=>vm.runInContext('('+collectNativeRuntime.toString()+')(session)',f.ctx);
+ const before=read(),move=(object,key,slot)=>{object[slot]=object[key];delete object[key];};
+ assert.equal(before.profile,'canonical');assert.equal(before.objects[3],f.s.$T.$FSocket);
+ move(f.s,'$DoDispatchMessageAsync','$2');move(f.s,'$GetNextMessageID','$8');
+ assert.throws(read,/unknown runtime build/);
+ move(f.message,'get_$ParametersOffset','$6');move(f.message,'$DoSetDataSize','$1');move(f.message,'$GrowData','$3');
+ move(f.s.$T,'$SendMessage','$4');move(f.s.$T,'$InvalidateResponseAwaiters','$1');move(f.s.$T,'$CancelResponseAwaiters','$0');
+ move(f.s.$T,'$FSocket','$a');
+ const klass=f.ctx.rpc.TBGMessageDynamicData;
+ for(const [key,slot] of [['$FSignatureOffset','$m'],['$FMessageTypeOffset','$f'],['$FMessageFormatVersionOffset','$d'],['$FMessageIDOffset','$e'],['$FObjectOwnerIDOffset','$i'],['$FObjectIDOffset','$h'],['$FMethodIDOffset','$g']])move(klass,key,slot);
+ const observed=read();
+ assert.equal(observed.profile,'compact');
+ assert.deepEqual({...observed.slots,message:{...observed.slots.message}},{disposed:'$r',pendingDisconnect:'$y',transportStatus:'$F',socket:'$a',data:'$7',dataSize:'$8',message:{get_$ParametersOffset:'$6',$DoSetDataSize:'$1',$GrowData:'$3'}});
+ assert.equal(Object.keys(observed.functions).length,53);
+ for(const [key,fn] of Object.entries(before.functions))assert.equal(observed.functions[key],fn,key);
+ assert.deepEqual(observed.constants,before.constants);assert.equal(observed.objects[3],f.s.$T.$a);
+ const both=()=>{Object.assign(klass,before.constants);f.s.$DoDispatchMessageAsync=f.s.$2;f.message.$GrowData=f.message.$3;};
+ both();assert.throws(read,/unknown runtime build/);
+ for(const k of Object.keys(before.constants).slice(1))delete klass[k];delete f.s.$DoDispatchMessageAsync;delete f.message.$GrowData;
+ assert.equal(read().profile,'compact');
+ delete f.s.$T.$4;assert.throws(read,/missing transport\.\$4$/);
+});

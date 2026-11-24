@@ -115,12 +115,14 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
   assert.equal(JSON.stringify(detail).includes('PRIVATE'),false);
   assert.equal(JSON.stringify(refused).includes('diagnostic'),false);
   assert.equal(refused.javascriptSourceBoundary,undefined);
-  assert.deepEqual(f.calls,['type','open','page','schema'],'no extra browser read or Next after schema refusal');
+  assert.deepEqual(f.calls,['type','open','page','schema','close','dispose'],
+    'a known settings refusal discards only the owned opening without Next');
+  assert.ok(f.events.some(event=>event.phase==='javascript_managed_admission_discarded'));
   assert.equal(admission.state,'retired');
 });
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  schemaOverride,openingFault,fivePage=false,inputTransitionOnce=false,
+  schemaOverride,openingFault,fivePage=false,inputTransitionOnce=false,inputFields=[],schemaLost=false,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
@@ -148,6 +150,8 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     dispatchManagedJavascriptDone: async () => {calls.push('done');doneSent=true;if(doneFails)throw Error('lost Done reply');
       return {status: 'SUCCEEDED', output: {done_gesture_returned: true,wizard_commit_verified: false,execution_started: null}};},
     closeManagedJavascriptWizard: async ({task}) => {calls.push('close'); if (closeFails||closeRefusalFails) throw Error('lost Close reply');
+      if(task.error_stage==='admission')assert.ok(task.admission_page.tid.endsWith(';JavaScriptColumnsWizard')
+        ||task.admission_page.tid.endsWith(';TuneDataSourceInputPortWizard'));
       return {verified: true, closed: true, node_id: 'node',draft_discarded:task.error_stage==='done'?null:true,settings_applied:task.error_stage==='done'?null:false,execution_started:task.error_stage==='done'?null:false};},
     makeJavascriptSchemaContextCode: () => 'schema',
     makeJavascriptManagedPageCode: () => 'page',
@@ -171,6 +175,10 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     calls.push(code);
     if (code === 'type') return {verified: true, node_id: 'node',
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
+    if(code==='schema'&&schemaLost)throw Error('lost schema reply');
+    if(code==='schema'&&fivePage&&!inputNextSent)return {verified:true,node_context:{...node,verified:true,surface:'wizard'},
+      generation:null,grids:['grdSourceColumns','grdTargetColumns'].map(grid=>({
+        tid:'MF;TF-1;WizrdMCF;TuneDataSourceInputPortWizard;'+grid+';tbl',fields:inputFields}))};
     if (code === 'schema') return schemaOverride??{verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
@@ -183,6 +191,8 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       tid:'MF;TF-1;WizrdMCF;'+(!inputNextSent?'TuneDataSourceInputPortWizard':!columnsNextSent?'JavaScriptColumnsWizard':codeNextSent?'DoneWizard':'JavaScriptCodeWizard'),
       index:!inputNextSent?0:!columnsNextSent?1:codeNextSent?4:2,indicator_count:5,
       visible_editors:columnsNextSent&&!codeNextSent?1:0}};
+    if(code==='page'&&!columnsNextSent)return {ready:true,node_guid:'node',
+      page:{tid:'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard',index:0,indicator_count:4,visible_editors:0}};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
@@ -214,6 +224,33 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     }}), driver});
   return {calls, events, sourceAdapter, record};
 }
+
+test('unconnected input admission refuses nonempty input settings after owned discard',async()=>{
+  const f=fixture({fivePage:true,inputFields:[{Name:'Retained'}]});
+  const adapter=await f.sourceAdapter();
+  await assert.rejects(adapter.open({owner,deadline}),/input settings are not complete and empty/);
+  assert.deepEqual(f.calls,['type','open','page','schema','close','dispose']);
+  assert.equal(adapter.uncertain,false);
+  assert.equal(adapter.active,false);
+});
+
+for(const fault of ['schemaLost','closeRefusalFails'])
+test('admission retains uncertainty after '+fault,async()=>{
+  const f=fixture({[fault]:true,schemaOverride:{verified:false,node_context:{...node,verified:true,surface:'wizard'}}});
+  const adapter=await f.sourceAdapter();
+  await assert.rejects(adapter.open({owner,deadline}));
+  assert.equal(adapter.uncertain,true);
+  assert.equal(f.calls.includes('dispose'),false);
+  assert.equal(f.calls.filter(call=>call==='close').length,fault==='schemaLost'?0:1);
+});
+
+test('admission never closes a foreign schema owner',async()=>{
+  const f=fixture({schemaOverride:{verified:false,node_context:{...node,node_id:'foreign',verified:true,surface:'wizard'}}});
+  const adapter=await f.sourceAdapter();
+  await assert.rejects(adapter.open({owner,deadline}),/schema owner changed/);
+  assert.equal(adapter.uncertain,true);
+  assert.equal(f.calls.includes('close'),false);
+});
 
 test('managed source adapter admits full source after owned open/schema/Next/three reads/Close', async () => {
   const f = fixture();
@@ -284,7 +321,7 @@ test('managed Next waits for the owned Code page without repeating Next', async 
   const handle = await adapter.open({owner, deadline});
   await adapter.discard(handle, {owner, deadline});
   assert.equal(f.calls.filter(call => call === 'next').length, 1);
-  assert.equal(f.calls.filter(call => call === 'page').length, 2);
+  assert.equal(f.calls.filter(call => call === 'page').length, 3);
 });
 
 test('lost managed Close reply is terminal and never dispatches a second Close', async () => {

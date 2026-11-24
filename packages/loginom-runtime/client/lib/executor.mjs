@@ -821,8 +821,15 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
     const handler=graph.connectionHandler;
-    if(!graph.isMouseDown||!handler.first||handler.previous?.cell!==source.port.FCell
-      ||diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown!==true)throw Error('Link validation drag owner changed');
+    const ownership={graph_mouse_down:!!graph.isMouseDown,connection_first:!!handler.first,source_cell:handler.previous?.cell===source.port.FCell,
+      delegation_mouse_down:diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown===true};
+    const failed=Object.keys(ownership).filter(key=>!ownership[key]);
+    if(failed.length){
+      const flag=value=>typeof value==='boolean'||value===null?value:typeof value;
+      const observed={...ownership,graph_mouse_down_value:flag(graph.isMouseDown),
+        delegation_mouse_down_value:flag(diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown)};
+      throw Error('Link validation drag owner changed: '+failed.join(',')+'; observed='+JSON.stringify(observed));
+    }
     const value=diagram.FValidatedConnectionsCache?.FCache?.[source.port.FCell.id]?.[target.port.FCell.id];
     if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
     const box=target.element.getBoundingClientRect();
@@ -1908,7 +1915,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await waitForNoMask(60000);
         transientDialog = false;
         ensureDeadline();
-        modifiedAfter = await read(deadline);
+        // Bound the transient modified-flag race and keep five seconds for
+        // verified continuation binding after a confirmed Save.
+        modifiedAfter = await read(Math.min(deadline - 5000, Date.now() + 5000));
       }
       if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
       ensureDeadline();

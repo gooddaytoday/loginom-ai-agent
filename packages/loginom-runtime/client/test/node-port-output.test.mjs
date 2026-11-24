@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/node-port-output.mjs';
+import {decodePortCell,makeNodePortOutputCode,readNodePortOutput,variantCapability} from '../lib/node-port-output.mjs';
+import {collectNativeRuntime} from '../lib/collapse-native-runtime.mjs';
+import {nativeRuntimePins} from '../lib/collapse-native-runtime-pins.mjs';
+import {directNativeRuntimePins} from '../lib/direct-source-native-pins.mjs';
 import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
 import {adaptCell} from '../lib/variant-native-values.mjs';
 
@@ -24,7 +27,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
   AsVariant:async(row,col)=>{rpcCalls.push([row,col]);helper.$FCacheInitialized=true;helper.$FData??={};return rows[row][col];}});helper.FBaseProxy=dataSource;
  if(batch)dataSource.$.$I=71;
  if(treeOutput){
-  dataSource.$.$I=141;
+  dataSource.$.$I=83;
   const scalar=proxy('leaf',{get_Name:async()=> 'flag',get_DisplayName:async()=> 'Flag',get_IsContainer:async()=>false,get_IsArray:async()=>false,get_DataType:async()=>1});
   const children=proxy('treeChildren',{get_Count:async()=>1,getItem:async()=>scalar});
   const treeRoot=proxy('treeRoot',{get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>false,get_SubNodes:async()=>children});
@@ -44,7 +47,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{__riid:83},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -56,6 +59,20 @@ test('tree_io serialized reader retains completed-port ownership and disposes ev
  assert.equal(result.output.freshness_basis,'completed_execution_port_source');assert.equal(result.output.tree.complete,true);
  assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
  assert.equal(Object.hasOwn(result.output,'row_count'),false);assert.deepEqual(f.rpcCalls,[]);
+});
+for(const interfaceId of [141,71,116,undefined])test('tree source rejects an interface other than the requested native tree '+interfaceId,async()=>{
+ const f=fixture({treeOutput:true});f.dataSource.$.$I=interfaceId;
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+ assert.equal(result.verified,false);assert.equal(result.reason,'source_binding');assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(f.disposed.sort(),['dataSource','output']);
+});
+test('tree source keeps session identity and the latest completed execution bound throughout reading',async()=>{
+ for(const [change,cleanup] of [[f=>{f.dataSource.$S={};},true],[f=>{f.dataSource.$.$O++;},true],[f=>{f.child.data.Status=2;},false],[f=>{f.child.data.ModelNode={};},false]]){
+  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
+  f.dataSource.get_RootNodeDef=async()=>{const root=await get();change(f);return root;};
+  const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+  assert.equal(result.verified,false);assert.equal(result.cleanup_complete,cleanup);assert.equal(Object.hasOwn(result,'output'),false);
+ }
 });
 test('tree_io native schema RPC failure retains server text privately behind its bounded stage',async()=>{
  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
@@ -646,6 +663,29 @@ const observedCapability=tag=>({read:`async(source,options,decode)=>({pending:0,
  const frame=[...${JSON.stringify(collapseObserved[tag][0])},...Array(${48-collapseObserved[tag][0].length}).fill(0)],d=decode(frame,60);
  return {row,column,tag:d.tag,payload:frame.slice(0,d.consumed_bytes),frame_size:60,...(d.tag===7?{civilTime:{value:'2026-11-07T12:00:00.000',timezone:'America/New_York'}}:{})};}})`,
  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}});
+test('typed interface71 output passes the shipped per-build pin profiles and its source getter pin to its exact reader',async()=>{
+ const f=fixture({rows:[[false]],types:[6],batch:async(_source,_offset,_count,...out)=>{
+  [ [[false]],[],[],[],[],[],[[false]] ].forEach((value,index)=>{out[index].value=value;});
+ }}),observed=observedCapability(11);
+ // Shipped capability; only the browser transport is replaced by the observed frame.
+ const variant={...variantCapability,decode:observed.decode,adapt:observed.adapt};
+ const expected=JSON.stringify({profiles:{
+  canonical:{...nativeRuntimePins,datetime:{from_oadate:'e35fbf955d5d95bd97724063fb6e40fbdbc6235e4cb34b00860d9611ff75949c',add_bias:'bbabbc4e121b32ea7f93ff900a4fb7cf47ec5853be1a200fc86b993e62262d19'}},
+  compact:{...directNativeRuntimePins,datetime:{from_oadate:'14292d68490bb88f1854f21afa81b1e59ec81176f80c2f7abd37adf722c52ce8',add_bias:'7b799065c792dfb45686d73a8a751a0a0de4ed564827860fa1fa8b2d69fd4486'}}},
+  source:{as_variant:'cbad2c6d75a8fa3b54bc73acc3002172622c8ac329b5be6f505e4440294f855a'}});
+ assert.notEqual(JSON.stringify(nativeRuntimePins.functions),JSON.stringify(directNativeRuntimePins.functions));
+ variant.read=`async(source,options,decode,collect,pins,treePins,sourcePins)=>{
+  if(source.$.$I!==71||options.directSource!==true||options.treeValue||options.variableValue||treePins!==undefined)throw Error('wrong direct source mode');
+  if(JSON.stringify({profiles:pins,source:sourcePins})!==${JSON.stringify(expected)})throw Error('wrong direct source pins');
+  if(collect.toString()!==${JSON.stringify(collectNativeRuntime.toString())})throw Error('wrong runtime collector');
+  return (${observed.read})(source,options,decode);
+ }`;
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.equal(result.output.sample[0][0].cell_type,'boolean');assert.equal(result.output.sample[0][0].value,true);
+ assert.deepEqual(f.rpcCalls,[]);assert.ok(f.disposed.includes('dataSource'));
+});
 for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value with subtype for observed native tag '+tag,async()=>{
  const options={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},rows=[[1,tag===1?null:'shown']];
  if(tag!==1){

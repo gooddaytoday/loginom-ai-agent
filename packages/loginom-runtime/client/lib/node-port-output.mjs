@@ -4,9 +4,9 @@ import {createNativeVariantReader} from './variant-native-read.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {adaptCell} from './variant-native-values.mjs';
 import {collectNativeRuntime} from './collapse-native-runtime.mjs';
-import {nativeRuntimePins,nativeVariablePins,nativeTreePins} from './collapse-native-runtime-pins.mjs';
-const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,treePins:nativeTreePins,
- variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins};
+import {nativeRuntimeProfiles,nativeVariablePins,nativeTreePins,nativeDataSourcePins} from './collapse-native-runtime-pins.mjs';
+export const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimeProfiles,treePins:nativeTreePins,
+ variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins,sourcePins:nativeDataSourcePins};
 
 export function makeNodeVariableOutputCode(binding,options){
  validatePreparedNodeContext(binding);
@@ -233,7 +233,9 @@ export async function readTreePortSource(source,call,track,decode,native) {
  const instance=async(index,row,path,depth,arrayItem=false)=>{
   const def=schema[index];count(depth);
   if(def.is_array&&!arrayItem){
-   const start={$:0},size={$:0};await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
+   // The root has no parent row: GetRowCount is its complete native range.
+   const start={$:0},size={$:rows};
+   if(index!==0)await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
    need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
     &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
    const children=[];
@@ -254,7 +256,8 @@ export async function readTreePortSource(source,call,track,decode,native) {
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(rows===1,'tree_document_count');
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});
+ need(schema[0].is_array?Number.isSafeInteger(rows)&&rows>=0:rows===1,'tree_document_count');
  const document=await instance(0,0,'',0);
  const instances=[];
  const flatten=(node,parent)=>{
@@ -401,14 +404,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
-   const interfaceId=value(identity,'$I');
-   need(identity&&(target.kind==='tree'?interfaceId===141:interfaceId===116||interfaceId===71)
+   const interfaceId=value(identity,'$I'),treeInterface=target.kind==='tree'?bg.IBGDataTree:null,treeInterfaceId=value(treeInterface,'__riid');
+   // RPC interface IDs belong to the loaded Loginom implementation, not the build label.
+   need(identity&&(target.kind==='tree'?Number.isInteger(treeInterfaceId)&&treeInterfaceId>0&&interfaceId===treeInterfaceId:interfaceId===116||interfaceId===71)
     &&(target.kind==='tree'||helper&&value(helper,'FBaseProxy')===dataSource),'source_binding');
    need(value(dataSource,'$S')===value(baseline.nodeData,'$S')&&value(output,'$S')===value(dataSource,'$S'),'source_session');
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
    const batchProxy=interfaceId===71?bg.rpc?.TIBGDataSourceRpcCachedInternal_Proxy:null;
    const getValueAsString=interfaceId===71?bg.rpc?.TIBGDataSource_Proxy?.prototype?.GetValueAsString:null;
-   return {helper,identity,interfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
+   return {helper,identity,interfaceId,treeInterface,treeInterfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
   const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
@@ -455,7 +459,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
    // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
    const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
-   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,directSource:sourceBaseline.interfaceId===71,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins,undefined,variant.sourcePins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const direct=sourceBaseline.interfaceId===71;
    const batch=direct&&requested>0?await (async()=>{

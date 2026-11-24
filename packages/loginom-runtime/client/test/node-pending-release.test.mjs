@@ -19,19 +19,23 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,views=false,variableMapping=false,context=node}={}) {
- let open=wizard,visualizers=views;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
+function surface({wizard=false,foreign=false,locked=false,dialog=false,mask=false,views=false,variableMapping=false,jsonList=false,context=node}={}) {
+ let open=wizard,visualizers=views,list=jsonList;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
+ const jsonRoot='W;JSONToTreeWizard;pedSourceColumn;ValueControl;boundlist';
  const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'views'},
   workflow_navigation:{status:'observed',control_ref:'ui-nav',control_tid:'MF;TF-1;path',path},
   ui:{elements:[{tid:'MF;TF-1;path',ref:'ui-nav',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:variableMapping?'input_mapping':'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
+  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:jsonList?'json_tree':variableMapping?'input_mapping':'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
   prepared_node_context:{...context,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard',...(variableMapping?{input_port:{direction:'input',port:0,native_index:1,port_guid:'variables',opening_operation_id:'apply:n7:port',node_icon_class:'bg-vendor-icon-calcdata'}}:{})},
-  ui:{elements:[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
+  ...(list?{observation_root:{ref:'ui-list',identity:{anchor_tid:jsonRoot}}}:{}),
+  ui:{elements:list?[{tid:jsonRoot+';Ответ_сервера',ref:'ui-option',role:'option',label:'Ответ сервера',allowed_actions:['click','press']}]
+   :[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
   :{wizard:{status:'absent'},prepared_node_context:{...context,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
    ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:mask?[{ref:'ui-mask'}]:[]}};
  return {gestures,channel:{
   observe:async({ready})=>{const s=state();if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
-  perform:async({resolve,initialObservation})=>{gestures.push(resolve(initialObservation));open=false;visualizers=false;}}};
+  perform:async({resolve,initialObservation})=>{const action=resolve(initialObservation);gestures.push(action);
+   if(action.verb==='press'){list=false;return;}open=false;visualizers=false;}}};
 }
 const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_complete:true}},transportUncertain=false}={})=>({
  transportUncertain,lastReceipt:{id:'apply:n7'},deadline:Date.now()+10000,
@@ -339,6 +343,26 @@ const stop=async(f,phase)=>{
  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(job.outcome.output.pending_phase,phase);
  return job;
 };
+
+for(const fault of [null,'foreign','transport','cleanup'])test('JSON configure refusal releases only its own settled draft: '+fault,async()=>{
+ const ui=surface({wizard:true,jsonList:true,foreign:fault==='foreign'});
+ const f=fixture({type:'trees.from_json',release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,
+  readReceipt:async()=>({state:'completed',receipt:{operation_id:'apply:picker',action_key:'ui.act',cleanup_complete:fault!=='cleanup'}}),deadline:Date.now()+10000})});
+ f.handler.configure=async()=>{const op=f.context().operation;op.transportUncertain=fault==='transport';
+  op.lastReceipt={id:'apply:picker',operation_id:'apply:picker',action_key:'ui.act'};
+  throw Error('Node procedure readiness timeout: JSON column option; no mutation was authorized');};
+ const r=request();r.target.type='trees.from_json';f.runtime.startNodeApply(r);
+ const result=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ if(fault){assert.equal(result.outcome.output.pending_phase,'configure');assert.equal(f.runtime.hasUnsettledWork(),true);assert.deepEqual(ui.gestures,[]);return;}
+ assert.equal(result.outcome.status,'FAILED');assert.equal(result.outcome.cleanup_complete,true);
+ assert.equal(result.outcome.output.configuration.status,'discarded');assert.equal(result.outcome.output.pending_phase,null);
+ assert.match(result.outcome.output.error.message,/JSON column option/);assert.equal(result.outcome.output.error.code,'NODE_APPLY_STOPPED');
+ assert.deepEqual(ui.gestures,[{verb:'press',ref:'ui-option',key:'Escape'},{verb:'click',ref:'ui-close'}]);
+ assert.equal(f.runtime.hasUnsettledWork(),false);f.runtime.assertPreparationAllowed();
+ f.handler.configure=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ f.runtime.startNodeApply({...r,operation_id:'next',target:{kind:'existing',type:'trees.from_json',ref:node},finish:'done'});
+ assert.equal((await f.runtime.waitNodeApply('next',{timeoutMs:1000})).outcome.status,'SUCCEEDED');
+});
 
 for(const classified of [false,true])test('a completed REST configure failure releases its draft and admits the next node operation (automatic='+classified+')',async()=>{
  const ui=surface({wizard:true});
