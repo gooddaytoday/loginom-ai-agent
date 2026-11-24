@@ -41,33 +41,34 @@ test('a node hidden by the retained console is revealed before graph selection a
 
 // ST4b n12: training completed, then two strictly pre-gesture epoch refusals
 // preceded a native graph-body redraw. Only graph_execution.node_ref changed.
-async function launchRecovery(fault,{code:refusalCode='UI_EPOCH_CHANGED',...receipt}={}) {
+async function launchRecovery(fault,{code:refusalCode='UI_EPOCH_CHANGED',refusals=2,expire=false,...receipt}={}) {
  const f=await execution({offscreen:false,selectedInitially:true});await f.driver.launchGraph();
- const workflow={prefix:'MF;TF-1',tab_tid:'tab'},records=[];
+ const workflow={prefix:'MF;TF-1',tab_tid:'tab'},records=[],mutationDeadlines=[];
  let attempts=0,gestures=0;
  const operation={id:'regression',action:{action_key:'node.apply',revision:'1'},deadline:10000,
   checkpoint:{document_id:'doc',workflow_ref:workflow}};
- const channel=createNodeProcedure({operation,now:()=>1,wait:async()=>{},targetOrigin:'http://example.test',targetBuild:'7.4.2',
-  record:async e=>{records.push(e);return structuredClone(e)},wrapMutation:(code,options)=>({options}),
+ const channel=createNodeProcedure({operation,now:()=>expire&&attempts>0?operation.deadline:1,wait:async()=>{},targetOrigin:'http://example.test',targetBuild:'7.4.2',
+  record:async e=>{records.push(e);return structuredClone(e)},
+  wrapMutation:(code,options)=>{mutationDeadlines.push(Number(code.match(/"deadline_at":(\d+)/)?.[1]));return {options};},
   execute:async code=>{
    if(typeof code==='string') {
     const s=f.snapshot();Object.assign(s,{origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,
      dom_epoch:{document:'doc',revision:attempts+1},scan:{complete:true}});
     Object.assign(s.ui,{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false}});
     const control=s.ui.elements.find(e=>e.tid==='launch');control.ref='ui-launch-'+attempts;
-    control.graph_execution={node_id:'node',node_ref:attempts===2?'ui-body-new':'ui-body-old',mode:'execute',source:'native_selected_graph_node'};
-    if(attempts===2&&fault==='node')control.graph_execution.node_id='foreign';
-    if(attempts===2&&fault==='mode')control.graph_execution.mode='deactivate';
-    if(attempts===2&&fault==='source')control.graph_execution.source='foreign';
+    control.graph_execution={node_id:'node',node_ref:attempts===refusals?'ui-body-new':'ui-body-old',mode:'execute',source:'native_selected_graph_node'};
+    if(attempts===refusals&&fault==='node')control.graph_execution.node_id='foreign';
+    if(attempts===refusals&&fault==='mode')control.graph_execution.mode='deactivate';
+    if(attempts===refusals&&fault==='source')control.graph_execution.source='foreign';
     return {status:'SUCCEEDED',output:s};
    }
    attempts++;
-   if(attempts<3)return {status:'NOT_APPLIED',operation_id:code.options.id,action_key:'ui.act',phase:'preconditions',
+   if(attempts<=refusals)return {status:'NOT_APPLIED',operation_id:code.options.id,action_key:'ui.act',phase:'preconditions',
     effect_possible:false,cleanup_complete:true,error:{code:refusalCode},trace:[],...receipt};
    gestures++;
    return {status:'SUCCEEDED',operation_id:code.options.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true};
   }});
- return {run:()=>channel.perform({...f.launchRequest,initialObservation:undefined}),records,operation,
+ return {run:()=>channel.perform({...f.launchRequest,initialObservation:undefined}),records,operation,mutationDeadlines,
   get attempts(){return attempts},get gestures(){return gestures}};
 }
 for(const code of ['UI_EPOCH_CHANGED','GRAPH_EXECUTION_CONTEXT_CHANGED'])test('regression launch rebinds a redrawn body only after proved no-effect '+code,async()=>{
@@ -84,6 +85,30 @@ for(const [name,receipt] of Object.entries({effect:{effect_possible:true},cleanu
  const f=await launchRecovery(undefined,{code:'GRAPH_EXECUTION_CONTEXT_CHANGED',...receipt});await assert.rejects(f.run());
  assert.equal(f.attempts,1);assert.equal(f.gestures,0);
  assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+});
+const geometryRefusal={error:{code:'UI_REFERENCE_STALE',message:'Observed control geometry changed'}};
+test('graph launch refreshes once after a proved no-effect geometry refusal',async()=>{
+ const fixture=await launchRecovery(undefined,{refusals:1,...geometryRefusal});await fixture.run();
+ assert.equal(fixture.attempts,2);assert.equal(fixture.gestures,1);assert.equal(fixture.operation.deadline,10000);
+ assert.deepEqual(fixture.mutationDeadlines,[10000,10000]);
+ assert.deepEqual(fixture.records.filter(entry=>entry.phase==='node_step_prepared').map(entry=>entry.action.ref),['ui-launch-0','ui-launch-1']);
+ assert.deepEqual(fixture.records.filter(entry=>entry.phase==='node_step_refresh_authorized').map(entry=>entry.reason),['graph_execution_geometry_changed']);
+});
+test('graph launch refuses persistent geometry drift after one refresh',async()=>{
+ const fixture=await launchRecovery(undefined,geometryRefusal);await assert.rejects(fixture.run(),/Observed control geometry changed/);
+ assert.equal(fixture.attempts,2);assert.equal(fixture.gestures,0);
+});
+for(const fault of ['node','mode','source'])test('graph launch geometry refresh refuses changed '+fault,async()=>{
+ const fixture=await launchRecovery(fault,{refusals:1,...geometryRefusal});
+ await assert.rejects(fixture.run());
+ assert.equal(fixture.attempts,1);assert.equal(fixture.gestures,0);
+ assert.equal(fixture.records.filter(entry=>entry.phase==='node_step_refresh_authorized').length,1);
+});
+for(const [name,options] of Object.entries({effect:{effect_possible:true},cleanup:{cleanup_complete:false},
+ phase:{phase:'applying'},gesture:{trace:[{event:'ui_gesture_applied'}]},expired:{expire:true},
+ otherStale:{error:{code:'UI_REFERENCE_STALE',message:'Observed control is detached'}}}))test('graph launch geometry refresh refuses '+name,async()=>{
+ const fixture=await launchRecovery(undefined,{refusals:1,...geometryRefusal,...options});await assert.rejects(fixture.run());
+ assert.equal(fixture.attempts,1);assert.equal(fixture.gestures,0);
 });
 for(const selectedInitially of [false,true])test('offscreen saved node is revealed before selection/launch, selected: '+selectedInitially,async()=>{
  const f=await execution({selectedInitially});await f.driver.launchGraph();
