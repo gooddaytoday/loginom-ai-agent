@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {makeJavascriptManagedSelectionReadCode, dispatchManagedJavascriptBody, dispatchManagedJavascriptSetting} from './javascript-managed-selection.mjs';
+import {makeJavascriptManagedSelectionReadCode, makeJavascriptManagedSelectionBodyCode, dispatchManagedJavascriptBody,
+  dispatchManagedJavascriptSetting} from './javascript-managed-selection.mjs';
 import {waitManagedJavascriptWizardSettlement} from './javascript-managed-opening.mjs';
 import {dispatchManagedJavascriptDeactivation} from './javascript-managed-deactivation.mjs';
 
@@ -48,6 +49,17 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     // The capture only reads. No body or Setting gesture has been prepared.
     error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
     throw error;
+  }
+  if (before.ready !== true) {
+    try { makeJavascriptManagedSelectionBodyCode({...task, mode: 'body', gesture_id: task.operation_id + ':body', expected: before}); }
+    catch (error) {
+      // Refused before the body journal or any click: only the read-only lease
+      // is held. A confirmed dispose makes this opening free of effects; a lost
+      // dispose reply propagates without a refusal and keeps the gate closed.
+      await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'dispose'}));
+      error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+      throw error;
+    }
   }
   const selected = before.ready === true ? before
     : (await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions})).output?.selection;
