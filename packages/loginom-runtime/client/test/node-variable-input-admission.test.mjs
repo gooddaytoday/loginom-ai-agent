@@ -65,6 +65,26 @@ for(const [name,args,path,hint] of [
  });
 }
 
+test('typed text export mapping refusal preserves the table mapping repair hint',async()=>{
+ const {runtime,calls}=fixture();
+ const args=request('exports.text','delimited',{},{
+  target:{kind:'existing',type:'exports.text',ref:ref('saved-export')},inputs:[],
+ });
+ const refusal=async mappings=>{
+  let outcome;
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...args,mappings}),error=>{
+   outcome=runtime.requestFailure(new Error(error.message,{cause:error}));
+   return true;
+  });
+  return compactNodeRequestFailure(outcome,{...args,mappings});
+ };
+ const table=await refusal([{direction:'input',port:0}]);
+ assert.match(table.next_step.instruction,/transform.reform_columns/);
+ assert.match(table.next_step.instruction,/SAME existing export/);
+ assert.deepEqual(await refusal([mapping()]),table);
+ assert.deepEqual(calls,[]);
+});
+
 const pathBinding={parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'Path'}};
 const boundText=request('imports.text','delimited',{
  source:{kind:'verified_delivery',artifact_id:'artifact',upload_operation_id:'up'},

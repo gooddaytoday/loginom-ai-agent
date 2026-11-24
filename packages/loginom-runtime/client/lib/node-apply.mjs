@@ -21,7 +21,9 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 
 export class NodeVariableInputError extends Error {
   constructor(request, capabilities, path, message, correction) {
-    super('Invalid parameters.'+path+': '+message);
+    const prefix='Invalid parameters.'+path+': ';
+    const reason=String(message);
+    super(reason.startsWith(prefix)?reason:prefix+reason);
     const ports=(capabilities.variables??[]).map(port=>'variables input '+port);
     if(capabilities.control)ports.push('control input 0');
     const supported=request.target.type+' ('+request.mode+') '
