@@ -48,6 +48,22 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+test('verified relink receipt survives node checkpoint and compact model delivery',async()=>{
+ const f=fixture(),prepare=f.drivers.prepareTarget,r=request();r.finish='done';r.read.ports=[];
+ const removed={source:'original',output:0,target:'node1',input:0},created={source:'filter',output:1,target:'node1',input:0};
+ f.drivers.prepareTarget=async(...args)=>({...await prepare(...args),target:{replaced_links:[{removed:{...removed,guid:'native-link'},created}]}});
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED');
+ assert.deepEqual(result.replaced_links,[{removed,created}]);
+ const reply=compactNodeResult({operation_id:'apply1',state:'settled',outcome:{status:result.status,output:result}});
+ assert.deepEqual(reply.replaced_links,result.replaced_links);
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const {userResultSchema}=await import('../lib/user-results.mjs');
+ const validator=new AjvJsonSchemaValidator();
+ for(const [schema,value] of [[nodeApplyResultSchema,result],[userResultSchema,reply]]){
+  const validation=validator.getValidator(schema)(value);assert.equal(validation.valid,true,validation.errorMessage);
+ }
+});
 test('successful text preview tells the caller to continue on its existing import node',async()=>{
  const f=fixture(),r=request();
  r.parameters={preview_only:true};r.finish='close';r.read.ports=[];
