@@ -1,6 +1,9 @@
 import { describe, expect } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
+import { Agent } from "../../src/agent/agent"
+import { Command } from "../../src/command"
+import { Permission } from "../../src/permission"
 import { Skill } from "../../src/skill"
 import { Discovery } from "../../src/skill/discovery"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
@@ -520,6 +523,7 @@ description: A skill in the .loginom-ai-agent/skill directory.
           )
 
           const skill = yield* Skill.Service
+          yield* skill.refresh(Effect.die(Error("Disabled external discovery must not invalidate dependents")))
           const list = (yield* skill.all()).filter((s) => s.location !== "<built-in>")
           expect(list.map((s) => s.name)).toEqual(["opencode-skill"])
         }),
@@ -583,3 +587,55 @@ description: A skill in the .loginom-ai-agent/skills directory.
     ),
   )
 })
+
+const catalog = testEffect(Layer.mergeAll(
+  LayerNode.compile(LayerNode.group([Skill.node, Command.node, Agent.node])),
+  node,
+  testInstanceStoreLayer,
+))
+
+catalog.live("refreshes already warm skill, command and agent catalogs after home changes", () =>
+  provideTmpdirInstance(() => Effect.gen(function* () {
+    const skill = yield* Skill.Service
+    const command = yield* Command.Service
+    const agent = yield* Agent.Service
+    const name = "refresh-columns"
+    const directory = path.join(Global.Path.home, ".agents/skills", name)
+    const location = path.join(directory, "SKILL.md")
+    const resource = path.join(directory, "references/columns.md")
+    yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(directory, { recursive: true, force: true })))
+    const check = () => skill.refresh(Effect.andThen(command.invalidate(), agent.invalidate()))
+    const display = (description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n${description}\n`
+
+    expect((yield* skill.available()).some((item) => item.name === name)).toBe(false)
+    expect((yield* command.list()).some((item) => item.name === name)).toBe(false)
+    const before = yield* agent.get("build")
+    expect(Permission.evaluate("external_directory", resource, before!.permission).action).not.toBe("allow")
+    yield* check()
+
+    yield* Effect.promise(async () => {
+      await Bun.write(location, display("First revision."))
+      await Bun.write(resource, "sku, warehouse")
+    })
+    yield* check()
+    expect((yield* skill.require(name)).description).toBe("First revision.")
+    expect((yield* command.get(name))?.description).toBe("First revision.")
+    const updated = yield* agent.get("build")
+    expect(Permission.evaluate("external_directory", resource, updated!.permission).action).toBe("allow")
+
+    yield* Effect.promise(async () => {
+      const time = await fs.stat(location)
+      await Bun.write(location, display("New revision."))
+      await fs.utimes(location, time.atime, time.mtime)
+    })
+    yield* check()
+    expect((yield* command.get(name))?.description).toBe("New revision.")
+    expect((yield* skill.require(name)).content).toContain("New revision.")
+    yield* check()
+
+    yield* Effect.promise(() => fs.rm(directory, { recursive: true }))
+    yield* check()
+    expect(yield* command.get(name)).toBeUndefined()
+    expect(Permission.evaluate("external_directory", resource, (yield* agent.get("build"))!.permission).action).not.toBe("allow")
+  })),
+)

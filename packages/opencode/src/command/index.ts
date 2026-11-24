@@ -53,6 +53,7 @@ export const Default = {
 
 export interface Interface {
   readonly get: (name: string) => Effect.Effect<Info | undefined>
+  readonly invalidate: () => Effect.Effect<void>
   readonly list: () => Effect.Effect<Info[]>
 }
 
@@ -182,7 +183,7 @@ const layer = Layer.effect(
       return Object.values(s.commands)
     })
 
-    return Service.of({ get, list })
+    return Service.of({ get, list, invalidate: () => InstanceState.invalidate(state) })
   }),
 )
 

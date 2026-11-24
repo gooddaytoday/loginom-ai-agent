@@ -353,6 +353,12 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     bootstrapInstance,
   })
 
+  const refreshCommands = async (directory: string) => {
+    const [, setStore] = children.child(directory, { bootstrap: false })
+    const commands = await loadCommands(directory, serverSDK.api.command, sdkFor(directory), serverSDK.protocol)
+    setStore("command", commands)
+  }
+
   const children = createChildStoreManager({
     owner,
     scope: serverSDK.scope,
@@ -362,9 +368,8 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     onBootstrap: (directory) => {
       void bootstrapInstance(directory)
     },
-    onMcp: (directory, setStore) => {
-      void loadCommands(directory, serverSDK.api.command, sdkFor(directory), serverSDK.protocol)
-        .then((commands) => setStore("command", commands))
+    onMcp: (directory) => {
+      void refreshCommands(directory)
         .catch((err) => {
           showToast({
             variant: "error",
@@ -684,6 +689,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     disableMcp: children.disableMcp,
     queryOptions: queryOptionsApi,
     refreshProviders,
+    refreshCommands,
     // bootstrap,
     updateConfig: updateConfigMutation.mutateAsync,
     project: projectApi,

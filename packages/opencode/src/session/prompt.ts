@@ -1,3 +1,4 @@
+import { skillSource } from "@/product/skill-source"
 import { attachmentResolver } from "@/product/attachment-resolver"
 import { turnLifecycle } from "@/product/turn-lifecycle"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -128,6 +129,7 @@ const layer = Layer.effect(
     const plugin = yield* Plugin.Service
     const commands = yield* Command.Service
     const skills = yield* Skill.Service
+    const refreshSkills = () => skills.refresh(Effect.andThen(commands.invalidate(), agents.invalidate()))
     const config = yield* Config.Service
     const permission = yield* Permission.Service
     const fsys = yield* FSUtil.Service
@@ -1313,6 +1315,7 @@ const layer = Layer.effect(
               Effect.provideService(FSUtil.Service, fsys),
               Effect.provideService(Session.Service, sessions),
               Effect.provideService(Agent.Service, agents),
+              Effect.provideService(Skill.Service, skills),
               Effect.provideService(AppProcess.Service, appProcess),
             )
 
@@ -1330,7 +1333,7 @@ const layer = Layer.effect(
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
+            const [skillInstructions, env, instructions, mcpInstructions, modelMsgs] = yield* Effect.all([
               sys.skills(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
@@ -1342,7 +1345,7 @@ const layer = Layer.effect(
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...turn.system(),
-              ...(skills ? [skills] : []),
+              ...(skillInstructions ? [skillInstructions] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
@@ -1453,7 +1456,48 @@ const layer = Layer.effect(
       return yield* state.startShell(input.sessionID, lastAssistant(input.sessionID), shellImpl(input, ready), ready)
     })
 
+    const configuredCommandParts = Effect.fnUntraced(function* (templateCommand: string, argsText: string) {
+      const raw = argsText.match(argsRegex) ?? []
+      const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
+
+      const placeholders = templateCommand.match(placeholderRegex) ?? []
+      let last = 0
+      for (const item of placeholders) {
+        const value = Number(item.slice(1))
+        if (value > last) last = value
+      }
+
+      const withArgs = templateCommand.replaceAll(placeholderRegex, (_, index) => {
+        const position = Number(index)
+        const argIndex = position - 1
+        if (argIndex >= args.length) return ""
+        if (position === last) return args.slice(argIndex).join(" ")
+        return args[argIndex]
+      })
+      const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
+      let template = withArgs.replaceAll("$ARGUMENTS", argsText)
+
+      if (placeholders.length === 0 && !usesArgumentsPlaceholder && argsText.trim()) {
+        template = template + "\n\n" + argsText
+      }
+
+      const shellMatches = ConfigMarkdown.shell(template)
+      if (shellMatches.length > 0) {
+        const cfg = yield* config.get()
+        const sh = Shell.preferred(cfg.shell)
+        const results = yield* Effect.promise(() =>
+          Promise.all(
+            shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
+          ),
+        )
+        let index = 0
+        template = template.replace(bashRegex, () => results[index++])
+      }
+      return yield* resolvePromptParts(template.trim())
+    })
+
     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
+      yield* refreshSkills()
       const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       const directory = yield* InstanceState.directory
       if (DashboardSession.profile(session) === "loginom-dashboard" && !DashboardSession.isDashboardWork(directory))
@@ -1474,45 +1518,6 @@ const layer = Layer.effect(
       const agentName = cmd.agent ?? input.agent
       const commandSkill = cmd.source === "skill" ? yield* skills.require(cmd.name).pipe(Effect.orDie) : undefined
       const commandGrant = commandSkill ? TaskScope.bundledActivation(commandSkill) : undefined
-
-      const raw = input.arguments.match(argsRegex) ?? []
-      const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
-      const templateCommand = yield* Effect.promise(async () => cmd.template)
-
-      const placeholders = templateCommand.match(placeholderRegex) ?? []
-      let last = 0
-      for (const item of placeholders) {
-        const value = Number(item.slice(1))
-        if (value > last) last = value
-      }
-
-      const withArgs = templateCommand.replaceAll(placeholderRegex, (_, index) => {
-        const position = Number(index)
-        const argIndex = position - 1
-        if (argIndex >= args.length) return ""
-        if (position === last) return args.slice(argIndex).join(" ")
-        return args[argIndex]
-      })
-      const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
-      let template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
-
-      if (placeholders.length === 0 && !usesArgumentsPlaceholder && input.arguments.trim()) {
-        template = template + "\n\n" + input.arguments
-      }
-
-      const shellMatches = commandGrant ? [] : ConfigMarkdown.shell(template)
-      if (shellMatches.length > 0) {
-        const cfg = yield* config.get()
-        const sh = Shell.preferred(cfg.shell)
-        const results = yield* Effect.promise(() =>
-          Promise.all(
-            shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
-          ),
-        )
-        let index = 0
-        template = template.replace(bashRegex, () => results[index++])
-      }
-      template = template.trim()
 
       const taskModel = yield* Effect.gen(function* () {
         if (cmd.model) return Provider.parseModel(cmd.model)
@@ -1535,7 +1540,19 @@ const layer = Layer.effect(
         throw error
       }
 
-      const templateParts = yield* resolvePromptParts(template)
+      if (commandSkill && !commandGrant)
+        yield* permission.ask({
+          permission: "skill",
+          patterns: [cmd.name],
+          always: [cmd.name],
+          metadata: {},
+          sessionID: session.id,
+          ruleset: Permission.merge(agent.permission, session.permission ?? [], DashboardSession.dashboardRules(DashboardSession.profile(session))),
+        }).pipe(Effect.orDie)
+      const template = yield* Effect.promise(async () => cmd.template)
+      const templateParts = commandSkill
+        ? skillSource.commandParts(template, input.arguments)
+        : yield* configuredCommandParts(template, input.arguments)
       const inputFiles = new Set(
         input.parts?.flatMap((part) =>
           part.type === "file" && new URL(part.url).protocol === "file:" ? [fileURLToPath(part.url)] : [],
@@ -1544,7 +1561,7 @@ const layer = Layer.effect(
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
       )
-      const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
+      const isSubtask = !commandSkill && ((agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true)
       const parts = isSubtask
         ? [
             {
@@ -1597,7 +1614,7 @@ const layer = Layer.effect(
 
     return Service.of({
       cancel,
-      prompt,
+      prompt: (input) => refreshSkills().pipe(Effect.andThen(prompt(input))),
       loop,
       shell,
       command,

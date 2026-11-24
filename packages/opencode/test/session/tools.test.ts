@@ -1,3 +1,4 @@
+import { Skill } from "@/skill"
 import { expect } from "bun:test"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -79,6 +80,7 @@ const fakeTruncate = Truncate.Service.of({
 const layer = Layer.mergeAll(
   LayerNode.compile(FSUtil.node),
   Layer.mock(AppProcess.Service, {}),
+  Layer.mock(Skill.Service, {}),
   Layer.mock(Session.Service, {
     get: () => Effect.succeed(session),
     getForExecution: () => Effect.succeed(session),

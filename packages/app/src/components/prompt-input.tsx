@@ -28,6 +28,7 @@ import {
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { useServerSync } from "@/context/server-sync"
 import { useComments } from "@/context/comments"
 import { Button } from "@opencode-ai/ui/button"
 import { DockShellForm, DockTray } from "@opencode-ai/ui/dock-surface"
@@ -118,6 +119,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
 
   const sync = useSync()
+  const serverSync = useServerSync()
+  const refreshCommands = () => void serverSync().refreshCommands(sdk().directory).catch(() => {})
   const files = useFile()
   const prompt = props.state ?? usePrompt()
   const layout = useLayout()
@@ -1004,6 +1007,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         atOnInput(atMatch[1])
         setStore({ popover: "at", slashMenu: false, slashMenuQuery: "" })
       } else if (slashMatch) {
+        if (store.popover !== "slash") refreshCommands()
         slashOnInput(slashMatch[1])
         setStore({ popover: "slash", slashMenu: false, slashMenuQuery: "" })
       } else {
@@ -1208,6 +1212,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       setMode: (mode) => setStore("mode", mode),
       setPopover: (popover) => {
         if (!popover) return closePopover()
+        if (popover === "slash" && store.popover !== "slash") refreshCommands()
         setStore({ popover, slashMenu: false, slashMenuQuery: "" })
       },
       newSessionWorktree: () => props.newSessionWorktree,

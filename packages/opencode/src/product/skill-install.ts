@@ -8,6 +8,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { assertExternalDirectoryEffect } from "@/tool/external-directory"
+import { Skill } from "@/skill"
 import { Tool } from "@/tool/tool"
 
 const Parameters = Schema.Struct({ action: Schema.Literals(["validate", "install"]), source: Schema.NonEmptyString })
@@ -20,6 +21,7 @@ export const SkillInstallTool = Tool.define(
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const flags = yield* RuntimeFlags.Service
+    const skills = yield* Skill.Service
     return {
       description: "Validate a portable Agent Skill folder without installing it. Use install only when the user asks to copy a skill from a local folder; the product will request one-time approval.",
       parameters: Parameters,
@@ -60,9 +62,13 @@ export const SkillInstallTool = Tool.define(
           return yield* Effect.acquireUseRelease(
             Effect.tryPromise(() => prepareLocalSkill(directory, Global.Path.home, authorizeRead, ctx.abort)),
             (candidate) => Effect.gen(function* () {
+              const active = yield* skills.get(candidate.name)
+              const override = active?.source === "project" || active?.source === "config" || active?.source === "url"
+                ? active.location
+                : undefined
               const result = (status: string) => ({
                 title: "Install skill",
-                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, warnings: candidate.warnings }),
+                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, warnings: candidate.warnings, override }),
                 metadata: {},
               })
               if (candidate.previous === candidate.digest) return result("already-installed")

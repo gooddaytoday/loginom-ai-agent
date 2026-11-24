@@ -1,5 +1,6 @@
 import { expect } from "bun:test"
 import { Effect, Fiber, Layer } from "effect"
+import { rm } from "node:fs/promises"
 import { join, relative } from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppProcess } from "@opencode-ai/core/process"
@@ -15,13 +16,14 @@ import { Session } from "@/session/session"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { MessageID, SessionID } from "@/session/schema"
 import type { Tool } from "@/tool/tool"
+import { Skill } from "@/skill"
 import { Truncate } from "@/tool/truncate"
 import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const it = testEffect(
   Layer.mergeAll(
-    LayerNode.compile(LayerNode.group([Agent.node, AppProcess.node, FSUtil.node, Permission.node, RuntimeFlags.node, Session.node, Truncate.node])),
+    LayerNode.compile(LayerNode.group([Agent.node, AppProcess.node, FSUtil.node, Permission.node, RuntimeFlags.node, Session.node, Skill.node, Truncate.node])),
     LayerNode.compile(CrossSpawnSpawner.node),
     testInstanceStoreLayer,
   ),
@@ -36,6 +38,7 @@ it.live("the chat validates with read permissions and only publishes after one-t
       yield* Effect.promise(async () => {
         await Bun.write(join(directory, "columns/SKILL.md"), "---\nname: columns\ndescription: Checks columns.\n---\n[Columns](references/columns.md)\n")
         await Bun.write(resource, "id, amount")
+        await Bun.write(join(directory, ".agents/skills/columns/SKILL.md"), "---\nname: columns\ndescription: Project override.\n---\n")
       })
       const home = Global.Path.home
       const tools: Tool.Def[] = yield* toolContributor.definitions("default")
@@ -68,6 +71,7 @@ it.live("the chat validates with read permissions and only publishes after one-t
 
       const installation = { action: "install", source: "columns" }
       const installed = join(home, ".agents/skills/columns")
+      yield* Effect.addFinalizer(() => Effect.promise(() => rm(installed, { recursive: true, force: true })))
       const pending = pollWithTimeout(
         permissions.list().pipe(Effect.map((requests) => requests.find((request) => request.permission === "skill_install"))),
         "Skill installation did not ask for consent",
@@ -84,7 +88,7 @@ it.live("the chat validates with read permissions and only publishes after one-t
       const fresh = yield* pending
       expect(fresh.id).not.toBe(request.id)
       yield* permissions.reply({ requestID: fresh.id, reply: "once" })
-      expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({ status: "installed", path: installed })
+      expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({ status: "installed", path: installed, override: join(directory, ".agents/skills/columns/SKILL.md") })
       expect(yield* Effect.promise(() => Bun.file(join(installed, "references/columns.md")).text())).toBe("id, amount")
       expect(JSON.parse((yield* tool!.execute(installation, ctx)).output)).toMatchObject({ status: "already-installed" })
     }),

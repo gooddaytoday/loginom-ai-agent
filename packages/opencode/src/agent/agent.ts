@@ -62,6 +62,7 @@ const GeneratedAgent = Schema.Struct({
 })
 
 export interface Interface {
+  readonly invalidate: () => Effect.Effect<void>
   readonly get: (agent: string) => Effect.Effect<Info>
   readonly list: () => Effect.Effect<Info[]>
   readonly defaultInfo: () => Effect.Effect<Info>
@@ -79,7 +80,7 @@ export interface Interface {
   >
 }
 
-type State = Omit<Interface, "generate">
+type State = Omit<Interface, "generate" | "invalidate">
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
@@ -353,6 +354,7 @@ const layer = Layer.effect(
     )
 
     return Service.of({
+      invalidate: () => InstanceState.invalidate(state),
       get: Effect.fn("Agent.get")(function* (agent: string) {
         return yield* InstanceState.useEffect(state, (s) => s.get(agent))
       }),

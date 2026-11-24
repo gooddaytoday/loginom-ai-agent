@@ -453,7 +453,7 @@ export function Autocomplete(props: {
     const results: AutocompleteOption[] = [...slashes()]
 
     for (const serverCommand of sync.data.command) {
-      if (serverCommand.source === "skill") continue
+      if (serverCommand.source === "skill" && slashes().some((entry) => entry.display === "/" + serverCommand.name)) continue
       const label = serverCommand.source === "mcp" ? ":mcp" : ""
       results.push({
         display: "/" + serverCommand.name + label,
@@ -646,6 +646,10 @@ export function Autocomplete(props: {
   }))
 
   function show(mode: "@" | "/") {
+    if (mode === "/")
+      void sdk.client.command.list({ workspace: project.workspace.current() }).then((result) => {
+        if (result.data) sync.set("command", result.data)
+      }).catch(() => {})
     setStore({
       visible: mode,
       index: props.input().cursorOffset,

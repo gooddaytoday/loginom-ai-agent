@@ -4172,3 +4172,41 @@ noLLMServer.instance(
     }),
   { config: cfg },
 )
+
+unix("a skill command delivers literal instructions plus explicit arguments and files", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    const name = "literal-columns"
+    const body = "Example mentions @ignored.txt and $ARGUMENTS with literal marker !`printf SKILL_LITERAL`."
+    const attachment = path.join(test.directory, "input.lgp")
+    yield* Effect.promise(async () => {
+      await Bun.write(path.join(test.directory, ".agents/skills", name, "SKILL.md"),
+        `---\nname: ${name}\ndescription: Checks columns.\n---\n${body}\n`)
+      await Bun.write(path.join(test.directory, "ignored.txt"), "example file")
+      await Bun.write(attachment, "selected user input")
+    })
+    const { llm } = yield* useServerConfig(providerCfg)
+    const { prompt, chat } = yield* boot()
+    const sessions = yield* Session.Service
+    const command = Schema.decodeUnknownSync(SessionPrompt.CommandInput)({
+      sessionID: chat.id,
+      command: name,
+      arguments: "actual argument",
+      parts: [{ type: "file", mime: "application/x-loginom-package", url: pathToFileURL(attachment).href, filename: "input.lgp" }],
+    })
+    yield* llm.text("done")
+    yield* prompt.command(command)
+    const user = (yield* sessions.messages({ sessionID: chat.id })).find((message) => message.info.role === "user")!
+    expect(user.parts.flatMap((part) => part.type === "text" && !part.synthetic ? [part.text] : [])).toEqual([
+      expect.stringContaining(body),
+      "actual argument",
+    ])
+    expect(user.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([pathToFileURL(attachment).href])
+
+    const denied = yield* sessions.create({ permission: [{ permission: "skill", pattern: name, action: "deny" }] })
+    const refusal = yield* Effect.exit(prompt.command({ ...command, sessionID: denied.id }))
+    expect(Exit.isFailure(refusal)).toBe(true)
+    expect(yield* sessions.messages({ sessionID: denied.id })).toHaveLength(0)
+  }),
+  30_000,
+)

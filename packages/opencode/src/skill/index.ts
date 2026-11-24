@@ -1,7 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
 import { realpath } from "node:fs/promises"
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, Semaphore } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
 import type { Agent } from "@/agent/agent"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -21,8 +21,6 @@ import { escapeHtml } from "@/util/html"
 import { skillSource } from "@/product/skill-source"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
-const AGENTS_EXTERNAL_DIR = ".agents"
-const EXTERNAL_SKILL_PATTERN = "skills/**/SKILL.md"
 const LOGINOM_AI_AGENT_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
 const SKILL_PATTERN = "**/SKILL.md"
 
@@ -101,6 +99,7 @@ export interface Interface {
   readonly require: (name: string) => Effect.Effect<Info, NotFoundError>
   readonly all: () => Effect.Effect<Info[]>
   readonly dirs: () => Effect.Effect<string[]>
+  readonly refresh: (invalidateDependents: Effect.Effect<void>) => Effect.Effect<void>
   readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
 }
 
@@ -202,12 +201,12 @@ const discoverSkills = Effect.fnUntraced(function* (
   const externalDirs: string[] = []
   if (!disableExternalSkills) {
     if (!disableClaudeCodeSkills) externalDirs.push(CLAUDE_EXTERNAL_DIR)
-    externalDirs.push(AGENTS_EXTERNAL_DIR)
+    externalDirs.push(skillSource.agentsDirectory)
 
     for (const dir of externalDirs) {
       const root = path.join(global.home, dir)
       if (!(yield* fsys.isDir(root))) continue
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "global", source: "external" })
+      yield* scan(state, root, skillSource.externalPattern, { dot: true, scope: "global", source: "external" })
     }
 
     const upDirs = yield* fsys
@@ -215,7 +214,7 @@ const discoverSkills = Effect.fnUntraced(function* (
       .pipe(Effect.catch(() => Effect.succeed([] as string[])))
 
     for (const root of upDirs) {
-      yield* scan(state, root, EXTERNAL_SKILL_PATTERN, { dot: true, scope: "project", source: "project" })
+      yield* scan(state, root, skillSource.externalPattern, { dot: true, scope: "project", source: "project" })
     }
   }
 
@@ -334,7 +333,22 @@ const layer = Layer.effect(
       return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
     })
 
-    return Service.of({ get, require, all, dirs, available })
+    const sourceState = yield* InstanceState.make(() =>
+      Effect.sync(() => ({ revision: undefined as string | undefined, gate: Semaphore.makeUnsafe(1) })),
+    )
+    const refresh = Effect.fn("Skill.refresh")(function* (invalidateDependents: Effect.Effect<void>) {
+      if (flags.disableExternalSkills) return
+      const source = yield* InstanceState.get(sourceState)
+      yield* source.gate.withPermit(Effect.gen(function* () {
+        const revision = yield* skillSource.revision(global.home)
+        if (revision === undefined || revision === source.revision) return
+        yield* InstanceState.invalidate(discovered)
+        yield* InstanceState.invalidate(state)
+        yield* invalidateDependents
+        source.revision = revision
+      }))
+    })
+    return Service.of({ get, require, all, dirs, available, refresh })
   }),
 )
 
