@@ -8,6 +8,7 @@ Keep it outside Git: it contains runtime log locations and native node IDs.
 import argparse
 import csv
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -51,8 +52,11 @@ def audit(path, cases):
         failed = state.get('status') == 'error' or any(
             item.get('status') in ('FAILED', 'NOT_APPLIED', 'AMBIGUOUS', 'failed', 'error')
             or item.get('ok') is False for item in objects(reply))
+        message = next((str(item['message']) for item in objects(reply) if item.get('message')), '')
+        if not message and state.get('status') == 'error':
+            message = str(state.get('error', ''))[:500]
         calls.append({'line': line, 'tool': part.get('tool', ''), 'input': state.get('input', {}),
-                      'failed': failed, 'codes': codes, 'reply': reply})
+                      'failed': failed, 'codes': codes, 'message': message, 'reply': reply})
     loginom = [call for call in calls if call['tool'].startswith('loginom_')]
     errors = [call for call in loginom if call['failed']]
     signatures = Counter((call['tool'], json.dumps(call['input'], sort_keys=True, ensure_ascii=False)) for call in loginom)
@@ -72,6 +76,10 @@ def audit(path, cases):
     config = cases / case / 'case.json'
     budget = json.loads(config.read_text())['budget'] if config.is_file() else {}
     non_loginom = [call for call in calls if not call['tool'].startswith('loginom_')]
+    oracle_accesses = [dict(line=call['line'], tool=call['tool'], input=call['input']) for call in non_loginom
+                       if re.search(r'expected[^/\\\s]*\.json|oracle\.py', json.dumps(call['input']))]
+    credential_accesses = [dict(line=call['line'], tool=call['tool'], input=call['input']) for call in non_loginom
+                           if re.search(r'auth\.json|connection/generations', json.dumps(call['input']))]
     forbidden = [dict(line=call['line'], tool=call['tool'], substring=word)
                  for call in calls for word in budget.get('forbid', [])
                  if word.lower() in (call['tool'] + json.dumps(call['input'], ensure_ascii=False)).lower()]
@@ -90,7 +98,7 @@ def audit(path, cases):
             wanted_header = [column['name'] for column in expected['outputs'][0]['columns']]
             header = dict(actual=actual_header, expected=wanted_header, exact=actual_header == wanted_header)
     return dict(case=case, log=str(path), loginom_calls=len(loginom), errors=len(errors),
-                first_error={key: errors[0][key] for key in ('line', 'tool', 'codes')} if errors else None,
+                first_error={key: errors[0][key] for key in ('line', 'tool', 'codes', 'message')} if errors else None,
                 error_codes=dict(Counter(code for call in errors for code in call['codes'])),
                 recoveries=[dict(line=call['line'], tool=call['tool']) for call in calls
                             if 'recover' in call['tool'] or 'browser_recovery' in json.dumps(call['input'])],
@@ -101,6 +109,8 @@ def audit(path, cases):
                 identical_repeats=[dict(tool=tool, input=json.loads(request), count=count)
                                    for (tool, request), count in signatures.items() if count > 1],
                 non_loginom=[dict(line=call['line'], tool=call['tool'], input=call['input']) for call in non_loginom],
+                oracle_accesses=oracle_accesses, credential_accesses=credential_accesses,
+                oracle_isolation='CONTAMINATED' if oracle_accesses else 'NO_ACCESS_OBSERVED',
                 forbidden=forbidden, budget_breaches=breaches)
 
 
