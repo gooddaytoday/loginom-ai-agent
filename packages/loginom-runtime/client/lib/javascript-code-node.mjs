@@ -1,4 +1,4 @@
-import {verifyJavascriptMappingGraph,verifyJavascriptUnconnectedInput,javascriptUnconnectedInputMapping} from './javascript-graph-preservation.mjs';
+import {verifyJavascriptMappingGraph,verifyJavascriptUnconnectedInput,javascriptUnconnectedInputMapping,javascriptUnconnectedInputVerified} from './javascript-graph-preservation.mjs';
 import {retainedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 export {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
@@ -12,7 +12,8 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
-import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
+import {admitJavascriptExistingSchema,refuseJavascriptExistingTarget} from './javascript-existing-schema-refusal.mjs';
+import {isUnconfiguredJavascriptSchema} from './javascript-declared-schema.mjs';
 import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
 import {NODE_READ_MODE,alignReadSchema} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
@@ -35,8 +36,8 @@ export function validateJavascriptCodeRequest(parameters,mode,request) {
     'JavaScript Done/Close cannot request output reading');
   if(parameters.input_state==='unconnected'&&request.variable_inputs?.length){
     const [input]=request.variable_inputs;
-    need(request.target.kind==='new'&&request.variable_inputs.length===1&&input.kind==='variables'&&input.input===0,
-      'JavaScript unconnected variable input requires a new node and the variable port 0');
+    need(request.variable_inputs.length===1&&input.kind==='variables'&&input.input===0,
+      'JavaScript unconnected variable input requires the variable port 0');
   }
   if(request.target.kind==='new'){
     need(request.finish!=='close','JavaScript new Close cannot discard committed target/input effects');
@@ -44,8 +45,10 @@ export function validateJavascriptCodeRequest(parameters,mode,request) {
     if(parameters.schema_mode==='declared')validateJavascriptDeclaredPrimitiveColumns(parameters.columns);
     return parameters;
   }
-  need(request.inputs.length===0&&parameters.columns===undefined,
-    'JavaScript existing lifecycle preserves inputs and declared columns');
+  need(!request.inputs.some(input=>input.replace_existing===true),'JavaScript existing lifecycle does not replace inputs');
+  need(request.finish!=='close'||parameters.columns===undefined
+    &&(parameters.input_state!=='unconnected'||!request.variable_inputs?.length),
+  'JavaScript Close preserves inputs and declared columns');
   return parameters;
 }
 
@@ -119,7 +122,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false,finalExecutionSettled=false;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,retainedVariableLink,doneReceipt,lastSourceAdapter,materializationSettled=false,finalExecutionSettled=false;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -152,29 +155,34 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     const policyAdmission=(kind,boundOwner,deadline,expectedSource,expectedSettings)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
       deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings,
       ...(request.finish==='execute'?{requireDeclaredOutput:()=>request.target.kind==='new'
-        ?request.parameters.schema_mode==='code':sourceSnapshot?.settings?.generation}:{})});
+        ?request.parameters.schema_mode==='code':isUnconfiguredJavascriptSchema(sourceSnapshot?.schema)
+          ?request.parameters.schema_mode==='code':sourceSnapshot?.settings?.generation}:{})});
+    const existingEvidence=deadline=>({receipt:admitted,snapshot:sourceSnapshot,baseline:existingBaseline,
+      parameters:request.parameters,owner,record:onRecord,deadline,request});
     const ownedVariableLinks=node=>{
       const [input]=request.variable_inputs??[];
       if(!input)return [];
-      // The target checkpoint witnesses new-node creation and the requested
-      // native edge, including both port GUIDs. A graph observation alone does not.
+      // The target checkpoint witnesses the selected node and the requested
+      // native edge, including both port GUIDs.
       const {completed,pending,result}=operation.targetPhase??{};
       const links=result?.variable_links,link=links?.[0];
-      need(completed===true&&!pending&&result?.status==='SUCCEEDED'&&result.created===true
+      need(completed===true&&!pending&&result?.status==='SUCCEEDED'&&result.created===(request.target.kind==='new')
+        &&(result.created||existingBaseline?.unconfigured===true)
         &&same(result.node?.ref,node)&&Array.isArray(links)&&links.length===1&&link?.target===node.node_id
         &&link.source===input.source.node_id&&link.output===input.output&&link.input===input.input&&link.kind===input.kind
+        &&(!retainedVariableLink||same(retainedVariableLink,link))
         &&[link.source_port_guid,link.target_port_guid].every(guid=>typeof guid==='string'&&guid.length>0),
         'JavaScript unconnected variable input ownership unconfirmed');
       return links;
     };
-    const graph=async ctx=>{
+    const graph=async(ctx,{beforeTarget=false}={})=>{
       need(typeof operation.nodeTargetAdapter?.observe==='function','JavaScript complete graph observer unavailable');
       const value=await operation.nodeTargetAdapter.observe({document_id:request.document_id,
         workflow_ref:request.workflow_ref,target:request.target,inputs:request.inputs},ctx.deadline,ctx.signal);
       need(value?.complete===true&&value.document_id===ctx.document_id&&same(value.workflow_ref,ctx.workflow_ref)
         &&Array.isArray(value.nodes)&&Array.isArray(value.links)&&Array.isArray(value.foreign_links),
       'JavaScript complete graph owner changed');
-      if(request.parameters.input_state==='unconnected'&&ctx.node){
+      if(!beforeTarget&&request.parameters.input_state==='unconnected'&&ctx.node){
         const node=nodeRef(owner);
         verifyJavascriptUnconnectedInput(value,node,ownedVariableLinks(node));
       }
@@ -252,22 +260,40 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           ()=>admission.admit(request.parameters.source_text===undefined?{}:
           {source_text:request.parameters.source_text,
             ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})}));
-        need(admitted.effective_source.filesystem!==true||request.parameters.input_state==='unconnected',
-          'JavaScript FS requires input_state:unconnected before mutation or execution');
         if(request.target.kind==='existing'){
-          existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
-            parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});
+          existingBaseline=await admitJavascriptExistingSchema(existingEvidence(ctx.deadline));
+          const evidence=existingEvidence(ctx.deadline);
+          if(admitted.effective_source.filesystem===true&&request.parameters.input_state!=='unconnected')
+            await refuseJavascriptExistingTarget(evidence,'filesystem_input_required');
           // Preserve binds the reader's exact identity; effective_source also
           // contains module-policy/parser metadata and is not a source binding.
           expected??=admitted.previous_source;
           need(admitted.effective_source.source_sha256===expected.source_sha256,
             'JavaScript existing effective source admission differs');
-          existingGraphBaseline=await graph({...ctx,node:request.target.ref});
+          const node=nodeRef(owner);
+          existingGraphBaseline=await graph({...ctx,node},{beforeTarget:true});
+          const nodes=existingGraphBaseline.nodes.filter(item=>same(item.ref,node));
+          need(nodes.length===1&&nodes[0].type===request.target.type,'JavaScript existing graph target owner changed');
+          if(request.parameters.input_state==='unconnected'){
+            const [input]=request.variable_inputs??[];
+            retainedVariableLink=input?observedVariableLink(existingGraphBaseline,nodes[0],input):undefined;
+            if(!javascriptUnconnectedInputVerified(existingGraphBaseline,node,retainedVariableLink?[retainedVariableLink]:[]))
+              await refuseJavascriptExistingTarget(evidence,'unconnected_graph');
+          }else if(existingBaseline.unconfigured&&!request.inputs.length
+            &&!existingGraphBaseline.links.some(link=>link.target===node.node_id&&link.input===0)){
+            await refuseJavascriptExistingTarget(evidence,'table_input_required');
+          }
           return verified({effect_possible:true,source_sha256:expected.source_sha256,settings_changed:false});
         }
+        need(admitted.effective_source.filesystem!==true||request.parameters.input_state==='unconnected',
+          'JavaScript FS requires input_state:unconnected before mutation or execution');
         need(admitted.intent==='create'&&admitted.effective_source.source_sha256===expected.source_sha256,
           'JavaScript new source admission differs');
         return verified({source_sha256:expected.source_sha256,settings_changed:false});
+      },
+      async refuseUnappliedTarget(ctx,message){
+        if(request.target.kind==='existing'&&existingBaseline&&!operation.transportUncertain)
+          await refuseJavascriptExistingTarget(existingEvidence(ctx.deadline),'target_not_applied',message);
       },
       async mapPorts(mappings,ctx){
         need(mappings.length===0,'JavaScript Code lifecycle currently preserves default mappings');
@@ -290,12 +316,29 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       },
       async openWizard(ctx){
         enter(ctx);need(admitted&&inputMapping,'JavaScript source/input admission unavailable');
+        const preserveSchema=existingBaseline&&!existingBaseline.unconfigured;
+        const schema_mode=preserveSchema?existingBaseline.schema_mode:request.parameters.schema_mode;
+        if(existingBaseline?.unconfigured){
+          existingGraphBaseline=await graph(ctx);
+          if(request.inputs.length&&operation.targetPhase?.result?.effects?.some(effect=>effect.kind==='connect'&&effect.verified===true)){
+            // The verified table connection can populate the source grid.
+            // Pin the fresh settings and the original source before editing.
+            const stableSettings=settings=>({...settings,grids:settings.grids.filter(grid=>!grid.tid.endsWith(';grdSourceColumns;tbl'))});
+            const previous=stableSettings(sourceSnapshot.settings);
+            const fresh=policyAdmission('existing',owner,ctx.deadline,admitted.previous_source);
+            const receipt=await fresh.admit({});
+            const baseline=javascriptExistingLifecycleBaseline({receipt,snapshot:sourceSnapshot,parameters:{},owner});
+            need(baseline.unconfigured&&same(previous,stableSettings(sourceSnapshot.settings)),
+              'JavaScript unconfigured settings changed after connecting the table input');
+            existingBaseline=baseline;
+          }
+        }
         adapter=sourceAdapter(owner,ctx.deadline);handle=await adapter.open({owner,deadline:ctx.deadline,
-          schemaMode:existingBaseline?'preserve':request.parameters.schema_mode,
-          ...(!existingBaseline&&request.parameters.schema_mode==='declared'?{columns:request.parameters.columns}:{})});
-        const schema_mode=existingBaseline?.schema_mode??request.parameters.schema_mode;
+          schemaMode:preserveSchema?'preserve':schema_mode,
+          ...(!preserveSchema&&schema_mode==='declared'?{columns:request.parameters.columns}:{}),
+          ...(existingBaseline?.unconfigured?{expectedSettings:existingBaseline.settings_sha256}:{})});
         need(handle.settings.generation===(schema_mode==='code'),'JavaScript schema mode unconfirmed');
-        if(existingBaseline){
+        if(preserveSchema){
           need(javascriptSourceSettingsDigest(handle.settings)===existingBaseline.settings_sha256,
             'JavaScript existing settings changed before source mutation');
           if(existingBaseline.columns)handle.declaredColumns=structuredClone(existingBaseline.columns);
@@ -363,8 +406,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           admission=policyAdmission('existing',owner,ctx.deadline);
           configured=await admission.admit({});
           const after=javascriptExistingLifecycleBaseline({receipt:configured,snapshot:sourceSnapshot,
-            parameters:{schema_mode:existingBaseline.schema_mode},owner});
-          need(after.settings_sha256===existingBaseline.settings_sha256,
+            parameters:{schema_mode:existingBaseline.unconfigured?request.parameters.schema_mode:existingBaseline.schema_mode},owner});
+          need(!after.unconfigured&&after.settings_sha256===(existingBaseline.unconfigured?settings:existingBaseline.settings_sha256),
             'JavaScript existing settings changed across Done');
         }
         if(!existingBaseline)configured=await admission.withMutation({receipt:admitted,owner:initialOwner},async()=>{
@@ -384,7 +427,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         }
         handle=null;
         doneReceipt=verified({effect_possible:true,mode,settings_applied:true,execution_id:null,execution_started:null,
-          schema_mode:existingBaseline?.schema_mode??request.parameters.schema_mode,
+          schema_mode:existingBaseline&&!existingBaseline.unconfigured?existingBaseline.schema_mode:request.parameters.schema_mode,
           ...(declaredColumns?{declared_columns:declaredColumns}:{}),
           explicit_execute_requested:false,wizard_commit_verified:true,graph_owner_verified:committed.graph_owner_verified,
           owned_done_settled:committed.owned_done_settled,source_readback_verified:true,settings_preserved:true,settings_sha256:settings,
@@ -460,14 +503,15 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       // A materialization launch may settle before its process identity can
       // be read. Release proves cleanup only, never completion or a replay.
       // The retained REST child also uses the independently settled Done.
-      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
+      releasePendingPhases:['target','input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
         const afterDone=['node_finish','materialization_start','finish'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
           &&(state.pending.phase==='node_finish'||state.pending.phase==='materialization_start'&&materializationSettled
             ||state.pending.phase==='finish'&&finalExecutionSettled)
           &&adapter?.active===false&&adapter.uncertain===false
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
-        need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,
+        need(['input_mapping','open','configure'].includes(state.pending?.phase)
+          ||state.pending?.phase==='target'&&state.pending.boundary_settled===true||afterDone,
           'Only a stopped JavaScript draft or settled Done with no unresolved source opening can be released here');
         const deadline=now()+NODE_RELEASE_BUDGET_MS;
         enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
@@ -493,6 +537,17 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
 
 function nodeRef(owner){return {document_id:owner.document_id,workflow_id:owner.workflow_id,node_id:owner.node_id};}
 
+function observedVariableLink(graph,target,input) {
+  const sources=graph.nodes.filter(item=>['document_id','workflow_id','node_id'].every(key=>item.ref[key]===input.source[key]));
+  if(sources.length!==1)return;
+  const output=sources[0].variable_outputs?.filter(port=>port.kind==='variables'&&port.port===input.output);
+  const port=target.variable_inputs?.filter(port=>port.kind==='variables'&&port.port===input.input);
+  if(output?.length!==1||port?.length!==1
+    ||![output[0].port_guid,port[0].port_guid].every(guid=>typeof guid==='string'&&guid.length>0))return;
+  return (graph.variable_links??[]).find(link=>link.source===input.source.node_id&&link.output===input.output
+    &&link.target===target.ref.node_id&&link.input===input.input&&link.kind==='variables'
+    &&link.source_port_guid===output[0].port_guid&&link.target_port_guid===port[0].port_guid);
+}
 
 function javascriptReadbackMapping(mapping,direction){
   if(direction==='input'&&mapping.input_state==='unconnected')return {port:0,autosync:mapping.autosync,fields:[],
