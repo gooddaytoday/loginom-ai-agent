@@ -752,3 +752,67 @@ for(const intent of ['new_draft','open_package'])for(const owner of ['native','f
  const again=await execute(f,{intent,...(intent==='open_package'?{packagePath:'/user/test.lgp'}:{}),recoverOnly:true,timeoutMs:500},Clock);
  assert.ok(!JSON.stringify(again).includes('supersecret'));
 });
+
+// Loginom 7.4.2 restore prompt, observed on app.loginom.ai (LAB-1960 1943/a-3).
+function sessionRestoreFixture(intent,{fault='none'}={}){
+ const f=pageFixture({authenticated:true}),c=f.context,query=c.document.querySelectorAll,getCmp=c.Ext.getCmp,locator=f.page.locator;
+ const connection=c.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection,form=c.bg.app.Application.FInstance.FMainForm;
+ if(fault!=='no baseline'){connection.FSession={};connection.FRemoteSession={};}
+ form.FReconnecting=false;
+ const text=value=>({isConnected:true,innerText:value,getAttribute:()=>null,parentElement:null,
+  getBoundingClientRect:()=>({width:100,height:20}),matches:()=>false,closest:()=>null});
+ const title=text('Восстановление сессии'),body=text(fault==='retry text'?'Ошибка при попытке восстановить сессию Восстановить сессию?':'Обнаружен разрыв связи. Восстановить сессию?');
+ const yes=text('Восстановить'),no=text(fault==='foreign buttons'?'OK':'Закрыть');
+ yes.getAttribute=k=>k==='data-tid'?'msgbox;tlb;yes':null;no.getAttribute=k=>k==='data-tid'?'msgbox;tlb;no':null;
+ const box={...text('Восстановление сессии Обнаружен разрыв связи. Восстановить сессию? Восстановить Закрыть'),id:'messagebox-1001',
+  getAttribute:k=>k==='class'?'x-window x-message-box x-layer':null,contains:e=>[title,body,yes,no].includes(e),querySelector:()=>null,querySelectorAll:()=>[yes,no]};
+ const mask={...text(''),id:'mf-mask',getAttribute:k=>k==='data-tid'?'MF':k==='class'?'x-body x-container bg-mask-message':null,matches:q=>q.includes('mask')};
+ const native={$className:'Ext.window.MessageBox',el:{dom:box},hidden:false,header:{titleCmp:{textEl:{dom:title}}},body:{dom:body},msg:{el:{dom:body}}};
+ const state={shown:false,restores:0,cfg:{}};
+ c.Ext.getCmp=id=>id===box.id?native:getCmp(id);c.Ext.Msg={get cfg(){return state.cfg;}};
+ c.document.querySelectorAll=q=>state.shown&&q.startsWith('[role=')?[mask,box]:query(q);
+ c.document.createTreeWalker=e=>{let read=false;return {nextNode:()=>read?null:(read=true,{textContent:e.innerText,parentElement:e})};};
+ const disconnect=()=>{state.shown=true;connection.Connected=false;form.FReconnecting=true;};
+ state.reconnect=()=>{connection.Connected=true;form.FReconnecting=false;if(fault==='replaced session')connection.FSession={};};
+ f.page.locator=q=>{
+  if(q==='[data-tid="msgbox;tlb;yes"]')return {count:async()=>state.shown?1:0,isVisible:async()=>state.shown,innerText:async()=>'Восстановить',
+   click:async()=>{state.restores++;state.shown=false;if(fault!=='lost reconnect')state.reconnect();}};
+  const l=locator(q),click=l.click;
+  l.click=async(...args)=>{await click(...args);if(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen'))disconnect();};return l;
+ };
+ f.page.waitForFunction=async fn=>{if(!runInContext('('+fn.toString()+')()',c))throw Error('timeout');};
+ let elapsed=0;class Clock extends Date{static now(){return elapsed;}}
+ c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;};
+ const run=(extra={})=>execute(f,{intent,...(intent==='open_package'?{packagePath:'/user/test.lgp'}:{}),timeoutMs:2000,...extra},Clock);
+ return {f,state,connection,run,gestures:()=>f.events.filter(e=>e==='create_draft'||e==='open_package').length};
+}
+for(const intent of ['new_draft','open_package'])test('preparation restores the original session from the exact native restore prompt and verifies again: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent);
+ const r=await s.run();
+ assert.equal(r.status,'READY',JSON.stringify(r));assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+ assert.ok(r.trace.some(t=>t.condition==='connection_restored'&&t.satisfied===true));
+});
+for(const intent of ['new_draft','open_package'])for(const fault of ['no baseline','retry text','foreign buttons'])test('preparation never answers an unproven or different restore prompt: '+intent+' '+fault,async()=>{
+ const s=sessionRestoreFixture(intent,{fault});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.reason,'NATIVE_MESSAGE_BOX_BLOCKED');assert.equal(r.effect_possible,true);
+ assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);
+ if(fault==='no baseline'){assert.equal(r.connection_restore,'owner_unbound');assert.equal(r.next_step.same_operation_id,true);}
+});
+for(const intent of ['new_draft','open_package'])test('a replaced native session after restore fails closed without repeating the package gesture: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'replaced session'});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.reason,'NATIVE_MESSAGE_BOX_BLOCKED');assert.equal(r.connection_restore,'session_replaced');
+ assert.equal(r.effect_possible,true);assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+for(const intent of ['new_draft','open_package'])test('a pending restore is never answered twice for the same native prompt: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'lost reconnect'});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'awaiting_original_attempt');assert.equal(s.state.restores,1);
+ s.state.shown=true;
+ const again=await s.run({recoverOnly:true});
+ assert.equal(again.status,'NOT_READY');assert.equal(again.connection_restore,'attempted');assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+ s.state.reconnect();s.state.shown=false;
+ const recovered=await s.run({recoverOnly:true});
+ assert.equal(recovered.status,'READY',JSON.stringify(recovered));assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
