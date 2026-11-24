@@ -22418,7 +22418,8 @@ B2.9f (`loginom-agent/src/{dashboard-tools,permissions,index}.ts`) не трог
 | Коммит | Что |
 |---|---|
 | `1416bc8a11` `feat(cli): run --dashboard prepares the dashboard's folder before its session (B2.9i)` | код: файлы форка `cli/src/standalone.ts` (+22 −2, флаг и конфликты), `cli/src/run/product.ts` (+86 −22, `RunProduct.dashboard`, общий `ask` и `refuse`); правка upstream `cli/src/run/run.ts` (+12 −2); зависимость `@loginom-ai-agent/dashboard` в `cli/package.json` и `bun.lock` (+1, +1); тест — новый `cli/test/cli-dashboard.test.ts` (4 теста) |
-| следующий | этот раздел и строка `run/run.ts` в `catalog.md` |
+| `24763884e6` `docs(upstream-sync): record B2.9i run --dashboard, its tests and mutations` | первая версия этого раздела и строка `run/run.ts` в `catalog.md` |
+| следующий | по ревью советника: проверки приёмки повторены на `24763884e6` (выводы ниже — оттуда), находка о `--worktree` |
 
 Файлов кода пять (предел — пять): три `.ts`, `package.json`, `bun.lock`. `loginom-agent` не трогал.
 
@@ -22514,7 +22515,8 @@ B2.9f (`loginom-agent/src/{dashboard-tools,permissions,index}.ts`) не трог
 | `loginom-agent` | 102 pass, 0 fail | 102 pass, 0 fail |
 | `cli` | 606 pass, 9 skip, 1 fail: «bundled ripgrep of the server» (`getaddrinfo EAI_AGAIN github.com`: кэш ripgrep прогона пуст, сети нет) | 610 pass (+4 новых), 9 skip, 1 fail — то же имя, та же причина |
 
-Новых падений нет: имена падений базы и итога совпадают.
+Новых падений нет: имена падений базы и итога совпадают. `product` повторён на `24763884e6` с этим разделом в дереве
+(охранные `names` и `repo-paths` читают и журнал): 60 pass, 3 fail — те же три.
 
 Повторы (навык `unit-tests`): `cli-dashboard.test.ts --rerun-each 3` — 12 pass, 0 fail (137 с).
 
@@ -22528,19 +22530,21 @@ fix home left: [.bun .bun/install .bun/install/cache ]
 fix tmp left: [opencode-test-transpiler-cache ]
 ```
 
+Всё ниже — на `24763884e6` (код, тест и первая версия этого раздела); `bun run check` — ещё и на `1416bc8a11`:
+
 ```text
 $ cd packages/cli && bun typecheck
-✓ No type errors in 2,252 files across 2 projects
+✓ No type errors in 2,254 files across 2 projects             # с cli-dashboard.test.ts
 $ cd packages/cli && bun run typecheck:tsc                     # tsc -b — код 0
 $ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0; 612 файлов, как на базе
 against a6b15d33daf6: 612 divergent upstream files
   CAT-08: 0 (pending: B2.7)
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                          # код 0
-$ bun run check                                                # код 0, под unshare -n, на 1416bc8a11 с этим разделом
+$ bun run check                                                # код 0, под unshare -n
 Found 905 warnings and 0 errors.                               # как в B2.9h; в изменённых файлах — ни одного
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
- Tasks:    39 successful, 39 total                             # 38 из кэша turbo
+ Tasks:    39 successful, 39 total                             # все из кэша turbo; на 1416bc8a11 — 38 из кэша
 ```
 
 `run/run.ts` уже расходился с upstream (B2.7a1, B2.7a4), `cli/package.json` — тоже; новых расходящихся файлов нет,
@@ -22586,6 +22590,18 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - **Для B2.9j:** `--file` берётся относительно PWD, не рабочей папки (выше); процесс `run` остаётся в PWD (0.4 уходил в
   корень дашбордов, чтобы удаление рабочей папки не держал `cwd` процесса). Отмена во время `dashboard.read` не
   обрывает чтение в Host (B2.9h).
+- **`run --dashboard <id> --worktree`** не входит в конфликты 0.4 (у 0.4 `run` такого флага не было) и проходит
+  `forward`. Подготовка идёт первой: снимок израсходован, затем отказ создания worktree, код 1, модель не спрошена (проба
+  одним случаем на фикстуре теста, без коммита):
+
+  ```text
+  {"code":1,"stderr":"Cannot create a worktree from <tmp>/profile/data/dashboards/campaign-14e0f2a7/work: it is not a
+   checkout of this project that supports worktrees, such as a git repository\n","events":["error"],
+   "seen":["/dashboard/snapshots/c4701efd-…"],"hits":0,"host":["start","connection.status","connection.ready","dashboard.read"]}
+  ```
+
+  Если каталог данных профиля лежит внутри git-репозитория, worktree создался бы из него, и сессия ушла бы из рабочей
+  папки дашборда — не проверял. Добавить `--worktree` к конфликтам — решение владельца (новый критерий сверх 0.4).
 
 ### Не проверено
 
