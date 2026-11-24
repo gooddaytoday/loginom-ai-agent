@@ -145,16 +145,6 @@ try {
     throw Error("EXTERNAL_SKILL_IN_CLEAN_FIXTURE")
   const resources = await app.evaluate(() => process.resourcesPath)
   if (collisions) {
-    const selector = '.toast-v2[data-visible="true"][data-removed="false"] [data-description]'
-    async function diagnostic(text) {
-      await page.waitForFunction(
-        ({ selector, text }) =>
-          [...document.querySelectorAll(selector)].filter((element) => element.textContent.includes(text)).length === 1,
-        { selector, text },
-        { timeout: 10000 },
-      )
-      await page.locator(selector).filter({ hasText: text }).waitFor({ timeout: 10000 })
-    }
     await writeFile(join(evidence, "discovery-body.txt"), await page.locator("body").innerText())
     await writeFile(
       join(evidence, "discovery-toasts.json"),
@@ -166,40 +156,7 @@ try {
         2,
       ),
     )
-    if (damage) {
-      if (resources !== join(dirname(application), "resources")) throw Error("WRONG_TEST_RESOURCE_ROOT")
-      // The UI exposes three stacked toasts. Read and dismiss the front one
-      // as a user would, rather than require all diagnostics at once.
-      const remaining = new Set([
-        "Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application.",
-        ...reservedNames.map((name) => `Ignored external skill '${name}':`),
-      ])
-      const acknowledged = []
-      const front = page.locator('.toast-v2[data-front="true"][data-visible="true"][data-removed="false"]')
-      await front.hover()
-      while (remaining.size) {
-        await front.waitFor({ timeout: 10000 })
-        const id = await front.getAttribute("data-testid")
-        if (!id) throw Error("DIAGNOSTIC_ID_REQUIRED")
-        // New warnings may reorder the stack between reading and clicking.
-        const current = page.getByTestId(id)
-        await current.hover()
-        const text = await current.locator("[data-description]").innerText()
-        acknowledged.push(text)
-        for (const expected of remaining) {
-          if (text.includes(expected)) remaining.delete(expected)
-        }
-        await writeFile(join(evidence, "acknowledged-diagnostics.json"), JSON.stringify(acknowledged, null, 2))
-        await page.screenshot({ path: join(evidence, `acknowledged-diagnostic-${acknowledged.length}.png`) })
-        await current.locator("[data-close-button]").click()
-      }
-    }
-    if (!damage) {
-      for (const name of reservedNames) {
-        await diagnostic(`Ignored external skill '${name}':`)
-      }
-    }
-    await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
+    if (damage && resources !== join(dirname(application), "resources")) throw Error("WRONG_TEST_RESOURCE_ROOT")
     const commandsResponse = await fetch(`${server.url}/command?directory=${encodeURIComponent(workspace)}`, {
       headers: { authorization: `Basic ${Buffer.from(`${server.username}:${server.password}`).toString("base64")}` },
       signal: AbortSignal.timeout(30000),
@@ -215,10 +172,32 @@ try {
       productCommands.some((command) => command.source !== "skill")
     )
       throw Error("PRODUCT_COMMAND_SOURCE_INVALID")
-    for (const name of reservedNames) {
-      await diagnostic(`Ignored external command '${name}' from config:`)
+    // Only three stacked toasts are visible. Read and dismiss the front diagnostic as a user would.
+    const remaining = new Set([
+      ...reservedNames.map((name) => `Ignored external skill '${name}':`),
+      ...reservedNames.map((name) => `Ignored external command '${name}' from config:`),
+      ...(damage ? ["Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application."] : []),
+    ])
+    const acknowledged = []
+    const front = page.locator('.toast-v2[data-front="true"][data-visible="true"][data-removed="false"]')
+    await front.hover()
+    while (remaining.size) {
+      await front.waitFor({ timeout: 10000 })
+      const id = await front.getAttribute("data-testid")
+      if (!id) throw Error("DIAGNOSTIC_ID_REQUIRED")
+      // New warnings may reorder the stack between reading and clicking.
+      const current = page.getByTestId(id)
+      await current.hover()
+      const text = await current.locator("[data-description]").innerText()
+      acknowledged.push(text)
+      for (const expected of remaining) {
+        if (text.includes(expected)) remaining.delete(expected)
+      }
+      await writeFile(join(evidence, "acknowledged-diagnostics.json"), JSON.stringify(acknowledged, null, 2))
+      await page.screenshot({ path: join(evidence, `acknowledged-diagnostic-${acknowledged.length}.png`) })
+      await current.locator("[data-close-button]").click()
     }
-    await page.screenshot({ path: join(evidence, "command-diagnostics.png") })
+    await page.screenshot({ path: join(evidence, "skill-diagnostics.png") })
   }
   const fileTypes = await page.locator('input[type="file"]').getAttribute("accept")
   await writeFile(join(evidence, "composer-file-types.json"), JSON.stringify({ accept: fileTypes }, null, 2))
