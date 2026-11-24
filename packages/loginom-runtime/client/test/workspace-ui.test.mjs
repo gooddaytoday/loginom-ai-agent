@@ -5961,13 +5961,60 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
+test('restored text Export input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+ for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
+  const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+  opening.nativeIndex=opening.portTree.FIndex=opening.port.FPortIndex=0;
+  opening.node.FIconCls='bg-vendor-icon-exporttextfile';
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-exporttextfile';
+  const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
+  const collection={FParentNode:group,FItems:[opening.portTree]};
+  group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
+  opening.nodeTree.FInputPortsRootNode=group;
+  const components=new Map(crumbs.slice(5).map((e,i)=>{
+   e.id='export-ancestry-'+i;e.attrs.id=e.id;
+   return [e.id,{el:{dom:e},_node:{data:{node:[opening.nodeTree,group,opening.portTree,wizardTree][i]}}}];
+  }));
+  page.context.Ext={getCmp:id=>components.get(id)};
+  const wizard=opening.wizard.FView.el.dom;
+  page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
+  const definition=mappingCoverageFixture(page);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(definition.base))
+   e.attrs['data-tid']=e.attrs['data-tid'].replace(definition.base,'MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;').replace('colDefaultUsageType_','colUsageType_');
+  for(const e of [...definition.form.children]){e.remove();wizard.append(e);}
+  definition.form.remove();
+  page.context.innerWidth=1280;page.context.innerHeight=800;
+  page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',undefined,wizard);
+  for(const i of [5,6]){
+   crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};
+   for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};
+  }
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(fault==='node')opening.node.FGuid='foreign';
+  if(fault==='port')opening.port.FGuid='foreign';
+  if(fault==='workflow')opening.workflow={};
+  if(fault==='opening')preparation.inputPortOpenReceipts.clear();
+  if(fault==='index')opening.port.FPortIndex=1;
+  if(fault==='icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(fault==='caption')crumbs[7].ownText='Other source';
+  if(fault==='folder')crumbs[6].ownText='Выходные порты';
+  if(fault==='duplicate')page.add('a',crumbs[5].getAttribute('data-tid'),crumbs[5].ownText,crumbs[5].box,panel);
+  if(fault==='sensitive')crumbs[5].attrs['aria-label']='password';
+  if(fault==='hidden')panel.style.display='none';
+  const result=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
+  assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned text export input observes its actual hidden data-source caption',async()=>{
   const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
   assert.equal(full.output.wizard.input_port_context.status,'observed');
   assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
-  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  assert.deepEqual(full.output.prepared_node_context.input_port,{...expectedPort,wizard_index:expectedPort.native_index});
   const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
   assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
   assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);

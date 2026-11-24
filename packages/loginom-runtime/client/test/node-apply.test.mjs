@@ -406,6 +406,11 @@ test('source validation preserves a bounded cause and partial effects without fi
  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.pending_phase,'configure');
  assert.equal(result.error.cause.code,'WIZARD_SOURCE_VALIDATION_FAILED');assert.equal(result.error.cause.message.length,240);
  assert.ok(!JSON.stringify(result).includes('must not escape'));assert.ok(!f.calls.includes('finish'));
+ const reply=compactNodeResult({operation_id:'apply1',state:'settled',outcome:{status:result.status,effect_possible:true,cleanup_complete:false,error:result.error,output:result}});
+ assert.equal(reply.next_step.tool,'dock_operation_inspect');
+ assert.match(reply.next_step.instruction,/SAME import node/);
+ assert.match(reply.next_step.instruction,/dock_artifact_deliver.*dock_storage_source/);
+ assert.match(reply.next_step.instruction,/XML/);
  const count=f.calls.length;await assert.rejects(f.run(request(),{resume:true}),/unresolved/);assert.equal(f.calls.length,count);
 });
 test('native step diagnostics survive a previously unlisted Loginom failure code',async()=>{
@@ -974,4 +979,15 @@ for(const owned of [false,true])test('W1 variable output requires an owned compl
 for(const code of ['BINDING_TYPE_MISMATCH','BINDING_NULL_UNSUPPORTED'])test('binding refusal keeps its public reason '+code,async()=>{
  const f=fixture();f.drivers.prepareTarget=async()=>{throw Object.assign(Error(code+': /groups/0/0/value'),{nodePhaseRefusal:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}});};
  const r=await f.run();assert.equal(r.error.code,code);assert.equal(r.status,'NOT_APPLIED');assert.equal(r.effect_possible,false);
+});
+// LAB-1963: a REST variable-port refusal before any gesture keeps no draft; release the node through the same proof.
+for(const fault of [null,'other-node','transport','receipt','effect','phase','journal'])test('REST no-effect variable mapping refusal is released through guarded release: '+fault,async()=>{
+ const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='other-node'?'imports.text':'integration.rest_request';p.mode='request';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['request']});
+ f.drivers.mapPorts=async()=>{f.operation.lastReceipt={id:'apply1:n8',operation_id:'apply1:n8',action_key:'node.variables.variable_mapping.internal'};
+  if(fault==='transport')f.operation.transportUncertain=true;
+  const effect=fault==='effect';
+  throw Object.assign(Error('Port opening blocked'),{receipt:{operation_id:fault==='receipt'?'other':'apply1:n8',action_key:'node.variables.variable_mapping.internal',phase:fault==='phase'?'variable_mapping_read':'variable_mapping',status:effect?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effect,cleanup_complete:!effect,output:{status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:'page.evaluate: Error: Port opening blocked'},error:{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:'page.evaluate: Error: Port opening blocked'}}});};
+ f.drivers.releasePending=async()=>{f.calls.push('release-rest-variable-refusal');return {verified:true,cleanup_complete:true,node_context:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},cleanup:{wizard_closed:false}};};
+ const r=await f.run(p);assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r.error));assert.equal(r.cleanup_complete,!fault);assert.equal(r.pending_phase,fault?'input_mapping':null);assert.equal(r.error.code,'NODE_APPLY_STOPPED');
+ assert.equal(f.calls.includes('release-rest-variable-refusal'),!fault||fault==='journal');assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
 });

@@ -864,3 +864,46 @@ for(const fault of ['data-input','control-input','foreign-tid','foreign-native',
  const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.equal(f.gestures.length,0);
  assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
 });
+
+// LAB-1963: REST variables input after its data input mapping Done saw the
+// workflow's own ModelForm bg-mask-message and refused at begin.
+function restVariablesBusy(){
+ const {f,panel}=importVariablesBusy();f.node.FIconCls='bg-vendor-icon-restclient';
+ return {f,panel};
+}
+for(const stage of ['begin','menu_issued','open_issued'])test('REST variables input waits for its exact native graph mask at '+stage,async()=>{
+ const {f,panel}=restVariablesBusy();let waits=0;
+ if(stage!=='begin')f.flags.graphMasks=[];
+ if(stage==='menu_issued'){
+  let reads=0;const read=f.readNode;
+  f.run=()=>openPreparedOutputPort(f.page,f.task,async(...args)=>{const s=await read(...args);if(++reads===2)f.flags.graphMasks=[panel];return s;});
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)f.flags.graphMasks=[panel];};return l;};
+ }
+ f.page.waitForTimeout=async()=>{if(!f.flags.graphMasks.length)return;assert.equal(f.gestures.length,stage==='open_issued'?1:0);if(++waits===3)f.flags.graphMasks=[];};
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(waits,3);assert.equal(f.gestures.length,2);
+ assert.ok(r.trace.some(t=>t.event==='input_port_graph_busy'&&t.mode===stage&&t.samples===3));
+});
+for(const fault of ['data-input','control-input','foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner','locked-node'])test('REST variable graph wait refuses '+fault,async()=>{
+ const {f,panel}=restVariablesBusy();
+ if(fault==='data-input')delete f.task.kind;
+ if(fault==='control-input')f.task.kind='control';
+ if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const get=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':get(k);}
+ if(fault==='locked-node')f.node.FLocked=true;
+ let waits=0;f.page.waitForTimeout=async()=>{waits++;if(fault==='persistent')f.task.deadline=Date.now()-1;if(fault==='changed-owner')f.graph.FView.el.dom={};};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.equal(f.gestures.length,0);
+ assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
+});
+test('REST variables input graph wait is bounded before any gesture',async()=>{
+ const {f}=restVariablesBusy();let waits=0;
+ f.task.deadline=Date.now()+600000;f.page.waitForTimeout=async()=>{waits++;};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.match(r.error,/ModelForm remained busy/);
+ assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.equal(f.gestures.length,0);assert.equal(waits,150);
+});

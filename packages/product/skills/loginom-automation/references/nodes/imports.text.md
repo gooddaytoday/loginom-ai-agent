@@ -4,6 +4,8 @@
 Existing needs confirmed source CSV before Execute/read.
 Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip cleanup/Save.
 
+Missing CSV: `next_step`; SAME node, no XML.
+
 Execute with known schema/format. Otherwise preview and compare ORIGINAL text locally.
 Server download only by request or contradiction. User bans win.
 `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
