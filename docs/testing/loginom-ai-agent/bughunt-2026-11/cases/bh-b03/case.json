@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 100,
+    "max_errors": 8,
+    "max_nodes": 6,
+    "forbid": [
+      "sqlite3",
+      "convert ",
+      "curl ",
+      "wget ",
+      "expected.json",
+      "oracle.py"
+    ]
+  },
+  "notes": "Минимум узлов с итоговым экспортом: 4. Нативный ErrorCode=6 и префикс описания зафиксированы discovery REST; точное описание — гипотеза oracle. Проверить ProbeTag/readback, флаг (#1246)."
+}

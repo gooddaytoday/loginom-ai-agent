@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Day",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Day": "2026-11-01",
+          "Amount": 10.5
+        },
+        {
+          "Day": "2026-11-02",
+          "Amount": null
+        },
+        {
+          "Day": "2026-11-03",
+          "Amount": 0.0
+        },
+        {
+          "Day": "2026-11-04",
+          "Amount": null
+        },
+        {
+          "Day": "2026-11-05",
+          "Amount": null
+        },
+        {
+          "Day": "2026-11-06",
+          "Amount": null
+        },
+        {
+          "Day": "2026-11-07",
+          "Amount": -2.25
+        }
+      ]
+    }
+  ]
+}
