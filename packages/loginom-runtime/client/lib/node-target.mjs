@@ -565,13 +565,15 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,se
   if(operation.lastReceipt){
     const response=await readReceipt(operation.lastReceipt);
     check();
-    if(response?.state==='completed'&&response.receipt?.cleanup_complete===false
-      &&phase==='target'&&!operation.targetPhase&&operation.preTargetGraph&&settleChild)
-      childCleanup=await settleChild(response.receipt,{deadline,signal});
-    if(response?.state!=='completed'||response.receipt?.cleanup_complete!==true&&childCleanup?.cleanup_complete!==true)
+    if(response?.state==='completed'&&response.receipt
+      &&phase==='target'&&!operation.targetPhase&&operation.preTargetGraph&&settleChild){
+      const proof=await settleChild(response.receipt,{deadline,signal});
+      if(proof?.verified===true&&proof.cleanup_complete===true)childCleanup=proof;
+    }
+    if(response?.state!=='completed'||response.receipt?.cleanup_complete!==true&&!childCleanup)
       throw Error('Pre-target release requires confirmed browser completion and cleanup');
   }
-  if(!operation.targetPhase&&operation.nodeEffectPossible===true&&operation.cleanupConfirmed!==true&&childCleanup?.cleanup_complete!==true)
+  if(!operation.targetPhase&&operation.nodeEffectPossible===true&&operation.cleanupConfirmed!==true&&!childCleanup)
     throw Error('Pre-target child effects have no settled checkpoint');
   check();
   const ctx={deadline,signal};

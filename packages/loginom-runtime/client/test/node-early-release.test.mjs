@@ -53,7 +53,7 @@ function fixture(phase='target',type='imports.text'){
         if(!state.allowChildRelease)throw Error('child still unsettled');
         operation.preTargetGraph=structuredClone(graph);operation.cleanupConfirmed=true;
       }}:{}),
-      ...(phase==='target_import_read'?{settleBeforeTarget:receipt=>settleImportMappingRead({operation,receipt,channel:{
+      ...(phase==='target_import_read'?{settleBeforeTarget:(receipt,ctx)=>state.settleImportRead?.(receipt,ctx)??settleImportMappingRead({operation,receipt,channel:{
         async releaseImportMappingRead(opening){
           state.mappingReadReleases=(state.mappingReadReleases??0)+1;
           if(state.blocked)throw Error('Wizard is still open');
@@ -389,6 +389,35 @@ for(const fault of ['none','wizard','running','foreign-owner','changed-graph'])t
     }
   }
   assert.equal(f.state.mappingReadReleases??0,fault==='wizard'?2:['running','foreign-owner'].includes(fault)?0:1);
+  assert.deepEqual(f.calls,[]);
+});
+
+for(const fault of ['none','foreign-source','foreign-port'])test('existing Import source refusal uses the original completed preview even after the parent stops: '+fault,async()=>{
+  const f=fixture('target_import_read'),source={...node,node_id:'variables'};
+  f.request.target={kind:'existing',type:'imports.text',ref:node};
+  f.state.graph.nodes.push(...[[node,'imports.text'],[source,'variables.user']].map(([ref,type])=>({ref,type,label:type,inputs:[],outputs:[0],position:{x:320,y:280},locked:false})));
+  await stop(f);
+  const operation=f.state.operation;
+  const key='node.variables.user_runtime_read.internal',reference={id:'apply:n1',operation_id:'apply:n1',action_key:key,signature:'original'};
+  operation.lastReceipt=reference;
+  operation.preTargetImportRead={reference,node:source,port_guid:'vars-out',verb:'user_runtime_read'};
+  const {settleImportBindingBeforeTarget}=await import('../lib/import-bindings.mjs');
+  f.state.settleImportRead=(receipt,ctx)=>settleImportBindingBeforeTarget({operation},ctx,{},receipt);
+  f.state.receiptResult={state:'completed',receipt:{action_key:key,action_revision:'1',operation_id:reference.id,status:'SUCCEEDED',
+    phase:'user_runtime_read',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{
+      verified:true,cleanup_complete:true,independent_readback:true,source_active:true,
+      node_context:{...source,verified:true,surface:'graph',locked:false,...(fault==='foreign-source'?{node_id:'foreign'}:{})},
+      output:{kind:'variables',port:4,port_guid:fault==='foreign-port'?'foreign':'vars-out'}}}};
+  assert.equal(operation.cleanupConfirmed,false);
+  const result=await release(f);
+  if(fault==='none'){
+    assert.equal(result.status,'SUCCEEDED',result.error?.message);
+    assert.equal(result.output.original_outcome.effect_possible,true);
+    assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+  }else{
+    assert.equal(result.error.code,'NODE_RELEASE_REFUSED');
+    assert.throws(()=>f.runtime.assertPreparationAllowed());
+  }
   assert.deepEqual(f.calls,[]);
 });
 

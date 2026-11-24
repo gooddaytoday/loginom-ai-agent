@@ -4,6 +4,7 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
+import {settleImportMappingRead} from './node-pending-release.mjs';
 import {validateTextImportPatch} from './text-import-procedure.mjs';
 const parameter='/settings/source/source_path';
 const need=(ok,code)=>{if(!ok)throw Error(code+': '+parameter);};
@@ -55,6 +56,34 @@ export async function prepareImportBinding(options,ctx,config,settings){
   throw error;
  }
 }
+
+function retainImportBindingRead(operation,verb,node,port_guid){
+ const reference=operation.lastReceipt;
+ if(reference?.action_key==='node.variables.'+verb+'.internal'&&typeof port_guid==='string'&&port_guid)
+  operation.preTargetImportRead={reference:structuredClone(reference),verb,node,port_guid};
+}
+
+export async function settleImportBindingBeforeTarget(options,ctx,config,receipt){
+ const {operation}=options;
+ if(receipt.cleanup_complete!==true){
+  const node=operation.parameters.target.ref;
+  if(node)return settleImportMappingRead({operation,channel:importBindingChannel(options,ctx,config,node),receipt});
+  return;
+ }
+ // A missing file witness can stop the parent after a native Preview or
+ // mapping read has already closed. Recheck the child's own browser receipt.
+ const read=operation.preTargetImportRead,ref=operation.lastReceipt,r=receipt.output,n=r?.node_context;
+ if(!read||!ref||JSON.stringify(read.reference)!==JSON.stringify(ref)||receipt.operation_id!==ref.operation_id
+   ||receipt.action_key!==ref.action_key||receipt.action_revision!=='1'||receipt.phase!==read.verb||receipt.status!=='SUCCEEDED'
+   ||r?.verified!==true||r.cleanup_complete!==true||n?.verified!==true||n.surface!=='graph'||n.locked!==false
+   ||!['document_id','workflow_id','node_id'].every(k=>n[k]===read.node[k]))return;
+ const sourcePreview=read.verb==='user_runtime_read',port=sourcePreview?r.output:r.mapping;
+ const inactive=sourcePreview&&r.source_active===false&&receipt.effect_possible===false;
+ if(inactive||(!sourcePreview||r.source_active===true)&&r.independent_readback===true
+   &&port?.kind==='variables'&&port.port_guid===read.port_guid&&port.port===(sourcePreview?4:0))
+  return {verified:true,cleanup_complete:true,operation_id:receipt.operation_id,action_key:receipt.action_key};
+}
+
 async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath,readField=readImportBindingField,validate,parameter:path=parameter}={}){
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
@@ -74,17 +103,22 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
    &&incoming.length<=1&&incoming.every(e=>e.source===sourceId&&e.output===link.output),'BINDING_PORT_MISMATCH');
  }
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
+ const source=nodes[0],sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
+ if(!saved){
+  need(sourcePort?.length===1,'BINDING_SOURCE_UNVERIFIED');
+  options.operation.preTargetGraph=structuredClone(graph);
+ }
  // A link requested on a disconnected Import has no connected layout yet.
  // Verify the source by name now and read the native mapping after linking.
  if(r.target.kind==='existing'&&!saved&&incoming.length){
-  options.operation.preTargetGraph=structuredClone(graph);
   const target=importBindingChannel(options,ctx,config,r.target.ref);
   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
   need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
+  retainImportBindingRead(options.operation,'variable_mapping_read',r.target.ref,mapping?.port_guid);
  }
- const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
- const sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
+ const channel=importBindingChannel(options,ctx,config,source.ref);
  let proof=sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;
+ if(!saved)retainImportBindingRead(options.operation,'user_runtime_read',source.ref,sourcePort[0].port_guid);
  // Cancel in the values editor deactivates the source. Use it only when the
  // source is already inactive; preview preserves active foreign Imports too.
  if(saved&&proof?.source_active===false)proof=await channel.configureUserVariables([],'close');
