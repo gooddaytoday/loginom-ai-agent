@@ -8,6 +8,22 @@ const object = (v: unknown): Row => v && typeof v === "object" && !Array.isArray
 const id = (v: unknown) => typeof v === "string" && /^[\w.:-]{1,180}$/.test(v) ? v : null
 const bool = (v: unknown) => typeof v === "boolean" ? v : null
 const digest = (v: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(v).digest("hex")
+function imageFact(value: unknown) {
+  const f = object(value)
+  return typeof f.sha256 === "string" && /^[a-f0-9]{64}$/.test(f.sha256) && typeof f.bytes === "number" &&
+    Number.isSafeInteger(f.bytes) && f.bytes >= 0 && typeof f.mime === "string" && /^image\/(png|jpeg|webp|gif)$/.test(f.mime)
+    ? { sha256: f.sha256, bytes: f.bytes, mime: f.mime } : null
+}
+function normalizedImage(part?: Row) {
+  if (typeof part?.url !== "string" || typeof part.mime !== "string" || !/^image\/(png|jpeg|webp|gif)$/.test(part.mime)) return null
+  const prefix = `data:${part.mime};base64,`
+  if (!part.url.startsWith(prefix)) return null
+  const encoded = part.url.slice(prefix.length), bytes = Buffer.from(encoded, "base64")
+  return bytes.length && bytes.toString("base64") === encoded ? { mime: part.mime, bytes: bytes.length, sha256: digest(bytes) } : null
+}
+async function archiveBytes(file: string) {
+  return await realpath(file).catch(() => null) === file ? Bun.file(file).bytes().catch(() => null) : null
+}
 function parse(text: unknown): Row {
   try { return typeof text === "string" ? object(JSON.parse(text)) : {} } catch { return {} }
 }
@@ -46,7 +62,7 @@ async function nativeSources(dir: string, session: string, gaps: Set<string>, ar
       if (!bytes) { gaps.add("native:unreadable"); continue }
       const rows = lines(new TextDecoder().decode(bytes), "native", gaps)
       const sidecar = path.join(path.dirname(file), "browser-recovery-text.jsonl")
-      const text = await realpath(sidecar).catch(() => null) === sidecar ? await Bun.file(sidecar).bytes().catch(() => null) : null
+      const text = await archiveBytes(sidecar)
       const previous = sources.findIndex(s => s.source === source)
       if (previous >= 0) sources.splice(previous, 1)
       sources.push({ source, origin: "profile", sha256: digest(bytes), rows,
@@ -82,11 +98,13 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
     if (!isBrowserRecoveryTool(name)) return []
     const input = object(state.input), output = parse(state.output ?? state.error)
     const screenshots = object(state.metadata).screenshotFiles
-    const files = name === "browser_take_screenshot" && Array.isArray(screenshots) ? screenshots.map(object).flatMap(f =>
-      id(f.partID) && typeof f.sha256 === "string" && /^[a-f0-9]{64}$/.test(f.sha256) && typeof f.bytes === "number" &&
-      Number.isSafeInteger(f.bytes) && f.bytes >= 0 && typeof f.mime === "string" && /^image\/(png|jpeg|webp|gif)$/.test(f.mime)
-        ? [{ partID: id(f.partID), sha256: f.sha256, bytes: f.bytes, mime: f.mime }] : []) : null
-    return [{ files, refused: state.status === "error" && typeof output.refused === "string" && !!output.refused, line: e.line, call: id(part.callID), message: id(part.messageID), tool: name, input, output,
+    const attachments = name === "browser_take_screenshot" && Array.isArray(state.attachments) ? state.attachments.map(object).filter(a =>
+      a.type === "file" && a.sessionID === session && id(part.messageID) && a.messageID === part.messageID && id(a.id)) : []
+    const metadata = Array.isArray(screenshots) ? screenshots.map(object).filter(f => id(f.partID)) : []
+    const parts = metadata.length ? metadata : attachments.map(a => ({ partID: a.id }))
+    const files = name === "browser_take_screenshot" && (parts.length || Array.isArray(screenshots))
+      ? parts.map(f => ({ partID: id(f.partID), ...imageFact(f) })) : null
+    return [{ files, attachments, refused: state.status === "error" && typeof output.refused === "string" && !!output.refused, line: e.line, call: id(part.callID), message: id(part.messageID), tool: name, input, output,
       status: id(state.status), action: name === browserRecoveryToolName ? id(input.action) : null }]
   })
   const starts: number[] = []
@@ -99,7 +117,9 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
     starts.push(i)
   }
   if (calls.length && starts[0] !== 0) gaps.add("cli:missing-start")
-  const episodes = starts.map((i, index) => {
+  const journal = archive && calls.some(c => c.files?.length) ? await archiveBytes(path.join(archive, "data/browser-recovery-delivery.jsonl")) : null
+  const receipts = journal ? lines(new TextDecoder().decode(journal), "screenshot:delivery", gaps).filter(r => r.sessionID === session) : []
+  const episodes = await Promise.all(starts.map(async (i, index) => {
     const start = calls[i]!, operation = id(start.input.operation_id)
     const group = calls.slice(i, starts[index + 1]).filter(c => {
       const original = object(object(c.output.verification).original_operation)
@@ -118,7 +138,7 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
     if (!start.refused && start.output.phase === "browser" && handoff !== true) gaps.add("native:handoff")
     const nativeActions = rows.filter(r => r.phase === "browser_recovery_action")
     let nextAction = 0
-    const actions = group.filter(c => c.tool !== browserRecoveryToolName).map(c => {
+    const actions = await Promise.all(group.filter(c => c.tool !== browserRecoveryToolName).map(async c => {
       // Admission refusals carry no phase. A post-dispatch refusal includes the controller view.
       const beforeDispatch = c.refused && c.output.phase === undefined
       const sha256 = digest(JSON.stringify(c.input)), r = beforeDispatch ? undefined : nativeActions[nextAction++]
@@ -135,9 +155,37 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
       if (!text && object(linked?.page).ok === true && Array.isArray(linked?.content) && linked.content.some(b => object(b).type === "text")) gaps.add("text:missing")
       if (linked?.tool === "browser_take_screenshot" && Array.isArray(linked.content) &&
         linked.content.filter(b => object(b).type === "image").length > (c.files?.length ?? 0)) gaps.add("cli:screenshot-files")
-      return { ...(c.files ? { files: c.files } : {}), refused: c.refused, call: c.call, message: c.message, line: c.line, tool: c.tool, sha256, nativeLine: linked?.line ?? null, text,
+      const files = c.files && await Promise.all(c.files.map(async f => {
+        const blocks = text ? textRows[0]!.text_blocks as string[] : []
+        const names = blocks.flatMap(b => Array.from(b.matchAll(/^- \[Screenshot of [^\n]*?\]\((?:[^\n]*[\\/])?((?:page|element)-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z\.(?:png|jpeg|webp))\)\s*$/gm), m => m[1]!))
+        const filename = names.length === 1 ? names[0] : null
+        const bytes = archive && match && filename ? await archiveBytes(path.join(archive, path.dirname(match.source.source), "artifacts", filename)) : null
+        const source = bytes ? { filename, bytes: bytes.length, sha256: digest(bytes) } : null
+        if (!source) gaps.add("screenshot:source-missing")
+        if (!f.sha256) gaps.add("cli:screenshot-files")
+        if (source && f.sha256 && (source.sha256 !== f.sha256 || source.bytes !== f.bytes || !filename?.endsWith("." + f.mime?.slice(6)))) gaps.add("screenshot:source-mismatch")
+        const parts = c.attachments.filter(a => a.id === f.partID)
+        const normalized = parts.length === 1 ? normalizedImage(parts[0]) : null
+        if (!normalized) gaps.add("screenshot:attachment-missing")
+        const delivery = receipts.filter(r => c.call && r.callID === c.call && id(r.attemptID)).map(r => {
+          const images = Array.isArray(r.images) ? r.images.map(imageFact) : null
+          const matched = images?.some(i => i && normalized && i.sha256 === normalized.sha256 && i.mime === normalized.mime && i.bytes === normalized.bytes)
+          let inclusion = "unknown"
+          if (r.responseObserved === true && typeof r.outputPresent === "boolean" && images) {
+            if (!images.length) inclusion = "absent"
+            if (r.outputPresent && matched) inclusion = "matched"
+            if (r.outputPresent && normalized && images.length && !matched && images.every(Boolean)) inclusion = "mismatch"
+          }
+          if (inclusion === "mismatch") gaps.add("screenshot:delivery-mismatch")
+          return { attemptID: id(r.attemptID), result: r.result === "stream" || r.result === "error" ? r.result : null,
+            responseObserved: bool(r.responseObserved), outputPresent: bool(r.outputPresent), images, inclusion }
+        })
+        if (!delivery.length) gaps.add("screenshot:delivery-missing")
+        return { ...f, source, normalized, delivery }
+      }))
+      return { ...(files ? { files } : {}), refused: c.refused, call: c.call, message: c.message, line: c.line, tool: c.tool, sha256, nativeLine: linked?.line ?? null, text,
         isError, transportError, pageOk }
-    })
+    }))
     if (nativeActions.some(r => !actions.some(a => a.nativeLine === r.line))) gaps.add("cli:unmatched-action")
     const controls = group.filter(c => c.action).map(c => {
       const v = object(c.output.verification), original = object(v.original_operation), stopped = object(c.output.stopped)
@@ -165,7 +213,7 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
     return { operation, controls, started, nativeAttempt: match?.attempt ?? null, nativeSource: match?.source.source ?? null, handoff, actions,
       cliVerification: finish?.verification ?? null, stop: id(stop?.code), cleanup: id(object(stop?.cleanup).state),
       nativeStop: nativeCode, nativeCleanup, verified, receipt, original: finish?.original ?? null, configuration: finish?.configuration ?? null, execution: finish?.execution ?? null }
-  })
+  }))
   if (nativeRows.some(r => !episodes.some(ep => ep.operation === r.operation_id && (ep.nativeAttempt === r.attempt_id ||
     (r.phase === "browser_recovery_receipt" && ep.receipt && ep.receipt === object(r.receipt).id))))) gaps.add("cli:unmatched-native")
   const nativePhases = sources.length && ![...gaps].some(g => ["native:invalid-line", "native:manifest", "native:digest", "native:missing", "native:path", "native:unreadable"].includes(g))

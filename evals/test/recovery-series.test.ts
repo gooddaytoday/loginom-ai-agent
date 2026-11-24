@@ -101,7 +101,7 @@ test("a missing journal is a gap and an old manifest does not relabel its retain
   expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missing: path.dirname(f.run) })
 })
 
-const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex")
+const hash = (text: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(text).digest("hex")
 const session = "synthetic-session", operation = "synthetic-operation"
 const start = { action: "start", operation_id: operation }, finish = { ...start, action: "finish" }
 const native = (phase: string, data = {}) => ({ phase: "browser_recovery_" + phase, operation_id: operation, attempt_id: "episode", ...data })
@@ -184,17 +184,21 @@ test("the observed ordinary run distinguishes zero recovery from unavailable evi
     .toMatchObject({ requested: null, nativePhases: 1, gaps: expect.arrayContaining(["cli:unmatched-native"]) })
 })
 
+async function closedProfile(dir: string, run: string) {
+  const profileDir = path.join(run, "profile"), archive = profileDir + ".history/closed"
+  await mkdir(profileDir)
+  await write(path.join(dir, "cleanup.json"), { profileDir, archive, processes: { status: "confirmed", capture_complete: true, unknownProcesses: [] },
+    serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true })
+  const config = path.join(run, "config.json")
+  await write(config, { ...await Bun.file(config).json(), profileDir })
+  const attempt = path.join(archive, "loginom/runtime/generations/g/chats", hash(session), "attempts/r")
+  return { attempt, archive }
+}
 test("the closed profile supplies the native source and links only this action's private text", async () => {
   const action = native("action", { tool: "browser_snapshot", arguments_sha256: hash("{}"), is_error: false, transport_error: null,
     page: { ok: true }, budget: { calls_left: 29 }, content: [{ type: "text", bytes: 7 }] })
   const evidence = await episode([begin, tool("act", "browser_snapshot", {}, {})], undefined, async (dir, run) => {
-    const profileDir = path.join(run, "profile"), archive = profileDir + ".history/closed"
-    await mkdir(profileDir)
-    await write(path.join(dir, "cleanup.json"), { profileDir, archive, processes: { status: "confirmed", capture_complete: true, unknownProcesses: [] },
-      serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true })
-    const config = path.join(run, "config.json")
-    await write(config, { ...await Bun.file(config).json(), profileDir })
-    const attempt = path.join(archive, "loginom/runtime/generations/g/chats", hash(session), "attempts/r")
+    const { attempt } = await closedProfile(dir, run)
     await Bun.write(path.join(attempt, "execution-events.jsonl"), [...opened, action, native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })]
       .map(r => JSON.stringify(r)).join("\n"))
     await Bun.write(path.join(attempt, "browser-recovery-text.jsonl"), [
@@ -238,7 +242,83 @@ test("a screenshot links source file IDs and image digests without claiming prov
     [...opened, native("action", { tool: "browser_take_screenshot", arguments_sha256: hash("{}"), is_error: false, transport_error: null,
       page: { ok: true }, content: [{ type: "image", mime_type: "image/png", bytes: 6, sha256: hash("base64 text") }] }),
     native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })])
-  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ actions: [{ call: "image-call", files: [image] }] }] })
+  expect(evidence.recovery).toMatchObject({ gaps: expect.arrayContaining(["screenshot:source-missing", "screenshot:attachment-missing", "screenshot:delivery-missing"]),
+    episodes: [{ actions: [{ call: "image-call", files: [image] }] }] })
+})
+
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNgAAAAAgAB5Sfe/AAAAABJRU5ErkJggg==", "base64")
+const jpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AP7//2Q==", "base64")
+const filename = "page-2026-01-02T03-04-05-006Z.png"
+const original = { partID: "file-part", mime: "image/png", bytes: png.length, sha256: hash(png) }
+const normalized = { mime: "image/jpeg", bytes: jpeg.length, sha256: hash(jpeg) }
+const received = { sessionID: session, callID: "image-call", attemptID: "request-1", result: "error",
+  responseObserved: true, outputPresent: true, images: [normalized] }
+async function screenshot(receipts: unknown[], options: { source?: Uint8Array | null; filename?: string; metadata?: object; attachment?: object } = {}) {
+  const name = options.filename ?? filename, source = options.source === undefined ? png : options.source
+  const shot = tool(received.callID, "browser_take_screenshot", {}, {})
+  const attachment = { type: "file", sessionID: session, messageID: shot.part.messageID, id: original.partID,
+    mime: normalized.mime, url: "data:image/jpeg;base64," + jpeg.toString("base64"), ...options.attachment }
+  const cli = { ...shot, part: { ...shot.part, state: { ...shot.part.state, attachments: [attachment], metadata: options.metadata ?? { screenshotFiles: [original] } } } }
+  return (await episode([begin, cli], undefined, async (dir, run) => {
+    const { archive, attempt } = await closedProfile(dir, run)
+    const action = native("action", { tool: "browser_take_screenshot", arguments_sha256: hash("{}"), is_error: false, transport_error: null,
+      page: { ok: true }, budget: { calls_left: 29 }, content: [{ type: "text" }, { type: "image" }] })
+    await Bun.write(path.join(attempt, "execution-events.jsonl"), [...opened, action, native("stopped", { code: "runtime_closed", cleanup: { state: "retained" } })]
+      .map(r => JSON.stringify(r)).join("\n"))
+    await write(path.join(attempt, "browser-recovery-text.jsonl"), { attempt_id: "episode", calls_left: 29,
+      text_blocks: [`### Result\n- [Screenshot of viewport](../../private-location/artifacts/${name})`] })
+    if (source) await Bun.write(path.join(attempt, "artifacts", name), source)
+    if (receipts.length) await Bun.write(path.join(archive, "data/browser-recovery-delivery.jsonl"), receipts.map(r => JSON.stringify(r)).join("\n"))
+  })).recovery
+}
+test("a closed PNG is linked to the normalized JPEG in the observed HTTP error", async () => {
+  const report = await screenshot([{ ...received, sessionID: "foreign" }, { ...received, callID: "other" }, received])
+  expect(report).toMatchObject({ gaps: [], episodes: [{ actions: [{ call: "image-call", message: "message-image-call",
+    files: [{ ...original, source: { filename, bytes: png.length, sha256: hash(png) }, normalized,
+      delivery: [{ attemptID: received.attemptID, result: "error", responseObserved: true, outputPresent: true, images: [normalized], inclusion: "matched" }] }] }] }] })
+  expect(JSON.stringify(report)).not.toMatch(/private-location|Screenshot of viewport|base64|data:image/)
+})
+
+test("SDK retries preserve observed omission, unknown input and a different delivered image", async () => {
+  const report = await screenshot([received, { ...received, attemptID: "empty", images: [] },
+    { ...received, attemptID: "disconnected", responseObserved: false, outputPresent: null, images: null },
+    { ...received, attemptID: "opaque", images: [null] }, { ...received, attemptID: "other-bytes", result: "stream", images: [original] }])
+  const delivery = report.episodes[0].actions[0].files[0].delivery
+  expect(delivery.map((r: { attemptID: string; inclusion: string }) => [r.attemptID, r.inclusion])).toEqual([
+    ["request-1", "matched"], ["empty", "absent"], ["disconnected", "unknown"], ["opaque", "unknown"], ["other-bytes", "mismatch"]])
+  expect(report.gaps).toEqual(["screenshot:delivery-mismatch"])
+})
+
+test("an altered or missing PNG preserves the independently observed JPEG and request", async () => {
+  for (const [source, gap] of [[Buffer.from("other image"), "screenshot:source-mismatch"], [null, "screenshot:source-missing"]] as const) {
+    const report = await screenshot([received], { source })
+    expect(report).toMatchObject({ gaps: [gap], episodes: [{ actions: [{ files: [{ normalized,
+      source: source ? { filename, sha256: hash(source), bytes: source.length } : null, delivery: [{ inclusion: "matched" }] }] }] }] })
+  }
+  expect(await screenshot([])).toMatchObject({ gaps: ["screenshot:delivery-missing"], episodes: [{ actions: [{ files: [
+    { source: { filename, sha256: original.sha256 }, normalized, delivery: [] }] }] }] })
+})
+
+test("a damaged or foreign attachment cannot prove inclusion of this normalized part", async () => {
+  for (const fields of [{ url: "data:image/jpeg;base64,!" + jpeg.toString("base64") }, { messageID: "other-message" }, { id: "other-part" }]) {
+    expect(await screenshot([received], { attachment: fields })).toMatchObject({ gaps: ["screenshot:attachment-missing"],
+      episodes: [{ actions: [{ files: [{ source: { sha256: original.sha256 }, normalized: null,
+        delivery: [{ images: [normalized], inclusion: "unknown" }] }] }] }] })
+  }
+})
+
+test("a missing source digest preserves the independently bound attachment, PNG and delivery", async () => {
+  for (const metadata of [{}, { screenshotFiles: [{ partID: original.partID }] }]) {
+    expect(await screenshot([received], { metadata })).toMatchObject({ gaps: ["cli:screenshot-files"], episodes: [{ actions: [
+      { files: [{ partID: original.partID, source: { sha256: original.sha256 }, normalized, delivery: [{ inclusion: "matched" }] }] }] }] })
+  }
+})
+
+test("a WebP screenshot uses its original Playwright artifact", async () => {
+  const source = Buffer.from("UklGRhoAAABXRUJQVlA4TA4AAAAvAAAAAAcQEf0PRET/Aw==", "base64")
+  const name = filename.replace(".png", ".webp"), webp = { ...original, bytes: source.length, mime: "image/webp", sha256: hash(source) }
+  const report = await screenshot([received], { source, filename: name, metadata: { screenshotFiles: [webp] } })
+  expect(report).toMatchObject({ gaps: [], episodes: [{ actions: [{ files: [{ ...webp, source: { filename: name, sha256: webp.sha256 } }] }] }] })
 })
 
 test("a changed diagnostic file cannot supply a native conclusion", async () => {
