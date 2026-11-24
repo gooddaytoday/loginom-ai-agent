@@ -616,13 +616,13 @@ test('bh-v11 source read refused before the body gesture leaves the read registr
 // lease is disposed and the opening has no effect. A lost dispose reply or a
 // returned click keeps the opening closed.
 const graphState={prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}};
-function bodyRefusalExecute({modes,bodyStatus='NOT_APPLIED',disposeFails=false}){
+function bodyRefusalExecute({modes,bodyStatus='NOT_APPLIED',bodyCode='SELECTION_SNAPSHOT_CHANGED',disposeFails=false}){
  return async code=>{
   if(code.includes('runManagedJavascriptSelectionBody')){
    modes.push('body');const gesture_id=code.match(/"gesture_id":"([^"]+)"/)[1];
    return bodyStatus==='NOT_APPLIED'
     ?{status:'NOT_APPLIED',phase:'preflight',effect_possible:false,cleanup_complete:true,action_key:'javascript.selection.body',
-     action_revision:'1',operation_id:gesture_id,output:{},error:{code:'SELECTION_SNAPSHOT_CHANGED',message:'Selection snapshot changed'},trace:[]}
+     action_revision:'1',operation_id:gesture_id,output:{},error:{code:bodyCode,message:'Selection refused'},trace:[]}
     :{status:'SUCCEEDED',phase:'gesture_returned',effect_possible:true,cleanup_complete:true,action_key:'javascript.selection.body',
      action_revision:'1',operation_id:gesture_id,output:{body_gesture_returned:true},error:null,trace:[]};
   }
@@ -634,7 +634,8 @@ function bodyRefusalExecute({modes,bodyStatus='NOT_APPLIED',disposeFails=false})
   throw Error('unexpected browser call '+mode);
  };
 }
-for(const [name,variant] of Object.entries({refused:{},disposeFails:{disposeFails:true},clicked:{bodyStatus:'SUCCEEDED'}}))
+for(const [name,variant] of Object.entries({refused:{},disposeFails:{disposeFails:true},clicked:{bodyStatus:'SUCCEEDED'},
+ leaseRefused:{bodyCode:'SELECTION_LEASE_UNAVAILABLE'}}))
 test('A1 body gesture refused before its click releases the lease: '+name,async()=>{
  const modes=[],events=[];
  await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
@@ -645,9 +646,10 @@ test('A1 body gesture refused before its click releases the lease: '+name,async(
    else assert.equal(error.nodePhaseRefusal,undefined);
    if(name==='disposeFails')assert.equal(error.message,'lost reply');
    if(name==='clicked')assert.match(error.message,/blocked after gesture/);
+   if(name==='leaseRefused')assert.match(error.message,/selection unconfirmed/);
    return true;
   });
- assert.deepEqual(modes,name==='clicked'?['capture','body','inspect']:['capture','body','dispose']);
+ assert.deepEqual(modes,name==='clicked'?['capture','body','inspect']:name==='leaseRefused'?['capture','body']:['capture','body','dispose']);
  assert.deepEqual(events,['javascript_managed_body_prepared','javascript_managed_body_returned']);
 });
 

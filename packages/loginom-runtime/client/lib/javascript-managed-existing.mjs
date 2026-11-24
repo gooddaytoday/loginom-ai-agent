@@ -66,13 +66,14 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     }
   }
   const gestured = before.ready === true ? null : await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions});
-  if (gestured?.status === 'NOT_APPLIED' && gestured.effect_possible === false && gestured.cleanup_complete === true) {
-    // The settled body receipt refused before its click (the selection was
-    // blocked or changed). Release the read-only lease; a lost dispose reply
-    // propagates without a refusal and keeps the gate closed.
+  if (gestured?.status === 'NOT_APPLIED' && gestured.effect_possible === false && gestured.cleanup_complete === true
+    && gestured.error?.code === 'SELECTION_SNAPSHOT_CHANGED') {
+    // The settled body receipt refused at its pre-click check (the selection
+    // was blocked or changed). Release the read-only lease; a lost dispose
+    // reply propagates without a refusal and keeps the gate closed. A lease
+    // refusal can follow an earlier click on that lease and is not covered.
     await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'dispose'}));
-    throw noEffect(Error('Managed JavaScript existing body gesture refused before its click: '
-      + String(gestured.error?.code ?? 'NOT_APPLIED')));
+    throw noEffect(Error('Managed JavaScript existing body gesture refused before its click: SELECTION_SNAPSHOT_CHANGED'));
   }
   const selected = gestured ? gestured.output?.selection : before;
   if (selected?.ready !== true || selected.node_tid!==context.tid || Date.now() >= deadline)
