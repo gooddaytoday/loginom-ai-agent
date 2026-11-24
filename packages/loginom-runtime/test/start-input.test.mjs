@@ -74,3 +74,11 @@ test("browser recovery never reaches validation or Help readiness", () => {
     assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
   assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
 })
+
+test("P5 reaches only the assigned chat with its own account's package", () => {
+  const input = { ...base, chat: "a".repeat(64), connection: { username: "owner" }, acceptanceSaveReadPackage: "/owner/task.lgp" }
+  assert.equal(validateStartInput(input).acceptanceSaveReadPackage, "/owner/task.lgp")
+  for (const patch of [{ validation: true }, { chat: "dashboard-uuid" }, { acceptanceSaveReadPackage: "/another/task.lgp" },
+    { acceptanceSaveReadPackage: "/owner/../another/task.lgp" }])
+    assert.throws(() => validateStartInput({ ...input, ...patch }), /LOGINOM_START_INVALID/)
+})

@@ -162,6 +162,7 @@ export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: stri
 
 export async function runAgent(input: {
   command: AgentCommand
+  acceptanceSaveReadPackage?: string
   expectedSkillDigest?: string
   taskId: string
   model: string
@@ -199,13 +200,13 @@ export async function runAgent(input: {
     await assertNoDebuggers()
   }
   const cmd = [...input.command.cmd, ...args]
-  const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd,
+  const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd, saveRead: input.acceptanceSaveReadPackage !== undefined,
     profileDir: input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir: input.workdir, env: input.command.env })
     .catch(() => { throw new SandboxFailure("не удалось подготовить binary CLI, профиль или mounts") }) : undefined
   const env: Record<string, string> = boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }
   const processRun = await superviseProcess({
     cmd, cwd: boundary?.cwd ?? input.command.cwd,
-    env, sandbox: boundary?.cmd,
+    env, sandbox: boundary?.cmd, stdin: boundary ? input.acceptanceSaveReadPackage : undefined,
     profileDir: input.profileDir, outDir: input.outDir, captureSecrets: input.command.cleanupSecrets,
     timeoutMs: input.timeoutMs, signal: input.signal,
     owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },

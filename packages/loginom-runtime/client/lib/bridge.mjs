@@ -151,6 +151,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const saveAdmissions = new Map();
   let saveSequence=0;
   let lastSavedPackage = null;
+  let acceptanceSaveReadPackage = config.acceptanceSaveReadPackage;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
   // preparation, the original receipt no longer owns that tab for cleanup.
@@ -660,12 +661,16 @@ export async function createBridge(config, session, { browserTransport: managedB
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
               try{
-                const prepared=session.metadata.workspacePreparation?.state;
-                const options={sessionId:session.metadata.sessionId,documentId:prepared?.document_id,
-                  account:prepared?.loginom_account??config.replayLoginUser,packagePath:savedOutcome.output.package_ref.path,
-                  loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
-                const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
-                const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,savedOutcome);
+                const path=savedOutcome.output.package_ref.path;
+                if(acceptanceSaveReadPackage===path && savedOutcome.action_key==='package.save_checkpoint'
+                  && savedOutcome.output.save_completed===true && lastSavedPackage?.operation_id===operationId
+                  && savedOutcome.operation_id===operationId && lastSavedPackage.path===path
+                  && lastSavedPackage.document_id===session.metadata.workspacePreparation?.state?.document_id){
+                  acceptanceSaveReadPackage=undefined;
+                  const recorded=await recordExecution({phase:'acceptance_fault_triggered',condition:'P5',operation_id:operationId,package_path:path}).catch(()=>null);
+                  if(recorded)throw Error('Saved package state read failed');
+                }
+                const state=await readSavedState({path}),advice=savedPackageStateAdvice(state,savedOutcome);
                 await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,state,advice});
                 reply.content.push({type:'text',text:JSON.stringify(advice)});
               }catch{

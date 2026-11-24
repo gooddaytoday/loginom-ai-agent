@@ -9,6 +9,7 @@ import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
 import { InstallationBrowserRecovery } from "@opencode-ai/core/installation/version"
 import { join } from "node:path"
+import { existsSync, readFileSync, rmdirSync } from "node:fs"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import { hostError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
@@ -70,7 +71,20 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     failure("CLI_CANCELLED", 130)
     return
   }
+  // The closed eval sandbox supplies private input on fd 0. Leave it open
+  // at EOF so the ordinary prompt reader sees the original user message.
+  const marker = "/run/loginom-eval-save-read"
+  let acceptanceSaveReadPackage: string | undefined
+  if (mode === "run" && process.platform === "linux" && existsSync(marker)) {
+    rmdirSync(marker)
+    if (dashboard || !headless) {
+      failure("CLI_ARGUMENT_INVALID", 2)
+      return
+    }
+    acceptanceSaveReadPackage = readFileSync(0, "utf8")
+  }
   const host = await launchNodeHost({
+    acceptanceSaveReadPackage,
     node: bundle.node,
     entry: bundle.entry,
     resources: bundle.resources,
@@ -206,13 +220,15 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
         throw error ?? new Error("CLI_ARGUMENT_INVALID")
       })
     if (mode === "run") {
-      const { RunCommand, setRunDashboard } = await import("./cmd/run")
+      const { createRunCommand, RunCommand, setRunDashboard } = await import("./cmd/run")
       if (signal?.aborted) throw Error("CLI_CANCELLED")
       if (target) {
         setRunDashboard(dashboardPrompt(target.action))
         cleanup.detach = () => setRunDashboard()
       }
-      await parser.command(RunCommand).parseAsync(target ? ["--dir", target.directory, ...filtered] : filtered)
+      const run = acceptanceSaveReadPackage === undefined ? RunCommand :
+        createRunCommand(session => host.request("acceptance.bindSaveRead", session))
+      await parser.command(run).parseAsync(target ? ["--dir", target.directory, ...filtered] : filtered)
     } else {
       const { TuiThreadCommand, setTuiLoginomHost, setTuiStartupWarning } = await import("./cmd/tui")
       setTuiLoginomHost(host.port)

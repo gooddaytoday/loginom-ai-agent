@@ -145,7 +145,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, acceptanceSaveReadPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -223,6 +223,7 @@ async function handle(message) {
         // Acceptance-only shutdown cleanup; the bridge binds it to the observed
         // prepared account, so no replay login account is needed here.
         acceptanceCleanupPackage,
+        acceptanceSaveReadPackage,
         closeSavedPackageOnShutdown,
         browserRecovery,
         storageDirectories: {

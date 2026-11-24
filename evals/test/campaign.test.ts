@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
+import { parseEnv } from "node:util"
 import { mkdir, mkdtemp, rm, stat, utimes } from "node:fs/promises"
 import { emptyResult } from "../src/run"
 import { writeLeaseReceipt } from "../src/lease"
@@ -301,12 +302,14 @@ test("campaign durably records a batch before exposing its parameters and reuses
     const manifest: CampaignManifest = { id: "admission", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
       keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
         EVAL_AGENT_MODEL: "pinned/model", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "judge", JUDGE_REASONING: "xhigh" } }
-    const state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+    const state: CampaignJournal = { manifestHash: "a".repeat(64), server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0,
       cleanupVerified: true, verificationAttempted: true, verificationDir: path.join(root, "previous-verification") }
     const config = { stateDir: root, controllerLock: path.join(root, "controller.lock"), harnessRoot: path.join(root, "harness"), slotsFile: path.join(root, "slots.json"),
       batchEnvFile: path.join(root, "batch.env"), resourceBudgetFile: path.join(root, "budget.json"),
       corpora: { ordinary: { entrypoint: "src/run.ts", tasks: "tasks" } } }
+    manifest.keys.push({ corpus: "ordinary", taskId: "second", round: 1, experiment: {
+      family: "save", pair: "test", arm: "before", order: 1, condition: "P5" } })
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
@@ -314,6 +317,7 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(saved.verificationAttempted).not.toBe(true)
     expect(saved.verificationDir).toBeUndefined()
     const env = await Bun.file(config.batchEnvFile).text()
+    expect(loadConfig(["--skip-judge", "--dry-run"], parseEnv(env)).campaign?.control?.saveReadTasks).toEqual(["second"])
     expect(env).toContain('EVAL_AGENT_MODEL="pinned/model"')
     expect(env).toContain(`EVAL_ENTRYPOINT=${JSON.stringify(path.join(config.harnessRoot, "src/run.ts"))}`)
     expect(env).toContain(`EVAL_TASKS=${JSON.stringify(path.join(config.harnessRoot, "tasks"))}`)

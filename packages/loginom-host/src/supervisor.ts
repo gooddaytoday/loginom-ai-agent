@@ -24,6 +24,7 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  acceptanceSaveReadPackage?: string
   // Private owner policy. The runtime derives the path from its confirmed Save.
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability for temporary browser recovery tools.

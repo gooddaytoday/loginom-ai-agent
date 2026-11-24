@@ -279,6 +279,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     command: input.command,
     expectedSkillDigest: input.expectedSkillDigest,
     taskId: task.id,
+    acceptanceSaveReadPackage: input.slot && config.campaign?.control?.saveReadTasks?.includes(task.id) ? packagePath : undefined,
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,

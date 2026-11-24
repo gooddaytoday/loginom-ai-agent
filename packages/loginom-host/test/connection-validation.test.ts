@@ -3,6 +3,7 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:f
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
+import { createHash } from "node:crypto"
 import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
 import { credentials } from "../src/connection/credentials"
@@ -30,6 +31,7 @@ async function fixture(
   help: "shipped" | "held" | "missing" | "tampered" = "shipped",
   holdStart = false,
   failClose = false,
+  acceptanceSaveReadPackage?: string,
 ) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
@@ -56,6 +58,7 @@ async function fixture(
     import {join} from 'node:path';
     let starting;
     function ready() {
+      if (existsSync(${JSON.stringify(marker + ".refuse")})) return process.send({id:starting.id,error:'LOGINOM_BROWSER_UNAVAILABLE'});
       process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)}}
         : {id:starting.id,result:{protocol:1,generation:starting.input.generation,checked:true,ready:true,chat:starting.input.chat}});
     }
@@ -67,14 +70,15 @@ async function fixture(
         const cache=join(message.input.stateDir,'http-cache');
         const cacheHit=message.input.validationHttpCache===true && existsSync(join(cache,'fixture-hit'));
         if(message.input.validationHttpCache===true){mkdirSync(cache,{recursive:true});writeFileSync(join(cache,'fixture-hit'),'owned fixture cache');}
-        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid,httpCache:message.input.validationHttpCache===true,cacheHit}));
+        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid,saveRead:message.input.acceptanceSaveReadPackage,httpCache:message.input.validationHttpCache===true,cacheHit}));
         if (!${holdStart}) ready();
       }
+      if (message.operation === 'dashboardRead') process.send({id:message.id,result:null});
       if (message.operation === 'close') process.send({id:message.id,result:{closed:${!failClose}}},()=>process.exit(${failClose ? 1 : 0}));
     });`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, acceptanceSaveReadPackage })
   return {
     host,
     catalog,
@@ -97,6 +101,35 @@ async function fixture(
     },
   }
 }
+
+test("only the designated chat receives the post-Save read fault once", async () => {
+  const path = "/user/task.lgp", f = await fixture("", "shipped", false, false, path)
+  const session = "created-session", chat = createHash("sha256").update(session).digest("hex")
+  const start = async () => JSON.parse(await readFile(f.marker, "utf8"))
+  try {
+    f.host.bindAcceptanceSaveRead(session)
+    const checked = await f.host.api.check(f.candidate)
+    expect(await start()).not.toHaveProperty("saveRead")
+    await f.host.api.save({ revision: 0, validationId: checked.validationId })
+    await f.host.settled()
+    await f.host.catalog(1)
+    await f.host.readDashboard({ origin: new URL(f.candidate.url).origin, generation: 1,
+      binding: { packagePath: path, workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() } })
+    expect(await start()).not.toHaveProperty("saveRead")
+    await f.host.runtime(1, "b".repeat(64))
+    expect(await start()).not.toHaveProperty("saveRead")
+    await writeFile(f.marker + ".refuse", "")
+    await expect(f.host.runtime(1, chat)).rejects.toThrow("LOGINOM_BROWSER_UNAVAILABLE")
+    await rm(f.marker + ".refuse")
+    await f.host.runtime(1, chat)
+    expect((await start()).saveRead).toBe(path)
+    f.host.markRuntimeStale(chat)
+    await f.host.retireRuntime(chat)
+    await f.host.runtime(1, chat)
+    expect(await start()).not.toHaveProperty("saveRead")
+    expect(() => f.host.bindAcceptanceSaveRead(session)).toThrow()
+  } finally { await f.close() }
+}, 15_000)
 
 test("validation shares only HTTP cache for identical credentials and clears it at shutdown", async () => {
   const f = await fixture("")

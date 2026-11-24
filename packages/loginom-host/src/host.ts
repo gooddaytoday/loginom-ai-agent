@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "@opencode-ai/schema/loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -214,11 +214,14 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  acceptanceSaveReadPackage?: string
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
+  let saveReadPackage = options.acceptanceSaveReadPackage
+  let saveReadChat: string | undefined
   const inputs = inputStore(join(root, "inputs"))
   const references = fileReferences(join(root, "file-references"))
   await references.cleanup()
@@ -455,6 +458,8 @@ export async function createLoginomHost(options: {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     // Mutate cache state only after the existing resource-verification admission.
     const httpCache = validationHttpCache && await prepareValidationCache(connection)
+    const acceptanceSaveReadPackage = purpose === "chat" && chat === saveReadChat ? saveReadPackage : undefined
+    if (acceptanceSaveReadPackage) saveReadPackage = undefined
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -466,6 +471,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         validationHttpCache: httpCache,
+        ...(acceptanceSaveReadPackage ? { acceptanceSaveReadPackage } : {}),
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
@@ -479,7 +485,11 @@ export async function createLoginomHost(options: {
         resourceCacheVersion: resourceVersion,
       },
       signal,
-    ).catch(startupFailure)
+    ).catch((error: unknown) => {
+      if (acceptanceSaveReadPackage && error instanceof RuntimeStartupError && error.cleanupConfirmed)
+        saveReadPackage = acceptanceSaveReadPackage
+      return startupFailure(error)
+    })
   }
   function startupFailure(error: unknown): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
@@ -671,6 +681,10 @@ export async function createLoginomHost(options: {
         unsettledWork: leases.unsettledWork || states.some((state) => state.unsettledWork),
         dispatching: states.some((state) => state.dispatching),
       }
+    },
+    bindAcceptanceSaveRead(session: string) {
+      if (!saveReadPackage || saveReadChat || !session) throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      saveReadChat = createHash("sha256").update(session).digest("hex")
     },
     browserRecovery: options.browserRecovery === true,
     references,

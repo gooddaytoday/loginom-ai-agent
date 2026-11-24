@@ -135,6 +135,15 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
 }, 15_000)
 
+test("private CLI startup can bind its P5 package to a single new session", async () => {
+  const host = await launchNodeHost({ node: fixture.node, entry: fixture.entry, root: join(fixture.directory, "p5"),
+    resources: fixture.directory, headless: true, acceptanceSaveReadPackage: "/user/task.lgp" })
+  try {
+    expect(await host.request("acceptance.bindSaveRead", "session-one")).toBe(true)
+    await expect(host.request("acceptance.bindSaveRead", "session-two")).rejects.toThrow()
+  } finally { await host.close() }
+}, 15_000)
+
 test("host startup permits readiness after 30 seconds and still closes completely", async () => {
   const entry = join(fixture.directory, "slow-start.mjs")
   await writeFile(

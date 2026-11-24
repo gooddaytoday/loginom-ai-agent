@@ -6,6 +6,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
+import { validAcceptancePackage } from "../../loginom-runtime/src/start-input.mjs"
 import { DashboardRead } from "./dashboard"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
@@ -100,7 +101,11 @@ async function dispatch(message: unknown) {
         ("browserRecovery" in input && typeof input.browserRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      const acceptanceSaveReadPackage = "acceptanceSaveReadPackage" in input ? input.acceptanceSaveReadPackage : undefined
+      if (acceptanceSaveReadPackage !== undefined && !validAcceptancePackage(acceptanceSaveReadPackage))
+        throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
+        acceptanceSaveReadPackage,
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -123,6 +128,12 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "acceptance.bindSaveRead") {
+      if (typeof input !== "string") throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      state.host.bindAcceptanceSaveRead(input)
+      reply({ id: message.id, result: true })
+      return
+    }
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })

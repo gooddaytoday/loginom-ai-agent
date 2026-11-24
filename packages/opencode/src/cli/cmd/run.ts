@@ -152,7 +152,7 @@ async function toolError(part: ToolPart) {
   }
 }
 
-export const RunCommand = effectCmd({
+export const createRunCommand = (onSessionCreated?: (session: string) => Promise<unknown>) => effectCmd({
   command: "run [message..]",
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
@@ -626,6 +626,7 @@ export const RunCommand = effectCmd({
           return
         }
 
+        if (onSessionCreated) await onSessionCreated(id)
         return {
           id,
           title: result.data?.title ?? name,
@@ -1149,6 +1150,8 @@ export const RunCommand = effectCmd({
     })
   }),
 })
+
+export const RunCommand = createRunCommand()
 
 type MiniCommandInput = {
   directory?: string
