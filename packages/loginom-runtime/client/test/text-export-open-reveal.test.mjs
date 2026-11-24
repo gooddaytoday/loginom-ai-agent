@@ -95,8 +95,8 @@ test('new Export keeps its complete drawing reveal',async()=>{
  assert.equal(f.records.find(e=>e.action?.verb==='reveal_prepared_node').action.target,'drawing');
 });
 
-const deniedBefore=['unconfirmed Execute journal','cancelled','expired','transport','unconfirmed destination','missing package identity'];
-const refusedFresh=['wrong record','wrong tab','wrong package','different unsaved package','new document','wrong node','finish ACK still missing'];
+const deniedBefore=['later group before checkpoint','unconfirmed Execute journal','cancelled','expired','transport','unconfirmed destination','missing package identity'];
+const refusedFresh=['replaced older group','later group during wait','later group before resume','wrong record','wrong tab','wrong package','different unsaved package','new document','wrong node','finish ACK still missing'];
 for(const scenario of ['control','P3','second node','lost marker ACK','lost finish receipt','same group after repaint','unsaved package after repaint',...deniedBefore,...refusedFresh])
 test('export finish after one Execute: '+scenario,async t=>{
  const {node,workflow}=fixture();
@@ -111,6 +111,12 @@ test('export finish after one Execute: '+scenario,async t=>{
   const ok=async()=>({verified:true,cleanup_complete:true});
   let page;
   const app=runtime(new Page(),{now:()=>Date.now()+clockOffset,acceptanceProbe:scenario==='control'||absent?undefined:{condition:'P3',packagePath},onRecord:async e=>{
+    if(scenario==='same group after repaint'&&e.phase==='node_observation_completed'&&e.readiness.condition==='one new node execution group'){
+     for(const p of page.processes)p.state='pending_or_failed';
+    }
+    if(e.phase==='node_observation_completed'&&(scenario==='later group before checkpoint'&&e.readiness.condition==='one new node execution group'
+     ||scenario==='later group during wait'&&e.readiness.condition==='new node execution completed'))
+     page.processes.unshift({...page.processes[0],process_id:'2',record_id:'later'});
     if(scenario==='unconfirmed Execute journal'&&e.phase==='node_step_completed'&&
      records.some(p=>p.internal_operation_id===e.internal_operation_id&&p.action?.verb==='execute_wizard'))return {...e,outcome:{...e.outcome,operation_id:'foreign'}};
     if(absent&&e.phase==='node_phase_completed'&&e.receipt.phase==='finish'){
@@ -129,6 +135,7 @@ test('export finish after one Execute: '+scenario,async t=>{
     configure:async()=>({verified:true,cleanup_complete:true,configuration:{destination,configured:{destination_check:{verified:scenario!=='unconfirmed destination',destination}}}})}]]),
    nodeApplyDriverFactory:options=>{
     page=fixture({owner:options.operation,now:options.now,fault:scenario==='transport'?scenario:undefined,receiptOptions:options.receiptOptions,onRecord:options.onRecord});
+    if(scenario==='replaced older group')page.processes.push({parent_id:null,process_id:'1',record_id:'old',state:'completed',error:false});
     if(scenario==='missing package identity')page.changedSurface.package_identity=null;
     if(['unsaved package after repaint','different unsaved package'].includes(scenario))page.changedSurface.package_identity={path:null,name:'Task'};
     return {...page.driver,mapPorts:options.operation.id==='first'?async()=>{throw Error('Input mapping unavailable');}:ok,
@@ -158,11 +165,15 @@ test('export finish after one Execute: '+scenario,async t=>{
    assert.equal(advice.next_steps.some(s=>s.tool==='dock_node_resume'),false);
    assert.throws(()=>app.startNodeApply({operation_id:'export'},{resume:true}));
    assert.deepEqual(await store.outputFiles(compactNodeResult(job)),[]);
+   if(scenario==='later group before checkpoint')assert.equal((await app.recover('export',{strategy:'abandon_operation',recoveryOperationId:'release'})).output.original_outcome.output.execution.status,'unknown');
   }else if(absent){
    const advice=(await app.inspect({operationId:'export'})).output;
    assert.deepEqual(advice.next_steps[0].arguments,{operation_id:'export'});
    assert.equal(advice.next_steps[0].tool,'dock_node_resume');
    if(['same group after repaint','unsaved package after repaint'].includes(scenario))page.changedSurface.dom_epoch={document:'browser',revision:4};
+   if(scenario==='same group after repaint')for(const p of page.processes)p.state='completed';
+   if(scenario==='later group before resume')page.processes.unshift({...page.processes[0],process_id:'2',record_id:'later'});
+   if(scenario==='replaced older group')page.processes[0].record_id='replacement';
    if(scenario==='wrong record')page.processes[0].record_id='another';
    if(scenario==='wrong tab')page.changedSurface.active_tab_ref='another';
    if(scenario==='different unsaved package')page.changedSurface.package_identity={path:null,name:'Other'};
@@ -176,6 +187,7 @@ test('export finish after one Execute: '+scenario,async t=>{
     assert.deepEqual(await store.outputFiles(result),[]);
     assert.equal(page.gestures.filter(g=>g.startsWith('execute_wizard:')).length,1);
     assert.equal((await app.inspect({operationId:'export'})).output.next_steps[0].arguments.strategy,'abandon_operation');
+    if(scenario.startsWith('later group'))assert.equal((await app.recover('export',{strategy:'abandon_operation',recoveryOperationId:'release'})).output.original_outcome.output.execution.status,'unknown');
     return;
    }
    assert.deepEqual([result.state,result.status],['settled','SUCCEEDED'],JSON.stringify(result));
@@ -202,5 +214,5 @@ test('export finish after one Execute: '+scenario,async t=>{
   }
   assert.equal(records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='finish'),scenario!=='P3'&&!deniedBefore.includes(scenario));
   assert.equal(page.gestures.filter(g=>g.startsWith('execute_wizard:')).length,1);
-  assert.equal(page.processes.filter(p=>p.parent_id===null).length,1);
+  assert.equal(page.processes.filter(p=>p.parent_id===null).length,scenario==='later group before checkpoint'?2:1);
 });

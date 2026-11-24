@@ -10,7 +10,7 @@ import {validateTextExportParameters,requireTextExportBindingSource} from './tex
 import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
-import {exportContinuationSurface,verifyExportContinuation,verifyStartedExportGroup} from './text-export-continuation.mjs';
+import {exportContinuationSurface,sameExportRoots,verifyExportContinuation,verifyStartedExportGroup} from './text-export-continuation.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
@@ -100,7 +100,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
   let channel,signal,driver,execution,configuration,inputMapping,variableMapping=null,recoveryReads=0;
-  let startedFinish,confirmedStepId;
+  let startedFinish,confirmedStepId,resumedProcesses;
   const record=async event=>{
    const saved=await onRecord(event);
    if(event.phase==='node_step_completed'){
@@ -128,6 +128,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
    // readPreparedNodeContext binds the native package and tab even before the first Save.
    const pkg=surface?.package_identity;
    if(launchConfirmed&&operation.nodeApply.pending?.phase==='finish'&&surface.active_tab_ref
+    &&surface.node_processes.processes.every(p=>p.parent_id!==null||/^[1-9]\d*$/.test(p.process_id)&&BigInt(p.process_id)<=BigInt(e.group_id))
     &&(typeof pkg?.path==='string'&&pkg.path.length>0||pkg?.path===null&&typeof pkg.name==='string'&&pkg.name.length>0)){
     const config=operation.nodeApply.phases.find(p=>p.phase==='configure')?.value.configuration;
     const check=config?.configured?.destination_check,requested=operation.nodeApply.request.parameters.destination;
@@ -151,6 +152,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
      ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true});
     need(surface.active_tab_ref===original.tab&&surface.package_identity?.path===original.package.path&&surface.package_identity?.name===original.package.name
      &&verifyStartedExportGroup({node:state.node,finish:original.value,surface}),'Original export execution checkpoint differs');
+    resumedProcesses=surface.node_processes;
     return original.value;
    },
    verifySource:async()=>verified({source_kind:'upstream_table',not_applicable:true}),
@@ -219,7 +221,8 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
    async configureExport(ctx,p){enter(ctx);const r=await configureTextExport(channel,p,{...ctx,mode:operation.nodeApply.request.mode,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,variableMapping,close:closePreparedWizard});configuration=r.configuration;return r;},
    finish,
    async waitExecution(ctx){startedFinish=undefined;enter(ctx);need(driver,'Export execution baseline missing');
-    try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});}
+    try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal,
+     verifyProcessHistory:resumedProcesses?current=>need(sameExportRoots(resumedProcesses,current),'Export process history changed before file reading'):undefined});}
     catch(error){
      if(!ctx.stopSignal?.aborted||error!==ctx.stopSignal.reason||operation.transportUncertain)throw error;
      const saved=await onRecord({phase:'node_server_stop_requested',operation_id:operation.id,execution:structuredClone(ctx.execution),node:structuredClone(ctx.node)});

@@ -16,11 +16,16 @@ function boundExportExecution({node,finish,surface,checkpoint}){
 export function verifyExportContinuation(args){
  return boundExportExecution(args)&&JSON.stringify(exportContinuationSurface(args.surface))===JSON.stringify(args.finish.continuation_surface);
 }
+export function sameExportRoots(before,current){
+ const records=s=>s.processes.filter(p=>p.parent_id===null).map(p=>[p.process_id,p.record_id]).sort(([a],[b])=>a.localeCompare(b));
+ return current?.verified===true&&current.inventory_complete===true&&current.show_completed===true
+  &&current.root_id===before.root_id&&JSON.stringify(records(current))===JSON.stringify(records(before));
+}
 // The original group may advance while its finish acknowledgement is missing.
 export function verifyStartedExportGroup({node,finish,surface}){
  const before=finish.continuation_surface;
  return boundExportExecution({node,finish,surface:before})&&boundExportExecution({node,finish,surface})
   &&surface.dom_epoch.document===before.dom_epoch.document&&surface.dom_epoch.revision>=before.dom_epoch.revision
-  &&surface.prepared_node_context.tid===before.prepared_node_context.tid&&surface.node_processes.root_id===before.node_processes.root_id
+  &&surface.prepared_node_context.tid===before.prepared_node_context.tid&&sameExportRoots(before.node_processes,surface.node_processes)
   &&[before,surface].every(s=>s.node_processes.processes.filter(p=>p.parent_id===null&&p.process_id===finish.execution_group.group_id).length===1);
 }

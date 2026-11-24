@@ -108,8 +108,8 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     // readiness read instead of discarding one full inventory immediately.
     return observe(condition,s=>consoleVisible(s)&&ready(s),extra);
   }
-  async function closeConsole(s) {
-    if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
+  async function closeConsole(s,verifyProcessHistory) {
+    if(consoleVisible(s))await act(s,'ConsoleForm;btnClose','click',fresh=>{verifyProcessHistory?.(fresh.node_processes);return node;});
     const closed=await observe('process console closed',s=>!consoleVisible(s),{readProcesses:false,readProcessControls:true});
     // An initially open ConsoleForm scopes out the toolbar. Retain its
     // control after Close, before launch, also in the shared channel.
@@ -345,7 +345,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       });
       return verifyExecutionReadWait(execution,snapshot.node_processes,readWaitBinding);
     },
-    async waitCompleted({signal,stopSignal}={}) {
+    async waitCompleted({signal,stopSignal,verifyProcessHistory}={}) {
       requireValue(execution,'An identified execution is required');
       let s;
       const condition='new node execution completed';
@@ -430,7 +430,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};
       const receipt=failed?verifyFailedChildExecution(execution,s.node_processes,child,owner)
         :verifyCompletedExecution(execution,s.node_processes,owner);
-      await closeConsole(s);
+      await closeConsole(s,verifyProcessHistory);
       await returnToExecutedWorkflow(channel,node);
       return failed?{...receipt,cleanup_complete:true,effect_possible:false}:receipt;
     },
