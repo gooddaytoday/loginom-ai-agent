@@ -19921,3 +19921,263 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Простой в S6 — 6 минут на переднем плане и 5 с у службы, а не 19–30 минут, как в spike: один цикл обновления каталога.
 - Полные наборы `loginom-host`, `evals`, `tui` после закрытия `.claude` не запускались (задание называет `cli`, `server`,
   `core`, `loginom-agent`).
+
+## B2.9a Разведка дашбордов
+
+23.11.2026. Задача B2.9a (В-85), ветка `b29a-dashboards-scout` от `oc2-migration` (`ed7e816b82`), рабочее дерево
+`.claude/worktrees/b29a`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99): код дашбордов в нём тот же, что на точке
+отсечения `a080f7725c` (ниже, «Команды и вывод»). Только чтение кода и этот раздел; кода нет, тестов не запускал, модель
+не вызывалась. Bun 1.4.4 переносной первым в `PATH`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть. Решения
+владельца (`decisions.md`, ветка `prototype-source`) — только читал: В-85, В-86, В-97 п. 9, В-99.
+
+### Итог
+
+- 0.4 разносит дашборды по 26 файлам `packages/opencode/src` и 19 файлам тестов. Новых файлов кода три
+  (`tool/dashboard.ts`, `product/dashboard-session.ts`, `cli/standalone-dashboard.ts`), остальное — правки ядра 0.4:
+  сессия, ход, файловые инструменты, разрешения, CLI.
+- В v2 этих швов нет. Профиль, пути и привязку к черновику плагин строит на своих хуках (`permission.evaluate`,
+  `execute.before`, `context`, `prompt`, `mcp.transform`, `storage`). Правок `core` разведка не требует, и после d и g
+  `pending: B2.9` у CAT-05 снимается без путей upstream. Файлы upstream правят только задачи CLI: i и j
+  (`cli/src/run/{run,noninteractive}.ts`, `cli/src/mini-host.ts`, `tui/src/mini/tool.ts`), с записью в `catalog.md`
+  (CAT-08, CAT-11, CAT-12), как B2.7a4 записал `run/run.ts` и `noninteractive.ts`.
+- Подготовка цели до чата уезжает в RPC плагина: Host теперь в службе. Это блок `standalone-run.ts` (CLI) и логика
+  Desktop `dashboard-target.ts` с 9 тестами. Desktop в B4 (ВШ-6) остаются очередь ссылок и мост к RPC.
+- Нарезка — 9 задач, B2.9b…B2.9j. Оценка — 7–9,5 агенто-дня; строка дельты плана — 3–5 (ниже, «Оценка»). В шлюз B
+  я отношу три задачи — b, c, d: профиль дашборда — открытая часть G1 (`guarantees.md`). Это моё решение, его нужно
+  подтвердить (ниже, «Где решал сам»).
+- Вопрос владельцу один: разрешения в сессии дашборда. Он блокирует B2.9f и B2.9g; B2.9b начинать можно.
+
+### Поправки к плану
+
+- В плане сказано: «Перенести в плагин: … `standalone-dashboard`». На деле это код CLI: разбор `run --dashboard`
+  (B2.9i). В плагин уходит только подготовка цели (B2.9h).
+- Правки `tool-policy`, `turn-lifecycle` и `task-scope` уже перенесены в B2.2, B2.3 и B2.5d — в `access.ts`, `index.ts`
+  и `dock.ts`, но без профиля дашборда. Осталась только дельта дашбордов (B2.9b).
+- 256 строк без задачи (B1.2b) распределены так: `session`, `prompt`, `tools`, `external-directory`, файловые
+  инструменты, `permission`, `command` → B2.9b, c, d, g.
+- 154 строки CLI (`run.ts`, `standalone-run.ts`, `import.ts`): первые два файла → B2.9h, i, j. `import.ts` не нужен
+  (B2.9d).
+- `json_schema` в сессии дашборда (0.4: `prompt.ts`) не нужен: в `PromptInput` v2 нет формата ответа
+  (`schema/src/prompt-input.ts`).
+
+### Карта 0.4 → v2
+
+Строки: у новых файлов — `wc -l`, у правок — изменённые строки `git diff --stat 6adfe42cea a63462dde1` (добавленные и
+удалённые вместе). Тесты 0.4 — файлы и число тестов о дашбордах.
+
+| Файл 0.4 | Строк | Тесты 0.4 | Назначение | Куда в v2 |
+|---|---|---|---|---|
+| `opencode/src/tool/dashboard.ts` | 226 | `test/tool/dashboard.test.ts` 792 (18 тестов, с циклами ≈30 случаев) | `dashboard_draft` (черновик на localhost), `dashboard_publish` (через Host; вопрос с узлом, пакетом и конфликтом версии), `dashboard_delete` (версии и папка, вопрос на каждый набор) | плагин, новый `loginom-agent/src/dashboard-tools.ts`: e, f, g |
+| `opencode/src/product/dashboard-session.ts` | 71 | `test/product/dashboard-session.test.ts` 134 (6) | корень `<data>/dashboards`, признак рабочей папки, правило `dashboard_publish ask`, пути (чтение `work/`, запись `work/src/`, ссылки), маркер черновика в metadata | плагин, новый `loginom-agent/src/dashboard.ts`: корень и признак — b, пути — c, маркер → хранилище плагина — d, правило публикации — f |
+| `opencode/src/cli/standalone-dashboard.ts` | 20 | `test/cli/standalone-dashboard.test.ts` 498 (7), `standalone-dashboard-pty.py` 72 | разбор `run --dashboard <id>`, конфликты флагов | `cli`: `cli/src/standalone.ts` (`forward`) — i; pty — j |
+| `opencode/src/product/tool-policy.ts` | 46 (20) | `tool-policy.test.ts` (2 о дашборде) | профиль `loginom-dashboard`: только `read`, `glob`, `grep`, `edit`, `write`, `apply_patch`, `skill`, `dashboard_*`; без Loginom и MCP | перенесено в B2.2 (`access.ts`) без профиля; дельта — b |
+| `opencode/src/product/turn-lifecycle.ts` | 232 (36) | `turn-lifecycle.test.ts` (1) | ход дашборда без аренды Host и без подсказок Loginom | перенесено в B2.3, B2.5d (`index.ts`: `hold`, `dock.refresh`, `dock.system`); дельта — b |
+| `opencode/src/session/task-scope.ts` | 148 (3) | `task-scope.test.ts` (2) | неизменяемый базовый профиль задачи | перенесено в B2.2 (`access.ts` `next`, хук `prompt`); дельта — b |
+| `opencode/src/product/tool-contributor.ts` | 11 | — | инструменты дашборда — только в его профиле | регистрация в `index.ts`: b, e |
+| `opencode/src/session/session.ts` | 46 | `prompt.test.ts` (2 из 4), `session.test.ts` (11 строк) | `getForExecution` (принять старую строку, сверить маркер), `retireDashboard`, маркер при create, fork и setMetadata | d (хранилище плагина, хук `fork`), g (`deleted`) |
+| `opencode/src/session/prompt.ts` | 33 | `prompt.test.ts` (4) | сверка маркера; в дашборде нет MCP-ресурсов, `json_schema` и подзадач без допуска; конец хода после удаления; команда — только в рабочей папке | b (MCP, вложения агентов), d (маркер), g (конец хода); `json_schema` не нужен |
+| `opencode/src/session/tools.ts` | 23 | `tools.test.ts` (12 строк), `profile-tools.test.ts` (100 строк) | `ctx.dashboardWork`, правило публикации в наборе, маркер до и после чтения | b, c, d |
+| `opencode/src/tool/external-directory.ts` | 53 | `dashboard-guard.test.ts` 523 (17, ≈21 случай), `external-directory.test.ts` (2 строки) | пути до вопроса; запись под блокировкой снимка (`withSnapshot`) | c (пути), d (сверка черновика) |
+| `opencode/src/tool/{edit,write,apply_patch}.ts` | 13 + 9 + 23 | в guard | запись через `workspaceWriter`, без форматтера | c, d |
+| `opencode/src/tool/{glob,grep}.ts` | 19 + 20 | в guard | проверка внешнего каталога раньше вопроса | c |
+| `opencode/src/permission/index.ts` | 16 | в `dashboard.test.ts` | `dashboard_delete` спрашивает всегда, «always» → отказ | g (`permissions.ts`), по вопросу владельцу |
+| `opencode/src/command/index.ts` | 4 | — | без MCP prompts в рабочей папке | b (`ctx.mcp.transform`) |
+| `opencode/src/{format/index,lsp/lsp}.ts` | 3 + 3 | guard: Prettier ×4, LSP ×2 | форматтеры и LSP выключены в рабочей папке | LSP не нужен: в файловых инструментах v2 его нет (`core/src/tool/plugin/write.ts:30`, `edit.ts:254`); форматтер — c |
+| `opencode/src/tool/tool.ts` | 1 | — | поле `dashboardWork` контекста | не нужен: плагин знает Location и сессию |
+| `opencode/src/cli/cmd/run.ts` | 74 | `standalone-dashboard.test.ts` | рабочая папка как `--dir`, синтетическая часть `dashboardPrompt`, подтверждение удаления, текст отказа публикации | i (папка, промпт), j (подтверждения) |
+| `opencode/src/cli/standalone-run.ts` | 69 | то же; `fixture/standalone.ts` (71 строка) | подготовка цели до чата частным Host (`prepareDashboard`, `dashboard.read`), уведомления, коды | h (RPC), i (вызов из CLI) |
+| `opencode/src/cli/cmd/run/runtime.stdin.ts` | 44 | pty | `readTerminalConfirmation` | j |
+| `opencode/src/cli/cmd/run/tool.ts` | 3 | — | вывод `dashboard_delete` блоком | j (`tui/src/mini/tool.ts`) |
+| `opencode/src/cli/cmd/import.ts` | 44 | `import.test.ts` (68 строк), `httpapi-sync.test.ts` (44) | импорт и повтор событий не снимают маркер | не нужен: привязка вне metadata (d) |
+| `packages/dashboard` | 56 файлов / 4 816 (B1.2b) | 32 / 7 803 | шаблон, сборка, черновик, публикатор, контракты | как есть (В-85); от `v0.4.0` отличается одной строкой (`web/server.ts`, B1.5) |
+| `loginom-host/src/{dashboard,task-scope}.ts`; части `adapter`, `host`, `host-port`, `node-entry`, `errors` | 56 + 16 | `dashboard.test.ts` 313, `task-scope.test.ts` 570 | операции хранилища публикаций, профиль Host `loginom-dashboard`, `dashboard.read` до чата | как есть; плагин зовёт `lease.dashboard*` и запрос Host до чата |
+| `loginom-runtime/src/dashboard-storage.{mjs,d.mts}` | 270 + 4 | 334 | хранилище публикаций в Loginom | как есть |
+| `product/src/dashboard-root.ts` | 39 | 53 | маркер, корень данных CLI и Desktop, признак папки | как есть; плагину нужен `isDashboardWorkDirectory`; `dashboardDataRoot` в B не нужен (корень у сервера, h) |
+| `product/skills/loginom-dashboard/SKILL.md` | 68 | `bundled-skills` | навык | как есть (B2.4) |
+| `desktop/src/main/dashboard-target.ts` | 52 | `dashboard-target.test.ts` 257 (9) | подготовка цели до чата: статус, готовность, каталог, `readDashboard` | логика и 9 тестов — h; мост к RPC — B4 (ВШ-6) |
+| `desktop/src/main/deep-links.ts` | 28 | `deep-links.test.ts` 16 (1) | очередь ссылок `loginom-ai-agent://`, холодный старт | B4 (ВШ-6, В-97 п. 9) |
+| `desktop/test/loginom/dashboard-chat.ts` | 353 | — | ручная GUI-проверка | B4 и этап C, с показом |
+| `desktop`: `index.ts:431-441`, `ipc.ts`, preload | — | — | IPC окна | B4 (мост), этап C |
+| `app`: `dashboard-links.ts` 147, `dashboard-handoff.ts` 18, `prompt-input/submit.ts` и др. (+611 по B1.2b) | — | `test-browser/dashboard-publication.test.ts` 215, `e2e/regression/dashboard-delete-result.spec.ts` 27 | ссылки, «Изменить в чате», показ публикации | этап C |
+
+### Что в v2 даёт плагину нужное
+
+Всё ниже прочитано в коде, не проверено запуском:
+
+- **Профиль на всю сессию по папке.** Плагин живёт в каждой Location (`ctx.location.directory`), поэтому базовый профиль
+  дашборда задаёт папка Location, как в 0.4 его задавал каталог сессии.
+- **Пути.** `permission.evaluate` получает ресурсы `read` и `edit`. Внутри Location это относительный путь, снаружи —
+  абсолютный (`core/src/file-access.ts`). `patch` передаёт все цели, в том числе перенос и удаление (`patch.ts:187-193`);
+  `glob` и `grep` передают каталог через `external_directory`, а `path` — в metadata. Путь там лексический: ссылку внутри
+  папки ядро считает своей. Внутренним ядро считает и весь git-репозиторий проекта (`file-access.ts:92-95`). Поэтому
+  проверка `realpath` против `work/` нужна в плагине (тест 0.4 «… including inside a git repository»).
+- **MCP.** `ctx.mcp.transform` убирает серверы Location: вместе с ними уходят инструменты, ресурсы и prompts.
+- **Привязка.** Есть хранилище плагина `ctx.storage`. У metadata сессии есть изъян: её задают `session.create` и
+  `session.update` публичного API (`protocol/src/groups/session.ts:179, 311`), и её наследуют форки
+  (`schema/src/session-metadata.ts`). Перенос B3.1 metadata сохраняет (`core/src/database/v1-migration.bun.ts:896`).
+- **Вопрос посреди инструмента.** `ctx.permission.assert` с ресурсами и metadata. Правило «спрашивать каждый раз» уже есть
+  у терминала (`permissions.ts`, `settle`).
+- **Host.** `ServiceHost.acquire` даёт аренду с `dashboardRead`/`Publish`/`Versions`/`Delete` и `scope`
+  (`loginom-host/src/adapter.ts`). Запрос `dashboard.read` до чата знает `node-entry.ts:129`.
+- **Остановить ход после инструмента плагину нечем.** В `Tool.Result` нет такого признака. `session.interrupt` кончает
+  исполнение как `interrupted`, и `run` сообщает ошибку `aborted` (`cli/src/run/noninteractive.ts:351-361`).
+- **Форматтер.** Без ключа `formatter` в конфиге форматтеров нет: `resolve` в `core/src/config/plugin/formatter.ts:64-76`
+  тогда возвращает `undefined`, и `ConfigFormatterPlugin` ничего не ставит. Встроенный конфиг продукта (B2.8) этого
+  ключа не задаёт (`grep formatter` по `cli/src`, `product`, `loginom-agent/src` — пусто). С ключом `patch` зовёт `formatter.file` (`patch.ts:261`), а домена форматтеров у плагина нет.
+- **Модель-сценарий в тестах CLI.** `cli/test/fixture/product-run.ts` (`scriptedModel`) отвечает вызовами инструментов и
+  записывает тела запросов. Проверка из CLI без настоящей модели работает так же, как в 0.4.
+
+### Нарезка
+
+Задачи — не больше пяти файлов кода (тесты и документы не считаются). Буквы без префикса ниже — B2.9b…B2.9j.
+
+| Задача | Что | Файлы кода | Зависит от | Размер | Приёмка: тесты 0.4 и проверка из CLI без модели | Шлюз B |
+|---|---|---|---|---|---|---|
+| **B2.9b** Профиль | Location, чья папка — рабочая папка дашборда (`isDashboardWorkDirectory` под `Global.Path.data/dashboards`), получает базовый профиль `loginom-dashboard` на всю сессию. `permits` — только `read`, `glob`, `grep`, `edit`, `write`, `patch`, `skill`, `dashboard_*`. Навык и вложение базу не меняют (`next`, хук `prompt`). Нет аренды Host, каталога Dock и подсказок Loginom (`hold`, `dock.refresh`, `dock.system`; B2.3 «сессия дашборда без аренды»). MCP-серверы Location убраны. Вложения агентов в промпте отклоняются | `loginom-agent/src/{access,index}.ts`, новый `loginom-agent/src/dashboard.ts` | B2.2, B2.3, B2.5d, B2.6a (сделаны) | M | `tool-policy.test.ts` (2), `task-scope.test.ts` (2) → `access.test.ts`; `dashboard-session.test.ts` (4 о признаке папки) → `loginom-agent/test/dashboard.test.ts`; `turn-lifecycle.test.ts` (1), дашборд из `profile-tools.test.ts`, `prompt.test.ts` «persisted subtask» → `server/test/loginom-access.test.ts`. CLI: `run --model test/…` в папке-фикстуре — в запросе нет `shell`, `subagent`, `loginom_*` и MCP, записи аренды Host нет | **да**, G1 («профиль дашборда — B2.9»); мутация: база не применяется |
+| **B2.9c** Пути | Чтение — только внутри `work/`, запись — только в `work/src/`, по реальному пути: ссылки, `..` через ссылку, висячие ссылки, `control/`. Выход наружу — отказ без вопроса (`external_directory` в дашборде — deny). Хуки `permission.evaluate` (ресурсы `read`, `edit`) и `execute.before` (`glob`, `grep`: `path` и шаблон с `..`). Форматтер файлов дашборда (ниже, «Где решал сам») | `dashboard.ts`, `index.ts`, `permissions.ts` | b | M | `dashboard-session.test.ts` (1 о путях, в том числе внутри git-репозитория) → `loginom-agent/test/dashboard.test.ts`; `dashboard-guard.test.ts` (17 тестов без 2 о LSP) → `server/test/loginom-dashboard-files.test.ts` на инструментах v2. CLI: модель-сценарий зовёт `read ../control/binding.json` и `write notes.txt` — ошибка инструмента без вопроса, и с `--auto` тоже; `write src/App.tsx` проходит | **да**, G1; мутация: проверка пути всегда пропускает |
+| **B2.9d** Привязка к черновику | Сессия дашборда привязана к `draftId` из `control/binding.json`. Привязка хранится в `ctx.storage`, не в metadata. Маркеры 0.4 из metadata плагин переносит в хранилище один раз — при первом старте в Location дашборда, для всех её сессий (`ctx.session.list`); позже metadata не читается. Старый чат после пересоздания или удаления папки получает `LOGINOM_SCOPE_DENIED` до модели и до инструмента. Сверка — до записи и после неё. Форк и `move` сессии в папку дашборда | `dashboard.ts`, `index.ts` | b; c (те же файлы, после неё) | S | `prompt.test.ts`: «adopts an older dashboard row once…» и «…retires every old chat across recreation» (часть о старых чатах); `dashboard-guard.test.ts`: «expired dashboard context», «cannot capture a replacement draft». Вместо `import.test.ts`, `httpapi-sync.test.ts`, `session.test.ts` (маркер) — `session.update` с чужой metadata привязку не меняет. CLI: `run --session <старый>` после пересоздания — отказ, запросов к модели не прибавилось | **да**, G1; мутация: привязка не сверяется |
+| **B2.9e** `dashboard_draft` | Черновик из `src/` (`draftDashboard`, ресурсы из `LOGINOM_AI_AGENT_RESOURCES`). Инструмент есть только в Location дашборда, с `codemode: false`. Сервер черновика гасится при выгрузке плагина. У `loginom-agent` — зависимость `@loginom-ai-agent/dashboard` | новый `dashboard-tools.ts`, `index.ts`, `loginom-agent/package.json` (+`bun.lock`) | b | S | `dashboard.test.ts`: 2 теста `dashboard_draft`. CLI: без ресурсов — `DASHBOARD_RESOURCES_MISSING`; в обычной папке инструмента нет | нет |
+| **B2.9f** `dashboard_publish` | Подготовка (`withDashboardStage`, `preparePublish`). Последняя версия читается через аренду Host с `scope bind loginom-dashboard`. Вопрос `dashboard_publish` — узел, путь пакета и конфликт (`ctx.permission.assert` с metadata). Затем сверка черновика и `finishPublish`. Как спрашивать — по ответу на вопрос владельцу | `dashboard-tools.ts`, `permissions.ts`, `index.ts` | e, d; **вопрос 1** | M | `dashboard.test.ts`: публикация ×3 ответа, пересоздание, «approval belongs to the draft» (публикация), прерывание сборки, предел вывода, отказы Host ×4, новая версия на сервере; `dashboard-session.test.ts` «publication requires confirmation…». Host — `server/test/fixture/loginom-dock-host.ts`. CLI: с `--auto` Host-фикстура получает одну публикацию | нет |
+| **B2.9g** `dashboard_delete` | Список версий; вопрос на каждый новый набор; прогресс — в metadata инструмента. Затем удаление папки и отзыв черновика, привязка — `deleted`. Конец хода после удаления: хук `context` убирает инструменты, ход кончается одним ответом модели | `dashboard-tools.ts`, `permissions.ts`, `index.ts` | f; **вопрос 1** | M | `dashboard.test.ts`: 9 тестов удаления (14 случаев с циклами), «approval belongs» (удаление); `prompt.test.ts` «successful dashboard deletion ends its turn» — в v2: в следующем запросе нет инструментов. CLI: без терминала — отказ (j) | нет |
+| **B2.9h** RPC подготовки цели | `loginom.dashboard`. `prepare(id, defer)`: статус подключения, ожидание готовности и каталога поколения, `dashboard.read` Host до чата, `prepareDashboard` в `Global.Path.data/dashboards` из шаблона ресурсов. Ответ — папка, действие, уведомление или код: `LOGINOM_CONFIG_REQUIRED`, `DASHBOARD_SNAPSHOT_*`, `DASHBOARD_BINDING_CONFLICT`, `DASHBOARD_PUBLICATION_*`. `find(id)` — для Desktop. Зовут CLI (i) и Desktop (ВШ-6) на Location своего рабочего каталога: CLI — PWD `run`, как `loginom.preflight`; Desktop — Location окна. Папки дашборда до `prepare` нет, RPC работает с `Global.Path.data` | новый `dashboard-target.ts`, `host.ts` (запрос Host до чата), `index.ts` | b | M | 9 тестов Desktop `dashboard-target.test.ts` → тест RPC в `server/test` (Studio-фикстура, Host по сценарию). CLI — в i | нет |
+| **B2.9i** `run --dashboard <id>` | `Standalone.forward`: флаг и конфликты (`--continue`, `-c`, `--session`, `-s`, `--fork`, `--command`, `--dir`, `--attach`; не для TUI) → код 2. `run/product.ts`: `prepare` до создания сессии, уведомления 0.4 в stderr, коды. `run/run.ts`: Location — рабочая папка, промпт с `dashboardPrompt(action)` (синтетических частей промпта в v2 нет — способ выбрать в задаче) | `cli/src/standalone.ts`, `cli/src/run/{product,run}.ts` | h, e | M | `standalone-dashboard.test.ts`: флаги (3), неверные аргументы и нет подключения без проекта (1: неверные аргументы отклоняет `forward` до сервера; при «нет подключения» `prepare` идёт на Location PWD — создаёт ли v2 при этом проект, проверить в i, в 0.4 не создавал), `--headless` вместо ID (1), основной путь (1, без удаления) → `cli/test/cli-dashboard.test.ts`. CLI: `run --dashboard <id> --model test/… -- "Покажи суммы."` — код 0; в запросе `dashboardPrompt("create")` и рабочая папка, есть `dashboard_draft`, нет `shell`. Повтор: `DASHBOARD_SNAPSHOT_UNAVAILABLE`, код 1, без запроса к модели | нет (приёмка плана: «сессия дашборда из CLI работает») |
+| **B2.9j** Подтверждения в CLI | `dashboard_delete`: ввод «Удалить <случайное>» в управляющем терминале — и с `--auto`. Отмена, EOF, Ctrl+C, нет TTY — отказ. Публикация без `--auto` — отказ с текстом 0.4. Вывод удаления блоком | `cli/src/run/{noninteractive,product}.ts`, `cli/src/mini-host.ts` (чтение терминала), `tui/src/mini/tool.ts` | i, g | S | `standalone-dashboard.test.ts`: подтверждение публикации (`auto` ложь и истина), pty-случаи (11, Linux) со `standalone-dashboard-pty.py` → `cli/test` | нет |
+| — | Очередь ссылок `loginom-ai-agent://dashboard` и мост Desktop к RPC h | — | h | — | `deep-links.test.ts` | B4, ВШ-6 (В-97 п. 9) |
+| — | Показ, «Изменить в чате», `dashboard-links`, `dashboard-handoff`, `dashboard-publication` | — | — | — | — | этап C |
+
+Порядок. `index.ts` правят почти все задачи, поэтому цепочка последовательная: b → c → d → e → f → g. h идёт после b, i —
+после h и e, j — после i и g. Параллельно цепочке можно вести только h, и то с аккуратным слиянием `index.ts`.
+
+### Оценка
+
+Размер в таблице нарезки — по объёму кода и тестов, дни — по каждой задаче отдельно: b 1–1,5, c 1–1,5, d 0,5, e 0,5,
+f 1, g 1–1,5, h 0,5–1, i 1, j 0,5–1.
+
+| | Задачи | Дни |
+|---|---|---|
+| Шлюз B (G1) | b, c, d | 2,5–3,5 |
+| Плагин вне шлюза | e, f, g, h | 3–4 |
+| CLI | i, j | 1,5–2 |
+| **B2.9 всего** | 9 | **7–9,5** |
+| План, строка дельты B2.9 (оценку этапа В-98 сменил на 54–87, пересмотр — на checkpoint B2) | — | 3–5 |
+| Предложение B1.2b | — | 2–3 |
+
+Больше строки плана на 4–4,5 дня; перерасход — к пересмотру на checkpoint B2 (В-98). Причины:
+
+1. **Швов 0.4 в v2 нет.** `getForExecution`, `ctx.dashboardWork`, `workspaceWriter` и разрешения ядра 0.4 нужно
+   заменить хуками плагина. Около 2,8 тыс. строк тестов переписываются на фикстуры сервера v2, как в B2.5, а не
+   копируются.
+2. **Подготовка цели Desktop переезжает в плагин (h).** Это 52 строки кода и 257 строк тестов, при оценке плана их
+   не было. ВШ-6 в B4 (1–1,5 дня) от этого уменьшится.
+3. **CLI (i, j, 1,5–2 дня) план считал частью «плагинной» оценки.** Если владелец согласится, что в CLI удаление
+   всегда отклоняется, j сводится к одной строке в i (−0,5–1 день).
+
+### Вопрос владельцу
+
+1. **Разрешения в сессии дашборда.** Вопрос меняет контракт B2.6a. Блокирует B2.9f и B2.9g, а для B2.9c — приёмку
+   записи. Начинать b, d, e, h можно.
+   - **0.4.** Запись в `work/src/` шла без вопроса: агент `build` разрешал всё, путь ограничивал профиль. Публикация
+     спрашивала всегда, даже при общем `allow` (правило `dashboard_publish ask` после правил пользователя), и называла
+     узел и пакет. Удаление спрашивало каждый раз: ответ «always» превращался в отказ, в CLI требовался ввод фразы даже с
+     `--auto`.
+   - **v2 сейчас (B2.6a).** `edit` — «спрашивать». `dashboard_publish` и `dashboard_delete` — вид «Сохранять в
+     Loginom»: «Разрешено» и «в этом разговоре» снимают вопрос.
+   - **А.** Как в 0.4. В Location дашборда `edit` внутри `work/src/` проходит без вопроса. Публикация и удаление
+     спрашивают каждый раз, как терминал (В-31): ни «Разрешено», ни «в этом разговоре» вопрос не снимают. Запрет
+     администратора действует.
+   - **Б.** По видам B2.6a. Запись спрашивает: в CLI без `--auto` модель не может править черновик. Публикацию и
+     удаление снимает «Разрешено».
+   - **В.** Запись — как в 0.4, публикация и удаление — по видам B2.6a.
+   - **Рекомендация: А.** Это паритет шлюза B и требование `docs/security/dashboard-isolation.md`: привязка в снимке —
+     заявление отправителя, защита от подмены — окно подтверждения публикации с узлом и пакетом. ux-spec про удаление
+     говорит «спрашивает» (B2.6a, «Найдено»).
+
+### Где решал сам
+
+- **Шлюз.** В-86 дашборды не называет, Desktop-часть В-97 п. 9 выносит из приёмки шлюза. Но в строке G1
+  `guarantees.md` «профиль дашборда — B2.9» записан как неперенесённая часть гарантии. Поэтому в шлюз B отнесены
+  задачи профиля, путей и привязки (b, c, d) — с мутациями. Инструменты, RPC и CLI — вне шлюза, в объёме этапа B по
+  В-85. Подтвердить владельцу: так b, c, d попадают и в checkpoint B2 (G1 с мутациями).
+- **Корень дашбордов — у сервера** (`Global.Path.data/dashboards`), CLI и Desktop получают папку через RPC h. Находка
+  B1.4c (`dashboardDataRoot` по умолчанию `prod`) этим снимается. Сама функция остаётся в `product` без вызовов, не
+  удалял.
+- **Привязку хранит плагин, а не metadata сессии.** Metadata меняет публичный API и наследует форк, а 0.4 защищал маркер
+  в четырёх местах (`setMetadata`, fork, import, повтор событий). Маркеры 0.4 плагин переносит в хранилище один раз,
+  при первом старте в Location дашборда; после этого подмена metadata привязку не меняет.
+- **Пути закрывает только плагин, правок upstream нет.** В 0.4 запись шла под блокировкой снимка (`withSnapshot`,
+  синхронная SQLite-транзакция). Плагин записью ядра не владеет, поэтому вместо блокировки — сверка до записи и после
+  неё. Остаётся узкая гонка с пересозданием папки: одна запись старого чата может попасть в новый черновик того же
+  дашборда. Записываю это в c и d как ограничение. Подтвердить владельцу: ослабление касается задачи из G1.
+- **Форматтер.** В v2 он работает только при ключе `formatter` в конфиге пользователя; встроенный prettier ищет
+  `package.json` с зависимостью вверх от папки Location. Закрыть в c одним из двух способов: конфиг проекта
+  `formatter: false` в рабочей папке (`h` пишет его при подготовке, модель туда писать не может) или запрет имён
+  конфигов форматтеров в `src/`. Выбор — в задаче; шов upstream — только если оба способа не пройдут.
+- **Конец хода после удаления — без правки upstream.** Следующий запрос идёт без инструментов, это на один ответ модели
+  больше, чем в 0.4. Вариант с `interrupt` даёт в CLI ошибку вместо кода 0.
+- **LSP и `json_schema` не переносятся** — в v2 их нет (выше). LSP перепроверять при синхронизации с upstream: в
+  `write.ts` и `edit.ts` стоит TODO «after LSP runtime exists».
+
+### Найдено, не чинил
+
+- Перечень переносимого в плане B2.9 неточен (раздел «Поправки к плану»): `standalone-dashboard` — CLI, а
+  `tool-policy`, `turn-lifecycle`, `task-scope` уже перенесены. План не правил: это kit, не моя ветка.
+- `FileAccess.resolve` считает внутренним весь git-репозиторий проекта. Если каталог данных лежит в репозитории, ядро не
+  спросит `external_directory` при чтении `../control`. Для дашбордов это закрывает c; для обычных сессий так и задумано
+  upstream.
+- ВШ-6 (Desktop) теряет подготовку цели — её оценку стоит пересмотреть на checkpoint B4 после h.
+
+### Команды и вывод
+
+```text
+$ git rev-parse 'v0.4.0^{commit}'
+a63462dde14d4c01a3643ef4ad01b390d4c24abc
+$ git diff --stat a080f7725c a63462dde1 -- packages/opencode packages/dashboard packages/product packages/loginom-host \
+    packages/loginom-runtime packages/desktop/src/main/dashboard-target.ts packages/desktop/src/main/deep-links.ts \
+    packages/app/src/pages/layout | tail -1
+ 4 files changed, 31 insertions(+), 6 deletions(-)       # diagnostics-cli и standalone-status, не дашборды
+$ git diff --stat 6adfe42cea a63462dde1 -- packages/opencode/src | tail -1
+ 26 files changed, 779 insertions(+), 108 deletions(-)  # B1.2b по коммитам «dashboard»: +748 кода
+$ git diff --stat 6adfe42cea a63462dde1 -- packages/opencode/test | tail -1
+ 19 files changed, 2766 insertions(+), 63 deletions(-)
+$ git log --oneline 6adfe42cea..a63462dde1 -i --grep=dashboard | wc -l
+53
+$ git diff --stat a63462dde1 ed7e816b82 -- packages/dashboard packages/loginom-host/src/{dashboard,task-scope}.ts \
+    packages/loginom-host/test/{dashboard,task-scope}.test.ts packages/loginom-runtime/src/dashboard-storage.mjs \
+    packages/loginom-runtime/test/dashboard-storage.test.mjs packages/product/src/dashboard-root.ts \
+    packages/product/test/dashboard-root.test.ts packages/product/skills/loginom-dashboard
+ packages/dashboard/src/web/server.ts    | 2 +-
+ packages/loginom-host/src/task-scope.ts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)       # Effect 4.1 (B1.5) и одна строка task-scope
+$ grep -rn "dashboard" packages/loginom-agent/src           # на ed7e816b82
+packages/loginom-agent/src/permissions.ts:66:  { action: "dashboard_publish", resource: "*", kind: "save", effect: "ask" },
+packages/loginom-agent/src/permissions.ts:67:  { action: "dashboard_delete", resource: "*", kind: "save", effect: "ask" },
+```
+
+Строки и тесты файлов — `git show a63462dde1:<путь> | wc -l`, имена тестов — `grep` по `test(`, `it.instance(`,
+`it.live(` в тех же файлах.
+
+Проверки дерева на `f53d289278` (коммит раздела; хук `pre-commit` — `clean`). Следующие коммиты ветки меняют только
+этот раздел журнала; `catalog-check.py` на них повторён — тот же вывод. Перед `check` выполнен
+`npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` (Node 24.19.0), как в прежних разделах:
+
+```text
+$ bun run secrets staged
+{"status":"clean","commits":0,"archives":0,"current_files":0,...}
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0, как на базе
+against a6b15d33daf6: 609 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+  CAT-08: 0 (pending: B2.7)
+$ bun run check                                                        # код 0
+Found 905 warnings and 0 errors.                                       # как в B2.8
+ Tasks:    39 successful, 39 total
+```
+
+### Не проверено
+
+- Свойства хуков v2 из раздела «Что в v2 даёт плагину нужное» прочитаны в коде, запуском не проверялись. Это ресурсы
+  `permission.evaluate` у `patch` с переносом и удалением, `mcp.transform` по Location, `ctx.storage` и вопрос
+  `assert` посреди инструмента.
+- Где лежит `<data>/dashboards` после переноса профилей 0.4 (B3.3) и есть ли там папки, не смотрел. Поля metadata у
+  перенесённых сессий видел только в коде миграции.
+- Шаблон дашбордов в артефакте CLI — по описи B2.7a2, заново не проверял.
+- Windows и macOS (`realpath`, ссылки, регистр путей) — только в объёме тестов 0.4.
