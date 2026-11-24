@@ -109,13 +109,14 @@ export async function lgdExportNext(page,task,readNode,readContext,readBrowser,f
    if(name!==null){
     const source=task.variableMapping.fields.filter(f=>f.name===name&&f.source&&f.type===5&&!f.is_null);
     if(source.length!==1||typeof source[0].value!=='string')throw Error('unique observed string variable required');
-    const caption=name+' ( '+source[0].value+' )';
+    const caption=(source[0].label??name)+' ( '+source[0].value+' )';
     await page.locator('[data-tid='+JSON.stringify(tid+';VariableControl;trg_picker')+']').waitFor({state:'visible',timeout:Math.min(5000,remaining())});remaining();
     record('binding_picker_started');await click(tid+';VariableControl;trg_picker');record('binding_picker_completed');
     const choice=await page.evaluate(({tid,caption})=>{
      const es=document.querySelectorAll('[data-tid='+JSON.stringify(tid+';VariableControl')+']'),c=es.length===1&&Ext.getCmp(es[0].id);
-     const rows=c?.getStore?.()?.getData?.()?.items;
-     if(!Array.isArray(rows)||rows.filter(r=>r.data.field2===caption).length!==1)return null;
+     if(c?.el?.dom!==es[0])return null;
+     const store=c?.getStore?.(),rows=store?.getData?.()?.items;
+     if(!Array.isArray(rows)||store.isLoading?.()||rows.filter(r=>r.data.field2===caption).length!==1)return null;
      const root=c.getPicker?.()?.el?.dom,options=root?[...root.querySelectorAll('[data-tid]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})&&e.textContent.trim()===caption):[];
      return options.length===1&&options[0].getAttribute('data-tid').startsWith(tid+';VariableControl;boundlist;')?options[0].getAttribute('data-tid'):null;
     },{tid,caption});
