@@ -5,6 +5,9 @@ declare const LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: string | null
 
 export const Product = Object.freeze({
   name: "Loginom AI Agent",
+  // The publisher in the Windows version resource of the CLI executable (B4.7c). Desktop's electron-builder takes the
+  // same name from the author in packages/desktop/package.json.
+  publisher: "Loginom",
   slug: "loginom-ai-agent",
   namespace: "@loginom-ai-agent",
   envPrefix: "LOGINOM_AI_AGENT_",

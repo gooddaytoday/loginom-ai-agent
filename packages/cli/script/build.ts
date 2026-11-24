@@ -13,6 +13,7 @@ import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@openc
 import { buildAppArchive } from "./app-assets"
 import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
 import { resolveProductPty } from "./opencode-pty"
+import { brandWindowsRuntime, windowsResource } from "./windows-resource"
 import { NativeArch } from "../../../script/native-arch"
 import { bundledModelsSnapshot, modelsSnapshotPlugin } from "../../core/script/models-snapshot"
 import { Product } from "@loginom-ai-agent/product"
@@ -211,7 +212,8 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
         "--no-warnings",
         "--",
       ],
-      windows: {},
+      // Loginom AI Agent (B4.7c): the product's name, publisher and version instead of Bun's (windows-resource.ts).
+      windows: item.os === "win32" ? windowsResource(Script.channel, Script.version) : {},
     },
     define: {
       LOGINOM_AI_AGENT_VERSION: `'${Script.version}'`,
@@ -259,7 +261,11 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
 }
 
 async function compileExecutable(item: (typeof allTargets)[number]) {
-  const release = process.env.BUN_COMPILE_RELEASE
+  // Loginom AI Agent (B4.7c): Bun sets `compile.windows` only on Windows, so elsewhere a Windows target compiles from a
+  // downloaded runtime that already carries the product's version resource.
+  const release =
+    process.env.BUN_COMPILE_RELEASE ??
+    (item.os === "win32" && process.platform !== "win32" ? `bun-v${Bun.version}` : undefined)
   if (!release) return
 
   const platform = item.os === "win32" ? "windows" : item.os
@@ -308,6 +314,7 @@ async function compileExecutable(item: (typeof allTargets)[number]) {
   }
   await $`unzip -oq ${archive} -d ${cache}`
   await rm(archive)
+  if (item.os === "win32") await brandWindowsRuntime(executable, windowsResource(Script.channel, Script.version))
   return executable
 }
 
