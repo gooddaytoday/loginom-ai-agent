@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Key",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Segment",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 11,
+          "Key": "plain",
+          "Segment": "north"
+        },
+        {
+          "Id": 12,
+          "Key": "a & b",
+          "Segment": "south"
+        },
+        {
+          "Id": 13,
+          "Key": "x+y/z?",
+          "Segment": "центр"
+        },
+        {
+          "Id": 14,
+          "Key": "Привет",
+          "Segment": "east"
+        }
+      ]
+    }
+  ]
+}

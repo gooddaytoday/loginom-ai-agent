@@ -1,0 +1,11 @@
+{
+  "budget": {
+    "max_tool_calls": 9,
+    "max_errors": 1,
+    "max_nodes": 0,
+    "forbid": [
+      "hidden-marker",
+      "forbidden-result"
+    ]
+  }
+}

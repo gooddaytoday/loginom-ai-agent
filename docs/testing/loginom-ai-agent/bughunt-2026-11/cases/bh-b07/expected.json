@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "result.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Qty",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Gross",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Net",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 31,
+          "Qty": 3,
+          "Price": 12.5,
+          "Gross": 37.5,
+          "Net": 33.75
+        },
+        {
+          "Id": 32,
+          "Qty": 0,
+          "Price": 8.0,
+          "Gross": 0.0,
+          "Net": 0.0
+        },
+        {
+          "Id": 33,
+          "Qty": 2,
+          "Price": 0.75,
+          "Gross": 1.5,
+          "Net": 1.35
+        },
+        {
+          "Id": 34,
+          "Qty": 5,
+          "Price": 4.2,
+          "Gross": 21.0,
+          "Net": 18.900000000000002
+        }
+      ]
+    }
+  ]
+}
