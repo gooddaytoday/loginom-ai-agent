@@ -13,6 +13,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
+// The `bun` that records installs is a shell script.
 const posix = test.skipIf(process.platform === "win32")
 
 posix.each(["dev", "beta", "prod"])(

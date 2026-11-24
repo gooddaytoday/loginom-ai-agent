@@ -234,6 +234,16 @@ test.skipIf(!Bun.which("unzip"))(
       expect(log).not.toContain("args=")
       expect(log).not.toContain(marker)
       for (const name of files) expect(entry(name)).not.toContain(key)
+      // The log on disk, which the archive masks, holds neither the saved key nor the prompt that quotes it.
+      const logs = path.join(root, "profile", "data", "log")
+      for (const name of await fs.readdir(logs)) {
+        const text = await fs.readFile(path.join(logs, name), "utf8")
+        expect({ name, key: text.includes(key), marker: text.includes(marker) }).toEqual({
+          name,
+          key: false,
+          marker: false,
+        })
+      }
     } finally {
       await llm.server.stop(true)
     }
@@ -242,15 +252,15 @@ test.skipIf(!Bun.which("unzip"))(
 )
 
 // The log of the profile on disk keeps no command line, as in 0.4: OpenCode 2 wrote each one, with the values of `--answer`
-// (B2.7a3b). The first command fails in its handler, the second while its flags are parsed, which logs the failure too.
+// (B2.7a3b). An unknown flag fails the command while its flags are parsed, before any server, and logs the failure too.
 test("the CLI log on disk keeps no command line, of a command or of its failure", async () => {
   const root = await temporary()
   const key = "fixture-cli-log-answer-value"
-  for (const args of [
-    ["auth", "login", "openai", "--method", "key", "--answer", `key=${key}`],
-    ["debug", "paths", `--answer=${key}`],
-  ])
-    expect((await product(root, args)).code).toBe(1)
+  const result = await product(root, ["auth", "login", "--answer", `key=${key}`, "--unknown-flag"])
+  expect({ code: result.code, unrecognized: result.stderr.includes("Unrecognized flag") }).toEqual({
+    code: 1,
+    unrecognized: true,
+  })
   const logs = path.join(root, "profile", "data", "log")
   const log = (
     await Promise.all((await fs.readdir(logs)).map((name) => fs.readFile(path.join(logs, name), "utf8")))

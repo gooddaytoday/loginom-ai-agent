@@ -19928,8 +19928,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 Эталон 0.4 — `v0.4.0`. Bun 1.4.4 переносной, Node 24.19.0 и `gitleaks` 8.30.1 (`~/.local/bin`) — первыми в `PATH` только
 для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть; `npm ci
 --ignore-scripts` клиента `packages/loginom-runtime/client`; Electron 44.9.1 для тестов `desktop` распакован его
-`install.js` из кэша `~/.cache/electron` под `unshare -n`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом
-коммите. Тесты, мутации и пробы — под `unshare -n` (поднят только `lo`) с временными `HOME`, `TMPDIR`, `XDG_*`. С сетью —
+`install.js` из кэша `~/.cache/electron` под `unshare -n`. Хук `pre-commit` (`bun run secrets staged`) — `clean` на
+каждом прошедшем коммите; две остановки хука — в «Найдено». Тесты, мутации и пробы — под `unshare -n` (поднят только `lo`) с временными `HOME`, `TMPDIR`, `XDG_*`. С сетью —
 только `npm ci` (клиент и полный тест `stage-resources`, ниже). Crates.io не вызывался: все 57 архивов крейтов были в кэше
 Cargo `~/.cargo` настоящего пользователя (читался, не писался; `CARGO_HOME` задан явно, потому что `HOME` временный). Модель не вызывалась:
 ни один тест и ни одна проба не отправляли промпт. База для сравнения — отдельное дерево на `ed7e816b82` в scratchpad
@@ -19949,7 +19949,8 @@ build.rs}`; `catalog.md` (CAT-02, CAT-12).
 | `a70d477c5b` `fix(cli): keep command lines out of the CLI log` | `cli/src/index.ts`, тест `cli/test/cli-standalone.test.ts` (новый случай и правка имеющегося) |
 | `2bc1efc14c` `feat(loginom-host): stage the notices of loginom-ai-agent-pty and its crates` | `loginom-host/script/stage-resources.ts`, тесты `loginom-host/test/pty-notices.test.ts` (новый), `stage-resources.test.ts` (+5 строк в полном случае) |
 | `9ee821c2a1` `docs(upstream-sync): describe the CLI-only Desktop build and the CLI log without command lines in the catalog` | `catalog.md`: CAT-02, CAT-12 |
-| следующий | этот раздел |
+| `897903b537` `docs(upstream-sync): record the stage B release tails: …` | этот раздел, первая редакция |
+| следующий | тесты: `cli-standalone.test.ts` (сырой журнал в случае выгрузки; новый случай — один процесс без сервера), комментарий пропуска в `bundled-cli.test.ts`; правки раздела |
 
 Файлы кода — пять (предел — пять), тесты не считаются:
 
@@ -19986,6 +19987,9 @@ build-node.ts`) в любом канале, и для сборки, и для р
   dev runs the CLI from packages/cli`, код 1, `resources/` не тронут); `--build-server` по-прежнему принимается и ничего не
   меняет; служба всегда из исходников (`LOGINOM_AI_AGENT_DESKTOP_CLI_DEV`), как и раньше по умолчанию.
 
+Других путей к CLI из npm в `packages/desktop` нет: `git grep` по `@opencode/cli`, `bun install`, `download` в `script/`,
+`scripts/`, `src/main`, `electron-builder.config.ts`; `perf/startup.bench.ts` берёт только `@opencode/client/service`.
+
 ### 2. Журнал CLI на диске без командной строки
 
 Было: `cli/src/index.ts` писал `args=[…]` в двух записях — `cli starting` (каждая команда) и `cli process failed` (упавшая
@@ -20013,6 +20017,10 @@ files under root with the key: []
 
 Ключа нет ни в одном файле временного корня (весь корень, включая базу профиля). Причина в `cause` ключа не содержит.
 `auth login` с этим ответом падает на форме («Unknown form field: key») до подключения: ключ никуда не уходит.
+
+Ключ, **сохранённый** через `POST /api/integration/stub/connect/key`, и промпт `run`, где он и метка (случай выгрузки
+B2.7a3b), в сыром журнале на диске теперь тоже не встречаются — проверка добавлена в тот же случай. Строка B2.7a3b «key in
+log raw file: true» объяснялась `args`: других писателей ключа в журнал нет.
 
 ### 3. Уведомления о лицензиях своего pty
 
@@ -20058,8 +20066,8 @@ real 0m1.263s                                         # 1,5 МБ на диске
 |---|---|
 | `desktop/script/bundled-cli.test.ts`, «the %s channel without a built CLI fails and downloads nothing» (таблица `dev`, `beta`, `prod`; не Windows) | `copyBuiltCliToResources` в отдельном процессе Bun с `LOGINOM_AI_AGENT_CHANNEL` и подставным `bun` первым в `PATH`, который записывает вызовы: подставной `bun` не вызывался, код не 0, ошибка называет каталог и команду сборки, `resources/` не создан |
 | там же, «a built CLI is bundled with its version» (Linux) | собранный CLI копируется в `resources/loginom-ai-agent-cli` с файлом версии — отказ не шире нужного |
-| `cli/test/cli-standalone.test.ts`, «the CLI log on disk keeps no command line, of a command or of its failure» (новый) | вход продукта из исходников: `auth login openai --method key --answer key=<ключ>` и `debug paths --answer=<ключ>` (ошибка разбора пишет `cli process failed`), код 1; файлы `<профиль>/data/log`: есть `cli starting` и `cli process failed`, нет ключа и нет `args=`. Ключ — `fixture-cli-log-answer-value` |
-| там же, «diagnostics export carries the chat … none of its saved keys or command lines» (правка) | было `toContain("args=[redacted]")` — в журнале теперь нет `args=` совсем: `toContain('message="cli starting"')` и `not.toContain("args=")` |
+| `cli/test/cli-standalone.test.ts`, «the CLI log on disk keeps no command line, of a command or of its failure» (новый) | вход продукта из исходников, один процесс без сервера: `auth login --answer key=<ключ> --unknown-flag` — код 1, «Unrecognized flag» (ошибка разбора пишет и `cli process failed`); файлы `<профиль>/data/log`: есть `cli starting` и `cli process failed`, нет ключа и нет `args=`. Ключ — `fixture-cli-log-answer-value`, ~1 с |
+| там же, «diagnostics export carries the chat … none of its saved keys or command lines» (правка) | было `toContain("args=[redacted]")` — в журнале теперь нет `args=` совсем: `toContain('message="cli starting"')` и `not.toContain("args=")`; плюс каждый файл `<профиль>/data/log` на диске — без сохранённого ключа и без метки промпта |
 | `loginom-host/test/pty-notices.test.ts`, «the notices name the service and every crate of its Cargo.lock…» (пропуск, если архивов нет в кэше Cargo) | настоящий lock: пакеты описи — все 58 пакетов lock по порядку; `loginom-ai-agent-pty` — `MIT`, единственный файл `LICENSE` байт в байт `process-daemon/LICENSE`; у 13 прямых зависимостей `Cargo.toml` (всех платформ) есть текст верхнего уровня; sha256 каждого файла; `inventory.json` на диске = возвращённой описи. Загрузка запрещена |
 | там же, «crate archives must match the lock, cached or downloaded; a crate without license text is missing» | lock и `.crate` собраны в тесте (`ustar`, `gzip`): архив из второго каталога кэша, второй — загрузкой (ровно один URL `static.crates.io`), свой `LICENSE` сервиса, `target/…/LICENSE` не читается, `src/license.rs` не текст лицензии, `vendor/COPYING` — `nested`, README — `documentation`, крейт без текста — в `missing`; архив, не совпавший с lock, из кэша и из загрузки — `LOGINOM_CRATE_HASH_MISMATCH`, описи нет |
 | `loginom-host/test/stage-resources.test.ts`, «full resource staging…» (+5 строк; нужен `LOGINOM_AI_AGENT_TEST_BROWSERS`) | после настоящего `stageResources` (вид `desktop`): строка в `THIRD_PARTY_NOTICES.md`, опись с `loginom-ai-agent-pty`, файл описи в `resource-manifest.json` |
@@ -20085,8 +20093,8 @@ $ LOGINOM_AI_AGENT_TEST_NODE=… LOGINOM_AI_AGENT_TEST_BROWSERS=<каталог 
 === MD2 only prod refuses; dev and beta download from npm (before the task): 2 pass / 2 fail             # dev и beta
 === MD3 no check: a missing build fails on copyFile, without naming the build: 1 pass / 3 fail          # ENOENT вместо ошибки со сборкой
 === ML0 no mutation: 2 pass / 0 fail
-=== ML1 cli starting logs the command line again: 0 pass / 2 fail          # ключ в журнале; в архиве args=[redacted]
-=== ML2 cli process failed logs the command line again: 1 pass / 1 fail    # ключ из debug paths --answer=<ключ>
+=== ML1 cli starting logs the command line again: 0 pass / 2 fail          # ключ в сыром журнале; в архиве args=[redacted]
+=== ML2 cli process failed logs the command line again: 1 pass / 1 fail    # ключ из auth login --answer … --unknown-flag
 === MP0 no mutation: 2 pass / 0 fail
 === MP1 the service's own license is left out: 0 pass / 2 fail
 === MP2 crate archives are not checked against the lock: 1 pass / 1 fail
@@ -20115,7 +20123,13 @@ $ LOGINOM_AI_AGENT_TEST_NODE=… LOGINOM_AI_AGENT_TEST_BROWSERS=<каталог 
 | `cli` | 606 pass, 9 skip, 0 fail (615, 79) | 607 pass, 9 skip, 0 fail (616, 79): +1 «the CLI log on disk keeps no command line…» |
 | `loginom-host` | 547 pass, 12 skip, 2 fail (561, 66) | 549 pass, 12 skip, 2 fail (563, 67): +2 `pty-notices`; те же падения — «archive verification preserves manifest modes under a private umask» и «actual managed entry reads live bridge work…» (`managed-work-entry`), как в B2.7a3b |
 
-Два случая `stage-resources` с путём дерева в имени различаются только путём.
+Два случая `stage-resources` с путём дерева в имени различаются только путём. Наборы шли на `9ee821c2a1`; после правки
+тестов `cli-standalone.test.ts` файл прогнан целиком тем же `suite.sh` — 10 pass, 0 fail (40 с), мутации ML — заново
+(выше). Новые случаи — `--rerun-each 5` без падений: `bundled-cli` и `bundle-loginom` (25), `pty-notices` (10), новый
+случай `cli` (5).
+
+Без `CARGO_HOME` (временный `HOME`, кэша Cargo нет) и без сети `pty-notices.test.ts` и `stage-resources.test.ts`: 14 pass,
+2 skip (случай на настоящем lock и полный случай), 0 fail — в crates.io ничего не идёт.
 
 ```text
 $ cd packages/desktop && bun typecheck            # ✓ No type errors in 3,370 files across 2 projects
@@ -20136,6 +20150,9 @@ Found 905 warnings and 0 errors.                  # как в B4.7c; в изме
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
  Tasks:    39 successful, 39 total
 ```
+
+После правки тестов (`cli-standalone.test.ts`, `bundled-cli.test.ts`) полный `bun run check` не повторялся: `oxlint` и
+`prettier --check` обоих файлов — 0 замечаний, `bun run typecheck:tsc` пакета `cli` — код 0.
 
 `prettier --check`: новые тесты, `cli-standalone.test.ts`, `desktop/script/*.ts` и `README.md` проходят; `cli/src/index.ts`
 и `stage-resources.ts` не проходили и на базе (длинные строки upstream и `apply-identity`), мои строки — в форме
@@ -20177,9 +20194,15 @@ prettier.
 - **`desktop-cli.ts` по-прежнему ищет `resources/loginom-ai-agent-cli-dev`** при `LOGINOM_AI_AGENT_DESKTOP_ISOLATED_SERVER=1`
   без `LOGINOM_AI_AGENT_DESKTOP_CLI_DEV`. Писал этот файл только `--download-server`; `bun dev` всегда задаёт `CLI_DEV`,
   так что путь мёртвый. Не трогал (CAT-09, предел файлов).
-- **Сборка Desktop без `packages/cli/dist` теперь падает в `dev` и `beta`.** Это и требовалось, но всё, что собирало Desktop
-  без CLI (CI, сценарии стендов), должно сначала собрать CLI — а ему после B4.7c нужны `cargo` и Zig или
-  `LOGINOM_AI_AGENT_PTY_BIN`.
+- **Сборка Desktop без `packages/cli/dist` теперь падает в `dev` и `beta` — и в CI это заметно.** Раньше эти места молча
+  встраивали CLI OpenCode из npm: `loginom-windows.yml`, задание `build-package-test` (`script/build-windows.ps1
+  -Product Both -Channel dev` собирает Desktop до CLI, а CLI — через `build-cli.ts` в другой каталог), и задание
+  `updater-mirror-linux` (`bun run build` в `packages/desktop` без сборки CLI). `build-windows.ps1 -Product Desktop
+  -Channel prod` (`updater-fixtures`) падал и раньше. `release.yml` кладёт артефакт `build-cli` в `packages/cli/dist` —
+  ему правка не мешает. Чинить — B5.1: собрать CLI до Desktop (ему после B4.7c нужны `cargo` и Zig или
+  `LOGINOM_AI_AGENT_PTY_BIN`). `loginom-macos.yml` зовёт `packages/desktop/scripts/build-macos.ts`, которого в v2 нет.
+- **Новая зависимость сборки — кэш Cargo или `static.crates.io`.** Без кэша (`CARGO_HOME` пуст, pty пришёл готовым)
+  сборка артефакта CLI и Desktop скачивает 57 архивов без повторов: сбой сети — сбой сборки.
 - **Хук `pre-commit` дважды остановил коммит, оба раза по делу:** без `~/.local/bin` в `PATH` нет `gitleaks` (первый коммит), и черновик этого раздела содержал личный домашний путь машины (`personal-home-path`) — путь заменён описанием. Хуки не обходились.
 - **`bun run secrets staged` печатает `"current_files":0`** при файлах в индексе — как в разделе B2.8. Не разбирался.
 - **Хук agent-kit ложно сработал** на команду `python3` с текстом `process.env.` в heredoc (похоже на `.env`). Файлов с
@@ -20193,4 +20216,6 @@ prettier.
   функцией, уведомления — полным случаем `stage-resources` вида `desktop`; вид `cli` идёт тем же кодом, отдельно не
   запускался.
 - Загрузка крейтов с `static.crates.io` — только подставной функцией; настоящая сеть к crates.io не вызывалась.
+- Без кэша Cargo (как на раннерах CI) случай на настоящем lock пропускается: тогда «сервис и его крейты» проверяет только
+  фикстура, а полный случай `stage-resources` пропускается без `LOGINOM_AI_AGENT_TEST_BROWSERS`.
 - `bun dev` целиком (Electron, служба из исходников) не запускался — только отказ на `--download-server`.
