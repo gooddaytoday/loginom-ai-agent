@@ -329,7 +329,8 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    // CollectionItem.FIndex is a lazy cache: SetCollection/Index can leave it
    // null until the Index getter materializes it. Read the exact owned slot
    // instead, without calling that getter or a data proxy.
-   const exportInput=input&&!control&&!variables&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile'].includes(r.node.FIconCls)&&r.portIndex===0&&r.nativeIndex===0;
+   const exportInput=input&&!control&&!variables&&r.portIndex===0&&r.nativeIndex===0
+    &&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(r.node.FIconCls);
    const cachedWizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
    const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):cachedWizardIndex;
