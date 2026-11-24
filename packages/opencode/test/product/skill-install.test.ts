@@ -91,6 +91,22 @@ it.live("the chat validates with read permissions and only publishes after one-t
       expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({ status: "installed", path: installed, override: join(directory, ".agents/skills/columns/SKILL.md") })
       expect(yield* Effect.promise(() => Bun.file(join(installed, "references/columns.md")).text())).toBe("id, amount")
       expect(JSON.parse((yield* tool!.execute(installation, ctx)).output)).toMatchObject({ status: "already-installed" })
+
+      yield* Effect.promise(() => Bun.write(resource, "id, amount, version-two"))
+      const declinedUpdate = yield* Effect.forkChild(Effect.exit(tool!.execute(installation, ctx)))
+      const replacement = yield* pending
+      expect(replacement.metadata.skillInstall).toContain('Замена скилла "columns"')
+      expect((replacement.metadata.skillInstall as string[]).some((line) => line.startsWith("Текущая ревизия: "))).toBe(true)
+      yield* permissions.reply({ requestID: replacement.id, reply: "reject" })
+      expect((yield* Fiber.join(declinedUpdate))._tag).toBe("Failure")
+      const installedResource = join(installed, "references/columns.md")
+      expect(yield* Effect.promise(() => Bun.file(installedResource).text())).toBe("id, amount")
+      const confirmUpdate = yield* Effect.forkChild(tool!.execute(installation, ctx))
+      const confirmed = yield* pending
+      expect(confirmed.id).not.toBe(replacement.id)
+      yield* permissions.reply({ requestID: confirmed.id, reply: "once" })
+      expect(JSON.parse((yield* Fiber.join(confirmUpdate)).output).status).toBe("installed")
+      expect(yield* Effect.promise(() => Bun.file(installedResource).text())).toBe("id, amount, version-two")
     }),
   ),
 )

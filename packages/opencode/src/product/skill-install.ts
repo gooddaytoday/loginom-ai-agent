@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import { relative, resolve } from "node:path"
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Flock } from "@opencode-ai/core/util/flock"
 import { Global } from "@opencode-ai/core/global"
 import { validateSkillFolder } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { prepareLocalSkill } from "@loginom-ai-agent/loginom-host/skill-install/index"
@@ -60,7 +61,10 @@ export const SkillInstallTool = Tool.define(
           }
 
           return yield* Effect.acquireUseRelease(
-            Effect.tryPromise(() => prepareLocalSkill(directory, Global.Path.home, authorizeRead, ctx.abort)),
+            Effect.tryPromise(() => prepareLocalSkill(directory, Global.Path.home, authorizeRead, {
+              signal: ctx.abort,
+              lock: (name, control, run) => Flock.withLock("skill-install:" + name, run, { dir: control, signal: ctx.abort }),
+            })),
             (candidate) => Effect.gen(function* () {
               const active = yield* skills.get(candidate.name)
               const override = active?.source === "project" || active?.source === "config" || active?.source === "url"
@@ -71,30 +75,35 @@ export const SkillInstallTool = Tool.define(
                 output: JSON.stringify({ status, name: candidate.name, path: candidate.path, warnings: candidate.warnings, override }),
                 metadata: {},
               })
-              if (candidate.previous === candidate.digest) return result("already-installed")
-              if (candidate.previous !== undefined) throw Error("This skill name is already installed.")
-              yield* assertExternalDirectoryEffect(ctx, candidate.path, { kind: "directory", write: true })
-              yield* askPaths("edit", candidate.paths, candidate.path)
-              yield* ctx.ask({
-                permission: "skill_install",
-                patterns: [candidate.name],
-                always: [],
-                metadata: {
-                  operationId: candidate.id,
-                  skillInstall: [
-                    "Установка скилла " + literal(candidate.name),
-                    "Источник: " + literal(source),
-                    "Ревизия копии: " + candidate.digest,
-                    "Описание автора: " + literal(candidate.description),
-                    "Папка установки: " + literal(candidate.path),
-                    "Скилл будет доступен другим агентам, которые используют ~/.agents/skills.",
-                    ...candidate.warnings.map((warning) => "Замечание: " + literal(warning)),
-                  ],
-                },
-              })
-              return result(yield* Effect.tryPromise(() => candidate.publish()))
+              let previous = candidate.previous
+              while (true) {
+                if (previous?.digest === candidate.digest) return result("already-installed")
+                yield* assertExternalDirectoryEffect(ctx, candidate.path, { kind: "directory", write: true })
+                yield* askPaths("edit", [...new Set([...candidate.paths, ...(previous?.paths ?? [])])], candidate.path)
+                yield* ctx.ask({
+                  permission: "skill_install",
+                  patterns: [candidate.name],
+                  always: [],
+                  metadata: {
+                    operationId: candidate.id,
+                    skillInstall: [
+                      (previous ? "Замена скилла " : "Установка скилла ") + literal(candidate.name),
+                      "Источник: " + literal(source),
+                      ...(previous ? ["Текущая ревизия: " + previous.digest] : []),
+                      "Ревизия копии: " + candidate.digest,
+                      "Описание автора: " + literal(candidate.description),
+                      "Папка установки: " + literal(candidate.path),
+                      "Скилл будет доступен другим агентам, которые используют ~/.agents/skills.",
+                      ...candidate.warnings.map((warning) => "Замечание: " + literal(warning)),
+                    ],
+                  },
+                })
+                const publication = yield* Effect.tryPromise(() => candidate.publish(previous))
+                if (typeof publication === "string") return result(publication)
+                previous = publication.previous
+              }
             }),
-            (candidate) => Effect.promise(candidate.dispose),
+            (candidate) => Effect.tryPromise(candidate.dispose).pipe(Effect.catch(() => Effect.logWarning("Could not remove the skill staging folder"))),
           ).pipe(Effect.orDie)
         }),
     }

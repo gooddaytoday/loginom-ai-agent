@@ -62,15 +62,21 @@ async function revision(root: string, signal?: AbortSignal) {
     }
     hash.update(JSON.stringify([name, resource.kind, mode, resource.link, bytes.digest("hex")]))
   }
-  return hash.digest("hex")
+  return { digest: hash.digest("hex"), paths: [root, ...[...entries.values()].map((entry) => entry.absolute)] }
 }
 
 export async function prepareLocalSkill(
   source: string,
   home: string,
   authorizeRead: (paths: string[]) => Promise<void>,
-  signal?: AbortSignal,
+  options: {
+    lock: <T>(name: string, control: string, run: () => Promise<T>) => Promise<T>
+    signal?: AbortSignal
+    move?: typeof rename
+  },
 ) {
+  const signal = options.signal
+  const move = options.move ?? rename
   const root = await realpath(source)
   if (!(await lookup(join(root, "SKILL.md")))) throw Error("The source folder needs a root SKILL.md.")
   const entries = await tree(root, signal, true)
@@ -109,7 +115,13 @@ export async function prepareLocalSkill(
     if (!validated.data || validated.errors.length) throw Error(validated.errors.map((item) => item.message).join("\n"))
     const name = validated.data.name
     const path = join(skills, name)
-    const digest = await revision(draft, signal)
+    const digest = (await revision(draft, signal)).digest
+    const key = name.normalize().toLowerCase()
+    const recovery = join(control, "previous-" + createHash("sha256").update(key).digest("hex"))
+    const locked = async <T>(run: () => Promise<T>) => {
+      if (await realpath(control) !== control) throw Error("The installation directory changed.")
+      return options.lock(key, control, run)
+    }
     const current = async () => {
       if (!(await directory(skills))) return
       const other = (await readdir(skills)).find((entry) =>
@@ -119,7 +131,26 @@ export async function prepareLocalSkill(
       if (!(await directory(path))) return
       return revision(path, signal)
     }
-    const previous = await current()
+    const recover = async () => {
+      if (!(await directory(agents)) || !(await directory(control))) throw Error("The installation directory changed.")
+      const existing = await current()
+      if (!(await directory(recovery))) return existing
+      const backups = await readdir(recovery)
+      if (!backups.length) return existing
+      if (backups.length !== 1 || !/^[a-f0-9]{64}$/.test(backups[0]))
+        throw Error("Ambiguous skill replacement recovery; the saved versions were kept.")
+      const backup = join(recovery, backups[0])
+      if (!(await directory(backup))) throw Error("The previous skill copy is unavailable.")
+      if (!existing) {
+        await move(backup, path)
+        return current()
+      }
+      if (existing.digest !== backups[0])
+        throw Error("An interrupted replacement and a different installed version both exist; the versions were kept.")
+      await rm(backup, { recursive: true })
+      return existing
+    }
+    const previous = await locked(recover)
     return {
       id: randomUUID(),
       source,
@@ -139,16 +170,35 @@ export async function prepareLocalSkill(
       digest,
       previous,
       dispose,
-      async publish() {
-        signal?.throwIfAborted()
-        const existing = await current()
-        if (existing === digest) return "already-installed" as const
-        if (existing !== undefined || previous !== undefined) throw Error("This skill name is already installed.")
-        if (await revision(draft, signal) !== digest) throw Error("The prepared skill changed. Prepare it again.")
-        signal?.throwIfAborted()
-        await directory(skills, true)
-        await rename(draft, path)
-        return "installed" as const
+      publish(approved: typeof previous) {
+        return locked(async () => {
+          signal?.throwIfAborted()
+          const existing = await recover()
+          if (existing?.digest === digest) return "already-installed" as const
+          if (existing?.digest !== approved?.digest) return { previous: existing }
+          if ((await revision(draft, signal)).digest !== digest) throw Error("The prepared skill changed. Prepare it again.")
+          signal?.throwIfAborted()
+          await directory(skills, true)
+          if (!existing) {
+            await move(draft, path)
+            return "installed" as const
+          }
+          await directory(recovery, true)
+          const backup = join(recovery, digest)
+          await move(path, backup)
+          try {
+            signal?.throwIfAborted()
+            await move(draft, path)
+          } catch (error) {
+            if (!(await lookup(path))) await move(backup, path)
+            throw error
+          }
+          await rm(backup, { recursive: true }).catch(() => {
+            // Publication succeeded. The next operation can clean up this known predecessor.
+            console.warn("Could not remove a completed skill replacement backup")
+          })
+          return "installed" as const
+        })
       },
     }
   } catch (error) {

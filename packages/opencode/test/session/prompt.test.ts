@@ -1,5 +1,4 @@
 import { Global } from "@opencode-ai/core/global"
-import { rm } from "node:fs/promises"
 import {
   createAttachmentReceipt,
   attachmentReceiptSource,
