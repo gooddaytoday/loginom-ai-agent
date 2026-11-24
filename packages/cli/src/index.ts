@@ -122,19 +122,16 @@ Effect.gen(function* () {
       process.off("unhandledRejection", unhandledRejection)
     }),
   )
+  // Loginom AI Agent: no command line in the log on disk, as in 0.4: it carries keys (`--answer key=…`) and prompts.
   yield* Effect.logInfo("cli starting", {
     version: LOGINOM_AI_AGENT_VERSION,
     channel: LOGINOM_AI_AGENT_CHANNEL,
     local: LOGINOM_AI_AGENT_LOCAL,
-    args: process.argv.slice(2),
   })
   return yield* Runtime.run(Commands, Handlers, { version: LOGINOM_AI_AGENT_VERSION })
 }).pipe(
   Effect.catchCause((cause) =>
-    Effect.logError("cli process failed", {
-      cause,
-      args: process.argv.slice(2),
-    }).pipe(Effect.andThen(Effect.failCause(cause))),
+    Effect.logError("cli process failed", { cause }).pipe(Effect.andThen(Effect.failCause(cause))),
   ),
   Effect.annotateLogs({ role: "cli" }),
   Effect.provide(Config.layer),

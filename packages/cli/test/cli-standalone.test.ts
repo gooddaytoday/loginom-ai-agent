@@ -230,7 +230,8 @@ test.skipIf(!Bun.which("unzip"))(
         .filter((name) => name.startsWith("cli/"))
         .map(entry)
         .join("\n")
-      expect(log).toContain("args=[redacted]")
+      expect(log).toContain('message="cli starting"')
+      expect(log).not.toContain("args=")
       expect(log).not.toContain(marker)
       for (const name of files) expect(entry(name)).not.toContain(key)
     } finally {
@@ -239,6 +240,26 @@ test.skipIf(!Bun.which("unzip"))(
   },
   90_000,
 )
+
+// The log of the profile on disk keeps no command line, as in 0.4: OpenCode 2 wrote each one, with the values of `--answer`
+// (B2.7a3b). The first command fails in its handler, the second while its flags are parsed, which logs the failure too.
+test("the CLI log on disk keeps no command line, of a command or of its failure", async () => {
+  const root = await temporary()
+  const key = "fixture-cli-log-answer-value"
+  for (const args of [
+    ["auth", "login", "openai", "--method", "key", "--answer", `key=${key}`],
+    ["debug", "paths", `--answer=${key}`],
+  ])
+    expect((await product(root, args)).code).toBe(1)
+  const logs = path.join(root, "profile", "data", "log")
+  const log = (
+    await Promise.all((await fs.readdir(logs)).map((name) => fs.readFile(path.join(logs, name), "utf8")))
+  ).join("\n")
+  expect(log).toContain('message="cli starting"')
+  expect(log).toContain('message="cli process failed"')
+  expect(log).not.toContain(key)
+  expect(log).not.toContain("args=")
+}, 60_000)
 
 // The product CLI is removed by the installer of its archive (B2.7a8). OpenCode's `uninstall` would remove the profile's
 // cache and leave the installed copy behind (B2.7a9).
