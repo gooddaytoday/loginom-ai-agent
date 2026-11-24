@@ -12,7 +12,7 @@ import pkg from "../package.json"
 import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import { buildAppArchive } from "./app-assets"
 import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
-import { resolveOpencodePty, resolveProductPty } from "./opencode-pty"
+import { resolveProductPty } from "./opencode-pty"
 import { NativeArch } from "../../../script/native-arch"
 import { bundledModelsSnapshot, modelsSnapshotPlugin } from "../../core/script/models-snapshot"
 import { Product } from "@loginom-ai-agent/product"
@@ -132,8 +132,8 @@ const wsReexportPlugin: BunPlugin = {
 }
 
 for (const item of targets) {
-  // Loginom AI Agent (B2.7a9): the product CLI embeds its own loginom-ai-agent-pty; the default build keeps the npm one.
-  const opencodePty = await (standalone ? resolveProductPty : resolveOpencodePty)({
+  // Loginom AI Agent (B2.7a9, B4.7c): the product CLI and the default build, which Desktop bundles, embed our own pty.
+  const opencodePty = await resolveProductPty({
     platform: item.os,
     arch: item.arch,
     ...(item.os === "linux" ? { libc: item.abi ?? "glibc" } : {}),
