@@ -32,12 +32,13 @@ def receipt(state):
         return {}
 
 
-def audit(path, budget):
+def audit(path, budget, required_executions=()):
     calls, errors, recoveries, external, forbidden, oracle_access = [], [], [], [], [], []
     signatures = collections.defaultdict(list)
     creates, deletes, graphs, seen = [], [], [], set()
     tool_counts = collections.Counter()
     settled = {}
+    operation_types, executed_types = {}, set()
     for line, raw in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
         try:
             event = json.loads(raw)
@@ -66,6 +67,12 @@ def audit(path, budget):
             errors.append(dict(entry, codes=codes or ['TOOL_ERROR']))
         if tool.startswith('loginom_'):
             calls.append(entry)
+            if tool.endswith('node_apply'):
+                operation_types[request.get('operation_id')] = request.get('target', {}).get('type')
+            if isinstance(value, dict) and value.get('execution', {}).get('status') == 'completed':
+                node_type = operation_types.get(value.get('operation_id'))
+                if node_type:
+                    executed_types.add(node_type)
             if isinstance(value, dict) and tool.endswith(('node_wait', 'node_apply', 'node_status')) and value.get('status'):
                 settled[value.get('operation_id')] = dict(status=value['status'], node=value.get('node'), location=location)
             normalized = {k:v for k,v in request.items() if k != 'operation_id'}
@@ -95,6 +102,7 @@ def audit(path, budget):
                  if c.get('settled') and isinstance(c['settled'].get('node'), dict) and c['settled']['node'].get('node_id')}
     exceeded = [name for name,value in [('max_tool_calls',len(calls)),('max_errors',len(errors)),('max_nodes',len(confirmed))]
                 if name in budget and value>budget[name]]
+    missing = sorted(set(required_executions) - executed_types)
     return dict(file=str(path), loginom_calls=len(calls), all_tool_counts=dict(tool_counts),
                 error_count=len(errors), errors=errors,
                 error_code_counts=dict(collections.Counter(code for error in errors for code in error['codes'])),
@@ -102,7 +110,8 @@ def audit(path, budget):
                 create_attempts=creates, delete_attempts=deletes, graph_observations=graphs,
                 non_loginom_actions=external, forbidden=forbidden, oracle_access=oracle_access,
                 confirmed_created_nodes=confirmed,
-                budget_exceeded=exceeded, audit_pass=not (exceeded or forbidden or oracle_access),
+                budget_exceeded=exceeded, missing_required_executions=missing,
+                audit_pass=not (exceeded or forbidden or oracle_access or missing),
                 nodes_budget='manual: compare saved native graph and create/delete receipts')
 
 
@@ -117,7 +126,11 @@ def main():
         if name is None:
             continue
         config = json.loads((args.cases/name/'case.json').read_text(encoding='utf-8'))
-        result.append(dict(case=name, **audit(path, config.get('budget', {}))))
+        expected = json.loads((args.cases/name/'expected.json').read_text(encoding='utf-8'))
+        required = [n['type'] for n in expected['nodes'] if n['type'] in ['programming.python','programming.javascript']]
+        if expected.get('execution_error') or expected.get('refusal'):
+            required = []
+        result.append(dict(case=name, **audit(path, config.get('budget', {}), required)))
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
