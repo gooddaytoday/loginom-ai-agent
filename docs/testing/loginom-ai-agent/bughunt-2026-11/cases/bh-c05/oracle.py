@@ -48,4 +48,5 @@ expected = {
         "rows": rows,
     }],
 }
+expected['absent_node_types'] = ['transform.calculator']
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))

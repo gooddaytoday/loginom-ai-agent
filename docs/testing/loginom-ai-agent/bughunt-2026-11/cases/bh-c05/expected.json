@@ -66,5 +66,8 @@
         }
       ]
     }
+  ],
+  "absent_node_types": [
+    "transform.calculator"
   ]
 }
