@@ -22396,3 +22396,203 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Вызывающие: CLI `run --dashboard` (B2.9i) и мост Desktop (B4, ВШ-6) — не делались. Создаёт ли v2 проект на Location
   PWD при вызове RPC — по строке нарезки проверяет i.
 - Windows и macOS — только Linux.
+
+## B2.9i run --dashboard
+
+24.11.2026. Задача B2.9i (вне шлюза B), ветка `b29i-run-dashboard` от `oc2-migration` (`e707ef4dad`), рабочее дерево
+`.claude/worktrees/b29i`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template` — в этом
+дереве и в дереве базы `<scratchpad>/b29i/base` (`e707ef4dad`, detached). Хук `pre-commit` (`bun run secrets staged`) —
+`clean` на каждом коммите. Тесты, мутации и полные прогоны — под `unshare -n` (поднят только `lo`), с временными `HOME`,
+`TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`. **Модель не вызывалась:** модель — HTTP-заглушка по
+сценарию (`cli/test/fixture/product-run.ts`, B2.7a4) на `127.0.0.1`, сети нет; запросы к ней тест считает. Прочитано:
+этот журнал — B2.9a (строка B2.9i), B2.9h, B2.7a4, B2.7a4b; 0.4 — `opencode/src/cli/standalone-dashboard.ts`, блок
+дашборда `standalone-run.ts`, `cmd/run.ts` (папка, синтетическая часть), тест `test/cli/standalone-dashboard.test.ts`;
+v2 — `cli/src/{standalone,loginom-cli}.ts`, `cli/src/run/{run,product,noninteractive}.ts`,
+`loginom-agent/src/{dashboard-target,host}.ts`, `dashboard/src/agent/folder.ts`; навык `.opencode/skills/unit-tests`.
+B2.9f (`loginom-agent/src/{dashboard-tools,permissions,index}.ts`) не трогал.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `1416bc8a11` `feat(cli): run --dashboard prepares the dashboard's folder before its session (B2.9i)` | код: файлы форка `cli/src/standalone.ts` (+22 −2, флаг и конфликты), `cli/src/run/product.ts` (+86 −22, `RunProduct.dashboard`, общий `ask` и `refuse`); правка upstream `cli/src/run/run.ts` (+12 −2); зависимость `@loginom-ai-agent/dashboard` в `cli/package.json` и `bun.lock` (+1, +1); тест — новый `cli/test/cli-dashboard.test.ts` (4 теста) |
+| следующий | этот раздел и строка `run/run.ts` в `catalog.md` |
+
+Файлов кода пять (предел — пять): три `.ts`, `package.json`, `bun.lock`. `loginom-agent` не трогал.
+
+### Как устроено
+
+- **Флаг** (`Standalone.forward`, вход продукта до разбора). `--dashboard <id>` и `--dashboard=<id>` — только у `run`:
+  без ID, с ID, похожим на флаг (`--`, `--model`, `--headless`), с одним из `--continue`, `-c`, `--session`, `-s`,
+  `--fork`, `--command`, `--dir`, `--attach` (и в форме `--флаг=…`) или у другой команды, в том числе у TUI, — отказ
+  `CLI_ARGUMENT_INVALID: run --dashboard needs a snapshot ID …`, код 2, профиль не открывается. Флаги проверяются по
+  исходным опциям, до того как `forward` снимает `--headless`: `--dashboard --headless <id>` — отказ, как в 0.4. ID
+  уходит в `LOGINOM_AI_AGENT_RUN_DASHBOARD`, как `--command` в B2.7a4b: `run` без флага переменную снимает, другие
+  команды (частный `serve`) её не трогают.
+- **Подготовка** (`RunProduct.dashboard`, файл форка `run/product.ts`), до создания сессии: RPC `loginom.dashboard`
+  `prepare({ id, defer: false })` на Location PWD (как `loginom.preflight`), с сигналом прогона и тем же ожиданием
+  `rpc.unavailable` (100 мс, до 60 с; общая функция `ask`). CLI всегда проверяет публикацию (`defer: false`), как 0.4.
+  Ответ с кодом — отказ как `failure()` 0.4: событие `error` (`name` — код, `data.message` — текст RPC) при `--format
+  json` и текст в stderr; код выхода 2 у `LOGINOM_CONFIG_REQUIRED`, 130 у отмены, иначе 1. Уведомление — текстом 0.4 в
+  stderr (`newer-publication`, `publication-check-unavailable`, `latest-build-failed` с `notice.error ?? ""`).
+- **Строгий журнал до снимка.** С `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` `RunProduct.dashboard` сначала зовёт
+  `RunProduct.preflight` (`loginom.preflight`): запись журнала — `LOGINOM_RECOVERY_REQUIRED`, код 4, снимок Studio не
+  тратится. 0.4 проверял журнал до подготовки.
+- **Сессия** (`run/run.ts`, правка upstream): Location — папка из ответа (`<data>/dashboards/<имя>-<ключ>/work`), туда
+  же `resolveSessionTarget` создаёт сессию; в текст промпта после сообщения пользователя добавлена задача
+  `dashboardPrompt(action)` пакета `dashboard` (`create` или `edit`). Профиль дашборда, инструменты и пути дают B2.9b–e
+  по Location; CLI их не задаёт. У `cli` — новая зависимость `@loginom-ai-agent/dashboard` (`package.json`, `bun.lock`).
+
+### Тесты
+
+`packages/cli/test/cli-dashboard.test.ts` (новый): два модульных теста `Standalone.forward` и два процессных — вход
+продукта из исходников (`src/loginom-cli.ts run`), профиль CLI, модель-заглушка, PWD — каталог проекта случая. Частный
+сервер `run` запускает Host из ресурсов случая: Node из `LOGINOM_AI_AGENT_TEST_NODE` и свой `host/node-host.mjs`, который
+пишет каждый запрос в журнал и отвечает по файлам случая (`generation`, `ready`, `read`, `recoveries`); шаблон —
+ссылка на `packages/dashboard/template`; Studio — `Bun.serve` на `127.0.0.1`, снимок отдаёт один раз, `/dashboard/lookup`
+— по сценарию. Процессные — только Linux, как `cli-loginom.test.ts`. Всё — в своём `mkdtemp`, удаляется в конце.
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test/cli/standalone-dashboard.test.ts`) | На v2 |
+|---|---|
+| «dashboard flags preserve the message and the argument boundary», «RunCommand parses the dashboard directory before the message boundary» | «dashboard flags preserve the message and the argument boundary»: `forward` снимает `--dashboard <id>` и `--dashboard=<id>`, сохраняет `--` и сообщение, `--dashboard` после `--` — текст; ID — в окружении `run`, `serve` его не трогает, следующий `run` без флага снимает. Папки в аргументах больше нет (её даёт RPC), поэтому второй тест 0.4 слит с первым |
+| «dashboard rejects conflicting flags, missing IDs and the TUI» | то же имя: восемь флагов в обеих формах, ID нет / пуст / `--` / `--model`, команда без `run`; окружение после отказов пустое |
+| «standalone dashboard does not accept a headless option as its missing snapshot ID» | случай `--dashboard --headless <id>` модульного теста выше. Процессная часть не нужна: отказ `forward` случается до профиля, путь входа с кодом 2 проверяет процессный тест ниже |
+| «standalone dashboard reports invalid arguments and missing connection without creating a project» | начало процессного «standalone dashboard starts from the snapshot in its folder with the dashboard profile»: `--continue` — код 2, stdout пуст, stderr `CLI_ARGUMENT_INVALID: run --dashboard…`; поколение 0 — код 2, stderr `LOGINOM_CONFIG_REQUIRED`, одно событие `error`, папки `dashboards` нет, Studio не спрошена, запросов к модели нет, `.writer` нет |
+| «standalone dashboard starts from the snapshot and preserves explicit publication approval» (часть без публикации) | тот же процессный тест дальше: новый дашборд — код 0, Host спрошен `start`, `connection.status`, `connection.ready`, `dashboard.read` с origin Studio, поколением 1 и привязкой; папка `campaign-<ключ>/work` со `snapshot.json`; в первом запросе модели — `Working directory: <work>` и «Покажи суммы.» + `dashboardPrompt("create")`; инструменты — только `read`, `glob`, `grep`, `edit`, `write`, `apply_patch`, `skill` и `dashboard_*`, `dashboard_draft` есть. Повтор ID — код 1, `DASHBOARD_SNAPSHOT_UNAVAILABLE`, модель не спрошена. Отказ чтения публикации при локальной папке — код 0, уведомление «Не удалось проверить публикацию…», `dashboardPrompt("edit")`. Новая публикация — уведомление «На стенде новая версия…»; её сборка упала — «Сборка версии … не удалась. Текущая версия: …. Ошибка сборки.». Новый дашборд при `DASHBOARD_ACCESS_DENIED` — код 1, код и текст Host («Недостаточно прав…»), модель не спрошена |
+| то же, отмена во время `connection.ready` | «Ctrl+C during the preparation and strict recovery stop the run before the model»: SIGINT, пока Host держит `connection.ready`, — код 130, stderr `CLI_CANCELLED`, `dashboard.read` не прозвучал, `.writer` нет. Затем строгий журнал (новое): запись — код 4, `LOGINOM_RECOVERY_REQUIRED`, Studio о снимке не спрошена, модель тоже |
+| то же, отмена во время `dashboardRead` (Host получает `interrupt` и `close`) | **не перенесено**: Host службы общий, CLI его не закрывает, а `dashboard.read` сигнала не берёт (B2.9h, «Найдено»). Отмена ожидания RPC — тот же путь, что выше |
+| то же, публикация с `--auto` и без | B2.9j |
+| «ordinary dashboard run %s» (pty, удаление) | B2.9j |
+
+### Мутации
+
+Каждая — точечная правка `packages/cli/src` на `1416bc8a11` (одна или две замены, каждая найдена ровно один раз), прогон
+`bun test test/cli-dashboard.test.ts` (для общих с B2.7a4b мест — ещё `test/run/product.test.ts`), затем `git checkout`
+(`<scratchpad>/b29i/scripts/mutate.py`). Без мутаций — 4/0 и 48/0. Тестов в файле четыре: модульные «flags preserve»
+(`flags`) и «rejects» (`rejects`), процессные «starts from the snapshot» (`main`) и «Ctrl+C … strict recovery» (`stop`).
+
+| Мутация | Где | `cli-dashboard` (pass/fail) | Красные |
+|---|---|---|---|
+| M1 конфликты флагов не проверяются | `standalone.ts` | **2/2** | `rejects`; `main` (`--continue` прошёл) |
+| M2 ID ищется после снятия `--headless` | `standalone.ts` | **3/1** | `rejects` (`--dashboard --headless <id>`) |
+| M3 флаг принят без `run` (TUI) | `standalone.ts` | **3/1** | `rejects` |
+| M4 ID не записывается в окружение | `standalone.ts` | **1/3** | `flags`, `main`, `stop` |
+| M5 ID остаётся для следующего `run` | `standalone.ts` | **3/1** | `flags` |
+| M6 флаг принят как ID | `standalone.ts` | **3/1** | `rejects` |
+| M7 `defer: true` | `product.ts` | **2/2** | `main` (нет `connection.ready` и `dashboard.read`); `stop` |
+| M8 папка ответа не берётся | `product.ts` | **3/1** | `main` (`Working directory`) |
+| M9 без задачи дашборда | `product.ts` | **3/1** | `main` |
+| M10 действие всегда `create` | `product.ts` | **3/1** | `main` (`edit` при опубликованном) |
+| M11 уведомления не печатаются | `product.ts` | **3/1** | `main` |
+| M12 отказ без текста Host | `product.ts` | **3/1** | `main` («Недостаточно прав») |
+| M13 `LOGINOM_CONFIG_REQUIRED` — код 1 | `product.ts` | **3/1**; `product.test.ts` **47/1** | `main`; B2.7a4b «the RPC is awaited…» |
+| M14 строгий журнал не до подготовки | `product.ts` | **3/1** | `stop` (Studio спрошена о снимке) |
+| M15 отмена подготовки — `CLI_RUN_FAILED` | `product.ts` | **3/1** | `stop` |
+| M16 RPC без сигнала прогона | `product.ts` | **3/1**; `product.test.ts` **47/1** | `stop`; B2.7a4b «strict recovery asks…, and Ctrl+C…» (по таймауту 180 с) |
+| M17 `rpc.unavailable` не ждётся | `product.ts` | **2/2**; `product.test.ts` **47/1** | `main`, `stop`; B2.7a4b «the RPC is awaited…» |
+| M18 текст `newer-publication` потерян | `product.ts` | **3/1** | `main` |
+| M19 Location — PWD | `run.ts` | **3/1** | `main` |
+| M20 отказ не останавливает прогон | `run.ts` | **2/2** | `main`, `stop` |
+| M21 задача не добавлена к промпту | `run.ts` | **3/1** | `main` |
+| M22 крючка подготовки нет | `run.ts` | **2/2** | `main`, `stop` |
+
+Код базы (`git checkout e707ef4dad -- packages/cli/src`, тест на месте): **0/4**, все красные. Итого 22 мутации — все
+красные. После всех мутаций `git status` — только несохранённый `catalog.md`.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29i/scripts/{suites.sh,t.sh}`): база — `e707ef4dad` в `<scratchpad>/b29i/base`, итог —
+это дерево на `1416bc8a11`; по пакетам подряд, база, затем итог, `bun test --timeout 60000`, каждый под `unshare -n`
+со свежими временными `HOME`/`TMPDIR`/`XDG_*`; `npm ci` клиента `loginom-runtime` и шаблона `dashboard`,
+`LOGINOM_AI_AGENT_TEST_NODE` заданы.
+
+| Пакет | `e707ef4dad` | итог |
+|---|---|---|
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же |
+| `loginom-agent` | 102 pass, 0 fail | 102 pass, 0 fail |
+| `cli` | 606 pass, 9 skip, 1 fail: «bundled ripgrep of the server» (`getaddrinfo EAI_AGAIN github.com`: кэш ripgrep прогона пуст, сети нет) | 610 pass (+4 новых), 9 skip, 1 fail — то же имя, та же причина |
+
+Новых падений нет: имена падений базы и итога совпадают.
+
+Повторы (навык `unit-tests`): `cli-dashboard.test.ts --rerun-each 3` — 12 pass, 0 fail (137 с).
+
+Изоляция (`<scratchpad>/b29i/scripts/real-xdg.sh`, как в B2.9h): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad; после прогона в `HOME` — только кэш транспилятора самого `bun test` (`.bun/install/cache/@t@/*.pile`), во
+временном каталоге — только общий кэш транспилятора дочерних CLI (`isolatedEnv`); профилей, `dashboards` и проектов нет:
+
+```text
+fix exit=0 xdg-vars=0  4 pass  0 fail                        # test/cli-dashboard.test.ts на 1416bc8a11
+fix home left: [.bun .bun/install .bun/install/cache ]
+fix tmp left: [opencode-test-transpiler-cache ]
+```
+
+```text
+$ cd packages/cli && bun typecheck
+✓ No type errors in 2,252 files across 2 projects
+$ cd packages/cli && bun run typecheck:tsc                     # tsc -b — код 0
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0; 612 файлов, как на базе
+against a6b15d33daf6: 612 divergent upstream files
+  CAT-08: 0 (pending: B2.7)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                          # код 0
+$ bun run check                                                # код 0, под unshare -n, на 1416bc8a11 с этим разделом
+Found 905 warnings and 0 errors.                               # как в B2.9h; в изменённых файлах — ни одного
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                             # 38 из кэша turbo
+```
+
+`run/run.ts` уже расходился с upstream (B2.7a1, B2.7a4), `cli/package.json` — тоже; новых расходящихся файлов нет,
+`catalog.json` не менялся, правка `run.ts` дописана в `catalog.md` (запись CAT-12, `run` CLI продукта).
+
+### Где решал сам
+
+- **Задача дашборда — текстом промпта.** Синтетических частей у `session.prompt` v2 нет; строка нарезки оставила способ
+  задаче. Меньший — добавить `dashboardPrompt(action)` к тексту после сообщения пользователя, как `run` уже добавляет
+  текст файлов (`"\n\n"`): одна строка в `run.ts`, без правки протокола и плагина. Следствие: в истории сессии задача —
+  часть сообщения пользователя, а не скрытая часть, как в 0.4 (`synthetic: true`).
+- **Текст задачи — в CLI, а не в ответе RPC.** Ответ `loginom.dashboard` (B2.9h) несёт `action`; поле с готовым текстом
+  было бы изменением общего контракта. Поэтому у `cli` — зависимость `@loginom-ai-agent/dashboard` (только
+  `contract/prompt.ts`). Файлов кода — пять, с `package.json` и `bun.lock`.
+- **Ошибка аргументов — по соглашению v2** (B2.7a4): причина в stderr после `CLI_ARGUMENT_INVALID: `, кода 2, события
+  `error` нет. 0.4 печатал голый код и событие при `--format json`; вход продукта отказывает до разбора `--format` для
+  всех флагов одинаково.
+- **Строгий журнал до подготовки.** Решение, оставленное B2.9h («B2.9i решит»): при `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`
+  проверка идёт до `prepare`, иначе код 4 приходил бы уже после израсходованного снимка. Цена — второй вызов
+  `loginom.preflight` после создания сессии (крючок B2.7a4b в `noninteractive.ts` не трогал). Без строгого журнала
+  `run --dashboard` Host до подготовки не спрашивает, как обычный `run` (B2.7a4b): записи журнала проверяет сам Host.
+- **`--headless` как ID** — проверен модульно, без своего процесса: навык `unit-tests` велит разбор проверять в процессе
+  теста. Процессных тестов два.
+- **Отмена во время чтения публикации** не перенесена (таблица выше).
+- **`--file` — относительно PWD**, как у любого `run` v2: файлы читаются до подготовки. В 0.4 `--dir` указывал на
+  рабочую папку, и `--file src/main.tsx` брался из неё (pty-случай удаления 0.4). Перенос чтения файлов после подготовки
+  — правка `run()`, вне строки нарезки; для B2.9j записано ниже.
+
+### Найдено, не чинил
+
+- **Проект PWD создаётся и без дашборда.** Строка нарезки просила проверить. При «нет подключения» `prepare` идёт на
+  Location PWD, и v2 поднимает её: в базе профиля появляется строка `project` с `worktree` = PWD, сессий нет, папки
+  `dashboards` нет. 0.4 до сервера не доходил и ничего не создавал. Проба — копия профиля после отказа
+  `LOGINOM_CONFIG_REQUIRED` (`<scratchpad>/b29i/probe/q.ts` по `profile/data/loginom-ai-agent.db`):
+
+  ```text
+  project [{"id":"5388f1b5…","worktree":"<tmp>/cli-dashboard-mDTI3R/project","vcs":null,…,"time_initialized":null,…}]
+  workspace []
+  ```
+
+  Так же поступает обычный `run` и `loginom.preflight` в этом каталоге; другого способа позвать RPC без Location у CLI
+  нет. Тест проверяет только то, что проверял 0.4: нет `dashboards`, нет `.writer`.
+- **Для B2.9j:** `--file` берётся относительно PWD, не рабочей папки (выше); процесс `run` остаётся в PWD (0.4 уходил в
+  корень дашбордов, чтобы удаление рабочей папки не держал `cwd` процесса). Отмена во время `dashboard.read` не
+  обрывает чтение в Host (B2.9h).
+
+### Не проверено
+
+- Настоящий Node host и Studio: Host — свой `node-host.mjs` по сценарию, Studio — фикстура; путь плагина с ними —
+  B2.9h. Собранный `loginom-ai-agent-cli` не собирался: вход тот же (`loginom-cli.ts`).
+- Подтверждения публикации и удаления в CLI, вывод удаления, pty-случаи — B2.9j.
+- `DASHBOARD_SNAPSHOT_INVALID`, `DASHBOARD_BINDING_CONFLICT`, `DASHBOARD_PUBLICATION_*` через CLI — тот же путь отказа,
+  что `DASHBOARD_SNAPSHOT_UNAVAILABLE` и `DASHBOARD_ACCESS_DENIED`; отдельно не проверены.
+- Ctrl+C во время `dashboard.read` (Host не обрывает чтение, B2.9h); Desktop (B4, ВШ-6).
+- Windows и macOS — только Linux (процессные тесты — только Linux, как `cli-loginom.test.ts`).
