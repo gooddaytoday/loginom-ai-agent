@@ -95,6 +95,7 @@ async function main() {
   const controller = new AbortController()
   installSigint(controller)
   const attempt = await runAttempt({ config, command, source, task, attempt: Number(number), runId, runDir,
+    expectedSkillDigest: config.agent.cliMode === "binary" ? environment.dock?.skillRevision ?? undefined : undefined,
     signal: controller.signal, profileRecovered: false, skipJudge: true })
   const out = path.join(runDir, task.id, number!)
   const cleanup = await afterAttempt(config, { ...command, cleanupDir: path.join(out, "management") }, attempt.result, out)

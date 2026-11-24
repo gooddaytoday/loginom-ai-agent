@@ -10,13 +10,13 @@ import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
 import { writeLeaseReceipt } from "./lease"
 
-type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; hasPassword?: boolean; url?: string; username?: string }
+type View = { state: string; browser?: { state?: string }; recoveries?: string[]; failure?: string; hasApiKey?: boolean; hasPassword?: boolean; url?: string; username?: string }
 
 // Native CLI reports password presence; legacy clients report their MCP key.
 const passwordMatches = (view: View, expected?: boolean) => view.hasPassword === undefined ||
   typeof view.hasPassword === "boolean" && (expected === undefined || view.hasPassword === expected)
 const connectionConfigured = (view: View, expected?: boolean) => passwordMatches(view, expected) &&
-  (view.hasApiKey === true || view.hasApiKey === undefined && typeof view.hasPassword === "boolean")
+  (typeof view.hasPassword === "boolean" || view.hasApiKey === true)
 
 const retainedProfileFiles = new Set([
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
@@ -314,13 +314,14 @@ export function agentConfigJson(config: EvalConfig) {
 export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const observed = await management(command, ["loginom", "status", "--format", "json"])
   const view = parseView(observed.stdout)
-  if (observed.exitCode !== 0 || !view || !["ready", "starting"].includes(view.state) || view.failure || view.recoveries?.length || !connectionConfigured(view, Boolean(config.loginom.password)) ||
+  if (view?.browser?.state === "failed") throw new EvalFailure("LOGINOM_BROWSER_NOT_READY", 2)
+  if (observed.exitCode !== 0 || !view || !["ready", "starting", "configured"].includes(view.state) || view.failure || view.recoveries?.length || !connectionConfigured(view, Boolean(config.loginom.password)) ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
   if (saved?.$schema === "urn:loginom-ai-agent:config") delete saved.$schema
   if (JSON.stringify(saved) !== JSON.stringify(agentConfigJson(config))) throw new EvalFailure("PROFILE_CONFIGURATION_DRIFT", 2)
-  return view.state === "starting" ? checkStarting(command, 2) : observed
+  return needsConnectionCheck(view) ? checkConnection(command, 2) : observed
 }
 
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
@@ -337,7 +338,8 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   if (view && !passwordMatches(view)) throw new EvalFailure("PROFILE_STATUS_INVALID", 2)
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
     throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
-  const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false || !passwordMatches(view, Boolean(config.loginom.password))
+  const fresh = !view || view.state === "unconfigured" || (view.hasPassword === undefined && view.hasApiKey === false) ||
+    !passwordMatches(view, Boolean(config.loginom.password))
   if (fresh) await setupProfile(config, command)
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
@@ -422,23 +424,28 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2, ex
       throw new EvalFailure(`loginom recover завершился кодом ${recover.exitCode}:\n${recover.stderr.trim()}`, exitCode)
   }
   const restored = acknowledged ? await status(command, exitCode) : first
-  if (["ready", "starting"].includes(restored.state) && (restored.hasApiKey !== undefined || restored.hasPassword !== undefined) &&
+  if (restored.browser?.state === "failed") throw new EvalFailure("LOGINOM_BROWSER_NOT_READY", exitCode)
+  if (["ready", "starting", "configured"].includes(restored.state) && (restored.hasApiKey !== undefined || restored.hasPassword !== undefined) &&
     !connectionConfigured(restored, expectedHasPassword)) throw new EvalFailure("PROFILE_NOT_PREPARED", exitCode)
   // Each standalone status has its own Help startup. Polling another process
   // cannot finish that startup; an explicit check proves readiness in one host.
-  const checked = restored.state === "starting" && connectionConfigured(restored, expectedHasPassword) && !restored.failure && !restored.recoveries?.length
-    ? await checkStarting(command, exitCode) : false
+  const checked = needsConnectionCheck(restored) && connectionConfigured(restored, expectedHasPassword) && !restored.failure && !restored.recoveries?.length
+    ? await checkConnection(command, exitCode) : false
   const view = checked ? restored : await settle(command, restored, exitCode)
   if ((view.state !== "ready" && !checked) || view.recoveries?.length || view.failure)
     throw new EvalFailure(
       `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}` +
-        (view.state === "unconfigured" ? " — выполните `--reset-profile` или проверьте LOGINOM_DOCK_API_KEY" : ""),
+        (view.state === "unconfigured" ? " — выполните `--reset-profile` или проверьте настройки подключения" : ""),
       exitCode,
     )
   return { recovered: acknowledged, view }
 }
 
-async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
+function needsConnectionCheck(view: View) {
+  return ["starting", "configured"].includes(view.state) || view.state === "ready" && view.browser?.state === "unknown"
+}
+
+async function checkConnection(command: AgentCommand, exitCode: 1 | 2) {
   const result = await management(command, ["loginom", "check", "--format", "json"])
   const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
     { ok?: unknown; code?: unknown; help?: { state?: unknown }; browser?: { state?: unknown } } | null | undefined

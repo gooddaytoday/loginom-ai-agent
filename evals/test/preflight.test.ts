@@ -5,7 +5,7 @@ import os from "node:os"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight, requestPreflight, verifyAdminRuntime } from "../src/preflight"
+import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, installedSkillRevision, preflight, requestPreflight, verifyAdminRuntime } from "../src/preflight"
 import { agentCommand } from "../src/cli"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
@@ -443,4 +443,22 @@ test("dockSkillRevision: читает result.revision и падает без rev
   } finally {
     server.stop()
   }
+})
+
+test("binary preflight rejects corrupted installed skill before contacting Loginom", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-skill-"))
+  try {
+    const binary = path.join(root, "bin/loginom-ai-agent-cli")
+    const resources = path.join(root, "resources/loginom")
+    const file = "skills/loginom-automation/SKILL.md"
+    await Bun.write(binary, "fixture")
+    await Bun.write(path.join(resources, file), "corrupted")
+    await Bun.write(path.join(resources, "resource-manifest.json"), JSON.stringify({ protocol: 1, files: [{ path: file, sha256: "0".repeat(64) }] }))
+    await expect(installedSkillRevision(binary)).rejects.toThrow("LOGINOM_SKILL_HASH_MISMATCH")
+    const content = "---\nname: loginom-automation\ndescription: Synthetic skill\n---\n"
+    const sha256 = new Bun.CryptoHasher("sha256").update(content).digest("hex")
+    await Bun.write(path.join(resources, file), content)
+    await Bun.write(path.join(resources, "resource-manifest.json"), JSON.stringify({ protocol: 1, files: [{ path: file, sha256 }] }))
+    expect(await installedSkillRevision(binary)).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify([["SKILL.md", sha256]])).digest("hex"))
+  } finally { await rm(root, { recursive: true, force: true }) }
 })

@@ -102,7 +102,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       storageDir: env.LOGINOM_STORAGE_DIR ?? "/workdir/UserStorage/user",
     },
     dock: {
-      apiKey: agentless ? "" : required("LOGINOM_DOCK_API_KEY", true),
+      apiKey: agentless ? "" : required("LOGINOM_DOCK_API_KEY", mode !== "binary"),
       baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org",
     },
     agent: {

@@ -706,3 +706,13 @@ test("runAgent: launcher жив до завершения helper, игнорир
   expect(run.processCleanup.verification).toHaveLength(2)
   expect(run.processCleanup.verification?.every((pass) => pass.owned_remaining === 0)).toBe(true)
 }, 15_000)
+
+test("skill audit checks every observed preparation against the installed digest", () => {
+  const digest = "a".repeat(64)
+  const event = (source: string, skillRevision: string) => JSON.stringify({ type: "tool_use", part: { type: "tool", tool: "loginom_dock_prepare",
+    state: { status: "completed", output: JSON.stringify({ prepared: true, source, skillRevision }) } } })
+  expect(parseEvents("", [], digest).skillAudit).toBe("not_observed")
+  expect(parseEvents(event("bundled", digest), [], digest).skillAudit).toBe("verified")
+  expect(parseEvents(event("remote", digest), [], digest).skillAudit).toBe("mismatch")
+  expect(parseEvents([event("bundled", digest), event("bundled", "b".repeat(64))].join("\n"), [], digest).skillAudit).toBe("mismatch")
+})

@@ -44,6 +44,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource, sign
     throw new EvalFailure("Изолированный live eval требует EVAL_CLI_MODE=binary и EVAL_CLI_BIN установленного CLI", 2)
   if (config.agent.cliMode === "binary") {
     await checkIsolatedLoginom(source, slot)
+    environment.dock = { skillRevision: await installedSkillRevision(config.agent.cliBin!) }
     await assertNoDebuggers()
     await checkSandbox(config)
   }
@@ -55,9 +56,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource, sign
     throw new EvalFailure(`Loginom недоступен: ${config.loginom.url} → ${page?.status ?? "нет ответа"}`, 2)
   if (source.kind === "docker") environment.loginom = { imageDigest: await containerDigest(source.container) }
   await checkStorage(source)
-  environment.dock = { skillRevision: await dockSkillRevision(config.dock) }
-  if (config.agent.cliMode === "binary" && !(await Bun.file(config.agent.cliBin ?? "").exists()))
-    throw new EvalFailure(`EVAL_CLI_BIN не найден: ${config.agent.cliBin}`, 2)
+  if (config.agent.cliMode === "fake") environment.dock = { skillRevision: await dockSkillRevision(config.dock) }
   environment.agent = await agentInfo(config)
   await mkdir(config.agent.workspaceRoot, { recursive: true })
   await checkFreeSpace(evalsRoot)
@@ -278,6 +277,16 @@ async function containerDigest(container: string) {
   const [running, image] = inspected.text().trim().split("\t")
   if (running !== "true") throw new EvalFailure(`Контейнер ${container} не запущен`, 2)
   return image ?? null
+}
+
+export async function installedSkillRevision(cliBin: string) {
+  const binary = await realpath(path.resolve(evalsRoot, cliBin)).catch(() => { throw new EvalFailure("EVAL_CLI_BIN не найден", 2) })
+  const { verifyBundledSkills } = await import("../../packages/loginom-runtime/client/lib/bundled-skill-manifest.mjs")
+  const skills = await verifyBundledSkills(path.join(path.dirname(path.dirname(binary)), "resources/loginom"))
+    .catch(error => { throw new EvalFailure(error.message, 2) })
+  const skill = skills.find(skill => skill.name === "loginom-automation")
+  if (!skill) throw new EvalFailure("LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING", 2)
+  return skill.digest
 }
 
 export async function dockSkillRevision(dock: { apiKey: string; baseUrl: string }): Promise<string> {

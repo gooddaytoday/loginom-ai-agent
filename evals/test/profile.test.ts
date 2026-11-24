@@ -535,9 +535,9 @@ test("ensureProfile: unconfigured при существующем cli-profile.js
   expect(written.permission).toEqual({ "loginom_*": "allow" })
 })
 
-test("ensureProfile: ready с hasApiKey не вызывает setup и пишет config", async () => {
+test("ensureProfile: ready без устаревшего API-ключа не вызывает setup и пишет config", async () => {
   const { config, command, profileDir } = await fakeProfile({
-    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasPassword: false, hasApiKey: false }),
   })
   expect((await ensureProfile(config, command)).fresh).toBe(false)
   expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(false)
@@ -615,7 +615,7 @@ test.each([
   { password: "", view: { hasPassword: false }, accepted: true },
   { password: "synthetic-password", view: { hasPassword: false }, accepted: false },
   { password: "", view: { hasPassword: true }, accepted: false },
-  { password: "synthetic-password", view: { hasPassword: true, hasApiKey: false }, accepted: false },
+  { password: "synthetic-password", view: { hasPassword: true, hasApiKey: false }, accepted: true },
   { password: "synthetic-password", view: { hasPassword: false, hasApiKey: true }, accepted: false },
   { password: "synthetic-password", view: { hasPassword: "true", hasApiKey: true }, accepted: false },
   { password: "synthetic-password", view: { hasApiKey: true }, accepted: true },
@@ -681,14 +681,14 @@ test.each([true, false])("modern password presence %s is reused and recovered wi
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
-test("verifyProfile admits the public password view through native Help check", async () => {
+test.each(["starting", "configured", "ready"])("verifyProfile admits %s public password view through native Help check", async phase => {
   const context = await fakeProfile()
   const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a", password: "synthetic-password" } }
   const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
   const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
   try {
     await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
-    await Bun.write(state, JSON.stringify({ state: "starting", hasPassword: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(state, JSON.stringify({ state: phase, browser: { state: "unknown" }, hasPassword: true, url: config.loginom.url, username: config.loginom.username }))
     await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "verified" } } }))
     expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
@@ -874,7 +874,6 @@ test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой rese
     EVAL_FAKE_STATE_FILE: await stateFile({ state: "unconfigured", hasApiKey: false }),
   })
   await expect(recoverIfNeeded(command, 1)).rejects.toThrow("--reset-profile")
-  await expect(recoverIfNeeded(command, 1)).rejects.toThrow("LOGINOM_DOCK_API_KEY")
 })
 
 test("assertAuth: без auth.json — EvalFailure с командой providers login; с записью провайдера — ок", async () => {
@@ -967,8 +966,8 @@ test.each([
   }
 })
 
-test("recoverIfNeeded: verified Help refuses a failed browser", async () => {
-  const file = await stateFile({ state: "starting", hasApiKey: true, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } })
+test.each(["ready", "starting"])("recoverIfNeeded: %s Help refuses a failed browser", async state => {
+  const file = await stateFile({ state, hasApiKey: true, browser: { state: state === "ready" ? "failed" : "unknown" } })
   const check = await stateFile({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } } })
   const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check })
   try {
@@ -1247,4 +1246,15 @@ test.each(["timeout", "interrupted"])("management check outcome: %s remains expl
     expect(outcome.predicates.withinTimeout).toBe(kind !== "timeout")
     expect(outcome.predicates.uninterrupted).toBe(kind !== "interrupted")
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("ensureProfile keeps legacy ready profiles without credential indicators", async () => {
+  const state = await stateFile({ state: "ready" })
+  const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: state })
+  try {
+    expect((await ensureProfile(context.config, context.command)).fresh).toBe(false)
+  } finally {
+    await rm(context.profileDir, { recursive: true, force: true })
+    await rm(path.dirname(state), { recursive: true, force: true })
+  }
 })

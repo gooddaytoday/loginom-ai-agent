@@ -232,7 +232,7 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
         const completed = await admin!.verifySlotUser(context.lease.slot.username).then(() => runAttempt({ config: context.config, command: context.command, source: parseArtifactSource("docker", context.config.loginom),
           task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir, signal: controller.signal, profileRecovered: false,
           slotId, slot: { file, lease: context.lease, secretFile: path.join(file.controller.stateDir, `prepare-${slotId}.secret.json`) },
-          skipJudge: config.skipJudge, judge: settings, judgeGate: gate, evaluationHash })).catch((error: unknown) => ({
+          expectedSkillDigest: metadata.dock?.skillRevision ?? undefined, skipJudge: config.skipJudge, judge: settings, judgeGate: gate, evaluationHash })).catch((error: unknown) => ({
             result: { ...emptyResult(job.taskId, job.attempt, false), slot_id: slotId, harness_error: describe(error) }, stop: true,
           })).finally(() => watcher.stop())
         const result = completed.result

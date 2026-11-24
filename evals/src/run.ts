@@ -103,6 +103,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
           initialInfraAttempt: history.initial,
           judge: settings,
           skipJudge: config.skipJudge,
+          expectedSkillDigest: config.agent.cliMode === "binary" ? environment.dock?.skillRevision ?? undefined : undefined,
           evaluationHash,
         })
         if (retry === 0) attempts.push(result)
@@ -222,6 +223,7 @@ export async function runAttempt(input: {
   skipJudge: boolean
   judge?: JudgeSettings
   judgeGate?: ReturnType<typeof createJudgeGate>
+  expectedSkillDigest?: string
   evaluationHash?: string
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
@@ -275,6 +277,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const since = Date.now()
   const run = await runAgent({
     command: input.command,
+    expectedSkillDigest: input.expectedSkillDigest,
     taskId: task.id,
     model: config.agent.model,
     variant: config.agent.variant,
@@ -370,6 +373,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
+    skill_audit: run.skillAudit,
     session_id: run.sessionId ?? null,
     errors: base.errors,
     stderr_head: run.stderrHead.trim() ? run.stderrHead : null,

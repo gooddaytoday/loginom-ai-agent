@@ -241,3 +241,7 @@ test("loadConfig: EVAL_JUDGE_COMMAND разбивается по пробела�
     "fixtures/fake-codex.ts",
   ])
 })
+
+test("binary CLI loads bundled skills without a Dock key", () => {
+  expect(loadConfig([], { ...full, EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "fixture-cli", LOGINOM_DOCK_API_KEY: undefined }).dock.apiKey).toBe("")
+})

@@ -6,6 +6,8 @@ import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
 import { redactKnownSecrets } from "./output-redaction"
 import { childEnvironment } from "./child-environment"
+import { readSelectionReceipt } from "./node-selection"
+import type { AttemptResult } from "./report"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -25,7 +27,7 @@ type Part = {
 }
 type Event = { type?: string; sessionID?: string; part?: Part; status?: { type?: string }; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
 
-export function parseEvents(text: string, secrets: string[] = []) {
+export function parseEvents(text: string, secrets: string[] = [], expectedSkillDigest?: string) {
   const events = text.split("\n").flatMap((line) => {
     const parsed = parseJson(line)
     return typeof parsed === "object" && parsed !== null ? [parsed as Event] : []
@@ -48,7 +50,8 @@ export function parseEvents(text: string, secrets: string[] = []) {
   const receipts = truncateReceipts(
     tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => redactKnownSecrets(part.state?.output ?? "", secrets)),
   )
-  const prepare = tools.find((part) => part.tool === "loginom_dock_prepare" && completed(part))
+  const preparations = tools.filter(part => part.tool === "loginom_dock_prepare")
+  const prepare = preparations.find(completed)
   const preparation = firstJsonObject(prepare?.state?.output ?? "") as { skillRevision?: unknown } | undefined
   const errorEvents = events.filter((event) => event.type === "error")
   const sessionId = events.find(event => typeof event.sessionID === "string")?.sessionID
@@ -65,6 +68,7 @@ export function parseEvents(text: string, secrets: string[] = []) {
     nodeReceipts: receipts.kept,
     nodeReceiptsDropped: receipts.dropped,
     actionManifestSha256: prepare?.state?.output?.match(/"manifest_sha256":"([0-9a-f]{64})"/)?.[1],
+    skillAudit: auditSkill(preparations, expectedSkillDigest),
     skillRevision: typeof preparation?.skillRevision === "string" ? preparation.skillRevision : undefined,
     finalText: events.filter((event) => event.type === "text").at(-1)?.part?.text,
     cost: sum((part) => part?.cost),
@@ -116,6 +120,16 @@ export type FailureKind = ReturnType<typeof failureKind>
 
 const droppedChildEnv = /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/
 
+function auditSkill(preparations: Part[], expectedDigest?: string): AttemptResult["skill_audit"] {
+  if (!expectedDigest) return undefined
+  if (!preparations.length) return "not_observed"
+  return preparations.every(part => {
+    const receipt = readSelectionReceipt(part) as { prepared?: unknown; source?: unknown; skillRevision?: unknown } | null
+    return part.state?.status === "completed" && receipt?.prepared === true &&
+      receipt.source === "bundled" && receipt.skillRevision === expectedDigest
+  }) ? "verified" : "mismatch"
+}
+
 export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env): {
   mode: EvalConfig["agent"]["cliMode"]; cmd: string[]; cwd: string; env: Record<string, string>
 } {
@@ -148,6 +162,7 @@ export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: stri
 
 export async function runAgent(input: {
   command: AgentCommand
+  expectedSkillDigest?: string
   taskId: string
   model: string
   variant?: string
@@ -201,7 +216,7 @@ export async function runAgent(input: {
   const stdout = processRun.stdout
   const stderr = processRun.stderr
   const exitCode = processRun.exitCode
-  const parsed = parseEvents(stdout, input.command.cleanupSecrets)
+  const parsed = parseEvents(stdout, input.command.cleanupSecrets, input.expectedSkillDigest)
   const run = {
     exitCode,
     timeoutMs: input.timeoutMs,

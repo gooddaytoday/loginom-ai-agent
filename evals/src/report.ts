@@ -67,6 +67,7 @@ export type AttemptResult = {
   cleanup_error: string | null
   environment_cleanup?: EnvironmentCleanup
   action_manifest_sha256: string | null
+  skill_audit?: "verified" | "mismatch" | "not_observed"
   skill_revision?: string | null
   session_id: string | null
   profile_recovered: boolean
