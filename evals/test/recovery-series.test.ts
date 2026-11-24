@@ -105,9 +105,9 @@ const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).diges
 const session = "synthetic-session", operation = "synthetic-operation"
 const start = { action: "start", operation_id: operation }, finish = { ...start, action: "finish" }
 const native = (phase: string, data = {}) => ({ phase: "browser_recovery_" + phase, operation_id: operation, attempt_id: "episode", ...data })
-const tool = (id: string, name: string, input: object, output: object, status = "completed") => ({
+const tool = (id: string, name: string, input: object, output: object | string, status = "completed") => ({
   type: "tool_use", sessionID: session, part: { type: "tool", sessionID: session, callID: id, messageID: "message-" + id,
-    tool: "loginom_" + name, state: { status, input, [status === "error" ? "error" : "output"]: JSON.stringify(output) } },
+    tool: "loginom_" + name, state: { status, input, [status === "error" ? "error" : "output"]: typeof output === "string" ? output : JSON.stringify(output) } },
 })
 async function episode(cli: unknown[], records?: unknown[], prepare?: (dir: string, run: string) => Promise<void>) {
   const f = await pilot(), dir = path.join(f.run, "double/1")
@@ -247,4 +247,56 @@ test("a changed diagnostic file cannot supply a native conclusion", async () => 
   })
   expect(evidence).toMatchObject({ result: { score: 0, cleanup: "confirmed" }, recovery: {
     gaps: expect.arrayContaining(["native:digest"]), nativePhases: null, requested: true, episodes: [{ handoff: null, verified: null }] } })
+})
+
+async function controllerTrace(calls: [string, object][], failFirstClick = false) {
+  const { createBrowserRecovery } = await import(path.resolve(import.meta.dir, "../../packages/loginom-runtime/client/lib/browser-recovery.mjs"))
+  const records: Record<string, unknown>[] = [], cli = []
+  let clicks = 0
+  const controller = createBrowserRecovery({ enabled: true, gate: (run: () => Promise<unknown>) => run(),
+    record: async (event: Record<string, unknown>) => { records.push(event); return event }, probe: () => ({ ok: true }),
+    browser: { callTool: async ({ name }: { name: string }) => ({ isError: name === "browser_click" && ++clicks === 1 && failFirstClick, content: [] }) },
+    executor: { browserRecoveryBasis: () => ({ step: { key: "synthetic-step" } }), browserRecoveryHandoff: () => ({ stopped: true }),
+      stopBrowserRecovery: () => ({ state: "retained" }) } })
+  for (const [name, input] of calls) {
+    const reply = await controller.call(name, input)
+    cli.push(tool("c" + (cli.length + 1), name, input, reply.content.map((b: { text: string }) => b.text).join("\n"), reply.isError ? "error" : "completed"))
+  }
+  await controller.close()
+  return { cli, records }
+}
+const stop = { ...start, action: "stop" }
+test("a second start refused by the active controller remains a request in its original episode", async () => {
+  const t = await controllerTrace([[control, start], [control, start], ["browser_snapshot", {}], [control, stop]])
+  expect(t.records.map(r => r.phase)).toEqual(["browser_recovery_started", "browser_recovery_handoff", "browser_recovery_action", "browser_recovery_stopped"])
+  const { recovery } = await episode(t.cli, t.records)
+  expect(recovery.gaps).toEqual([])
+  expect(recovery.episodes).toMatchObject([{ started: true, nativeAttempt: t.records[0]!.attempt_id,
+    controls: [{ call: "c1", refused: false }, { call: "c2", refused: true }, { call: "c4", stopped: "model_stopped" }],
+    actions: [{ call: "c3", nativeLine: 3 }], nativeStop: "model_stopped" }])
+})
+
+test("a gesture refused before dispatch does not consume the following native action", async () => {
+  const click = { target: "synthetic-button" }
+  const t = await controllerTrace([[control, start], ["browser_click", click], ["browser_click", click],
+    ["browser_snapshot", {}], ["browser_click", click], [control, stop]], true)
+  expect(t.records.filter(r => r.phase === "browser_recovery_action").map(r => [r.tool, r.is_error])).toEqual([
+    ["browser_click", true], ["browser_snapshot", false], ["browser_click", false]])
+  const { recovery } = await episode(t.cli, t.records)
+  expect(recovery.gaps).toEqual([])
+  expect(recovery.episodes[0].actions).toMatchObject([
+    { call: "c2", nativeLine: 3, isError: true, refused: false }, { call: "c3", nativeLine: null, refused: true },
+    { call: "c4", nativeLine: 4, isError: false }, { call: "c5", nativeLine: 5, isError: false }])
+})
+
+test("a partial native close identifies each missing fact and retains its recorded counterpart", async () => {
+  const t = await controllerTrace([[control, start]])
+  const close = t.records.at(-1)!
+  expect(close).toMatchObject({ phase: "browser_recovery_stopped", code: "runtime_closed", cleanup: { state: "retained" } })
+  for (const [code, state] of [[null, "retained"], ["runtime_closed", null], [null, null]] as const) {
+    const edited = { ...close, code: code ?? undefined, cleanup: { state: state ?? undefined } }
+    const { recovery } = await episode(t.cli, [...t.records.slice(0, -1), edited])
+    expect(recovery.gaps).toEqual([...(code ? [] : ["native:stop-code"]), ...(state ? [] : ["native:stop-cleanup"])])
+    expect(recovery.episodes).toMatchObject([{ started: true, handoff: true, nativeStop: code, nativeCleanup: state }])
+  }
 })

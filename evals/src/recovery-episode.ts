@@ -86,16 +86,24 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
       id(f.partID) && typeof f.sha256 === "string" && /^[a-f0-9]{64}$/.test(f.sha256) && typeof f.bytes === "number" &&
       Number.isSafeInteger(f.bytes) && f.bytes >= 0 && typeof f.mime === "string" && /^image\/(png|jpeg|webp|gif)$/.test(f.mime)
         ? [{ partID: id(f.partID), sha256: f.sha256, bytes: f.bytes, mime: f.mime }] : []) : null
-    return [{ files, line: e.line, call: id(part.callID), message: id(part.messageID), tool: name, input, output,
+    return [{ files, refused: state.status === "error" && typeof output.refused === "string" && !!output.refused, line: e.line, call: id(part.callID), message: id(part.messageID), tool: name, input, output,
       status: id(state.status), action: name === browserRecoveryToolName ? id(input.action) : null }]
   })
-  const starts = calls.flatMap((c, i) => c.action === "start" ? [i] : [])
+  const starts: number[] = []
+  for (const [i, call] of calls.entries()) {
+    if (call.action !== "start") continue
+    const previous = calls[starts.at(-1) ?? -1]
+    // A busy controller echoes the held operation in its refusal. This request started nothing.
+    if (call.refused && previous && !previous.refused && call.output.operation_id === previous.input.operation_id &&
+        ["handoff", "browser", "verify", "stopping"].includes(String(call.output.phase))) continue
+    starts.push(i)
+  }
   if (calls.length && starts[0] !== 0) gaps.add("cli:missing-start")
   const episodes = starts.map((i, index) => {
     const start = calls[i]!, operation = id(start.input.operation_id)
     const group = calls.slice(i, starts[index + 1]).filter(c => {
       const original = object(object(c.output.verification).original_operation)
-      if (c.tool === browserRecoveryToolName && (!operation || c.input.operation_id !== operation ||
+      if (c.tool === browserRecoveryToolName && (!operation || (c.input.operation_id !== operation && !(c.refused && c.output.operation_id === operation)) ||
         (c.output.operation_id !== undefined && c.output.operation_id !== operation) || (original.operation_id !== undefined && original.operation_id !== operation))) {
         gaps.add("cli:operation")
         return false
@@ -104,15 +112,18 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
     })
     const candidates = sources.flatMap(source => source.rows.filter(r => r.phase === "browser_recovery_started" &&
       operation && r.operation_id === operation && id(r.attempt_id)).map(r => ({ source, attempt: id(r.attempt_id)! })))
-    const match = candidates.length === 1 && starts.filter(k => calls[k]!.input.operation_id === operation).length === 1 ? candidates[0] : undefined
+    const match = !start.refused && candidates.length === 1 && starts.filter(k => !calls[k]!.refused && calls[k]!.input.operation_id === operation).length === 1 ? candidates[0] : undefined
     const rows = match?.source.rows.filter(r => r.operation_id === operation && r.attempt_id === match.attempt) ?? []
     const handoff = bool(rows.find(r => r.phase === "browser_recovery_handoff")?.stopped)
-    if (start.output.phase === "browser" && handoff !== true) gaps.add("native:handoff")
+    if (!start.refused && start.output.phase === "browser" && handoff !== true) gaps.add("native:handoff")
     const nativeActions = rows.filter(r => r.phase === "browser_recovery_action")
-    const actions = group.filter(c => c.tool !== browserRecoveryToolName).map((c, j) => {
-      const sha256 = digest(JSON.stringify(c.input)), r = nativeActions[j]
+    let nextAction = 0
+    const actions = group.filter(c => c.tool !== browserRecoveryToolName).map(c => {
+      // Admission refusals carry no phase. A post-dispatch refusal includes the controller view.
+      const beforeDispatch = c.refused && c.output.phase === undefined
+      const sha256 = digest(JSON.stringify(c.input)), r = beforeDispatch ? undefined : nativeActions[nextAction++]
       const linked = r?.tool === c.tool && r?.arguments_sha256 === sha256 ? r : undefined
-      if (!linked) gaps.add("native:action")
+      if (!linked && !beforeDispatch) gaps.add("native:action")
       const isError = bool(linked?.is_error), pageOk = bool(object(linked?.page).ok)
       const transportError = linked?.transport_error === null ? false : typeof linked?.transport_error === "string" ? true : null
       if (linked && (pageOk === null || transportError === null || (!transportError && isError === null))) gaps.add("native:action-outcome")
@@ -124,20 +135,23 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
       if (!text && object(linked?.page).ok === true && Array.isArray(linked?.content) && linked.content.some(b => object(b).type === "text")) gaps.add("text:missing")
       if (linked?.tool === "browser_take_screenshot" && Array.isArray(linked.content) &&
         linked.content.filter(b => object(b).type === "image").length > (c.files?.length ?? 0)) gaps.add("cli:screenshot-files")
-      return { ...(c.files ? { files: c.files } : {}), call: c.call, message: c.message, line: c.line, tool: c.tool, sha256, nativeLine: linked?.line ?? null, text,
+      return { ...(c.files ? { files: c.files } : {}), refused: c.refused, call: c.call, message: c.message, line: c.line, tool: c.tool, sha256, nativeLine: linked?.line ?? null, text,
         isError, transportError, pageOk }
     })
     if (nativeActions.some(r => !actions.some(a => a.nativeLine === r.line))) gaps.add("cli:unmatched-action")
     const controls = group.filter(c => c.action).map(c => {
       const v = object(c.output.verification), original = object(v.original_operation), stopped = object(c.output.stopped)
       return { line: c.line, call: c.call, message: c.message, action: c.action, status: c.status, phase: id(c.output.phase),
-        refused: typeof c.output.refused === "string", verification: id(v.status), uncertain: bool(v.uncertain),
+        refused: c.refused, operation: id(c.input.operation_id), verification: id(v.status), uncertain: bool(v.uncertain),
         receipt: id(v.receipt_id), original: id(original.status), configuration: id(object(original.configuration).status),
         execution: id(object(original.execution).status), stopped: id(stopped.code), cleanup: id(object(stopped.cleanup).state) }
     })
     const finish = controls.findLast(c => c.verification)
     const stop = group.map(c => object(c.output.stopped)).findLast(s => id(s.code))
     const nativeStop = rows.findLast(r => r.phase === "browser_recovery_stopped")
+    const nativeCode = id(nativeStop?.code), nativeCleanup = id(object(nativeStop?.cleanup).state)
+    if (nativeStop && !nativeCode) gaps.add("native:stop-code")
+    if (nativeStop && !nativeCleanup) gaps.add("native:stop-cleanup")
     if (stop && (!nativeStop || nativeStop.code !== stop.code || object(nativeStop.cleanup).state !== object(stop.cleanup).state)) gaps.add("native:stop")
     const verifiedRow = rows.findLast(r => r.phase === "browser_recovery_verified")
     const verified = id(verifiedRow?.status)
@@ -145,12 +159,12 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
       r.phase === "browser_recovery_receipt" && r.operation_id === operation && object(r.receipt).id === finish.receipt) ? finish.receipt : null
     if (finish && (verified !== finish.verification || !rows.some(r => r.phase === "browser_recovery_attested"))) gaps.add("native:verification")
     if (finish?.receipt && !receipt) gaps.add("native:receipt")
-    const started = match || start.output.phase === "browser" ? true : controls[0]?.refused && !candidates.length ? false : null
+    const started = start.refused ? false : match || start.output.phase === "browser" ? true : null
     if (started && !nativeStop && !stop && !["continuable", "completed"].includes(finish?.verification ?? "")) gaps.add("episode:outcome")
-    if (started === null || candidates.length && !match) gaps.add("native:start")
+    if (started === null || !start.refused && candidates.length && !match) gaps.add("native:start")
     return { operation, controls, started, nativeAttempt: match?.attempt ?? null, nativeSource: match?.source.source ?? null, handoff, actions,
       cliVerification: finish?.verification ?? null, stop: id(stop?.code), cleanup: id(object(stop?.cleanup).state),
-      nativeStop: id(nativeStop?.code), nativeCleanup: id(object(nativeStop?.cleanup).state), verified, receipt, original: finish?.original ?? null, configuration: finish?.configuration ?? null, execution: finish?.execution ?? null }
+      nativeStop: nativeCode, nativeCleanup, verified, receipt, original: finish?.original ?? null, configuration: finish?.configuration ?? null, execution: finish?.execution ?? null }
   })
   if (nativeRows.some(r => !episodes.some(ep => ep.operation === r.operation_id && (ep.nativeAttempt === r.attempt_id ||
     (r.phase === "browser_recovery_receipt" && ep.receipt && ep.receipt === object(r.receipt).id))))) gaps.add("cli:unmatched-native")
