@@ -21982,3 +21982,200 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Собранный артефакт CLI и Desktop: ядро теперь достаёт пакет `dashboard` динамическим `import()` (с условиями `#sqlite` и
   импортами `.ts`); проверены только исходники и typecheck `core`, `server`, `cli`.
 - Windows и macOS, Desktop (Location окна дашборда — B4, ВШ-6), настоящая модель.
+
+## B2.3d Без пробуждения после перезапуска (В-104)
+
+24.11.2026. Ветка `b23d-no-wake` от `oc2-migration` (`02bc900c9c`), рабочее дерево `.claude/worktrees/b23d`. Эталон 0.4 —
+`v0.4.0` (В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и `git commit`;
+`bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci --ignore-scripts --offline` клиента
+`packages/loginom-runtime/client` и шаблона `packages/dashboard/template` — в этом дереве и в дереве базы
+`<scratchpad>/b23d/base` (`02bc900c9c`, detached), все четыре — код 0. Хук `pre-commit` (`bun run secrets staged`) —
+`clean` на каждом коммите. Тесты, мутации и прогоны пакетов — под `unshare -n` (поднят только `lo`), со свежими
+временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE` и кэшем rg. **Модель не вызывалась**: в
+тестах — `TestLLM` ядра (запросы считаются по модели) и подставной `drain` харнесса `session-execution`; сети нет.
+
+Прочитано: решения В-100, В-104, В-105; этот журнал — B2.3c; v2 — `core/src/session/execution/restart.ts`,
+`execution.ts`, `execution/subagent-report.ts`, `subagent-completion.ts`, `subagent-job.ts`, `run-coordinator.ts`
+(`wake`, `awaitIdle`), `tool/plugin/shell.ts` (`reattach`, `notify`), `session/store.ts` (заявка, счётчик), `job.ts`
+(строки фоновых задач); тесты `shell-restart`, `session-execution`, `subagent-idle-e2e`; навык
+`.opencode/skills/unit-tests`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `49f6695523` `feat(core): wake nothing a restart recovered while turns wait for the user (B2.3d)` | правка прохода, комментарии опции, тесты, CAT-07 |
+| следующий | этот раздел |
+
+Файлов кода три, все upstream и уже в CAT-07: `core/src/session/execution/restart.ts` (+14 −2), `server/src/options.ts`
+(+1 −1, комментарий поля), `cli/src/server-process.ts` (+2 −2, комментарий строки продукта); строка продукта
+`resumeTurns: false` из B2.3c не менялась. Тесты upstream: `core/test/shell-restart.test.ts` (+46 −18) и
+`core/test/session-execution.test.ts` (+19 −28) — случаи B2.3c переписаны; `core/test/subagent-idle-e2e.test.ts` (+136)
+— теперь в CAT-07.
+
+### Как было после B2.3c
+
+Ход самой сессии проход оставлял пользователю, а три пути вызывали модель без него (журнал, раздел B2.3c, «Фоновые
+терминалы и подагенты»):
+
+1. Конец фоновой команды `shell`, которую восстановленный сервер досматривает (`ShellTool.reattach` с обёрткой
+   уведомлений прохода `notices`), — итог во входящие и `wake`. Во время прохода будились только сессии без заявки (в
+   конце прохода), после прохода — любые.
+2. Ребёнок работающей задачи `subagent` — «The server restarted…» (`prepareResume`) и `SubagentJob.start`.
+3. Отчёт ребёнка будит родителя: по концу продолженного хода (обработчик `settled` исполнения) и отчёт из outbox
+   (ребёнок кончил до перезапуска) — через ту же обёртку `notices`, в конце прохода, если у родителя нет заявки.
+
+### Решение
+
+Всё — в `restart.ts`, под той же опцией `resumeTurns === false`, в двух местах:
+
+- **Обёртка `notices`**: при опции уведомление прохода только ложится во входящие (`resume: false`, как и было), `wake`
+  не зовётся ни сразу, ни отложенно (`wakes` в финализаторе), ни после прохода. Это закрывает пути 1 и 3 (outbox):
+  итоги команд и отчёты сохраняются, модель их получит со следующим сообщением пользователя (`Session.inbox` показывает их и
+  до того).
+- **`recoverSubagent`, ветка `running`**: вместо `prepareResume` и запуска — `leaveToUser(child)` (терминал
+  `interrupted`, `reason: "user"`, заявка и счётчик сняты — как ход самой сессии в B2.3c) и отчёт родителю через ту же
+  обёртку: `state: cancelled`, текст «The server restarted while the subagent was working. It was stopped and not
+  continued.»; доставка закрывает строку задачи (`completeBackground`), следующий старт её уже не тронет. Путь 2 закрыт,
+  а путь 3 по концу хода ребёнка не возникает: ребёнок не исполняется.
+
+После правки при опции в проходе недостижимы `wake(…)`, `execution.resume` и `SubagentJob.start`. Без опции обе ветки
+не срабатывают — поведение OpenCode 2 (сборка без продукта, `fetch.ts`, SDK, тесты upstream; мутации M5, M5b). Протокол не менялся (В-105): причина `user`, как в B2.3c.
+
+После ручного продолжения всё как в v2: сообщение пользователя будит сессию, ход идёт по истории вместе с итогами из
+входящих; фоновые команды и подагенты, запущенные уже после продолжения, идут не через обёртку прохода и будят сессию,
+как обычно (команда — тест ниже и мутация M6; подагент — по коду: отчёт его хода доставляет обработчик `settled`).
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `shell-restart.test.ts` «watches the command but leaves the turn and its notice to the user when turns do not resume» (случай B2.3c переписан) | весь app ядра, `TestLLM`, подставной демон: ход ждёт команду `shell`, мягкий перезапуск с передачей демона; второй сервер с `resumeTurns: false`: вызов закрыт «перенесён в фон», команда — строка фоновой задачи, запросов к модели 1, `outcome: interrupted`. **Случай 1:** команда кончилась — дождаться, пока строка задачи уйдёт (`completeBackground` идёт после уведомления и возможного `wake`, так что пробуждение к этому времени уже записано), `wait` сессии — запросов по-прежнему 1, итог (`source: shell`, `state: completed`) во входящих. **П. 2:** `prompt` «continue» — итог в ленте, ход запускает новую команду в фоне (`background: true`) и кончается; её конец будит сессию — четвёртый запрос, второй итог в ленте |
+| `subagent-idle-e2e.test.ts` «leaves a background child killed mid-turn to the user and tells its parent without a wake when turns do not resume» | `TestLLM`, два процесса на одной базе: ребёнок фоновой задачи на первом запросе, процесс убит; второй с `resumeTurns: false`. **Случай 2:** запросов ребёнка 1 (не 2), ребёнок `interrupted`, заявка снята, сообщения `notice: restart` нет. **Случай 3:** строка задачи закрыта, во входящих родителя отчёт `state: cancelled` «…not continued», запросов родителя 0; `prompt` родителю — отчёт в ленте, один запрос родителя |
+| там же «keeps a report committed before a crash in the inbox without waking the parent when turns do not resume» | **Случай 3 (outbox):** ребёнок кончил, доставка отчёта «упала» после коммита (подставной inbox), родитель без заявки; проход с `resumeTurns: false` — отчёт «crash-safe answer» во входящих, в ленте пусто, запросов родителя 0, ребёнка 1 |
+| `session-execution.test.ts` «leaves a suspended parent and its background subagent to the user when turns do not resume» (случай B2.3c переписан) | харнесс upstream, подставной `drain`: родитель и ребёнок с заявками, задача `subagent` идёт; после прохода и `awaitIdle` обоих — `drain` не звался ни разу, `interrupted` — ребёнок и родитель, оба `reason: "user"`, синтетических `Synthetic` нет, заявки сняты, задача закрыта, во входящих родителя отчёт `cancelled` |
+
+Устойчивость: четыре случая `--rerun-each 10` (`--test-name-pattern=turns.do.not.resume`) — 40 pass, 0 fail, 14 с.
+`cli/test/restart-turn.test.ts` (B2.3c) — 2 pass, 0 fail.
+
+### Мутации
+
+`<scratchpad>/b23d/scripts/mutations.sh` (`mutate.py`: одна правка, тест, байты назад; `git status` до и после
+совпал, кроме двух файлов каталога, которые я правил в это время). M1–M6 — до коммита, код тот же, что в
+`49f6695523`; после них в `shell-restart` поправлен только поиск новой команды (без `!`), и M1, M6 на финальном тесте
+повторены (M1b, M6b).
+
+```text
+mut-M1-notices-wake            core shell-restart + e2e + session-execution  62 pass 3 fail
+  # обёртка снова будит: shell — Expected 1, Received 3 (запросов до пользователя); оба случая e2e — входящие пусты
+  # (отчёт продвинут проснувшимся родителем); случай session-execution зелёный — родитель там с заявкой
+mut-M2-child-continues         core e2e + session-execution  58 pass 2 fail
+  # ветка ребёнка убрана (как v2): drained [child]; e2e — ребёнок "succeeded" вместо "interrupted"
+mut-M3-report-wakes            core e2e + session-execution  58 pass 2 fail
+  # отчёт об остановленном ребёнке через будящий Session.synthetic: drained [parent]; e2e — входящие пусты
+mut-M4-no-child-terminal       core e2e + session-execution  58 pass 2 fail
+  # без leaveToUser(child): нет interrupted ребёнка; e2e — outcome undefined
+mut-M5-default-flipped         core shell-restart + e2e + session-execution  51 pass 14 fail
+  # условие обёртки «!== true» (поведение продукта по умолчанию): красны 14 тестов upstream восстановления после перезапуска
+mut-M5b-default-flipped-child  core e2e + session-execution  51 pass 9 fail
+  # то же для ветки ребёнка: красны 9 тестов upstream возобновления подагентов
+mut-M6-new-command-silent      core shell-restart  4 pass 1 fail
+  # shell.ts: уведомление новой фоновой команды без пробуждения — п. 2 красный (таймаут 30 с на ожидании 4-го запроса)
+M0-after                       core три файла 65 pass 0 fail; cli restart-turn 2 pass 0 fail
+mut-M1b-notices-wake           core shell-restart  4 pass 1 fail
+mut-M6b-new-command-silent     core shell-restart  4 pass 1 fail
+M0-final                       core три файла 65 pass 0 fail
+```
+
+M6 падает по таймауту: из ожиданий теста от уведомления новой команды зависит только ожидание четвёртого запроса.
+
+### Прогоны пакетов
+
+Скрипт `<scratchpad>/b23d/scripts/suites.sh`: `bun run test` каждого пакета подряд, база (`02bc900c9c`,
+`<scratchpad>/b23d/base`) и `49f6695523`. Прогоны перекрывались: `core` базы шёл вместе с `product`, `loginom-agent`
+и частью `server` коммита, `server` и `cli` базы — во время проб и мутаций; `cli` и `core` коммита — без других
+прогонов пакетов.
+
+| Пакет | База `02bc900c9c` | `49f6695523` |
+|---|---|---|
+| `product` | 60 pass, 3 fail | 60 pass, 3 fail — ровно три известных (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` |
+| `loginom-agent` | 93 pass, 0 fail | 93 pass, 0 fail |
+| `server` | 295 pass, 3 skip, 0 fail (267 с) | 295 pass, 3 skip, 0 fail (258 с) |
+| `cli` | 609 pass, 9 skip, 0 fail (556 с) | 609 pass, 9 skip, 0 fail (555 с) |
+| `core` | 7126 pass, 354 skip, 4 fail (249 с) | 7129 pass (+2 новых случая e2e, +1 — см. ниже), 354 skip, 3 fail (229 с) |
+
+Три падения `core` — те же, что на базе и в B2.3c: `ShellParse > extracts static directory targets across escapes, …`,
+`util.effect-flock > fails on unwritable lock roots`, `util.flock > fails clearly on unwritable lock roots`. Четвёртое
+падение базы — `ConfigSkillPlugin.Plugin > follows missing source directories as their parents appear` (2,1 с, под
+нагрузкой параллельных прогонов): отдельно на базе `test/config/skill.test.ts` — 11 pass, 0 fail; на коммите не падало.
+Отсюда +1 pass сверх двух новых случаев. Новых падений нет.
+
+### Проверки
+
+На `49f6695523`:
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary          # код 0
+against a6b15d33daf6: 612 divergent upstream files                     # как на базе
+  CAT-07: 16                                                           # база: 15 (+ subagent-idle-e2e.test.ts)
+  CAT-12: 203                                                          # база: 204 (тот же файл по маске)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check  # код 0
+would change: 0 files
+$ bun run check                                                        # код 0
+Found 905 warnings and 0 errors.                                       # oxlint; ни одного по файлам задачи
+ Tasks:    39 successful, 39 total
+$ bun typecheck   # core, server, cli — по пакету
+✓ No type errors in 2,031 files across 2 projects
+✓ No type errors in 1,670 files across 2 projects
+✓ No type errors in 2,250 files across 2 projects
+```
+
+`prettier --check` — файлы задачи отформатированы, кроме `cli/src/server-process.ts`, который не проходит и на базе
+(длинные строки `apply-identity`, B1.4a); мои две строки в нём по формату.
+
+### Где решал сам
+
+- **Итоги восстановленных команд не будят и после ручного продолжения.** Условие в обёртке не знает, продолжал ли
+  пользователь сессию: итог команды, досмотренной после перезапуска и кончившейся уже после продолжения, тоже ждёт
+  следующего сообщения (если идёт ход, он заберёт итог на ближайшей границе шага, как любой `steer`). Задание требует
+  «как в v2» только для новых команд и подагентов; помнить «сессия продолжена после перезапуска» — заметно больше кода.
+  Меньший вариант.
+- **Не будятся и сессии в покое.** Задание говорит о сессии, прерванной перезапуском; сессия без заявки (ход кончился до
+  перезапуска, команда в фоне ещё шла) в v2 тоже просыпалась — в конце прохода или по концу команды. Заголовок В-104 —
+  «модель не вызывается без пользователя», поэтому условие общее, без списка сессий; это и меньше кода. Тестом это
+  покрыто для отчётов подагента родителю в покое (оба случая e2e), для `shell` — по коду (ниже, «Не проверено»).
+- **Ребёнку — тот же терминал, родителю — отчёт `cancelled`.** Без терминала заявка ребёнка и строка задачи остались бы
+  навсегда, и каждый старт находил бы их снова. Без отчёта модель родителя не узнала бы, что ребёнок не закончил.
+  `cancelled` — то же состояние, что после остановки ребёнка пользователем (`SubagentReport`: `interrupted` →
+  `cancelled`), только без пробуждения; текст отчёта — для модели, протокол не меняется (В-105).
+- **Пользователь продолжает ребёнка сам — его отчёт будит родителя, как в v2** (ребёнок с `parentID` докладывает родителю
+  о каждом периоде, `subagent-idle-e2e` «reports every directly prompted busy period…»). Это действие пользователя; не
+  трогал.
+- **Задачи изображений** не менялись: и в v2 итог восстановленной задачи доставляется с `resume: false`
+  (`recoverToolJob`).
+- **Тесты подагента — на подставной модели.** Харнесс `session-execution` стоит на подставном `drain`, поэтому случаи 2 и
+  3 добавлены в `subagent-idle-e2e` (`boot` принимает опции `SessionRestart`), а случай `session-execution` B2.3c
+  переписан: он проверял прежнее поведение.
+- **Каталог.** `subagent-idle-e2e.test.ts` и раньше отличался от upstream (имя конфига `loginom-ai-agent.json`, маска
+  CAT-12); теперь он в списке CAT-07, всего файлов по-прежнему 612 (CAT-07 15 → 16, CAT-12 204 → 203). Раздел B2.3c
+  журнала не правил, хотя его абзац «Фоновые терминалы и подагенты» и строки мутаций подагента устарели: действует этот
+  раздел.
+
+### Найдено, не чинил
+
+- Ничего нового в чужом коде. Нестабильный `ConfigSkillPlugin.Plugin > follows missing source directories…` — выше, под
+  нагрузкой; причину не разбирал. Три падения `core` — известны с B1.
+
+### Не проверено
+
+- Windows и macOS: тесты — только Linux.
+- Установленный Desktop и собранный CLI — только исходники; через настоящую службу (`serve --service`) проверен только
+  ход самой сессии (`cli/test/restart-turn.test.ts`, B2.3c), фоновые команды и подагенты — харнессами ядра.
+- Команда, которую модель запустила в фоне ещё до перезапуска (`recoverShellJob` → `reattach`), — по коду: та же
+  обёртка `notices`; тест покрывает вызов, который в фон перенёс сам проход (`settleBackgroundedCalls`).
+- Сессия в покое (без заявки) с восстановленной командой `shell`, в том числе с командой, кончившейся за время
+  перезапуска, но известной демону, — по коду: та же обёртка `notices`; тестом покрыта только прерванная сессия.
+- Итог восстановленной команды, пришедший посреди хода, начатого пользователем, — по коду (заберёт ближайшая граница
+  шага), тестом не покрыт.
+- Как клиенты показывают итоги во входящих до продолжения — этап C (кнопка «Продолжить», В-105).
+- Перезапуск, когда демон команд умер вместе со службой, — как в B2.3c, только по коду.

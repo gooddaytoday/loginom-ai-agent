@@ -161,6 +161,7 @@ const boot = (
     readonly global: Context.Context<Global.Service>
     readonly llm: Context.Context<LLMClientService>
     readonly inbox?: InboxNode
+    readonly restart?: SessionRestart.Options
   },
 ) =>
   Effect.gen(function* () {
@@ -173,6 +174,7 @@ const boot = (
         LayerNodePlatform.llmClient.replace(Layer.succeedContext(input.llm)),
         SessionRunnerModel.node.replace(modelLayer),
         ...(input.inbox ? [SessionInbox.node.replace(input.inbox)] : []),
+        ...(input.restart ? [SessionRestart.node.replace(SessionRestart.configured(input.restart))] : []),
       ]),
       scope,
     )
@@ -192,6 +194,7 @@ type HarnessInput = {
   readonly config?: Record<string, unknown>
   readonly database?: string
   readonly inbox?: InboxNode
+  readonly restart?: SessionRestart.Options
 }
 
 const setup = Effect.fnUntraced(function* (input?: HarnessInput) {
@@ -243,6 +246,7 @@ const harness = Effect.fnUntraced(function* (input?: HarnessInput) {
     global: base.global,
     llm: base.llmContext,
     inbox: input?.inbox,
+    restart: input?.restart,
   })
   yield* prepareLocation(app, base.location)
   const registry = yield* Tool.Service.pipe(Effect.provide(app.locations.get(base.location)))
@@ -626,6 +630,138 @@ describe("subagent idle reports end to end", () => {
 
         yield* second.restart.resumeSuspendedSessions
         expect(yield* deliveredReports(second, parent.id)).toHaveLength(1)
+      }),
+    30_000,
+  )
+
+  // `resumeTurns: false` (the Loginom AI Agent server, В-104): after a restart nothing calls the model before the user.
+  e2e.live(
+    "keeps a report committed before a crash in the inbox without waking the parent when turns do not resume",
+    () =>
+      Effect.gen(function* () {
+        const crashed = yield* Deferred.make<void>()
+        const h = yield* harness({ inbox: crashInbox(crashed), restart: { resumeTurns: false } })
+        yield* h.llm.serve(
+          script({
+            reviewer: [TestLLM.text("crash-safe answer", "turn-1")],
+            build: [TestLLM.text("parent ack", "parent-1")],
+          }),
+        )
+
+        const launched = yield* h.call("call-launch")
+        const childID = outputSessionID(launched.metadata)
+        yield* Deferred.await(crashed)
+        yield* h.sessions.wait(childID)
+        yield* h.jobs.wait({ id: childID })
+        expect(yield* h.jobs.pendingBackground).toMatchObject([{ id: childID, status: "completed" }])
+
+        // The sweep admits the report; a wake would already be registered when it returns.
+        yield* h.restart.resumeSuspendedSessions
+        yield* h.sessions.wait(h.parent.id)
+        expect(yield* h.jobs.pendingBackground).toEqual([])
+        expect(yield* h.sessions.inbox(h.parent.id)).toMatchObject([
+          {
+            type: "synthetic",
+            payload: {
+              text: expect.stringContaining("crash-safe answer"),
+              metadata: { source: "subagent", childID, state: "completed" },
+            },
+          },
+        ])
+        expect(yield* deliveredReports(h, h.parent.id)).toEqual([])
+        const requests = yield* h.llm.requests()
+        expect(requests.filter((request) => request.model.id === "build")).toEqual([])
+        expect(requests.filter((request) => request.model.id === "reviewer")).toHaveLength(1)
+      }),
+    30_000,
+  )
+
+  e2e.live(
+    "leaves a background child killed mid-turn to the user and tells its parent without a wake when turns do not resume",
+    () =>
+      Effect.gen(function* () {
+        const base = yield* setup()
+        const database = path.join(base.dir.path, "restart.sqlite")
+        const firstScope = yield* Scope.make()
+        yield* Effect.addFinalizer(() => Scope.close(firstScope, Exit.void))
+        const first = yield* boot(firstScope, {
+          database,
+          global: base.global,
+          llm: base.llmContext,
+        })
+        yield* prepareLocation(first, base.location)
+        const registry = yield* Tool.Service.pipe(Effect.provide(first.locations.get(base.location)))
+        const parent = yield* first.sessions.create({
+          location: base.location,
+          model: Model.Ref.make({ id: Model.ID.make("parent"), providerID: Provider.ID.make("test") }),
+        })
+        yield* base.llm.serve(
+          script({
+            reviewer: [TestLLM.text("interrupted answer", "turn-1"), TestLLM.text("recovered answer", "turn-2")],
+            build: [TestLLM.text("parent ack", "parent-1")],
+          }),
+        )
+        const gate = yield* base.llm.gate()
+        const launched = yield* executeTool(registry, {
+          sessionID: parent.id,
+          ...toolIdentity,
+          call: {
+            type: "tool-call",
+            id: "call-launch",
+            name: SubagentTool.name,
+            input: { agent: "reviewer", description: "restart review", prompt: "review this" },
+          },
+        })
+        const childID = outputSessionID(launched.metadata)
+        yield* gate.started
+
+        // Crash the first process mid-turn: the claim and running outbox row survive.
+        yield* Scope.close(firstScope, Exit.void)
+        yield* gate.release
+
+        const secondScope = yield* Scope.make()
+        yield* Effect.addFinalizer(() => Scope.close(secondScope, Exit.void))
+        const second = yield* boot(secondScope, {
+          database,
+          global: base.global,
+          llm: base.llmContext,
+          restart: { resumeTurns: false },
+        })
+        yield* prepareLocation(second, base.location)
+        expect((yield* claims(second))[childID]).toBe(true)
+        expect(yield* second.jobs.pendingBackground).toMatchObject([{ id: childID, status: "running" }])
+        yield* second.restart.resumeSuspendedSessions
+        yield* second.sessions.wait(childID)
+        yield* second.sessions.wait(parent.id)
+
+        // The child is not continued: interrupted, its claim released, no restart notice, no second request.
+        expect((yield* second.sessions.get(childID)).outcome).toBe("interrupted")
+        expect((yield* claims(second))[childID]).toBe(false)
+        expect(
+          (yield* second.sessions.context(childID)).filter(
+            (message) => message.type === "synthetic" && message.metadata?.notice === "restart",
+          ),
+        ).toEqual([])
+        // The parent hears it in its inbox, settled as cancelled, and is not woken by it.
+        expect(yield* second.jobs.pendingBackground).toEqual([])
+        expect(yield* second.sessions.inbox(parent.id)).toMatchObject([
+          {
+            type: "synthetic",
+            payload: {
+              text: expect.stringContaining("not continued"),
+              metadata: { source: "subagent", childID, state: "cancelled" },
+            },
+          },
+        ])
+        const requests = yield* base.llm.requests()
+        expect(requests.filter((request) => request.model.id === "reviewer")).toHaveLength(1)
+        expect(requests.filter((request) => request.model.id === "build")).toEqual([])
+
+        // The user continues the parent: the kept report reaches it with the prompt.
+        yield* second.sessions.prompt({ sessionID: parent.id, text: "continue" })
+        yield* waitForReports(second, parent.id, 1)
+        expect((yield* deliveredReports(second, parent.id))[0]!.metadata).toMatchObject({ state: "cancelled" })
+        expect((yield* base.llm.requests()).filter((request) => request.model.id === "build")).toHaveLength(1)
       }),
     30_000,
   )

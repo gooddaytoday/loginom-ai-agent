@@ -29,6 +29,8 @@ const RESUME_EXHAUSTED = {
   message: "Execution was interrupted repeatedly and will not be resumed automatically.",
 } as const
 
+const SUBAGENT_LEFT = "The server restarted while the subagent was working. It was stopped and not continued."
+
 export interface Options {
   /**
    * Times a single turn may be resumed before it is terminalized instead.
@@ -39,7 +41,8 @@ export interface Options {
   readonly maxAttempts?: number
   /**
    * `false` leaves each turn the restart found unfinished to its user: it ends interrupted, with no restart notice and
-   * no model request. Background shell commands and running subagent children are recovered either way.
+   * no model request. A running subagent child is left the same way and its parent told so. Recovered background
+   * commands still run and report, but no recovered notice wakes a session: it waits for the user.
    */
   readonly resumeTurns?: boolean
 }
@@ -361,6 +364,14 @@ export const layer = (options?: Options) =>
         }
 
         if (yield* execution.isActive(recovery.childSessionID)) return false
+        if (options?.resumeTurns === false) {
+          yield* leaveToUser(recovery.childSessionID)
+          yield* deliverSubagentSafe(notices, background.notificationID, recovery, {
+            status: "cancelled",
+            error: SUBAGENT_LEFT,
+          })
+          return false
+        }
         // prepareResume publishes Execution.Failed directly on the bus outside the
         // coordinator, so the settle hook never reports an exhausted child.
         if (!(yield* prepareResume(recovery.childSessionID))) {
@@ -420,7 +431,8 @@ export const layer = (options?: Options) =>
             synthetic: (input) =>
               sessions.synthetic({ ...input, resume: false }).pipe(
                 Effect.tap(() => {
-                  if (suspended.has(input.sessionID)) return Effect.void
+                  // Turns left to the user: a recovered notice waits in the inbox, even once the sweep is over.
+                  if (options?.resumeTurns === false || suspended.has(input.sessionID)) return Effect.void
                   if (!state.defer) return wake(input.sessionID)
                   wakes.add(input.sessionID)
                   return Effect.void
