@@ -73,8 +73,8 @@ export async function completePackageUpload(page,task,upload,waitReady=waitArtif
 // Upload submission can settle before its file grid reload does. Wait on the
 // same native directory/view/store before discovery or scrolling, without
 // refreshing, downloading, or resubmitting anything while it is covered.
-export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimumLoadCount=null,refresh=null) {
- const binding=await page.evaluateHandle(({snapshot,origin,build})=>{
+export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimumLoadCount=null,refresh=null,expectedGrid=null) {
+ const binding=await page.evaluateHandle(({snapshot,origin,build,expectedGrid})=>{
   const prefix=snapshot.workflow_ref.prefix,gridTid=prefix+';FileStorageForm;pnlFileStorage;tbl';
   const elements=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];
   const tabs=[...document.querySelectorAll('[data-tid='+JSON.stringify(snapshot.workflow_ref.tab_tid)+']')];
@@ -82,11 +82,11 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
   const card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
   const element=elements[0],view=element&&globalThis.Ext?.getCmp?.(element.id),store=view?.getStore?.();
   if(location.origin!==origin||globalThis.bg?.app?.Version!==build||state?.epoch!==snapshot.dom_epoch.document
-    ||elements.length!==1||tabs.length!==1||!tabs[0].classList.contains('x-tab-active')
+    ||elements.length!==1||expectedGrid!==null&&element!==expectedGrid||tabs.length!==1||!tabs[0].classList.contains('x-tab-active')
     ||view?.el?.dom!==element||!store||typeof store.isLoading!=='function'||!card?.Controller?.Node?.data?.node)
     throw Error('DISCOVERY_READY_BINDING_UNAVAILABLE');
   return {document,element,view,store,tab:tabs[0],card,controller:card.Controller,directoryNode:card.Controller.Node.data.node,gridTid};
- },{snapshot:task.snapshot,origin:task.expected_origin,build:task.expected_build});
+ },{snapshot:task.snapshot,origin:task.expected_origin,build:task.expected_build,expectedGrid});
  const inspect=({binding:b,task:t,minimumLoadCount,poll=false,busyOnly=false})=>{
   const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
   const card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
@@ -136,7 +136,7 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
     buffered:b.store.isBufferedStore===true,complete,only_parent:onlyParent,placeholder,generation_ready:generation,
     hit:hit?{tid:hit.getAttribute('data-tid'),classes:typeof hit.className==='string'?hit.className.slice(0,200):''}:null,
     masks:masks.slice(0,8).map(e=>({tid:e.getAttribute('data-tid'),classes:e.className})),dialogs:dialogs.length};
-  if(busyOnly&&!observed.ready&&!busySameOwner)throw Error('DISCOVERY_REFRESH_BLOCKED');
+  if(busyOnly&&!observed.ready&&!busySameOwner)throw Error('DISCOVERY_READY_BLOCKED');
   return poll?(observed.ready?observed:false):observed;
  };
  const revalidateReady=async()=>{
@@ -159,9 +159,10 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
  try {
   const before=await page.evaluate(inspect,{binding,task,minimumLoadCount});trace.push({event:'artifact_discovery_readiness',...before});
   if(!before.ready){
+   if(expectedGrid!==null&&!before.busy_same_owner)return before;
    const remaining=deadline-Date.now();if(remaining<=0)throw Error('DISCOVERY_READY_DEADLINE');
    const ready=await page.waitForFunction(inspect,
-    {binding,task,minimumLoadCount,poll:true},{timeout:remaining,polling:250});
+    {binding,task,minimumLoadCount,poll:true,busyOnly:expectedGrid!==null},{timeout:remaining,polling:250});
    await ready.dispose();
   }
   const after=await revalidateReady();
@@ -235,7 +236,7 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
  // Artifact verification already owns a 60-second browser budget. Leave a
  // small transport margin, but allow slow Windows/Loginom uploads to publish
  // their final size instead of imposing a separate short discovery timeout.
- const deadline=Date.now()+55000;
+ const deadline=Math.min(task.deadline_at??Infinity,Date.now()+55000);
  const settledDirectory=async()=>{
   for(let attempt=0;attempt<16;attempt++){
    if(Date.now()>=deadline)throw Error('DISCOVERY_DIRECTORY_SETTLEMENT_DEADLINE');
@@ -348,6 +349,13 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal,w
    },{tid:gridTid,reset,epoch:roots.output.dom_epoch});
    uncertain=false;
    if(!move.applied&&move.code==='DISCOVERY_EPOCH_CHANGED')continue;
+   // A native load can cover the grid after readiness. Reobserve only after
+   // the same grid's listing advances, before sending any scroll or download.
+   if(!move.applied&&move.code==='DISCOVERY_GRID_BLOCKED'&&Number.isSafeInteger(readiness.load_count)){
+    trace.push({event:'artifact_discovery_scroll_blocked',load_count:readiness.load_count});
+    const settled=await waitReady(page,task,deadline,trace,readiness.load_count+1,null,owner);
+    if(settled.ready){reset=false;continue;}
+   }
    // A settled nonempty listing can still predate a successful upload.
    if(!move.applied&&move.code==='DISCOVERY_FILE_NOT_FOUND'&&readiness.complete===true
       &&!missingRowRefreshed&&refreshes<20&&await refreshDirectory()){

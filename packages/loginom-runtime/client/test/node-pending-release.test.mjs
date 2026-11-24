@@ -389,7 +389,8 @@ const stop=async(f,phase)=>{
  return job;
 };
 
-for(const foreign of [false,true])test('abandon_operation after export input opening failure, foreign owner='+foreign,async()=>{
+for(const type of ['exports.text','exports.excel','exports.lgd'])
+for(const foreign of [false,true])test('abandon_operation after '+type+' input opening failure, foreign owner='+foreign,async()=>{
  const receipt={status:'AMBIGUOUS',action_key:'node.input_port.open.internal',action_revision:'1',operation_id:'apply:n7',
   phase:'port_open',effect_possible:true,cleanup_complete:false,output:{verified:false,cleanup_complete:false},
   error:{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:'Opened port wizard owner differs'},
@@ -404,7 +405,7 @@ for(const foreign of [false,true])test('abandon_operation after export input ope
   }
   return s;
  };
- const f=fixture({type:'exports.text',execute:async code=>{
+ const f=fixture({type,execute:async code=>{
   assert.ok(code.includes('"receipt_read":true'));
   return {status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'observed',
    effect_possible:false,error:null,trace:[],output:{state:'completed',receipt}};
@@ -423,7 +424,7 @@ for(const foreign of [false,true])test('abandon_operation after export input ope
   f.calls.push('mapping');f.context().operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7',action_key:receipt.action_key};
   throw new NodeProcedureStepError(receipt);
  };
- const r=request();r.target.type='exports.text';f.runtime.startNodeApply(r);
+ const r=request();r.target.type=type;f.runtime.startNodeApply(r);
  const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
  assert.equal(job.outcome.output.pending_phase,'input_mapping');assert.equal(job.outcome.status,'AMBIGUOUS');
  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-input'});

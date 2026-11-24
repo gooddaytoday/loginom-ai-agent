@@ -5961,14 +5961,17 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
-test('restored text Export input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+for(const [icon,wizardIndex] of [['exporttextfile',0],['exportexcelfile',1],['exportnative',1]])
+test(icon+' input0/native0 retains guarded Done with overflowing ancestry',async()=>{
  for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
   const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
-  opening.nativeIndex=opening.portTree.FIndex=opening.port.FPortIndex=0;
-  opening.node.FIconCls='bg-vendor-icon-exporttextfile';
-  crumbs[5].children[0].attrs.class='bg-vendor-icon-exporttextfile';
+  opening.nativeIndex=opening.port.FPortIndex=0;
+  opening.wizardIndex=wizardIndex;
+  opening.portTree.FIndex=null;
+  opening.node.FIconCls='bg-vendor-icon-'+icon;
+  crumbs[5].children[0].attrs.class=opening.node.FIconCls;
   const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
-  const collection={FParentNode:group,FItems:[opening.portTree]};
+  const collection={FParentNode:group,FItems:wizardIndex===0?[opening.portTree]:[{FModelNodePort:{}},opening.portTree]};
   group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
   opening.nodeTree.FInputPortsRootNode=group;
   const components=new Map(crumbs.slice(5).map((e,i)=>{
@@ -6004,6 +6007,7 @@ test('restored text Export input0/native0 retains guarded Done with overflowing 
   const result=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
   assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  if(fault==='valid')assert.equal(result.output.prepared_node_context.input_port.wizard_index,wizardIndex);
   assert.deepEqual(page.events,[]);
  }
 });
@@ -8052,6 +8056,17 @@ test('graph launch only exposes typed execution for the exact native selected no
  const e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);assert.deepEqual(clone(e.allowed_actions),['execute_graph_node'],JSON.stringify(e));
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
+});
+test('graph launch geometry drift is refused before the gesture',async()=>{
+ const fixture=graphLaunchFixture(),observed=await fixture.execute({mode:'observe'});
+ const control=observed.output.ui.elements.find(element=>element.tid===fixture.button.attrs['data-tid']);
+ fixture.page.beforeHandleGeometry=element=>{if(element===fixture.button)element.box.x+=2;};
+ const outcome=await fixture.execute({mode:'act',action:{verb:'execute_graph_node',ref:control.ref},snapshot:observed.output});
+ assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.phase,'preconditions');
+ assert.equal(outcome.error.code,'UI_REFERENCE_STALE');assert.equal(outcome.error.message,'Observed control geometry changed');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(outcome.trace.some(entry=>['ui_preconditions_verified','ui_gesture_applied'].includes(entry.event)),false);
+ assert.equal(fixture.page.events.filter(event=>event==='click').length,0);
 });
 test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
  const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;

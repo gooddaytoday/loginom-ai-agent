@@ -16,6 +16,7 @@ import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-
 import { PromptDashboardContext } from "@/components/prompt-input/context-items"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
+import { binaryReferenceMime } from "@/constants/file-picker"
 import { useComments } from "@/context/comments"
 import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
@@ -389,6 +390,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       readClipboardImage: platform.readClipboardImage,
       getPathForFile: platform.getPathForFile,
       referenceAttachment: platform.referenceAttachment,
+      referenceFile: (name) => Boolean(binaryReferenceMime(name)),
       missingPath: () =>
         showToast({
           title: language.t("prompt.toast.pasteUnsupported.title"),
