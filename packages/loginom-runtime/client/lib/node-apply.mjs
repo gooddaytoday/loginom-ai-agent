@@ -537,6 +537,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     if(request.target.type==='imports.text'&&request.parameters.preview_only===true&&request.finish==='close'&&finish.server_profile)
       state.output={status:'partial',evidence_ref:operation.id+':finish',ports:[],server_profile:finish.server_profile};
     const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
+      ...(target.target?.replaced_links?.length?{replaced_links:target.target.replaced_links.map(r=>Object.fromEntries(['removed','created'].map(k=>[k,
+        Object.fromEntries(['source','output','target','input'].map(f=>[f,r[k][f]]))])))}:{}),
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,
       warnings:request.target.type==='imports.text'&&typeof finish.node_label==='string'
         ?['Import node '+JSON.stringify(state.node)+' has observed caption '+JSON.stringify(finish.node_label)+' after Finish. '
@@ -586,9 +588,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A completed configure refusal cancels only its own uncommitted draft
     // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
+    const jsonTreeConfigureFailure=state.pending?.phase==='configure'&&request.target.type==='trees.from_json'
+      ?{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}:undefined;
     if(state.pending?.phase==='configure'&&!operation.transportUncertain
-      &&(error.restConfigureFailure||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
-      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
+      &&(jsonTreeConfigureFailure||error.restConfigureFailure||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure??jsonTreeConfigureFailure});}
       catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
     }
     // A cancelled output reread has no unresolved launch. Release only after

@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 2,
+    "max_nodes": 0,
+    "forbid": [
+      "python",
+      "sqlite",
+      "convert",
+      "to_csv",
+      "storage_upload",
+      "file_write"
+    ]
+  },
+  "notes": "Минимум узлов с CSV-экспортом: 0. Настоящий BIFF8 в OLE, не XLSX с переименованным расширением; контракт импорта только XLSX."
+}

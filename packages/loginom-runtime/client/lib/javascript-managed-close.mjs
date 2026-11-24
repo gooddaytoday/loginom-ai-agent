@@ -10,9 +10,16 @@ export function inspectManagedJavascriptClosePoint(args,inspect,readDraft) {
   const done=task.error_stage==='done';
   const state=inspect({held,task});
   const prefix=task.workflow_ref.prefix;
+  const admission=task.error_stage==='admission';
   if(state.ready!==true||state.node_guid!==task.owner.node_id
-    ||state.page?.tid!==prefix+';WizrdMCF;'+(done?'DoneWizard':'JavaScriptCodeWizard')
-    ||state.page.visible_editors!==(done?0:1)
+    ||(admission?JSON.stringify(state.page)!==JSON.stringify(task.admission_page)
+      ||state.page.visible_editors!==0
+      ||!(state.page.tid===prefix+';WizrdMCF;TuneDataSourceInputPortWizard'&&task.inputPage===true
+          &&state.page.index===0&&state.page.indicator_count===5
+        ||state.page.tid===prefix+';WizrdMCF;JavaScriptColumnsWizard'
+          &&state.page.index===(task.inputPage?1:0)&&state.page.indicator_count===(task.inputPage?5:4))
+      :state.page?.tid!==prefix+';WizrdMCF;'+(done?'DoneWizard':'JavaScriptCodeWizard')
+        ||state.page.visible_editors!==(done?0:1))
     ||done&&held.errorDialogClosedFor!==state.page.tid||held.wizard===undefined||held.wizardRoot===undefined)
     throw Error('Managed JavaScript Close owner unavailable');
   if(done)readDraft(args);
@@ -181,9 +188,11 @@ export async function runManagedJavascriptCloseConfirmation(page,task,inspect) {
 }
 
 function validate(task) {
-  const {cleanup_deadline,error_stage='code_next',...opening}=task??{};
+  const {cleanup_deadline,error_stage='code_next',admission_page,...opening}=task??{};
   makeJavascriptManagedPageCode(opening);
-  if(!['code_next','done'].includes(error_stage)||!Number.isSafeInteger(cleanup_deadline)||cleanup_deadline<=Date.now()
+  if(!['code_next','done','admission'].includes(error_stage)
+    ||(error_stage==='admission'?!admission_page:admission_page!==undefined)
+    ||!Number.isSafeInteger(cleanup_deadline)||cleanup_deadline<=Date.now()
     ||cleanup_deadline>Date.now()+60000)throw Error('Invalid managed JavaScript Close deadline');
 }
 
