@@ -24,7 +24,9 @@ async function prepareWorkspace(page, options) {
       await page.waitForTimeout(Math.min(100, remaining()));
     }
   };
-  let connectionRestore = null, packageGesture = false;
+  // What this call did to the restore prompt, independent of the last
+  // verify sample: a deadline after the reservation must not lose it.
+  let connectionRestore = null, packageGesture = false, restorePressed = null;
   // Each refusal says exactly what the runtime did to the restore prompt.
   const restoreRefusal = reason => {
     const replaced=reason==='session_replaced'||reason==='restore_unresolved';
@@ -33,6 +35,7 @@ async function prepareWorkspace(page, options) {
       gesture_unconfirmed:'The runtime tried to press "Восстановить" once, but the click was not confirmed; it will not press it again for this prompt. ',
       session_replaced:'Loginom reconnected with a different native session or account, so this preparation cannot be confirmed and its operation_id can no longer be reconciled. ',
       restore_unresolved:'Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; the runtime did not press anything for this preparation. ',
+      bind_only:'The runtime did not press "Восстановить": binding an already open package never answers the restore prompt. ',
       owner_unbound:'The runtime did not press "Восстановить": the native session is not the one this preparation started on. ',
       state_unproven:'The runtime did not press "Восстановить": the disconnected state is not proven. ',
       dialog:'The runtime did not press "Восстановить": the prompt changed or could not be verified at the moment of the click. '}[reason]
@@ -171,8 +174,13 @@ async function prepareWorkspace(page, options) {
     // A pressed restore binds the whole page: until it settles on its own
     // operation, or a reload starts a new document, no other operation may
     // take the current (possibly replaced) native session as its baseline.
+    // This holds for a replay or verification of an earlier operation too:
+    // only the operation that pressed "Восстановить" may settle it.
     const restoreUnresolved=[...state.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced));
-    if((mode==='identity'||mode==='reserve')&&restoreUnresolved)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'restore_unresolved'};
+    if(['identity','reserve','lookup','verify','restore_reserve'].includes(mode)&&restoreUnresolved){
+      const own=state.receipts.get(options.operationId);
+      return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'restore_unresolved',...(own?{package_gesture:own.packageGesture===true}:{})};
+    }
     if(mode==='identity')return {document_id:state.id,blocked:blockers.length>0,
       loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName??null};
     const request = JSON.stringify({session:options.sessionId,intent:options.intent,packagePath:options.packagePath,workflowRef:options.workflowRef});
@@ -238,6 +246,7 @@ async function prepareWorkspace(page, options) {
         ||[state.connectionGuard,state.downloadConnectionGuard].some(m=>typeof m?.values==='function'&&[...m.values()].some(a=>a?.prompt===prompt))?'attempted':null;
     if(mode==='restore_reserve'){
       // Reserve immediately before the click, on the prompt verify observed.
+      if(options.bindOpenOnly)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only'};
       const match=restorePrompt(),yes=exact('msgbox;tlb;yes');
       if(!current||!match||match.prompt!==current.restoreCandidate||yes.length!==1||!match.element.contains(yes[0])||!visible(yes[0]))
         return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'dialog'};
@@ -342,6 +351,8 @@ async function prepareWorkspace(page, options) {
       // may receive one restore gesture; masks are its backdrop.
       const match=restorePrompt();
       if(match){
+        // Bind-only adopts an already open package and never answers the prompt.
+        if(options.bindOpenOnly)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'bind_only',blocking_windows:blockingWindows};
         const refused=restoreRefused(match.prompt);
         if(refused)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:refused,blocking_windows:blockingWindows};
         current.restoreCandidate=match.prompt;
@@ -421,8 +432,8 @@ async function prepareWorkspace(page, options) {
       return result('BOUND',null,{document_id:binding.document_id,loginom_account:binding.loginom_account,target_verified:true});
     }
     const old=await inspect('lookup');
-    if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     packageGesture=old.package_gesture===true;
+    if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     if (old.missing) return missingPackage(old);
     // A confirmed pre-open refusal may continue without replacing its original receipt.
     if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
@@ -474,21 +485,26 @@ async function prepareWorkspace(page, options) {
     // One native restore gesture, then the same exact workflow verification.
     // The package gesture is never repeated; its effect stays effect_possible.
     const restoreSession=async observed=>{
-      const failed=reason=>({error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:reason,blocking_windows:observed.blocking_windows});
+      const failed=reason=>{if(restorePressed)restorePressed=reason;
+        return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:reason,blocking_windows:observed.blocking_windows};};
       const yes=tid('msgbox;tlb;yes');
       try{
         if(await yes.count()!==1||!await yes.isVisible()||(await yes.innerText()).trim()!=='Восстановить')return failed('dialog');
       }catch(error){if(error.message==='DEADLINE')throw error;return failed('dialog');}
       // The reservation rechecks the exact prompt; a refusal leaves no gesture.
+      remaining();
       const reserved=await inspect('restore_reserve');
       if(reserved?.reserved!==true)return failed(reserved?.connection_restore??'dialog');
+      restorePressed='gesture_unconfirmed';
       try{await yes.click({timeout:Math.min(3000,remaining())});}
       catch(error){if(error.message==='DEADLINE')throw error;return failed('gesture_unconfirmed');}
+      restorePressed='awaiting_original_attempt';
       try{await page.waitForFunction(()=>{const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
         return f?.FMapTree?.FServerConnection?.Connected===true&&f.FReconnecting===false;},null,{timeout:Math.min(10000,remaining())});}
       catch(error){if(error.message==='DEADLINE')throw error;return failed('awaiting_original_attempt');}
       const settled=await inspect('restore_settle');
       if(settled?.restored!==true)return failed(settled?.connection_restore??'attempted');
+      restorePressed=null;
       trace.push({condition:'connection_restored',satisfied:true});
       return {pending:true,blocking_windows:observed.blocking_windows};
     };
@@ -507,6 +523,7 @@ async function prepareWorkspace(page, options) {
     createdDraft=options.intent==='new_draft';
     return result('READY',null,{authenticated:true,...verified,replayed:old.exists===true});
   } catch (error) {
+    if (restorePressed) connectionRestore = restorePressed;
     return result('NOT_READY',error.message==='DEADLINE'?'DEADLINE':'PREPARATION_INTERRUPTED',
       {created_draft:createdDraft,verification_required:effectPossible});
   }
@@ -528,7 +545,8 @@ async function navigatePreparedGraph(page, options) {
     if(existing&&existing.request!==request)fail('OPERATION_CONFLICT');
     // As in dock_prepare's reserve: a new operation never starts over another
     // operation's pending or replaced session restore; only a reload clears it.
-    if(!existing&&[...p.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced)))fail('SESSION_RESTORE_UNRESOLVED');
+    // A replay of a completed navigation is refused as well.
+    if([...p.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced)))fail('SESSION_RESTORE_UNRESOLVED');
     if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true};
     const source=existing?.navigationSource??[...p.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===ref.workflow_id);
     if(!source?.packageNode||!source.tab)fail('Prepared workflow changed');
@@ -686,9 +704,11 @@ async function navigatePreparedGraph(page, options) {
       await page.waitForTimeout(Math.min(100,remaining()));
     }
   }catch(error){
-    if(error.message==='SESSION_RESTORE_UNRESOLVED'&&!effectPossible)return result('NOT_READY','NATIVE_MESSAGE_BOX_BLOCKED',{connection_restore:'restore_unresolved',
-      message:'Loginom lost its server connection ("Восстановление сессии"). Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; the runtime made no gesture for this navigation. Ask the user to reload the Loginom page, then call dock_prepare with a NEW operation_id. Do not dismiss the dialog.',
-      next_step:{tool:'dock_prepare',new_operation_id_required:true,after:'loginom_page_reloaded'}});
+    if(error.message==='SESSION_RESTORE_UNRESOLVED')return result('NOT_READY','NATIVE_MESSAGE_BOX_BLOCKED',{connection_restore:'restore_unresolved',
+      message:'Loginom lost its server connection ("Восстановление сессии"). Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; '
+        +(effectPossible?'the earlier navigation gesture of this operation may have taken effect in the lost session. ':'the runtime made no gesture for this navigation. ')
+        +'Ask the user to reload the Loginom page, then call dock_prepare with a NEW operation_id. Do not dismiss the dialog.',
+      next_step:{tool:'dock_prepare',new_operation_id_required:true,after:'loginom_page_reloaded'},verification_required:effectPossible});
     return result('NOT_READY',String(error.message).slice(0,500),{verification_required:effectPossible});
   }
 }

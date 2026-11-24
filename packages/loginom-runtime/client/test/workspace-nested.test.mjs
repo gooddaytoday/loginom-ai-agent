@@ -235,3 +235,14 @@ for(const restore of [{pending:true},{pending:false,replaced:true}])test('NW1 gr
   f.preparation.receipts.get('restoring').restore={prompt:{},pending:false};
   assert.equal((await f.navigate(f.ref,'enter','after-settle')).status,'READY');
 });
+
+// Review 3 of #1280: replaying a completed navigation is an operation too.
+for(const restore of [{pending:true},{pending:false,replaced:true}])test('NW1 replay of a completed navigation is refused behind an unresolved session restore: '+JSON.stringify(restore),async()=>{
+  const f=fixture(),entered=await f.navigate(f.ref);
+  assert.equal(entered.status,'READY',JSON.stringify(entered));
+  f.preparation.receipts.set('restoring',{phase:'reserved',restore:{prompt:{},...restore}});
+  const replay=await f.navigate(f.ref);
+  assert.equal(replay.status,'NOT_READY',JSON.stringify(replay));assert.equal(replay.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(replay.connection_restore,'restore_unresolved');assert.equal(replay.workflow_ref,undefined);
+  assert.equal(f.clicks(),1);
+});

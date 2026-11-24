@@ -1075,3 +1075,88 @@ for(const intent of ['new_draft','open_package'])test('a receipt lost after the 
  assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'attempted',JSON.stringify(r));
  assert.equal(r.next_step.same_operation_id,true);assert.equal(s.state.restores,1);
 });
+// Review 3 of #1280: the restore lock covers every operation except the one
+// that pressed "Восстановить", including replay of an earlier verified one.
+// Bind-only never presses it, and a deadline keeps the pressed state.
+const restoreSession=(s,intent='open_package')=>{
+ const metadata={skillRevision:'skill'};
+ const prepareWith=(operation_id,extra={})=>prepareWorkspaceSession({metadata,request:{operation_id,intent,
+  package_path:intent==='open_package'?'/user/test.lgp':null,workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},
+  async prepare({recoverOnly}){return s.run({operationId:operation_id,recoverOnly,...extra});}});
+ return {metadata,prepareWith};
+};
+for(const intent of ['new_draft','open_package'])test('replay of an earlier verified operation is refused behind another operation\'s replaced restore: '+intent,async()=>{
+ const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
+ const {metadata,prepareWith}=restoreSession(s);
+ const op1=await s.run({operationId:'op1',intent,...(intent==='new_draft'?{packagePath:null}:{})});
+ assert.equal(op1.status,'READY',JSON.stringify(op1));
+ s.state.fault='replaced account';s.state.disconnectOnVerify=true;
+ const op2=await prepareWith('op2');
+ assert.equal(op2.connection_restore,'session_replaced',JSON.stringify(op2));assert.equal(s.state.restores,1);
+ // The exact earlier request reaches the page through the session layer.
+ const replay=await s.run({operationId:'op1',intent,...(intent==='new_draft'?{packagePath:null}:{})});
+ assert.equal(replay.status,'NOT_READY',JSON.stringify(replay));assert.equal(replay.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+ assert.equal(replay.connection_restore,'restore_unresolved');assert.equal(replay.loginom_account,undefined);
+ assert.equal(replay.next_step.new_operation_id_required,true);assert.match(replay.message,/earlier package gesture may have taken effect/);
+ const sameOpen=await prepareWith('op1');
+ assert.equal(sameOpen.status,'NOT_READY',JSON.stringify(sameOpen));assert.equal(sameOpen.connection_restore,'restore_unresolved');
+ assert.equal(metadata.workspaceReady,false);
+ // op2 opens the package over op1's draft; nothing is repeated after it.
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),intent==='new_draft'?2:1);
+});
+test('replay of the earlier operation is refused while another operation\'s restore is pending',async()=>{
+ const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
+ assert.equal((await s.run({operationId:'op1'})).status,'READY');
+ s.state.fault='lost reconnect';s.state.disconnectOnVerify=true;
+ assert.equal((await s.run({operationId:'op2'})).connection_restore,'awaiting_original_attempt');
+ s.state.reconnect();s.state.shown=false;
+ const replay=await s.run({operationId:'op1',recoverOnly:true});
+ assert.equal(replay.status,'NOT_READY',JSON.stringify(replay));assert.equal(replay.connection_restore,'restore_unresolved');
+ // The pressing operation itself still settles on its own baseline.
+ const owner=await s.run({operationId:'op2'});
+ assert.equal(owner.status,'READY',JSON.stringify(owner));
+ assert.equal((await s.run({operationId:'op1',recoverOnly:true})).status,'READY');
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+test('bind-only preparation never presses the restore prompt',async()=>{
+ const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
+ assert.equal((await s.run({operationId:'op1'})).status,'READY');
+ s.state.fault='replaced account';s.state.disconnectOnVerify=true;
+ const bound=await s.run({operationId:'bind',bindOpenOnly:true,timeoutMs:5000});
+ assert.equal(bound.status,'NOT_READY',JSON.stringify(bound));assert.equal(bound.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+ assert.equal(bound.connection_restore,'bind_only');assert.match(bound.message,/did not press/);
+ assert.equal(bound.effect_possible,false);assert.equal(bound.loginom_account,undefined);
+ assert.equal(s.state.restores,0);assert.equal(s.gestures(),1);
+ // Bind-only left no restore receipt; the owner of the session still may answer.
+ assert.equal(s.f.context.__loginomDockPreparationV1.receipts.get('bind')?.restore,undefined);
+ const owner=await s.run({operationId:'op1',recoverOnly:true});
+ assert.equal(owner.connection_restore,'session_replaced',JSON.stringify(owner));assert.equal(s.state.restores,1);
+});
+for(const intent of ['new_draft','open_package'])test('a deadline after the restore click keeps the pressed restore: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'lost reconnect'});
+ // The reconnect wait consumes the rest of this call's deadline.
+ s.f.page.waitForFunction=async(fn,arg,{timeout})=>{await s.f.page.waitForTimeout(timeout);throw Error('timeout');};
+ const {prepareWith}=restoreSession(s,intent);
+ const r=await prepareWith('op1');
+ assert.equal(r.status,'NOT_READY');assert.equal(r.reason,'DEADLINE');
+ assert.equal(r.connection_restore,'awaiting_original_attempt',JSON.stringify(r));assert.equal(r.next_step.same_operation_id,true);
+ assert.match(r.message,/pressed "Восстановить" once/);assert.equal(s.state.restores,1);
+ await assert.rejects(prepareWith('op2'),/operation conflict/);
+ // The page receipt, not only the returned field, holds the lock.
+ const page=await s.run({operationId:'op2'});
+ assert.equal(page.status,'NOT_READY',JSON.stringify(page));assert.equal(page.connection_restore,'restore_unresolved');
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+test('a deadline after the click of a gesture-free preparation keeps its operation',async()=>{
+ const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
+ const {prepareWith}=restoreSession(s);
+ assert.equal((await prepareWith('op1')).status,'READY');
+ s.state.fault='lost reconnect';s.state.disconnectOnVerify=true;
+ s.f.page.waitForFunction=async(fn,arg,{timeout})=>{await s.f.page.waitForTimeout(timeout);throw Error('timeout');};
+ const op2=await prepareWith('op2');
+ assert.equal(op2.reason,'DEADLINE');assert.equal(op2.effect_possible,false);
+ assert.equal(op2.connection_restore,'awaiting_original_attempt',JSON.stringify(op2));
+ await assert.rejects(prepareWith('op3'),/operation conflict/);
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
