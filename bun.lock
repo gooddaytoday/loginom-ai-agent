@@ -507,6 +507,7 @@
       "name": "@loginom-ai-agent/loginom-agent",
       "version": "0.1.0",
       "dependencies": {
+        "@loginom-ai-agent/dashboard": "workspace:*",
         "@loginom-ai-agent/loginom-host": "workspace:*",
         "@loginom-ai-agent/product": "workspace:*",
         "@opencode/plugin": "workspace:*",

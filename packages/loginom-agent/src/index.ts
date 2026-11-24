@@ -11,6 +11,7 @@ import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { Dashboard } from "./dashboard"
+import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
@@ -132,6 +133,12 @@ export default Plugin.define({
     // A dashboard session sees none of its Location's MCP servers: no tools, resources or prompts (0.4 `allowsMcp`).
     await ctx.mcp.transform((editor) => {
       if (dashboard()) editor.list().forEach(([name]) => editor.remove(name))
+    })
+    // The dashboard's tools exist only in its Location (B2.9e), outside the CodeMode catalog like every tool no other
+    // profile permits. Its draft server stops when the plugin unloads.
+    const drafts = dashboardTools(ctx.location.directory, resources)
+    await ctx.tool.transform((editor) => {
+      if (dashboard()) editor.add(drafts.draft)
     })
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
@@ -521,6 +528,7 @@ export default Plugin.define({
     return async () => {
       stop.abort()
       await Promise.all([...leases.keys()].map(drop))
+      await drafts.close()
     }
   },
 })

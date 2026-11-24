@@ -17,6 +17,8 @@ export async function revokeDashboardDraft(key: string) {
 
 export async function draftDashboard(input: {
   work: string; resources: DashboardResources; signal?: AbortSignal; expectedDraftId?: string | null
+  // The server that serves the draft: the process-wide one, unless the caller owns one and closes it itself.
+  server?: (page: string) => ReturnType<typeof draftServer>
 }) {
   const work = await realpath(input.work)
   const saved = readDashboardSnapshot(work)
@@ -47,11 +49,7 @@ export async function draftDashboard(input: {
   })
   if (!build || !withCurrentSnapshot(() => true)) return STOPPED
   if (!build.ok) return "Сборка не удалась. Исправьте код и вызовите dashboard_draft снова.\n" + build.output
-  shared ??= draftServer(input.resources.page).catch((error: unknown) => {
-    shared = undefined
-    throw error
-  })
-  const server = await shared
+  const server = await (input.server ?? sharedServer)(input.resources.page)
   const url = withCurrentSnapshot(() => server.publish({
     key: saved.control.key,
     builds,
@@ -68,4 +66,11 @@ export async function draftDashboard(input: {
   const checked = await selfCheck({ resources: input.resources, url, signal: input.signal })
   if (!withCurrentSnapshot(() => true)) return STOPPED
   return `Черновик: ${url}\nПроверка типов и сборка: успешно.\nСамопроверка страницы: ${checked.ok ? "успешно" : "ошибка (" + checked.state + ")\n" + checked.errors.join("\n")}`
+}
+
+function sharedServer(page: string) {
+  return shared ??= draftServer(page).catch((error: unknown) => {
+    shared = undefined
+    throw error
+  })
 }
