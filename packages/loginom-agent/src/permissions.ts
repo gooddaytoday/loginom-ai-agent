@@ -6,8 +6,9 @@
 //   rules, the config's `permissions` (the settings mechanism in ux-spec) and the session's rules still override them,
 //   and a configured deny still wins before any hook;
 // - the `permission.evaluate` hook (`settle`) handles what rules cannot express: the conversation grant, a terminal
-//   command of the agent that always asks (В-31), a schedule's `run` check that never runs, subagents, whose own rules
-//   may not loosen the product's defaults, and reading the product's own directories outside the project;
+//   command of the agent and a dashboard's deletion, which always ask (В-31, В-102), a schedule's `run` check that never
+//   runs, subagents, whose own rules may not loosen the product's defaults, and reading the product's own directories
+//   outside the project;
 // - a refused call does not end the turn (B2.6b, В-75): the user's «Отклонить» and a rule's deny reach the model as text
 //   (`refusal`, applied in the plugin's `execute.after` and `execute.before`), and the call's metadata says which;
 // - the kinds the settings deny are named to the model before it tries them (`deniedKinds`, B2.6b2);
@@ -94,9 +95,14 @@ export function classify(action: string, resources: readonly string[]) {
   )
 }
 
-/** The kinds a conversation grant may cover: where the product asks by default, except the terminal (В-31). */
+/**
+ * The kinds a conversation grant may cover: where the product asks by default, except the terminal (В-31) and a
+ * dashboard's deletion (В-102), which ask every time.
+ */
 export function grantable(entry: Entry | undefined) {
-  return entry !== undefined && entry.kind !== "terminal" && entry.effect === "ask"
+  return (
+    entry !== undefined && entry.kind !== "terminal" && entry.action !== "dashboard_delete" && entry.effect === "ask"
+  )
 }
 
 type Request = {
@@ -126,6 +132,9 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
     // A command of the agent asks every time, whatever saved, configured or session rule allows it.
     return { effect: request.effect === "allow" ? ("ask" as const) : request.effect }
   }
+  // So does a dashboard's deletion, whatever allows «Сохранять пакеты в Loginom» (В-102, ux-spec).
+  if (entry.action === "dashboard_delete")
+    return { effect: request.effect === "allow" ? ("ask" as const) : request.effect }
   // A subagent's own rules (`explore` allows sites and reading outside the project) do not loosen the defaults.
   const effect = subagent && entry.effect === "ask" && request.effect === "allow" ? "ask" : request.effect
   if (effect === "ask" && grantable(entry) && granted.has(entry.kind)) return { effect: "allow" as const }

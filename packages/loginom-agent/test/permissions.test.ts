@@ -116,10 +116,12 @@ describe("permission kinds", () => {
     expect(withDefaults(denied)).toEqual([...rules, ...denied])
   })
 
-  test("a conversation grant covers what the product asks by default, never the terminal (В-31)", () => {
+  test("a conversation grant covers what the product asks by default, never the terminal (В-31) or a deletion (В-102)", () => {
     expect(grantable(classify("edit", ["a"]))).toBe(true)
     expect(grantable(classify("external_directory", ["/x/*"]))).toBe(true)
     expect(grantable(classify("webfetch", ["https://example.com"]))).toBe(true)
+    expect(grantable(classify("dashboard_publish", ["Заказы", "/a.lgp"]))).toBe(true)
+    expect(grantable(classify("dashboard_delete", ["Заказы", "/a.lgp"]))).toBe(false)
     // Asked only by OpenCode's own rules (a `.env` file) or never asked by the product.
     expect(grantable(classify("read", [".env"]))).toBe(false)
     expect(grantable(classify("shell", ["ls"]))).toBe(false)
@@ -165,6 +167,16 @@ describe("settle", () => {
       effect: "deny",
       message: terminalDenied,
     })
+  })
+
+  test("a dashboard's deletion asks whatever allows it; a deny stays (В-102)", () => {
+    const all = new Set(everyKind())
+    const request = { action: "dashboard_delete", resources: ["Заказы", "/a.lgp"], source }
+    expect(settle({ ...request, effect: "allow" }, false, all)).toEqual({ effect: "ask" })
+    expect(settle({ ...request, effect: "ask" }, false, all)).toEqual({ effect: "ask" })
+    expect(settle({ ...request, effect: "deny" }, false, all)).toEqual({ effect: "deny" })
+    // A publication of the same kind is covered by the grant.
+    expect(settle({ ...request, action: "dashboard_publish", effect: "ask" }, false, all)).toEqual({ effect: "allow" })
   })
 
   test("a subagent's own allow does not loosen a default question", () => {

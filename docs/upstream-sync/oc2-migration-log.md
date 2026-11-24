@@ -22878,3 +22878,253 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   что `DASHBOARD_SNAPSHOT_UNAVAILABLE` и `DASHBOARD_ACCESS_DENIED`; отдельно не проверены.
 - Ctrl+C во время `dashboard.read` (Host не обрывает чтение, B2.9h); Desktop (B4, ВШ-6).
 - Windows и macOS — только Linux (процессные тесты — только Linux, как `cli-loginom.test.ts`).
+
+## B2.9g dashboard_delete
+
+24.11.2026. Задача B2.9g (вне шлюза B), ветка `b29g-dashboard-delete` от `oc2-migration` (`dd82b0d6da`), рабочее дерево
+`.claude/worktrees/b29g`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template` (кэш npm —
+`/root/.npm`) — в этом дереве и в дереве базы `<scratchpad>/b29g/base` (`dd82b0d6da`, detached), все четыре — код 0. Хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и полные прогоны — под `unshare -n`
+(поднят только `lo`), со свежими временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`.
+**Модель не вызывалась:** в тестах сервера — `TestLLM`, сети нет. Прочитано: решение В-102 (и В-31); этот журнал — B2.9a
+(строка B2.9g, вопрос 1, «Где решал сам»), B2.9f, B2.6a…c («Где решал сам», «Найдено»); план этапа B — строки о В-102;
+0.4 — `tool/dashboard.ts` (`DashboardDeleteTool`), `permission/index.ts`, `session/prompt.ts` (конец хода), тесты
+`tool/dashboard.test.ts` и `session/prompt.test.ts`; пакет `dashboard` — `agent/{folder,draft}.ts`, `draft/server.ts`;
+`loginom-host/src/{adapter,dashboard,errors}.ts`; v2 — `core/src/permission.ts`, `core/src/config/plugin/policy.ts`,
+`core/src/session/model-request.ts`, `core/src/session/runner/publish-llm-event.ts` (`progress`),
+`plugin/src/promise/{adapter,tool}.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `a52fa90b7b` `feat(loginom-agent): dashboard_delete asks every time and ends its turn (B2.9g, В-102)` | код: `packages/loginom-agent/src/dashboard-tools.ts` (+98 −9: инструмент, `ask` по действию), `index.ts` (+27 −7: регистрация, `retire`, конец хода в `context` и `execute.after`, проверка запрета администратора у инструментов дашборда в `execute.before`), `permissions.ts` (+13 −5: `settle`, `grantable`), `dashboard.ts` (+2: `retire`); тесты: 11 новых случаев в `packages/loginom-agent/test/dashboard-tools.test.ts`, 1 — в `permissions.test.ts`, новый `packages/server/test/loginom-dashboard-delete.test.ts` (9), правки `loginom-access`, `loginom-dashboard-publish`, `loginom-permissions` |
+| следующий | этот раздел |
+
+Файлов кода четыре (предел — пять), все — пакета форка: `git diff dd82b0d6da a52fa90b7b --numstat --
+packages/loginom-agent/src`. Файлов upstream не правил, `catalog.json` не менялся; `bun install --frozen-lockfile` — без
+изменений.
+
+### Как устроено
+
+- **Инструмент** — `dashboardTools(...).remove` в `packages/loginom-agent/src/dashboard-tools.ts`, перенос 0.4
+  `DashboardDeleteTool`. Имя, описание, вход без аргументов и тексты результата — как в 0.4; metadata результата — 0.4
+  (`dashboardDeleted: true` или `isError: true`), без заголовка и `truncated` (как в B2.9e/f). Регистрируется рядом с
+  `dashboard_draft` и `dashboard_publish` только в Location дашборда, с `codemode: false` (`index.ts`). Порядок — как в 0.4:
+  1. привязка папки (`readDashboardBinding`; не читается — «Не удалось проверить привязку…», без Host), затем сверка
+     черновика чата (`bound`, B2.9d);
+  2. список версий — `dashboardVersions` на своём прогоне Host (`scope bind loginom-dashboard`, `release`, как у публикации);
+  3. круг: вопрос `dashboard_delete` (ресурсы — узел и путь пакета, metadata — `publicationCount` и, после первых
+     удалений, `confirmedRemoved`; `save` нет) → снова `bound` → `dashboardDelete` с поколением списка и одобренным набором.
+     `changed` — новый вопрос на оставшийся набор, итог подтверждённых удалений — в прогресс вызова (`call.progress`, 0.4
+     `ctx.metadata`); `failed` и ошибка Host — текст 0.4 с подтверждённым числом, черновик на месте;
+  4. `empty` — удаление папки (`removeDashboard` сверяет снимок; не вышло — текст 0.4), отзыв черновика у сервера черновиков
+     этой Location (`state.server.revoke`: процессного `shared` 0.4 в v2 нет), привязка чата — `deleted`
+     (`Dashboard.binding().retire`, 0.4 `retireDashboard`), результат «Дашборд удалён…».
+- **Разрешение (В-102).** Вид не меняется: `dashboard_delete` — «Сохранять пакеты в Loginom», «спрашивать» (B2.6a). Две
+  правки в `permissions.ts`, по образцу терминала (В-31):
+  - `settle`: `allow` от правил (настройка «Разрешено», сохранённое `always`, правила сессии, общий `* * allow`) у удаления
+    становится вопросом; `deny` остаётся;
+  - `grantable` ложно: RPC `loginom.permission.conversation` на вопросе удаления — `not_grantable`, разрешение вида в
+    разговоре его не снимает и открытый вопрос удаления не отвечает.
+
+  Это закрывает находку B2.6a («`dashboard_delete` отнесён к сохранению: при «Разрешено» удалит без вопроса»).
+
+  «Запрещено» — инструмент не предложен, вызов по имени отклоняет `execute.before` (`LOGINOM_PERMISSION_DENIED`,
+  `denied`), ход продолжается (B2.6b). «Отклонить» — `LOGINOM_PERMISSION_DECLINED`, `declined`, ход продолжается; если до
+  этого часть версий уже удалена, текст — тот же отказ плюс «Подтверждено удаление версий: N. Локальный черновик
+  сохранён.» (0.4 `DashboardDeleteRejected`), metadata — `confirmedRemoved` и `declined`.
+- **Запрет администратора — до Host.** `execute.before` проверяет правила и политику (`rules`, B2.6b) не только у
+  непредложенного инструмента, но и у `dashboard_publish` и `dashboard_delete` всегда (одно условие): запрет `tool.use`
+  отклоняет вызов `LOGINOM_POLICY_DENIED`, `policy` до сборки и до первого запроса Host. У публикации (B2.9f) запрет
+  раньше приходил на вопрос — после сборки и чтения Host; её тест изменён (`methods()` — `[]`).
+- **Конец хода.** Инструмент после удаления вызывает `retire`: плагин пишет привязку `deleted` и помечает сессию в памяти
+  (`deleted`, снимается в `drop` по концу исполнения). Пока метка стоит, `execute.after` не подменяет результат удаления
+  отказом B2.9d (папки уже нет), а хук `context` не сверяет черновик и убирает из запроса все инструменты: модель отвечает
+  один раз текстом, ход кончается (0.4 обрывал цикл сразу — здесь на один ответ модели больше, как решила разведка B2.9a).
+  Следующий промпт этого и других чатов удалённой папки отклоняет хук `prompt` (`LOGINOM_SCOPE_DENIED`), и после новой
+  подготовки тоже.
+
+### Тесты
+
+9 тестов удаления 0.4 (14 случаев с циклами), «approval belongs» и конец хода; юнит — на самом инструменте с вопросами,
+которые отвечает случай (`packages/loginom-agent/test/dashboard-tools.test.ts`), сервер — модель по сценарию, Host по
+сценарию, вопрос идёт через правила и хуки (новый `packages/server/test/loginom-dashboard-delete.test.ts`):
+
+| Тест 0.4 (`v0.4.0:packages/opencode/test/…`) | На v2 |
+|---|---|
+| `tool/dashboard.test.ts` «dashboard deletion honors an explicit denial for the bound package» | сервер, то же имя: правило конфига `dashboard_delete` `deny` на путь пакета — инструмент предложен, вопроса нет, `LOGINOM_PERMISSION_DENIED`, `denied`, Host — только список версий, `dashboardDelete` нет, исходники на месте, ход продолжился |
+| «delete preserves publications and draft until explicit once: reject / abort / always» | сервер, то же имя: вопрос один, ресурсы — узел и пакет, metadata `{ publicationCount: 1 }`, `save` нет; Host — только список; `reject` — `declined`, ход продолжился; `abort` → `stop` (`session.interrupt`) — открытых вопросов нет; `always` 0.4 (ответ «always» другому вопросу дал общее разрешение) → «always» другому вопросу `dashboard_delete` с `save: ["*"]` сохраняет разрешение удаления для проекта — открытый вопрос остаётся открытым, а следующее удаление снова спрашивает. Версии и исходники на месте |
+| «delete asks for the updated publication set after the first approval» | юнит, то же имя: второй вопрос — `{ publicationCount: 2 }`, оба — узел и пакет без `save`; Host — список, одно удаление; отказ — набор и исходники на месте |
+| «declining the new deletion set preserves confirmed removals in the terminal tool error» | юнит, то же имя: `Tool.Error` — `LOGINOM_PERMISSION_DECLINED…` + «Подтверждено удаление версий: 1. Локальный черновик сохранён.», metadata `confirmedRemoved: 1`, `declined`; прогресс `{ confirmedRemoved: 1 }` |
+| «delete reports confirmed partial progress and submits only the newly approved set» | юнит, то же имя: три вопроса (`1`, `1 + 1`, `0 + 1`), один список, удаления `[7, [v]]`, `[7, rest]`, `[7, []]`, прогресс, папки нет, `retire` — с сессией вызова |
+| «delete keeps sources and live preview after: unknown / denied / invalid / invalid count» | юнит, те же имена, на черновике Location (`dashboard_draft` того же набора инструментов): текст причины, с числом подтверждённых или без него, второго вопроса нет, исходник и данные черновика те же; `unknown` — повтор начинается со свежего списка и удаляет, черновик больше не отдаётся (404) |
+| «delete preserves a newly prepared snapshot and retries from a fresh empty listing» | юнит, то же имя (`bound` случая пропускает): пока вопрос открыт, папку готовят заново — версии удалены, папка не удалена («…удалить не удалось»), снимок новый; повтор — пустой список, `{ publicationCount: 0 }`, удаление. Хвост 0.4 о старом и новом чате — сервер, «…the turn ends…» |
+| «approval from a deleted draft cannot mutate publications after recreation» | сервер, то же имя: папку удалили и подготовили заново, пока вопрос открыт; ответ `once` — `LOGINOM_SCOPE_DENIED` (`Dashboard.unbound`), `dashboardDelete` нет, версии на месте |
+| «delete removes two versions and the local draft, and leaves the neighbour available» | юнит, то же имя: один вопрос на две версии, удалены версии этого узла, соседний узел и его папка на месте |
+| «write/apply_patch approval belongs to the draft that requested permission» (удаление) | юнит «a chat that no longer belongs to its draft deletes nothing: before the listing / after the question» — по образцу B2.9f: сверка черновика до списка (Host не тронут) и после вопроса (только список); на сервере — «approval from a deleted draft…» |
+| `session/prompt.test.ts` «successful dashboard deletion ends its turn…» (часть о конце хода; о старых чатах — B2.9d) | сервер, ««Разрешено» still asks; «один раз» deletes the versions and the folder, and the turn ends with one answer»: при «Разрешено» вопрос есть; после `once` — «Дашборд удалён…», `dashboardDeleted`, версий и папки нет; запросов к модели два — второй без инструментов, ответ модели последний (шаг сценария после удаления не выполнен); промпт этого и другого чата папки — `LOGINOM_SCOPE_DENIED`, и после новой подготовки; запросов к модели не прибавилось; новый чат работает |
+| — (В-102) | сервер, ««в этом разговоре» does not cover the deletion…»: RPC на вопросе удаления — `not_grantable`, вопрос открыт; разрешение вида, данное на вопросе публикации, отвечает его, а не удаление; с разрешением в силе следующее удаление снова спрашивает |
+| — (В-102, B2.6b) | сервер, ««Запрещено» refuses without a question, reaches nothing, and the turn goes on»: не предложен, `LOGINOM_PERMISSION_DENIED`, `denied`, к Host ни одного запроса, ход продолжился |
+| — (В-102, B2.6c) | сервер, «the administrator's deny wins over «Разрешено»: refused before the Host…»: `tool.use dashboard_delete:*` — инструмент предложен, `LOGINOM_POLICY_DENIED`, `policy`, вопросов нет, к Host ни одного запроса, ход продолжился |
+
+Изменены: `packages/server/test/loginom-access.test.ts` (B2.9b) — в списке инструментов профиля дашборда
+`dashboard_delete`; `loginom-dashboard-publish.test.ts` (B2.9f) — запрет
+администратора теперь до Host (`methods()` — `[]`); `loginom-permissions.test.ts` (B2.6a) — цикл «в этом разговоре» идёт
+по видам без удаления, удаление после разрешения своего вида спрашивает, а RPC на его вопросе — `not_grantable`;
+`loginom-agent/test/permissions.test.ts` — `grantable` и `settle` для удаления. В юнит-тестах `serviceHost` принимает
+ответы хранилища случая (`publications()` — по умолчанию).
+
+### Мутации
+
+Каждая — точечная правка в `packages/loginom-agent/src` на `a52fa90b7b`, затем `git checkout`
+(`<scratchpad>/b29g/scripts/mutations.py`; правка применяется, только если строка найдена ровно один раз). Наборы: юнит —
+`bun test test/dashboard-tools.test.ts test/permissions.test.ts -t 'delet|grant|settle|conversation'` в `loginom-agent`
+(18 случаев); сервер — `test/loginom-dashboard-delete.test.ts` (9), случай запрета администратора
+`loginom-dashboard-publish.test.ts` (1) и `loginom-permissions.test.ts -t 'conversation|policy touches'` (3). Без
+мутаций — 18/0, 9/0, 1/0, 3/0. Фильтр `loginom-permissions` первого прогона не брал случай «Разрешать в этом разговоре»;
+две мутации, которых он касается, повторены с фильтром `'Разрешать|conversation|policy touches'` (4 случая; без мутаций —
+4/0), в таблице — числа повтора.
+
+| Мутация | юнит | сервер удаления | публикация, админ | права | Красные |
+|---|---|---|---|---|---|
+| `settle`: удаление не спрашивает при `allow` | **17/1** | **7/2** | 1/0 | 4/0 | «Разрешено» — вопроса нет; `always` — сохранённое разрешение отвечает открытый вопрос, удаление уходит; юнит `settle` |
+| `grantable`: разрешение в разговоре покрывает удаление | **17/1** | **8/1** | 1/0 | **3/1** | «в этом разговоре» (RPC отвечает 200), «Разрешать в этом разговоре» B2.6a, юнит `grantable` |
+| удаления нет в таблице видов | **17/1** | **0/9** | 1/0 | **1/2** | все случаи сервера: удаление решает общее `* * allow` — вопроса нет, «Запрещено» его не запрещает; два случая B2.6a/B2.6c о виде «Сохранять» |
+| запрет администратора не проверяется до запуска инструментов | 18/0 | **8/1** | **0/1** | 3/0 | запрет у удаления (Host — список версий) и у публикации (сборка и чтение Host) |
+| инструмент не зарегистрирован | 18/0 | **1/8** | 1/0 | 3/0 | все, кроме «Запрещено»: вызов незарегистрированного имени отклоняет тот же `execute.before` по действию (B2.6b) |
+| конец хода: сессия не помечена | 18/0 | **8/1** | 1/0 | 3/0 | «…the turn ends…»: результат подменён отказом B2.9d, `context` отклоняет запрос после удаления |
+| конец хода: инструменты остаются в запросе | 18/0 | **8/1** | 1/0 | 3/0 | «…the turn ends…»: второй запрос с инструментами, сценарий идёт дальше |
+| `execute.after` подменяет результат удаления | 18/0 | **8/1** | 1/0 | 3/0 | «…the turn ends…»: результат — `LOGINOM_SCOPE_DENIED` |
+| привязка не становится `deleted` | 18/0 | 9/0 | 1/0 | 3/0 | **не ловится** (выше, «Где решал сам») |
+| вопроса нет | **см. ниже** | **2/7** | 1/0 | 3/0 | сервер — все случаи с вопросом |
+| ресурсы вопроса — `*` | **17/1** | **5/4** | 1/0 | 3/0 | ресурсы вопроса ×3; «явный запрет на пакет» — правило на путь пакета не срабатывает |
+| в вопросе нет `publicationCount` | **12/6** | **6/3** | 1/0 | 3/0 | все случаи, сверяющие metadata вопроса |
+| отказ после удалений теряет прогресс | **17/1** | 9/0 | 1/0 | 3/0 | «declining the new deletion set…» |
+| нет сверки черновика до списка | **16/2** | 9/0 | 1/0 | 3/0 | оба юнит-случая сверки (вторая становится первой); на сервере ловит сверка после вопроса |
+| нет сверки черновика после вопроса | **17/1** | **8/1** | 1/0 | 3/0 | «…after the question»; «approval from a deleted draft…» — удаление со старой привязкой ушло |
+| в удаление уходит первый список, а не одобренный набор | **17/1** | 9/0 | 1/0 | 3/0 | «…submits only the newly approved set» |
+| подтверждённые удаления не суммируются | **17/1** | 9/0 | 1/0 | 3/0 | «…confirmed partial progress…» |
+| прогресс не передаётся вызову | **16/2** | 9/0 | 1/0 | 3/0 | оба случая с прогрессом |
+| папка не удаляется | **14/4** | **8/1** | 1/0 | 3/0 | все случаи успешного удаления |
+| черновик не отзывается | **17/1** | 9/0 | 1/0 | 3/0 | «…live preview after unknown»: черновик отдаётся после удаления |
+| чат не отмечается (`retire` не вызван) | **17/1** | **8/1** | 1/0 | 3/0 | юнит «…partial progress» (`retire`), сервер — конец хода |
+
+«Вопроса нет», юнит: в двух случаях Host отвечает `changed`, пока вопрос не отклонят («…updated publication set…»,
+«declining the new deletion set…»); без вопроса удаление крутится без конца, память прогона росла (3,6 ГБ), прогон
+остановлен `kill` через 15 минут — к тому времени красными отмечены все 11 случаев удаления. Отдельный прогон без этих
+двух (`-t 'partial progress|two versions|live preview|newly prepared|no longer belongs'`): 6 из 9 случаев удаления
+красные; зелёные — две сверки черновика (до вопроса и отказ `bound`) и «two versions» (проверка внутри ответа не
+вызывается). После всех мутаций `git status` чистый.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29g/scripts/suites.sh`): база — `dd82b0d6da` в `<scratchpad>/b29g/base`, итог —
+`a52fa90b7b` в этом дереве (после мутаций, `git status` чистый). По пакетам подряд, каждый под `unshare -n` со свежими
+временными `HOME`/`TMPDIR`/`XDG_*`, архивом ripgrep 15.1.0 в кэше прогона (`LOGINOM_AI_AGENT_RIPGREP_CACHE`, sha256 тот же,
+что в `/root/.cache/loginom-bootstrap/ripgrep`), `npm ci` клиента `loginom-runtime` и шаблона `dashboard` и
+`LOGINOM_AI_AGENT_TEST_NODE`. `loginom-agent`, `server`, `loginom-host`, `product` — `bun test`; `dashboard` — `bun run
+test`, затем `node --test test/agent/draft.test.mjs`. База прогонялась параллельно с мутациями, итог — один.
+
+| Пакет | `dd82b0d6da` | `a52fa90b7b` |
+|---|---|---|
+| `loginom-agent` | 113 pass, 0 fail | 125 pass (+12), 0 fail |
+| `server` | 305 pass, 3 skip, 1 fail — `fetch.test.ts` «routes pending requests through the Session's instance» (ниже, «Найдено») | 315 pass (+9 новых, +1 тот же случай зелёный), 3 skip, 0 fail |
+| `dashboard`, `bun run test` | `test:coverage` — 50 и 36 pass; узловой набор — 91 pass, 3 fail, 2 skip: «a partial source copy is retried completely for new and known projects» и его «new project», «known project» | то же, те же имена |
+| `dashboard`, `draft.test.mjs` | 8 pass, 2 fail: «a prepared folder builds and serves its coherent sample using one shared server», «draft reports at most twenty console errors from the built app» (Chromium ревизии 1246, B2.9e) | то же, те же имена |
+| `loginom-host` | 547 pass, 14 skip, 2 fail: «archive verification preserves manifest modes under a private umask», «actual managed entry reads live bridge work and dispatching over private IPC» | то же, те же имена |
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же три (и на `bda4a270e3` с этим разделом) |
+
+`fetch.test.ts` отдельно, `--rerun-each 3`: база и итог — 39 pass, 0 fail. Повторы новых случаев: `loginom-dashboard-delete`
+`--rerun-each 3` — 27 pass, 0 fail; `dashboard-tools.test.ts -t delet --rerun-each 3` — 33 pass, 0 fail. Вместе с
+затронутыми файлами (`loginom-dashboard-{delete,publish,files,draft}`, `loginom-permissions`, `loginom-access`) — 59 pass,
+0 fail.
+
+Изоляция (`<scratchpad>/b29g/scripts/real-xdg.sh`, как в B2.9f): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad, корень данных тогда `$HOME/.local/share/loginom-ai-agent-dev`; после прогона пусто и там, и во временном
+каталоге прогона:
+
+```text
+head loginom-agent exit=0 xdg-vars=0  25 pass  0 fail       # test/dashboard-tools.test.ts
+head loginom-agent after: [] data: []
+head loginom-agent tmp left: []
+head server exit=0 xdg-vars=0  9 pass  0 fail               # test/loginom-dashboard-delete.test.ts
+head server after: [] data: []
+head server tmp left: []
+```
+
+```text
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 252 files                                 # tsc — код 0
+$ cd packages/server && bun typecheck
+✓ No type errors in 1,675 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0, вывод тот же, что на базе
+against a6b15d33daf6: 612 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                        # код 0
+$ bun run check                                              # код 0, под unshare -n, с этим разделом
+Found 905 warnings and 0 errors.                             # как в B2.9f
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                           # 32 из кэша turbo
+```
+
+`prettier --check` и `oxlint` изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **«always» на самом вопросе удаления — как «один раз», а не отказ, как в 0.4.** 0.4 правил `Permission` ядра (ответ
+  «always» на `dashboard_delete` — отказ). В v2 у вопроса нет `save`, и ядро принимает «always» как одобрение этого вопроса,
+  ничего не сохраняя; ответа плагин не видит (`assert` только разрешается), а подписка на `permission.replied` гонялась бы
+  с ответом. Правку ядра не делал: «всегда» удаление не разрешает, следующее снова спрашивает, а кнопку «always» у такого
+  вопроса продукт по В-31/В-102 показывать не должен (этап C; TUI v2 её без `save` и так не показывает). Случай 0.4
+  «always» перенесён как «always» другого вопроса, сохранивший разрешение удаления для проекта.
+- **«approval belongs» (удаление)** — по образцу B2.9f: «approval from a deleted draft…» на сервере и юнит-сверки
+  черновика до списка и после вопроса. 0.4-тест о `write`/`apply_patch` с удалением файла — запись в `src/` без вопроса
+  (В-102, B2.9c), его закрыл B2.9d.
+- **Чат, отвязанный от черновика, получает `LOGINOM_SCOPE_DENIED`,** а не текст 0.4 «Черновик удалён или пересоздан.
+  Дальнейшее удаление остановлено.»: `bound` бросает, как у публикации, а законченный результат `execute.after` (B2.9d) всё
+  равно заменил бы этим отказом. Прогресс таких удалений остаётся в metadata вызова.
+- **Отказ после части удалений — свой текст.** Общий код B2.6b заменил бы отказ на `declinedText` и потерял бы число
+  удалённых версий; инструмент сам бросает `Tool.Error` без причины-отказа: `declinedText` + прогресс, metadata
+  `declined`. Остальные отказы (без удалений, «Запрещено», политика) — общим кодом.
+- **Привязка `deleted` пишется, но мутацией не ловится** (выше, «Мутации»): после удаления папки старый чат отклонён и без неё, а
+  новая подготовка даёт новый `draftId`. Оставлена по строке нарезки и 0.4 `retireDashboard` — на случай папки без
+  `draftId`.
+- **Метка конца хода — в памяти,** снимается в `drop` по `session.execution.*`. Без неё (перезапуск посреди хода) чат
+  всё равно не идёт дальше: `prompt` и `context` отклоняют его по привязке.
+- **Запрет администратора до Host — проверкой в `execute.before`,** как у непредложенного инструмента (B2.6b), — одно
+  условие; поправлен и хвост B2.9f. Проверка — по ресурсу `*`: политика на один пакет (`dashboard_delete:/a.lgp`)
+  по-прежнему срабатывает только на вопросе, после списка версий (и у публикации — после сборки).
+- **Без `uninterruptibleMask` 0.4.** Остановка во время запроса Host передаёт его сигнал Host (`interrupt`), как у
+  публикации; ядро прерывает вызов, если он не закончился за 5 с после остановки.
+- **`catalog.json` не менялся:** файлов upstream нет. `pending: B2.9` у CAT-05 B2.9a предлагал снять после d и g, но в
+  записи CAT-05 стоят и выполненные B2.5, B2.6 — список ведёт оркестратор, не трогал.
+
+### Найдено, не чинил
+
+- `server/test/fetch.test.ts` «routes pending requests through the Session's instance» упал в полном прогоне базы
+  (`effect: "deny"` вместо `ask` у вопроса `shell` без источника) и прошёл в итоге и отдельно (база и итог, по 3 повтора).
+  Похоже на гонку с загрузкой плагина продукта: успел загрузиться — `settle` отклоняет `shell` без источника как проверку
+  расписания (B2.6a2), не успел — правило конфига спрашивает. Есть на базе, к B2.9g не относится; не разбирал.
+- `revokeDashboardDraft` пакета `dashboard` (`agent/draft.ts`) отзывает черновик только у процессного сервера `shared`,
+  которого в v2 нет (сервер черновиков — у Location, B2.9e); удаление отзывает у своего. Функция осталась без вызовов, не
+  удалял.
+- Ответ `reject` ядра отклоняет все открытые вопросы сессии (B2.9f) — для удаления так же: отказ одного набора и
+  остановка отклоняют и чужие открытые вопросы этой сессии.
+
+### Не проверено
+
+- Настоящий Host и стенд Loginom: Host — по сценарию; настоящих `dashboardVersions`/`dashboardDelete` хранилища
+  (`loginom-runtime/src/dashboard-storage.mjs`) не было.
+- Запрос без инструментов при истории с вызовами инструментов — только на подставной модели (маршрут OpenAI Chat).
+  Провайдеры, которым нужны определения инструментов при `tool_use` в истории, не проверялись.
+- Промпт, принятый (steer) пока шло удаление: он попадает в то же исполнение, и после удаления модель ответит на него
+  без инструментов, а не отказом `LOGINOM_SCOPE_DENIED` — по коду (метка конца хода проверяется, а не снимается).
+- Удаление из CLI (`run` без терминала — отказ, ввод фразы — B2.9j) и из Desktop (ВШ-6, B4); показ вопроса без «always» и
+  прогресса (этап C).
+- Остановка посреди `dashboardDelete` и удаление папки во время сборки черновика — по коду (тот же `interrupt` Host и
+  `activeStages`, что у публикации и 0.4).
+- Windows и macOS, настоящая модель.

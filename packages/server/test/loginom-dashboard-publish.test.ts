@@ -378,7 +378,7 @@ describe("loginom.product dashboard_publish (B2.9f, В-102)", () => {
   )
 
   it.live(
-    "the administrator's deny wins over «Разрешено»: refused without a question, nothing is sent, the turn goes on",
+    "the administrator's deny wins over «Разрешено»: refused before the Host, without a question, the turn goes on",
     () =>
       Effect.gen(function* () {
         const test = yield* boot({
@@ -392,9 +392,9 @@ describe("loginom.product dashboard_publish (B2.9f, В-102)", () => {
         expect(asked).toEqual([])
         expect(result.results).toEqual([policyDeniedText({ action: "dashboard_publish", kind: "save" })])
         expect(result.refusals).toEqual(["policy"])
-        // The policy is a hook, not a rule: the tool is offered, and its question is denied once the build is ready.
+        // The policy is a hook, not a rule: the tool is offered, and its call is refused before it runs (B2.9g).
         expect(result.offered).toContain("dashboard_publish")
-        expect(test.methods()).toEqual(read)
+        expect(test.methods()).toEqual([])
         expect(yield* test.sample).toBe(true)
         expect(result.answered).toBe(true)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
