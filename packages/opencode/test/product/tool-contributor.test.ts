@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import type { Tool as AITool } from "ai"
+import { Image } from "@/image/image"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { Config } from "@/config/config"
+import { TestConfig } from "../fixture/config"
+import { createHash } from "node:crypto"
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { MessageID, SessionID } from "@/session/schema"
 import type { TaskScope } from "@/session/task-scope"
 import type { Provider } from "@/provider/provider"
@@ -27,7 +34,7 @@ function setup(options: {
   image?: boolean
   fail?: boolean
   catalog?: ReturnType<typeof catalogOf>
-  result?: { content: { type: "text"; text: string }[]; _meta?: Record<string, unknown> }
+  result?: Pick<CallToolResult, "content" | "_meta">
 }) {
   const requested: string[] = []
   const status: { failure?: string } = {}
@@ -135,6 +142,54 @@ describe("toolContributor", () => {
     const run = setup({ profile: "default" })
     await run.run()
     expect(Object.keys(run.tools)).toEqual(["loginom_find"])
+  })
+
+  test("a screenshot retains its original file digest and part ID across normalization", async () => {
+    const { PhotonImage } = await import("@silvia-odwyer/photon-node")
+    const source = new PhotonImage(
+      Uint8Array.from({ length: 40_000 }, (_, i) =>
+        i % 4 === 3 ? 255 : Math.floor((Math.sin(i + 1) + 1) * 11_111) % 256,
+      ),
+      100,
+      100,
+    )
+    const bytes = Buffer.from(source.get_bytes())
+    source.free()
+    const data = bytes.toString("base64")
+    const content = [{ type: "image" as const, mimeType: "image/png", data }]
+    const run = setup({ profile: "loginom-automation", image: true, result: { content } })
+    await run.run()
+    const result = (await run.tools.loginom_browser_take_screenshot.execute!(
+      {},
+      { toolCallId: "shot", messages: [] },
+    )) as {
+      attachments: SessionV1.FilePart[]
+      metadata: Record<string, unknown>
+      content: typeof content
+    }
+    const [file] = result.attachments
+    expect(file).toMatchObject({ messageID: taskMessageID, sessionID, url: `data:image/png;base64,${data}` })
+    expect(result.metadata.screenshotFiles).toEqual([
+      {
+        partID: file.id,
+        mime: "image/png",
+        bytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      },
+    ])
+    expect(result.content).toEqual(content)
+    const limit = TestConfig.layer({
+      get: () => Effect.succeed({ attachment: { image: { max_width: 72, max_base64_bytes: 17_000 } } }),
+    })
+    const resized = await Effect.runPromise(
+      Image.Service.use((service) => service.normalize(file)).pipe(
+        Effect.provide(LayerNode.compile(Image.node, [[Config.node, limit]])),
+      ),
+    )
+    expect(resized).toMatchObject({ id: file.id, messageID: taskMessageID, sessionID, mime: "image/jpeg" })
+    const image = PhotonImage.new_from_byteslice(Buffer.from(resized.url.slice(resized.url.indexOf(",") + 1), "base64"))
+    expect(image.get_width()).toBe(72)
+    image.free()
   })
 
   test("a screenshot tool is offered only to a model that accepts images", async () => {

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { createXai } from "@ai-sdk/xai"
-import { APICallError, generateText } from "ai"
+import { APICallError, generateText, streamText, wrapLanguageModel } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+import { Global } from "@opencode-ai/core/global"
+import path from "node:path"
+import { mkdir, rename, rmdir, stat } from "node:fs/promises"
+import { screenshotDelivery } from "@/product/screenshot-delivery"
 import { MessageV2 } from "../../src/session/message-v2"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
@@ -113,6 +118,137 @@ function basePart(messageID: string, id: string) {
 }
 
 describe("session.message-v2.toModelMessage", () => {
+  test("a private receipt matches the screenshot bytes received by the Responses endpoint", async () => {
+    const callID = "call_" + crypto.randomUUID()
+    const data = "Zm9v"
+    const url = `data:image/png;base64,${data}`
+    const history: SessionV1.WithParts[] = [
+      {
+        info: assistantInfo("msg_shot", "msg_user"),
+        parts: [
+          {
+            ...basePart("msg_shot", "tool"),
+            type: "tool",
+            callID,
+            tool: "loginom_browser_take_screenshot",
+            state: {
+              status: "completed",
+              title: "shot",
+              input: {},
+              time: { start: 0, end: 1 },
+              output: "private screenshot caption",
+              metadata: {},
+              attachments: [{ ...basePart("msg_shot", "file"), type: "file", mime: "image/png", url }],
+            },
+          },
+        ],
+      },
+    ]
+    const received: unknown[] = []
+    const statuses: number[] = []
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        const body = await request.json()
+        received.push(
+          body.input.find(
+            (item: { call_id?: string; type: string }) =>
+              item.type === "function_call_output" && item.call_id === callID,
+          )?.output,
+        )
+        const status = statuses.shift()
+        if (status && status !== 200) return Response.json({ error: { message: "synthetic failure" } }, { status })
+        const events = [
+          {
+            type: "response.output_item.added",
+            output_index: 0,
+            item: { type: "message", id: "item", status: "in_progress", role: "assistant", content: [] },
+          },
+          { type: "response.output_text.delta", item_id: "item", delta: "fixture reply", logprobs: null },
+        ]
+        return new Response(
+          events.map((event) => "data: " + JSON.stringify(event) + "\n\n").join("") + "data: [DONE]\n\n",
+          { headers: { "content-type": "text/event-stream" } },
+        )
+      },
+    })
+    const provider = createOpenAI({ baseURL: server.url.href, apiKey: "test-key" })
+    const journal = path.join(Global.Path.data, "browser-recovery-delivery.jsonl")
+    const read = async () =>
+      (await Bun.file(journal).text())
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((row) => row.callID === callID)
+    const send = async (stripMedia: boolean, ...responses: number[]) => {
+      statuses.push(...responses)
+      const result = streamText({
+        model: wrapLanguageModel({ model: provider.responses("terra"), middleware: screenshotDelivery(sessionID) }),
+        messages: await MessageV2.toModelMessages(history, model, { stripMedia }),
+        maxRetries: responses.length - 1,
+        onError: () => {},
+      })
+      return Array.fromAsync(result.fullStream)
+    }
+    const output = [
+      { type: "input_text", text: "private screenshot caption" },
+      { type: "input_image", image_url: url },
+    ]
+    const images = [
+      { mime: "image/png", bytes: 3, sha256: "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae" },
+    ]
+    try {
+      expect((await Bun.file(journal).exists()) ? await read() : []).toEqual([])
+      const success = await send(false, 200)
+      expect(success.flatMap((part) => (part.type === "text-delta" ? [part.text] : []))).toEqual(["fixture reply"])
+      expect(
+        (await send(false, 400)).some(
+          (part) => part.type === "error" && APICallError.isInstance(part.error) && part.error.statusCode === 400,
+        ),
+      ).toBe(true)
+      expect((await send(true, 503, 200)).map((part) => part.type)).toEqual(success.map((part) => part.type))
+      expect(received).toEqual([output, output, "private screenshot caption", "private screenshot caption"])
+      const rows = await read()
+      expect(rows.map((row) => [row.result, row.responseObserved, row.outputPresent, row.images])).toEqual([
+        ["stream", true, true, images],
+        ["error", true, true, images],
+        ["error", true, true, []],
+        ["stream", true, true, []],
+      ])
+      expect(rows.every((row) => row.sessionID === sessionID)).toBe(true)
+      expect(new Set(rows.map((row) => row.attemptID)).size).toBe(4)
+      expect((await stat(journal)).mode & 0o777).toBe(0o600)
+      expect(JSON.stringify(rows)).not.toMatch(/private screenshot caption|image_url|base64|test-key|Zm9v/)
+      // A full or unusable evidence sink must preserve both the stream and SDK retries.
+      await rename(journal, journal + ".saved")
+      try {
+        await mkdir(journal)
+        expect((await send(false, 503, 200)).map((part) => part.type)).toEqual(success.map((part) => part.type))
+        expect(received.slice(4)).toEqual([output, output])
+      } finally {
+        await rmdir(journal)
+        await rename(journal + ".saved", journal)
+      }
+      const shot = history[0].parts[0]
+      if (shot.type !== "tool") throw new Error("fixture requires a tool result")
+      shot.tool = "loginom_browser_snapshot"
+      await send(false, 200)
+      expect(await read()).toEqual(rows)
+      shot.tool = "loginom_browser_take_screenshot"
+      await server.stop(true)
+      expect((await send(false, 200)).some((part) => part.type === "error")).toBe(true)
+      expect((await read()).at(-1)).toMatchObject({
+        result: "error",
+        responseObserved: false,
+        outputPresent: null,
+        images: null,
+      })
+    } finally {
+      server.stop(true)
+    }
+  }, 15_000)
+
   test("private outputFiles never change the model-visible export receipt", async () => {
     const output =
       ' {"status":"SUCCEEDED","output":{"file_artifacts":[{"artifact_id":"csv-1","destination":"/server/result.csv"}]}}\n'

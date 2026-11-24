@@ -15,6 +15,7 @@ import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import type { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
+import { screenshotDelivery } from "@/product/screenshot-delivery"
 import { Permission } from "@/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
@@ -338,6 +339,10 @@ const live: Layer.Layer<
                   return args.params
                 },
               },
+              ...(input.model.providerID === "openai" &&
+              !Plugin.experimentalWebSocketsEnabled({ enabled: flags.experimentalWebSockets })
+                ? [screenshotDelivery(input.sessionID)]
+                : []),
             ],
           }),
           experimental_telemetry: {

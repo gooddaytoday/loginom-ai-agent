@@ -18,6 +18,7 @@ import { TaskScope } from "@/session/task-scope"
 import { Tool } from "@/tool/tool"
 import { isRecord } from "@/util/record"
 import type { Truncate } from "@/tool/truncate"
+import { screenshotImageFact } from "./screenshot-delivery"
 import { toolPolicy } from "./tool-policy"
 
 export type ContributeInput = {
@@ -288,6 +289,11 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
                       : [],
                   ),
                   content: result.content,
+                }
+                if (key === "loginom_browser_take_screenshot" && output.attachments.length) {
+                  Object.assign(output.metadata, {
+                    screenshotFiles: output.attachments.map((file) => ({ partID: file.id, ...screenshotImageFact(file.url) })),
+                  })
                 }
                 if (options.abortSignal?.aborted) yield* input.processor.completeToolCall(options.toolCallId, output)
                 return output
