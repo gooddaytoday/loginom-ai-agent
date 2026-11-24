@@ -18891,7 +18891,9 @@ skill/index.ts}`. v2 — `cli/src/{server-process,update-notifier}.ts`, `cli/src
 | `2d35baa09b` `test(cli): check .claude skills in both network mode cases and spawn one server less (B2.8)` | проверка `.claude` перенесена в оба случая с каталогом, отдельный сервер для неё убран (skill `unit-tests`: один-два подпроцесса на файл); в случае S6 — проверка результата `todowrite` |
 | `75b1258634` `docs(upstream-sync): record the built-in product config and network mode (B2.8)` | этот раздел (первая версия) |
 | `f947dc0ce8` `fix(cli): read the network mode from the config directory the server reads (B2.8)` | `server-process.ts` (+5 −3): режим читается из каталога `LOGINOM_AI_AGENT_CONFIG_DIR` после сохранённого окружения службы — ниже, «Служба» |
-| следующий | этот раздел: служба, итоговые прогоны; CAT-07 — +12 −6 |
+| `feba53e531`, `2a5a36eae6` `docs(upstream-sync): …` | этот раздел: служба, итоговые прогоны, каталог конфига; CAT-07 — +12 −6 |
+| `19dfc7804d` `test(cli): a saved service environment that moves the config dir keeps device mode offline (B2.8)` | тест на `f947dc0ce8` по запросу оркестратора: служба, `serve --service`; помощник `serve` принимает аргументы запуска |
+| следующий | этот раздел: тест службы, мутация M9, итоговые прогоны; CAT-07 — проверка |
 
 Файлов кода три (предел — пять); правка upstream одна — `server-process.ts` (итого +12 −6), он уже в CAT-07.
 
@@ -18947,7 +18949,8 @@ skill/index.ts}`. v2 — `cli/src/{server-process,update-notifier}.ts`, `cli/src
 
 ### Тесты
 
-`packages/cli/test/network-mode.test.ts` (новый, 4 теста). Серверные случаи запускают настоящий `serve --port 0` из
+`packages/cli/test/network-mode.test.ts` (новый, 5 тестов). Серверные случаи запускают настоящий `serve --port 0` (случай
+службы — `serve --service`) из
 исходников (`isolatedEnv`) **без переключателей продукта в окружении**: сняты `LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH`,
 `…_DISABLE_FREE_MODELS`, `…_DISABLE_CLAUDE_CODE(_SKILLS)`, `…_CONFIG_CONTENT`, `…_MODELS_URL`, `OPENCODE_API_KEY`
 (`isolatedEnv` по умолчанию ставит `DISABLE_MODELS_FETCH` и `CONFIG_CONTENT={}` — с ними тесты прошли бы впустую). Все
@@ -18959,6 +18962,7 @@ loopback. Так запрос вне loopback виден, но не сделан
 |---|---|
 | чтение режима | нет файла или ключа — `online`; `device`; `.jsonc` с комментарием поверх `.json` — `online`; `"intranet"` — `device`; битый `.jsonc` поверх `.json` с `online` — `device` |
 | «Только этот компьютер», S6 | глобальный конфиг `{"network":"device"}`, проектный — `{"network":"online"}` и провайдер `stub` на подставной модели. Старт, `GET /api/model`, сессия, ход (модель вызывает `todowrite`, затем отвечает текстом), ожидание, SIGTERM. Заглушка-прокси — 0 соединений; в моделях есть `stub` и нет ни одной модели `opencode`; модель получила не меньше 2 запросов, в последнем — вызов `todowrite` и сообщение `role: "tool"` с его результатом |
+| «Только этот компьютер», служба с сохранённым окружением (`19dfc7804d`) | `serve --service`; в конфиге службы `service-local.json` — свободный порт и `env: { LOGINOM_AI_AGENT_CONFIG_DIR: <saved-config> }`; ключ `{"network":"device"}` и провайдер `stub` лежат только в `<saved-config>`, в каталоге запуска конфига нет. Пароль — из конфига службы. Заглушка-прокси — 0 соединений; в моделях есть `stub` (сервер читает перенесённый каталог) и нет моделей `opencode` |
 | «Интернет» по умолчанию | глобальный конфиг `{}`, каталог — файл (`LOGINOM_AI_AGENT_MODELS_PATH`) с одной моделью `opencode/big-pickle` (цена 0, `base_url` — подставной сервер на `127.0.0.1`). Заглушка-прокси видит `CONNECT models.opencode.ai:443 HTTP/1.1` (каталог включён); ход без выбранной модели уходит на подставной сервер с `Authorization: Bearer public` (путь бесплатных моделей, а не ключ), ответ «Free model answer» есть в сообщениях сессии. Навыки: `~/.agents/skills/home-agents` в `GET /api/skill` есть, `~/.claude/skills/home-claude` и `<проект>/.claude/skills/project-claude` нет |
 | «Только этот компьютер», тот же каталог | `{"network":"device"}`: прокси — 0 соединений, `big-pickle` в моделях нет, подставной сервер — 0 запросов, ответа нет; навыки — как в предыдущем случае |
 
@@ -19025,7 +19029,26 @@ tree clean
 ```
 
 На `f947dc0ce8` M1–M4 повторены: те же 2 pass / 2 fail с теми же именами; после прогона в `git status` только этот
-раздел и `catalog.md`. Возврат `f947dc0ce8` (режим снова из `global.config`) тесты не ловят — только проба службы выше.
+раздел и `catalog.md`.
+
+M9 — возврат кода до `f947dc0ce8`: `server-process.ts` из `2d35baa09b`, тест `19dfc7804d`, затем `git checkout`:
+
+```text
+$ git show 2d35baa09b:packages/cli/src/server-process.ts > packages/cli/src/server-process.ts
+ packages/cli/src/server-process.ts | 8 +++-----
+$ … bun test --timeout 60000 test/network-mode.test.ts
+error: expect(received).toEqual(expected)
+- []
++ [
++   "CONNECT models.opencode.ai:443 HTTP/1.1",
++   "CONNECT models.opencode.ai:443 HTTP/1.1",
++ ]
+(fail) product defaults of the server > «Только этот компьютер» in a config dir moved by the saved service environment keeps the service offline
+ 4 pass
+ 1 fail
+```
+
+Без мутации: 5 pass, 0 fail; `--rerun-each 3` — 15 pass, 0 fail.
 
 На первой версии теста M6 остался зелёным: битый `.jsonc` лежал поверх `.json` со значением `device`, и `findLast`
 давал тот же ответ. Случай переписан (`.json` — `online`), M6 краснит.
@@ -19076,8 +19099,7 @@ $ unshare -n sh -c '. toolchain.sh && ip link set lo up && (bun scripts/s6.ts de
 | `serve --service` | `f947dc0ce8` | `device` | 0 | 0 | 0 |
 
 Во всех шести прогонах ход прошёл (`todowrite` в истории), выход — `exited 143`. Случай с сохранённым окружением
-проверен только пробой: автоматического теста нет (служба в тесте — фиксированный порт и файл регистрации, это ещё один
-тяжёлый подпроцесс).
+закреплён тестом службы в `19dfc7804d` (выше, «Тесты»; мутация M9).
 
 ### Приёмка
 
@@ -19101,6 +19123,8 @@ $ unshare -n sh -c '. toolchain.sh && ip link set lo up && (bun scripts/s6.ts de
 После `f947dc0ce8` (одно выражение в `server-process.ts`) `cli` повторён целиком ещё раз: 601 pass, 9 skip, 0 fail;
 `bun typecheck` `cli` — 0 ошибок; `bun run check` — код 0 (ниже — этот прогон). `server`, `core`, `loginom-agent` от
 `server-process.ts` не зависят и после правки не повторялись.
+На `19dfc7804d` (тест службы) `cli` целиком — 602 pass (+7 против базы), 9 skip, 0 fail; `bun run check` — код 0
+(905 предупреждений, 0 ошибок, 39 из 39 задач); `catalog-check.py` — код 0, 609 файлов; `apply-identity --check` — 0 файлов.
 
 ```text
 $ cd packages/cli && bun typecheck
@@ -19137,8 +19161,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - **Уведомление CLI об обновлениях закрыто в `device`**, хотя S6 его не проходит (нет TTY и ленты): задание называет
   проверки обновлений.
 - **Тесты — в `packages/cli`**: только там стартует сервер продукта; у сервера библиотеки (`server/test`) умолчаний продукта
-  нет. Три подпроцесса `serve` на файл — по skill `unit-tests` (один-два на файл); отдельный сервер для `.claude` убран в
-  `2d35baa09b`.
+  нет. Подпроцессов `serve` на файл четыре (skill `unit-tests` советует один-два): отдельный сервер для `.claude` убран в
+  `2d35baa09b`, четвёртый — служба по запросу оркестратора (`19dfc7804d`).
 
 ### Не закрыто в «Только этот компьютер» (этап F)
 
@@ -19164,8 +19188,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Установленные сборки (Desktop, CLI), Windows и macOS: только Linux из исходников. Полное доказательство на установленных
   сборках — этап F (по плану).
-- Тесты — только `serve --port 0`; служба (`serve --service`) — пробой S6 из исходников (выше). Служба, которую
-  запускает сам Desktop, и сохранённое окружение, которое пишет Desktop, не проверялись.
+- Служба — тест и проба S6 из исходников (`serve --service`). Служба, которую запускает сам Desktop, и сохранённое
+  окружение, которое пишет Desktop, не проверялись.
 - Ответ настоящей бесплатной модели (B6, с согласия владельца); `run` и TUI с режимом.
 - Простой в S6 — 6 минут на переднем плане и 5 с у службы, а не 19–30 минут, как в spike: один цикл обновления каталога.
 - Полные наборы `loginom-host`, `evals`, `tui` после закрытия `.claude` не запускались (задание называет `cli`, `server`,
