@@ -381,18 +381,23 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     requireValue(value?.verified===true && value.cleanup_complete===true, 'Node phase did not verify '+name);
     verify(value);
-    if(probe?.condition==='P3'&&probe.operationId===operation.id&&!probe.attempted&&name==='finish'
-      &&request.finish==='execute'&&value.execution_started===true&&value.execution_group?.execution_id===value.execution_id
-      &&['document_id','workflow_id','node_id'].every(k=>value.execution_group.node?.[k]===state.node[k])){
-      const configuration=state.phases.find(p=>p.phase==='configure')?.value.configuration;
-      const destination=probe.packagePath.slice(0,-4)+'.result.csv';
-      if(configuration?.destination===destination&&configuration.configured?.destination_check?.verified===true
-        &&configuration.configured.destination_check.destination===destination){
+    if(probe?.operationId===operation.id&&!probe.attempted){
+      const stop=async details=>{
         probe.attempted=true;
-        const ack=await acknowledge({phase:'acceptance_fault_triggered',condition:'P3',target_phase:name,
-          receipt_id:pending.receipt_id,node:state.node,destination,execution_id:value.execution_id,
-          group_record_id:value.execution_group.group_record_id}).catch(()=>null);
-        if(ack)throw Error('The export execution acknowledgement was unavailable');
+        const ack=await acknowledge({phase:'acceptance_fault_triggered',condition:probe.condition,target_phase:name,
+          receipt_id:pending.receipt_id,node:state.node,...details}).catch(()=>null);
+        if(ack)throw Error(name==='finish'?'The export execution acknowledgement was unavailable':'The wizard opening acknowledgement was unavailable');
+      };
+      if(probe.condition==='P1'&&name==='open'&&value.node_context?.verified===true&&value.node_context.surface==='wizard'
+        &&['document_id','workflow_id','node_id'].every(k=>value.node_context[k]===state.node[k]))
+        await stop({input_sha256:probe.inputSha256,code:'NODE_APPLY_STOPPED'});
+      if(probe.condition==='P3'&&name==='finish'&&value.execution_started===true&&value.execution_group?.execution_id===value.execution_id
+        &&['document_id','workflow_id','node_id'].every(k=>value.execution_group.node?.[k]===state.node[k])){
+        const configuration=state.phases.find(p=>p.phase==='configure')?.value.configuration;
+        const destination=probe.packagePath.slice(0,-4)+'.result.csv';
+        if(configuration?.destination===destination&&configuration.configured?.destination_check?.verified===true
+          &&configuration.configured.destination_check.destination===destination)
+          await stop({destination,execution_id:value.execution_id,group_record_id:value.execution_group.group_record_id});
       }
     }
     const receipt={phase:name,receipt_id:pending.receipt_id,status:'verified',effect_possible:value.effect_possible===true,value:structuredClone(value)};
@@ -451,7 +456,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       await phase('workflow',ctx=>drivers.activateWorkflow({...ctx,waitForActive:true}));
     // File verification does not infer identity from the displayed path. The
     // driver checks an already completed upload/inspect/verify receipt chain.
-    await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
+    const source=await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
     if(drivers.activateWorkflow)await phase('workflow',ctx=>drivers.activateWorkflow(ctx));
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
@@ -460,6 +465,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // same filename cannot inherit this assignment if the first stops early.
     if(probe?.condition==='P3'&&!probe.operationId&&request.target.type==='exports.text'&&request.finish==='execute'
       &&request.parameters.destination===probe.packagePath.slice(0,-4)+'.result.csv')probe.operationId=operation.id;
+    if(probe?.condition==='P1'&&!probe.operationId&&request.target.type==='imports.text'&&request.finish==='done'
+      &&source.source?.sha256===probe.inputSha256)probe.operationId=operation.id;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>openRecovery?.wizard_open?openRecovery.value:drivers.openWizard(ctx));

@@ -207,6 +207,15 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
   return { code: state.stopped ? 1 : 0, runDir }
 }
 
+export async function campaignProbe(condition: string | undefined, packagePath: string, files: string[]) {
+  if (!condition) return
+  if (condition !== "P1") return { condition, packagePath }
+  const csv = files.filter(file => /\.csv$/i.test(file))
+  if (csv.length !== 1) throw new EvalFailure("Для назначенной пробы текстового импорта нужен однозначный входной CSV", 2)
+  const inputSha256 = new Bun.CryptoHasher("sha256").update(await Bun.file(csv[0]!).bytes()).digest("hex")
+  return { condition, packagePath, inputSha256 }
+}
+
 export async function runAttempt(input: {
   config: EvalConfig
   command: AgentCommand
@@ -280,7 +289,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     command: input.command,
     expectedSkillDigest: input.expectedSkillDigest,
     taskId: task.id,
-    acceptanceProbe: condition ? { condition, packagePath } : undefined,
+    acceptanceProbe: await campaignProbe(condition, packagePath, files),
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTextImportNodeSupport,validateTextImportNodeParameters,verifyTextImportSource} from '../lib/text-import-node.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+import {Page,runtime} from './support/executor-fixture.mjs';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools,textImportParametersSchema} from '../lib/node-api.mjs';
 const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:[{name:'A',label:'A',type:'integer',data_kind:'Дискретный',used:true}]},source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}});
@@ -24,36 +25,80 @@ for(const kind of ['new','existing'])test('bound Import observes its input mappi
  await assert.rejects(driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000}),/STOP_AFTER_READ_ONLY_MAPPING/);
 });
 
-function coveredImport({existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={}}={}) {
+function coveredImport({existing=false,foreign=false,unknown=false,repaint=false,refusals=1,receiptChange={},operation,onRecord,receiptOptions}={}) {
  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
- const actions=[],records=[];let covered=!repaint,opened=false,pending,generation=0;
+ const actions=[],records=[],receipts=new Map();let covered=!repaint,opened=false,pending,generation=0,stage='text_import_file';
  const graphTid='MF;TF-1;Graph;Import';
  const state=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,graph_identity:{status:'observed',container_ref:'graph'},dom_epoch:{document:'dom',revision:1},scan:{complete:true},
   prepared_node_context:{...node,node_id:foreign&&!covered?'foreign':node.node_id,verified:true,surface:opened?'wizard':'graph',tid:graphTid,locked:false},
-  wizard:opened?{status:'observed',stage:'text_import_file',root_tid:'wizard',root_ref:'wizard',
+  wizard:opened?{status:'observed',stage,root_tid:'wizard',root_ref:'wizard',
    owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:'node',label:'Import'},{tid:'wizard',label:'Wizard'}]},
    import_source:{fields:Object.fromEntries(Object.entries({source_path:'',connection:'file',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}).map(([k,value])=>[k,{status:'observed',value}]))}}:{status:'absent'},
   ui:{masks:[],dialogs:[],truncated:{masks:false,dialogs:false},elements:[
+   ...(opened?[{tid:'wizard;btnClose',ref:'ui-close',allowed_actions:['click']},{tid:'wizard;btnDone',ref:'ui-done',allowed_actions:['finish_wizard']}]:[]),
    {ref:'ui-body'+(generation?'-'+generation:''),tid:graphTid,scope:'graph',identity:{anchor_tid:graphTid,path:[]},signature:{tag:'g'},graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:covered?'point_not_observed':'point_observed',...(covered?{covering:[{anchor_tid:graphTid+';NodesControls'}]}:{})}},
-   {ref:'ui-label',tid:graphTid+';Label;Label',label:'Import',graph_node:{part:'label'},allowed_actions:['click'],interaction:{state:'point_observed'}},
+   {ref:'ui-label',tid:graphTid+';Label;Label',label:'Import',graph_node:{part:'label',label_text:'Import'},allowed_actions:['click'],interaction:{state:'point_observed'}},
    {ref:'ui-settings',tid:graphTid+';Setting',allowed_actions:['open_wizard','begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:workflow.navigation_path},interaction:{state:'point_observed'}}]}});
  const support=createTextImportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
- const driver=support.nodeApplyDriverFactory({operation:{id:'import',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{...request(),target:{kind:existing?'existing':'new'},parameters:params()}}},
-  now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{records.push(e);if(e.phase==='node_step_prepared')pending=e;return e;},execute:async()=>{
+ const driver=support.nodeApplyDriverFactory({operation:operation??{id:'import',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{...request(),target:{kind:existing?'existing':'new'},parameters:params()}}},
+  now:Date.now,receiptOptions:receiptOptions??(()=>({})),verifiedUploads:()=>[uploaded()],
+  readReceipt:async ref=>({state:'completed',receipt:receipts.get(ref.operation_id)}),
+  onRecord:async e=>{records.push(e);if(e.phase==='node_step_prepared')pending=e;return onRecord?onRecord(e):e;},execute:async()=>{
    if(!pending)return {status:'SUCCEEDED',output:state()};
    const step=pending;pending=null;const a=step.action;actions.push(a);
    const stale=repaint&&a.ref.startsWith('ui-body')&&generation<refusals;
    if(stale)generation++;
    const refused=stale||a.ref==='ui-body'&&covered;
    if(a.ref==='ui-label')covered=false;
-   if(a.ref==='ui-settings')opened=true;
-   return {operation_id:step.internal_operation_id,action_key:'ui.act',status:unknown&&a.ref==='ui-label'?'AMBIGUOUS':refused?'NOT_APPLIED':'SUCCEEDED',
+   if(a.ref==='ui-settings'){opened=true;stage='text_import_file';}
+   if(a.ref==='ui-done'||a.ref==='ui-close')opened=false;
+   const receipt={operation_id:step.internal_operation_id,action_key:'ui.act',status:unknown&&a.ref==='ui-label'?'AMBIGUOUS':refused?'NOT_APPLIED':'SUCCEEDED',
     phase:refused?'preconditions':'completed',effect_possible:!refused,cleanup_complete:!unknown,
     error:refused?{code:stale?'UI_REFERENCE_STALE':'UI_REFERENCE_OBSCURED',message:'The observed control is replaced or covered'}:null,trace:[],
     ...(stale?{output:state(),...receiptChange}:{})};
+   receipts.set(step.internal_operation_id,receipt);return receipt;
   }});
- return {actions,records,run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
+ return {actions,records,node,workflow,driver,configured:()=>{assert.ok(opened);stage='done';},run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
 }
+test('P1 stops after opening the assigned import and releases that node before any execution baseline',async()=>{
+ const {node,workflow}=coveredImport(),inputSha256=uploaded().artifact.sha256;
+ for(const assignedHash of [undefined,'b'.repeat(64),inputSha256]){
+  const stopped=assignedHash===inputSha256;
+  const events=[],pages=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,
+   nodes:[{ref:node,type:'imports.text',label:'Import',position:{x:100,y:100},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+  const ok=async()=>({verified:true,cleanup_complete:true});
+  const app=runtime(new Page(),{now:Date.now,acceptanceProbe:assignedHash?{condition:'P1',packagePath:'/test/task.lgp',inputSha256:assignedHash}:undefined,
+   onRecord:async e=>{events.push(e);return e;},nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true}),
+   nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:validateTextImportNodeParameters,
+    configure:async()=>{pages.at(-1).configured();return ok();}}]]),
+   nodeApplyDriverFactory:o=>{const page=coveredImport({existing:true,operation:o.operation,onRecord:o.onRecord,receiptOptions:o.receiptOptions});
+    pages.push(page);return {...page.driver,mapPorts:ok};}});
+  const r={...request(),operation_id:'import',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+   target:{kind:'existing',type:'imports.text',ref:node},mode:'delimited',parameters:params(),read:{ports:[],sample_rows:0,require_exact_numbers:false},
+   budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+  app.startNodeApply(r);
+  let job=await app.waitNodeApply('import',{timeoutMs:2000});
+  assert.equal(job.outcome?.status,stopped?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(job.outcome?.error));
+  if(stopped){
+   assert.equal((await app.inspect({operationId:'import'})).output.state,'pending');
+   assert.equal(job.outcome.output.pending_phase,'open');
+   assert.equal(job.outcome.output.execution.status,'not_requested');
+   const released=await app.recover('import',{strategy:'abandon_operation',recoveryOperationId:'release'});
+   assert.equal(released.output.resolution,'released_after_proof',JSON.stringify(released));
+   assert.deepEqual(released.output.original_outcome.output.node,node);
+   assert.equal(pages[0].actions.filter(a=>a.ref==='ui-close').length,1);
+   app.startNodeApply({...r,operation_id:'continued'});job=await app.waitNodeApply('continued',{timeoutMs:2000});
+   assert.equal(job.outcome?.status,'SUCCEEDED',JSON.stringify(job.outcome?.error));
+  }
+  assert.equal((await app.inspect({operationId:stopped?'continued':'import'})).output.state,'resolved');
+  assert.deepEqual(job.outcome.output.node,node);
+  assert.equal(pages.flatMap(p=>p.actions).filter(a=>a.verb==='finish_wizard').length,1);
+  assert.equal(events.filter(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='configure').length,1);
+  assert.equal(events.some(e=>e.readiness?.condition?.includes('process console')),false);
+  assert.deepEqual(events.filter(e=>e.phase==='acceptance_fault_triggered').map(e=>[e.operation_id,e.receipt_id,e.node,e.input_sha256]),stopped?[['import','import:open',node,inputSha256]]:[]);
+ }
+});
+
 for(const existing of [false,true])test('import opens through its label when hover controls cover the body, existing: '+existing,async()=>{
  const f=coveredImport({existing});assert.equal((await f.run()).verified,true);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-label','ui-body','ui-settings']);

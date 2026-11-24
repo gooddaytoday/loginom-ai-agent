@@ -3,7 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import { parseEnv } from "node:util"
 import { mkdir, mkdtemp, rm, stat, utimes } from "node:fs/promises"
-import { emptyResult } from "../src/run"
+import { campaignProbe, emptyResult } from "../src/run"
 import { writeLeaseReceipt } from "../src/lease"
 import { campaignEnvironment, campaignTick, prepareCampaignBatch, publishCampaign, type CampaignManifest, type CampaignJournal } from "../script/run-campaign"
 import { pendingJudgeFixture } from "./helpers/pending-judge"
@@ -312,6 +312,8 @@ test("campaign durably records a batch before exposing its parameters and reuses
       family: "save", pair: "test", arm: "before", order: 1, condition: "P5" } })
     manifest.keys.push({ corpus: "ordinary", taskId: "export", round: 1, experiment: {
       family: "execute", pair: "test", arm: "before", order: 1, condition: "P3" } })
+    manifest.keys.push({ corpus: "ordinary", taskId: "import", round: 1, experiment: {
+      family: "import", pair: "test", arm: "before", order: 1, condition: "P1" } })
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
@@ -319,7 +321,13 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(saved.verificationAttempted).not.toBe(true)
     expect(saved.verificationDir).toBeUndefined()
     const env = await Bun.file(config.batchEnvFile).text()
-    expect(loadConfig(["--skip-judge", "--dry-run"], parseEnv(env)).campaign?.control?.probeTasks).toEqual(new Map([["second", "P5"], ["export", "P3"]]))
+    const probes = loadConfig(["--skip-judge", "--dry-run"], parseEnv(env)).campaign?.control?.probeTasks
+    expect(probes).toEqual(new Map([["second", "P5"], ["export", "P3"], ["import", "P1"]]))
+    const csv = path.join(root, "source.csv")
+    await Bun.write(csv, "abc")
+    expect(await campaignProbe(probes?.get("import"), "/owner/task.lgp", [csv])).toEqual({
+      condition: "P1", packagePath: "/owner/task.lgp", inputSha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" })
+    for (const files of [[], [csv, csv]]) await expect(campaignProbe("P1", "/owner/task.lgp", files)).rejects.toThrow("CSV")
     expect(env).toContain('EVAL_AGENT_MODEL="pinned/model"')
     expect(env).toContain(`EVAL_ENTRYPOINT=${JSON.stringify(path.join(config.harnessRoot, "src/run.ts"))}`)
     expect(env).toContain(`EVAL_TASKS=${JSON.stringify(path.join(config.harnessRoot, "tasks"))}`)

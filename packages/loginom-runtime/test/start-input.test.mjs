@@ -79,6 +79,10 @@ test("only named probes reach the assigned chat and its own account's package", 
   const probe = { condition: "P3", packagePath: "/owner/task.lgp" }
   const input = { ...base, chat: "a".repeat(64), connection: { username: "owner" }, acceptanceProbe: probe }
   assert.deepEqual(validateStartInput(input).acceptanceProbe, probe)
+  const source = { ...probe, condition: "P1", inputSha256: "b".repeat(64) }
+  assert.deepEqual(validateStartInput({ ...input, acceptanceProbe: source }).acceptanceProbe, source)
+  for (const bad of [{ ...probe, condition: "P1" }, { ...source, inputSha256: "invalid" }, { ...source, condition: "P3" }])
+    assert.throws(() => validateStartInput({ ...input, acceptanceProbe: bad }), /LOGINOM_START_INVALID/)
   for (const patch of [{ validation: true }, { chat: "dashboard-uuid" }, { acceptanceProbe: { ...probe, condition: "custom" } },
     { acceptanceProbe: { ...probe, phase: "finish" } }, { acceptanceProbe: { ...probe, packagePath: "/another/task.lgp" } },
     { acceptanceProbe: { ...probe, packagePath: "/owner/../another/task.lgp" } }])

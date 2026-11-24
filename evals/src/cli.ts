@@ -162,7 +162,7 @@ export type AgentCommand = ReturnType<typeof agentCommand> & { cleanupDir?: stri
 
 export async function runAgent(input: {
   command: AgentCommand
-  acceptanceProbe?: { condition: string; packagePath: string }
+  acceptanceProbe?: { condition: string; packagePath: string; inputSha256?: string }
   expectedSkillDigest?: string
   taskId: string
   model: string
