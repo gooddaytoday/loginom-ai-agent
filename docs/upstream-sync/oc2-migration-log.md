@@ -20149,7 +20149,22 @@ packages/loginom-agent/src/permissions.ts:67:  { action: "dashboard_delete", res
 ```
 
 Строки и тесты файлов — `git show a63462dde1:<путь> | wc -l`, имена тестов — `grep` по `test(`, `it.instance(`,
-`it.live(` в тех же файлах. Проверки дерева (код 0) — ниже, после коммита раздела.
+`it.live(` в тех же файлах.
+
+Проверки дерева на `f53d289278` (коммит раздела; хук `pre-commit` — `clean`). Перед `check` выполнен
+`npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` (Node 24.19.0), как в прежних разделах:
+
+```text
+$ bun run secrets staged
+{"status":"clean","commits":0,"archives":0,"current_files":0,...}
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0, как на базе
+against a6b15d33daf6: 609 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+  CAT-08: 0 (pending: B2.7)
+$ bun run check                                                        # код 0
+Found 905 warnings and 0 errors.                                       # как в B2.8
+ Tasks:    39 successful, 39 total
+```
 
 ### Не проверено
 
