@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
-import { exists } from "node:fs/promises"
 import path from "node:path"
-import { copyBuiltCliToResources, downloadCliToResources, getCurrentCli, resolveChannel } from "./utils"
+import { copyBuiltCliToResources, resolveChannel } from "./utils"
 import { verifyBundles } from "./verify-bundles"
 
 // Prepares resources/ (icons, metainfo, the bundled CLI) for LOGINOM_AI_AGENT_CHANNEL and builds the app into out/.
-// The CLI comes from ../cli/dist when it holds the target; otherwise dev downloads the published dev CLI,
-// beta the beta CLI, and prod fails.
+// Loginom AI Agent: every channel takes the CLI from ../cli/dist and fails without it; none downloads one from npm.
 const dir = path.resolve(import.meta.dir, "..")
 
 const cli = path.resolve(dir, "../cli/dist")
@@ -20,14 +18,7 @@ await $`bun ./script/copy-icons.ts ${channel}`
 
 await $`bun ./script/copy-metainfo.ts ${channel}`
 
-const built = await exists(path.join(cli, getCurrentCli().package.replace("@opencode/", "")))
-
-if (channel === "prod" && !built)
-  throw new Error(`Production desktop builds bundle the CLI from ${cli}; build it first`)
-
-if (built) await copyBuiltCliToResources(cli)
-
-if (!built) await downloadCliToResources(channel === "beta" ? "beta" : undefined)
+await copyBuiltCliToResources(cli)
 
 // Loginom AI Agent (B4.8a): resources/loginom — Node, the Host entry, Chromium, the Dock runtime, help and the product
 // skills. Every channel needs LOGINOM_AI_AGENT_NODE_SOURCE and LOGINOM_AI_AGENT_BROWSER_SOURCE, as in 0.4.

@@ -1,10 +1,7 @@
-import { chmod, copyFile, mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { chmod, copyFile, exists } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { Option, Schema } from "effect"
 import { Product } from "@loginom-ai-agent/product"
-
-const CLI_VERSION = "dev"
 
 const Manifest = Schema.fromJsonString(Schema.Struct({ version: Schema.NonEmptyString }))
 
@@ -85,27 +82,17 @@ export function nodePtyPackage(target?: string) {
 }
 
 // Loginom AI Agent (B4.7): the bundled CLI and its version file carry the product name, as the CLI did in 0.4.
-export async function downloadCliToResources(
-  version = CLI_VERSION,
-  dest = windowsify(`resources/${Product.cliExecutable}`),
-) {
-  const { $ } = await import("bun")
-  const cli = getCurrentCli()
-  const directory = await mkdtemp(join(tmpdir(), "opencode-cli-"))
-
-  try {
-    await $`bun install --no-save --cwd ${directory} ${`${cli.package}@${version}`} ${`--os=${cli.os}`} ${`--cpu=${cli.cpu}`}`
-    await copyCliToResources(join(directory, "node_modules", cli.package), dest)
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
-
-  console.log(`Copied ${cli.package}@${version} to ${dest}`)
-}
-
+// Every channel bundles the CLI built from packages/cli, as 0.4 built it from source: the CLI that npm publishes
+// (`@opencode/cli-*`) is OpenCode's.
 export async function copyBuiltCliToResources(root: string, dest = windowsify(`resources/${Product.cliExecutable}`)) {
   const cli = getCurrentCli()
   const directory = cli.package.replace("@opencode/", "")
+
+  if (!(await exists(join(root, directory))))
+    throw new Error(
+      `Desktop bundles the CLI built from packages/cli, and ${join(root, directory)} is missing. Build it first: ` +
+        `LOGINOM_AI_AGENT_TARGET=${directory.replace("cli-", "")} bun run --cwd packages/cli build`,
+    )
   await copyCliToResources(join(root, directory), dest)
 }
 

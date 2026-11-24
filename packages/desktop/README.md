@@ -28,11 +28,10 @@ Both read the same environment as every other release package:
 | `LOGINOM_AI_AGENT_TARGET`  | `darwin-arm64`, `darwin-x64`, `windows-arm64`, `windows-x64`, `linux-x64`, `linux-arm64`. Defaults to the host. |
 
 The CLI is placed outside `app.asar` in the application's resources directory, and packaging fails if it is missing.
-`bun run build` uses `packages/cli/dist` when that holds the target's CLI. Otherwise `dev` (and `local`, unset or unrecognized)
-downloads the published dev CLI, `beta` downloads the beta CLI, and `prod`/`latest` fail.
+`bun run build` takes the target's CLI from `packages/cli/dist` in every channel and fails without it, naming the build
+to run. No channel downloads a CLI from npm.
 
-`bun dev` is separate from packaging: it uses local renderer/server mode, the dev app identity, and the CLI source by
-default. `bun dev --download-server <version>` instead downloads that CLI version for local development.
+`bun dev` is separate from packaging: it uses local renderer/server mode, the dev app identity, and the CLI source.
 
 ## Beta channel
 
