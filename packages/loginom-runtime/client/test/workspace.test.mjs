@@ -121,6 +121,10 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
   return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);tab.files=element('MF;TF-'+(tabs.length+1)+';FileStorageForm');tab.filesForm=new FileStorageForm(tab.files);}, page: {
     url: () => url,
     async goto(value) { url = value;context.location={origin:new URL(value).origin,pathname:new URL(value).pathname};events.push('navigate'); },
+    async waitForFunction() {
+      assert.equal(authenticated, true);
+      return { jsonValue: async () => 'authenticated', dispose: async () => {} };
+    },
     async evaluate(fn,args) {context.args=args;return runInContext(`(${fn.toString()})(args)`,context);},
     locator, async waitForTimeout() {entryDelay=Math.max(0,entryDelay-1);busyTicks=Math.max(0,busyTicks-1);},
   } };
@@ -173,6 +177,48 @@ test('private identity observation binds the real preparation document without a
   assert.deepEqual(fixture.events,['navigate']);
   const prepared=await execute(fixture,{operationId:'actual-open'});
   assert.equal(prepared.status,'READY');assert.equal(prepared.document_id,identity.document_id);
+});
+
+for(const pending of ['entry','mask'])test('private upload identity waits for initialized workspace: '+pending,async()=>{
+  const fixture=pageFixture({authenticated:true,entryDelay:pending==='entry'?3:0,busyTicks:pending==='mask'?3:0});
+  let waits=0;
+  const wait=fixture.page.waitForTimeout;
+  fixture.page.waitForTimeout=async()=>{waits++;await wait();};
+  const identity=await execute(fixture,{identityOnly:true});
+  assert.equal(identity.status,'BOUND');
+  assert.equal(waits,3,'avatar visibility must not authorize storage navigation before workspace initialization');
+  assert.equal(identity.effect_possible,false);assert.equal(identity.created_draft,false);
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.size,0);
+  assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('private upload identity refuses a blocking window without navigation or a receipt',async()=>{
+  const fixture=pageFixture({authenticated:true,blocked:true});
+  const identity=await execute(fixture,{identityOnly:true});
+  assert.equal(identity.status,'NOT_READY');assert.equal(identity.reason,'STORAGE_IDENTITY_UNAVAILABLE');
+  assert.equal(identity.effect_possible,false);assert.equal(identity.created_draft,false);
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.size,0);
+  assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('private upload identity can bind an initialized Files workspace before choosing a destination',async()=>{
+  const fixture=pageFixture({authenticated:true});fixture.openFiles();
+  const identity=await execute(fixture,{identityOnly:true});
+  assert.equal(identity.status,'BOUND');assert.equal(identity.effect_possible,false);
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.size,0);
+  assert.deepEqual(fixture.events,['navigate']);
+});
+
+test('private upload identity consumes the original deadline while waiting for initialization',async()=>{
+  const fixture=pageFixture({authenticated:true,entryDelay:30});let elapsed=0;
+  const wait=fixture.page.waitForTimeout;
+  fixture.page.waitForTimeout=async()=>{elapsed+=100;await wait();};
+  const identity=await execute(fixture,{identityOnly:true,timeoutMs:1000},{now:()=>elapsed});
+  assert.equal(identity.status,'NOT_READY');assert.equal(identity.reason,'DEADLINE');
+  assert.equal(identity.phase,'storage_workspace_ready');assert.equal(elapsed,1000);
+  assert.equal(identity.effect_possible,false);assert.equal(identity.created_draft,false);
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.size,0);
+  assert.deepEqual(fixture.events,['navigate']);
 });
 
 test('server-path opening from the exact native Files directory preserves the existing workflow and storage identity',async()=>{

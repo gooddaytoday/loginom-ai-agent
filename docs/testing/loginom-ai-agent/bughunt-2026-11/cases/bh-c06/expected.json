@@ -1,0 +1,137 @@
+{
+  "package_path": "/bughunt/bh-c06.lgp",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "transform.sorting"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "export_destination": "/bughunt/bh-c06.csv",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        },
+        {
+          "name": "Share",
+          "label": "Share",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 7,
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 250.5,
+          "Share": 0.35232067510548526
+        },
+        {
+          "RowID": 3,
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 100.5,
+          "Share": 0.14135021097046413
+        },
+        {
+          "RowID": 9,
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 90.5,
+          "Share": 0.12728551336146274
+        },
+        {
+          "RowID": 2,
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 70.25,
+          "Share": 0.09880450070323488
+        },
+        {
+          "RowID": 8,
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 60.25,
+          "Share": 0.08473980309423347
+        },
+        {
+          "RowID": 10,
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 40.5,
+          "Share": 0.056962025316455694
+        },
+        {
+          "RowID": 11,
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 30.75,
+          "Share": 0.043248945147679324
+        },
+        {
+          "RowID": 5,
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 20.5,
+          "Share": 0.028832630098452883
+        },
+        {
+          "RowID": 4,
+          "Region": "Север",
+          "Category": "Офис",
+          "Revenue": 18.75,
+          "Share": 0.026371308016877638
+        },
+        {
+          "RowID": 6,
+          "Region": "Юг",
+          "Category": "Офис",
+          "Revenue": 12.5,
+          "Share": 0.017580872011251757
+        },
+        {
+          "RowID": 1,
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 10.5,
+          "Share": 0.014767932489451477
+        },
+        {
+          "RowID": 12,
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 5.5,
+          "Share": 0.007735583684950774
+        }
+      ]
+    }
+  ]
+}

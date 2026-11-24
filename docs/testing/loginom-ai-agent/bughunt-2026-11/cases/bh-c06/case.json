@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 90,
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Source package is self-contained. Preserve source/sort/export GUIDs; one calculator is added. seed.csv is private oracle input, not an attachment."
+}

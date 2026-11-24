@@ -648,6 +648,19 @@ the export filename in the task. This keeps server-source filenames out of the
 export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
+A private case may add `case.json` with `base` (another case in the same
+`--cases` directory, run first in the same chat, then this case continues it),
+`input_files` (attachments of this turn) and `budget` (read only by
+`bughunt-audit.py`). The first turn of a private case attaches every file in
+`data/`, any format; a continuation attaches only its `input_files`.
+
+The model under test defaults to `openai/gpt-6.1-sol` medium with the shared
+OAuth link. `RUN_CHECK_MODEL`, `RUN_CHECK_VARIANT` (empty: no `--variant`) and
+`RUN_CHECK_AUTH` (an `auth.json` symlinked into each profile, never copied)
+select another provider, e.g. `opencode-go/deepseek-v4.1-flash` with
+`RUN_CHECK_AUTH=~/.config/loginom-run-check/auth-opencode-go.json`. Two-turn
+scenarios keep the default model. `results.json` records the model per run.
+
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV
 positions, and every record, including the first, is checked as data. Omitted

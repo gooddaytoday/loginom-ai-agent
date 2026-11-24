@@ -4,6 +4,7 @@ import {chromium} from 'playwright-core';
 import {adaptCell,temporalProfile} from '../lib/variant-native-values.mjs';
 import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
 import {createNativeVariantReader} from '../lib/variant-native-read.mjs';
+import {collectNativeRuntime} from '../lib/collapse-native-runtime.mjs';
 import {readNativeVariableCells} from '../lib/node-port-output.mjs';
 import {createHash,webcrypto} from 'node:crypto';
 import vm from 'node:vm';
@@ -46,9 +47,9 @@ test('civil datetime is additive; the legacy scalar envelope remains unchanged',
  for(const bad of [{...cell,timezone:''},{...cell,value:'2026-01-02'}, {...cell,native:{...cell.native,civil_time_verified:false}}])assert.equal(validate(bad).valid,false);
 });
 
-function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false,treeValue=false}={}){
+function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false,treeValue=false,directSource=false,build=directSource?'compact':'canonical'}={}){
  const environment={crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,DataView,setTimeout,clearTimeout,decode:decodeVariantFrame,
-  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue,treeValue};
+  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue,treeValue,directSource,build};
  const context=vm.createContext(environment);
  // Exact observed frontend implementations, pinned by the production reader.
  vm.runInContext(`Date.FromOADate=function (d) {
@@ -64,28 +65,159 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
         return result;
     };
  var counters={requests:0,releasedRequests:0,releasedResponses:0},next;
- var source={$:{$I:treeValue?166:variableValue?427:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
-  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(size!==(variableValue?20:32))throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(treeValue?7230:variableValue?1141:321)||flag!==0)throw Error('wrong method');},
+ var source={$:{$I:treeValue?166:variableValue?427:directSource?71:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
+  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(size!==(variableValue?20:32))throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(treeValue?7230:variableValue?1141:directSource?166:321)||flag!==0)throw Error('wrong method');},
    WriteParameter(offset,row){if(offset!==(treeValue?4:0))throw Error('row offset');this.row=row;},WriteParameter$a(offset,column){if(offset!==(treeValue?0:8))throw Error('column offset');this.column=column;},get_MessageID(){return 101;},Release(){counters.releasedRequests++;}};
  }},DispatchMessageAsync(request,exceptions){
   if(exceptions!==false)throw Error('exception unmarshalling');
   return {continueWith(callback){
    const payload=frames[request.row].payload,bytes=new Uint8Array(60);bytes.set(payload,12);
-   const complete=()=>callback({getAwaitedResult(){return {$FData:bytes,$FDataSize:60,get_MessageType(){return 1;},get_MessageID(){return foreign?999:101;},set_StaticDataSize(){},Release(){counters.releasedResponses++;}};}});
+   const complete=()=>callback({getAwaitedResult(){return {...(build==='compact'?{$7:bytes,$8:60}:{$FData:bytes,$FDataSize:60}),get_MessageType(){return 1;},get_MessageID(){return foreign?999:101;},set_StaticDataSize(){},Release(){counters.releasedResponses++;}};}});
    if(deferred)next=complete;else complete();
   }};
  }}};
- var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}}}};
+ var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}},TIBGDataSource_Proxy:{prototype:{AsVariant:function(row,column){}}}}};
  source.$FHelper={FBaseProxy:source};
+ if(build==='compact'){Object.assign(source.$S,{$r:false,$y:false,$F:0});source.$S.$T.$a=source.$S.$T.$FSocket;delete source.$S.$T.$FSocket;for(const k of ['$FDisposed','$FPendingDisconnect','$FTransportStatus'])delete source.$S[k];}
  var treePins={get_as_variant:''};
- var collect=session=>({functions:{send:session.DispatchMessageAsync},constants:{},objects:[session,session.$M]});
+ var sourcePins={as_variant:''};
+ var slots=build==='compact'?{disposed:'$r',pendingDisconnect:'$y',transportStatus:'$F',socket:'$a',data:'$7',dataSize:'$8',message:{}}
+  :{disposed:'$FDisposed',pendingDisconnect:'$FPendingDisconnect',transportStatus:'$FTransportStatus',socket:'$FSocket',data:'$FData',dataSize:'$FDataSize',message:{}};
+ var collect=session=>({profile:build,slots,functions:{send:session.DispatchMessageAsync},constants:{},objects:[session,session.$M]});
  var stable=()=>{if(changed&&counters.requests)throw Error('binding changed');};
  var make=${createNativeVariantReader.toString()};`,context);
- environment.pins={constants:{},functions:{send:createHash('sha256').update(vm.runInContext('source.$S.DispatchMessageAsync.toString()',context)).digest('hex')}};
+ const sha=code=>createHash('sha256').update(vm.runInContext(code+'.toString()',context)).digest('hex');
+ environment.pins={[build]:{constants:{},functions:{send:sha('source.$S.DispatchMessageAsync')},datetime:{from_oadate:sha('Date.FromOADate'),add_bias:sha('Date.AddBias')}}};
  vm.runInContext('treePins.get_as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant.toString()',context)).digest('hex')),context);
- if(unpinned)environment.pins.functions.send='bad';
- return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue},decode,collect,pins,treePins)`,context)};
+ vm.runInContext('sourcePins.as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant.toString()',context)).digest('hex')),context);
+ if(unpinned)environment.pins[build].functions.send='bad';
+ return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue,directSource},decode,collect,pins,treePins,sourcePins)`,context)};
 }
+
+test('direct interface71 uses its observed method166 and preserves every native Variant subtype',async()=>{
+ const f=transportFixture({directSource:true}),reader=await f.run();
+ for(let row=0;row<observedRows.length;row++){
+  const raw=await reader.read(row,2);
+  assert.equal(raw.tag,observedRows[row].tag);
+  assert.deepEqual(Array.from(raw.payload),observedRows[row].payload);
+ }
+ assert.equal(reader.unsettled,false);
+ assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context)),{requests:8,releasedRequests:8,releasedResponses:8});
+});
+for(const mutation of ['source.$S.$r=true','source.$S.$y=true','source.$S.$F=1','source.$S.$T.$a.readyState=3'])test('direct source refuses compact runtime transport state: '+mutation,async()=>{
+ const f=transportFixture({directSource:true}),reader=await f.run();
+ vm.runInContext(mutation,f.context);
+ await assert.rejects(reader.read(0,2),/session transport not live/);
+ assert.equal(vm.runInContext('counters.requests',f.context),0);
+});
+for(const fault of ['wrong-interface','wrong-mode','implementation','replacement','foreign','changed','unpinned'])test('direct source retains exact interface, getter and transport guards: '+fault,async()=>{
+ const f=transportFixture({directSource:true,[fault]:true});
+ if(fault==='wrong-interface')vm.runInContext('source.$.$I=116',f.context);
+ if(fault==='wrong-mode')f.environment.directSource=false;
+ if(fault==='implementation')vm.runInContext("sourcePins.as_variant='bad'",f.context);
+ const expected={'wrong-interface':/^Error: Variant read: interface71 source required$/,'wrong-mode':/^Error: Variant read: interface116 source required$/,
+  implementation:/^Error: Variant read: source getter implementation$/,replacement:/^Error: Variant read: source getter changed$/,
+  foreign:/^Error: Variant read: non-value or foreign response$/,changed:/^Error: binding changed$/,unpinned:/^Error: Variant read: loaded implementation changed: send$/}[fault];
+ await assert.rejects(async()=>{
+  const reader=await f.run();
+  if(fault==='replacement')vm.runInContext('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant=function(){}',f.context);
+  await reader.read(0,2);
+ },expected);
+ const counts=JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context));
+ assert.equal(counts.releasedRequests,counts.requests);
+ if(['wrong-interface','wrong-mode','implementation','replacement','unpinned'].includes(fault))assert.equal(counts.requests,0);
+});
+
+// Real collectNativeRuntime on a page whose loaded build is canonical or compact.
+// Stubs stand in for the 53 critical functions; pins are hashes of this page's stubs,
+// and each build's stub sources differ, so exactly one pin set passes on a page.
+const compactSlots={session:{$DoDispatchMessageAsync:'$2',$GetNextMessageID:'$8'},message:{get_$ParametersOffset:'$6',$DoSetDataSize:'$1',$GrowData:'$3'},
+ transport:{$SendMessage:'$4',$InvalidateResponseAwaiters:'$1',$CancelResponseAwaiters:'$0'},
+ class:{$FSignatureOffset:'$m',$FMessageTypeOffset:'$f',$FMessageFormatVersionOffset:'$d',$FMessageIDOffset:'$e',$FObjectOwnerIDOffset:'$i',$FObjectIDOffset:'$h',$FMethodIDOffset:'$g'}};
+function loadedRuntimeFixture({build,interfaceId}){
+ const environment={crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,DataView,setTimeout,clearTimeout,decode:decodeVariantFrame,frames:observedRows,build,interfaceId};
+ const context=vm.createContext(environment);
+ vm.runInContext(`
+ var counters={requests:0,releasedRequests:0,releasedResponses:0};
+ var c=build==='compact',slot=(group,key)=>c?(${JSON.stringify(compactSlots)}[group][key]??key):key;
+ // Every implementation carries its build in its source, so the two builds hash differently.
+ var fn=(name,params='',body='')=>new Function('counters','frames','return function '+name.replace(/\\W/g,'_')+'('+params+'){/* '+build+' '+name+' */'+body+'}')(counters,frames);
+ var message={
+  set_StaticDataSize:fn('set_StaticDataSize','size','this.size=size;'),InitializeMethodCallMessage:fn('InitializeMethodCallMessage','owner,object,method,flag','this.call=[owner,object,method,flag];'),
+  WriteParameter:fn('WriteParameter','offset,value','this.row=value;'),WriteParameter$a:fn('WriteParameter$a','offset,value','this.column=value;'),
+  get_MessageID:fn('get_MessageID','','return this.id;'),get_MessageType:fn('get_MessageType','','return this.type;'),
+  Release:fn('Release','',"counters[this.response?'releasedResponses':'releasedRequests']++;")};
+ for(const name of ['get_$ParametersOffset','$DoSetDataSize','$GrowData','set_MessageID','set_Signature','set_MessageType','set_ObjectOwnerID','set_ObjectID','set_MethodID','CheckSignature','IsSignatureValid','get_Signature','get_MessageFormatVersion'])message[slot('message',name)]=fn(name);
+ var Klass=function(){};Klass.prototype=message;Klass.Acquire=fn('Acquire');Klass.BGRemoteMessageSignature=18242;
+ [0,2,3,4,8,12,16].forEach((value,i)=>{Klass[slot('class',['$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'][i])]=value;});
+ var rpc={TBGMessageDynamicData:Klass},BitConverter={},ss={Task:function(){},TaskCompletionSource:function(){}};
+ for(const name of ['FromInt8','FromUInt8','FromInt16','FromUInt16','FromInt32','FromUInt32','FromBigInt','FromInt64','FromUInt64','ToInt8','ToUInt8','ToInt16','ToUInt16','ToInt32','ToUInt32'])BitConverter[name]=fn(name);
+ for(const name of ['continueWith','getAwaitedResult'])ss.Task.prototype[name]=fn(name);
+ for(const name of ['setResult','setException'])ss.TaskCompletionSource.prototype[name]=fn(name);
+ var transport={FFinished:false,FDisconnected:false};transport[c?'$a':'$FSocket']={readyState:1};
+ for(const name of ['SendReceive','$SendMessage','Send','InternalSend','DoReceive','DoReceiveMessage','$InvalidateResponseAwaiters','$CancelResponseAwaiters'])transport[slot('transport',name)]=fn(name);
+ var session={$T:transport,$M:{GetDynamicData:(make=>function(){counters.requests++;const m=make();m.id=101;return m;})(()=>new Klass())}};
+ Object.assign(session,c?{$r:false,$y:false,$F:0}:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0});
+ var data=c?'$7':'$FData',size=c?'$8':'$FDataSize';
+ session.DispatchMessageAsync=function(request,exceptions){
+  if(exceptions!==false)throw Error('exceptions');
+  return {continueWith(callback){
+   const bytes=new Uint8Array(60);bytes.set(frames[request.row].payload,12);
+   const response=Object.assign(new Klass(),{response:true,id:request.id,type:1,[data]:bytes,[size]:60});
+   callback({getAwaitedResult:()=>response});
+  }};
+ };
+ for(const name of ['$DoDispatchMessageAsync','$GetNextMessageID','get_TransportStatus'])session[slot('session',name)]=fn(name);
+ Date.FromOADate=function(d){return Date.AddBias(new Date(Math.round((d-25569)*86400000)));};
+ Date.AddBias=function(d){return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds(),d.getUTCMilliseconds());};
+ var source={$:{$I:interfaceId,$OW:0,$O:9},$S:session};
+ var bg={rpc:{TIBGDataSource_Proxy:{prototype:{AsVariant:function(row,column){}}}}};
+ var collect=${collectNativeRuntime.toString()};
+ var make=${createNativeVariantReader.toString()};`,context);
+ const sha=code=>createHash('sha256').update(vm.runInContext(code+'.toString()',context)).digest('hex');
+ const own=vm.runInContext('collect(session)',context);
+ const pins={functions:Object.fromEntries(Object.entries(own.functions).map(([k,fn])=>[k,createHash('sha256').update(Function.prototype.toString.call(fn)).digest('hex')])),
+  constants:JSON.parse(JSON.stringify(own.constants)),datetime:{from_oadate:sha('Date.FromOADate'),add_bias:sha('Date.AddBias')}};
+ environment.sourcePins={as_variant:sha('bg.rpc.TIBGDataSource_Proxy.prototype.AsVariant')};
+ return {context,environment,pins,run:profiles=>{environment.profiles=profiles;
+  return vm.runInContext(`make(source,{deadline:Date.now()+5000,stable:()=>{},directSource:interfaceId===71},decode,collect,profiles,undefined,sourcePins)`,context);}};
+}
+const otherBuild=build=>build==='compact'?'canonical':'compact';
+for(const build of ['canonical','compact'])for(const interfaceId of [116,71])test(`interface${interfaceId} on a ${build} build reads through the real runtime collector with that build's pins`,async()=>{
+ const f=loadedRuntimeFixture({build,interfaceId}),reader=await f.run({[build]:f.pins});
+ for(const row of [2,3,4]){
+  const raw=await reader.read(row,2);
+  assert.equal(raw.tag,observedRows[row].tag);assert.deepEqual(Array.from(raw.payload),observedRows[row].payload);
+ }
+ assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context)),{requests:3,releasedRequests:3,releasedResponses:3});
+ assert.equal(vm.runInContext('collect(session).profile',f.context),build);
+});
+for(const build of ['canonical','compact'])test(`a ${build} build refuses the other build's pin set and an absent profile`,async()=>{
+ const f=loadedRuntimeFixture({build,interfaceId:116}),other=loadedRuntimeFixture({build:otherBuild(build),interfaceId:116});
+ await assert.rejects(f.run({[build]:other.pins}),/^Error: Variant read: loaded implementation changed: /);
+ await assert.rejects(f.run({[otherBuild(build)]:f.pins}),new RegExp('^Error: Variant read: unsupported runtime build: '+build+'$'));
+ await assert.rejects(f.run({[build]:{...f.pins,datetime:{...f.pins.datetime,add_bias:'other'}}}),/^Error: Variant read: civil datetime implementation changed$/);
+ assert.equal(vm.runInContext('counters.requests',f.context),0);
+});
+test('compact build binds each message method through its own slot and refuses a replaced slot',async()=>{
+ const f=loadedRuntimeFixture({build:'compact',interfaceId:71}),reader=await f.run({compact:f.pins});
+ vm.runInContext('session.$M.GetDynamicData=(get=>function(){const m=get();m.$3=function(){};return m;})(session.$M.GetDynamicData)',f.context);
+ await assert.rejects(reader.read(0,2),/^Error: Variant read: (message implementation changed|loaded runtime changed)$/);
+});
+test('compact build refuses its own transport state slots, never the canonical names',async()=>{
+ for(const mutation of ['session.$r=true','session.$y=true','session.$F=1','transport.$a.readyState=3']){
+  const f=loadedRuntimeFixture({build:'compact',interfaceId:116}),reader=await f.run({compact:f.pins});
+  vm.runInContext(mutation,f.context);
+  await assert.rejects(reader.read(0,2),/^Error: Variant read: session transport not live$/,mutation);
+  assert.equal(vm.runInContext('counters.requests',f.context),0);
+ }
+});
+test('a page mixing build slots is an unknown build and is refused before any request',async()=>{
+ const f=loadedRuntimeFixture({build:'compact',interfaceId:71});
+ vm.runInContext('session.$DoDispatchMessageAsync=session.$2;delete session.$2',f.context);
+ await assert.rejects(f.run({compact:f.pins}),/^Error: Loaded native runtime: unknown runtime build$/);
+ assert.equal(vm.runInContext('counters.requests',f.context),0);
+});
 
 test('observed W1 interface427/method1141 uses no row/column parameters and retains int32 subtype',async()=>{
  const f=transportFixture({variableValue:true});

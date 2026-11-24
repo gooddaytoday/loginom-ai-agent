@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "type": "imports.excel",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-a08-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Month",
+          "label": "Month",
+          "type": "string"
+        },
+        {
+          "name": "Total",
+          "label": "Total",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Month": "2026-01",
+          "Total": 78.57
+        },
+        {
+          "Month": "2026-02",
+          "Total": 188.72
+        },
+        {
+          "Month": "2026-03",
+          "Total": 334.88
+        }
+      ]
+    }
+  ]
+}

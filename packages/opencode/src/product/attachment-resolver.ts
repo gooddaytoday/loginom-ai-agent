@@ -35,7 +35,7 @@ export const attachmentResolver = {
     ]
   },
 
-  // Large local files reach the model as a bounded reference; no file bytes enter the provider request.
+  // Local file receipts reach the model as bounded references, without file bytes.
   referenceParts: Effect.fnUntraced(function* (part: FileDraft, filepath: string, url: URL, owner: Owner) {
     const receiptID = attachmentReceiptID(part.source?.type === "file" ? part.source.text.value : undefined)
     const info = receiptID ? undefined : yield* Effect.promise(() => stat(filepath).catch(() => undefined))
@@ -46,12 +46,16 @@ export const attachmentResolver = {
       : attachmentReceiptSource(yield* Effect.promise(() => createAttachmentReceipt(filepath)))
     const id = attachmentReceiptID(source?.type === "file" ? source.text.value : undefined)!
     yield* Effect.promise(() => bindAttachmentReceipt(id, filepath, { session: owner.sessionID, message: owner.messageID }))
+    const guidance =
+      part.mime === "application/octet-stream" || part.mime === "application/vnd.ms-excel"
+        ? "Use loginom_file_admit for verified delivery, or explain if the format is unsupported."
+        : "Use loginom_file_profile before reading or admission; then scan, sample and validate the scenario on the sample before delivering the full file."
     const parts: Draft<SessionV1.Part>[] = [
       {
         ...owner,
         type: "text",
         synthetic: true,
-        text: `Attached local data reference: ${filepath}. Use loginom_file_profile before reading or admission; then scan, sample and validate the scenario on the sample before delivering the full file. No file bytes are included in this message.`,
+        text: `Attached local data reference: ${filepath}. ${guidance} No file bytes are included in this message.`,
       },
       // References are represented to the provider by the bounded text above.
       // Keep CSV/XLSX paths out of provider file/download handling.
