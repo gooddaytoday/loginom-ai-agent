@@ -75,6 +75,50 @@ for(const variant of ['absent','opened','missing-node','unknown-receipt','change
   assert.throws(()=>f.runtime.assertPreparationAllowed());
  }
 });
+for(const action of ['resume','release'])test('inspect and '+action+' a retained variable mapping under stricter admission',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'saved'};
+ let opens=0;
+ const f=fixture({wrapDrivers:(_context,drivers)=>({...drivers,
+  async openWizard(){
+   if(++opens===1)throw Error('original opening reply lost');
+   return {verified:true,cleanup_complete:true};
+  },
+  async verifyPendingOpen(){
+   return {wizard_open:false,verified:true,cleanup_complete:true,effect_possible:false};
+  },
+  async releasePending(){
+   return {verified:true,cleanup_complete:true,node_context:node,cleanup:{wizard_closed:true}};
+  },
+ })});
+ f.graph.nodes.push({ref:node,type:'imports.text',label:'Saved',inputs:[],outputs:[0]});
+ f.handler.variable_inputs={variables:[0]};
+ const r={...request(),target:{kind:'existing',type:'imports.text',ref:node},
+  mappings:[{kind:'variables',direction:'input',port:0}]};
+ f.runtime.startNodeApply(r);
+ const stopped=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assert.equal(stopped.outcome.output.pending_phase,'open');
+
+ // Model a stored request whose mapping was accepted before tighter admission.
+ f.handler.variable_inputs={};
+ f.handler.validate=(_parameters,_mode,req)=>assert.deepEqual(req.mappings,[]);
+ assert.throws(()=>f.runtime.startNodeApply({...r,operation_id:'fresh'}),/Unsupported mapping/);
+ const inspected=await f.runtime.inspect({operationId:r.operation_id});
+ assert.equal(inspected.output.state,'pending');
+ if(action==='resume'){
+  f.runtime.startNodeApply({operation_id:r.operation_id},{resume:true});
+  const resumed=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+  assert.equal(resumed.outcome.status,'SUCCEEDED',JSON.stringify(resumed.error??resumed.outcome.error));
+  assert.equal(opens,2);
+ }else{
+  const released=await f.runtime.recover(r.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
+  assert.equal(released.status,'SUCCEEDED');
+  assert.equal(released.output.original_outcome.error.code,'NODE_OPERATION_RELEASED');
+  assert.equal(released.output.original_outcome.cleanup_complete,true);
+  assert.equal(opens,1);
+ }
+ assert.ok(!f.calls.includes('create'));
+});
+
 test('node drivers carry plain observations and typed outcomes through the real bridge parser',async()=>{
  let observed;
  const f=fixture({execute:async code=>{

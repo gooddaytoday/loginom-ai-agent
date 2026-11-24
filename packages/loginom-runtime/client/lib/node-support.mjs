@@ -65,6 +65,29 @@ export function nodeOutputForJournal(value,redactor){
  return cleaned;
 }
 
+// The apply handlers admit these native target ports. Dynamic ports and
+// connection ownership are still verified by the target driver.
+const variables0={variables:[0]},control0={control:true},noVariableInputs={};
+const variableInputsByType=new Map([
+ ['transform.calculator',variables0],
+ ['programming.javascript',variables0],
+ ['imports.text',variables0],
+ ['imports.excel',variables0],
+ ['imports.lgd',variables0],
+ ['exports.text',variables0],
+ ['exports.excel',variables0],
+ ['exports.lgd',variables0],
+ ['integration.rest_request',variables0],
+ ['transform.filter_data',control0],
+ ['transform.sorting',control0],
+ ['transform.group_data',control0],
+ ['variables.calculator',{variables:[0],control:true}],
+ ['variables.replace',variables0],
+ ['variables.to_table',variables0],
+ ['variables.column_union',{variables:[0,1,2]}],
+ ['control.condition',{variables:[0],modes:['variable_branch']}],
+]);
+
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
@@ -99,6 +122,8 @@ export function createCandidateNodeSupport(config) {
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
  const python=createPythonNodeSupport(config);
  const nodeApplyHandlers=new Map([...loop.nodeApplyHandlers,...supernode.nodeApplyHandlers,...supernodeOutput.nodeApplyHandlers,...python.nodeApplyHandlers,...databaseImport.nodeApplyHandlers,...condition.nodeApplyHandlers,...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ for(const [type,handler] of nodeApplyHandlers)
+  nodeApplyHandlers.set(type,{...handler,variable_inputs:variableInputsByType.get(type)??noVariableInputs});
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||nodeApplyHandlers.get(type)?.unchangedExecution?.(options.operation.parameters)===true||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));
