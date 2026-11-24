@@ -24,9 +24,17 @@ async function prepareWorkspace(page, options) {
       await page.waitForTimeout(Math.min(100, remaining()));
     }
   };
+  let connectionRestore = null;
+  const restoreRefusal = reason => ({connection_restore:reason,
+    message:'Loginom lost its server connection ("Восстановление сессии"). '+(reason==='attempted'||reason==='awaiting_original_attempt'
+      ?'The runtime already pressed "Восстановить" once for this prompt and the original session is not confirmed. '
+      :'The runtime did not restore it: the original native session is not proven ('+reason+'). ')
+      +'Ask the user to restore the Loginom session, then call dock_prepare with the SAME operation_id to reconcile. The package gesture may have taken effect; do not repeat it or dismiss the dialog.',
+    next_step:{tool:'dock_prepare',same_operation_id:true,after:'loginom_session_restored'}});
   const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
     authenticated, created_draft: createdDraft, effect_possible: effectPossible,
-    operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
+    operation_id: options.operationId, session_id: options.sessionId, trace,
+    ...(status!=='READY'&&connectionRestore?restoreRefusal(connectionRestore):{}), ...extra });
   const missingPackage = proof => result('NOT_READY','PACKAGE_OPEN_REJECTED',{
     ...proof, authenticated:true, effect_possible:false, package_absence_verified:true, package_path:options.packagePath,
     message:'The saved package does not exist. For a new task call dock_prepare with intent new_draft, a NEW operation_id and no package_path. Keep this same package path/name as the final Save destination. Do not stop the task or retry Open for this future Save path.',
@@ -34,7 +42,12 @@ async function prepareWorkspace(page, options) {
   });
   // Cached Loginom getters, plus a read-only existence check before Open.
   // Never execute or mutate a package through native methods here.
-  const inspect = async mode => page.evaluate(async ({ mode, options, deadline }) => {
+  const inspect = async mode => {
+    const value = await inspectPage(mode);
+    if (value?.connection_restore) connectionRestore = value.connection_restore;
+    return value;
+  };
+  const inspectPage = async mode => page.evaluate(async ({ mode, options, deadline }) => {
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
@@ -114,6 +127,14 @@ async function prepareWorkspace(page, options) {
     // Session-restore baseline: the native handles of the last connected,
     // settled session. Restore is accepted only if Loginom keeps exactly them.
     const mainForm=app?.Application?.FInstance?.FMainForm,serverConnection=mainForm?.FMapTree?.FServerConnection;
+    // A restore whose reconnect outlived its wait settles only on the same handles.
+    if(state.connectionRestore?.pending&&serverConnection?.Connected===true&&mainForm.FReconnecting===false){
+      const owner=state.connectionOwner;
+      if(!(owner&&owner.connection===serverConnection&&owner.remote===serverConnection.FRemoteSession
+        &&owner.session===serverConnection.FSession&&owner.account===serverConnection.UserName))
+        return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'session_replaced'};
+      state.connectionRestore.pending=false;
+    }
     if(serverConnection?.Connected===true&&mainForm.FReconnecting!==true&&serverConnection.FSession&&serverConnection.FRemoteSession&&!state.connectionRestore?.pending)
       state.connectionOwner={connection:serverConnection,remote:serverConnection.FRemoteSession,session:serverConnection.FSession,account:serverConnection.UserName};
     if(options.storageBinding && (state.id!==options.storageBinding.document_id
@@ -402,13 +423,9 @@ async function prepareWorkspace(page, options) {
       const observed=await inspect('verify');
       return observed?.session_restore===true?await restoreSession(observed):observed;
     });
+    if (verified.connection_restore) connectionRestore = verified.connection_restore;
     if (verified.error) return result('NOT_READY',verified.error,{authenticated:true,
-      ...(verified.connection_restore?{connection_restore:verified.connection_restore,
-        message:'Loginom lost its server connection ("Восстановление сессии"). '+(verified.connection_restore==='attempted'||verified.connection_restore==='awaiting_original_attempt'
-          ?'The runtime already pressed "Восстановить" once for this prompt and the original session is not confirmed. '
-          :'The runtime did not restore it: the original native session is not proven ('+verified.connection_restore+'). ')
-          +'Ask the user to restore the Loginom session, then call dock_prepare with the SAME operation_id to reconcile. The package gesture may have taken effect; do not repeat it or dismiss the dialog.',
-        next_step:{tool:'dock_prepare',same_operation_id:true,after:'loginom_session_restored'}}
+      ...(verified.connection_restore?{}
       :verified.error==='NATIVE_MESSAGE_BOX_BLOCKED'?{message:'Loginom is blocked by a native MessageBox. Report its title, text and buttons from trace.blocking_windows to the user. Preparation is unconfirmed; do not repeat the package gesture or dismiss an unknown dialog.'}:{}),
       ...(verified.error==='PACKAGE_OPEN_REJECTED' ? {message:(verified.renderer_error
         ? 'Loginom could not render the opened package (TestableCellRenderer). '

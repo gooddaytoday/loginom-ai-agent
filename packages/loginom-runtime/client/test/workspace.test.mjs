@@ -816,3 +816,24 @@ for(const intent of ['new_draft','open_package'])test('a pending restore is neve
  const recovered=await s.run({recoverOnly:true});
  assert.equal(recovered.status,'READY',JSON.stringify(recovered));assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
 });
+for(const intent of ['new_draft','open_package'])test('a late reconnect to a replaced native session never becomes READY: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'lost reconnect'});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'awaiting_original_attempt');assert.equal(s.state.restores,1);
+ s.state.reconnect();s.connection.FSession={};
+ for(let i=0;i<2;i++){
+  const again=await s.run({recoverOnly:true});
+  assert.equal(again.status,'NOT_READY');assert.equal(again.reason,'NATIVE_MESSAGE_BOX_BLOCKED');assert.equal(again.connection_restore,'session_replaced');
+ }
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+test('restore diagnostics survive the production preparation parser',async()=>{
+ const refused=sessionRestoreFixture('new_draft',{fault:'no baseline'}),restored=sessionRestoreFixture('new_draft');
+ for(const [fixture,status] of [[refused,'NOT_READY'],[restored,'READY']]){
+  const raw=await fixture.run();
+  const parsed=parseWorkspacePreparation({content:[{type:'text',text:'### Result\n'+JSON.stringify(raw)}]});
+  assert.equal(parsed.status,status);
+  if(status==='READY')assert.ok(parsed.trace.some(t=>t.condition==='connection_restored'));
+  else{assert.equal(parsed.connection_restore,'owner_unbound');assert.equal(parsed.next_step.tool,'dock_prepare');assert.match(parsed.message,/Восстановление сессии/);}
+ }
+});
