@@ -21540,7 +21540,8 @@ adapter}.ts`, `schema/src/tool.ts`, `core/src/plugin/product.ts`; навык `.o
 | Коммит | Что |
 |---|---|
 | `fca97f82f5` `feat(loginom-agent): dashboard_draft in a dashboard's Location, its draft server stops with the plugin (B2.9e)` | код: новый `packages/loginom-agent/src/dashboard-tools.ts` (57 строк), `index.ts` (+8), `packages/loginom-agent/package.json` (+1, зависимость `@loginom-ai-agent/dashboard`) и `bun.lock` (+1), `packages/dashboard/src/agent/draft.ts` (+10 −5); тесты: новые `packages/loginom-agent/test/dashboard-tools.test.ts` (3) и его помощник `test/fixture/dashboard-folder.ts`, новый `packages/server/test/loginom-dashboard-draft.test.ts` (2); в `packages/server/test/loginom-access.test.ts` (B2.9b) список инструментов профиля дашборда — с `dashboard_draft` |
-| следующий | этот раздел |
+| `4063833a86` `docs(upstream-sync): record B2.9e dashboard_draft, its draft server and the mutations` | этот раздел |
+| следующий | уточнения раздела: условие шаблона, SHA прогонов, причина падений `draft.test.mjs`, артефакт |
 
 Файлов кода четыре (предел — пять; `bun.lock` — к `package.json`), все — пакетов форка; файлов upstream не правил,
 `catalog.json` не менялся. `bun install --frozen-lockfile` после правки — «no changes».
@@ -21643,11 +21644,13 @@ test/agent/draft.test.mjs` (из `test:browser`: здесь черновик с�
 | `server` | 292 pass, 3 skip, 1 fail — `fetch.test.ts` «routes pending requests through the Session's instance» (`deny` вместо `ask`, нестабильный, записан в B2.9c) | 295 pass (+2 новых), 3 skip, 0 fail |
 | `dashboard`, `bun run test` | `test:coverage` — 50 и 36 pass, 0 fail; узловой набор — 91 pass, 3 fail, 2 skip: «a partial source copy is retried completely for new and known projects» и его «new project», «known project» | то же, те же имена |
 | `dashboard`, `draft.test.mjs` | 8 pass, 2 fail: «a prepared folder builds and serves its coherent sample using one shared server», «draft reports at most twenty console errors from the built app» — оба ждут настоящий Chromium ревизии 1246 | то же, те же имена |
-| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же |
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же (и на `4063833a86` с этим разделом) |
 
-Первый полный прогон `server` итога (`bfde2ef57e`, до правки списка B2.9b) — 293 pass, 2 fail: два случая профиля
-дашборда B2.9b (выше, «Тесты»); после правки — таблица (`fca97f82f5`). Падения `dashboard` на базе и в итоге совпадают по
-именам; «partial source copy» падает и на базе, не разбирал.
+Итог `dashboard` — на `bfde2ef57e` (код тот же, что в `fca97f82f5`: следующая правка — только список теста B2.9b),
+`loginom-agent` и `server` — на `fca97f82f5`. Первый полный прогон `server` (`bfde2ef57e`, до правки списка B2.9b) — 293
+pass, 2 fail: два случая профиля дашборда B2.9b (выше, «Тесты»). Падения `dashboard` на базе и в итоге совпадают по
+именам; «partial source copy» падает и на базе, не разбирал. Оба падения `draft.test.mjs` — в выводе «browserType.launch:
+… executable doesn't exist at …/ms-playwright/chromium-1246/…» и на базе, и в итоге.
 
 Повторы (навык `unit-tests`) на `fca97f82f5`: `dashboard-tools.test.ts --rerun-each 5` — 15 pass, 0 fail (37 с);
 `loginom-dashboard-draft.test.ts --rerun-each 5` — 10 pass, 0 fail (55 с). `loginom-access`, `loginom-dashboard-files` и
@@ -21703,10 +21706,11 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   ядро заново активирует плагины Location, выгружает плагин продукта: открытый у пользователя черновик перестаёт
   отвечать, следующий `dashboard_draft` отдаёт ссылку на новом порту. Это прямое следствие требования; в 0.4 повторной
   активации не было.
-- **Черновик после выгрузки нового сервера не запускает** (проверка `closed`, две строки). Вызов, начатый старым
-  экземпляром плагина, по коду переживает повторную активацию (вызов принадлежит исполнению сессии, а не плагину), и без
-  проверки запустил бы сервер, который никто не закроет до конца процесса. Как прерывается такой вызов в живой Location,
-  запуском не проверял; проверка закреплена юнит-тестом.
+- **Черновик после выгрузки нового сервера не запускает** (проверка `closed`, две строки). Предполагаю, что вызов,
+  начатый старым экземпляром плагина, может пережить повторную активацию (вызов идёт в исполнении сессии, а не в
+  плагине) — код ядра об этом не читал. Тогда без проверки он запустил бы сервер, который никто не закроет до конца
+  процесса. Это защита от гонки; правило `AGENTS.md` дерева v2 просит согласовывать такое с владельцем — записываю на
+  подтверждение, проверка закреплена юнит-тестом и снимается двумя строками.
 - **`expectedDraftId` не передаётся.** 0.4 передавал маркер сессии, и черновик, папку которого пересоздали во время
   вызова, отвечал «Черновик остановлен». В v2 черновик сессии сверяют хуки до вызова и после него (B2.9d): результат
   старому чату не попадёт. Передать привязку значило бы открыть её из `Dashboard.binding` — пятый файл кода. Остаётся:
@@ -21719,17 +21723,21 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   краснит только юнит-тест.
 - **Без заголовка и `truncated`.** 0.4 возвращал `title: "Черновик dashboard"` и `metadata: { truncated: false }`. В
   `Tool.Result` v2 заголовка нет, а `truncated` ядро v2 не читает: результат — только текст.
+- **Новое условие тестов: зависимости шаблона.** Задание называет `npm ci` клиента и `LOGINOM_AI_AGENT_TEST_NODE`; тестам
+  черновика нужен ещё `npm ci --ignore-scripts` в `packages/dashboard/template` — сборка 0.4 идёт его `tsc` и Vite, как в
+  0.4-задаче `unit`. Без него помощник падает с текстом «A draft needs … `npm ci` in packages/dashboard/template …»:
+  проверено — `dashboard-tools.test.ts` 1 pass, 2 fail, `loginom-dashboard-draft.test.ts` 0 pass, 2 fail. Пропуск не
+  делал: тихо пропущенный случай сервера не ловил бы мутации.
 - **Тесты.** Два теста 0.4 — юнит-тесты на самом инструменте, как 0.4 звал свой. Случаи сервера — в новом файле: рядом
   B2.3c правит `server`, а `boot` из `loginom-dashboard-files.test.ts` строит синтетическую папку, и его корень ресурсов
   с навыками (`resourceInventory`) не принял бы ссылку на шаблон вне корня.
 
 ### Найдено, не чинил
 
-- Тестам `loginom-agent` и `server` теперь нужны зависимости шаблона (`npm ci` в `packages/dashboard/template`), как
-  0.4-задаче `unit`. Сценарий `check-test.yml` дерева v2 их не ставит, как и клиент `loginom-runtime` и
-  `LOGINOM_AI_AGENT_TEST_NODE` для прежних тестов, — к B5.1.
+- Сценарий `check-test.yml` дерева v2 не ставит зависимости шаблона (выше, «Где решал сам»), как и клиент
+  `loginom-runtime` и `LOGINOM_AI_AGENT_TEST_NODE` для прежних тестов, — к B5.1.
 - Закреплённого Chromium ревизии 1246 (`packages/product/loginom-release.json`) здесь нет (есть 1223 и 1248), поэтому
-  первый случай `dashboard/test/agent/draft.test.mjs` (настоящая самопроверка) падает и на базе, и здесь.
+  два случая `dashboard/test/agent/draft.test.mjs` с настоящей самопроверкой падают и на базе, и здесь.
 - Файлы пакета `dashboard` не отформатированы Prettier (свой стиль, `prettier --check` и на базе предупреждает); правку
   `agent/draft.ts` сделал в его стиле, файл не переформатировал.
 - Хук `execute.before` продукта отвечает `LOGINOM_SCOPE_DENIED` и на имя незарегистрированного инструмента (контрольный
@@ -21746,4 +21754,6 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Вызов, начатый до повторной активации плагинов и закончившийся после неё, — только юнит-тестом (`close`, затем вызов);
   настоящая активация посреди сборки не воспроизводилась.
 - Две Location дашбордов в одном процессе — по коду: у каждой свой сервер, выгрузка одной другую не трогает.
+- Собранный артефакт CLI и Desktop: ядро теперь достаёт пакет `dashboard` динамическим `import()` (с условиями `#sqlite` и
+  импортами `.ts`); проверены только исходники и typecheck `core`, `server`, `cli`.
 - Windows и macOS, Desktop (Location окна дашборда — B4, ВШ-6), настоящая модель.
