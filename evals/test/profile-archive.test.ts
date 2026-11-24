@@ -94,6 +94,29 @@ test("durable archive: recovery reconciles both sides after an I/O failure and a
   } finally { await chmod(path.join(context.archive, "data"), 0o700).catch(() => {}); await context.close() }
 })
 
+test.each(["profile", "archive"] as const)("durable archive: an old intent with the migration marker in %s stays pending", async side => {
+  const context = await fixture()
+  const directory = "loginom/connection"
+  const marker = path.join(directory, "v040-migration.json")
+  const oldRoot = path.join(directory, "history.json")
+  try {
+    // Capture a real file snapshot, then reproduce the old journal's root name without changing its inode.
+    await Bun.write(path.join(context.profile, oldRoot), JSON.stringify({ state: "complete" }))
+    await mkdir(path.join(context.archive, "data"), { mode: 0o500 })
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("EACCES")
+    await chmod(path.join(context.archive, "data"), 0o700)
+    const intent = await Bun.file(context.journal).json()
+    intent.roots.find((row: { name: string }) => row.name === oldRoot).name = marker
+    await Bun.write(context.journal, JSON.stringify(intent))
+    await mkdir(path.join(context[side], directory), { recursive: true, mode: 0o700 })
+    await rename(path.join(context.profile, oldRoot), path.join(context[side], marker))
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("ARCHIVE_MIGRATION_MARKER_INTENT")
+    expect(await Bun.file(context.journal).json()).toEqual(intent)
+    expect(await Bun.file(path.join(context[side], marker)).json()).toEqual({ state: "complete" })
+    expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).text()).toBe("database")
+  } finally { await chmod(path.join(context.archive, "data"), 0o700).catch(() => {}); await context.close() }
+})
+
 test.each(["foreign-file", "symlink-parent"] as const)("durable archive: %s target refuses before moving any profile data", async kind => {
   const context = await fixture()
   try {
@@ -155,6 +178,18 @@ test("durable archive: a hardlink refuses before any move and preserves its othe
     expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).text()).toBe("database")
     expect(await Bun.file(path.join(context.root, "other-database")).text()).toBe("database")
     expect(await Bun.file(context.journal).exists()).toBe(false)
+  } finally { await context.close() }
+})
+
+test("durable archive: a hardlinked migration marker prevents archiving", async () => {
+  const context = await fixture()
+  try {
+    const marker = path.join(context.profile, "loginom/connection/v040-migration.json")
+    await Bun.write(marker, JSON.stringify({ state: "complete" }))
+    await link(marker, path.join(context.root, "other-marker"))
+    await expect(archiveProfileEvidence(context.profile, context.archive, context.journal)).rejects.toThrow("ARCHIVE_TOPOLOGY")
+    expect(await Bun.file(context.journal).exists()).toBe(false)
+    expect(await Bun.file(path.join(context.profile, "data/loginom-ai-agent.db")).text()).toBe("database")
   } finally { await context.close() }
 })
 

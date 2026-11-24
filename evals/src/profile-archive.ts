@@ -1,7 +1,7 @@
 import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, mkdir, open, readdir, readlink, realpath, rename } from "node:fs/promises"
-import { assertProfileClean, profileHistory, waitProfileIdle } from "./profile"
+import { assertProfileClean, migrationMarker, profileHistory, waitProfileIdle } from "./profile"
 import { writerIdentity, type ProcessCleanup, type UnitBinding, type UnitExitProof } from "./process-supervisor"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { EvalFailure } from "./fail"
@@ -32,6 +32,8 @@ export async function archiveProfileEvidence(profile: string, archive: string, j
   const manifest: Manifest = saved === undefined ? { version: 1, kind: "profile-archive", profile, archive, bindings,
     roots: await Promise.all((await profileHistory(profile)).sort().map(async file => ({ name: path.relative(profile, file), snapshot: await capture(file) }))),
     status: "intent", at: new Date().toISOString() } : requireManifest(saved, profile, archive, bindings)
+  if (manifest.status === "intent" && manifest.roots.some(root => root.name === migrationMarker))
+    throw new EvalFailure("ARCHIVE_MIGRATION_MARKER_INTENT", 2)
   await validateTarget(archive, manifest.roots)
   if (saved === undefined) await writeLeaseReceipt(journal, manifest)
   const locations = await Promise.all(manifest.roots.map(async root => {
