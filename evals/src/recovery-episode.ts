@@ -207,7 +207,7 @@ export async function recoveryEpisode(dir: string, expected?: string | null, slo
       r.phase === "browser_recovery_receipt" && r.operation_id === operation && object(r.receipt).id === finish.receipt) ? finish.receipt : null
     if (finish && (verified !== finish.verification || !rows.some(r => r.phase === "browser_recovery_attested"))) gaps.add("native:verification")
     if (finish?.receipt && !receipt) gaps.add("native:receipt")
-    const started = start.refused ? false : match || start.output.phase === "browser" ? true : null
+    const started = start.refused ? false : handoff ?? (start.output.phase === "browser" ? true : null)
     if (started && !nativeStop && !stop && !["continuable", "completed"].includes(finish?.verification ?? "")) gaps.add("episode:outcome")
     if (started === null || !start.refused && candidates.length && !match) gaps.add("native:start")
     return { operation, controls, started, nativeAttempt: match?.attempt ?? null, nativeSource: match?.source.source ?? null, handoff, actions,

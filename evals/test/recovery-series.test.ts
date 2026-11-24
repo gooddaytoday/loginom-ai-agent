@@ -138,7 +138,7 @@ test("continuable joins the executor receipt and three actions while the origina
       page: { ok: true }, is_error: false, transport_error: null })), native("attested"),
     { phase: "browser_recovery_receipt", operation_id: operation, receipt: { id: "receipt" } },
     native("verified", { status: "continuable", receipt_id: "receipt" })])
-  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ operation, nativeAttempt: "episode", handoff: true,
+  expect(evidence.recovery).toMatchObject({ gaps: [], episodes: [{ operation, started: true, nativeAttempt: "episode", handoff: true,
     verified: "continuable", receipt: "receipt", original: "FAILED", configuration: "unknown", execution: "unknown" }] })
   expect(evidence.recovery.episodes[0].actions.map((a: {nativeLine: number}) => a.nativeLine)).toEqual([3, 4, 5])
 })
@@ -149,7 +149,7 @@ test("unresolved and stopped survive a missing native journal alongside the inde
     tool("f", control, finish, { operation_id: operation, phase: "browser", verification: { status: "unresolved", uncertain: false } }),
     tool("s", control, { ...start, action: "stop" }, { operation_id: operation, phase: "stopped", stopped })])
   expect(evidence).toMatchObject({ result: { exitCode: 1, score: 0, pass: false, judgeStatus: "no_artifact", cleanup: "confirmed" },
-    recovery: { gaps: expect.arrayContaining(["native:missing"]), episodes: [{ nativeAttempt: null, verified: null,
+    recovery: { gaps: expect.arrayContaining(["native:missing", "native:handoff"]), episodes: [{ started: true, handoff: null, nativeAttempt: null, verified: null,
       cliVerification: "unresolved", stop: "model_stopped", cleanup: "retained", actions: [{ nativeLine: null }, { nativeLine: null }] }] } })
 })
 
@@ -329,14 +329,14 @@ test("a changed diagnostic file cannot supply a native conclusion", async () => 
     gaps: expect.arrayContaining(["native:digest"]), nativePhases: null, requested: true, episodes: [{ handoff: null, verified: null }] } })
 })
 
-async function controllerTrace(calls: [string, object][], failFirstClick = false) {
+async function controllerTrace(calls: [string, object][], { failFirstClick = false, executorStopped = true } = {}) {
   const { createBrowserRecovery } = await import(path.resolve(import.meta.dir, "../../packages/loginom-runtime/client/lib/browser-recovery.mjs"))
   const records: Record<string, unknown>[] = [], cli = []
   let clicks = 0
   const controller = createBrowserRecovery({ enabled: true, gate: (run: () => Promise<unknown>) => run(),
     record: async (event: Record<string, unknown>) => { records.push(event); return event }, probe: () => ({ ok: true }),
     browser: { callTool: async ({ name }: { name: string }) => ({ isError: name === "browser_click" && ++clicks === 1 && failFirstClick, content: [] }) },
-    executor: { browserRecoveryBasis: () => ({ step: { key: "synthetic-step" } }), browserRecoveryHandoff: () => ({ stopped: true }),
+    executor: { browserRecoveryBasis: () => ({ step: { key: "synthetic-step" } }), browserRecoveryHandoff: () => ({ stopped: executorStopped }),
       stopBrowserRecovery: () => ({ state: "retained" }) } })
   for (const [name, input] of calls) {
     const reply = await controller.call(name, input)
@@ -346,6 +346,15 @@ async function controllerTrace(calls: [string, object][], failFirstClick = false
   return { cli, records }
 }
 const stop = { ...start, action: "stop" }
+test("a start that could not stop the executor records a request without browser handoff", async () => {
+  const t = await controllerTrace([[control, start]], { executorStopped: false })
+  const { recovery } = await episode(t.cli, t.records)
+  expect(recovery).toMatchObject({ requested: true, gaps: [], episodes: [{
+    started: false, nativeAttempt: t.records[0]!.attempt_id, handoff: false, actions: [], stop: "executor_not_stopped",
+    nativeStop: "executor_not_stopped", controls: [{ action: "start", phase: "stopped", status: "completed", refused: false }],
+  }] })
+})
+
 test("a second start refused by the active controller remains a request in its original episode", async () => {
   const t = await controllerTrace([[control, start], [control, start], ["browser_snapshot", {}], [control, stop]])
   expect(t.records.map(r => r.phase)).toEqual(["browser_recovery_started", "browser_recovery_handoff", "browser_recovery_action", "browser_recovery_stopped"])
@@ -359,7 +368,7 @@ test("a second start refused by the active controller remains a request in its o
 test("a gesture refused before dispatch does not consume the following native action", async () => {
   const click = { target: "synthetic-button" }
   const t = await controllerTrace([[control, start], ["browser_click", click], ["browser_click", click],
-    ["browser_snapshot", {}], ["browser_click", click], [control, stop]], true)
+    ["browser_snapshot", {}], ["browser_click", click], [control, stop]], { failFirstClick: true })
   expect(t.records.filter(r => r.phase === "browser_recovery_action").map(r => [r.tool, r.is_error])).toEqual([
     ["browser_click", true], ["browser_snapshot", false], ["browser_click", false]])
   const { recovery } = await episode(t.cli, t.records)
