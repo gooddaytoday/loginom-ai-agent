@@ -19284,7 +19284,7 @@ scratchpad (удалено).
 
 | Коммит | Что |
 |---|---|
-| `a446ee6bad` `feat(cli): embed loginom-ai-agent-pty in the CLI that Desktop bundles (B4.7c)` | `cli/script/{build,opencode-pty}.ts`, тест `cli/test/product-pty.test.ts` (+3 случая) |
+| `a446ee6bad` `feat(cli): embed loginom-ai-agent-pty in the CLI that Desktop bundles (B4.7c)` | `cli/script/{build,opencode-pty}.ts`, тест `cli/test/product-pty.test.ts` (+2 случая и проверка в имеющемся) |
 | `d3e65bf9cf` `feat(cli): name the product in the Windows version resource of the CLI executable (B4.7c)` | `cli/script/build.ts`, файл форка `cli/script/windows-resource.ts`, `product/src/index.ts`, тест `cli/test/windows-resource.test.ts` |
 | `461e462ef4` `docs(upstream-sync): describe Desktop's own pty and the Windows version resource of the CLI in the catalog (B4.7c)` | `catalog.md`: CAT-02, CAT-13 |
 | следующий | этот раздел |
@@ -19486,7 +19486,9 @@ left (by this build or run path): []
 ```
 
 В обеих `compile.windows` с именем продукта по-прежнему передаётся Bun — и не действует: это и есть ограничение
-кросс-сборки.
+кросс-сборки. По той же причине **ничего не краснеет, если убрать строку `windows: windowsResource(…)` из
+`compile`**: ни юнит-тесты, ни MW1 и MW2 — на Linux Bun её не читает. Её действие (ресурс при сборке на Windows) здесь
+не проверяется вообще — B5.1.
 
 ### Приёмка
 
@@ -19567,9 +19569,17 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 ### Не проверено
 
-- **Windows.** Ни один exe не запускался: wine здесь нет, стенд не трогал. Работает ли CLI из правленой среды Bun —
-  по сравнению разделов (выше), не запуском; как Bun на Windows пишет `compile.windows` (в том числе версию `0.0.0.0`) — по
-  документации. Имя службы в Диспетчере задач проверит B5.1 или повтор B4.14c.
+- **Windows.** Ни один exe не запускался: wine здесь нет, стенд не трогал. `pefile` проверил только путь кросс-сборки
+  (среда Bun, правленая resedit). Работает ли CLI из правленой среды — по сравнению разделов (выше), не запуском. Сборка
+  на Windows идёт другим путём — `compile.windows` самого Bun (в том числе версия `0.0.0.0`) — и не запускалась ни разу:
+  только документация. Имя службы в Диспетчере задач проверит B5.1 или повтор B4.14c.
+- **Повтор B4.14c прежним рецептом не соберётся.** B4.14c собирал CLI Desktop для Windows на Linux с бинарником npm;
+  теперь кросс-сборке нужен `loginom-ai-agent-pty.exe` в `LOGINOM_AI_AGENT_PTY_BIN`, а его нет: `build.rs` — только
+  MSVC. Значит, CLI Desktop для Windows собирается на Windows, где `build.ts` сам запускает `cargo` (`+crt-static`,
+  B2.7a9) — этот путь тоже ни разу не запускался.
 - **Настоящий `loginom-ai-agent-pty.exe`** в кросс-сборке — нет, только заглушка; собрать его на Linux нельзя (MSVC).
+- **Другие среды Bun для Windows.** Раскладку разделов, которую требует resedit (после `.rsrc` только `.reloc`),
+  проверял только у `bun-windows-x64-baseline` 1.4.4; у `bun-windows-x64` и `bun-windows-aarch64` — нет. Если там
+  иначе, `brandWindowsRuntime` падает с ошибкой resedit и сборка останавливается, а не выпускает exe с «Bun».
 - **macOS** и цели arm64, musl — не собирались.
 - **deb, rpm, AppImage** и установленный Desktop — нет, только `--linux dir` от root с `--no-sandbox`.
