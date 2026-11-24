@@ -1,0 +1,16 @@
+{
+  "budget": {
+    "max_tool_calls": 20,
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "python",
+      "sqlite",
+      "convert",
+      "to_csv",
+      "storage_upload",
+      "file_write"
+    ]
+  },
+  "notes": "Минимум узлов: 0. Корневой массив не поддержан: trees.from_json требует один JSON object (tree-parameters.mjs). Ожидается объяснение сразу, без попыток создания цепочки. Подстрока JSON проверяет только предмет; смысл отказа проверяет refusal-check.py, действия — audit-a.py."
+}

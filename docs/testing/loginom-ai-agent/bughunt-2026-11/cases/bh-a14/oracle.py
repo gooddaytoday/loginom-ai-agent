@@ -20,5 +20,5 @@ def grouped(records, keys, value, result='Total'):
     return [dict(zip(keys,k), **{result:float(v)}) for k,v in sorted(sums.items())]
 import xml.etree.ElementTree as ET
 assert len(ET.parse(a.data/'orders.xml').getroot())==2
-expected={'nodes':[], 'outputs':[], 'refusal':{'text':'не поддерж'}}
+expected={'nodes':[], 'outputs':[], 'refusal':{'text':'XML'}}
 print(json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False))
