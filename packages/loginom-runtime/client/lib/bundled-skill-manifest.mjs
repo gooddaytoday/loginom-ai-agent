@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { readFile, readdir, readlink, realpath, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { parseDocument } from 'yaml';
 
 // Shared by Host verification and the bundled runtime. Revision depends only
@@ -65,45 +65,134 @@ export async function verifyBundledSkills(resources, { mode = 'installed' } = {}
     contents.set(file.path, bytes.toString('utf8'));
   }
   for (const entry of entries.filter(file => /^skills\/[^/]+\/SKILL\.md$/.test(file.path))) {
-    const directory = join(root, dirname(entry.path));
-    const header = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(contents.get(entry.path))?.[1];
-    if (!header) throw Error('LOGINOM_SKILL_FRONTMATTER_INVALID');
-    const yaml = parseDocument(header);
-    if (yaml.errors.length) throw Error('LOGINOM_SKILL_FRONTMATTER_INVALID');
-    const data = yaml.toJS();
-    const fields = ['name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'];
-    if (!data || typeof data !== 'object' || data.name !== entry.path.split('/')[1]
-      || data.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.name)
-      || Object.keys(data).some(key => !fields.includes(key))
-      || typeof data.description !== 'string' || !data.description.trim() || data.description.length > 1024
-      || (data.compatibility !== undefined && (typeof data.compatibility !== 'string' || data.compatibility.length > 500))
-      || ['license', 'allowed-tools'].some(key => data[key] !== undefined && typeof data[key] !== 'string')
-      || (data.metadata !== undefined && (!data.metadata || typeof data.metadata !== 'object'
-        || Array.isArray(data.metadata) || Object.values(data.metadata).some(value => typeof value !== 'string'))))
-      throw Error('LOGINOM_SKILL_FRONTMATTER_INVALID');
-    const generated = data.metadata?.['loginom-generated'];
-    const allowedMissing = mode === 'source' && generated
-      ? new Set([relative(root, resolve(directory, decodeURIComponent(generated.split(/[?#]/)[0]))).split(sep).join('/')])
-      : new Set();
-    if (generated) requireResource(root, directory, directory, generated, listed, allowedMissing);
-    for (const markdown of entries.filter(file => file.path.startsWith(dirname(entry.path) + '/') && file.path.endsWith('.md'))) {
-      for (const link of contents.get(markdown.path).matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
-        const target = link[1] ?? link[2];
-        if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue;
-        requireResource(root, directory, dirname(join(root, markdown.path)), target, listed, allowedMissing);
-      }
-    }
+    const prefix = dirname(entry.path) + '/';
+    const files = new Map(entries.filter(file => file.path.startsWith(prefix))
+      .map(file => [file.path.slice(prefix.length), contents.get(file.path)]));
+    const result = validateSkillFiles(entry.path.split('/')[1], files, { source: mode === 'source' });
+    if (result.errors.length) throw Error(result.errors[0].code);
   }
   return skills.map(skill => ({ ...skill, directory: join(root, 'skills', skill.name),
     location: join(root, 'skills', skill.name, 'SKILL.md'), content: contents.get('skills/' + skill.name + '/SKILL.md') }));
 }
 
-function requireResource(root, skill, parent, target, listed, allowedMissing) {
-  const path = resolve(parent, decodeURIComponent(target.split(/[?#]/)[0]));
-  const inside = relative(skill, path);
-  if (!inside || isAbsolute(inside) || inside === '..' || inside.startsWith('..' + sep))
-    throw Error('LOGINOM_SKILL_RESOURCE_ESCAPE');
-  const key = relative(root, path).split(sep).join('/');
-  if (!listed.has(key) && !allowedMissing.has(key))
-    throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING');
+function outside(path) {
+  return isAbsolute(path) || path === '..' || path.startsWith('..' + sep);
+}
+
+export async function inspectSkillFolder(directory, { external = false } = {}) {
+  const files = new Map();
+  const errors = [];
+  try {
+    const root = await realpath(directory);
+    await visit(root);
+
+    async function visit(parent) {
+      for (const entry of await readdir(parent, { withFileTypes: true })) {
+        if (entry.name === '.git') continue;
+        const file = join(parent, entry.name);
+        const path = relative(root, file).split(sep).join('/');
+        if (entry.isDirectory()) {
+          await visit(file);
+          continue;
+        }
+        const absolute = entry.isSymbolicLink() ? await realpath(file) : file;
+        if (outside(relative(root, absolute)) || (entry.isSymbolicLink() && win32.isAbsolute(await readlink(file)))) {
+          errors.push({ code: 'LOGINOM_SKILL_RESOURCE_ESCAPE', path, message: 'Link leaves the portable skill folder.' });
+          continue;
+        }
+        if (!entry.isFile() && !(entry.isSymbolicLink() && (await stat(absolute)).isFile())) continue;
+        files.set(path, path.endsWith('.md') ? await readFile(absolute, 'utf8') : undefined);
+      }
+    }
+  } catch {
+    errors.push({ code: 'LOGINOM_SKILL_FOLDER_UNREADABLE', message: 'Could not read the skill folder or one of its resources.' });
+  }
+  if (errors.length) return { errors, warnings: [] };
+  return validateSkillFiles(basename(resolve(directory)), files, { external });
+}
+
+function validateSkillFiles(directoryName, files, { external = false, source = false } = {}) {
+  const errors = [];
+  const warnings = [];
+  const invalid = message => ({ code: 'LOGINOM_SKILL_FRONTMATTER_INVALID', path: 'SKILL.md', message });
+  const format = message => (external ? warnings : errors).push(invalid(message));
+  const content = files.get('SKILL.md');
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+  const data = frontmatter && parseMetadata(frontmatter[1]);
+  if (!data || typeof data.name !== 'string' || !safeName(data.name)
+    || typeof data.description !== 'string' || !data.description.trim()) {
+    errors.push(invalid('SKILL.md needs a valid YAML header with a safe name and a non-empty text description.'));
+    return { errors, warnings };
+  }
+  if (directoryName !== data.name) format('The skill name must match the folder name.');
+  if (data.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.name))
+    format('Use 1–64 lowercase ASCII letters, digits and single internal hyphens in the name.');
+  if (data.description.length > 1024) format('Keep the description within 1024 characters.');
+  const fields = ['name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'];
+  for (const key of Object.keys(data).filter(key => !fields.includes(key))) format('Unrecognized YAML field: ' + key);
+  if (data.compatibility !== undefined && (typeof data.compatibility !== 'string'
+    || !data.compatibility.trim() || data.compatibility.length > 500))
+    format('Compatibility must be text of 1–500 characters when provided.');
+  for (const key of ['license', 'allowed-tools']) {
+    if (data[key] !== undefined && typeof data[key] !== 'string') format(key + ' must be text.');
+  }
+  if (data.metadata !== undefined && (!data.metadata || typeof data.metadata !== 'object'
+    || Array.isArray(data.metadata) || Object.values(data.metadata).some(value => typeof value !== 'string')))
+    format('Metadata must be a map with text values.');
+  if (content.slice(frontmatter[0].length).trimEnd().split(/\r?\n/).length > 500)
+    warnings.push({ code: 'LOGINOM_SKILL_LENGTH', path: 'SKILL.md', message: 'Consider moving details into a linked reference to keep SKILL.md under 500 lines.' });
+
+  const generated = typeof data.metadata?.['loginom-generated'] === 'string' ? data.metadata['loginom-generated'] : undefined;
+  const deferred = source && generated ? resourcePath('SKILL.md', generated) : undefined;
+  if (generated && !external) requireResource('SKILL.md', generated);
+  for (const [path, markdown] of files) {
+    if (!path.endsWith('.md') || markdown === undefined) continue;
+    for (const link of markdown.matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
+      const target = link[1] ?? link[2];
+      if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue;
+      requireResource(path, target);
+    }
+  }
+  return { data, errors, warnings };
+
+  function requireResource(path, target) {
+    const key = resourcePath(path, target);
+    if (!key) {
+      errors.push({ code: 'LOGINOM_SKILL_RESOURCE_ESCAPE', path, message: 'Unsafe local resource path: ' + target });
+      return;
+    }
+    if (!files.has(key) && key !== deferred) {
+      (external ? warnings : errors).push({
+        code: 'LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING', path, message: 'Missing local resource: ' + target,
+      });
+    }
+  }
+}
+
+function parseMetadata(header) {
+  const document = parseDocument(header, { stringKeys: true });
+  if (document.errors.length || document.warnings.length) return;
+  try {
+    const data = document.toJS({ maxAliasCount: 0 });
+    if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+  } catch {
+    return;
+  }
+}
+
+function safeName(name) {
+  return /^[\p{L}\p{M}\p{N}_.-]+$/u.test(name) && !name.startsWith('.') && !name.endsWith('.')
+    && !/^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(name)
+    && !Object.hasOwn(Object.prototype, name) && Buffer.byteLength(name) <= 255;
+}
+
+function resourcePath(file, target) {
+  try {
+    const local = decodeURIComponent(target.split(/[?#]/)[0]);
+    if (!local || /[:\\\u0000]/.test(local) || win32.isAbsolute(local)) return;
+    const inside = posix.join(posix.dirname(file), local);
+    if (inside !== '.' && inside !== '..' && !inside.startsWith('../')) return inside;
+  } catch {
+    return;
+  }
 }

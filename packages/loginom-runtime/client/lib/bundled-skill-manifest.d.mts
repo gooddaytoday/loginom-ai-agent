@@ -12,3 +12,11 @@ export function verifyBundledSkills(resources: string, options?: { mode?: "insta
   location: string
   content: string
 }[]>
+
+type SkillDiagnostic = { code: string; message: string; path?: string }
+
+export function inspectSkillFolder(directory: string, options?: { external?: boolean }): Promise<{
+  data?: { name: string; description: string; [key: string]: unknown }
+  errors: SkillDiagnostic[]
+  warnings: SkillDiagnostic[]
+}>
