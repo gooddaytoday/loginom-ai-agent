@@ -126,6 +126,8 @@ export default Plugin.define({
       const refused = await binding.refusal(sessionID)
       if (refused) throw new Error(refused)
     }
+    // The chats whose running execution deleted their dashboard (B2.9g): it ends with one answer of the model.
+    const deleted = new Set<string>()
 
     // Skill sources (G6): the bundled catalog owns the product's skill IDs and names, so only it grants access.
     const resources = process.env.LOGINOM_AI_AGENT_RESOURCES
@@ -135,11 +137,18 @@ export default Plugin.define({
     await ctx.mcp.transform((editor) => {
       if (dashboard()) editor.list().forEach(([name]) => editor.remove(name))
     })
-    // The dashboard's tools exist only in its Location (B2.9e, B2.9f), outside the CodeMode catalog like every tool no
+    // The dashboard's tools exist only in its Location (B2.9e…g), outside the CodeMode catalog like every tool no
     // other profile permits. Its draft server stops when the plugin unloads.
-    const drafts = dashboardTools(ctx.location.directory, resources, { permission: ctx.permission, bound })
+    const drafts = dashboardTools(ctx.location.directory, resources, {
+      permission: ctx.permission,
+      bound,
+      retire: async (sessionID) => {
+        await binding.retire(sessionID)
+        deleted.add(sessionID)
+      },
+    })
     await ctx.tool.transform((editor) => {
-      if (dashboard()) [drafts.draft, drafts.publish].forEach((tool) => editor.add(tool))
+      if (dashboard()) [drafts.draft, drafts.publish, drafts.remove].forEach((tool) => editor.add(tool))
     })
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
@@ -188,6 +197,7 @@ export default Plugin.define({
       leases.delete(sessionID)
       refused.delete(sessionID)
       offered.delete(sessionID)
+      deleted.delete(sessionID)
       dock.forget(sessionID)
       const lease = await current
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
@@ -373,6 +383,12 @@ export default Plugin.define({
       dock.hide(event)
     }
     await ctx.session.hook("context", async (event) => {
+      // After its dashboard's deletion the turn ends, as in 0.4: the request offers no tools, so the model answers once.
+      // The folder is gone, and the chat's next prompt is refused.
+      if (deleted.has(event.sessionID)) {
+        Object.keys(event.tools).forEach((name) => delete event.tools[name])
+        return
+      }
       await bound(event.sessionID)
       // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
       // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
@@ -404,12 +420,16 @@ export default Plugin.define({
       const reason = dashboard() ? Dashboard.callError(ctx.location.directory, event.tool, event.input) : undefined
       if (reason) throw new Tool.Error({ message: Dashboard.deniedText(reason), metadata: { permissionDenied: true } })
       // OpenCode does not offer a tool whose action the rules deny outright, and fails a call to it as unknown. A model
-      // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b).
+      // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b). A dashboard's
+      // publication and deletion are checked before they build or reach the Host, so the administrator's deny, which
+      // leaves them offered, refuses them there (B2.6c, В-102).
       const offer = offered.get(event.sessionID)
       const action =
         offer && !offer.has(event.tool)
           ? ((await ctx.tool.list()).find((tool) => tool.id === event.tool)?.options?.permission ?? event.tool)
-          : undefined
+          : ["dashboard_publish", "dashboard_delete"].includes(event.tool)
+            ? event.tool
+            : undefined
       const error =
         action !== undefined && classify(action, [])?.resource === "*" ? await rules(event, action) : undefined
       const text = error instanceof Tool.Error ? refusal(error.error) : undefined
@@ -421,8 +441,8 @@ export default Plugin.define({
     await ctx.tool.hook("execute.after", async (event) => {
       calls.delete(`${event.messageID} ${event.id}`)
       // The folder may have been prepared again while the call ran: its result does not reach the old chat (B2.9d,
-      // 0.4 checked after a read). A write that already landed cannot be undone.
-      if (dashboard() && event.status === "completed") {
+      // 0.4 checked after a read). A write that already landed cannot be undone. The deletion's result reaches its chat.
+      if (dashboard() && event.status === "completed" && !deleted.has(event.sessionID)) {
         const refused = await binding.refusal(event.sessionID)
         if (refused) {
           event.result = { content: refused }

@@ -294,7 +294,8 @@ describe("loginom.product permissions (B2.6a)", () => {
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
-        for (const request of asked) {
+        // A dashboard's deletion asks every time (В-102): below.
+        for (const request of asked.filter((item) => item.action !== "dashboard_delete")) {
           const id = yield* test.create(`conversation ${request.action}`)
           const first = yield* test.ask(id, request)
           expect(first.effect).toBe("ask")
@@ -306,8 +307,8 @@ describe("loginom.product permissions (B2.6a)", () => {
           ])
           expect(yield* test.open(id)).toEqual([])
           expect((yield* test.ask(id, request)).effect).toBe("allow")
-          // Every other kind still asks, and the terminal stays off.
-          for (const other of asked.filter((item) => item.kind !== request.kind))
+          // Every other kind still asks, so does a dashboard's deletion, and the terminal stays off.
+          for (const other of asked.filter((item) => item.kind !== request.kind || item.action === "dashboard_delete"))
             expect([other.action, (yield* test.ask(id, other)).effect]).toEqual([other.action, "ask"])
           expect((yield* test.ask(id, { action: "shell", resources: ["ls"], source })).effect).toBe("deny")
           // Another conversation of the same project asks again: unlike OpenCode's `always`, nothing is project-wide.
@@ -315,6 +316,14 @@ describe("loginom.product permissions (B2.6a)", () => {
           expect((yield* test.ask(other, request)).effect).toBe("ask")
         }
         expect(yield* test.saved).toEqual([])
+
+        // A dashboard's deletion is not granted on its own question, like a terminal command (В-31, В-102).
+        const deletion = yield* test.create("conversation dashboard_delete")
+        const remove = yield* test.ask(deletion, { action: "dashboard_delete", resources: ["*"] })
+        const refused = yield* test.conversation(deletion, remove.id)
+        expect(refused.status).not.toBe(200)
+        expect(refused.body).toMatchObject({ type: "not_grantable", data: { action: "dashboard_delete" } })
+        expect((yield* test.open(deletion)).map((item) => item.id)).toEqual([remove.id])
 
         // A grant answers the session's other open questions it now covers, and only those.
         const id = yield* test.create("parallel")

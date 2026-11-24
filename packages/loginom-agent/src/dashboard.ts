@@ -106,6 +106,8 @@ export function binding(plugin: Pick<Plugin.Context, "location" | "session" | "s
       const source = session.fork ? await stored(session.fork.sessionID) : undefined
       if (source !== undefined) await bind(sessionID, source)
     },
+    // The chat that deleted its dashboard (B2.9g, 0.4 `retireDashboard`): no folder prepared later is its own.
+    retire: (sessionID: string) => bind(sessionID, "deleted"),
   }
 }
 
