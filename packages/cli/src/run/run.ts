@@ -88,7 +88,13 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
     fetch: noTimeoutFetch,
   })
   const explicit = parseRunModel(input.model)
-  const location = { directory: prepared.directory }
+  // Loginom AI Agent (B2.9i): `run --dashboard <id>` of the product CLI runs in the dashboard's folder, which the
+  // server prepares before the session, and adds the dashboard's task to the prompt (`product.ts`).
+  const dashboard = RunProduct.enabled()
+    ? await RunProduct.dashboard({ client, location: { directory: prepared.directory }, format: input.format, signal })
+    : { directory: prepared.directory, prompt: undefined }
+  if (!dashboard) return
+  const location = { directory: dashboard.directory }
   const worktree =
     input.worktree === undefined
       ? undefined
@@ -134,7 +140,11 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
     client,
     sessionID: target.session.id,
     location: target.location,
-    message: [prepared.message, ...prepared.files.flatMap((file) => ("text" in file ? [file.text] : []))].join("\n\n"),
+    message: [
+      prepared.message,
+      ...(dashboard.prompt ? [dashboard.prompt] : []),
+      ...prepared.files.flatMap((file) => ("text" in file ? [file.text] : [])),
+    ].join("\n\n"),
     files: prepared.files.flatMap((file) => ("attachment" in file ? [file.attachment] : [])),
     agent: target.agent,
     model: target.model,

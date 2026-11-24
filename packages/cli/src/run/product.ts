@@ -7,7 +7,8 @@
 export * as RunProduct from "./product"
 
 import path from "node:path"
-import { isRpcError, type LocationRef, type OpenCodeClient } from "@opencode/client/promise"
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
+import { isRpcError, type JsonValue, type LocationRef, type OpenCodeClient } from "@opencode/client/promise"
 import { Option, Schema } from "effect"
 
 type RunError = { type: string; message: string; status?: number }
@@ -79,46 +80,109 @@ export async function preflight(input: {
 }) {
   const automation = process.env.LOGINOM_AI_AGENT_RUN_COMMAND === "loginom-automation"
   if (!automation && process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY !== "1") return true
-  const refused = await ask(input, automation).catch(() => (input.signal.aborted ? "CLI_CANCELLED" : "CLI_RUN_FAILED"))
+  const refused = await ask(input, "loginom.preflight", "check", { automation }).then(
+    (output) => Option.getOrElse(decodePreflight(output), () => ({ code: "LOGINOM_REPLY_INVALID" })).code,
+    () => (input.signal.aborted ? "CLI_CANCELLED" : "CLI_RUN_FAILED"),
+  )
   if (refused === undefined) return true
-  process.exitCode = exits[refused] ?? 1
-  if (input.format === "json")
-    process.stdout.write(
-      JSON.stringify({
-        type: "error",
-        timestamp: Date.now(),
-        sessionID: input.sessionID,
-        error: error(code(refused)),
-      }) + "\n",
-    )
-  process.stderr.write(refused + "\n")
+  refuse(input, refused)
   return false
+}
+
+/**
+ * `run --dashboard <id>` (B2.9i): the server's product plugin prepares the dashboard's folder from its Studio snapshot
+ * before the session (`loginom.dashboard`, B2.9h), and the run takes place there, with the task 0.4 added to the prompt
+ * (`v0.4.0:packages/opencode/src/cli/standalone-run.ts`). The CLI always checks the latest publication, as 0.4's did.
+ * Strict recovery refuses before the one-time snapshot is spent, as 0.4 checked its journal first. 0.4's notices go to
+ * stderr; a refusal is written as 0.4 wrote it, with `LOGINOM_CONFIG_REQUIRED` exiting 2 and the others 1. Returns the
+ * directory of the run and the task, the run's own directory without a dashboard, or nothing when refused.
+ */
+export async function dashboard(input: {
+  client: OpenCodeClient
+  location: LocationRef
+  format: "default" | "json"
+  signal: AbortSignal
+}) {
+  const id = process.env.LOGINOM_AI_AGENT_RUN_DASHBOARD
+  if (id === undefined) return { directory: input.location.directory }
+  if (!(await preflight({ ...input, sessionID: "" }))) return undefined
+  const reply = await ask(input, "loginom.dashboard", "prepare", { id, defer: false }).then(
+    (output) => Option.getOrElse(decodeDashboard(output), () => ({ code: "LOGINOM_REPLY_INVALID" })),
+    () => ({ code: input.signal.aborted ? "CLI_CANCELLED" : "CLI_RUN_FAILED" }),
+  )
+  if ("code" in reply) {
+    refuse({ ...input, sessionID: "" }, reply.code, "message" in reply ? reply.message : reply.code)
+    return undefined
+  }
+  const notice = reply.notice
+  if (notice)
+    process.stderr.write(
+      (notice.kind === "newer-publication"
+        ? `На стенде новая версия ${notice.latest}. Локальные исходники сохранены; перед заменой потребуется подтверждение.`
+        : notice.kind === "publication-check-unavailable"
+          ? "Не удалось проверить публикацию в Studio. Открыт сохранённый локальный черновик."
+          : `Сборка версии ${notice.latest} не удалась. Текущая версия: ${notice.current ?? "нет"}. ${notice.error ?? ""}`) +
+        "\n",
+    )
+  return { directory: reply.directory, prompt: dashboardPrompt(reply.action) }
 }
 
 const exits: Record<string, number> = { LOGINOM_CONFIG_REQUIRED: 2, LOGINOM_RECOVERY_REQUIRED: 4, CLI_CANCELLED: 130 }
 const decodePreflight = Schema.decodeUnknownOption(Schema.Struct({ code: Schema.optional(Schema.String) }))
+const decodeDashboard = Schema.decodeUnknownOption(
+  Schema.Union([
+    Schema.Struct({ code: Schema.String, message: Schema.String }),
+    Schema.Struct({
+      directory: Schema.String,
+      action: Schema.Literals(["create", "edit"]),
+      notice: Schema.optional(
+        Schema.Struct({
+          kind: Schema.String,
+          latest: Schema.optional(Schema.String),
+          current: Schema.optional(Schema.String),
+          error: Schema.optional(Schema.String),
+        }),
+      ),
+    }),
+  ]),
+)
 
-// The plugin registers its RPC once the Location's plugins have loaded, and the server does not wait for them.
-async function ask(input: Parameters<typeof preflight>[0], automation: boolean): Promise<string | undefined> {
+// The plugin registers its RPCs once the Location's plugins have loaded, and the server does not wait for them.
+async function ask(
+  input: { client: OpenCodeClient; location: LocationRef; signal: AbortSignal },
+  rpcID: string,
+  method: string,
+  request: JsonValue,
+) {
   const deadline = Date.now() + 60_000
   while (true) {
     const reply = await input.client.rpc
       .call(
-        {
-          rpcID: "loginom.preflight",
-          method: "check",
-          input: { automation },
-          location: { directory: input.location.directory },
-        },
+        { rpcID, method, input: request, location: { directory: input.location.directory } },
         { signal: input.signal },
       )
       .catch((failure: unknown) => {
         if (isRpcError(failure) && failure.type === "rpc.unavailable" && Date.now() < deadline) return undefined
         throw failure
       })
-    if (reply) return Option.getOrElse(decodePreflight(reply.output), () => ({ code: "LOGINOM_REPLY_INVALID" })).code
+    if (reply) return reply.output
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
+}
+
+// A refusal before the model, as 0.4's `failure()`: the error event with JSON output, and the reason on stderr.
+function refuse(input: { format: "default" | "json"; sessionID: string }, name: string, message = name) {
+  process.exitCode = exits[name] ?? 1
+  if (input.format === "json")
+    process.stdout.write(
+      JSON.stringify({
+        type: "error",
+        timestamp: Date.now(),
+        sessionID: input.sessionID,
+        error: error({ type: name, message }),
+      }) + "\n",
+    )
+  process.stderr.write(message + "\n")
 }
 
 const connection = new Set([
