@@ -247,7 +247,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     identityPage.url=()=>config.loginomUrl;
     identityPage.evaluate=async(fn,args)=>{identityPage.context.args=args;return runInContext(`(${fn.toString()})(args)`,identityPage.context);};
     identityPage.locator=()=>({isVisible:async()=>true});
-    const mask=identityPage.add('div','preparation-loading');mask.attrs.class='x-mask-msg';
+    // #1272 waits for a settled Home/Files/workflow before binding identity.
+    // A loading mask is pending; an unknown dialog must still refuse before upload.
+    identityPage.add('button','MF;TF-1;HomePage;btnCreateUnsavedPackage');
+    const mask=identityPage.add('div','preparation-blocker');mask.attrs.class='x-window';
     const refused=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.equal(packageDeliveries.length,0,'identity refusal must precede upload');
