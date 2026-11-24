@@ -3,7 +3,7 @@
 // 0.4's first case also compared the root with `dashboardDataRoot(process.env)` of `product`, the root Desktop and the
 // CLI computed themselves; in OpenCode 2 the server prepares the folders (B2.9h), so only its own root counts.
 // Its paths (B2.9c): the path case of the same file on `Dashboard.pathError`, and what the plugin's hooks ask of it
-// (`settle`, `searchError`); the real tools on a server are `server/test/loginom-dashboard-files.test.ts`.
+// (`settle`, `callError`); the real tools on a server are `server/test/loginom-dashboard-files.test.ts`.
 // The root is under the server's data directory, which each case points at a temporary directory of its own
 // (`fixture/temporary-data.ts`) and removes with its folders.
 import { expect, test } from "bun:test"
@@ -167,7 +167,7 @@ test("the dashboard's word on a request: outside refused, a write in src allowed
     expect([action, resources, word(action, ...resources)]).toEqual([action, resources, undefined])
 })
 
-test("a dashboard search stays in the work folder: its path by the real path, `~` as Core expands it, no `..` in a glob", async () => {
+test("a dashboard's file tools are checked before they run: a search's path, a write's target, every path of a patch; `~` as Core expands it, no `..` in a glob", async () => {
   await using folder = await dashboardFolder()
   await using outside = await outsideFolder()
   await mkdir(join(folder.work, "src"))
@@ -178,9 +178,21 @@ test("a dashboard search stays in the work folder: its path by the real path, `~
     ["glob", { pattern: "*", path: "src" }],
     ["grep", { pattern: "\\.\\./x", include: "*.tsx" }],
     ["grep", { pattern: "x", path: join(folder.work, "src") }],
+    ["write", { path: "src/main.tsx", content: "x" }],
+    ["edit", { path: "src/main.tsx", oldString: "x", newString: "y" }],
+    [
+      "patch",
+      {
+        patchText: patch(
+          "*** Add File: src/a.tsx\n+a\n*** Update File: src/main.tsx\n*** Move to: src/b.tsx\n@@\n-x\n+y",
+        ),
+      },
+    ],
+    // Core reports a patch it cannot parse; a read asks before it opens anything.
+    ["patch", { patchText: "not a patch" }],
     ["read", { path: "../control/binding.json" }],
   ] as const)
-    expect([tool, input, Dashboard.searchError(folder.work, tool, input)]).toEqual([tool, input, undefined])
+    expect([tool, input, Dashboard.callError(folder.work, tool, input)]).toEqual([tool, input, undefined])
   for (const [tool, input] of [
     ["glob", { pattern: "*", path: ".." }],
     ["glob", { pattern: "../control/*" }],
@@ -193,5 +205,24 @@ test("a dashboard search stays in the work folder: its path by the real path, `~
     ["grep", { pattern: "x", path: "src/link/binding.json" }],
     ["grep", { pattern: "x", include: "../control/*" }],
   ] as const)
-    expect([tool, input, Dashboard.searchError(folder.work, tool, input)]).toEqual([tool, input, Dashboard.outside])
+    expect([tool, input, Dashboard.callError(folder.work, tool, input)]).toEqual([tool, input, Dashboard.outside])
+  for (const [tool, input] of [
+    ["write", { path: "sample.json", content: "x" }],
+    ["write", { path: "~/x.tsx", content: "x" }],
+    ["edit", { path: "../control/binding.json", oldString: "x", newString: "y" }],
+    ["edit", { path: "src/link/binding.json", oldString: "x", newString: "y" }],
+    ["patch", { patchText: patch("*** Update File: ../control/binding.json\n@@\n-x\n+y") }],
+    ["patch", { patchText: patch("*** Delete File: snapshot.json") }],
+    [
+      "patch",
+      {
+        patchText: patch(
+          "*** Add File: src/a.tsx\n+a\n*** Update File: src/main.tsx\n*** Move to: sample.json\n@@\n-x\n+y",
+        ),
+      },
+    ],
+  ] as const)
+    expect([tool, input, Dashboard.callError(folder.work, tool, input)]).toEqual([tool, input, Dashboard.srcOnly])
 })
+
+const patch = (body: string) => `*** Begin Patch\n${body}\n*** End Patch`

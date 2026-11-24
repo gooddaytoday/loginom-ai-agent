@@ -367,9 +367,10 @@ export default Plugin.define({
     await ctx.tool.hook("execute.before", async (event) => {
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
-      // A dashboard session searches only its work folder (B2.9c).
-      const searched = dashboard() ? Dashboard.searchError(ctx.location.directory, event.tool, event.input) : undefined
-      if (searched) throw new Tool.Error({ message: Dashboard.deniedText(searched) })
+      // A dashboard session's file tools stay in its work folder (B2.9c); a client counts the refusal as a denied
+      // permission, as it counts the hook's (`permission.rejected`).
+      const reason = dashboard() ? Dashboard.callError(ctx.location.directory, event.tool, event.input) : undefined
+      if (reason) throw new Tool.Error({ message: Dashboard.deniedText(reason), metadata: { permissionDenied: true } })
       // OpenCode does not offer a tool whose action the rules deny outright, and fails a call to it as unknown. A model
       // that calls it anyway (the bundled skill names `loginom_dock_action_run`) is told why (B2.6b).
       const offer = offered.get(event.sessionID)

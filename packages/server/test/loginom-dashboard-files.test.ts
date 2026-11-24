@@ -20,6 +20,7 @@ import { it } from "../../core/test/lib/effect"
 import { Dashboard } from "../../loginom-agent/src/dashboard"
 import { deniedText, policyDeniedText } from "../../loginom-agent/src/permissions"
 import { temporaryData } from "../../loginom-agent/test/fixture/temporary-data"
+import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
 
@@ -34,7 +35,7 @@ import { pluginsLoaded } from "./fixture/routes"
 
 type Step = { tool: string; input?: unknown } | { text: string }
 const script = (...steps: Step[]) => `SCRIPT<${JSON.stringify(steps)}>SCRIPT`
-// Each case boots one or more server Locations and runs up to 25 scripted steps.
+// Each case boots one or more server Locations and runs up to 28 scripted steps.
 const timeout = 30_000
 const ok = "completed"
 const no = Dashboard.deniedText
@@ -62,6 +63,32 @@ const boot = (options: Options = {}) =>
     )
     const global = path.join(dir, "global")
     const system = path.join(global, "system")
+    // The bundled skill catalog, verified as in an installation (B2.4; its verifier needs `npm ci` in
+    // `packages/loginom-runtime/client`), which holds all three product skills, the dashboard's own among them.
+    const resources = path.join(dir, "resources")
+    yield* Effect.promise(async () => {
+      for (const name of ["loginom-automation", "package-docs", "loginom-dashboard"])
+        await Bun.write(
+          path.join(resources, "skills", name, "SKILL.md"),
+          `---\nname: ${name}\ndescription: Bundled ${name}.\n---\n\nBUNDLED ${name}\n`,
+        )
+      await Bun.write(
+        path.join(resources, "resource-manifest.json"),
+        JSON.stringify({ protocol: 1, files: await resourceInventory(resources) }),
+      )
+    })
+    yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        const previous = process.env.LOGINOM_AI_AGENT_RESOURCES
+        process.env.LOGINOM_AI_AGENT_RESOURCES = resources
+        return previous
+      }),
+      (previous) =>
+        Effect.sync(() => {
+          if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_RESOURCES
+          else process.env.LOGINOM_AI_AGENT_RESOURCES = previous
+        }),
+    )
     const folder = yield* Effect.promise(async () => {
       await fs.mkdir(Dashboard.root(), { recursive: true })
       const root = await fs.mkdtemp(path.join(Dashboard.root(), "files-"))
@@ -204,6 +231,12 @@ const boot = (options: Options = {}) =>
         )
         return {
           outcomes: parts.map((part) => (part.state.status === "error" ? part.state.error.message : part.state.status)),
+          // Whether each failed call is a denied permission for a client, as `cli/src/run/product.ts` (`denied`) reads it.
+          denied: parts.flatMap((part) =>
+            part.state.status === "error"
+              ? [part.state.error.type === "permission.rejected" || part.state.metadata?.permissionDenied === true]
+              : [],
+          ),
           told: told(requests.at(-1)),
           // Every call result the model read.
           results: JSON.stringify(
@@ -228,6 +261,7 @@ function settled(
     calls.map(([step, outcome]) => [step, outcome]),
   )
   expect(result.told).toEqual(calls.flatMap(([, outcome]) => (outcome === ok ? [] : [outcome])))
+  expect(result.denied).toEqual(calls.flatMap(([, outcome]) => (outcome === ok ? [] : [true])))
   expect(result.answers).toEqual([["stop", undefined], ...Array(calls.length).fill(["tool-calls", undefined])])
   expect(asked).toEqual([])
 }
@@ -253,6 +287,8 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           [{ tool: "read", input: { path: "." } }, ok],
           [{ tool: "glob", input: { pattern: "**/*" } }, ok],
           [{ tool: "grep", input: { pattern: "synthetic" } }, ok],
+          // The dashboard's skill loads: `external_directory` is refused, but a skill asks only `skill`.
+          [{ tool: "skill", input: { id: "loginom-dashboard" } }, ok],
           [{ tool: "read", input: { path: "../control/binding.json" } }, no(Dashboard.outside)],
           [{ tool: "read", input: { path: "src/link/binding.json" } }, no(Dashboard.outside)],
           [{ tool: "read", input: { path: "src/dangling.ts" } }, no(Dashboard.dangling)],
@@ -269,6 +305,15 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           ],
           [
             { tool: "edit", input: { path: "src/link/binding.json", oldString: "control synthetic", newString: "x" } },
+            no(Dashboard.srcOnly),
+          ],
+          // `edit` reads its target before it asks: a refusal only at the question would tell a missing file apart.
+          [
+            { tool: "edit", input: { path: "../control/binding.json", oldString: "wrong guess", newString: "x" } },
+            no(Dashboard.srcOnly),
+          ],
+          [
+            { tool: "edit", input: { path: "../control/missing.json", oldString: "x", newString: "y" } },
             no(Dashboard.srcOnly),
           ],
           [{ tool: "glob", input: { pattern: "*", path: ".." } }, no(Dashboard.outside)],
@@ -323,6 +368,9 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           ],
           [patch("*** Add File: src/d.tsx\n+d\n*** Add File: ../control/new.json\n+x"), no(Dashboard.srcOnly)],
           [patch("*** Update File: src/link/binding.json\n@@\n-control synthetic\n+x"), no(Dashboard.srcOnly)],
+          // `patch` reads what it updates or deletes before it asks: a wrong line and a missing file are refused alike.
+          [patch("*** Update File: ../control/binding.json\n@@\n-wrong guess\n+x"), no(Dashboard.srcOnly)],
+          [patch("*** Delete File: ../control/missing.json"), no(Dashboard.srcOnly)],
         ] as const
         const result = yield* test.run(session.id, calls)
         expect(result.tools).toContain("patch")
@@ -345,7 +393,7 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
   )
 
   it.live(
-    "without git, a path outside is refused at `external_directory` without a question, the product's own directories too",
+    "without git, a read outside is refused at `external_directory` without a question, the product's own directories too; a write outside before the call",
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
@@ -359,10 +407,10 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           [{ tool: "read", input: { path: path.join(test.dir, "outside.txt") } }, no(Dashboard.outside)],
           [{ tool: "read", input: { path: "../control/binding.json" } }, no(Dashboard.outside)],
           [{ tool: "read", input: { path: result } }, no(Dashboard.outside)],
-          [{ tool: "write", input: { path: path.join(test.dir, "new.txt"), content: "x" } }, no(Dashboard.outside)],
+          [{ tool: "write", input: { path: path.join(test.dir, "new.txt"), content: "x" } }, no(Dashboard.srcOnly)],
           [
             { tool: "edit", input: { path: path.join(test.dir, "outside.txt"), oldString: "outside", newString: "x" } },
-            no(Dashboard.outside),
+            no(Dashboard.srcOnly),
           ],
         ] as const
         const outcome = yield* test.run(session.id, calls)

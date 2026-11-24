@@ -7,6 +7,8 @@ import { existsSync, lstatSync, realpathSync } from "node:fs"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
 import { Global } from "@opencode/util/global"
+import { Patch } from "@opencode/util/patch"
+import { Result } from "effect"
 
 /** The root of the dashboards' folders: the server's own data directory, as in 0.4. */
 export const root = () => join(Global.Path.data, "dashboards")
@@ -43,17 +45,31 @@ export function settle(directory: string, request: { readonly action: string; re
 }
 
 /**
- * Why `glob` or `grep` may not search in a dashboard session, or nothing. Their `path` reaches `permission.evaluate`
- * only as an `external_directory` question, which a git repository around the data directory or a link inside the work
- * folder never raises, so it is checked before the call, resolved as Core resolves it (`FileAccess.resolvePath`: `~`).
- * A glob — `glob`'s `pattern`, `grep`'s `include` — may not climb with `..`; `grep`'s `pattern` is a regular expression.
+ * Why a file tool's call may not run in a dashboard session, checked before it runs, or nothing. Paths resolve as Core
+ * resolves them (`FileAccess.resolvePath`: `~`). The `path` of `glob` and `grep` is not a resource of their request:
+ * `permission.evaluate` sees it only as an `external_directory` question, which a git repository around the data
+ * directory or a link inside the work folder never raises. `edit` and `patch` read their targets before they ask `edit`
+ * (`edit` whether the file exists, `patch` its lines too), so a refusal only at that question would tell the model what
+ * lies outside; `write` is checked with them. A glob — `glob`'s `pattern`, `grep`'s `include` — may not climb with `..`;
+ * `grep`'s `pattern` is a regular expression.
  */
-export function searchError(directory: string, tool: string, input: unknown) {
+export function callError(directory: string, tool: string, input: unknown) {
+  const value = (input ?? {}) as { path?: unknown; pattern?: unknown; include?: unknown; patchText?: unknown }
+  const reach = (path: unknown, write: boolean) =>
+    typeof path === "string" ? pathError(directory, resolve(directory, home(path)), write) : undefined
+  if (tool === "write" || tool === "edit") return reach(value.path, true)
+  if (tool === "patch") {
+    const parsed = Patch.parse(typeof value.patchText === "string" ? value.patchText : "")
+    if (!Result.isSuccess(parsed)) return
+    return parsed.success
+      .flatMap((hunk) => [hunk.path, ...(hunk.type === "update" && hunk.movePath ? [hunk.movePath] : [])])
+      .map((path) => reach(path, true))
+      .find((reason) => reason !== undefined)
+  }
   if (tool !== "glob" && tool !== "grep") return
-  const value = (input ?? {}) as { path?: unknown; pattern?: unknown; include?: unknown }
   const glob = tool === "glob" ? value.pattern : value.include
   if (typeof glob === "string" && /(^|[\\/])\.\.([\\/]|$)/.test(glob)) return outside
-  return pathError(directory, resolve(directory, home(typeof value.path === "string" ? value.path : ".")))
+  return reach(value.path ?? ".", false)
 }
 
 /**
