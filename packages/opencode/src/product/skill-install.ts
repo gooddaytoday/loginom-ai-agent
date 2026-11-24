@@ -1,50 +1,95 @@
 import { Effect, Schema } from "effect"
 import { relative, resolve } from "node:path"
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Global } from "@opencode-ai/core/global"
 import { validateSkillFolder } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { prepareLocalSkill } from "@loginom-ai-agent/loginom-host/skill-install/index"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
+import { RuntimeFlags } from "@/effect/runtime-flags"
 import { assertExternalDirectoryEffect } from "@/tool/external-directory"
 import { Tool } from "@/tool/tool"
 
-const Parameters = Schema.Struct({ action: Schema.Literal("validate"), source: Schema.String })
+const Parameters = Schema.Struct({ action: Schema.Literals(["validate", "install"]), source: Schema.NonEmptyString })
+
+const literal = (text: string) =>
+  JSON.stringify(text).replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, (char) => `\\u{${char.codePointAt(0)!.toString(16)}}`)
 
 export const SkillInstallTool = Tool.define(
   "skill_install",
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
+    const flags = yield* RuntimeFlags.Service
     return {
-      description: "Validate a portable Agent Skill folder by path. Reports format and resource diagnostics without installation.",
+      description: "Validate a portable Agent Skill folder without installing it. Use install only when the user asks to copy a skill from a local folder; the product will request one-time approval.",
       parameters: Parameters,
       execute: (args: typeof Parameters.Type, ctx: Tool.Context) =>
         Effect.gen(function* () {
           ctx.abort.throwIfAborted()
+          if (args.action === "install" && flags.disableExternalSkills)
+            throw Error("External skills are disabled in this Loginom process.")
           const instance = yield* InstanceState.context
           const bridge = yield* EffectBridge.make()
-          const source = resolve(instance.directory, args.source)
+          const source = args.source.startsWith("~/") ? resolve(Global.Path.home, args.source.slice(2)) : resolve(instance.directory, args.source)
           const directory = yield* fs.realPath(source).pipe(Effect.orElseSucceed(() => source))
-          const authorizeRead = (paths: string[]) =>
+          const askPaths = (permission: "read" | "edit", paths: string[], filepath: string) =>
             ctx.ask({
-              permission: "read",
+              permission,
               patterns: paths.map((path) => relative(instance.worktree, path)),
               always: ["*"],
-              metadata: { filepath: directory },
+              metadata: { filepath },
             })
-          yield* ctx.ask({ permission: "skill_install", patterns: [args.action], always: [args.action], metadata: {} })
+          const authorizeRead = (paths: string[]) =>
+            bridge.promise(askPaths("read", paths, directory)).then(() => ctx.abort.throwIfAborted())
+          if (args.action === "validate")
+            yield* ctx.ask({ permission: "skill_install", patterns: [args.action], always: [args.action], metadata: {} })
           yield* assertExternalDirectoryEffect(ctx, source, { kind: "directory" })
           if (directory !== source) yield* assertExternalDirectoryEffect(ctx, directory, { kind: "directory" })
-          yield* authorizeRead([...new Set([source, directory])])
-          const result = yield* Effect.tryPromise(() =>
-            validateSkillFolder(directory, {
-              authorizeRead: (paths) =>
-                bridge.promise(authorizeRead(paths)).then(() => ctx.abort.throwIfAborted()),
-            }),
-          ).pipe(Effect.orDie)
-          return {
-            title: "Validate skill folder",
-            output: JSON.stringify({ path: source, name: result.data?.name, errors: result.errors, warnings: result.warnings }),
-            metadata: {},
+          yield* askPaths("read", [...new Set([source, directory])], directory)
+          if (args.action === "validate") {
+            const result = yield* Effect.tryPromise(() =>
+              validateSkillFolder(directory, { authorizeRead }),
+            ).pipe(Effect.orDie)
+            return {
+              title: "Validate skill folder",
+              output: JSON.stringify({ path: source, name: result.data?.name, errors: result.errors, warnings: result.warnings }),
+              metadata: {},
+            }
           }
+
+          return yield* Effect.acquireUseRelease(
+            Effect.tryPromise(() => prepareLocalSkill(directory, Global.Path.home, authorizeRead, ctx.abort)),
+            (candidate) => Effect.gen(function* () {
+              const result = (status: string) => ({
+                title: "Install skill",
+                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, warnings: candidate.warnings }),
+                metadata: {},
+              })
+              if (candidate.previous === candidate.digest) return result("already-installed")
+              if (candidate.previous !== undefined) throw Error("This skill name is already installed.")
+              yield* assertExternalDirectoryEffect(ctx, candidate.path, { kind: "directory", write: true })
+              yield* askPaths("edit", candidate.paths, candidate.path)
+              yield* ctx.ask({
+                permission: "skill_install",
+                patterns: [candidate.name],
+                always: [],
+                metadata: {
+                  operationId: candidate.id,
+                  skillInstall: [
+                    "Установка скилла " + literal(candidate.name),
+                    "Источник: " + literal(source),
+                    "Ревизия копии: " + candidate.digest,
+                    "Описание автора: " + literal(candidate.description),
+                    "Папка установки: " + literal(candidate.path),
+                    "Скилл будет доступен другим агентам, которые используют ~/.agents/skills.",
+                    ...candidate.warnings.map((warning) => "Замечание: " + literal(warning)),
+                  ],
+                },
+              })
+              return result(yield* Effect.tryPromise(() => candidate.publish()))
+            }),
+            (candidate) => Effect.promise(candidate.dispose),
+          ).pipe(Effect.orDie)
         }),
     }
   }),

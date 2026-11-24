@@ -1,3 +1,4 @@
+import { skillInstallConfirmation } from "@loginom-ai-agent/product"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
@@ -8,6 +9,10 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
 export const Event = PermissionV1.Event
+
+function onceRequired(request: Pick<PermissionV1.Request, "permission" | "metadata">) {
+  return request.permission === "dashboard_delete" || skillInstallConfirmation(request) !== undefined
+}
 
 export interface Interface {
   readonly ask: (input: PermissionV1.AskInput) => Effect.Effect<void, PermissionV1.Error>
@@ -67,7 +72,7 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
-      const once = request.permission === "dashboard_delete"
+      const once = onceRequired(request)
       let needsAsk = once
 
       for (const pattern of request.patterns) {
@@ -112,7 +117,7 @@ const layer = Layer.effect(
       const existing = pending.get(input.requestID)
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
-      const reply = input.reply === "always" && existing.info.permission === "dashboard_delete" ? "reject" : input.reply
+      const reply = input.reply === "always" && onceRequired(existing.info) ? "reject" : input.reply
       pending.delete(input.requestID)
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
@@ -155,7 +160,7 @@ const layer = Layer.effect(
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
-        if (item.info.permission === "dashboard_delete") continue
+        if (onceRequired(item.info)) continue
         const ok = item.info.patterns.every(
           (pattern) => evaluate(item.info.permission, pattern, approved).action === "allow",
         )

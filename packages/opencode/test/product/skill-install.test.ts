@@ -1,9 +1,10 @@
 import { expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Fiber, Layer } from "effect"
 import { join, relative } from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppProcess } from "@opencode-ai/core/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
@@ -16,7 +17,7 @@ import { MessageID, SessionID } from "@/session/schema"
 import type { Tool } from "@/tool/tool"
 import { Truncate } from "@/tool/truncate"
 import { provideTmpdirInstance, testInstanceStoreLayer } from "../fixture/fixture"
-import { testEffect } from "../lib/effect"
+import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const it = testEffect(
   Layer.mergeAll(
@@ -26,7 +27,7 @@ const it = testEffect(
   ),
 )
 
-it.live("the chat can validate a folder, subject to read permissions on its resources", () =>
+it.live("the chat validates with read permissions and only publishes after one-time consent", () =>
   provideTmpdirInstance((directory) =>
     Effect.gen(function* () {
       const instance = yield* InstanceState.context
@@ -36,6 +37,7 @@ it.live("the chat can validate a folder, subject to read permissions on its reso
         await Bun.write(join(directory, "columns/SKILL.md"), "---\nname: columns\ndescription: Checks columns.\n---\n[Columns](references/columns.md)\n")
         await Bun.write(resource, "id, amount")
       })
+      const home = Global.Path.home
       const tools: Tool.Def[] = yield* toolContributor.definitions("default")
       const tool = tools.find((item) => item.id === "skill_install")
       expect(tool).toBeDefined()
@@ -63,6 +65,28 @@ it.live("the chat can validate a folder, subject to read permissions on its reso
         ] }).pipe(Effect.orDie),
       }))
       expect(denied._tag).toBe("Failure")
+
+      const installation = { action: "install", source: "columns" }
+      const installed = join(home, ".agents/skills/columns")
+      const pending = pollWithTimeout(
+        permissions.list().pipe(Effect.map((requests) => requests.find((request) => request.permission === "skill_install"))),
+        "Skill installation did not ask for consent",
+      )
+      const rejected = yield* Effect.forkChild(Effect.exit(tool!.execute(installation, ctx)))
+      const request = yield* pending
+      expect(request.metadata.skillInstall).toContain("Папка установки: " + JSON.stringify(installed))
+      expect(yield* Effect.promise(() => Bun.file(join(installed, "SKILL.md")).exists())).toBe(false)
+      yield* permissions.reply({ requestID: request.id, reply: "reject" })
+      expect((yield* Fiber.join(rejected))._tag).toBe("Failure")
+      expect(yield* Effect.promise(() => Bun.file(join(installed, "SKILL.md")).exists())).toBe(false)
+
+      const approved = yield* Effect.forkChild(tool!.execute(installation, ctx))
+      const fresh = yield* pending
+      expect(fresh.id).not.toBe(request.id)
+      yield* permissions.reply({ requestID: fresh.id, reply: "once" })
+      expect(JSON.parse((yield* Fiber.join(approved)).output)).toMatchObject({ status: "installed", path: installed })
+      expect(yield* Effect.promise(() => Bun.file(join(installed, "references/columns.md")).text())).toBe("id, amount")
+      expect(JSON.parse((yield* tool!.execute(installation, ctx)).output)).toMatchObject({ status: "already-installed" })
     }),
   ),
 )

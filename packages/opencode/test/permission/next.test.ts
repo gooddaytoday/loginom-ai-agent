@@ -1172,3 +1172,39 @@ it.instance(
     }),
   { git: true },
 )
+
+it.live("a skill write requires a fresh once reply despite a general allow", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    const store = yield* InstanceStore.Service
+    yield* store.provide({ directory }, Effect.gen(function* () {
+      const input = {
+        sessionID: SessionID.make("ses_skill_write"),
+        permission: "skill_install",
+        patterns: ["columns"],
+        metadata: { operationId: "write-snapshot", skillInstall: ["Install columns from a local folder"] },
+        always: ["*"],
+        ruleset: [{ permission: "*", pattern: "*", action: "allow" }] as const,
+      }
+      const first = yield* Effect.forkChild(Effect.exit(ask(input)))
+      const initial = (yield* waitForPending(1))[0]
+      expect(initial.always).toEqual([])
+      yield* reply({ requestID: initial.id, reply: "always" })
+      const refused = yield* Fiber.join(first)
+      expect(Exit.isFailure(refused)).toBe(true)
+
+      const second = yield* Effect.forkChild(ask(input))
+      const fresh = (yield* waitForPending(1))[0]
+      expect(fresh.id).not.toBe(initial.id)
+      yield* reply({ requestID: fresh.id, reply: "once" })
+      yield* Fiber.join(second)
+
+      const denied = yield* fail(ask({
+        ...input,
+        ruleset: [...input.ruleset, { permission: "skill_install", pattern: "columns", action: "deny" }],
+      }))
+      expect(denied).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(yield* list()).toHaveLength(0)
+    }))
+  }),
+)

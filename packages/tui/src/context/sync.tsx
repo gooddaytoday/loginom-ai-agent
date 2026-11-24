@@ -1,3 +1,4 @@
+import { skillInstallConfirmation } from "@loginom-ai-agent/product"
 import type {
   Message,
   Agent,
@@ -206,7 +207,7 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (permission.mode === "auto") {
+          if (permission.mode === "auto" && !skillInstallConfirmation(request)) {
             void sdk.client.permission.reply({
               requestID: request.id,
               reply: "once",

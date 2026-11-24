@@ -54,3 +54,9 @@ export function productName(channel: keyof typeof Product.channels) {
   if (channel === "prod") return Product.name
   return `${Product.name} ${channel === "beta" ? "Beta" : "Dev"}`
 }
+
+export function skillInstallConfirmation(request: { permission?: string; metadata?: Record<string, unknown> }) {
+  if (request.permission !== "skill_install" || typeof request.metadata?.operationId !== "string") return
+  const lines = request.metadata.skillInstall
+  if (Array.isArray(lines) && lines.length && lines.every((line): line is string => typeof line === "string")) return lines
+}

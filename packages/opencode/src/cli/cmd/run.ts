@@ -1,3 +1,4 @@
+import { skillInstallConfirmation } from "@loginom-ai-agent/product"
 import { createAttachmentReceipt, attachmentReceiptSource } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { standaloneCancellation } from "../standalone-cancellation"
 import { exitCli } from "../exit"
@@ -915,12 +916,13 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              if (permission.permission === "dashboard_delete") {
+              const installation = skillInstallConfirmation(permission)
+              if (permission.permission === "dashboard_delete" || installation) {
                 const confirmationSignal = standaloneCancellation()
                 const replySignal = confirmationSignal ? AbortSignal.any([confirmationSignal, signal]) : signal
-                const choice = "Удалить " + randomBytes(4).toString("hex")
+                const choice = (installation ? "Подтвердить " : "Удалить ") + randomBytes(4).toString("hex")
                 const once = await readTerminalConfirmation(
-                  [...dashboardDeletionLines(permission), `Введите «${choice}» для подтверждения или «Отмена» для отказа.`, ""].join(EOL),
+                  [...(installation ?? dashboardDeletionLines(permission)), `Введите «${choice}» для подтверждения или «Отмена» для отказа.`, ""].join(EOL),
                   choice,
                   replySignal,
                 )

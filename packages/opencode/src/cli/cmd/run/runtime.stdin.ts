@@ -63,7 +63,7 @@ export async function readTerminalConfirmation(prompt: string, choice: string, s
   try {
     terminal = resolveInteractiveStdin()
   } catch {
-    process.stderr.write("Удаление отклонено: требуется управляющий терминал.\n")
+    process.stderr.write("Подтверждение отклонено: требуется управляющий терминал.\n")
     return false
   }
 
