@@ -5,6 +5,7 @@ import path from "node:path"
 import { Product } from "@loginom-ai-agent/product"
 import { verifyUpdateSignature } from "@loginom-ai-agent/product/update-signature"
 import { LOGINOM_AI_AGENT_VERSION } from "./version"
+import { NetworkMode } from "./network-mode"
 
 // Loginom AI Agent (B2.7d): the update notice of the product CLI, as in 0.4 (`v0.4.0:packages/opencode/src/cli/
 // update-notifier.ts`). It asks only the product feed of the build (`Product.updateFeed`, the define
@@ -67,6 +68,8 @@ export async function notify(input: {
     const platform = input.platform ?? process.platform
     const policy = await readSettings(input.policyFile ?? policyPath(platform, env), signal)
     if (policy.updates === "off") return
+    // Loginom AI Agent (B2.8): «Только этот компьютер» checks for no updates.
+    if ((await NetworkMode.read(input.config)) === "device") return
     const config = await readSettings(path.join(input.config, "updates.json"), signal)
     const channel = policy.channel ?? config.channel ?? "stable"
     if (channel !== "stable" && channel !== "unstable") return

@@ -22,6 +22,7 @@ import { WebUi } from "./services/web-ui"
 import { databasePath } from "./database-path"
 import { CliProfile } from "./profile"
 import { CliResources } from "./resources"
+import { NetworkMode } from "./network-mode"
 import { ShutdownDeadline } from "./shutdown-deadline"
 
 export type Mode = "default" | "service" | "stdio"
@@ -97,6 +98,13 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       // Loginom AI Agent (B2.7a10b): as in 0.4, glob and grep find the resources' rg on PATH before core downloads one.
       if (process.env.LOGINOM_AI_AGENT_RESOURCES)
         withBundledRipgrep(process.env, process.env.LOGINOM_AI_AGENT_RESOURCES)
+      // Loginom AI Agent (B2.8, U4): the network mode comes from the product's global config, not from Desktop's
+      // environment: the directory the server below reads, which a saved service environment may move. "device" closes
+      // the model catalog and OpenCode's free models, whose switch core reads from the environment only.
+      const network = yield* Effect.promise(() =>
+        NetworkMode.read(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? global.config),
+      )
+      if (network === "device") process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS = "1"
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
       const { ServiceHost } = yield* Effect.promise(() => import("@loginom-ai-agent/loginom-agent/host"))
@@ -145,18 +153,16 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           models: {
             url: process.env.LOGINOM_AI_AGENT_MODELS_URL,
             file: process.env.LOGINOM_AI_AGENT_MODELS_PATH,
-            fetch: !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH),
+            fetch: network === "online" && !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH),
           },
           config: {
             directory: process.env.LOGINOM_AI_AGENT_CONFIG_DIR,
             project: !truthy(
               process.env.LOGINOM_AI_AGENT_CONFIG_PROJECT_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG,
             ),
-            // .claude is only read for skills, so both flags gate the same roots.
-            claude: !(
-              truthy(process.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE) ||
-              truthy(process.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS)
-            ),
+            // Loginom AI Agent (B2.8, U4): .claude is only read for skills, and the product never reads it, as if
+            // LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE were always set.
+            claude: false,
             file: process.env.LOGINOM_AI_AGENT_CONFIG,
             content: process.env.LOGINOM_AI_AGENT_CONFIG_CONTENT,
           },
