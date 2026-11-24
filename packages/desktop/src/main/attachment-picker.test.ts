@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, truncate, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { ACCEPTED_FILE_EXTENSIONS } from "@opencode-ai/app/file-picker"
 import {
   assertAttachmentBudget,
   describePickedFiles,
@@ -95,6 +96,24 @@ test("large picker files return references before reading and do not consume inl
     await truncate(file, 5 * 1024 ** 3)
     const files = await describePickedFiles([file])
     expect(files[0]).toMatchObject({ kind: "local_reference", sourcePath: file, size: 5 * 1024 ** 3 })
+    expect(() => assertAttachmentBudget([...files, { size: MAX_ATTACHMENT_BYTES }])).not.toThrow()
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test.each([
+  ["sales.DB", "application/octet-stream"],
+  ["data.lgd", "application/octet-stream"],
+  ["legacy.xls", "application/vnd.ms-excel"],
+])("small native picker file %s returns a binary reference", async (name, mime) => {
+  expect(ACCEPTED_FILE_EXTENSIONS).toContain(name.split(".")[1]!.toLowerCase())
+  const directory = await mkdtemp(join(tmpdir(), "binary-picker-"))
+  const file = join(directory, name)
+  try {
+    await writeFile(file, Buffer.from([0, 255, 1, 2]))
+    const files = await describePickedFiles([file])
+    expect(files[0]).toMatchObject({ kind: "local_reference", sourcePath: file, filename: name, size: 4, mime })
     expect(() => assertAttachmentBudget([...files, { size: MAX_ATTACHMENT_BYTES }])).not.toThrow()
   } finally {
     await rm(directory, { recursive: true, force: true })

@@ -82,6 +82,7 @@ export type PromptInputV2AttachmentConfig = {
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
   referenceAttachment?: (file: File) => Promise<LocalAttachmentReference>
+  referenceFile?: (filename: string) => boolean
   missingPath?: () => void
   store?: (file: File) => Promise<{ id: string; url: string }>
 }
@@ -101,9 +102,12 @@ export function createPromptInputV2Attachments(
     if (!editor) return
     return { prompt, cursor: prompt.cursor() ?? cursorPosition(editor) }
   }
+  const needsReference = (file: File) =>
+    input.referenceFile?.(file.name) ||
+    (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))
   const add = async (file: File | LocalAttachmentReference, toast = true, target = capture(), clipboard = false) => {
     if (!target) return false
-    if ("kind" in file || (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp"))) {
+    if ("kind" in file || needsReference(file)) {
       if (!("kind" in file) && (!input.getPathForFile?.(file) || !input.referenceAttachment)) {
         input.missingPath?.()
         return false
@@ -174,9 +178,7 @@ export function createPromptInputV2Attachments(
       !found &&
       files.length > 0 &&
       toast &&
-      !files.some(
-        (file) => "kind" in file || (file.size > 16 * 1024 * 1024 && !file.name.toLowerCase().endsWith(".lgp")),
-      )
+      !files.some((file) => "kind" in file || needsReference(file))
     )
       input.warn()
     return found
