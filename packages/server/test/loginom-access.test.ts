@@ -574,10 +574,11 @@ describe("loginom.product access and tool gate (G1)", () => {
 // The dashboard profile (G1, B2.9b): 0.4 `turn-lifecycle.test.ts` «a dashboard run never acquires a connected Loginom
 // Host…», the two dashboard cases of `session/profile-tools.test.ts`, «the first dashboard prompt advertises only dashboard
 // builtins» and «a dashboard directory rejects a persisted subtask…» of `session/prompt.test.ts`
-// (`v0.4.0:packages/opencode/test`). The Location's folder is a dashboard's `work` folder; the dashboard tools themselves
-// arrive in B2.9e…g. The project config turns the terminal on and names an MCP server with instructions, so that what the
-// session does not get is there to get: an ordinary Location of the same config is the control.
-const dashboardTools = ["read", "glob", "grep", "edit", "write", "patch", "skill"]
+// (`v0.4.0:packages/opencode/test`). The Location's folder is a dashboard's `work` folder; of the dashboard tools,
+// `dashboard_draft` is there (B2.9e), publication and deletion arrive in B2.9f and g. The project config turns the
+// terminal on and names an MCP server with instructions, so that what the session does not get is there to get: an
+// ordinary Location of the same config is the control.
+const dashboardTools = ["read", "glob", "grep", "edit", "write", "patch", "skill", "dashboard_draft"]
 const guide = "Use lookup before mutate."
 const dashboardOptions = (dashboard: boolean, host?: ReturnType<typeof scriptedHost>): Options => ({
   dashboard,

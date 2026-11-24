@@ -15,6 +15,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@loginom-ai-agent/dashboard": "workspace:*",
     "@loginom-ai-agent/loginom-host": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
     "@opencode/plugin": "workspace:*",
