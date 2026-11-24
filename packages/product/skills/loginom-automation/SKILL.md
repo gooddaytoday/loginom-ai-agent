@@ -280,7 +280,7 @@ New REST, unique label; delete old REST, its URL encoder, unused connection ref 
 `target.label` необязателен: используй короткую подпись словами без `; | < >`, кавычек, обратной косой черты и управляющих символов; сравнения и формулы передавай только в `parameters`.
 
 Вход, ожидание и неопределённый результат — [Подготовка и отмена](references/browser.md);
-узлы, связи и источники данных — [Граф и узлы](references/canvas.md).
+вставка узла и замена входа — [Граф](references/canvas.md).
 
 Сессия работает в одном аутентифицированном контексте Loginom. Не вызывай
 Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы сервера для обхода

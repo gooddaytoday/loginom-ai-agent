@@ -197,6 +197,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(['remove_link','connect'].includes(kind)&&state.replacements?.some(r=>r.created.target===parameters.edge.target&&r.created.input===parameters.edge.input)){
+        if(!sameDomainGraph(state.last_graph??state.baseline,before)
+          ||!state.replacements.some(r=>same(kind==='remove_link'?r.removed:r.created,parameters.edge)))
+          throw Error('Named input replacement authorization changed before graph effect');
+      }
       if(kind==='remove_link'&&parameters.edge.output==='connection:0'
         &&(request.target.kind!=='new'||parameters.edge.target!==state.targetId
           ||!(state.auto_created_service_links??[]).some(e=>same(e,parameters.edge))))throw Error('Unowned REST service connection');
@@ -354,8 +359,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if(operation.restQueryInput&&(!restInputReplacement(graph)||!graph.links.some(e=>edgeKey(e)===edgeKey(operation.restQueryInput.edge))))
           throw Error('REST encoder input authorization differs from the existing graph');
         for(const input of request.inputs){
-          const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
+          const incoming=graph.links.filter(e=>e.target===existing.ref.node_id&&e.input===input.input);
+          if(incoming.length>1)throw Error('Requested input has ambiguous incoming links');
+          const occupied=incoming[0];
           if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
+            &&input.replace_existing!==true
             &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
             // LAB-1904: a replaced REST still feeds this consumer until it is deleted.
             +(node(graph,occupied.source).type==='integration.rest_request'&&request.inputs.some(i=>i.source.node_id!==occupied.source&&node(graph,i.source.node_id).type==='integration.rest_request')
@@ -382,6 +390,11 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         validateNodeTargetRequest({...request,target:{...request.target,position:state.newPosition}});
         if(!state.newPosition)throw Error('target.position: no verified free position available');
       }
+      state.replacements=request.target.kind!=='existing'?[]:request.inputs.filter(i=>i.replace_existing===true).flatMap(i=>{
+        const removed=graph.links.find(e=>e.target===state.targetId&&e.input===i.input);
+        const created={source:i.source.node_id,output:i.output,target:state.targetId,input:i.input};
+        return removed&&edgeKey(removed)!==edgeKey(created)?[{removed:structuredClone(removed),created}]:[];
+      });
       state.baseline = structuredClone(graph); await commit();
       break;
      }
@@ -421,9 +434,10 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
     for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
       const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+        ||(state.replacements??[]).some(r=>same(r.removed,edge))
         ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
       // Other existing links not mentioned by the caller are preserved.
-      // Conflicting links require an explicit edit contract, never deletion.
+      // Conflicting links require permission for this exact named input.
       if (!owned) {
         if (desired.some(d => d.input === edge.input)) throw new Error('Requested input is occupied by an unowned link');
         continue;
@@ -491,6 +505,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     state.completed=true;state.final_graph=structuredClone(graph);
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),
       created: request.target.kind === 'new', links: desired,...(variableDesired.length?{variable_links:graph.variable_links.filter(e=>variableDesired.some(d=>edgeKey(d)===edgeKey(e)))}:{}), auto_created_links: state.auto_created_links ?? [],
+      ...((state.replacements??[]).length?{replaced_links:structuredClone(state.replacements)}:{}),
       effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), configured: false, executed: false, package_saved: false };
     await commit(); return structuredClone(state.result);
   } catch (error) {
