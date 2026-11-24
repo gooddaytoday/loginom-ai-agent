@@ -421,17 +421,34 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // cannot be preempted; charge immediately after each native operation.
       const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
       // Checking all ~570 parts against every document element took 114 of
-      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
-      // matches only that element or its descendant: prefilter those once,
-      // keep other parts verbatim, then apply the full list to candidates.
-      // Same elements, same document order.
-      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
-      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
-      const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
-        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
-          .filter(element=>element.matches(guardSelector))
-        : document.querySelectorAll(guardSelector);
-      charge();for (const element of guards)if(addressedImportField(element))include(element);
+      // 306 ms per Files read (LAB-1188 profile). Broaden the wizard tid,
+      // but retain the descendant's selector so preview cells aren't candidates.
+      const guardParts=guardSelector.split(','),wizardTid='[data-tid*="WizrdMCF"]';
+      const guardCandidate=part=>{
+        const leading=/^\[data-tid[\^$*]?="[^"\\]*WizrdMCF[^"\\]*"\]/.exec(part);
+        if(!leading)return part;
+        const tail=part.slice(leading[0].length);
+        if(/^(?:\[data-tid[\^$*]?="[^"\\]*"\])*$/.test(tail))return wizardTid;
+        return /^ [a-z.#][\w.#-]*$/i.test(tail)?wizardTid+tail:part;
+      };
+      const tidPatterns=[],nativeGuards=[];
+      for(const part of guardParts){
+        const literal=preparedNodeWizard&&/^\[data-tid([\^$*]?)="([^"\\\r\n\f\0]+)"\]$/.exec(part);
+        if(!literal){nativeGuards.push(part);continue;}
+        const [,operator,value]=literal,escaped=value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        tidPatterns.push((operator===''||operator==='^'?'^':'')+escaped
+          +(operator===''||operator==='$'?'(?![\\s\\S])':''));
+      }
+      const tidGuard=tidPatterns.length?new RegExp(tidPatterns.join('|')):null,nativeGuard=nativeGuards.join(',');
+      const splitGuards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0);
+      const nativeMatches=splitGuards&&tidGuard?new Set(document.querySelectorAll(nativeGuard)):null;
+      charge();
+      const guards=splitGuards
+        ? [...document.querySelectorAll([...new Set(guardParts.map(guardCandidate))].join(','))]
+          .filter(element=>addressedImportField(element)
+            && (nativeMatches?nativeMatches.has(element)||tidGuard.test(element.getAttribute('data-tid')??''):element.matches(nativeGuard)))
+        : [...document.querySelectorAll(guardSelector)].filter(addressedImportField);
+      charge();for (const element of guards)include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
       const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
@@ -2379,9 +2396,9 @@ function readRenderedInputMapping(observation) {
       if(importFieldBase===columnBase&&definitionElements.length>6000) {
         const error=new Error('Import definition inventory exceeds 1000 fields');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error;
       }
-      // Full native schema validation adds at most 1000 ms for 1000 fields.
-      // Generic scans retain 500 ms, and the element/work limits stay fixed.
-      if(importFieldBase===columnBase)maxMs+=Math.ceil(definitionElements.length/6);
+      // Native hit-testing also scales with the rendered preview. Allow up
+      // to 4 ms per field; generic time and the element/work limits stay fixed.
+      if(importFieldBase===columnBase)maxMs+=4*Math.ceil(definitionElements.length/6);
       const definitionTids=new Map();
       for(const element of definitionElements) {
         const tid=getTid(element),matches=definitionTids.get(tid)??[];matches.push(element);definitionTids.set(tid,matches);
@@ -3483,16 +3500,32 @@ function readRenderedInputMapping(observation) {
       const parent=horizontalOwner(element);
       return parent ? {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth} : null;
     };
-    const interactionOf = (element, accept) => {
+    const importHitBounds=memoRead(parent=>{
+      if(!parent||parent===document.body)return {left:-Infinity,right:Infinity,top:-Infinity,bottom:Infinity};
+      const bounds=importHitBounds(parent.parentElement),style=getComputedStyle(parent);
+      const clipsX=['auto','scroll','hidden'].includes(style.overflowX);
+      const clipsY=['auto','scroll','hidden'].includes(style.overflowY);
+      if(!clipsX&&!clipsY)return bounds;
+      const box=boxOf(parent);
+      if(![box.x,box.y,box.width,box.height].every(Number.isFinite))return bounds;
+      return {left:clipsX?Math.max(bounds.left,box.x):bounds.left,right:clipsX?Math.min(bounds.right,box.x+box.width):bounds.right,
+        top:clipsY?Math.max(bounds.top,box.y):bounds.top,bottom:clipsY?Math.min(bounds.bottom,box.y+box.height):bounds.bottom};
+    });
+    const interactionOf = (element, accept, clip, centerOnly=false) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
       if (box.x>=width || box.y>=height || box.x+box.width<=0 || box.y+box.height<=0) return {state:'outside_viewport',point:null};
-      const left=Math.max(0,box.x),right=Math.min(width,box.x+box.width),top=Math.max(0,box.y),bottom=Math.min(height,box.y+box.height);
+      const left=Math.max(0,box.x,clip?.left??0),right=Math.min(width,box.x+box.width,clip?.right??width),
+        top=Math.max(0,box.y,clip?.top??0),bottom=Math.min(height,box.y+box.height,clip?.bottom??height);
+      if(clip&&(left>=right||top>=bottom))return {state:'point_not_observed',point:null,covering:[]};
       const covering=[],seenCovering=new Set();
-      for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
+      const fractions=centerOnly?[0.5]:[0.5,0.25,0.75];
+      for (const y of fractions) for (const x of fractions) {
         charge();
-        const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
+        const point=centerOnly?{x:box.x+box.width/2,y:box.y+box.height/2}:{x:left+(right-left)*x,y:top+(bottom-top)*y};
+        if(centerOnly&&(point.x<0||point.x>=width||point.y<0||point.y>=height))break;
+        const hit=document.elementFromPoint(point.x,point.y);
         if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
@@ -3600,6 +3633,7 @@ function readRenderedInputMapping(observation) {
         ||preparedGraphTid&&getTid(element)?.startsWith(preparedGraphTid+';')
           &&/^(?:Input|Output)_(?:Data|Var)-[0-9]+$/.test(getTid(element).slice(preparedGraphTid.length+1))).slice(0,240):[]);
     const retainedControls=new Set([...requiredControls,...controls.filter(element=>!requiredControls.has(element)).slice(0,240-requiredControls.size)]);
+    const wideImport=preparedNodeWizard&&wizard.stage==='text_import_format'&&wizard.import_columns?.truncated===true;
     const elements = controls.filter(element=>retainedControls.has(element)).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
@@ -3611,7 +3645,9 @@ function readRenderedInputMapping(observation) {
       const horizontalScroll=horizontalScrollOf(element);
       // A date string-format cell also holds the flag checkbox image: never
       // choose a point on that image, it would toggle the flag instead of editing.
-      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
+      const importCell=preparedNodeWizard&&importColumnCellRefs.has(state.ids.get(element));
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined,
+        importCell?importHitBounds(element.parentElement):undefined,wideImport&&!importCell&&wizardForms[0].contains(element));
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
