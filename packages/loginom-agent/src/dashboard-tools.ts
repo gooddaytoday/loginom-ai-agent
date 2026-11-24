@@ -58,10 +58,11 @@ export function dashboardTools(
       return { content: outputText(Buffer.from(output)) }
     },
   }
-  // The question of the Host's node and package (B2.9f): «Сохранять пакеты в Loginom» decides whether it is asked
-  // (В-102, `permissions.ts`), and a refusal reaches `execute.after` as it is, so the turn goes on (B2.6b, B2.6c). 0.4
-  // raced it with the call's abort; the plugin's `assert` outlives a stopped call, so a stop withdraws the call's open
-  // question instead (the core's `reply` then declines the session's other open questions too, as for any decline).
+  // The publication's question, which names the node and the package (B2.9f): «Сохранять пакеты в Loginom» decides
+  // whether it is asked (В-102, `permissions.ts`), and a refusal reaches `execute.after` as it is, so the turn goes on
+  // (B2.6b, B2.6c). 0.4 raced it with the call's abort; the plugin's `assert` outlives a stopped call, so a stop
+  // withdraws the call's open question instead (the core's `reply` then declines the session's other open questions
+  // too, as for any decline).
   const ask = async (call: ToolContext, request: { resources: string[]; metadata: Record<string, unknown> }) => {
     const settled = { done: false }
     call.signal.throwIfAborted()
