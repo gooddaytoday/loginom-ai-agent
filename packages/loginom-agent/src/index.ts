@@ -11,6 +11,7 @@ import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
 import { Dashboard } from "./dashboard"
+import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
@@ -487,6 +488,11 @@ export default Plugin.define({
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
         return code ? { code } : {}
       },
+    })
+    // A dashboard's folder before its chat (B2.9h): Desktop and the CLI ask on the Location of their own working directory.
+    await ctx.rpc.register(DashboardTarget.rpc, {
+      prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
+      find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
