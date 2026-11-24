@@ -466,7 +466,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
     // One admitted operation owns one immutable target. A later export to the
     // same filename cannot inherit this assignment if the first stops early.
-    if(probe?.condition==='P3'&&!probe.operationId&&request.target.type==='exports.text'&&request.finish==='execute'
+    if((probe?.condition==='P3'||probe?.condition==='P4')&&!probe.operationId&&request.target.type==='exports.text'&&request.finish==='execute'
       &&request.parameters.destination===probe.packagePath.slice(0,-4)+'.result.csv')probe.operationId=operation.id;
     if((probe?.condition==='P1'||probe?.condition==='P2')&&!probe.operationId&&request.target.type==='imports.text'&&request.finish==='done'
       &&source.source?.sha256===probe.inputSha256)probe.operationId=operation.id;
@@ -536,7 +536,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
       if(terminal)return terminal;
       // Output reading has its own work (formats, paging, restoration). The
       // configuration limit does not cap it; the total operation deadline still does.
-      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||request.read.variable_ports?.length>0||handler.fileOutput===true,verify:value=>requireValue(
+      const output=await phase('read',ctx=>{
+        if(probe?.condition==='P4'&&probe.operationId===operation.id)ctx.refuseAssignedExportRow=async file=>{
+          if(probe.attempted||file.destination!==request.parameters.destination||state.execution.status!=='completed'
+            ||file.execution_id!==state.execution.execution_id||!['document_id','workflow_id','node_id'].every(k=>file[k]===state.node[k]))return false;
+          probe.attempted=true;
+          return !!await acknowledge({phase:'acceptance_fault_triggered',condition:'P4',target_phase:'read',step:'first_file_row',
+            receipt_id:ctx.receipt_id,node:state.node,destination:file.destination,execution_id:file.execution_id}).catch(()=>null);
+        };
+        return drivers.readOutput(request.read,ctx);
+      },{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||request.read.variable_ports?.length>0||handler.fileOutput===true,verify:value=>requireValue(
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length

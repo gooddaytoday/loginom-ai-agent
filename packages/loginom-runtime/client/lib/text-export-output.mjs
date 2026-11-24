@@ -361,6 +361,10 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    await record('export_file_directory_refreshed',{directory,via:'native_directory_navigation'});
   }else await act(details,refresh);
   await inDirectory(directory);
+  if(ctx.refuseAssignedExportRow&&await ctx.refuseAssignedExportRow(fileBinding)){
+   readStep='file_row_observation';
+   throw Object.assign(Error('Export file row observation unavailable'),{code:'EXPORT_FILE_ROW_UNAVAILABLE'});
+  }
   s=await row(name);need(s.file_storage?.directory===directory,'Export file directory differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
