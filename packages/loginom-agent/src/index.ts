@@ -134,11 +134,11 @@ export default Plugin.define({
     await ctx.mcp.transform((editor) => {
       if (dashboard()) editor.list().forEach(([name]) => editor.remove(name))
     })
-    // The dashboard's tools exist only in its Location (B2.9e), outside the CodeMode catalog like every tool no other
-    // profile permits. Its draft server stops when the plugin unloads.
-    const drafts = dashboardTools(ctx.location.directory, resources)
+    // The dashboard's tools exist only in its Location (B2.9e, B2.9f), outside the CodeMode catalog like every tool no
+    // other profile permits. Its draft server stops when the plugin unloads.
+    const drafts = dashboardTools(ctx.location.directory, resources, { permission: ctx.permission, bound })
     await ctx.tool.transform((editor) => {
-      if (dashboard()) editor.add(drafts.draft)
+      if (dashboard()) [drafts.draft, drafts.publish].forEach((tool) => editor.add(tool))
     })
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).

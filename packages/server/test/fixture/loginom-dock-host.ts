@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto"
 import { HostTaskScope } from "../../../loginom-host/src/task-scope"
 
 // A scripted Loginom Host behind the private port of `loginom-host/src/node-client.ts`, for `ServiceHost.start({ connect })`.
-// It answers the requests the product plugin sends (`acquire`, `scope`, `tools`, `call`, `admit`, `release`) with the
-// task binding rules of `loginom-host/src/host-port.ts`, the current connection generation in every reply, and a
-// catalog and call results the test scripts. `log` keeps every request in order.
+// It answers the requests the product plugin sends (`acquire`, `scope`, `tools`, `call`, `admit`, `release`, and the
+// dashboard storage requests of B2.9f) with the task binding rules of `loginom-host/src/host-port.ts`, the current
+// connection generation in every reply, and a catalog, call results and publications the test scripts. `log` keeps every
+// request in order.
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> }
 type Scope = typeof HostTaskScope.Info.Type
@@ -18,6 +20,8 @@ export function scriptedHost(
     tools?: () => string | undefined
     /** Runs start with a browser runtime, as after `dock_prepare`. */
     prepared?: boolean
+    /** Answers a dashboard storage request (`publications`); a thrown error's message is the Host's error code. */
+    dashboard?: (method: string, input: Record<string, unknown>) => unknown
   } = {},
 ) {
   const listeners: ((event: { data: unknown }) => void)[] = []
@@ -83,6 +87,15 @@ export function scriptedHost(
       const files = input.files as { name: string }[]
       return reply(files.map((file, index) => ({ artifact_id: `artifact-${index + 1}`, name: file.name })))
     }
+    if (dashboardMethods.includes(request.method)) {
+      // As `host-port.ts`: only a run bound to the dashboard's profile reaches the publications.
+      if (run.scope?.profile !== "loginom-dashboard" || !options.dashboard) return fail("LOGINOM_SCOPE_DENIED")
+      try {
+        return reply(options.dashboard(request.method, input))
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : String(error))
+      }
+    }
     if (request.method === "call") {
       if (input.name === "dock_prepare") run.prepared = true
       return reply(
@@ -118,3 +131,25 @@ export const dockTool = (name: string, description = `${name} tool`): Tool => ({
     required: ["host_context_token", "path"],
   },
 })
+
+const dashboardMethods = ["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"]
+
+/** The name of a publication the scripted Host writes. */
+export const publicationName = "20261115T120000Z.json"
+
+/**
+ * A dashboard's publications in Loginom for `scriptedHost({ dashboard })`, as 0.4's `publicationHost` scripted them
+ * (`v0.4.0:packages/opencode/test/tool/dashboard.test.ts`): `dashboardRead` reports `latest`, if any; a write fails with
+ * `error`, reports `latest` as a newer version when `changed`, and otherwise is written as `publicationName` with the
+ * content's hash. The options are read at each request, so a case may change them meanwhile.
+ */
+export const publications =
+  (options: { latest?: { name: string; sourceHash: string }; changed?: boolean; error?: string } = {}) =>
+  (method: string, input: Record<string, unknown>) => {
+    if (method === "dashboardRead") return options.latest ? { version: options.latest, content: "{}" } : null
+    if (method !== "dashboardPublish") throw new Error("LOGINOM_HOST_REQUEST_FAILED")
+    if (options.error) throw new Error(options.error)
+    if (options.changed) return { status: "changed", latest: options.latest ?? null }
+    const sourceHash = createHash("sha256").update(String(input.content)).digest("hex")
+    return { status: "written", version: { name: publicationName, sourceHash } }
+  }
