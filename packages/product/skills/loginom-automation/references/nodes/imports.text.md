@@ -1,27 +1,27 @@
 # Текстовый файл (`imports.text`)
 
 <!-- mode: delimited -->
-Existing: confirmed source CSV before Execute/read; else ask.
-Reads add a visualizer after refusal too. `NOT_APPLIED`/`effect_possible=false`:
-report/ask CSV; no cleanup baseline/Save.
+Existing needs confirmed source CSV before Execute/read.
+Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip cleanup/Save.
 
-Native preview FIRST; compare ORIGINAL text locally. Server: no default download;
-exact check: request/contradiction only; user bans win.
+Missing CSV: `next_step`; SAME node, no XML.
+
+Execute with known schema/format. Otherwise preview and compare ORIGINAL text locally.
+Server download only by request or contradiction. User bans win.
 `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
-`output.server_profile`: native format/types, no Execute. `settings.source.encoding`;
-garbled: fresh `dock_storage_source`, `CP1251`. No rare types proof.
+`output.server_profile`: native format/types, no Execute. Reuse `node` as `target.ref` after Close.
+If garbled, fresh `dock_storage_source` and `settings.source.encoding` CP1251.
 `columns_omitted>0`: do NOT ask names. `auto_detect_columns:"new"`, omit `columns`;
 Execute; ALL names/types/N from readback/port. Edits: SAME node.
-Report native types, rare values unchecked. download/sampling: full sample settings.
+Report native types. Leave rare types unchecked. download/sampling: full sample settings.
 
 Rename/type edits: SAME Import's `settings.columns`, no Reform.
-Unchanged CSV loading: keep `settings.source`/`settings.format`/`mappings`,
-fields/order; requested edits only. Deliver session attachment:
-`overwrite=reject`; compare server bytes before path reuse. Never bypass
-`UPLOAD_PATH_CONFLICT` via path/policy changes or saved-node activation.
+Keep unchanged `settings.source`/`settings.format`/`mappings` and field order.
+Attachment `overwrite=reject`. Compare server bytes before reuse. Never bypass
+`UPLOAD_PATH_CONFLICT` via path/policy or saved-node activation.
 
-New: no `source_path`=upload_operation_id's path.
+Use receipt `output.upload_operation_id`. Omit `source_path` for its verified path.
 Fallback: UTF-8, header 1, skip 0, comma, decimal point, empty NULL, double quote.
 
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.

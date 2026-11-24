@@ -8,7 +8,8 @@ function fixture(fault) {
  const snapshot={authenticated:true,origin:'https://test',loginom_build:'7.4.2',workflow_ref:{prefix},dom_epoch:{document:'doc',revision:1},
   active_tab_ref:'tab',package_identity:null,file_storage:{status:'observed',directory:'/user/dock-p3'},observation_root:{ref:'nav'},ui:{elements:[],masks:[],dialogs:[]}};
  const task={snapshot,artifact:{name,bytes:42,upload:{directory:'/user/dock-p3'}},expected_origin:'https://test',expected_build:'7.4.2',operation_id:'verify'};
- const owner={isConnected:true,scrollHeight:2500,clientHeight:500,contains:e=>e===owner,
+ const staticListing=fault==='late_row'||fault==='missing_row';
+ const owner={isConnected:true,scrollHeight:staticListing?500:2500,clientHeight:500,contains:e=>e===owner,
   getBoundingClientRect:()=>({x:0,y:100,width:800,height:500}),get scrollTop(){return top;},set scrollTop(v){moves.push(v);top=v;}};
  const state={observer:{takeRecords:()=>[]},epoch:'doc',revision:1};
  const context=vm.createContext({document:{querySelectorAll:()=>fault==='owner'?[{}]:[owner],elementFromPoint:()=>fault==='blocked'?{}:owner},getComputedStyle:()=>({display:'block',visibility:'visible'})});
@@ -29,7 +30,7 @@ function fixture(fault) {
   if(fault==='refresh_busy_owner'&&directoryReads>=3)s.active_tab_ref='foreign';
   if(fault==='refresh_context'&&directoryReads>1||fault==='refresh_native_context'&&nativeChecks>0)s.active_tab_ref='foreign';
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
-  if(options.discover_roots&&(top>=1400||(fault==='empty'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
+  if(options.discover_roots&&(top>=1400||(fault==='empty'||fault==='late_row'||fault?.startsWith('refresh_busy')||fault?.startsWith('refresh_native'))&&refreshes>0)&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
   if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };
@@ -46,7 +47,7 @@ function fixture(fault) {
   if(refresh)await refresh(async()=>{nativeChecks++;return fault!=='refresh_native_limit'&&(!fault?.startsWith('refresh_native')||nativeChecks>1);});
   if(fault==='readiness_timeout'||fault==='refresh_timeout'&&refreshes)throw Error('Readiness timeout');
   if(minimum!==null)assert.ok(refreshes>=minimum);
-  return {load_count:refreshes,empty_native_store:(fault==='empty'||fault?.startsWith('refresh_'))&&refreshes===0};
+  return {load_count:refreshes,complete:staticListing,empty_native_store:(fault==='empty'||fault?.startsWith('refresh_'))&&refreshes===0};
  };
  return {run:()=>discoverArtifactAndDownload(page,task,ui,download,()=>{},ready),moves,deadlines,get settlements(){return settlements;},get downloads(){return downloads;},get refreshes(){return refreshes;},get waits(){return waits;}};
 }
@@ -128,6 +129,24 @@ for(const fault of ['owner','blocked','directory','absent','lost_scroll','lost_d
  const f=fixture(fault),r=await f.run();assert.notEqual(r.status,'SUCCEEDED');assert.ok(f.downloads<=1);
  if(['owner','blocked'].includes(fault)){assert.equal(r.effect_possible,false);assert.deepEqual(f.moves,[]);}
  if(['lost_scroll','lost_download'].includes(fault)){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);}
+});
+
+test('discovery refreshes a nonempty directory when the uploaded row is late',async()=>{
+ const f=fixture('late_row'),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error?.code);
+ assert.equal(f.refreshes,1);
+ assert.equal(f.downloads,1);
+ assert.deepEqual(f.moves,[]);
+ assert.equal(new Set(f.deadlines).size,1);
+});
+
+test('discovery refuses a missing row after one refresh of the complete directory',async()=>{
+ const f=fixture('missing_row'),r=await f.run();
+ assert.equal(r.error?.code,'DISCOVERY_FILE_NOT_FOUND');
+ assert.equal(f.refreshes,1);
+ assert.equal(f.downloads,0);
+ assert.equal(r.cleanup_complete,true);
+ assert.equal(new Set(f.deadlines).size,1);
 });
 
 test('host accepts a discovered reference only for the prepared document tab workflow and file',async()=>{

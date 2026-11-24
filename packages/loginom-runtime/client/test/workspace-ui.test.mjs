@@ -1854,6 +1854,33 @@ test('replacement type portal exposes only items owned by the selected field and
  }
 });
 
+for(const mode of ['owned','hidden','foreign','transient'])
+test('Python Next reports only a stable error from the owned wizard: '+mode,async()=>{
+ const page=new Page(),c=wizardStepFixture(page);
+ c.marker.attrs['data-tid']=c.base+';PythonCodeWizard;cmpCodeCM';
+ const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
+ let error,waits=0;
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{
+  await click(...args);
+  error=page.add('button',c.base+';btnError','Подробнее',undefined,mode==='foreign'?undefined:c.form);
+  error.attrs['data-qtip']='Исполняемый файл python3 не найден';
+  if(mode==='hidden')error.style.display='none';
+ };
+ page.waitForTimeout=async ms=>{
+  page.clock.advance(ms);waits++;
+  if(mode==='transient'&&waits===1){error.remove();c.marker.remove();page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);}
+ };
+ const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'done'},snapshot);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ if(mode==='owned'){
+  assert.equal(result.error.code,'WIZARD_PYTHON_VALIDATION_FAILED');
+  assert.equal(result.error.message,'Исполняемый файл python3 не найден');
+  assert.equal(waits,1);
+ }else if(mode==='transient')assert.equal(result.status,'SUCCEEDED');
+ else assert.equal(result.error.code,'WIZARD_STEP_NOT_CONFIRMED');
+});
+
 test('calculator Preview rejects a native formula error before Next or Done',async()=>{
  const page=new Page(),c=wizardStepFixture(page);
  c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
@@ -1932,7 +1959,7 @@ test('calculator Preview accepts only its native modal and closes with an observ
  }
 });
 
-test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+test('Journal C Preview parse-error with nested quotes is read and dismissed before a typed refusal',async()=>{
  for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','foreign_message','other_field','changed_owner']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
@@ -1961,6 +1988,43 @@ test('observed Preview parse-error msgbox is read and dismissed before a typed r
   assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
   if(fault==='none') {
    assert.equal(result.output.wizard.calculator_validation.field_name,'id');
+   assert.equal(result.output.wizard.calculator_validation.message,message);
+   assert.equal(result.output.ui.dialogs.length,0);
+  }
+ }
+});
+
+test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+ for(const tid of ['msgbox','msgbox-1','msgbox-12']) for(const fault of ['none','display_label','ambiguous_label','foreign_message','other_field','changed_owner']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+  const usesLabel=['display_label','ambiguous_label'].includes(fault);
+  const label='Стандартная ошибка доли A';
+  const message='Loginom '+build+' Настройка прервана 1. Ошибка разбора выражения "'+(usesLabel?label:'id')+'" 1.1. Неправильно расставлены скобки Технические подробности OK';
+  const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output;
+  snapshot.node_calculator={verified:true,expressions:[{name:usesLabel?'se_A':fault==='other_field'?'Other':'id',label,
+   formula:'Sqrt(1/2'},...(fault==='ambiguous_label'?[{name:'se_B',label,formula:'Sqrt(1/3)'}]:[])]};
+  const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);
+   if(dialog){dialog.remove();return;}
+   dialog=page.add('div',tid,'',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('div',null,message,undefined,dialog);
+   page.add('a',tid+';tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=fault==='changed_owner'?{}:box;
+   page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  const owned=['none','display_label'].includes(fault);
+  assert.equal(result.error.code,owned?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,owned?2:1);
+  if(owned) {
+   assert.equal(result.output.wizard.calculator_validation.field_name,usesLabel?'se_A':'id');
    assert.equal(result.output.wizard.calculator_validation.message,message);
    assert.equal(result.output.ui.dialogs.length,0);
   }
@@ -3889,6 +3953,32 @@ function importSourceFixture(page) {
   const display=page.add('span',base+'edtFirstLineAsTitle;ValueControl;DisplayEl','',undefined,header);display.attrs.class='x-form-checkbox';
   return {base,form,inputs,owners,header,native,display};
 }
+
+test('text import observes native local storage when Loginom hides its connection row',async()=>{
+  for(const mode of ['local','external','unverified','duplicate']) {
+    const page=new Page(),c=importSourceFixture(page);
+    const row=page.add('div',c.base+'cntConnection','',undefined,c.form);
+    row.id='connection-row';
+    row.style={display:'none'};
+    c.owners.connection.remove();
+    row.append(c.owners.connection);
+    if(mode==='external')c.inputs.connection.value='FTP';
+    if(mode==='duplicate')page.add('div',c.base+'edtConnection','',undefined,row);
+    page.context.bg.app.IsFileConnectionHidden=true;
+    page.context.Ext={getCmp:id=>id===row.id?{hidden:mode!=='unverified',el:{dom:row}}:null};
+
+    const snapshot=await page.observe();
+    const field=snapshot.wizard.import_source.fields.connection;
+    if(mode!=='local'){
+      assert.notEqual(field.status,'observed',mode);
+      continue;
+    }
+    assert.equal(field.status,'observed');
+    assert.equal(field.value,'Локальное');
+    assert.equal(field.enabled,false);
+    assert.equal(field.input_ref,undefined);
+  }
+});
 
 test('source code page selection verifies the original field after one native choice',async()=>{
   for(const mode of ['applied','delayed','unchanged','replaced']) {
@@ -5871,13 +5961,60 @@ test('native-owned export keeps its hidden node breadcrumb through input, settin
   }
 });
 
+test('restored text Export input0/native0 retains guarded Done with overflowing ancestry',async()=>{
+ for(const fault of ['valid','node','port','workflow','opening','index','icon','caption','folder','duplicate','sensitive','hidden']) {
+  const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+  opening.nativeIndex=opening.portTree.FIndex=opening.port.FPortIndex=0;
+  opening.node.FIconCls='bg-vendor-icon-exporttextfile';
+  crumbs[5].children[0].attrs.class='bg-vendor-icon-exporttextfile';
+  const group=opening.portTree.ParentNode,wizardTree=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node;
+  const collection={FParentNode:group,FItems:[opening.portTree]};
+  group.FSubNodes=opening.portCollection=collection;opening.portTree.FCollection=collection;
+  opening.nodeTree.FInputPortsRootNode=group;
+  const components=new Map(crumbs.slice(5).map((e,i)=>{
+   e.id='export-ancestry-'+i;e.attrs.id=e.id;
+   return [e.id,{el:{dom:e},_node:{data:{node:[opening.nodeTree,group,opening.portTree,wizardTree][i]}}}];
+  }));
+  page.context.Ext={getCmp:id=>components.get(id)};
+  const wizard=opening.wizard.FView.el.dom;
+  page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
+  const definition=mappingCoverageFixture(page);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(definition.base))
+   e.attrs['data-tid']=e.attrs['data-tid'].replace(definition.base,'MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;').replace('colDefaultUsageType_','colUsageType_');
+  for(const e of [...definition.form.children]){e.remove();wizard.append(e);}
+  definition.form.remove();
+  page.context.innerWidth=1280;page.context.innerHeight=800;
+  page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',undefined,wizard);
+  for(const i of [5,6]){
+   crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};
+   for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};
+  }
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(fault==='node')opening.node.FGuid='foreign';
+  if(fault==='port')opening.port.FGuid='foreign';
+  if(fault==='workflow')opening.workflow={};
+  if(fault==='opening')preparation.inputPortOpenReceipts.clear();
+  if(fault==='index')opening.port.FPortIndex=1;
+  if(fault==='icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(fault==='caption')crumbs[7].ownText='Other source';
+  if(fault==='folder')crumbs[6].ownText='Выходные порты';
+  if(fault==='duplicate')page.add('a',crumbs[5].getAttribute('data-tid'),crumbs[5].ownText,crumbs[5].box,panel);
+  if(fault==='sensitive')crumbs[5].attrs['aria-label']='password';
+  if(fault==='hidden')panel.style.display='none';
+  const result=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(result.output?.wizard?.input_port_context?.status==='observed',fault==='valid',fault);
+  assert.equal(result.output?.ui?.elements.some(e=>e.allowed_actions.includes('finish_wizard'))??false,fault==='valid',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned text export input observes its actual hidden data-source caption',async()=>{
   const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});
   assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
   assert.equal(full.output.wizard.input_port_context.status,'observed');
   assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных');
-  assert.deepEqual(full.output.prepared_node_context.input_port,expectedPort);
+  assert.deepEqual(full.output.prepared_node_context.input_port,{...expectedPort,wizard_index:expectedPort.native_index});
   const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
   assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
   assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);
@@ -8635,6 +8772,41 @@ for(const suffix of ['', '-1'])test('reform literal node cache picker uses the e
  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
  const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
  assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+test('date string-format editor sets the exact draft without invoking preset search',async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.viewportSize=()=>({width:1000,height:800});
+ const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:900,height:500});
+ const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:850,height:470},form);
+ const panel=page.add('div',base+'grdDataFormat','',{x:40,y:100,width:710,height:300},root);
+ panel.id='matrix';
+ page.add('div',base+'grdDataFormat;tbl','',{x:40,y:100,width:710,height:280},panel);
+ const editor=page.add('div',base+'grdDataFormat;tbl;celleditor;FormatStrEditor;cbx','',{x:450,y:126,width:180,height:25},panel);
+ editor.id='format-combo';
+ const input=page.add('input',null,'',{x:452,y:128,width:160,height:20},editor);
+ input.attrs.type='text';input.value='';
+ let record={isModel:true,internalId:'r0',data:{Func:18,ISO8601:false}};
+ const grid={el:{dom:panel},findPlugin:()=>({editing:true,context:{column:{dataIndex:'DoString'},record}})};
+ const combo={el:{dom:editor},inputEl:{dom:input},forceSelection:false,
+  setValue:text=>{page.events.push('format_set');input.value=text;}};
+ page.context.Ext={getCmp:id=>({'matrix':grid,'format-combo':combo})[id]};
+
+ const before=await page.observe();
+ const owned=before.ui.elements.find(e=>e.date_time_cell?.role==='format_editor');
+ assert.ok(owned?.allowed_actions.includes('fill'),JSON.stringify({stage:before.wizard.stage,field:owned}));
+ const result=await page.act({verb:'fill',ref:owned.ref,text:'%Y-%m'},before);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(input.value,'%Y-%m');
+ assert.deepEqual(page.events.filter(e=>e==='format_set'||e==='keyboard_type'),['format_set']);
+
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{await click(...args);record={...record,internalId:'other'};};
+ const after=await page.observe();
+ const changed=await page.act({verb:'fill',ref:owned.ref,text:'%Y'},after);
+ assert.equal(changed.error?.code,'DATE_FORMAT_EDITOR_CHANGED');
+ assert.equal(input.value,'%Y-%m');
+ assert.equal(page.events.filter(e=>e==='format_set').length,1);
 });
 
 test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{

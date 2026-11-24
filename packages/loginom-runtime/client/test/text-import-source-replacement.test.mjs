@@ -37,7 +37,7 @@ function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,in
 }
 
 function repaintingFormat(fault='delayed',button='Back') {
- const f=fixture(),records=[],workflow_ref={prefix:'MF;TF-1',tab_tid:'tab'};
+ const f=fixture({samePath:button==='Back'}),records=[],workflow_ref={prefix:'MF;TF-1',tab_tid:'tab'};
  const ref=button==='Back'?'ui-prev':'ui-refresh';
  const condition=button==='Back'?'Previous control available':'replacement source definitions refresh available';
  const operation={id:'replace',action:{action_key:'node.apply',revision:'1'},deadline:2000,
@@ -88,7 +88,7 @@ function repaintingFormat(fault='delayed',button='Back') {
 
 for(const fault of ['delayed','mask','late'])test('existing Import waits for its format repaint before Back: '+fault,async()=>{
  const f=repaintingFormat(fault);
- await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+ await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/old.csv');
  assert.equal(f.gestures.filter(a=>a.ref==='ui-prev').length,1);
  assert.ok(f.elapsed>=450);
  assert.equal(f.attempts,fault==='late'?2:1);
@@ -98,7 +98,7 @@ for(const fault of ['delayed','mask','late'])test('existing Import waits for its
 
 for(const fault of ['foreign','effect','unconfirmed','deadline'])test('existing Import format settlement refuses '+fault,async()=>{
  const f=repaintingFormat(fault);
- await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'));
+ await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/old.csv'));
  assert.equal(f.operation.deadline,2000);
  assert.ok(f.elapsed<=f.operation.deadline);
  assert.equal(f.gestures.filter(a=>a.ref==='ui-prev').length,fault==='effect'?1:0);
@@ -132,6 +132,22 @@ test('changed existing source refreshes stale native definitions and reconciles 
  assert.equal(r.verified,true);assert.equal(f.refreshes,1);assert.equal(r.preservation.source_schema_refreshed,true);
  assert.deepEqual(r.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),[f.retained[1],f.retained[0],f.extra]);
  assert.deepEqual(r.preservation.columns_before.map(c=>c.name),['Id','Title']);
+});
+
+test('a missing saved source is replaced before Next and retains the observed schema',async()=>{
+ const f=fixture(),act=f.channel.act,events=[];
+ f.channel.act=async action=>{
+  if(action.verb==='wizard_step'&&action.expected_stage==='text_import_format')
+   assert.equal(f.state().wizard.import_source.fields.source_path.value,'/test/new.csv','old source no longer exists');
+  await act(action);
+ };
+ const r=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv',{
+  captureOutputLayout:async()=>{events.push(f.state().wizard.stage);}
+ });
+ assert.equal(r.verified,true);assert.equal(f.refreshes,1);
+ assert.deepEqual(events,['text_import_format']);
+ assert.deepEqual(r.preservation.columns_before.map(c=>c.name),['Id','Title']);
+ assert.deepEqual(r.columns.map(c=>c.name),['Title','Id','Zone']);
 });
 
 test('sample to full changes only source_path and never refreshes definitions',async()=>{

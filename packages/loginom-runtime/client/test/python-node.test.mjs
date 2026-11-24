@@ -60,6 +60,16 @@ test('parameters: new nodes need code and schema mode; code mode forbids columns
  assert.throws(()=>validatePythonParameters({source_text:pandas,schema_mode:'code'},'script',request('new',{read:{ports:[0],coverage:'full'}})),/coverage/);
 });
 
+test('Python source bounds refusal describes the accepted size and line endings',()=>{
+ for(const source_text of ['x'.repeat(2049),'x\n'.repeat(128),'x\r\n'])
+  assert.throws(()=>validatePythonParameters({source_text,schema_mode:'code'},'script',request()),error=>{
+   assert.match(error.message,/source_bounds.*2048 characters.*128 lines/);
+   assert.match(error.message,/LF/);
+   assert.doesNotMatch(error.message,/Imports:/);
+   return true;
+  });
+});
+
 test('public envelope reuses the JavaScript parameter shape for programming.python',()=>{
  const args={target:{kind:'new',type:'programming.python'},mode:'script',parameters:{source_text:pandas,schema_mode:'code'},finish:'execute'};
  assert.equal(validateNodeApplyEnvelope(args),args);

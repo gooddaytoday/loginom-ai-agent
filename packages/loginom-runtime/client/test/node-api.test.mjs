@@ -6,9 +6,12 @@ import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
+ // #1281: optional inputs[].replace_existing adds 222 bytes to apply and resume
+ // (+444 full, +222 compact). #1282: json_field object-array guidance adds
+ // 16 bytes twice (+32 full, 0 compact). #1277 changes replies only (+0).
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,203205,'355b0205ac7db43c5846673ad23b567a28625bd6022186c145e9c945bdfdc0aa'],
-  [nodeApiTools.map(userNodeTool),14386,'601a58589ac28eee3a9423a07a1328e0fcd93ec8a3df064a10792009c1d491eb'],
+  [nodeApiTools,203681,'fb170fa5a0d723f633667e2babe09f975d11de7a88df52b3ea2fa58432fadc2c'],
+  [nodeApiTools.map(userNodeTool),14608,'dd74c97fbc7fc48bf8e7418109b329367aaf02c0b550fba5c79f8442225b006f'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

@@ -69,6 +69,31 @@ async function stop(f){
 }
 const release=f=>f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release'});
 
+test('#1247 a wrong palette drop stays pending through inspect and abandon without another drag',async()=>{
+  const f=fixture('target','integration.rest_request'),actual='bg-vendor-icon-jointree';
+  const receipt={status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true,
+    error:'Created node type mismatch: expected integration.rest_request, observed '+actual,
+    create_mismatch:{expected:f.request.target.type,actual}};
+  const mutate=f.adapter.mutate;
+  f.adapter.mutate=async effect=>{
+    await mutate(effect);
+    f.state.graph.nodes[0].type=actual;
+    return receipt;
+  };
+  f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:true,receipt});
+  const job=await stop(f);
+  assert.ok(job.outcome.output.error.message.includes(receipt.error));
+  // A subsequent edit to the graph cannot turn this drag into a verified creation.
+  f.state.graph.nodes[0].type=f.request.target.type;
+  await f.runtime.inspect({operationId:'apply'});
+  const result=await release(f);
+  assert.equal(result.error.code,'NODE_RELEASE_REFUSED');
+  assert.ok(result.error.message.includes(receipt.error));
+  assert.equal(f.state.operation.targetPhase.targetId,null);
+  assert.ok(f.state.operation.targetPhase.pending);
+  assert.deepEqual(f.calls,['create']);
+});
+
 for(const fault of ['running','unknown','cleanup','missing','identity','completed'])
 test('handoff reads the original target ledger without a parent receipt: '+fault,async()=>{
   const f=fixture('target_pending');await stop(f);

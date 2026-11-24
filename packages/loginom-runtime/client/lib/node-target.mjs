@@ -32,6 +32,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref))return null;
   const keep=(g,ids,edges=[])=>({nodes:g.nodes.filter(n=>!ids.includes(n.ref.node_id)).map(domainNode),links:g.links.filter(e=>!edges.includes(edgeKey(e))),variable_links:(g.variable_links??[]).filter(e=>!edges.includes(edgeKey(e)))});
   if(kind==='create'){
+    if(effect.receipt?.create_mismatch)return null;
     const added=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
     if(added.length!==1 || added[0].type!==p.type)return null;
     const id=added[0].ref.node_id,auto=after.links.filter(e=>!before.links.some(b=>edgeKey(b)===edgeKey(e)));
@@ -196,6 +197,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(['remove_link','connect'].includes(kind)&&state.replacements?.some(r=>r.created.target===parameters.edge.target&&r.created.input===parameters.edge.input)){
+        if(!sameDomainGraph(state.last_graph??state.baseline,before)
+          ||!state.replacements.some(r=>same(kind==='remove_link'?r.removed:r.created,parameters.edge)))
+          throw Error('Named input replacement authorization changed before graph effect');
+      }
       if(kind==='remove_link'&&parameters.edge.output==='connection:0'
         &&(request.target.kind!=='new'||parameters.edge.target!==state.targetId
           ||!(state.auto_created_service_links??[]).some(e=>same(e,parameters.edge))))throw Error('Unowned REST service connection');
@@ -241,7 +247,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           try{await record({operation_id:effect.id,phase:'node_target_link_graph_refused',internal_provenance:'node_target_v1',before:snapshot(before),after:snapshot(after)});}
           catch{/* Keep the original reconciliation refusal if evidence is unavailable. */}
         }
-        throw new Error('Graph effect needs reconciliation');
+        throw new Error(receipt?.create_mismatch?receipt.error:'Graph effect needs reconciliation');
       }
       state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
       state.pending = null; state.last_graph=structuredClone(after);
@@ -353,8 +359,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if(operation.restQueryInput&&(!restInputReplacement(graph)||!graph.links.some(e=>edgeKey(e)===edgeKey(operation.restQueryInput.edge))))
           throw Error('REST encoder input authorization differs from the existing graph');
         for(const input of request.inputs){
-          const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
+          const incoming=graph.links.filter(e=>e.target===existing.ref.node_id&&e.input===input.input);
+          if(incoming.length>1)throw Error('Requested input has ambiguous incoming links');
+          const occupied=incoming[0];
           if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
+            &&input.replace_existing!==true
             &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
             // LAB-1904: a replaced REST still feeds this consumer until it is deleted.
             +(node(graph,occupied.source).type==='integration.rest_request'&&request.inputs.some(i=>i.source.node_id!==occupied.source&&node(graph,i.source.node_id).type==='integration.rest_request')
@@ -381,6 +390,11 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         validateNodeTargetRequest({...request,target:{...request.target,position:state.newPosition}});
         if(!state.newPosition)throw Error('target.position: no verified free position available');
       }
+      state.replacements=request.target.kind!=='existing'?[]:request.inputs.filter(i=>i.replace_existing===true).flatMap(i=>{
+        const removed=graph.links.find(e=>e.target===state.targetId&&e.input===i.input);
+        const created={source:i.source.node_id,output:i.output,target:state.targetId,input:i.input};
+        return removed&&edgeKey(removed)!==edgeKey(created)?[{removed:structuredClone(removed),created}]:[];
+      });
       state.baseline = structuredClone(graph); await commit();
       break;
      }
@@ -420,9 +434,10 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
     for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
       const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+        ||(state.replacements??[]).some(r=>same(r.removed,edge))
         ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
       // Other existing links not mentioned by the caller are preserved.
-      // Conflicting links require an explicit edit contract, never deletion.
+      // Conflicting links require permission for this exact named input.
       if (!owned) {
         if (desired.some(d => d.input === edge.input)) throw new Error('Requested input is occupied by an unowned link');
         continue;
@@ -490,6 +505,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     state.completed=true;state.final_graph=structuredClone(graph);
     state.result = { status: 'SUCCEEDED', phase: 'target_ready', node: node(graph, state.targetId),
       created: request.target.kind === 'new', links: desired,...(variableDesired.length?{variable_links:graph.variable_links.filter(e=>variableDesired.some(d=>edgeKey(d)===edgeKey(e)))}:{}), auto_created_links: state.auto_created_links ?? [],
+      ...((state.replacements??[]).length?{replaced_links:structuredClone(state.replacements)}:{}),
       effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })), configured: false, executed: false, package_saved: false };
     await commit(); return structuredClone(state.result);
   } catch (error) {
@@ -565,7 +581,11 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
     await inspectNodeTarget({request,operation,adapter,record,deadline});
   check();
   const target=operation.targetPhase;
-  if(target?.pending)throw Error('Original target effect remains unresolved');
+  if(target?.pending){
+    const receipt=target.pending.receipt;
+    if(receipt?.create_mismatch)throw Error(receipt.error+'; inspect the unexpected node in the original workflow before continuing');
+    throw Error('Original target effect remains unresolved');
+  }
   const first=await adapter.observe(value,deadline,signal);
   check();
   const quiet=g=>g?.complete===true&&g.interaction_ready===true&&g.document_id===request.document_id&&same(g.workflow_ref,request.workflow_ref)

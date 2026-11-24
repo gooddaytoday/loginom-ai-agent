@@ -147,7 +147,10 @@ export function validateNodeTargetRequest(request) {
   }
   const targets = new Set();
   for (const input of request.inputs) {
-    object(input, ['source', 'output', 'input']); validateNodeReference(input.source); index(input.output); index(input.input);
+    object(input, ['source', 'output', 'input', 'replace_existing'], ['source', 'output', 'input']); validateNodeReference(input.source); index(input.output); index(input.input);
+    if(input.replace_existing!==undefined&&typeof input.replace_existing!=='boolean')throw Error('replace_existing must be a boolean');
+    if(input.replace_existing===true&&(target.kind!=='existing'||(NODE_TYPES[target.type].input_kinds?.[input.input]??'data')!=='data'))
+      throw Error('replace_existing requires a named tabular input on an existing target');
     if (input.source.document_id !== request.document_id || input.source.workflow_id !== request.workflow_ref.workflow_id) throw new Error('Input belongs to another workflow');
     if (targets.has(input.input)) throw new Error('More than one source for a target input');
     targets.add(input.input);

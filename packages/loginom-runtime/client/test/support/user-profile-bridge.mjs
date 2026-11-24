@@ -17,7 +17,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const resources = await createBundledSkillFixture(t);
   const directory = await mkdtemp(join(tmpdir(), 'loginom-user-bridge-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const compatibility = { profile_id: 'unit-linux-chromium', loginom_build: '7.4.2', platform: 'linux', browser: 'chromium' };
+  const platform = { darwin: 'macos', win32: 'windows', linux: 'linux' }[process.platform];
+  const compatibility = { profile_id: `unit-${platform}-chromium`, loginom_build: '7.4.2', platform, browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
   let connectionPage=null;
@@ -102,6 +103,9 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     await Promise.all([client.connect(agent), bridge.server.connect(server)]);
     assert.match(client.getInstructions(), /activate.*loginom-automation/i);
     assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
+    const describeTool=(await client.listTools()).tools.find(tool=>tool.name==='dock_action_describe');
+    assert.match(describeTool.description,/Pass JSON arrays directly for action_keys, node_types and modes/);
+    for(const key of ['action_keys','node_types','modes'])assert.equal(describeTool.inputSchema.properties[key].type,'array');
     const connection={Connected:true,UserName:'user',FRemoteSession:{},FSession:{}};
     const packageNode={PackageFileName:''};
     const form={FReconnecting:false,FMapTree:{FServerConnection:connection,PackageNodes:{Count:1,Items:()=>packageNode}}};
@@ -131,6 +135,17 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     for(const type of ['imports.lgd','exports.lgd'])assert.ok(result.knowledge.node_types.some(node=>node.type===type));
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
     assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
+    const describe=arguments_=>client.callTool({name:'dock_action_describe',arguments:arguments_});
+    const nativeArgs={action_keys:['package.save_checkpoint'],node_types:['imports.text'],modes:['delimited']};
+    const encodedArgs=Object.fromEntries(Object.entries(nativeArgs).map(([key,value])=>[key,JSON.stringify(value)]));
+    const actual=await describe(encodedArgs);
+    const decoded=JSON.parse(actual.content[0].text);
+    assert.equal(decoded.error,undefined,JSON.stringify(decoded.error));
+    assert.deepEqual(decoded,JSON.parse((await describe(nativeArgs)).content[0].text));
+    for(const args of [{action_keys:'['},{action_keys:'null'},{node_types:'"imports.text"'},{modes:'[1]',node_types:'["imports.text"]'},{action_keys:'["node.add"]'}]){
+      const denied=await describe(args);
+      assert.equal(JSON.parse(denied.content[0].text).error.code,'REQUEST_REJECTED');
+    }
     const oversized=await client.callTool({name:'dock_action_describe',arguments:{node_types:result.knowledge.node_types.map(card=>card.type)}});
     assert.equal(oversized.isError,true);
     assert.equal(JSON.parse(oversized.content[0].text).error.code,'USER_RESPONSE_BUDGET');
@@ -232,7 +247,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     identityPage.url=()=>config.loginomUrl;
     identityPage.evaluate=async(fn,args)=>{identityPage.context.args=args;return runInContext(`(${fn.toString()})(args)`,identityPage.context);};
     identityPage.locator=()=>({isVisible:async()=>true});
-    const mask=identityPage.add('div','preparation-loading');mask.attrs.class='x-mask-msg';
+    // #1272 waits for a settled Home/Files/workflow before binding identity.
+    // A loading mask is pending; an unknown dialog must still refuse before upload.
+    identityPage.add('button','MF;TF-1;HomePage;btnCreateUnsavedPackage');
+    const mask=identityPage.add('div','preparation-blocker');mask.attrs.class='x-window';
     const refused=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.equal(packageDeliveries.length,0,'identity refusal must precede upload');

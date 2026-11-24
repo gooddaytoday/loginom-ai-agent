@@ -84,6 +84,20 @@ test('read maps .html links and directories to shipped pages and suggests pages 
   assert.match(missing.text, /Similar pages:\n- .*rest-request\.md — REST-запрос/);
 });
 
+test('read handles URI arrays serialized as JSON strings by a model', async t => {
+  const { call } = await client(t);
+  const uris = [`${HELP_URI}/data/processors/func/calc-func/datetime.md`, 'processors/transformation/calc/'];
+  const expected = await call('read', { uris });
+  assert.equal(expected.isError, false);
+  assert.deepEqual(await call('read', { uris: JSON.stringify(uris) }), expected);
+  assert.deepEqual(await call('read', { uris: JSON.stringify(uris.slice(0, 1)) }), await call('read', { uris: uris[0] }));
+  for (const invalid of ['[]', '[1]', JSON.stringify(Array(11).fill(uris[0]))]) {
+    const result = await call('read', { uris: invalid });
+    assert.equal(result.isError, true);
+    assert.match(result.text, /list of up to 10 URIs/);
+  }
+});
+
 test('read and find give the page address on the Help site, not one rebuilt from the URI', async t => {
   const site = 'https://help.loginom.ru/userguide/';
   assert.equal(helpPageUrl(site, 'data/processors/func/calc-func/datetime.md'), `${site}processors/func/calc-func/datetime.html`);

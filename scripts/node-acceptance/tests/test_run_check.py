@@ -751,9 +751,10 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None, data_files=(), commands=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
+        for name in data_files: (case / 'data' / name).write_text('x')
         (case / 'task.md').write_text('Обработай недоступный тип данных.')
         expected = dict(nodes=[], outputs=[], refusal=dict(text=expected_text or 'Не могу: этот тип данных не поддерживается.'))
         if variant == 'import node': expected['nodes'] = [dict(type='imports.text')]
@@ -773,6 +774,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         phases = []
         def phase(name, command, folder, **kwargs):
             phases.append(name)
+            if commands is not None: commands.append((name, [str(c) for c in command]))
             instance.report['phase'] = name
             profile = out / case.name / 'profile'
             if name == 'setup':
@@ -1895,6 +1897,42 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             self.assertEqual(list(case['data'].iterdir()), [])
             with self.assertRaises(ValueError):
                 runner.scenario('../s-server-a', cases=root)
+
+    def test_private_case_json_continues_a_sibling_case_with_listed_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'base-case').mkdir()
+            (root / 'base-case/task.md').write_text('Построй сценарий')
+            follow = root / 'follow-up'
+            (follow / 'data').mkdir(parents=True)
+            (follow / 'task.md').write_text('Добавь фильтр')
+            (follow / 'data/rules.json').write_text('{}')
+            runner.write(follow / 'case.json', dict(base='base-case', input_files=['rules.json'], budget=dict(max_tool_calls=40)))
+            case = runner.scenario('follow-up', cases=root)
+            self.assertEqual((case['base'], case['input_files'], case['attach_all']), ('base-case', ['rules.json'], True))
+            for bad in [dict(base='follow-up'), dict(base='missing'), dict(input_files=['absent.csv']), dict(input_files=['../x']), dict(retries=2)]:
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    runner.write(follow / 'case.json', bad)
+                    runner.scenario('follow-up', cases=root)
+
+    def test_private_case_attaches_every_data_format_with_configured_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            commands = []
+            self.refusal_run(Path(directory), data_files=('orders.xml', 'orders.json', 'notes.txt'), commands=commands)
+            model = next(command for name, command in commands if name == 'model')
+            attached = sorted(Path(model[i + 1]).name for i, arg in enumerate(model) if arg == '--file')
+            self.assertEqual(attached, ['notes.txt', 'orders.json', 'orders.xml'])
+            self.assertEqual(model[model.index('--model') + 1], runner.MODEL)
+            self.assertEqual(model[model.index('--variant') + 1] if '--variant' in model else '', runner.VARIANT)
+
+    def test_model_and_auth_come_from_environment(self):
+        loaded = importlib.util.spec_from_file_location('run_check_env', Path(__file__).resolve().parents[1] / 'run-check.py')
+        module = importlib.util.module_from_spec(loaded)
+        with patch.dict(os.environ, {'RUN_CHECK_MODEL': 'opencode-go/deepseek-v4.1-flash', 'RUN_CHECK_AUTH': '/tmp/auth-go.json'}):
+            os.environ.pop('RUN_CHECK_VARIANT', None)
+            loaded.loader.exec_module(module)
+        self.assertEqual((module.MODEL, module.VARIANT, module.AUTH), ('opencode-go/deepseek-v4.1-flash', '', Path('/tmp/auth-go.json')))
+        self.assertEqual((runner.MODEL, runner.VARIANT), ('openai/gpt-6.1-sol', 'medium'))
 
     def test_flat_pair_preserves_the_assigned_account(self):
         config = {'username': 'test', 'url': 'https://app.loginom.ai', 'api_key': 'private', 'password': 'private', 'package_directory': '/test'}

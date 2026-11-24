@@ -13,6 +13,21 @@ import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 
+test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
+ const page=new Page(),receipt={status:'READY',operation_id:'shared'};
+ const engine=runtime(page,{getPreparationReceipt:id=>id==='shared'?receipt:null,
+  nodeApplyHandlers:new Map([['imports.text',{revision:'fixture',modes:['delimited'],validate(){},configure(){}}]])});
+ const request={operation_id:'shared',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'imports.text'},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ engine.startNodeApply(request);
+ const worker=await engine.waitNodeApply('shared');
+ assert.equal(worker.state,'settled');assert.equal(worker.error.code,'NODE_WORKER_REJECTED');
+ await assert.rejects(engine.inspect({operationId:'shared'}),/Operation is not known in this session/);
+ assert.deepEqual(engine.nodeApplyStatus('shared'),worker);
+});
+
 for(const action of ['package.save_checkpoint','package.save_as'])
 for(const fault of ['none','retry-restore','recover-owner','recover-awaiting','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
 test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
@@ -955,6 +970,7 @@ async function restSavePage(modified, restReference = true) {
  page.context.location={origin:'https://loginom.invalid'};
  page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
  await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
+ page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
  page.saveWrites=0;page.modifiedReads=0;
  const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
  page.save=()=>{page.saveWrites++;save();};
@@ -1115,7 +1131,36 @@ test('REST Save refuses an empty continuation before writing: '+action,async()=>
  assert.equal(page.events.includes('package_closed'),false);
 });
 
-for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false]])
+for(const changed of ['tid','suffix_removed','link','label','owner'])
+test('reopen matches names by native node identity: '+changed,async()=>{
+ const page=await restSavePage([false]);
+ page.nodes.length=0;
+ const duplicate=changed!=='suffix_removed',first=duplicate?'Data':'Data@0-0',second=duplicate?'Data@1':'Renamed';
+ page.addNode(first,64,64,['Output_Data-0']);
+ page.addNode(second,128,128,['Output_Data-0']);
+ page.addNode('Result',256,256,['Input_Data-0']);
+ page.edges=[(duplicate?second:first)+'|Output_Data-0|Result|Input_Data-0'];
+ const diagram=page.model.FDiagram,collection=diagram.FNodes.FCollection;
+ collection.forEach((node,index)=>{
+  node.FCell={index};node.FLabel={FRawValue:['Data',duplicate?'Data':'Renamed','Result'][index],parent:node,FCell:{parent:node.FCell}};
+ });
+ diagram.FmxGraph.view.getState=cell=>{
+  const entry=page.nodes[cell.index],tid=page.prefix+';Graph;'+entry.label;
+  return {shape:{node:diagram.FmxGraph.container.children.find(element=>element.tid===tid)}};
+ };
+ const reopen=page.onReopen;
+ page.onReopen=()=>{
+  reopen();page.nodes[0].label=duplicate?'Data@0-0':'Data';page.nodes[1].label=duplicate?'Data@0-1':'Renamed';
+  page.edges=[(!duplicate||changed==='link'?page.nodes[0].label:page.nodes[1].label)+'|Output_Data-0|Result|Input_Data-0'];
+  if(changed==='label')collection[1].FLabel.FRawValue='Different';
+  if(changed==='owner')collection[1].FLabel.parent={};
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/duplicates.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,['tid','suffix_removed'].includes(changed)?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,1);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[true,true,true,false],[false]])
 test('REST reference Save normalizes once after reopen: '+action+' '+modified,async()=>{
  const page=await restSavePage(modified);
  const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
@@ -1129,14 +1174,57 @@ test('REST reference Save normalizes once after reopen: '+action+' '+modified,as
  validateActionParameters(actions.get(action).output_schema,outcome.output);
 });
 
-test('REST normalization refuses a second dirty result without another Save or reopen',async()=>{
- const page=await restSavePage([true,true]);
- const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+for(const budget of [60000,7000,1000])
+test('REST normalization bounds dirty-state polling and reserves continuation time: '+budget,async()=>{
+ const page=await restSavePage([true,true]),deadline=page.clock+budget;
+ const evaluate=page.evaluate.bind(page);let started;
+ page.evaluate=async(fn,arg)=>{if(arg?.cleanDeadline!==undefined)started=page.clock;return evaluate(fn,arg);};
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.ok(page.clock-started<=5000,'dirty-state polling must stop within five seconds');
+ assert.ok(page.clock<=Math.max(started,deadline-5000),'polling must leave the continuation reserve intact');
  assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
  assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
- assert.equal(page.saveWrites,2);assert.equal(page.modifiedReads,2);
+ assert.equal(page.saveWrites,2);
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
- assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+ assert.equal(event.modified_after,true);
+});
+
+test('REST normalization keeps continuations when the last allowed clean read completes at its cutoff',async()=>{
+ const page=await restSavePage([true,true]),deadline=page.clock+20000;
+ const evaluate=page.evaluate.bind(page);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ page.evaluate=async(fn,arg)=>{
+  if(arg?.cleanDeadline!==undefined){
+   session.IsPackageModified=async()=>{
+    page.modifiedReads++;
+    if(page.clock<arg.cleanDeadline-100)return true;
+    // A server reply may arrive at the exact end of the polling window.
+    await page.waitForTimeout(arg.cleanDeadline-page.clock);return false;
+   };
+  }
+  return evaluate(fn,arg);
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.ok(deadline-page.clock>=5000,'confirmed Save must leave time for continuation binding');
+ assert.equal(outcome.output.workflow_continuations.length,1);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,false);
+ assert.equal(page.saveWrites,2);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+});
+
+test('REST normalization stops if the native session changes between modified-state reads',async()=>{
+ const page=await restSavePage([true,true,false]);
+ const connection=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+ const wait=page.waitForTimeout.bind(page);
+ page.waitForTimeout=async ms=>{
+  await wait(ms);
+  if(page.modifiedReads===2)connection.Session={...connection.Session};
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'AMBIGUOUS');assert.match(outcome.error.message,/Saved package changed during read/);
+ assert.equal(page.modifiedReads,2);assert.equal(page.saveWrites,2);
 });
 
 test('normalized REST keeps logical ownership and its same-source edit, while a changed source still refuses',async()=>{
@@ -1183,14 +1271,16 @@ test('Save normalizes an observed dirty node type exactly once: '+icon+' '+actio
  page.model.FDiagram.FNodes.FCollection[1].FIconCls=icon;
  const outcome=await run(page,action,{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
  assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
- assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ assert.equal(page.saveWrites,modified[0]?2:1);
  assert.equal(page.events.filter(e=>e==='package_closed').length,1);
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
  const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
  assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,modified.at(-1));
  assert.equal(event.additional_save,modified[0]);
- if(modified.at(-1))assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
- else {
+ if(modified.at(-1)){
+  assert.ok(page.modifiedReads>modified.length);assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ }else {
+  assert.equal(page.modifiedReads,modified.length);
   assert.equal(outcome.output.reopened,true);
   validateActionParameters(actions.get(action).output_schema,outcome.output);
   if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
@@ -1217,11 +1307,13 @@ test('grouping uses the existing guarded normalization only after dirty reopen: 
  assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
  assert.equal(page.events.filter(e=>e==='package_closed').length,1);
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
- assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ assert.equal(page.saveWrites,modified[0]?2:1);
  const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
  assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,modified.at(-1));
- if(modified.at(-1))assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
- else {
+ if(modified.at(-1)){
+  assert.ok(page.modifiedReads>modified.length);assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ }else {
+  assert.equal(page.modifiedReads,modified.length);
   assert.equal(outcome.output.reopened,true);
   validateActionParameters(actions.get(action).output_schema,outcome.output);
   if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
