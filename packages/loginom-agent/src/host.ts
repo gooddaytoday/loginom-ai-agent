@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto"
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -35,6 +36,8 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
+const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
  * Starts the process's Host in `<data>/loginom`, the Loginom directory of the server's profile: connection, recovery
@@ -103,6 +106,37 @@ export async function preflight(automation: boolean) {
     () => undefined,
     () => "LOGINOM_CONNECTION_NOT_READY",
   )
+}
+
+/**
+ * What a dashboard's preparation asks the Host before its chat (B2.9h), outside any session and lease, as 0.4's CLI
+ * asked its own Host (`standalone-run.ts`): the connection's status, its readiness (`connection.ready` waits for the
+ * catalog of the current generation) and the latest publication of a binding, read with the generation captured first,
+ * which the Host refuses once it is gone. The Host settled before its handshake answered. Without a Host every request
+ * rejects with `LOGINOM_HOST_NOT_READY`.
+ */
+export const dashboard = {
+  status: async () => {
+    const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
+    if (!view) throw new Error("LOGINOM_REPLY_INVALID")
+    return view
+  },
+  settled: async () => {
+    await state.current?.ready
+  },
+  catalog: () => request("connection.ready", {}),
+  readPublication: async (input: DashboardRead) => {
+    const source = decodePublication(await request("dashboard.read", input))
+    if (Option.isNone(source)) throw new Error("LOGINOM_REPLY_INVALID")
+    return source.value
+  },
+}
+
+async function request(method: string, input: unknown) {
+  const current = state.current
+  const connection = await current?.ready
+  if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
+  return connection.request(method, input)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

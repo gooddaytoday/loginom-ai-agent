@@ -22179,3 +22179,220 @@ $ bun typecheck   # core, server, cli — по пакету
   шага), тестом не покрыт.
 - Как клиенты показывают итоги во входящих до продолжения — этап C (кнопка «Продолжить», В-105).
 - Перезапуск, когда демон команд умер вместе со службой, — как в B2.3c, только по коду.
+
+## B2.9h RPC подготовки дашборда
+
+24.11.2026. Задача B2.9h (вне шлюза B), ветка `b29h-dashboard-rpc` от `oc2-migration` (`02bc900c9c`), рабочее дерево
+`.claude/worktrees/b29h`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть;
+`npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template`
+(кэш npm — `/root/.npm`) в этом дереве и в дереве базы `<scratchpad>/b29h/base` (`02bc900c9c`, detached). Хук
+`pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и полные прогоны — под `unshare -n`
+(поднят только `lo`), с временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`. **Модель не
+вызывалась:** новые тесты не создают сессий и не поднимают модели, сети нет. Прочитано: этот журнал — B2.9a (строка
+B2.9h, «Где решал сам»), B4.1 (Desktop-часть дашбордов, вопрос 9), B2.9b…e; 0.4 — `desktop/src/main/dashboard-target.ts`
+и его 9 тестов, связка `desktop/src/main/index.ts:431-441`, блок дашборда `opencode/src/cli/standalone-run.ts`; пакет
+`dashboard` — `agent/folder.ts`; `loginom-host` — `node-entry.ts` (`connection.*`, `dashboard.read`), `host.ts`
+(`readDashboard`, `catalog`), `errors.ts`, `transport.ts`; v2 — `plugin/src/promise/{rpc,adapter}.ts`, `core/src/rpc.ts`,
+`server/src/handlers/rpc.ts`; навык `.opencode/skills/unit-tests`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `e5a1a73d40` `feat(loginom-agent): loginom.dashboard prepares a dashboard's folder before its chat (B2.9h)` | код: новый `packages/loginom-agent/src/dashboard-target.ts`, `host.ts` (+34), `index.ts` (+6); тесты: новые `packages/loginom-agent/test/dashboard-target.test.ts` (9 тестов 0.4) и `packages/server/test/loginom-dashboard-target.test.ts` (3) |
+| `c0913238fa` `docs(upstream-sync): record B2.9h dashboard RPC, its tests and mutations` | первая версия этого раздела |
+| `b7bd56e80d` `fix(loginom-agent): loginom.dashboard answers a failed build without a reason (B2.9h)` | по ревью советника: уведомление `latest-build-failed` без причины RPC отклонял (`rpc.invalid_output`) — ответ отбрасывает поля без значения (`dashboard-target.ts`, +8); в тесте сервера — это уведомление и неверный ответ Host; в перенесённом тесте — `sep` вместо `"/"` |
+| следующий | этот раздел — по `b7bd56e80d` |
+
+Файлов кода три (предел — пять), все — пакета форка; файлов upstream не правил, `catalog.json` не менялся. Итог —
+`git diff 02bc900c9c b7bd56e80d --numstat`: `dashboard-target.ts` +154, `host.ts` +34, `index.ts` +6; тесты +369 и +387.
+
+### Как устроено
+
+- **RPC** `loginom.dashboard` регистрирует плагин продукта в каждой Location: папки дашборда до подготовки нет, поэтому
+  CLI (B2.9i) и Desktop (B4, ВШ-6) зовут его на Location своего рабочего каталога, как `loginom.preflight`. Определение и
+  обработчик — в `dashboard-target.ts`, в `index.ts` — только регистрация (6 строк: `index.ts` правят и f, g).
+  - `prepare({ id, defer })` — ответ: `directory`, `nodeName`, `action` (`create`/`edit`), `fresh`, `notice` 0.4
+    (`newer-publication`, `publication-check-unavailable`, `latest-build-failed` с `latest`, `current`, `error`) или
+    `code` и `message`. `defer` — `deferCreatePublicationCheck` 0.4: Desktop передаёт `true` (новый дашборд без проверки
+    публикации), CLI — `false` (0.4 CLI читал публикацию всегда).
+  - `find({ id })` — `{ found }`, 0.4 `checkDashboardTarget`: подготовлена ли папка, без повторного запроса снимка.
+- **Подготовка** — `DashboardTarget.prepare(id, deps)`, перенос 0.4 `getDashboardTarget` с теми же зависимостями (`status`,
+  `settled`, `catalog`, `readPublication`, `dashboards`, `template`, `fetch`, `signal`) и новым `defer`. Статус →
+  поколение 0 — `LOGINOM_CONFIG_REQUIRED` до снимка; снимок и папка — `prepareDashboard` пакета `dashboard`; публикация
+  читается после `settled` и `catalog(поколение)` с захваченными origin и поколением; отмена прекращает ожидание, публикацию
+  не читает и к локальным исходникам не откатывается. Пакет `dashboard` грузится первым вызовом (`import()`), как в B2.9e.
+- **Host службы** — `ServiceHost.dashboard` в `host.ts`, вне сессий и аренд, как 0.4 CLI спрашивал свой Host:
+  `status` — `connection.status` (`url`, `generation`; иначе `LOGINOM_REPLY_INVALID`); `settled` — рукопожатие Host
+  (`node-entry` отвечает на него после `host.settled()`); `catalog` — `connection.ready` (каталог текущего поколения);
+  `readPublication` — `dashboard.read` с захваченными origin и поколением, ответ строго `NullOr(PublicationSource)`. Host
+  сам отказывает в чтении ушедшего поколения (`LOGINOM_GENERATION_UNAVAILABLE`). Без Host (или когда он закрывается) —
+  `LOGINOM_HOST_NOT_READY`.
+- **Ответ** (`DashboardTarget.answer`): корень — `Dashboard.root()` (`Global.Path.data/dashboards`, B2.9b), шаблон —
+  `<ресурсы>/dashboard/template` из `LOGINOM_AI_AGENT_RESOURCES`. Нет ресурсов или `template/src` — `DASHBOARD_RESOURCES_MISSING`
+  до статуса и до снимка: Studio отдаёт снимок один раз. Ошибка — как в 0.4 CLI: коды `DASHBOARD_SNAPSHOT_(UNAVAILABLE|INVALID)`,
+  `DASHBOARD_BINDING_CONFLICT`, `DASHBOARD_PUBLICATION_(INVALID|TOO_LARGE)` — по имени, остальное — `hostError` (коды Host
+  и `LOGINOM_*` с текстом `hostErrorText`, иначе `LOGINOM_HOST_REQUEST_FAILED`). Сырой текст ошибки клиенту не уходит:
+  ошибка файловой системы несёт путь. Поля уведомления без значения ответ отбрасывает: `prepareDashboard` даёт
+  `latest-build-failed` с `error: undefined`, когда Studio не назвала причину, а схема ответа RPC такое поле отклоняет
+  (`rpc.invalid_output`, HTTP 500) — так было до `b7bd56e80d`, нашёл тест сервера.
+
+### Тесты
+
+| Тест 0.4 (`v0.4.0:packages/desktop/src/main/dashboard-target.test.ts`) | На v2 |
+|---|---|
+| все 9: «creates a dashboard from the one-time snapshot without signing in to Studio», «an unconfigured stand fails before fetching a snapshot», «an unavailable snapshot reports the public snapshot error», «checks the prepared local folder without consuming a snapshot again», «pre-chat publication read uses the captured origin, generation and lifecycle signal», «cold dashboard waits for captured generation before private read», «cancelling catalog wait never reads publication or falls back to local sources», «failed readiness preserves existing sources and base but cannot create a fresh draft», «a connection replacement during readiness never retargets the captured private read» | `packages/loginom-agent/test/dashboard-target.test.ts`, те же имена и тела на `DashboardTarget.prepare` и `find`. Отличия: путь шаблона; `defer: true` в каждом наборе зависимостей (Desktop 0.4 откладывал проверку всегда); код второго — `LOGINOM_CONFIG_REQUIRED` вместо `DASHBOARD_NOT_CONFIGURED` Desktop (строка нарезки и 0.4 CLI); `fetch` обёрнут в `studio(...)` с `preconnect` (тип `fetch` Bun 1.4.4 его требует); `redirect: "error" as const`; массив `studio` первого теста назван `calls`; префикс папки — с `sep`, а не `"/"` (на Windows 0.4-проверка была бы красной). Каждый случай — в своём `mkdtemp`, `Global.Path.data` не трогает |
+| — | `packages/server/test/loginom-dashboard-target.test.ts`, новый: сервер, Location обычного проекта, Studio случая (`Bun.serve` на `127.0.0.1`, снимок — один раз), Host по сценарию (`ServiceHost.start({ connect })` с `request`, журнал запросов), каталог данных случая (`temporaryData`), ресурсы — ссылка на шаблон. Первый случай: Desktop (`defer: true`) — папка в `Dashboard.root()`, это рабочая папка дашборда, `src` — из шаблона, Host спрошен только о статусе; `find` — ложь до и истина после; CLI (`defer: false`) — `connection.status`, `connection.ready`, `dashboard.read` с origin Studio, поколением 2 и привязкой снимка; опубликованный дашборд при `LOGINOM_CONNECTION_NOT_READY` — прежняя папка, `edit`, `notice: publication-check-unavailable`; Host отдаёт версию, а Studio (`/dashboard/lookup`) отвечает, что её сборка упала, без причины, — `notice: { kind: "latest-build-failed", latest }` |
+| — | второй: коды — поколение 0 → `LOGINOM_CONFIG_REQUIRED`, нет шаблона → `DASHBOARD_RESOURCES_MISSING` (Studio в обоих не спрошена), повтор снимка → `DASHBOARD_SNAPSHOT_UNAVAILABLE`, ответ Host — не публикация → `LOGINOM_REPLY_INVALID`, Host отказал в поколении → `LOGINOM_GENERATION_UNAVAILABLE` с текстом Host и без новой папки, нет `control/binding.json` → `DASHBOARD_BINDING_CONFLICT`, корень — файл → `LOGINOM_HOST_REQUEST_FAILED` без пути, Host закрыт → `LOGINOM_HOST_NOT_READY` без запросов к нему |
+| — | третий: запрос HTTP отменён, пока Host держит `connection.ready`, — `dashboard.read` не прозвучал, папки нет, следующая подготовка проходит |
+
+### Мутации
+
+Каждая — точечная правка в `packages/loginom-agent/src` на `b7bd56e80d` (первый прогон — на `e5a1a73d40`: у прежних 19
+мутаций те же числа), прогон `bun test test/dashboard-target.test.ts`
+в `loginom-agent` и `bun test test/loginom-dashboard-target.test.ts` в `server`, затем `git checkout`
+(`<scratchpad>/b29h/scripts/{mutations.sh,mutate.py}`; правка применяется, только если строка найдена ровно один раз). Без
+мутаций — 9/0 и 3/0.
+
+| Мутация | `dashboard-target` (0.4) | RPC на сервере | Красные |
+|---|---|---|---|
+| проверка публикации откладывается всегда | 9/0 | **2/1** | CLI-путь первого случая: нет `connection.ready` и `dashboard.read` |
+| не откладывается никогда | **8/1** | **0/3** | «creates a dashboard … without signing in to Studio»; на сервере все три |
+| `defer` RPC не передаётся (`true`) | 9/0 | **2/1** | CLI-путь первого случая |
+| нет проверки поколения 0 | **8/1** | **2/1** | «an unconfigured stand…»; код `LOGINOM_CONFIG_REQUIRED` |
+| чтение без ожидания готовности | **5/4** | **1/2** | «cold…», «cancelling…», «failed readiness…», «connection replacement…»; CLI-путь и отмена |
+| без `settled` (сразу `catalog`) | **4 красных по таймауту** | 3/0 | «cold…», «cancelling…», «failed readiness…», «connection replacement…»; процесс `bun test` после них не выходит — снят `kill` на первом прогоне и `timeout 180` на втором (ниже, «Найдено»). На сервере `settled` — рукопожатие, которое и так ждёт каждый запрос Host |
+| поколение чтения — новое, не захваченное | **8/1** | **2/1** | «connection replacement…»; лишний `connection.status` в журнале Host |
+| без гонки с отменой | **8/1** | **2/1** | «cancelling…»; отмена на сервере |
+| без `throwIfAborted` между готовностью и чтением | 9/0 | 3/0 | **выжила**: проверка 0.4 на узкое окно (отмена ровно после готовности); тесты 0.4 её тоже не ловят |
+| сигнал вызова RPC не передаётся | 9/0 | **2/1** | отмена на сервере: `dashboard.read` прозвучал |
+| сырой текст ошибки клиенту | 9/0 | **2/1** | коды: `EEXIST: … mkdir '<путь>'` вместо `LOGINOM_HOST_REQUEST_FAILED` |
+| без текста Host (`message` = код) | 9/0 | **2/1** | коды: `LOGINOM_GENERATION_UNAVAILABLE` без причины |
+| поля уведомления не чистятся | 9/0 | **2/1** | первый случай: `rpc.invalid_output` на `latest-build-failed` |
+| без проверки шаблона | 9/0 | **2/1** | коды: снимок израсходован, `LOGINOM_HOST_REQUEST_FAILED` |
+| папка не в `Dashboard.root()` | 9/0 | **2/1** | первый случай: не рабочая папка дашборда |
+| `dashboard.read` не спрашивается у Host | 9/0 | **1/2** | CLI-путь; коды (`LOGINOM_GENERATION_UNAVAILABLE`) |
+| `connection.ready` не спрашивается | 9/0 | **1/2** | CLI-путь; отмена (ждать нечего) |
+| закрытый Host отвечает | 9/0 | **2/1** | коды: `LOGINOM_HOST_NOT_READY` |
+| ответ `dashboard.read` не сверяется со схемой | 9/0 | **2/1** | коды: `LOGINOM_REPLY_INVALID` |
+| RPC не зарегистрирован | 9/0 | **0/3** | все |
+| `find` смотрит не в `Dashboard.root()` | 9/0 | **2/1** | первый случай: `found` ложь после подготовки |
+
+Код базы (`git checkout 02bc900c9c -- packages/loginom-agent/src`; новый `dashboard-target.ts` при этом остаётся, его
+тесты 0.4 — 9/0; на `e5a1a73d40`): RPC на сервере — **0/3**, все три случая красные, как при мутации «RPC не
+зарегистрирован». Итого 21 мутация: 20 красные, одна выжила (выше).
+После всех мутаций `git status` чистый, папки — во временных каталогах, удалены вместе с ними.
+
+### Приёмка
+
+Полные прогоны (`<scratchpad>/b29h/scripts/{all-suites.sh,suites.sh}`): база — `02bc900c9c` в `<scratchpad>/b29h/base`,
+итог — это дерево на `e5a1a73d40`, `loginom-agent` и `server` повторены на `b7bd56e80d`; по пакетам подряд, база, затем итог, каждый под `unshare -n` со свежими временными
+`HOME`/`TMPDIR`/`XDG_*`, `npm ci` клиента `loginom-runtime` и шаблона `dashboard` и `LOGINOM_AI_AGENT_TEST_NODE` заданы.
+`dashboard` — `bun run test`, затем `node --test test/agent/draft.test.mjs`, как в B2.9e; остальные — `bun test`.
+
+| Пакет | `02bc900c9c` | итог |
+|---|---|---|
+| `loginom-agent` | 93 pass, 0 fail | 102 pass (+9 новых), 0 fail — на `e5a1a73d40` и на `b7bd56e80d` |
+| `server` | 295 pass, 3 skip, 0 fail | 298 pass (+3 новых), 3 skip, 0 fail — на `e5a1a73d40` и на `b7bd56e80d` |
+| `dashboard`, `bun run test` | `test:coverage` — 50 и 36 pass, 0 fail; узловой набор — 91 pass, 3 fail, 2 skip: «a partial source copy is retried completely for new and known projects» и его «new project», «known project» | то же, те же имена |
+| `dashboard`, `draft.test.mjs` | 8 pass, 2 fail: «a prepared folder builds and serves its coherent sample using one shared server», «draft reports at most twenty console errors from the built app» — ждут Chromium ревизии 1246 (B2.9e) | то же, те же имена |
+| `loginom-host` | 545 pass, 14 skip, 4 fail: «archive verification preserves manifest modes under a private umask» (архив проверен без ожидаемого `LOGINOM_MANIFEST_PAYLOAD_MISMATCH`; прогон от root), «glob uses the bundled rg without a system rg and without network access» и «glob without the bundled rg on PATH fails with ripgrep execution failed» (`LOGINOM_RIPGREP_DOWNLOAD_FAILED`, `getaddrinfo EAI_AGAIN github.com`: кэш ripgrep прогона пуст, сети нет, 30 с), «actual managed entry reads live bridge work and dispatching over private IPC» (`Expected refusal` на файле больше 16 МиБ) | 545 pass, 14 skip, 4 fail — те же имена |
+| `product` | 60 pass, 3 fail — известные три (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` | 60 pass, 3 fail — те же; и на `c0913238fa` с первой версией раздела, и на коммите этой |
+
+Новых падений нет: у каждого пакета имена падений базы и итога совпадают. Падения `loginom-host` пакета дашбордов не
+касаются (сборка CLI, ripgrep, вложения) и есть на базе; причины — по выводу, не разбирал.
+
+Повторы (навык `unit-tests`) на `b7bd56e80d`: `dashboard-target.test.ts --rerun-each 10 --randomize` — 90 pass, 0 fail
+(0,4 с); `loginom-dashboard-target.test.ts --rerun-each 10 --randomize` — 30 pass, 0 fail (8,5 с).
+
+Изоляция (`<scratchpad>/b29h/scripts/real-xdg.sh`, как в B2.9b): окружение без единой `XDG_*`, `HOME` — свежий каталог в
+scratchpad, корень данных тогда `$HOME/.local/share/loginom-ai-agent-dev`; после прогона пусто и там, и во временном
+каталоге прогона:
+
+```text
+fix loginom-agent exit=0 xdg-vars=0  9 pass  0 fail        # test/dashboard-target.test.ts на b7bd56e80d
+fix loginom-agent after: [] data: []
+fix loginom-agent tmp left: []
+fix server exit=0 xdg-vars=0  3 pass  0 fail               # test/loginom-dashboard-target.test.ts
+fix server after: [] data: []
+fix server tmp left: []
+```
+
+```text
+$ cd packages/loginom-agent && bun run typecheck && bun run typecheck:tsc
+✓ No type errors in 250 files                                # tsc --noEmit — код 0
+$ cd packages/server && bun typecheck
+✓ No type errors in 1,672 files across 2 projects
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary  # код 0; 612 файлов, как на базе
+against a6b15d33daf6: 612 divergent upstream files
+  CAT-05: 0 (pending: B2.5, B2.6, B2.9)
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                        # код 0
+$ bun run check                                              # код 0, под unshare -n, на e5a1a73d40 и на b7bd56e80d
+Found 905 warnings and 0 errors.                             # как в B2.9b…e
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                           # 32 из кэша turbo
+```
+
+`prettier --check` и `oxlint` новых и изменённых файлов — без замечаний.
+
+### Где решал сам
+
+- **Где тесты.** Задание: «тесты `dashboard-target` 0.4 — перенести в плагин»; строка нарезки: «→ тест RPC в
+  `server/test`». Сделал оба, меньшими средствами: 9 тестов 0.4 — почти дословно на функции плагина
+  (`loginom-agent/test`), а связку с Host, корнем, кодами и сигналом RPC проверяет один новый файл сервера (3 случая):
+  без него мутации связки (`defer`, Host, коды, регистрация) оставались бы зелёными. Файл новый, как в B2.9e: рядом B2.3d
+  правит `server`.
+- **`find(id)` есть**, хотя задание называет только `prepare`: его называет строка нарезки, и четвёртый тест 0.4 проверяет
+  именно эту функцию. Ответ — `{ found }`, как булево 0.4 `checkDashboardTarget`, а не путь.
+- **`LOGINOM_CONFIG_REQUIRED` вместо `DASHBOARD_NOT_CONFIGURED`** Desktop 0.4 — по строке нарезки и 0.4 CLI. Мост Desktop
+  (B4) получит общий код.
+- **`DASHBOARD_RESOURCES_MISSING` — новая проверка**, раньше статуса. В 0.4 до этого не доходило: CLI без комплекта
+  кончался `LOGINOM_BUNDLE_REQUIRED`, у Desktop ресурсы были всегда. В службе ресурсы могут отсутствовать (запуск из
+  исходников), а пропавший шаблон после снимка тратил бы одноразовый снимок (`cpSync` падает уже после запроса к Studio).
+  Текст — сам код, как у остальных кодов дашборда в 0.4 CLI. Следствие: запуск из исходников без ресурсов отвечает этим
+  кодом, а не `LOGINOM_HOST_NOT_READY` (Host без ресурсов там тоже не запускается).
+- **Без Host — `LOGINOM_HOST_NOT_READY`**, а не `LOGINOM_CONNECTION_NOT_READY`, как `preflight` для автоматизации: у
+  подготовки нет даже статуса подключения. Код есть в `hostError`, отдельной ветки не понадобилось.
+- **`settled` и `catalog` у Host службы.** Отдельного «дождаться каталога поколения N» у Node host нет: `connection.ready`
+  ждёт каталог текущего поколения и сверяет, что оно не сменилось за ожидание. Связал `settled` с рукопожатием, `catalog` —
+  с `connection.ready`, без собственной сверки поколения: чтение несёт захваченное поколение, и Host сам отказывает
+  ушедшему (`host.ts` `performDashboard`). Поэтому мутация «без `settled`» на сервере зелёная — так и должно быть.
+- **Восстановления не проверяю.** 0.4 CLI до дашборда отказывал при записях журнала (`LOGINOM_RECOVERY_REQUIRED`, код 4);
+  в v2 это делает `loginom.preflight`, его CLI зовёт сам (B2.9i решит, звать ли его и для `--dashboard`).
+- **Определение RPC — в `dashboard-target.ts`**, а не рядом с `preflight` в `index.ts`: правка `index.ts` — 6 строк, его
+  правят и f, g.
+- **Поля уведомления без значения отбрасывает ответ RPC**, а не пакет `dashboard` (он — «как есть», В-85): в 0.4
+  уведомление уходило в окно через IPC Electron, где `undefined` просто пропадал.
+- **Третий случай сервера — отмена**: без него мутация «сигнал RPC не передаётся» оставалась бы зелёной. Отмена
+  HTTP-запроса прерывает обработчик RPC (`Effect.tryPromise` адаптера Promise API отдаёт ему сигнал) — это и проверено.
+
+### Найдено, не чинил
+
+- **Отмена не прерывает чтение Host.** `connection.request` сигнала не берёт, а `node-entry` не получает его для
+  `dashboard.read`: отменённая подготовка перестаёт ждать, но уже начатое чтение публикации доживает в Host до конца (он
+  поднимает для него рантайм). 0.4 CLI в этом случае закрывал свой частный Host целиком; Host службы общий, закрыть его
+  нельзя. Для B2.9i и B4: Ctrl+C в `run --dashboard` не оборвёт операцию Studio.
+- **Подготовки одного процесса идут по очереди** (`updates` в `dashboard/src/agent/folder.ts`), и ожидание готовности
+  стоит внутри очереди. Зависший Host держит все подготовки службы до таймаута запроса (`transport.ts`, 180 с) — и CLI, и
+  Desktop своего профиля. Мутация «без `settled`» это и показала: тест 0.4, упавший по таймауту, не отпустил очередь, и
+  `bun test` после него не вышел (снят `kill` через 6 мин).
+- Мутация «без `throwIfAborted` между готовностью и чтением» выживает и на тестах 0.4: окно — отмена ровно между ответом
+  `connection.ready` и чтением.
+- `prepareDashboard` (`dashboard/src/agent/folder.ts`) кладёт в `latest-build-failed` `error: undefined`, когда Studio
+  не назвала причину. Для RPC это закрыто в `b7bd56e80d` (выше); другие потребители уведомления — B2.9i (CLI печатает
+  `notice.error ?? ""`, как 0.4) и B4.
+- Тип `fetch` в Bun 1.4.4 требует `preconnect` (как в `dashboard-folder.ts` B2.9e): тестам 0.4 с голыми функциями нужна
+  обёртка.
+
+### Не проверено
+
+- Настоящий Node host: `connection.status`, `connection.ready` и `dashboard.read` — только Host по сценарию; форма ответов
+  сверена с `node-entry.ts` по коду. Настоящий Studio — фикстура (`/dashboard/snapshots/<id>`, `/dashboard/lookup` — ответ
+  сценария).
+- `DASHBOARD_SNAPSHOT_INVALID`, `DASHBOARD_PUBLICATION_(INVALID|TOO_LARGE)` и `newer-publication` через RPC — код и
+  регулярное выражение 0.4, отдельным случаем не проверены.
+- Вызывающие: CLI `run --dashboard` (B2.9i) и мост Desktop (B4, ВШ-6) — не делались. Создаёт ли v2 проект на Location
+  PWD при вызове RPC — по строке нарезки проверяет i.
+- Windows и macOS — только Linux.
