@@ -12,7 +12,7 @@ export async function verifyProductSkills(resources: string) {
   return skills
 }
 
-export async function validateSkillFolder(directory: string, options?: { external?: boolean }) {
+export async function validateSkillFolder(directory: string, options?: Parameters<typeof inspectSkillFolder>[1]) {
   const result = await inspectSkillFolder(directory, options)
   if (result.data && isReservedSkillName(result.data.name.toLowerCase())) {
     result.errors.push({

@@ -32,6 +32,7 @@ export const toolPolicy = {
   permits(profile: TaskScope.Profile, id: string, origin: Tool.Def["origin"]) {
     if (profile === "loginom-dashboard") return origin === "builtin" && DASHBOARD_BUILTINS.has(id)
     if (profile === "package-docs") return origin === "builtin" && DOCS_BUILTINS.has(id)
+    if (id === "skill_install") return origin === "builtin"
     return !PROFILE_TOOLS.includes(id) && (profile !== "loginom-automation" || id !== "task")
   },
 

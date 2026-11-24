@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 export const productSkillsDirectory = fileURLToPath(new URL("../skills/", import.meta.url))
 // Loginom Help shipped with the product: help-manifest.json, loginom-help/data/**.md and aliases.jsonl.
 export const productHelpDirectory = fileURLToPath(new URL("../help/", import.meta.url))
-export const reservedSkillNames = ["loginom-automation", "package-docs", "loginom-dashboard", "package-linter"] as const
+export const reservedSkillNames = ["loginom-automation", "loginom-create-skill", "package-docs", "loginom-dashboard", "package-linter"] as const
 export const obsoleteSkillNames = ["package_docs"] as const
 
 export function isReservedSkillName(name: string) {

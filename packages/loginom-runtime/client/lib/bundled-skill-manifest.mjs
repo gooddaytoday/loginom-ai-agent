@@ -79,8 +79,9 @@ function outside(path) {
   return isAbsolute(path) || path === '..' || path.startsWith('..' + sep);
 }
 
-export async function inspectSkillFolder(directory, { external = false } = {}) {
+export async function inspectSkillFolder(directory, { external = false, authorizeRead } = {}) {
   const files = new Map();
+  const markdown = new Map();
   const errors = [];
   try {
     const root = await realpath(directory);
@@ -101,11 +102,22 @@ export async function inspectSkillFolder(directory, { external = false } = {}) {
           continue;
         }
         if (!entry.isFile() && !(entry.isSymbolicLink() && (await stat(absolute)).isFile())) continue;
-        files.set(path, path.endsWith('.md') ? await readFile(absolute, 'utf8') : undefined);
+        files.set(path, undefined);
+        if (path.endsWith('.md')) markdown.set(path, [file, absolute]);
       }
     }
   } catch {
     errors.push({ code: 'LOGINOM_SKILL_FOLDER_UNREADABLE', message: 'Could not read the skill folder or one of its resources.' });
+  }
+  if (errors.length) return { errors, warnings: [] };
+  if (markdown.size) await authorizeRead?.([...new Set([...markdown.values()].flat())]);
+  for (const [path, [file, absolute]] of markdown) {
+    try {
+      if (await realpath(file) !== absolute) throw Error();
+      files.set(path, await readFile(absolute, 'utf8'));
+    } catch {
+      errors.push({ code: 'LOGINOM_SKILL_FOLDER_UNREADABLE', path, message: 'Could not read the skill resource.' });
+    }
   }
   if (errors.length) return { errors, warnings: [] };
   return validateSkillFiles(basename(resolve(directory)), files, { external });

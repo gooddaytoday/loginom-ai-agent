@@ -8,6 +8,8 @@ import { AbsolutePath } from "../schema"
 import { SkillV2 } from "../skill"
 import customizeOpencodeContent from "./skill/customize-opencode.md" with { type: "text" }
 
+export const CustomizeOpencodeDescription =
+  "Use when editing opencode's own configuration, including loginom-ai-agent.json, agents, subagents, commands, plugins, MCP servers, skill discovery settings, and permissions. For creating or installing a Loginom Agent Skill, use loginom-create-skill when available."
 export const CustomizeOpencodeContent = customizeOpencodeContent
 
 export const Plugin = define({
@@ -19,8 +21,7 @@ export const Plugin = define({
           type: "embedded",
           skill: SkillV2.Info.make({
             name: "customize-opencode",
-            description:
-              "Use ONLY when the user is editing or creating opencode's own configuration: loginom-ai-agent.json, loginom-ai-agent.jsonc, files under .loginom-ai-agent/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, commands, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself.",
+            description: CustomizeOpencodeDescription,
             location: AbsolutePath.make("/builtin/customize-opencode.md"),
             content: CustomizeOpencodeContent,
           }),
