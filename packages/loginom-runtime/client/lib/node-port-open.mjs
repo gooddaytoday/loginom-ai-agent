@@ -327,27 +327,31 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    const textExportInput=input&&!control&&!variables&&r.node.FIconCls==='bg-vendor-icon-exporttextfile'&&r.portIndex===0&&r.nativeIndex===0;
    const wizardIndex=portTree?.FIndex;
    const portCollection=group?.FSubNodes,items=portCollection?.FItems;
+   const collectionOwned=textExportInput&&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group
+    &&portTree.FCollection===portCollection&&Array.isArray(items)&&items.length<=100&&items.includes(portTree)
+    &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1;
+   const indexPending=collectionOwned&&r.phase!=='verified'&&(wizardIndex===null||wizardIndex===undefined);
    const indexOwned=textExportInput
-    ?Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100
-      &&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group&&portTree.FCollection===portCollection
-      &&Array.isArray(items)&&items.length<=100&&items[wizardIndex]===portTree
-      &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1
+    ?collectionOwned&&Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100&&items[wizardIndex]===portTree
     :wizardIndex===r.nativeIndex;
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
     ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof (variables&&!input?app.ModelServiceNodeTreeNode:app.ModelNodeTreeNode))
     ||nodeTree.FGuid!==r.node_id||nodeTree.FModelNode!==r.node.data||portTree.FModelNodePort!==r.port.data
-    ||!indexOwned||nodeTree.ParentNode!==r.workflow
+    ||!indexOwned&&!indexPending||nodeTree.ParentNode!==r.workflow
     ||model?.constructor?.name!=='WizardModelComponentForm'||!(input||variables?model.FModelSocket:model.FModelEnginePort)||model.FModelNode
     ||roots.length!==1||model.FView?.el?.dom!==roots[0])fail('Opened port wizard owner differs: '+JSON.stringify({
      native_index:r.nativeIndex,wizard_index:Number.isInteger(wizardIndex)?wizardIndex:null,index_owned:indexOwned,
+     index_type:typeof wizardIndex,tree_slot:Array.isArray(items)?items.indexOf(portTree):-1,collection_owned:collectionOwned,
      node:nodeTree?.FGuid===r.node_id&&nodeTree?.FModelNode===r.nodeData,port:portTree?.FModelNodePort===r.portData,
      workflow:nodeTree?.ParentNode===r.workflow,socket:!!(input||variables?model?.FModelSocket:model?.FModelEnginePort),model_node:!!model?.FModelNode,
      wizard:model?.constructor?.name==='WizardModelComponentForm',root:roots.length===1&&model?.FView?.el?.dom===roots[0]}));
-   if(r.phase==='verified'&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
-    ||r.portTree!==portTree||r.nodeTree!==nodeTree||(r.wizardIndex??r.nativeIndex)!==wizardIndex
+   if(r.wizard&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
+    ||r.portTree!==portTree||r.nodeTree!==nodeTree||r.phase==='verified'&&(r.wizardIndex??r.nativeIndex)!==wizardIndex
     ||textExportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
    r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;
-   r.wizardIndex=wizardIndex;if(textExportInput)r.portCollection=portCollection;r.phase='verified';
+   if(textExportInput)r.portCollection=portCollection;
+   if(indexPending)return {pending:true,reason:'port_wizard_index_pending',native_index:r.nativeIndex,tree_slot:items.indexOf(portTree)};
+   r.wizardIndex=wizardIndex;r.phase='verified';
    return {phase:r.phase,verified:true,document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
     direction,port:r.portIndex,native_index:r.nativeIndex,wizard_index:wizardIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
   }
@@ -362,7 +366,19 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    busy.samples++;await page.waitForTimeout(Math.min(100,remaining()));
   }
  };
- const finish=async()=>{while(remaining()>0){const result=await inspect('finish');if(!result.pending)return result;await page.waitForTimeout(Math.min(100,remaining()));}};
+ const finish=async()=>{
+  let indexDeadline,indexTrace;
+  while(remaining()>0){
+   if(indexDeadline&&Date.now()>=indexDeadline)throw Error('Port wizard index did not settle');
+   const result=await inspect('finish');if(!result.pending)return result;
+   if(result.reason==='port_wizard_index_pending'){
+    if(!indexTrace){indexDeadline=Math.min(task.deadline,Date.now()+15000);indexTrace={event:direction+'_port_wizard_index_pending',samples:0,...result};trace.push(indexTrace);}
+    indexTrace.samples++;if(Date.now()>=indexDeadline)throw Error('Port wizard index did not settle');
+   }
+   if(indexDeadline&&Date.now()>=indexDeadline)throw Error('Port wizard index did not settle');
+   await page.waitForTimeout(Math.min(100,remaining(),indexDeadline?Math.max(1,indexDeadline-Date.now()):100));
+  }
+ };
  try {
   remaining();let existing=await inspect('lookup');
   if(existing?.phase==='reserved'){await inspect('release_reserved');existing=null;}

@@ -477,6 +477,63 @@ function textExportFixture(wizardIndex=0) {
  return f;
 }
 
+for(const index of [0,1])test('text export waits for its owned tree index to initialize to '+index,async()=>{
+ const f=textExportFixture(index);f.portTree.FIndex=null;
+ const evaluate=f.page.evaluate;let samples=0;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(arg.mode==='finish'&&result.reason==='port_wizard_index_pending'&&++samples===3)f.portTree.FIndex=index;
+  return result;
+ };
+ const r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.equal(r.native_index,0);assert.equal(r.wizard_index,index);
+ assert.equal(samples,3);assert.equal(f.gestures.length,2);
+ assert.equal(r.trace.find(t=>t.event==='input_port_wizard_index_pending').samples,3);
+});
+
+for(const fault of ['persistent','port','wizard','collection','wrong-index','verified'])test('text export index settlement retains fail-closed '+fault,async()=>{
+ const f=textExportFixture();
+ if(fault==='verified')assert.equal((await f.run()).status,'SUCCEEDED');
+ f.portTree.FIndex=null;f.task.deadline=Date.now()+150;
+ const evaluate=f.page.evaluate;let samples=0;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(arg.mode==='finish'&&result.reason==='port_wizard_index_pending'&&++samples===1){
+   if(fault==='port')f.port.data={};
+   if(fault==='wizard')f.card.Controller.FController=Object.assign(Object.create(Object.getPrototypeOf(f.wizard)),f.wizard);
+   if(fault==='collection'){
+    const group=f.portTree.ParentNode;group.FSubNodes={...group.FSubNodes};f.portTree.FCollection=group.FSubNodes;
+   }
+   if(fault==='wrong-index')f.portTree.FIndex=1;
+  }
+  return result;
+ };
+ const r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.equal(r.verified,false);assert.equal(f.gestures.length,2);
+ if(fault==='verified')assert.equal(samples,0);
+});
+
+test('text export bounds index settlement at 15 seconds without extending the task deadline',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:100000});
+ const f=textExportFixture();f.portTree.FIndex=null;
+ const deadline=f.task.deadline;
+ let started;
+ const evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(result.reason==='port_wizard_index_pending')started??=Date.now();
+  return result;
+ };
+ f.page.waitForTimeout=async ms=>{
+  t.mock.timers.tick(ms);
+  if(started&&Date.now()-started>=15000)f.portTree.FIndex=0;
+ };
+ const r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.match(r.error,/Port wizard index did not settle/);
+ assert.equal(Date.now()-started,15000);assert.equal(f.task.deadline,deadline);assert.equal(f.gestures.length,2);
+});
+
 for(const hidden of [true,false])for(const wizardIndex of [0,1])test(`text export binds its cached input tree at index ${wizardIndex}, hidden=${hidden}`,async()=>{
  const f=textExportFixture(wizardIndex);
  await f.page.evaluate(hidden=>{globalThis.bg.app.IsFileConnectionHidden=hidden;},hidden);
