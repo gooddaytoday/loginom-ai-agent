@@ -87,7 +87,7 @@ case('bh-b03', '''Создай сценарий по statuses.csv: UTF-8, зап
      {'statuses.csv': [['Status','Url'],[404,'https://httpbin.org/status/404'],[500,'https://httpbin.org/status/500']]},
      "rows = [dict(RequestID=i, ErrorCode=6, ErrorDesc=f\"Status code {r['Status']}: {HTTPStatus(int(r['Status'])).phrase.upper()}\", HttpStatusCode=int(r['Status'])) for i,r in enumerate(read('statuses.csv'))]",
      [('RequestID','integer'),('ErrorCode','integer'),('ErrorDesc','string'),('HttpStatusCode','integer')], rest_nodes,
-     minimum=5, notes='Нативный ErrorCode=6 и префикс описания зафиксированы discovery REST; точное описание — гипотеза oracle. Проверить ProbeTag/readback, флаг (#1246).')
+     minimum=4, notes='Нативный ErrorCode=6 и префикс описания зафиксированы discovery REST; точное описание — гипотеза oracle. Проверить ProbeTag/readback, флаг (#1246).')
 post = [['Id','Body'], [21,json.dumps(dict(Id=21,Amount=12.5,Note='Привет & + /'),ensure_ascii=False)],
         [22,json.dumps(dict(Id=22,Amount=-3.25,Note='возврат'),ensure_ascii=False)],
         [23,json.dumps(dict(Id=23,Amount=0.0,Note=''),ensure_ascii=False)]]

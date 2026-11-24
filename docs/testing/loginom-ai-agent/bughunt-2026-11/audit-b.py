@@ -78,8 +78,9 @@ def audit(path, budget):
                 deletes.append(dict(entry, status=value.get('status') if isinstance(value,dict) else None))
             for obj in objects(value):
                 nodes = obj.get('nodes')
-                if isinstance(nodes,list) and nodes and all(isinstance(n,dict) and 'type' in n and any(k in n for k in ['ref','guid','node_id']) for n in nodes):
-                    graphs.append(dict(location=location, count=len(nodes), types=[n['type'] for n in nodes]))
+                if isinstance(nodes,list) and nodes and all(isinstance(n,dict) and any(k in n for k in ['ref','guid','node_id']) for n in nodes):
+                    graphs.append(dict(location=location, count=len(nodes),
+                        nodes=[dict(node_id=n.get('node_id'), type=n.get('type'), label=n.get('node_ref',{}).get('node_label')) for n in nodes]))
         elif tool not in ['skill', 'read', 'glob', 'grep', 'list', 'todowrite', 'todoread']:
             external.append(entry)
         serialized = tool + ' ' + json.dumps(request, ensure_ascii=False)
