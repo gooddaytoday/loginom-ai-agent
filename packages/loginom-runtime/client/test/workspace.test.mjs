@@ -833,12 +833,14 @@ function sessionRestoreFixture(intent,{fault='none'}={}){
   if(q==='[data-tid="msgbox;tlb;yes"]')return {count:async()=>state.shown?1:0,isVisible:async()=>state.shown&&state.fault!=='yes hidden',
    innerText:async()=>{if(state.fault==='prompt swapped at click')state.retryPrompt();return 'Восстановить';},
    click:async()=>{if(state.fault==='click lost')throw Error('click reply lost');
-    state.restores++;state.shown=false;if(state.fault!=='lost reconnect')state.reconnect();}};
+    state.restores++;state.shown=false;if(state.fault==='reload at click')runInContext('delete globalThis.__loginomDockPreparationV1',c);
+    if(state.fault!=='lost reconnect')state.reconnect();}};
   const l=locator(q),click=l.click;
   l.click=async(...args)=>{
    // A silent native session/account swap after this gesture was reserved.
    if(q.includes('btnPackagesMenu')&&state.fault==='session swapped after reserve')connection.FSession={};
    if(q.includes('btnPackagesMenu')&&state.fault==='account swapped after reserve')connection.UserName='other-account';
+   if(q.includes('btnPackagesMenu')&&state.fault==='server session swapped after reserve')connection.Session={...connection.Session};
    await click(...args);
    if(state.disconnectOnGesture&&(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen')))disconnect();
    if(q.includes('btnCreateUnsavedPackage')||q.includes('OpenDialogForm;btnOpen'))
@@ -850,7 +852,9 @@ function sessionRestoreFixture(intent,{fault='none'}={}){
  let elapsed=0;class Clock extends Date{static now(){return elapsed;}}
  c.Date=Clock;f.page.waitForTimeout=async ms=>{elapsed+=ms;state.onTick?.();};
  const run=(extra={})=>execute(f,{intent,...(intent==='open_package'?{packagePath:'/user/test.lgp'}:{}),timeoutMs:2000,...extra},Clock);
- return {f,state,elapsed:()=>elapsed,connection,run,gestures:()=>f.events.filter(e=>e==='create_draft'||e==='open_package').length};
+ // A real reload gives the page a new document and a clean global state.
+ const reload=()=>runInContext('delete globalThis.__loginomDockPreparationV1',c);
+ return {f,state,elapsed:()=>elapsed,connection,run,reload,gestures:()=>f.events.filter(e=>e==='create_draft'||e==='open_package').length};
 }
 for(const intent of ['new_draft','open_package'])test('preparation restores the original session from the exact native restore prompt and verifies again: '+intent,async()=>{
  const s=sessionRestoreFixture(intent);
@@ -905,7 +909,7 @@ test('restore diagnostics survive the production preparation parser',async()=>{
 });
 // Review of #1280: the restore baseline belongs to the gesture receipt, its
 // reservation sits right before the click, and each refusal tells the truth.
-for(const intent of ['new_draft','open_package'])for(const fault of ['session swapped after reserve','account swapped after reserve'])test('restore compares the prompt with the gesture receipt, not the latest connected session: '+intent+' '+fault,async()=>{
+for(const intent of ['new_draft','open_package'])for(const fault of ['session swapped after reserve','account swapped after reserve','server session swapped after reserve'])test('restore compares the prompt with the gesture receipt, not the latest connected session: '+intent+' '+fault,async()=>{
  const s=sessionRestoreFixture(intent,{fault});
  const r=await s.run();
  assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'owner_unbound');
@@ -923,7 +927,7 @@ for(const intent of ['new_draft','open_package'])test('session_replaced asks for
  assert.equal(r.next_step.new_operation_id_required,true);assert.equal(r.next_step.same_operation_id,undefined);
  const same=await s.run({recoverOnly:true});
  assert.equal(same.connection_restore,'session_replaced');assert.equal(same.next_step.new_operation_id_required,true);
- s.state.fault='none';s.state.disconnectOnGesture=false;
+ s.state.fault='none';s.state.disconnectOnGesture=false;s.reload();
  const next=await s.run({operationId:'prepare-after-reload'});
  assert.equal(next.status,'READY',JSON.stringify(next));assert.equal(next.connection_restore,undefined);assert.equal(s.state.restores,1);
 });
@@ -998,7 +1002,7 @@ test('the session accepts a NEW operation_id only after a proven session_replace
  const replaced=await prepareWith('first',s.run);
  assert.equal(replaced.connection_restore,'session_replaced');assert.equal(replaced.effect_possible,true);
  assert.equal((await prepareWith('first',s.run)).connection_restore,'session_replaced');
- s.state.fault='none';s.state.disconnectOnGesture=false;
+ s.state.fault='none';s.state.disconnectOnGesture=false;s.reload();
  const next=await prepareWith('after-reload',s.run);
  assert.equal(next.status,'READY',JSON.stringify(next));
  assert.deepEqual(calls,[['first',false],['first',true],['after-reload',false]]);
@@ -1008,4 +1012,66 @@ test('the session accepts a NEW operation_id only after a proven session_replace
   assertAllowed(){},assertTarget(){},async record(){},async save(){},async prepare({recoverOnly}){return pending.run({operationId:operation_id,recoverOnly});}});
  assert.equal((await attempt('first')).connection_restore,'awaiting_original_attempt');
  await assert.rejects(attempt('second'),/operation conflict/);
+});
+// Review 2 of #1280: a pressed restore binds the whole page. Another
+// operation_id never adopts a replaced or still restoring native session
+// without a reload, even when it needs no package gesture.
+for(const intent of ['new_draft','open_package'])for(const fault of ['replaced session','replaced account'])test('a NEW operation_id in the same document is refused after session_replaced: '+intent+' '+fault,async()=>{
+ const s=sessionRestoreFixture(intent,{fault});
+ const r=await s.run();
+ assert.equal(r.connection_restore,'session_replaced');assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+ s.state.fault='none';s.state.disconnectOnGesture=false;
+ for(const operationId of ['x','y']){
+  const next=await s.run({operationId});
+  assert.equal(next.status,'NOT_READY',JSON.stringify(next));assert.equal(next.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(next.connection_restore,'restore_unresolved');assert.equal(next.effect_possible,false);assert.equal(next.loginom_account,undefined);
+  assert.equal(next.next_step.new_operation_id_required,true);assert.match(next.message,/reload the Loginom page/);assert.match(next.message,/No package gesture/);
+ }
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+ s.reload();
+ const reloaded=await s.run({operationId:'after-reload'});
+ assert.equal(reloaded.status,'READY',JSON.stringify(reloaded));assert.equal(s.state.restores,1);
+});
+test('storage identity binding is refused behind an unresolved restore',async()=>{
+ const s=sessionRestoreFixture('new_draft',{fault:'replaced account'});
+ assert.equal((await s.run()).connection_restore,'session_replaced');
+ const bound=await s.run({operationId:'identity',identityOnly:true});
+ assert.equal(bound.status,'NOT_READY',JSON.stringify(bound));assert.equal(bound.connection_restore,'restore_unresolved');
+ assert.equal(bound.loginom_account,undefined);assert.equal(bound.effect_possible,false);
+ s.reload();
+ const after=await s.run({operationId:'identity-after-reload',identityOnly:true});
+ assert.equal(after.status,'BOUND',JSON.stringify(after));
+});
+test('a NEW operation_id never passes an unresolved restore of a gesture-free open_package',async()=>{
+ const s=sessionRestoreFixture('open_package');s.state.disconnectOnGesture=false;
+ const metadata={skillRevision:'skill'};
+ const prepareWith=operation_id=>prepareWorkspaceSession({metadata,request:{operation_id,intent:'open_package',package_path:'/user/test.lgp',workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},
+  async prepare({recoverOnly}){return s.run({operationId:operation_id,recoverOnly});}});
+ assert.equal((await prepareWith('op1')).status,'READY');
+ assert.equal(s.gestures(),1);
+ s.state.fault='lost reconnect';s.state.disconnectOnVerify=true;
+ const op2=await prepareWith('op2');
+ assert.equal(op2.connection_restore,'awaiting_original_attempt',JSON.stringify(op2));assert.equal(op2.effect_possible,false);assert.equal(s.state.restores,1);
+ // Loginom reconnects on another native session and closes the prompt.
+ s.state.reconnect();s.connection.FSession={};s.state.shown=false;
+ await assert.rejects(prepareWith('op3'),/operation conflict/);
+ const page=await s.run({operationId:'op3'});
+ assert.equal(page.status,'NOT_READY',JSON.stringify(page));assert.equal(page.connection_restore,'restore_unresolved');
+ const same=await prepareWith('op2');
+ assert.equal(same.status,'NOT_READY');assert.equal(same.connection_restore,'session_replaced');
+ assert.equal(s.state.restores,1);assert.equal(s.gestures(),1);
+});
+for(const fault of ['gesture_unconfirmed','attempted'])test('a pressed restore is never treated as a no-effect refusal: '+fault,async()=>{
+ const metadata={skillRevision:'skill',workspacePreparation:{identity:JSON.stringify({operation_id:'op2',intent:'open_package',package_path:'/user/test.lgp',workflow_ref:null}),
+  operation_id:'op2',attempted:true,effect_possible:false,state:{status:'NOT_READY',reason:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:fault,
+   effect_possible:false,created_draft:false,authenticated:true}}};
+ await assert.rejects(prepareWorkspaceSession({metadata,request:{operation_id:'op3',intent:'open_package',package_path:'/user/test.lgp',workflow_ref:null},
+  assertAllowed(){},assertTarget(){},async record(){},async save(){},async prepare(){throw Error('must not prepare');}}),/operation conflict/);
+});
+for(const intent of ['new_draft','open_package'])test('a receipt lost after the restore click is an unconfirmed attempt, not session_replaced: '+intent,async()=>{
+ const s=sessionRestoreFixture(intent,{fault:'reload at click'});
+ const r=await s.run();
+ assert.equal(r.status,'NOT_READY');assert.equal(r.connection_restore,'attempted',JSON.stringify(r));
+ assert.equal(r.next_step.same_operation_id,true);assert.equal(s.state.restores,1);
 });

@@ -27,11 +27,12 @@ async function prepareWorkspace(page, options) {
   let connectionRestore = null, packageGesture = false;
   // Each refusal says exactly what the runtime did to the restore prompt.
   const restoreRefusal = reason => {
-    const replaced=reason==='session_replaced';
+    const replaced=reason==='session_replaced'||reason==='restore_unresolved';
     const done={attempted:'The runtime has already pressed (or tried to press) "Восстановить" for this prompt and will not press it again; the original session is not confirmed. ',
       awaiting_original_attempt:'The runtime pressed "Восстановить" once; Loginom has not finished reconnecting the original session. Do not press it again. ',
       gesture_unconfirmed:'The runtime tried to press "Восстановить" once, but the click was not confirmed; it will not press it again for this prompt. ',
       session_replaced:'Loginom reconnected with a different native session or account, so this preparation cannot be confirmed and its operation_id can no longer be reconciled. ',
+      restore_unresolved:'Another preparation on this Loginom page pressed "Восстановить" and its restore is still pending or reconnected to a different native session; the runtime did not press anything for this preparation. ',
       owner_unbound:'The runtime did not press "Восстановить": the native session is not the one this preparation started on. ',
       state_unproven:'The runtime did not press "Восстановить": the disconnected state is not proven. ',
       dialog:'The runtime did not press "Восстановить": the prompt changed or could not be verified at the moment of the click. '}[reason]
@@ -167,6 +168,11 @@ async function prepareWorkspace(page, options) {
     path = typeof path==='string' && path ? '/'+path.replaceAll('\\','/').replace(/^\/+/, '') : null;
     const ready = !!tab && graph?.length===1 && visible(graph[0]) && workarea?.length===1 && visible(workarea[0])
       && !!packageNode && crumbs.length>2 && crumbs.length<=32 && blockers.length===0;
+    // A pressed restore binds the whole page: until it settles on its own
+    // operation, or a reload starts a new document, no other operation may
+    // take the current (possibly replaced) native session as its baseline.
+    const restoreUnresolved=[...state.receipts].some(([id,r])=>id!==options.operationId&&(r?.restore?.pending||r?.restore?.replaced));
+    if((mode==='identity'||mode==='reserve')&&restoreUnresolved)return {error:'NATIVE_MESSAGE_BOX_BLOCKED',connection_restore:'restore_unresolved'};
     if(mode==='identity')return {document_id:state.id,blocked:blockers.length>0,
       loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName??null};
     const request = JSON.stringify({session:options.sessionId,intent:options.intent,packagePath:options.packagePath,workflowRef:options.workflowRef});
@@ -194,8 +200,9 @@ async function prepareWorkspace(page, options) {
     }
     const current = state.receipts.get(options.operationId);
     const baselineKept=()=>!!current&&current.openConnected===true&&!!current.openRemoteSession&&!!current.openLocalSession
-      &&typeof current.openAccount==='string'&&current.openAccount.length>0&&!!serverConnection
-      &&serverConnection===current.openConnection&&serverConnection.FRemoteSession===current.openRemoteSession
+      &&!!current.openServerSession&&typeof current.openAccount==='string'&&current.openAccount.length>0&&!!serverConnection
+      &&serverConnection===current.openConnection&&serverConnection.Session===current.openServerSession
+      &&serverConnection.FRemoteSession===current.openRemoteSession
       &&serverConnection.FSession===current.openLocalSession&&serverConnection.UserName===current.openAccount;
     // A pressed restore settles only once, on this operation's own baseline.
     const settleRestore=()=>{
@@ -241,8 +248,10 @@ async function prepareWorkspace(page, options) {
     }
     if(mode==='restore_settle'){
       const settled=settleRestore();
+      // Only a proven baseline change is session_replaced; a lost receipt
+      // (for example a reload after the click) is an unconfirmed attempt.
       return settled==='settled'?{restored:true}:{error:'NATIVE_MESSAGE_BOX_BLOCKED',
-        connection_restore:settled==='waiting'?'awaiting_original_attempt':'session_replaced'};
+        connection_restore:settled==='waiting'?'awaiting_original_attempt':settled==='replaced'?'session_replaced':'attempted'};
     }
     if(mode==='open_dialog') {
       const roots=exact('OpenDialogForm'),element=roots.length===1?roots[0]:null;
@@ -406,6 +415,7 @@ async function prepareWorkspace(page, options) {
       });
       if(entry.hard_blocked)return result('NOT_READY','STORAGE_IDENTITY_UNAVAILABLE');
       const binding=await inspect('identity');
+      if(binding.error)return result('NOT_READY',binding.error,{authenticated:true});
       if(binding.blocked||typeof binding.loginom_account!=='string'||!binding.loginom_account.trim())
         return result('NOT_READY','STORAGE_IDENTITY_UNAVAILABLE');
       return result('BOUND',null,{document_id:binding.document_id,loginom_account:binding.loginom_account,target_verified:true});
@@ -478,7 +488,7 @@ async function prepareWorkspace(page, options) {
         return f?.FMapTree?.FServerConnection?.Connected===true&&f.FReconnecting===false;},null,{timeout:Math.min(10000,remaining())});}
       catch(error){if(error.message==='DEADLINE')throw error;return failed('awaiting_original_attempt');}
       const settled=await inspect('restore_settle');
-      if(settled?.restored!==true)return failed(settled?.connection_restore??'session_replaced');
+      if(settled?.restored!==true)return failed(settled?.connection_restore??'attempted');
       trace.push({condition:'connection_restored',satisfied:true});
       return {pending:true,blocking_windows:observed.blocking_windows};
     };
@@ -760,14 +770,21 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
       && previous.state.package_absence_verified === true
       && JSON.parse(previous.identity).intent === 'open_package'
       && previous.state.package_path === JSON.parse(previous.identity).package_path;
-    const replaceRefusal = previous.effect_possible === false
+    // A pressed restore click is not a package gesture, but its operation
+    // stays unresolved until that same operation reconciles it.
+    const restorePressed = ['attempted', 'awaiting_original_attempt', 'gesture_unconfirmed'].includes(previous.state?.connection_restore);
+    const replaceRefusal = previous.effect_possible === false && !restorePressed
       && previous.state?.status === 'NOT_READY' && (previous.state.reason === 'WORKFLOW_LOST' || missingWithoutEffect || request?.intent === 'open_package')
       && previous.state.effect_possible === false && previous.state.created_draft === false
       && previous.state.authenticated === true;
     // The page proved that Loginom replaced the native session this attempt
     // started on; that operation can never be reconciled, so a NEW ID may start.
+    // A refusal behind another operation's unresolved restore made no gesture
+    // and likewise needs a reloaded page and a NEW ID.
     const sessionReplaced = previous.state?.status === 'NOT_READY' && previous.state.reason === 'NATIVE_MESSAGE_BOX_BLOCKED'
-      && previous.state.connection_restore === 'session_replaced' && previous.state.authenticated === true;
+      && previous.state.authenticated === true && (previous.state.connection_restore === 'session_replaced'
+        || previous.state.connection_restore === 'restore_unresolved' && previous.state.effect_possible === false
+          && previous.state.created_draft === false && previous.effect_possible === false);
     if (previous.operation_id === request?.operation_id
         || !replaceRefusal && !sessionReplaced && (metadata.workspaceReady !== true || previous.state?.status !== 'READY')) {
       throw new Error('Preparation operation conflict: reconcile the existing request first');
