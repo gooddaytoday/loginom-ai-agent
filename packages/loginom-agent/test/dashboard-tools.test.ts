@@ -32,14 +32,16 @@ const call = (signal = new AbortController().signal): ToolContext => ({
   progress: async () => {},
 })
 
-// The plugin's side of the tools: `ask` answers the publication's question, and the chat belongs to its draft.
+// The plugin's side of the tools: `ask` answers the publication's question, and `bound` checks that the chat belongs to
+// its draft (by default it does).
 const session = (
   ask: (request: { resources: readonly string[]; metadata?: Record<string, unknown> }) => Promise<void> = async () => {
     throw Error("nothing is asked")
   },
+  bound = async () => {},
 ) => ({
   permission: { assert: ask, list: async () => [], reply: async () => {} },
-  bound: async () => {},
+  bound,
 })
 
 test("dashboard_draft reports missing installation resources", async () => {
@@ -229,6 +231,55 @@ test(
   },
   timeout,
 )
+
+test(
+  "an approval that arrives once the call was stopped sends nothing",
+  async () => {
+    await using folder = await dashboardFolder()
+    await using host = await serviceHost(folder)
+    const controller = new AbortController()
+    const tools = dashboardTools(
+      folder.work,
+      folder.resources,
+      session(async () => controller.abort()),
+    )
+    await expect(tools.publish.execute({}, call(controller.signal))).rejects.toThrow()
+    expect(host.requests("dashboardPublish")).toEqual([])
+    expect(await Bun.file(join(folder.work, "sample.json")).exists()).toBe(true)
+  },
+  timeout,
+)
+
+// 0.4 compared the captured draft with the session's after the build and checked the session again after the question.
+for (const [when, at] of [
+  ["after the build", 1],
+  ["after the question", 2],
+] as const)
+  test(
+    "a chat that no longer belongs to its draft sends nothing: " + when,
+    async () => {
+      await using folder = await dashboardFolder()
+      await using host = await serviceHost(folder)
+      const checks: number[] = []
+      const tools = dashboardTools(
+        folder.work,
+        folder.resources,
+        session(
+          async () => {},
+          async () => {
+            checks.push(checks.length + 1)
+            if (checks.length === at) throw Error("LOGINOM_SCOPE_DENIED: fixture")
+          },
+        ),
+      )
+      await expect(tools.publish.execute({}, call())).rejects.toThrow("LOGINOM_SCOPE_DENIED: fixture")
+      expect(checks).toHaveLength(at)
+      expect(host.log.map((request) => request.method)).toEqual(
+        at === 1 ? [] : ["acquire", "scope", "dashboardRead", "release"],
+      )
+    },
+    timeout,
+  )
 
 async function until<T>(read: () => Promise<T | undefined>, deadline = Date.now() + 60_000): Promise<T> {
   const value = await read()
