@@ -1,11 +1,13 @@
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
+// A request ref may list its three keys in any order; graph refs are canonical.
+const sameRef=(ref,node)=>['document_id','workflow_id','node_id'].every(key=>ref?.[key]===node?.[key]);
 
 export function javascriptUnconnectedInputVerified(graph,node,ownedVariableLinks=[]){
   const variableLinks=graph?.variable_links??[];
   return graph?.complete===true&&graph.document_id===node.document_id
     &&graph.workflow_ref?.workflow_id===node.workflow_id&&Array.isArray(graph.nodes)
-    &&graph.nodes.filter(item=>same(item.ref,node)).length===1
+    &&graph.nodes.filter(item=>sameRef(item.ref,node)).length===1
     &&Array.isArray(graph.links)&&Array.isArray(graph.foreign_links)&&graph.foreign_links.length===0
     &&[graph.links,graph.service_links??[],graph.rest_connection_links??[]].every(edges=>Array.isArray(edges)
       &&edges.every(edge=>typeof edge?.target==='string'&&edge.target!==node.node_id))
@@ -41,7 +43,7 @@ export function verifyJavascriptMappingGraph(before,after,node){
   need(before?.complete===true&&after?.complete===true&&before.document_id===node.document_id
     &&after.document_id===node.document_id&&before.workflow_ref.workflow_id===node.workflow_id
     &&after.workflow_ref.workflow_id===node.workflow_id,'JavaScript mapping graph owner changed');
-  const previous=before.nodes.find(item=>same(item.ref,node)),current=after.nodes.find(item=>same(item.ref,node));
+  const previous=before.nodes.find(item=>sameRef(item.ref,node)),current=after.nodes.find(item=>sameRef(item.ref,node));
   need(previous&&current,'JavaScript mapping node disappeared');
   const expected=previous.locked===true&&current.locked===false
     ?{...before,nodes:before.nodes.map(item=>item===previous?{...item,locked:false}:item)}:before;
