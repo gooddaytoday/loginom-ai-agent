@@ -12,8 +12,11 @@ import { readPendingJudge } from "../src/rejudge"
 import { runOfflineJudge } from "../src/judge-environment"
 import { requireResourceBudgetScopes, validResourceBound } from "../src/parallel-resource-budget"
 
-type CampaignKey = { corpus: string; taskId: string; round: number }
+type CampaignKey = { corpus: string; taskId: string; round: number
+  experiment?: { family: string; pair: string; arm: string; order: number; condition: string }
+}
 export type CampaignManifest = {
+  seriesPurpose?: "pilot" | "held-out" | "controlled" | "corpus"
   id: string; server: string; executor: string; parallel: number; batchSize: number
   keys: CampaignKey[]; pins: Record<string, string | number>; issueId?: string; wakeupIds?: string[]
   limits?: { consecutiveErrors?: number; maxStartedAttempts?: number; noProgressMs?: number }
