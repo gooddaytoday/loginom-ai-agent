@@ -321,22 +321,35 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    if(!['open_issued','deactivation_issued','verified'].includes(r.phase))fail('Port wizard was not opened by this operation');
    const wizardTree=card.Controller.Node?.data?.node,portTree=wizardTree?.ParentNode,group=portTree?.ParentNode,nodeTree=group?.ParentNode;
    const roots=exact(b.workflow_ref.prefix+';WizrdMCF');
-   // With the file connection hidden, the export wizard may also compact its data input to zero.
-   const compactTextExport=input&&!control&&!variables&&app.IsFileConnectionHidden===true
-    &&r.node.FIconCls==='bg-vendor-icon-exporttextfile'&&r.portIndex===0&&r.nativeIndex===0;
+   // Loginom opens the port by object (ModelForm.DoMappingInputPort), not by
+   // the diagram ordinal. Bind the export's tree index to its exact cached
+   // collection slot; visibility and package lifecycle do not identify it.
+   const textExportInput=input&&!control&&!variables&&r.node.FIconCls==='bg-vendor-icon-exporttextfile'&&r.portIndex===0&&r.nativeIndex===0;
    const wizardIndex=portTree?.FIndex;
+   const portCollection=group?.FSubNodes,items=portCollection?.FItems;
+   const indexOwned=textExportInput
+    ?Number.isInteger(wizardIndex)&&wizardIndex>=0&&wizardIndex<100
+      &&group===nodeTree?.FInputPortsRootNode&&portCollection?.FParentNode===group&&portTree.FCollection===portCollection
+      &&Array.isArray(items)&&items.length<=100&&items[wizardIndex]===portTree
+      &&items.filter(p=>p===portTree||p?.FModelNodePort===r.portData).length===1
+    :wizardIndex===r.nativeIndex;
    if(!(wizardTree instanceof app.WizardTreeNode)||!(portTree instanceof app.ModelPortTreeNode)
     ||!(group instanceof (input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode))||!(nodeTree instanceof (variables&&!input?app.ModelServiceNodeTreeNode:app.ModelNodeTreeNode))
     ||nodeTree.FGuid!==r.node_id||nodeTree.FModelNode!==r.node.data||portTree.FModelNodePort!==r.port.data
-    ||(wizardIndex!==r.nativeIndex&&!(compactTextExport&&wizardIndex===1))||nodeTree.ParentNode!==r.workflow
+    ||!indexOwned||nodeTree.ParentNode!==r.workflow
     ||model?.constructor?.name!=='WizardModelComponentForm'||!(input||variables?model.FModelSocket:model.FModelEnginePort)||model.FModelNode
-    ||roots.length!==1||model.FView?.el?.dom!==roots[0])fail('Opened port wizard owner differs');
+    ||roots.length!==1||model.FView?.el?.dom!==roots[0])fail('Opened port wizard owner differs: '+JSON.stringify({
+     native_index:r.nativeIndex,wizard_index:Number.isInteger(wizardIndex)?wizardIndex:null,index_owned:indexOwned,
+     node:nodeTree?.FGuid===r.node_id&&nodeTree?.FModelNode===r.nodeData,port:portTree?.FModelNodePort===r.portData,
+     workflow:nodeTree?.ParentNode===r.workflow,socket:!!(input||variables?model?.FModelSocket:model?.FModelEnginePort),model_node:!!model?.FModelNode,
+     wizard:model?.constructor?.name==='WizardModelComponentForm',root:roots.length===1&&model?.FView?.el?.dom===roots[0]}));
    if(r.phase==='verified'&&(r.wizard!==model||r.enginePort!==(input||variables?model.FModelSocket:model.FModelEnginePort)
-    ||r.portTree!==portTree||r.nodeTree!==nodeTree||(r.wizardIndex??r.nativeIndex)!==wizardIndex))fail('Port wizard receipt became stale');
+    ||r.portTree!==portTree||r.nodeTree!==nodeTree||(r.wizardIndex??r.nativeIndex)!==wizardIndex
+    ||textExportInput&&r.portCollection!==portCollection))fail('Port wizard receipt became stale');
    r.wizard=model;r.enginePort=input||variables?model.FModelSocket:model.FModelEnginePort;r.portTree=portTree;r.nodeTree=nodeTree;
-   r.wizardIndex=wizardIndex;r.phase='verified';
+   r.wizardIndex=wizardIndex;if(textExportInput)r.portCollection=portCollection;r.phase='verified';
    return {phase:r.phase,verified:true,document_id:r.document_id,workflow_id:r.workflow_id,node_id:r.node_id,
-    direction,port:r.portIndex,native_index:wizardIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
+    direction,port:r.portIndex,native_index:r.nativeIndex,wizard_index:wizardIndex,port_guid:r.port.FGuid,opening_operation_id:r.operation_id};
   }
   fail('Unknown port opening phase');
  },{task,mode});

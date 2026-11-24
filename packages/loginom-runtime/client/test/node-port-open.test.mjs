@@ -466,37 +466,58 @@ test('input port binds its own group and socket without accepting the output eng
  assert.equal((await f.run()).verified,false);assert.equal(f.gestures.length,2);
 });
 
-for(const wizardIndex of [0,1])test(`text export opens its input with a hidden connection at wizard index ${wizardIndex}`,async()=>{
+function textExportFixture(wizardIndex=0) {
  const f=fixture('input');
  f.node.FIconCls='bg-vendor-icon-exporttextfile';
- await f.page.evaluate(()=>{globalThis.bg.app.IsFileConnectionHidden=true;},null);
  f.portTree.FIndex=wizardIndex;
+ const group=f.portTree.ParentNode,nodeTree=group.ParentNode;
+ group.FSubNodes={FParentNode:group,FItems:Array.from({length:wizardIndex+1},(_,i)=>i===wizardIndex?f.portTree:{FIndex:i,FModelNodePort:{}})};
+ f.portTree.FCollection=group.FSubNodes;
+ nodeTree.FInputPortsRootNode=group;
+ return f;
+}
+
+for(const hidden of [true,false])for(const wizardIndex of [0,1])test(`text export binds its cached input tree at index ${wizardIndex}, hidden=${hidden}`,async()=>{
+ const f=textExportFixture(wizardIndex);
+ await f.page.evaluate(hidden=>{globalThis.bg.app.IsFileConnectionHidden=hidden;},hidden);
 
  const r=await f.run();
  assert.equal(r.status,'SUCCEEDED',r.error);
  assert.equal(r.port,0);
- assert.equal(r.native_index,wizardIndex);
+ assert.equal(r.native_index,0);
+ assert.equal(r.wizard_index,wizardIndex);
  assert.equal(f.port.FPortIndex,0);
  assert.equal((await f.run()).replayed,true);
  assert.equal(f.gestures.length,2);
 
+ const collection=f.portTree.FCollection;
+ f.portTree.ParentNode.FSubNodes={...collection};
+ assert.equal((await f.run()).verified,false);
+ f.portTree.ParentNode.FSubNodes=collection;
  f.portTree.FModelNodePort={};
  assert.equal((await f.run()).verified,false);
  assert.equal(f.gestures.length,2);
 });
 
-test('text export rejects an unrelated input index even when the connection is hidden',async()=>{
- const f=fixture('input');
- f.node.FIconCls='bg-vendor-icon-exporttextfile';
+test('text export rejects an index inconsistent with its cached input collection',async()=>{
+ const f=textExportFixture();
  await f.page.evaluate(()=>{globalThis.bg.app.IsFileConnectionHidden=true;},null);
  f.portTree.FIndex=2;
  assert.match((await f.run()).error,/Opened port wizard owner differs/);
 });
 
-test('a different wizard index still refuses when the connection is visible',async()=>{
- const f=fixture('input');
- f.node.FIconCls='bg-vendor-icon-exporttextfile';
- f.portTree.FIndex=1;
+for(const fault of ['missing','foreign-root','foreign-collection','foreign-parent','wrong-slot','duplicate-port','duplicate-tree','unbounded','fractional','negative'])test('text export rejects unproven cached tree ownership: '+fault,async()=>{
+ const f=textExportFixture(1),group=f.portTree.ParentNode;
+ if(fault==='missing')delete group.FSubNodes;
+ if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
+ if(fault==='foreign-collection')f.portTree.FCollection={};
+ if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
+ if(fault==='wrong-slot')group.FSubNodes.FItems.reverse();
+ if(fault==='duplicate-port')group.FSubNodes.FItems[0].FModelNodePort=f.port.data;
+ if(fault==='duplicate-tree')group.FSubNodes.FItems[0]=f.portTree;
+ if(fault==='unbounded')group.FSubNodes.FItems.length=101;
+ if(fault==='fractional')f.portTree.FIndex=0.5;
+ if(fault==='negative')f.portTree.FIndex=-1;
  assert.match((await f.run()).error,/Opened port wizard owner differs/);
 });
 test('unresolved opposite-direction port opening prevents a new gesture',async()=>{
