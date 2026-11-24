@@ -50,7 +50,7 @@ const binding = (draftId: string) => JSON.stringify({ draftId, note: "control sy
 // `git` makes the dashboard's folder a git repository, so Core counts `control` and `..` as the project's own and asks
 // no `external_directory` question: only the plugin's own check stands. `at` opens the Location in the work folder, at
 // an alias outside that links to it, or in an ordinary project. `user` is the user's config, `work` a config file at the
-// work folder's root (B2.9h writes one), `policies` the administrator's (B2.6c). `model` is the model's ID: OpenCode
+// work folder's root, `policies` the administrator's (B2.6c). `model` is the model's ID: OpenCode
 // offers `patch` instead of `edit` and `write` to GPT models.
 type Options = {
   git?: boolean
@@ -600,6 +600,12 @@ describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", (
         const before = yield* test.requests
         for (const old of [chat, kept])
           expect([old.id, yield* test.admit(old.id)]).toEqual([old.id, expect.stringContaining(Dashboard.unbound)])
+        // A side question and a manual compaction of the old chat reach no model either.
+        expect(
+          Exit.isFailure(yield* test.sessions.generate({ sessionID: chat.id, prompt: "x" }).pipe(Effect.exit)),
+        ).toBe(true)
+        yield* test.sessions.compact({ sessionID: chat.id }).pipe(Effect.exit)
+        yield* test.sessions.wait(chat.id)
         expect(yield* test.requests).toBe(before)
         expect((yield* test.sessions.messages({ sessionID: kept.id })).length).toBe(0)
 
@@ -810,9 +816,12 @@ describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", (
           ["user's formatter", { user: { formatter } }],
           ["user's formatter, patch", { user: { formatter }, model: "gpt-5-dashboard-files" }],
           ["the folder's config turns it on", { work: { formatter } }],
+          ["the folder's config, plugins activated again", { work: { formatter } }],
           ["control: ordinary Location", { user: { formatter }, at: "ordinary" }],
         ] as const) {
           const test = yield* boot(options)
+          // A plugin registered later activates the Location's plugins again: the product's removal still comes last.
+          if (label.includes("again")) yield* test.harness(() => Effect.void)
           const marker = path.join(test.dir, "formatter-marker")
           const session = yield* test.create(label)
           const calls =
@@ -845,7 +854,7 @@ describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", (
             ])
         }
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
-    // Four server Locations, and Prettier runs as a child process in the control.
+    // Five server Locations, and Prettier runs as a child process in the control.
     60_000,
   )
 })
