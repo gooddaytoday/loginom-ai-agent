@@ -567,3 +567,163 @@ test('D17 only the read-only selection capture can report an opening with no eff
   assert.equal(events.length,failCapture?0:1);assert.equal(reads,failCapture?1:2);
  }
 });
+
+// bh-v11: after a failed JS execution the captured selection can be blocked.
+// The body gesture is refused before its journal or click; only the read-only
+// lease is held, so a disposed lease reports an opening with no effect.
+for(const disposeFails of [false,true])test('unusable selection snapshot releases its lease before any body gesture'+(disposeFails?' unless dispose fails':''),async()=>{
+ const modes=[],events=[];
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
+  channel:{observe:async()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}})},
+  execute:async code=>{const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode);
+   if(mode==='capture')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+   if(mode==='dispose'){if(disposeFails)throw Error('lost reply');return {disposed:true};}
+   throw Error('unexpected browser call '+mode);},
+  record:async e=>{events.push(e);return e;},receiptOptions:()=>({})}),error=>{
+   if(disposeFails){assert.equal(error.message,'lost reply');assert.equal(error.nodePhaseRefusal,undefined);return true;}
+   assert.match(error.message,/body gesture/);
+   assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;
+  });
+ assert.deepEqual(modes,['capture','dispose']);assert.equal(events.length,0);
+});
+
+test('bh-v11 source read refused before the body gesture leaves the read registry settled',async()=>{
+ const {createJavascriptSourceReadRegistry}=await import('../lib/javascript-source-read-registry.mjs');
+ const {createJavascriptSourceReadSession}=await import('../lib/javascript-source-read-session.mjs');
+ const request={kind:'source',operation_id:'read-source',document_id:'document',
+  workflow_ref:prepared.workflow_ref,node};
+ const modes=[];
+ const execute=async code=>{const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode??'type');
+  if(mode==='capture')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='dispose')return {disposed:true};
+  if(!mode)return {verified:true,node_id:'node',icon_class:'bg-vendor-icon-javascript'};
+  throw Error('unexpected browser call '+mode);};
+ const registry=createJavascriptSourceReadRegistry({openSession:async req=>{
+  const sessionDeadline=Date.now()+300000;
+  const adapter=createJavascriptManagedSourceAdapter({page:{},prepared,node,uiEpoch:9,deadline:sessionDeadline,
+   targetOrigin:'http://test',execute,record:async e=>e,receiptOptions:()=>({}),
+   channel:()=>({observe:async()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}})})});
+  return createJavascriptSourceReadSession({request:req,uiEpoch:9,deadline:sessionDeadline,adapter,
+   redactor:createRedactor(),record:async e=>e});
+ }});
+ await assert.rejects(registry.read(request),/body gesture/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,false);
+ assert.deepEqual(modes,['type','capture','dispose']);
+});
+
+// LAB-1998 A1: a blocker appears between capture and the body pre-click check.
+// The settled body receipt reports NOT_APPLIED without a click, so the read-only
+// lease is disposed and the opening has no effect. A lost dispose reply or a
+// returned click keeps the opening closed.
+const graphState={prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}};
+function bodyRefusalExecute({modes,bodyStatus='NOT_APPLIED',bodyCode='SELECTION_SNAPSHOT_CHANGED',disposeFails=false}){
+ return async code=>{
+  if(code.includes('runManagedJavascriptSelectionBody')){
+   modes.push('body');const gesture_id=code.match(/"gesture_id":"([^"]+)"/)[1];
+   return bodyStatus==='NOT_APPLIED'
+    ?{status:'NOT_APPLIED',phase:'preflight',effect_possible:false,cleanup_complete:true,action_key:'javascript.selection.body',
+     action_revision:'1',operation_id:gesture_id,output:{},error:{code:bodyCode,message:'Selection refused'},trace:[]}
+    :{status:'SUCCEEDED',phase:'gesture_returned',effect_possible:true,cleanup_complete:true,action_key:'javascript.selection.body',
+     action_revision:'1',operation_id:gesture_id,output:{body_gesture_returned:true},error:null,trace:[]};
+  }
+  const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode??'type');
+  if(!mode)return {verified:true,node_id:'node',icon_class:'bg-vendor-icon-javascript'};
+  if(mode==='capture')return {ready:false,node_selected:false,body_point:{x:10,y:20},node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='inspect')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='dispose'){if(disposeFails)throw Error('lost reply');return {disposed:true};}
+  throw Error('unexpected browser call '+mode);
+ };
+}
+for(const [name,variant] of Object.entries({refused:{},disposeFails:{disposeFails:true},clicked:{bodyStatus:'SUCCEEDED'},
+ leaseRefused:{bodyCode:'SELECTION_LEASE_UNAVAILABLE'}}))
+test('A1 body gesture refused before its click releases the lease: '+name,async()=>{
+ const modes=[],events=[];
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
+  channel:{observe:async()=>graphState},execute:bodyRefusalExecute({modes,...variant}),
+  record:async e=>{events.push(e.phase);return e;},receiptOptions:()=>({})}),error=>{
+   if(name==='refused'){assert.match(error.message,/body gesture refused before its click: SELECTION_SNAPSHOT_CHANGED/);
+    assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});}
+   else assert.equal(error.nodePhaseRefusal,undefined);
+   if(name==='disposeFails')assert.equal(error.message,'lost reply');
+   if(name==='clicked')assert.match(error.message,/blocked after gesture/);
+   if(name==='leaseRefused')assert.match(error.message,/selection unconfirmed/);
+   return true;
+  });
+ assert.deepEqual(modes,name==='clicked'?['capture','body','inspect']:name==='leaseRefused'?['capture','body']:['capture','body','dispose']);
+ assert.deepEqual(events,['javascript_managed_body_prepared','javascript_managed_body_returned']);
+});
+
+const sourceRegistry=async(execute,observe)=>{
+ const {createJavascriptSourceReadRegistry}=await import('../lib/javascript-source-read-registry.mjs');
+ const {createJavascriptSourceReadSession}=await import('../lib/javascript-source-read-session.mjs');
+ return createJavascriptSourceReadRegistry({openSession:async req=>{
+  const sessionDeadline=Date.now()+300000;
+  const adapter=createJavascriptManagedSourceAdapter({page:{},prepared,node,uiEpoch:9,deadline:sessionDeadline,
+   targetOrigin:'http://test',execute,record:async e=>e,receiptOptions:()=>({}),channel:()=>({observe})});
+  return createJavascriptSourceReadSession({request:req,uiEpoch:9,deadline:sessionDeadline,adapter,
+   redactor:createRedactor(),record:async e=>e});
+ }});
+};
+const readRequest={kind:'source',operation_id:'read-source',document_id:'document',workflow_ref:prepared.workflow_ref,node};
+
+for(const name of ['refused','disposeFails'])test('A1 source read with a body refused before its click settles the read registry: '+name,async()=>{
+ const modes=[],registry=await sourceRegistry(bodyRefusalExecute({modes,disposeFails:name==='disposeFails'}),async()=>graphState);
+ await assert.rejects(registry.read(readRequest),name==='refused'?/refused before its click/:/lost reply/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,name==='disposeFails');
+ assert.deepEqual(modes,['type','capture','body','dispose']);
+});
+
+// LAB-1998 A2: observing or verifying the owner before capture only reads;
+// no lease, journal or gesture exists yet. Viewport navigation is a gesture
+// and is not covered.
+for(const fault of ['observe','owner','tid','wizard'])test('A2 owner check before capture is an opening with no effect: '+fault,async()=>{
+ const modes=[];
+ const observe=async()=>{
+  if(fault==='observe')throw Error('observe transport lost');
+  const state=structuredClone(graphState);
+  if(fault==='owner')state.prepared_node_context.node_id='foreign';
+  if(fault==='tid')state.prepared_node_context.tid='MF;TF-2;Graph;JS';
+  if(fault==='wizard')state.wizard.status='present';
+  return state;
+ };
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',channel:{observe},
+  execute:async()=>assert.fail('no browser call'),record:async()=>assert.fail('no journal'),receiptOptions:()=>({})}),error=>{
+   assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;});
+ const registry=await sourceRegistry(bodyRefusalExecute({modes}),observe);
+ await assert.rejects(registry.read(readRequest),/observe transport lost|graph owner unavailable/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,false);assert.deepEqual(modes,['type']);
+});
+
+for(const fault of ['lost','node_id','covered'])test('A2 a failure after viewport navigation keeps the opening uncertain: '+fault,async()=>{
+ const f=openingFixture({fault});
+ await assert.rejects(openManagedJavascriptExistingWizard(f.args),error=>{assert.equal(error.nodePhaseRefusal,undefined);return true;});
+ assert.ok(f.calls.includes('reveal'));
+});
+
+// Review of #1318: viewport navigation is a gesture. After a successful reveal,
+// a later capture, body-code or pre-click body refusal never reports an
+// opening with no effect; the same refusals of a visible node still do.
+for(const offscreen of [true,false])for(const fault of ['capture','bodyCode','bodyRefused'])
+test('reveal before a '+fault+' refusal '+(offscreen?'keeps the opening uncertain':'of a visible node has no effect'),async()=>{
+ const calls=[],tid='MF;TF-1;Graph;JS';let navigated=!offscreen;
+ const channel={
+  observe:async({ready})=>{calls.push('observe');
+   const state={prepared_node_context:{...node,verified:true,surface:'graph',tid,locked:false},wizard:{status:'absent'},
+    ui:{elements:[{tid,graph_node:{part:'body'},interaction:navigated?{state:'point_observed',point:{x:500,y:250}}:{state:'outside_viewport',point:null}}]}};
+   assert.ok(ready(state));return state;},
+  revealGraphNode:async()=>{calls.push('reveal');navigated=true;}};
+ const modes=[],refused=bodyRefusalExecute({modes});
+ const execute=async code=>{
+  const mode=code.match(/"mode":"(\w+)"/)?.[1];
+  if(mode==='capture'&&fault==='capture'){modes.push('capture');throw Error('lost capture reply');}
+  if(mode==='capture'&&fault==='bodyCode'){modes.push('capture');return {ready:false,blocked:true,node_tid:tid,dom_replacements:0};}
+  return refused(code);
+ };
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',channel,execute,
+  record:async e=>e,receiptOptions:()=>({})}),error=>{
+   if(offscreen)assert.equal(error.nodePhaseRefusal,undefined);
+   else assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+   return true;});
+ assert.deepEqual(calls,offscreen?['observe','reveal','observe']:['observe']);
+ assert.deepEqual(modes,{capture:['capture'],bodyCode:['capture','dispose'],bodyRefused:['capture','body','dispose']}[fault]);
+});

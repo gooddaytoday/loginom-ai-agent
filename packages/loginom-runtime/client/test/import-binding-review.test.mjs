@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createTextImportNodeSupport} from '../lib/text-import-node.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from '../lib/node-import-continuation.mjs';
+import {releaseNodeTarget} from '../lib/node-target.mjs';
 
 function savedImport(kind='bound',active=true,pathOverride){
  const node={document_id:'doc',workflow_id:'wf',node_id:'import'},source={...node,node_id:'vars'};
@@ -34,11 +35,13 @@ function savedImport(kind='bound',active=true,pathOverride){
    if(!pending)return {status:'SUCCEEDED',output:state()};
    const step=pending;pending=null;const action=step.action;actions.push(action.verb);
    if(action.verb.startsWith('user_')||action.verb==='variable_mapping_read'){
-    const output={verified:true,cleanup_complete:true,effect_possible:false,independent_readback:true,
-     node_context:action.verb==='variable_mapping_read'?node:source,
-     ...(action.verb==='variable_mapping_read'?{mapping}:{source_active:active,variables:structuredClone(variables)})};
+    const readingMapping=action.verb==='variable_mapping_read';
+    const output={verified:true,cleanup_complete:true,effect_possible:readingMapping,independent_readback:true,
+     node_context:{...(readingMapping?node:source),verified:true,surface:'graph',locked:false},
+     ...(readingMapping?{mapping}:{source_active:active,variables:structuredClone(variables)})};
     if(action.verb==='user_runtime_read'&&!active){output.independent_readback=false;delete output.variables;}
-    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'node.variables.'+action.verb+'.internal',cleanup_complete:true,effect_possible:false,output};
+    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'node.variables.'+action.verb+'.internal',
+     action_revision:'1',phase:action.verb,cleanup_complete:true,effect_possible:output.effect_possible,output};
    }
    if(action.verb==='begin_wizard')opened=true;else if(action.verb==='click'&&action.ref==='ui-cancel')opened=false;else assert.fail('Unexpected mutation '+JSON.stringify(action));
    return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,error:null,trace:[]};
@@ -120,6 +123,47 @@ for(const active of [true,false])for(const bindings of [undefined,[]])test('our 
  await f.driver().beforeTarget(f.ctx);assert.equal(f.witnesses(),2);
  assert.equal(f.operation.importBindingInventory[0].variable.name,'CsvPath');
  if(active)assert.ok(!f.actions.includes('user_values'));
+});
+
+for(const fault of ['missing witness','changed inventory'])test('saved Execute releases after '+fault+' following a completed mapping read',async()=>{
+ const f=savedImport(),{operation,ctx,r}=f;
+ f.graph.interaction_ready=true;
+ f.graph.nodes[0].locked=false;
+ f.graph.nodes.push({ref:r.target.ref,type:'imports.text',locked:false});
+ const adapter=operation.nodeTargetAdapter;
+ adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:r.document_id,workflow_ref:r.workflow_ref});
+ if(fault==='changed inventory')f.allowWitness();
+ const execute=f.options.execute;
+ let lastRead,reads=0;
+ f.options.execute=async()=>{
+  const receipt=await execute();
+  if(receipt.phase==='variable_mapping_read'){
+   reads++;
+   if(reads===2){
+    receipt.output.mapping=structuredClone(receipt.output.mapping);
+    receipt.output.mapping.fields[0].source.id++;
+   }
+   lastRead=receipt;
+  }
+  return receipt;
+ };
+ const driver=f.driver();
+ await assert.rejects(driver.beforeTarget(ctx),fault==='missing witness'?/fresh witness required/:/BINDING_SOURCE_UNVERIFIED/);
+ assert.equal(reads,fault==='missing witness'?1:2);
+ assert.equal(operation.nodeEffectPossible,true);
+ operation.nodeApply={request:r,pending:{phase:'target'}};
+ operation.cleanupConfirmed=false; // The enclosing operation stopped before target.
+ const actions=[...f.actions];
+ const result=await releaseNodeTarget({operation,adapter,deadline:ctx.deadline,record:async event=>event,
+  settleChild:driver.settleBeforeTarget,readReceipt:async reference=>{
+   assert.equal(reference.operation_id,lastRead.operation_id);
+   return {state:'completed',receipt:lastRead};
+  }});
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(result.child_cleanup.operation_id,lastRead.operation_id);
+ assert.deepEqual(result.node,r.target.ref);
+ assert.deepEqual(f.actions,actions);
 });
 
 for(const value of [null,''])test('explicit new string binding refuses '+(value===null?'NULL':'empty')+' before Execute',async()=>{

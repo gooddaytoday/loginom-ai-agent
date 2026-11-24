@@ -200,10 +200,13 @@ export async function preflightGroupingSource(options,ctx,config){
   try{
    let selected=before;
    if(before.ready!==true){
-    operation.cleanupConfirmed=false;
-    let result;
-    try{result=await dispatchManagedJavascriptBody({task,before,execute,record:onRecord,receiptOptions});}
-    catch(error){operation.transportUncertain=true;operation.nodeEffectPossible=true;throw error;}
+    const cleanupBefore=operation.cleanupConfirmed;operation.cleanupConfirmed=false;
+    let result,journaled=false;
+    try{result=await dispatchManagedJavascriptBody({task,before,execute,record:event=>{journaled=true;return onRecord(event);},receiptOptions});}
+    catch(error){
+     // Refused before its journal: no click can exist, so release the read lease.
+     if(!journaled){operation.cleanupConfirmed=cleanupBefore;error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+     operation.transportUncertain=true;operation.nodeEffectPossible=true;throw error;}
     operation.nodeEffectPossible ||= result.effect_possible===true;
     operation.cleanupConfirmed=result.cleanup_complete===true;
     need(result.status==='SUCCEEDED','Managed JavaScript source selection refused');

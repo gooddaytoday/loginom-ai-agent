@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {makeJavascriptManagedSelectionReadCode, dispatchManagedJavascriptBody, dispatchManagedJavascriptSetting} from './javascript-managed-selection.mjs';
+import {makeJavascriptManagedSelectionReadCode, makeJavascriptManagedSelectionBodyCode, dispatchManagedJavascriptBody,
+  dispatchManagedJavascriptSetting} from './javascript-managed-selection.mjs';
 import {waitManagedJavascriptWizardSettlement} from './javascript-managed-opening.mjs';
 import {dispatchManagedJavascriptDeactivation} from './javascript-managed-deactivation.mjs';
 
@@ -15,15 +16,27 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     owner: {document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id},
     workflow_ref: {tab_tid: prepared.workflow_ref.tab_tid, prefix: prepared.workflow_ref.prefix},
     targetOrigin, targetBuild: '7.4.2', deadline};
-  const graph = await channel.observe({condition: 'owned existing JavaScript graph before Setting',
-    ready: state => state.prepared_node_context?.surface === 'graph' && state.wizard?.status === 'absent'});
-  const context = graph.prepared_node_context;
-  if(context?.verified!==true||context.surface!=='graph'||graph.wizard?.status!=='absent'
-    ||!['document_id','workflow_id','node_id'].every(key=>context[key]===task.owner[key])
-    ||typeof context.tid!=='string'||!context.tid.startsWith(task.workflow_ref.prefix+';Graph;'))
-    throw Error('Managed JavaScript existing graph owner unavailable');
+  // Viewport navigation is a gesture: once it ran, no later refusal of this
+  // opening can claim that it had no effect.
+  let navigated = false;
+  const noEffect = error => {
+    if (!navigated) error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+    return error;
+  };
+  let graph, context;
+  try {
+    // Only an observation runs here: no lease, journal or gesture exists yet.
+    graph = await channel.observe({condition: 'owned existing JavaScript graph before Setting',
+      ready: state => state.prepared_node_context?.surface === 'graph' && state.wizard?.status === 'absent'});
+    context = graph.prepared_node_context;
+    if(context?.verified!==true||context.surface!=='graph'||graph.wizard?.status!=='absent'
+      ||!['document_id','workflow_id','node_id'].every(key=>context[key]===task.owner[key])
+      ||typeof context.tid!=='string'||!context.tid.startsWith(task.workflow_ref.prefix+';Graph;'))
+      throw Error('Managed JavaScript existing graph owner unavailable');
+  } catch(error) { throw noEffect(error); }
   const body=graph.ui?.elements?.filter(element=>element.tid===context.tid&&element.graph_node?.part==='body')??[];
   if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+    navigated = true;
     await channel.revealGraphNode();
     if(Date.now()>=deadline)throw Error('Managed JavaScript existing opening deadline expired');
     const revealed=await channel.observe({condition:'owned existing JavaScript graph revealed before capture',
@@ -44,13 +57,29 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
   }
   let before;
   try { before = await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'capture'})); }
-  catch(error) {
-    // The capture only reads. No body or Setting gesture has been prepared.
-    error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
-    throw error;
+  // The capture only reads. No body or Setting gesture has been prepared.
+  catch(error) { throw noEffect(error); }
+  if (before.ready !== true) {
+    try { makeJavascriptManagedSelectionBodyCode({...task, mode: 'body', gesture_id: task.operation_id + ':body', expected: before}); }
+    catch (error) {
+      // Refused before the body journal or any click: only the read-only lease
+      // is held. A confirmed dispose makes this opening free of effects; a lost
+      // dispose reply propagates without a refusal and keeps the gate closed.
+      await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'dispose'}));
+      throw noEffect(error);
+    }
   }
-  const selected = before.ready === true ? before
-    : (await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions})).output?.selection;
+  const gestured = before.ready === true ? null : await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions});
+  if (gestured?.status === 'NOT_APPLIED' && gestured.effect_possible === false && gestured.cleanup_complete === true
+    && gestured.error?.code === 'SELECTION_SNAPSHOT_CHANGED') {
+    // The settled body receipt refused at its pre-click check (the selection
+    // was blocked or changed). Release the read-only lease; a lost dispose
+    // reply propagates without a refusal and keeps the gate closed. A lease
+    // refusal can follow an earlier click on that lease and is not covered.
+    await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'dispose'}));
+    throw noEffect(Error('Managed JavaScript existing body gesture refused before its click: SELECTION_SNAPSHOT_CHANGED'));
+  }
+  const selected = gestured ? gestured.output?.selection : before;
   if (selected?.ready !== true || selected.node_tid!==context.tid || Date.now() >= deadline)
     throw Error('Managed JavaScript existing selection unconfirmed');
   const confirmation = {kind: 'deactivation', node: task.owner, graph_tid: selected.node_tid};

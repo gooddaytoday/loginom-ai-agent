@@ -26,9 +26,15 @@ export function resolveImportBindingParameters(p,r){
 export function importBindingChannel(options,ctx,config,node){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  operation.deadline=ctx.deadline;
- return createNodeProcedure({operation,execute,record:onRecord,now,...config,maxSteps:1024,signal:ctx.signal,
+ const channel=createNodeProcedure({operation,execute,record:onRecord,now,...config,maxSteps:1024,signal:ctx.signal,
   preparedNodeContext:{document_id:operation.parameters.document_id,workflow_ref:operation.parameters.workflow_ref,node},
   wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
+ return {...channel,async readVariablePortMapping(mapping){
+  const result=await channel.readVariablePortMapping(mapping);
+  if(result.independent_readback===true)
+   retainImportBindingRead(operation,'variable_mapping_read',node,result.mapping?.port_guid);
+  return result;
+ }};
 }
 export function resolveImportBindingValue(proof,name,mapping,expectedPath,validate=path=>validateTextImportPatch({source:{source_path:path}})){
  need(proof?.verified===true&&proof.cleanup_complete===true&&proof.independent_readback===true,'BINDING_SOURCE_UNVERIFIED');
@@ -104,21 +110,18 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  }
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
- if(!saved){
-  need(sourcePort?.length===1,'BINDING_SOURCE_UNVERIFIED');
-  options.operation.preTargetGraph=structuredClone(graph);
- }
+ if(!saved)need(sourcePort?.length===1,'BINDING_SOURCE_UNVERIFIED');
+ options.operation.preTargetGraph=structuredClone(graph);
  // A link requested on a disconnected Import has no connected layout yet.
  // Verify the source by name now and read the native mapping after linking.
  if(r.target.kind==='existing'&&!saved&&incoming.length){
   const target=importBindingChannel(options,ctx,config,r.target.ref);
   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
   need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
-  retainImportBindingRead(options.operation,'variable_mapping_read',r.target.ref,mapping?.port_guid);
  }
  const channel=importBindingChannel(options,ctx,config,source.ref);
  let proof=sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;
- if(!saved)retainImportBindingRead(options.operation,'user_runtime_read',source.ref,sourcePort[0].port_guid);
+ if(proof)retainImportBindingRead(options.operation,'user_runtime_read',source.ref,sourcePort[0].port_guid);
  // Cancel in the values editor deactivates the source. Use it only when the
  // source is already inactive; preview preserves active foreign Imports too.
  if(saved&&proof?.source_active===false)proof=await channel.configureUserVariables([],'close');

@@ -8,6 +8,7 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
+import {importBindingSchema,prepareImportBinding,settleImportBindingBeforeTarget} from '../lib/import-bindings.mjs';
 import {actions} from './support/executor-fixture.mjs';
 import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -623,6 +624,62 @@ test('verified unchanged workflow followed by typed preflight refusal frees the 
  f.adapter.activateWorkflow=f.adapter.verifyWorkflow;
  const refused=await f.runtime.runNodeApply(request());assert.equal(refused.status,'NOT_APPLIED');assert.equal(refused.effect_possible,false);assert.equal(refused.cleanup_complete,true);assert.equal(refused.output.node,null);assert.equal(f.graph.nodes.length,0);
  invalid=false;const corrected=await f.runtime.runNodeApply({...request(),operation_id:'corrected'});assert.equal(corrected.status,'SUCCEEDED');assert.equal(f.graph.nodes.length,1);
+});
+
+for(const changedGraph of [false,true])test('inactive Import binding source after workflow activation keeps release available; changed graph='+changedGraph,async()=>{
+ const source={document_id:'doc',workflow_id:'wf',node_id:'vars'};
+ const config={targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'};
+ let previewReceipt;
+ const f=fixture({execute:async code=>{
+  assert.match(code,/"receipt_read":true/);
+  return {status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',operation_id:'apply',phase:'receipt',
+   effect_possible:false,error:null,trace:[],output:{state:'completed',receipt:previewReceipt}};
+ },wrapDrivers:(options,drivers)=>{
+  const importOptions={...options,execute:async()=>{
+   const step=f.events.findLast(event=>event.phase==='node_step_prepared');
+   assert.equal(step.action.verb,'user_runtime_read');
+   previewReceipt={status:'SUCCEEDED',action_key:'node.variables.user_runtime_read.internal',action_revision:'1',
+    operation_id:step.internal_operation_id,phase:'user_runtime_read',effect_possible:false,cleanup_complete:true,error:null,trace:[],
+    output:{verified:true,cleanup_complete:true,effect_possible:false,source_active:false,independent_readback:false,
+     node_context:{...source,verified:true,surface:'graph',locked:false}}};
+   return previewReceipt;
+  }};
+  return {...drivers,beforeTarget:ctx=>prepareImportBinding(importOptions,ctx,config),
+   settleBeforeTarget:(receipt,ctx)=>settleImportBindingBeforeTarget(importOptions,ctx,config,receipt)};
+ }});
+ f.handler.binding_schema=importBindingSchema;
+ f.graph.interaction_ready=true;
+ f.graph.nodes.push({ref:source,type:'variables.user',inputs:[],outputs:[],locked:false,
+  variable_outputs:[{kind:'variables',port:4,port_guid:'vars-out'}]});
+ const ownedWorkflow={status:'SUCCEEDED',verified:true,document_id:'doc',workflow_ref:workflow,cleanup_complete:true};
+ f.adapter.verifyWorkflow=async()=>({...ownedWorkflow,effect_possible:false});
+ f.adapter.activateWorkflow=async()=>({...ownedWorkflow,effect_possible:true});
+ const r={...request(),variable_inputs:[{source,kind:'variables',input:0,output:4}],
+  bindings:[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'RegistryPath'}}]};
+ await f.runtime.startNodeApply(r);
+ const job=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assertJob(job);
+ assert.equal(job.outcome.error.code,'BINDING_SOURCE_UNVERIFIED');
+ assert.equal(job.outcome.status,'AMBIGUOUS');
+ assert.equal(job.outcome.effect_possible,true);
+ assert.equal(job.outcome.output.pending_phase,'target');
+ assert.deepEqual((await f.runtime.inspect({operationId:r.operation_id})).output.recovery_options,['abandon_operation']);
+ if(changedGraph)f.graph.nodes[0].label='Changed';
+ const released=await f.runtime.recover(r.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});
+ if(changedGraph){
+  assert.equal(released.error.code,'NODE_RELEASE_REFUSED');
+  assert.match(released.error.message,/Pre-target graph differs/);
+  assert.throws(()=>f.runtime.assertPreparationAllowed());
+ }else{
+  assert.equal(released.status,'SUCCEEDED',released.error?.message);
+  const original=released.output.original_outcome;
+  assert.equal(original.status,'FAILED');
+  assert.equal(original.effect_possible,true);
+  assert.equal(original.output.pending_phase,null);
+  assert.equal(original.output.node,null);
+  f.runtime.assertPreparationAllowed();
+ }
+ assert.deepEqual(f.calls,['source']);
 });
 
 for(const fault of ['denied_port','lost_observation'])test('Calculator source preflight preserves the actual pre-gesture boundary: '+fault,async()=>{
