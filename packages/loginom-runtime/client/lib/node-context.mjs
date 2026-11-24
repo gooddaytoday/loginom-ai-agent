@@ -78,16 +78,23 @@ export async function readPreparedNodeContext(page, binding) {
           &&o.document_id===b.document_id&&o.workflow_id===b.workflow_ref.workflow_id&&o.node_id===b.node.node_id
           &&o.wizard===model&&o.nodeTree===nodeTree&&o.portTree===portTree);
         const o=openings[0],input=o?.direction==='input',groupType=input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode,roots=exact(b.workflow_ref.prefix+';WizrdMCF');
-        const wizardIndex=o?.wizardIndex??o?.nativeIndex;
+        const textExportInput=input&&o?.kind!=='variables'&&o?.node.FIconCls==='bg-vendor-icon-exporttextfile'&&o.portIndex===0&&o.nativeIndex===0;
+        const portCollection=group?.FSubNodes,items=portCollection?.FItems;
+        const wizardIndex=textExportInput?(Array.isArray(items)?items.indexOf(portTree):-1):(o?.wizardIndex??o?.nativeIndex);
+        if(textExportInput&&(!Number.isInteger(wizardIndex)||wizardIndex<0||wizardIndex>=100
+          ||wizardIndex!==(o.wizardIndex??o.nativeIndex)
+          ||group!==nodeTree.FInputPortsRootNode||portCollection!==o.portCollection||portCollection?.FParentNode!==group||portTree?.FCollection!==portCollection
+          ||!Array.isArray(items)||items.length>100||items[wizardIndex]!==portTree
+          ||items.filter(p=>p===portTree||p?.FModelNodePort===o.portData).length!==1))return reject('wizard_model');
         if(openings.length!==1||!app.WizardTreeNode||!(w instanceof app.WizardTreeNode)
           ||!app.ModelPortTreeNode||!(portTree instanceof app.ModelPortTreeNode)
           ||!groupType||!(group instanceof groupType)||group.ParentNode!==nodeTree
           ||o.workflow!==workflowNode||o.packageNode!==packageNode||o.node.FGuid!==o.node_id
           ||o.node.data!==o.nodeData||o.port.data!==o.portData||o.port.FGuid!==o.portGuid||o.node.data!==nodeTree.FModelNode
           ||o.port.data!==portTree.FModelNodePort||o.port.parent!==o.node||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
-          ||portTree.FIndex!==wizardIndex||!o.enginePort||(input||o.kind==='variables'?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
+          ||!textExportInput&&portTree.FIndex!==wizardIndex||!o.enginePort||(input||o.kind==='variables'?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
-        outputPort={direction:input?'input':'output',port:o.portIndex,native_index:wizardIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
+        outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,wizard_index:wizardIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
         // Breadcrumb overflow may hide the node itself. Retain context only
         // when every rendered component still owns this exact indexed input opening.
         if(input&&Number.isInteger(o.portIndex)&&o.portIndex>=0&&o.portIndex<100&&o.portIndex===o.nativeIndex&&typeof o.portGuid==='string'&&o.portGuid.length>0

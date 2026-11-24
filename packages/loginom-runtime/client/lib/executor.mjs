@@ -821,8 +821,15 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     };
     const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
     const handler=graph.connectionHandler;
-    if(!graph.isMouseDown||!handler.first||handler.previous?.cell!==source.port.FCell
-      ||diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown!==true)throw Error('Link validation drag owner changed');
+    const ownership={graph_mouse_down:!!graph.isMouseDown,connection_first:!!handler.first,source_cell:handler.previous?.cell===source.port.FCell,
+      delegation_mouse_down:diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown===true};
+    const failed=Object.keys(ownership).filter(key=>!ownership[key]);
+    if(failed.length){
+      const flag=value=>typeof value==='boolean'||value===null?value:typeof value;
+      const observed={...ownership,graph_mouse_down_value:flag(graph.isMouseDown),
+        delegation_mouse_down_value:flag(diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown)};
+      throw Error('Link validation drag owner changed: '+failed.join(',')+'; observed='+JSON.stringify(observed));
+    }
     const value=diagram.FValidatedConnectionsCache?.FCache?.[source.port.FCell.id]?.[target.port.FCell.id];
     if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
     const box=target.element.getBoundingClientRect();
@@ -1908,7 +1915,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await waitForNoMask(60000);
         transientDialog = false;
         ensureDeadline();
-        modifiedAfter = await read(deadline);
+        // Bound the transient modified-flag race and keep five seconds for
+        // verified continuation binding after a confirmed Save.
+        modifiedAfter = await read(Math.min(deadline - 5000, Date.now() + 5000));
       }
       if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
       ensureDeadline();
@@ -2159,7 +2168,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -3059,6 +3068,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const inspect = async ({ operationId, signal } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
+    if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
+      const receipt=getPreparationReceipt(operationId);
+      if(receipt)return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:operationId,
+        phase:'retained_preparation_receipt',effect_possible:false,output:{state:'resolved',receipt:structuredClone(receipt),
+          next_steps:[{tool:'dock_action_describe',instruction:'Request selected node_types and modes for complete rules. This is the retained preparation receipt, not a fresh workspace observation.'}]},error:null,trace:[]};
+    }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
     if (!operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending());

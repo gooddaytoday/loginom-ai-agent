@@ -588,9 +588,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A completed configure refusal cancels only its own uncommitted draft
     // through the same receipt/owner/quiet-graph proof as manual release.
     // Unknown browser completion and a failed cleanup remain pending.
+    const jsonTreeConfigureFailure=state.pending?.phase==='configure'&&request.target.type==='trees.from_json'
+      ?{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}:undefined;
     if(state.pending?.phase==='configure'&&!operation.transportUncertain
-      &&(error.restConfigureFailure||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
-      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure});}
+      &&(jsonTreeConfigureFailure||error.restConfigureFailure||['exports.text','exports.excel','exports.lgd'].includes(request.target.type)&&operation.lastReceipt?.action_key==='node.export.next')){
+      try{return await releaseNodeApply({operation,handlers,drivers,record,signal,failure:error.restConfigureFailure??jsonTreeConfigureFailure});}
       catch(cleanupError){error.message+='; owned wizard cancellation unconfirmed: '+String(cleanupError.message).slice(0,240);}
     }
     // A cancelled output reread has no unresolved launch. Release only after

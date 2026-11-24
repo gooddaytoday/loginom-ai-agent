@@ -187,6 +187,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
+        getPreparationReceipt: operationId => {
+          const preparation=session.metadata.workspacePreparation;
+          return operationId===preparation?.operation_id&&session.metadata.workspaceReady===true
+            &&preparation.state?.status==='READY'&&preparation.state.operation_id===operationId?preparation.state:null;
+        },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
@@ -457,8 +462,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
             // Full transient loading/geometry diagnostics are retained above.
-            // The model needs readiness, identities and the complete knowledge
-            // bundle; raw diagnostic DOM can push a local-package reply over
+            // The model needs readiness, identities and node discovery;
+            // raw diagnostic DOM can push a local-package reply over
             // the existing wire budget without adding preparation authority.
             const delivered=structuredClone(result);
             if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);
@@ -467,7 +472,17 @@ export async function createBridge(config, session, { browserTransport: managedB
             // reply. Geometry duplicates those identities and is diagnostic;
             // retain its full receipt locally without spending delivery space.
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
-            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
+            const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id};
+            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            if(first&&ready&&reply.isError===true){
+              // Preparation is a discovery step. Node rules/schemas are still
+              // required through describe before apply; do not let the number
+              // of registered node cards crowd out readiness or input grants.
+              delivered.knowledge={...bundle,node_types:bundle.node_types.map(node=>({
+                type:node.type,candidate_node_apply_available:node.candidate_node_apply_available,modes:node.modes}))};
+              delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
+              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            }
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
               && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
@@ -544,7 +559,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               }
               const delivered=userProfile?userActionInventory(description):description;
               const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
-              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe'}):content;
+              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes:args.modes}):content;
               if(userProfile&&reply.isError!==true&&description.node_types?.length){
                 await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
                   skill_revision:(await skill.prepare()).detail.revision});

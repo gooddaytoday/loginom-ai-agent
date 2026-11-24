@@ -117,11 +117,11 @@ async function prepareWorkspace(page, options) {
       return {error:'STORAGE_IDENTITY_CHANGED'};
     const form=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
     const files=prefix&&exact(prefix+';FileStorageForm'),sender=form?.FFileSenderManager,input=form?.FFileInput;
-    const filesReady=options.intent==='open_package'&&files?.length===1&&visible(files[0])
+    const filesReady=(options.intent==='open_package'||options.identityOnly)&&files?.length===1&&visible(files[0])
       &&form?.constructor?.name==='FileStorageForm'&&form.FView?.el?.dom===files[0]
       &&sender?.constructor?.name==='FileSenderManager'&&sender.FActiveLoadersCount===0
       &&sender.FLastConflictResult===undefined&&!Object.keys(sender.FCurrentUploadFilePaths??{}).length
-      &&sender.CurrentDirectory===options.packagePath.slice(0,options.packagePath.lastIndexOf('/')+1)
+      &&(options.identityOnly||sender.CurrentDirectory===options.packagePath.slice(0,options.packagePath.lastIndexOf('/')+1))
       &&input?.isConnected&&input.files?.length===0;
     let node = app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
     let packageNode = null;
@@ -296,6 +296,13 @@ async function prepareWorkspace(page, options) {
     }
     authenticated=true;
     if(options.identityOnly){
+      // The avatar precedes the initial Home tab. Navigating to Files before
+      // that tab exists makes Loginom dereference a null NodeIndex.
+      const entry=await wait('storage_workspace_ready',async()=>{
+        const state=await inspect('observe');
+        return state.hard_blocked || !state.blocked&&(state.ready||state.home_ready||state.files_ready) ? state : null;
+      });
+      if(entry.hard_blocked)return result('NOT_READY','STORAGE_IDENTITY_UNAVAILABLE');
       const binding=await inspect('identity');
       if(binding.blocked||typeof binding.loginom_account!=='string'||!binding.loginom_account.trim())
         return result('NOT_READY','STORAGE_IDENTITY_UNAVAILABLE');

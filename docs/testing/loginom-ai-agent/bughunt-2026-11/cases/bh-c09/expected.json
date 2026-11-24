@@ -1,0 +1,59 @@
+{
+  "package_path": "/bughunt/bh-c09.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.join_data"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "export_destination": "/bughunt/bh-c09.csv",
+      "columns": [
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "2026-01",
+          "label": "2026-01",
+          "type": "real"
+        },
+        {
+          "name": "2026-02",
+          "label": "2026-02",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Category": "Офис",
+          "2026-01": 42.5,
+          "2026-02": 72.5
+        },
+        {
+          "Category": "Техника",
+          "2026-01": 60.5,
+          "2026-02": 90.75
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 90,
+    "max_errors": 0,
+    "max_nodes": 6,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Median is computed after deduplication, before removing outliers. The fixture distinguishes order of operations."
+}
