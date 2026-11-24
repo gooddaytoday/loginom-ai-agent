@@ -1,3 +1,5 @@
+import { Global } from "@opencode-ai/core/global"
+import { rm } from "node:fs/promises"
 import {
   createAttachmentReceipt,
   attachmentReceiptSource,
@@ -2445,7 +2447,7 @@ it.instance("concurrent loop callers all receive same error result", () =>
   }),
 )
 
-it.instance("prompt submitted during an active run is included in the next LLM input", () =>
+it.instance("prompt submitted during an active run refreshes the skill catalog without stopping the run", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
     const gate = yield* Deferred.make<void>()
@@ -2468,6 +2470,11 @@ it.instance("prompt submitted during an active run is included in the next LLM i
     yield* llm.wait(1)
     yield* waitForBusy(chat.id)
 
+    const skillDir = path.join(Global.Path.home, ".agents/skills/active-answer-skill")
+    yield* Effect.addFinalizer(() => Effect.promise(() => rm(skillDir, { recursive: true, force: true })))
+    yield* Effect.promise(() => Bun.write(path.join(skillDir, "SKILL.md"),
+      "---\nname: active-answer-skill\ndescription: A catalog refresh during an active response.\n---\n"))
+
     const id = MessageID.ascending()
     const b = yield* prompt
       .prompt({
@@ -2488,6 +2495,8 @@ it.instance("prompt submitted during an active run is included in the next LLM i
       "timed out waiting for second prompt to save",
     )
 
+    const catalog = yield* Skill.Service
+    expect((yield* catalog.get("active-answer-skill"))?.name).toBe("active-answer-skill")
     yield* Deferred.succeed(gate, void 0)
 
     const [ea, eb] = yield* Effect.all([Fiber.await(a), Fiber.await(b)])
