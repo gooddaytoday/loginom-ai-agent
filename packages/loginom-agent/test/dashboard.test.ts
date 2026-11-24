@@ -2,21 +2,23 @@
 // `v0.4.0:packages/opencode/test/product/dashboard-session.test.ts`, on the plugin's `Dashboard.isWork`, plus the latch.
 // 0.4's first case also compared the root with `dashboardDataRoot(process.env)` of `product`, the root Desktop and the
 // CLI computed themselves; in OpenCode 2 the server prepares the folders (B2.9h), so only its own root counts.
-// The root is the server's data directory (`Global.Path.data`, from `XDG_DATA_HOME`): run the suite with temporary XDG
-// directories. Each case makes its own folder under the root and removes it.
+// The root is under the server's data directory, which each case points at a temporary directory of its own
+// (`fixture/temporary-data.ts`) and removes with its folders.
 import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Dashboard } from "../src/dashboard"
+import { temporaryData } from "./fixture/temporary-data"
 
 const link = process.platform === "win32" ? "junction" : "dir"
 
 async function dashboardFolder() {
+  const data = await temporaryData()
   await mkdir(Dashboard.root(), { recursive: true })
   const root = await mkdtemp(join(Dashboard.root(), "fixture-"))
   await mkdir(join(root, "work"))
-  return { root, work: join(root, "work"), [Symbol.asyncDispose]: () => rm(root, { recursive: true, force: true }) }
+  return { root, work: join(root, "work"), [Symbol.asyncDispose]: () => data[Symbol.asyncDispose]() }
 }
 
 async function outsideFolder() {
@@ -42,14 +44,10 @@ test("only the exact dashboard work directory selects the profile", async () => 
   await mkdir(join(folder.work, "src"))
   const direct = join(Dashboard.root(), "work")
   await mkdir(direct)
-  try {
-    for (const directory of [folder.root, join(folder.work, "src"), direct, join(folder.root, "missing"), outside.path])
-      expect(Dashboard.isWork(directory)).toBe(false)
-    await mkdir(join(outside.path, "work"))
-    expect(Dashboard.isWork(join(outside.path, "work"))).toBe(false)
-  } finally {
-    await rm(direct, { recursive: true, force: true })
-  }
+  for (const directory of [folder.root, join(folder.work, "src"), direct, join(folder.root, "missing"), outside.path])
+    expect(Dashboard.isWork(directory)).toBe(false)
+  await mkdir(join(outside.path, "work"))
+  expect(Dashboard.isWork(join(outside.path, "work"))).toBe(false)
 })
 
 test("the profile follows the real dashboard directory through an outside alias", async () => {

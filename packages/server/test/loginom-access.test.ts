@@ -23,6 +23,7 @@ import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { Dashboard } from "../../loginom-agent/src/dashboard"
 import { ServiceHost } from "../../loginom-agent/src/host"
+import { temporaryData } from "../../loginom-agent/test/fixture/temporary-data"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
 import { scriptedHost } from "./fixture/loginom-dock-host"
@@ -68,6 +69,11 @@ const boot = (
 ) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-access-")).path
+    // The product plugin's own data directory (dashboards, file profiles) is the case's, not the runner's.
+    yield* Effect.acquireRelease(
+      Effect.promise(() => temporaryData()),
+      (data) => Effect.promise(() => data[Symbol.asyncDispose]()),
+    )
     const directory = options.dashboard ? yield* dashboardWork : dir
     const location = Location.Ref.make({ directory: AbsolutePath.make(directory) })
     const resources = path.join(dir, "resources")
@@ -284,8 +290,8 @@ const boot = (
     return { sessions, create, prompt, wizard, post, skills, requests, ran, answered, prompts, held, gate, resources }
   })
 
-// A dashboard's folder with its `work` folder, under the root the product plugin reads: the server's data directory
-// (`Global.Path.data`, from `XDG_DATA_HOME`), so the suite runs with temporary XDG directories. Removed after the case.
+// A dashboard's folder with its `work` folder, under the root the product plugin reads: the case's temporary data
+// directory (`boot`). Removed after the case.
 const dashboardWork = Effect.acquireRelease(
   Effect.promise(async () => {
     await fs.mkdir(Dashboard.root(), { recursive: true })
