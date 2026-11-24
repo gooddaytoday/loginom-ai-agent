@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createJavascriptCodeNodeSupport,validateJavascriptCodeRequest,javascriptCodeReadback,
   verifyJavascriptMappingGraph} from '../lib/javascript-code-node.mjs';
+import {verifyJavascriptUnconnectedInput} from '../lib/javascript-graph-preservation.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
@@ -29,6 +30,18 @@ test('unconnected source opt-in admits zero inputs without changing the existing
   assert.throws(()=>validateJavascriptCodeRequest(invalid.parameters,'script',invalid));
  }
  assert.doesNotThrow(()=>validateJavascriptCodeRequest(request.parameters,'script',request));
+});
+
+test('unconnected variable input is admitted only on the supported new JS port',()=>{
+ const variableInput={source,output:4,input:0,kind:'variables'};
+ const r={...structuredClone(request),inputs:[],variable_inputs:[variableInput],
+  parameters:{...request.parameters,input_state:'unconnected'}};
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(r.parameters,'script',r));
+ for(const bad of [{...r,variable_inputs:[{...variableInput,input:1}]},
+  {...r,variable_inputs:[{...variableInput,kind:'control'}]},
+  {...r,target:{kind:'existing',type:'programming.javascript',ref:node},parameters:{input_state:'unconnected'}}]){
+  assert.throws(()=>validateJavascriptCodeRequest(bad.parameters,'script',bad),/variable input/);
+ }
 });
 
 test('filesystem source requires the opt-in even when a source patch is otherwise valid',()=>{
@@ -76,7 +89,7 @@ test('reapplying Execute to an existing Data source retains two executions',()=>
  assert.deepEqual(ledger,['run','run','run','run']);
 });
 
-for(const fault of ['declared-execute','declared-reapply','declared-done-downstream','declared-stale-output'])
+for(const fault of ['declared-execute','declared-reapply','declared-done-downstream','declared-stale-output','declared-variable-source'])
 test('declared single execution lifecycle: '+fault,()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
@@ -166,11 +179,27 @@ function graph(){return {complete:true,document_id:'doc',workflow_ref:{workflow_
  {ref:node,locked:true,dom_epoch:'old',inputs:[0],outputs:[0],position:{x:256,y:256}}],
  links:[{source:'source',target:'node',input:0,output:0}],foreign_links:[]};}
 
+test('unconnected tabular input requires the exact owned variable link',()=>{
+ const edge={source:'source',target:'node',output:4,input:0,kind:'variables',
+  source_port_guid:'source-port',target_port_guid:'target-port'};
+ const current={...graph(),links:[],variable_links:[edge]};
+ assert.equal(verifyJavascriptUnconnectedInput(current,node,[edge]),true);
+ assert.throws(()=>verifyJavascriptUnconnectedInput(current,node),/incoming/);
+ for(const bad of [{...current,links:graph().links},
+  {...current,service_links:[{source:'source',target:'node'}]},
+  {...current,variable_links:[]},
+  {...current,variable_links:[edge,edge]},
+  {...current,variable_links:[{...edge,source_port_guid:'other-port'}]}]){
+  assert.throws(()=>verifyJavascriptUnconnectedInput(bad,node,[edge]),/incoming/);
+ }
+});
+
 test('mapping close permits only the own lock transition while preserving complete graph structure',()=>{
  const before=graph(),after=structuredClone(before);after.nodes[1].locked=false;
  after.nodes.forEach(item=>item.dom_epoch='new');assert.equal(verifyJavascriptMappingGraph(before,after,node),true);
  for(const change of [v=>v.nodes[0].locked=true,v=>v.links=[],v=>v.nodes[1].position.x++,v=>v.nodes.pop(),
-  v=>v.foreign_links=['foreign'],v=>v.nodes[1].ref.node_id='foreign',v=>v.complete=false]){
+  v=>v.foreign_links=['foreign'],v=>v.nodes[1].ref.node_id='foreign',v=>v.complete=false,
+  v=>v.variable_links=[{source:'source',target:'node',output:4,input:0,kind:'variables'}]]){
   const bad=structuredClone(after);change(bad);assert.throws(()=>verifyJavascriptMappingGraph(before,bad,node));
  }
 });

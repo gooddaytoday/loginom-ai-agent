@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createPromptAttachmentsCore } from "@/components/prompt-input/attachments"
+import { binaryReferenceMime } from "@/constants/file-picker"
 import { createPromptState } from "@/context/prompt"
 import { createPromptInputV2Attachments } from "../../session-ui/src/v2/components/prompt-input/attachments"
 import type { PromptInputV2Prompt } from "../../session-ui/src/v2/components/prompt-input/types"
@@ -209,6 +210,65 @@ test("large drag attachments preserve a native reference without storing a blob"
     expect(images(prompt)[0]).toMatchObject({ reference, sourcePath: reference.sourcePath })
     expect(await attachments.addAttachment(reference)).toBe(true)
     expect(images(prompt)).toHaveLength(2)
+    dispose()
+  })
+})
+
+test.each(["sales.DB", "data.lgd", "legacy.xls"])("small desktop drop preserves a reference for %s", async (filename) => {
+  await createRoot(async (dispose) => {
+    const prompt = createPromptState()
+    const file = new File([Uint8Array.of(0, 255, 1, 2)], filename)
+    const reference = {
+      kind: "local_reference" as const,
+      sourcePath: `C:\\Datasets\\${filename}`,
+      filename,
+      size: file.size,
+      lastModified: file.lastModified,
+      mime: filename.endsWith(".xls") ? "application/vnd.ms-excel" : "application/octet-stream",
+      receipt: "a".repeat(64),
+    }
+    file.slice = () => {
+      throw Error("must not read reference bytes")
+    }
+    const native = {
+      getPathForFile: () => reference.sourcePath,
+      referenceAttachment: async () => reference,
+    }
+    const legacy = createPromptAttachmentsCore({
+      ...native,
+      capture: prompt.capture,
+      editor: () => document.createElement("div"),
+    })
+    const [state, setState] = createStore({ prompt: [] as PromptInputV2Prompt })
+    const v2 = createPromptInputV2Attachments({
+      ...native,
+      referenceFile: (name) => Boolean(binaryReferenceMime(name)),
+      capture: () => ({
+        current: () => state.prompt,
+        cursor: () => 0,
+        set: (parts) => setState("prompt", parts),
+      }),
+      editor: () => document.createElement("div"),
+      focusEditor: () => undefined,
+      addPart: () => false,
+      setDraggingType: () => undefined,
+      directory: () => "C:\\Datasets",
+      isDialogActive: () => false,
+      warn: () => {
+        throw Error("unexpected unsupported attachment")
+      },
+      duplicate: () => undefined,
+      onError: (error) => {
+        throw error
+      },
+    })
+    const added = await Promise.allSettled([legacy.addAttachments([file]), v2.addAttachments([file])])
+    expect(added).toEqual([
+      { status: "fulfilled", value: true },
+      { status: "fulfilled", value: true },
+    ])
+    expect(images(prompt)[0]).toMatchObject({ reference, blob: { url: "" } })
+    expect(state.prompt[0]).toMatchObject({ reference, blob: { url: "" } })
     dispose()
   })
 })

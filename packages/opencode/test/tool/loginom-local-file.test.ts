@@ -376,6 +376,7 @@ for (const mode of [
       const sample = yield* Effect.promise(async () => {
         await writeFile(source, "region;amount\nNorth;25\nSouth;50\n")
         const profile = await profileFile(source, dir)
+        if (profile.format !== "csv") throw Error("expected CSV")
         return sampleFile(profile.profile_id, dir, { max_records: 1 })
       })
       yield* sessions.updateMessage({

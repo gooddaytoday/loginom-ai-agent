@@ -8057,6 +8057,17 @@ test('graph launch only exposes typed execution for the exact native selected no
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
 });
+test('graph launch geometry drift is refused before the gesture',async()=>{
+ const fixture=graphLaunchFixture(),observed=await fixture.execute({mode:'observe'});
+ const control=observed.output.ui.elements.find(element=>element.tid===fixture.button.attrs['data-tid']);
+ fixture.page.beforeHandleGeometry=element=>{if(element===fixture.button)element.box.x+=2;};
+ const outcome=await fixture.execute({mode:'act',action:{verb:'execute_graph_node',ref:control.ref},snapshot:observed.output});
+ assert.equal(outcome.status,'NOT_APPLIED');assert.equal(outcome.phase,'preconditions');
+ assert.equal(outcome.error.code,'UI_REFERENCE_STALE');assert.equal(outcome.error.message,'Observed control geometry changed');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(outcome.trace.some(entry=>['ui_preconditions_verified','ui_gesture_applied'].includes(entry.event)),false);
+ assert.equal(fixture.page.events.filter(event=>event==='click').length,0);
+});
 test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
  const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
  view.getState=()=>{

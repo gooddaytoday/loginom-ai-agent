@@ -34,9 +34,34 @@ async function fixture(bytes: Buffer | string, run: (path: string, dir: string) 
   }
 }
 
+test.each([
+  ["sqlite", "imports.database", Buffer.from("SQLite format 3\x00")],
+  ["lgd", "imports.lgd", Buffer.from("BGDATA\x03\x00\x02\x01")],
+])("recognizes %s by its binary signature before CSV inference", async (format, node, signature) => {
+  await fixture(Buffer.concat([signature, Buffer.alloc(32)]), async (path, dir) => {
+    const result = await profileFile(path, dir)
+    expect(result).toMatchObject({ format, import_node_type: node, status: "format_detected" })
+    expect(result).not.toHaveProperty("profile_id")
+    expect(await exactFileDigest(result.identity, dir)).toBeUndefined()
+  })
+})
+
+test("requires the SQLite signature terminator", async () => {
+  await fixture("SQLite format 3", async (path, dir) => {
+    await expect(profileFile(path, dir)).rejects.toThrow("LOGINOM_FILE_FORMAT_AMBIGUOUS")
+  })
+})
+
+test("a CSV column named BGDATA is still profiled as text", async () => {
+  await fixture("BGDATA;amount\nNorth;25\nSouth;50\n", async (path, dir) => {
+    const profile = await csvProfile(path, dir, { first_line_as_title: true })
+    expect(profile.settings.columns[0]?.name).toBe("BGDATA")
+  })
+})
+
 test("staging digest comes only from an exact scan of the same identity, not a quick or partial profile", async () => {
   await fixture("region;amount\nNorth;25\nSouth;50\n", async (path, dir) => {
-    const profile = await profileFile(path, dir, { first_line_as_title: true })
+    const profile = await csvProfile(path, dir, { first_line_as_title: true })
     const identity = await inspectReferenceFile(path)
     expect(await exactFileDigest(identity, dir)).toBeUndefined()
     const scan = await scanFile(profile.profile_id, dir)
