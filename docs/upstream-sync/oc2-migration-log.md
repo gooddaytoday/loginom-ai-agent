@@ -20718,7 +20718,9 @@ B2.9d, «Где решал сам»), B2.9b, B2.9c; 0.4 — `product/dashboard-s
 | `a9ad321b9a` `feat(loginom-agent): bind dashboard chats to their draft and keep formatters off (B2.9d)` | код: `packages/loginom-agent/src/dashboard.ts` (`draft`, `binding`, текст `unbound`), `index.ts` (сверка в хуках `prompt`, `context`, `compaction`, `generate`, `execute.before`, `permission.evaluate`, `execute.after`; `export { Dashboard }`), `packages/core/src/plugin/product.ts` (форматтеры в дашборде), `packages/core/src/formatter.ts` (`list`); тесты: два новых в `packages/loginom-agent/test/dashboard.test.ts`, `describe` B2.9d в `packages/server/test/loginom-dashboard-files.test.ts`, фикстуры B2.9c; `catalog.json` и `catalog.md` (CAT-07) |
 | `1d9118b537` `refactor(loginom-agent): a dashboard fork takes its source's draft only from the fork hook (B2.9d)` | привязку форка даёт хук `fork` (в любой Location), первое обращение в дашборде отличает только перенесённую сессию; тесты: `edit`, отклонённый до чтения цели, и сессия, начатая после удаления папки |
 | `a4d906f4d1` `docs(loginom-agent): say when 0.4 adopted a dashboard row without a marker (B2.9d)` | комментарий в `dashboard.ts`, кода нет |
-| следующий | этот раздел, строка G1, строка 7 и «Как запускать» в `guarantees.md` |
+| `35dfd6bb44` `docs(upstream-sync): record B2.9d draft binding, dashboard formatters and the G1 mutations` | первая версия этого раздела, строка G1, строка 7 и «Как запускать» в `guarantees.md` |
+| `b5bbbe22ba` `test(server): B2.9d old chat reaches no model through a side question or a compaction; …` | по ревью советника: сверку в `compaction` и `generate` не проверял ни один случай; форматтер — и после повторной активации плагинов |
+| следующий | этот раздел — по `b5bbbe22ba`, вывод `bun run check` |
 
 Файлов кода четыре (предел — пять): два — пакета форка, файл форка `core/src/plugin/product.ts` (шов U1) и одна правка
 upstream — `core/src/formatter.ts`, +2, записана в CAT-07 (`catalog.json`, `catalog.md`). Итог —
@@ -20750,7 +20752,8 @@ upstream — `core/src/formatter.ts`, +2, записана в CAT-07 (`catalog.j
 - **Форк** — хук `fork` даёт новой сессии привязку источника в любой Location (0.4: форк нёс маркер): форк старого чата
   получает отказ в дашборде, форк чата, вынесенного из дашборда, — и там, куда его вынесли.
 - **Где сверяется** (`index.ts`): хук `prompt` — до записи сообщения (бросает, промпт не принят); `context`, `compaction`,
-  `generate` — до запроса к модели (ход кончается неудачей исполнения, `outcome: failed`, повтора нет — проверено тестом);
+  `generate` — до запроса к модели (ход кончается неудачей исполнения, `outcome: failed`, повтора нет; побочный вопрос
+  `session.generate` отклонён, ручное сжатие к модели не идёт — проверено тестом);
   `execute.before` — до вызова, в том числе до чтения цели у `edit` и `patch`; `permission.evaluate` в дашборде — последний
   шаг плагина перед тем, как ядро читает или пишет файл (запрет с текстом отказа; пришедший запрет администратора
   остаётся); `execute.after` в дашборде — после вызова: если папку пересоздали, пока он шёл, результат заменяется текстом
@@ -20771,12 +20774,12 @@ upstream — `core/src/formatter.ts`, +2, записана в CAT-07 (`catalog.j
 
 | Тест 0.4 (`v0.4.0:packages/opencode/test`) | На v2 |
 |---|---|
-| `session/prompt.test.ts` «successful dashboard deletion ends its turn and retires every old chat across recreation» — часть о старых чатах; вместо `cli/import.test.ts`, `server/httpapi-sync.test.ts` и маркера в `session.test.ts` — `session.update` с чужой metadata | `server/test/loginom-dashboard-files.test.ts`, `describe` B2.9d, первый случай: чат с записью и чат с принятым, но не выполненным промптом (`resume: false`); папка удалена и подготовлена с новым черновиком — промпт обоих не принят (`LOGINOM_SCOPE_DENIED`), запросов к модели не прибавилось, сообщений нет; новый чат пишет и читает новый черновик; `PATCH /api/session/:id` с маркером нового черновика в metadata — старый чат по-прежнему отклонён; форк старого чата отклонён, форк нового работает; папка удалена — отказ и новому чату, и его форку, и сессии, начатой после удаления. Удаление папки инструментом (`dashboard_delete`) — B2.9g, здесь папку удаляет тест |
+| `session/prompt.test.ts` «successful dashboard deletion ends its turn and retires every old chat across recreation» — часть о старых чатах; вместо `cli/import.test.ts`, `server/httpapi-sync.test.ts` и маркера в `session.test.ts` — `session.update` с чужой metadata | `server/test/loginom-dashboard-files.test.ts`, `describe` B2.9d, первый случай: чат с записью и чат с принятым, но не выполненным промптом (`resume: false`); папка удалена и подготовлена с новым черновиком — промпт обоих не принят (`LOGINOM_SCOPE_DENIED`), запросов к модели не прибавилось, сообщений нет; побочный вопрос (`session.generate`) и ручное сжатие (`session.compact`) старого чата к модели не идут; новый чат пишет и читает новый черновик; `PATCH /api/session/:id` с маркером нового черновика в metadata — старый чат по-прежнему отклонён; форк старого чата отклонён, форк нового работает; папка удалена — отказ и новому чату, и его форку, и сессии, начатой после удаления. Удаление папки инструментом (`dashboard_delete`) — B2.9g, здесь папку удаляет тест |
 | `tool/dashboard-guard.test.ts` «a read with an expired dashboard context is denied before requesting permission», «an admitted dashboard tool cannot capture a replacement draft as its write target» | второй случай: папку пересоздают между ответом модели и вызовом (шаг сценария `act`) — `read`, `write` и `edit` отклонены до вызова тем же текстом, вопросов нет, файла в новой папке нет; запрос, сделавший вызов, — последний: следующий отклонён до модели, исполнение — `failed` |
 | — | третий, новый: папку пересоздаёт плагин случая (SDK, его хуки идут раньше хуков продукта) — на вопросе `edit` записи и после `read`. Запись отклонена сверкой на вопросе, файла нет; результат чтения заменён отказом, ни строки файла |
 | `session/prompt.test.ts` «execution adopts an older dashboard row once and preserves its current metadata» | четвёртый: сессии с маркерами 0.4 (текущий черновик, старый, `deleted`) и строка без маркера созданы до первой сверки — текущий и строка без маркера работают, старый и `deleted` отклонены, metadata строки без маркера не изменилась; после переноса metadata не читается: старый чат с маркером текущего черновика отклонён, новая сессия с маркером `deleted` работает |
 | — | пятый, новый (`move` v2): обычная сессия, перенесённая в папку дашборда, отклонена там, а вернувшись — работает; чат дашборда, перенесённый в обычную Location, отклонён там, его форк там — тоже, а вернувшись в свою папку — работает |
-| `tool/dashboard-guard.test.ts` «dashboard write/edit/apply_patch does not execute source Prettier configuration» (4) | шестой — заменил восьмой случай B2.9c: форматтер пользователя (Prettier с `$FILE`) и `src/.prettierrc.cjs` модели, который оставил бы метку вне рабочей папки. В дашборде метки нет после `write`, `edit`, `patch`, в том числе когда конфиг в корне `work` сам включает форматтер; контроль — обычная Location того же конфига: метка есть. «edit create» не перенесён: `edit` v2 не создаёт файл |
+| `tool/dashboard-guard.test.ts` «dashboard write/edit/apply_patch does not execute source Prettier configuration» (4) | шестой — заменил восьмой случай B2.9c: форматтер пользователя (Prettier с `$FILE`) и `src/.prettierrc.cjs` модели, который оставил бы метку вне рабочей папки. В дашборде метки нет после `write`, `edit`, `patch`, в том числе когда конфиг в корне `work` сам включает форматтер, и после повторной активации плагинов (SDK-плагин, зарегистрированный позже, заново активирует все плагины после себя: «only the unchanged prefix can stay alive», `core/src/plugin.ts`) — преобразование продукта снова последнее; контроль — обычная Location того же конфига: метка есть. «edit create» не перенесён: `edit` v2 не создаёт файл |
 | — | `loginom-agent/test/dashboard.test.ts`, два новых: `Dashboard.draft` (ID, `true` без файла и без `draftId`, ничего — на не JSON, массив, не UUID, число, каталог, исчезнувшую папку); маркеры переносятся один раз — второй экземпляр привязки на том же хранилище (перезапуск) список сессий не запрашивает и новой metadata не верит |
 
 Фикстуры B2.9c: `control/binding.json` теперь JSON с `draftId` (в нём осталась строка `control synthetic`, проверка «до
@@ -20828,10 +20831,12 @@ test/loginom-access.test.ts` в `server`, затем `git checkout` (`<scratchpa
 | папки нет — новая сессия проходит | 20/0 | **24/1** | старый чат (сессия, начатая после удаления) |
 | промпт принимается (сверка только у модели) | 20/0 | **22/3** | старый чат, маркеры, перенос (промпт принят) |
 | нет сверки в `context` | 20/0 | **24/1** | пересоздание посреди хода (второй запрос к модели) |
+| нет сверки в `compaction` (`b5bbbe22ba`) | 20/0 | **24/1** | старый чат: ручное сжатие — два запроса к модели |
+| нет сверки в `generate` (`b5bbbe22ba`) | 20/0 | **24/1** | старый чат: побочный вопрос получил ответ модели |
 | нет сверки до вызова | 20/0 | **24/1** | пересоздание посреди хода: `edit` отвечает «File not found» вместо отказа |
 | нет сверки на вопросе | 20/0 | **24/1** | сверка на вопросе (файл записан в новую папку) |
 | нет сверки результата | 20/0 | **24/1** | сверка на результате (содержимое дошло до модели) |
-| форматтеры остаются в дашборде | 20/0 | **24/1** | форматтер (метка Prettier) |
+| форматтеры остаются в дашборде | 20/0 | **24/1** | форматтер (метка Prettier); на `b5bbbe22ba` — то же |
 
 Код базы (`git checkout e3f19d99db -- packages/loginom-agent/src packages/core/src`, тесты этой ветки): **18/2** и **19/6** —
 красные два новых случая `dashboard.test.ts` и все шесть случаев B2.9d. После всех мутаций `git status` чистый,
@@ -20868,8 +20873,9 @@ src/main.tsx`, ответ. Затем папка удалена и подгот�
 | `product` (`repo-paths` сверяет пути `guarantees.md`) | 59 pass, 4 fail | 59 pass, 4 fail — те же, что в B2.9b и B2.9c (`names.test.ts`, три `repo-paths.test.ts`); старше задачи, не чинил |
 | `core`: `formatter.test.ts`, `plugin/product.test.ts` (шов) | 32 pass, 0 fail | 32 pass, 0 fail |
 
-Повторы (навык `unit-tests`) на `1d9118b537`: `dashboard.test.ts --rerun-each 10` — 100 pass, 0 fail;
-`loginom-dashboard-files.test.ts --rerun-each 10` — 130 pass, 0 fail.
+Повторы (навык `unit-tests`): `dashboard.test.ts --rerun-each 10` на `1d9118b537` — 100 pass, 0 fail;
+`loginom-dashboard-files.test.ts --rerun-each 10` на `1d9118b537` и на `b5bbbe22ba` — по 130 pass, 0 fail. `b5bbbe22ba`
+меняет только этот файл тестов, число случаев прежнее; полные прогоны выше — на `1d9118b537`.
 
 Изоляция (`<scratchpad>/b29d/scripts/real-xdg.sh`, как в B2.9b): окружение без единой `XDG_*`, `HOME` — свежий каталог в
 scratchpad, корень данных тогда `$HOME/.local/share/loginom-ai-agent-dev`:
@@ -20894,9 +20900,14 @@ against a6b15d33daf6: 610 divergent upstream files
   CAT-07: 13                                                 # +1: core/src/formatter.ts
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
 would change: 0 files                                        # код 0
+$ bun run check                                              # код 0, под unshare -n, b5bbbe22ba с этим разделом
+Found 905 warnings and 0 errors.                             # как в B2.9b и B2.9c
+sdk-docs: … 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total                           # первый прогон на 35dfd6bb44 — то же
 ```
 
-`prettier --check` и `oxlint` изменённых файлов — без замечаний.
+`catalog-check.py` и `apply-identity --check` повторены на итоговом дереве с этим разделом — тот же вывод. `prettier
+--check` и `oxlint` изменённых файлов — без замечаний.
 
 ### Где решал сам
 
@@ -20911,7 +20922,9 @@ would change: 0 files                                        # код 0
 
   Шов — преобразование `Formatter` из `product.ts`, последнее в цепочке; оно не зависит ни от какого конфига. Правка
   upstream общего вида (`list` есть у редакторов MCP, навыков, инструментов), записана в CAT-07. Подготовке B2.9h писать
-  конфиг `formatter: false` больше не нужно; восьмой случай B2.9c заменён (выше).
+  конфиг `formatter: false` больше не нужно; восьмой случай B2.9c заменён (выше). Это шире, чем разрешало задание
+  («конфиг или хук»), — подтвердить владельцу; отказ от правки upstream вернёт уязвимость B2.9c для пользователя, который
+  сам включил форматтер.
 - **Строка 0.4 без маркера принимается в любой папке.** 0.4 принимал такую строку (`true`) только в папке без `draftId`, в
   папке с `draftId` — отказывал. Отличить её от сессии v2, созданной до первой сверки в Location, нечем (ни у той, ни у
   другой маркера нет; хука создания сессии у плагина нет), поэтому обе при первом обращении берут текущий черновик.
