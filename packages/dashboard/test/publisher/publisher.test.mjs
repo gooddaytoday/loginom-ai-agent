@@ -199,20 +199,32 @@ test("pending backlog keeps bounded payload memory before dispatch", async t => 
     await writeFile(join(input.storage, path.replace(name, `20261115T1200${String(second).padStart(2, "0")}Z.json`)), JSON.stringify(publication))
   }
   // Isolate GC/resource measurement from the test runner and other compiler tests.
+  // V8 frees unreachable ArrayBuffer backing stores on a background sweeper after gc() returns, so a
+  // single reading can still count garbage when that thread is starved (CI saw ~12 MB of unswept
+  // payloads). Every reading after a full GC is an upper bound on reachable bytes, so the minimum of
+  // a few GC passes with yields settles the sweep without hiding payloads that are really retained.
   const output = execFileSync(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, ["--expose-gc", "--input-type=module", "-e", `
     import assert from "node:assert/strict";
     import fs from "node:fs/promises";
     import { syncBuiltinESMExports } from "node:module";
+    import { setTimeout as delay } from "node:timers/promises";
     import { scanPublications } from ${JSON.stringify(new URL("../../src/publisher/index.ts", import.meta.url).href)};
     const input = JSON.parse(process.argv[1]);
     const readdir = fs.readdir;
-    gc();
-    const baseline = process.memoryUsage().arrayBuffers;
+    const settled = async () => {
+      let bytes = Infinity;
+      for (let pass = 0; pass < 5; pass++) {
+        gc();
+        bytes = Math.min(bytes, process.memoryUsage().arrayBuffers);
+        await delay(10);
+      }
+      return bytes;
+    };
+    const baseline = await settled();
     let retained;
     fs.readdir = async (path, ...options) => {
       if (path === input.jobsIn && retained === undefined) {
-        gc();
-        retained = process.memoryUsage().arrayBuffers - baseline;
+        retained = await settled() - baseline;
       }
       return readdir(path, ...options);
     };
