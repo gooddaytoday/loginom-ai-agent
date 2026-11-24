@@ -14,15 +14,19 @@ import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
 import { Global } from "@opencode/util/global"
-import { Context, Deferred, Effect, Fiber, Layer, Schema, type Scope, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Schema, type Scope, Stream } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
 import { TestLLM } from "../../ai/src/testing"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
+import { Dashboard } from "../../loginom-agent/src/dashboard"
+import { ServiceHost } from "../../loginom-agent/src/host"
+import { temporaryData } from "../../loginom-agent/test/fixture/temporary-data"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
+import { scriptedHost } from "./fixture/loginom-dock-host"
 import { pluginsLoaded } from "./fixture/routes"
 
 // Loginom access grants and the tool gate of the built-in product plugin `loginom.product` (guarantee G1, stage B2.2),
@@ -48,7 +52,16 @@ type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 type Catalog = "verified" | "damaged" | "missing"
 // `sources` turns on OpenCode's project and `.claude` skill roots. `files`, relative to the project directory, are
 // written before the server starts; the profile lives under `global/config` there and the home directory under `home`.
-type Options = { catalog?: Catalog; sources?: boolean; files?: Record<string, string> }
+// `config` is the project config. `dashboard` puts the Location in a dashboard's work folder under the server's data
+// root (B2.9b) instead of the project directory; `host` is a scripted Host the server starts first (B2.3).
+type Options = {
+  catalog?: Catalog
+  sources?: boolean
+  files?: Record<string, string>
+  config?: Record<string, unknown>
+  dashboard?: boolean
+  host?: ReturnType<typeof scriptedHost>
+}
 
 const boot = (
   extra: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope> = () => Effect.void,
@@ -56,7 +69,13 @@ const boot = (
 ) =>
   Effect.gen(function* () {
     const dir = (yield* tmpdirScoped("loginom-access-")).path
-    const location = Location.Ref.make({ directory: AbsolutePath.make(dir) })
+    // The product plugin's own data directory (dashboards, file profiles) is the case's, not the runner's.
+    yield* Effect.acquireRelease(
+      Effect.promise(() => temporaryData()),
+      (data) => Effect.promise(() => data[Symbol.asyncDispose]()),
+    )
+    const directory = options.dashboard ? yield* dashboardWork : dir
+    const location = Location.Ref.make({ directory: AbsolutePath.make(directory) })
     const resources = path.join(dir, "resources")
     const global = path.join(dir, "global")
     yield* Effect.promise(async () => {
@@ -96,6 +115,12 @@ const boot = (
           else process.env.LOGINOM_AI_AGENT_RESOURCES = previous
         }),
     )
+    const host = options.host
+    if (host)
+      yield* Effect.acquireRelease(
+        Effect.promise(() => ServiceHost.start({ data: path.join(dir, "data"), connect: host.connect })),
+        () => Effect.promise(() => ServiceHost.close()),
+      )
     const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
     // Text answers the scripted model gave, as `<session> <text>`.
     const answered: string[] = []
@@ -115,7 +140,10 @@ const boot = (
           // Schedules are on by default in the dev channel.
           app: { channel: "dev", version: "test" },
           database: { path: ":memory:" },
-          config: options.sources ? {} : { project: false, claude: false },
+          config: {
+            ...(options.sources ? {} : { project: false, claude: false }),
+            ...(options.config ? { content: JSON.stringify(options.config) } : {}),
+          },
           models: { fetch: false, snapshot: false },
           fs: { filewatcher: false, fff: false },
         },
@@ -225,7 +253,7 @@ const boot = (
     // The wizard's RPC. Before a Location's first work its RPC routes are not registered yet (spike S7).
     const wizard = (sessionID: Session.ID, profile: string, text: string) =>
       Effect.gen(function* () {
-        const route = `/api/rpc/loginom.runner/start?location[directory]=${encodeURIComponent(dir)}`
+        const route = `/api/rpc/loginom.runner/start?location[directory]=${encodeURIComponent(directory)}`
         const output = yield* until(() =>
           post(route, { input: { sessionID, profile, text } }).pipe(
             Effect.flatMap((response) =>
@@ -250,10 +278,10 @@ const boot = (
         .pipe(Effect.map((all) => all.filter((request) => header(request) === sessionID && request.tools.length > 0)))
     const ran = (sessionID: Session.ID) => calls.filter((call) => call.startsWith(`${sessionID} `)).length
     // The skill catalog over HTTP, once the Location's plugins have loaded (the server does not wait for them).
-    const skills = pluginsLoaded(context, dir).pipe(
+    const skills = pluginsLoaded(context, directory).pipe(
       Effect.andThen(
         Effect.promise(() =>
-          handler(new Request(`http://opencode.local/api/skill?location[directory]=${encodeURIComponent(dir)}`)),
+          handler(new Request(`http://opencode.local/api/skill?location[directory]=${encodeURIComponent(directory)}`)),
         ),
       ),
       Effect.flatMap((response) => Effect.promise(() => response.json())),
@@ -261,6 +289,18 @@ const boot = (
     )
     return { sessions, create, prompt, wizard, post, skills, requests, ran, answered, prompts, held, gate, resources }
   })
+
+// A dashboard's folder with its `work` folder, under the root the product plugin reads: the case's temporary data
+// directory (`boot`). Removed after the case.
+const dashboardWork = Effect.acquireRelease(
+  Effect.promise(async () => {
+    await fs.mkdir(Dashboard.root(), { recursive: true })
+    const folder = await fs.mkdtemp(path.join(Dashboard.root(), "access-"))
+    await fs.mkdir(path.join(folder, "work"))
+    return folder
+  }),
+  (folder) => Effect.promise(() => fs.rm(folder, { recursive: true, force: true })),
+).pipe(Effect.map((folder) => path.join(folder, "work")))
 
 describe("loginom.product access and tool gate (G1)", () => {
   it.live(
@@ -526,6 +566,127 @@ describe("loginom.product access and tool gate (G1)", () => {
         yield* test.sessions.wait(session)
         expect(test.ran(session)).toBe(0)
         expect(JSON.stringify((yield* test.requests(session))[1]?.messages)).toContain(denied)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+})
+
+// The dashboard profile (G1, B2.9b): 0.4 `turn-lifecycle.test.ts` «a dashboard run never acquires a connected Loginom
+// Host…», the two dashboard cases of `session/profile-tools.test.ts`, «the first dashboard prompt advertises only dashboard
+// builtins» and «a dashboard directory rejects a persisted subtask…» of `session/prompt.test.ts`
+// (`v0.4.0:packages/opencode/test`). The Location's folder is a dashboard's `work` folder; the dashboard tools themselves
+// arrive in B2.9e…g. The project config turns the terminal on and names an MCP server with instructions, so that what the
+// session does not get is there to get: an ordinary Location of the same config is the control.
+const dashboardTools = ["read", "glob", "grep", "edit", "write", "patch", "skill"]
+const guide = "Use lookup before mutate."
+const dashboardOptions = (dashboard: boolean, host?: ReturnType<typeof scriptedHost>): Options => ({
+  dashboard,
+  host,
+  config: {
+    permissions: [{ action: "shell", resource: "*", effect: "allow" }],
+    mcp: {
+      servers: {
+        guide: { type: "local", command: [process.execPath, path.join(import.meta.dir, "fixture", "mcp-guide.cjs")] },
+      },
+    },
+  },
+})
+
+describe("loginom.product dashboard profile (G1, B2.9b)", () => {
+  it.live(
+    "a dashboard Location offers only its tools before any grant, leases no Host, sees no MCP server; skills, attachments and the wizard keep its base",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost()
+        const test = yield* boot(undefined, dashboardOptions(true, host))
+        const plain = yield* test.create("dashboard")
+        yield* test.prompt(
+          plain,
+          script(
+            { tool: "subagent", input: { agent: "general", description: "child", prompt: script({ text: "x" }) } },
+            { tool: probe },
+            { tool: "skill", input: { id: "loginom-automation" } },
+            { tool: probe },
+            { text: "end" },
+          ),
+        )
+        const seen = yield* test.requests(plain)
+        expect(seen).toHaveLength(5)
+        for (const request of seen) {
+          expect(names(request).every((name) => dashboardTools.includes(name))).toBe(true)
+          // OpenCode offers `patch` instead of `edit` and `write` to some models only, as 0.4 `apply_patch`.
+          expect(names(request)).toEqual(expect.arrayContaining(["read", "glob", "grep", "skill", "edit", "write"]))
+          // No Loginom hint and no MCP instructions either.
+          expect(system(request)).not.toContain("Loginom is available")
+          expect(JSON.stringify(request)).not.toContain(guide)
+        }
+        // The calls the model makes anyway are refused: a subagent, a Loginom tool before and after the skill that grants
+        // it elsewhere. The terminal is not called: even on, it asks before every command (B2.6a), and nobody answers.
+        expect(JSON.stringify(seen.at(-1)?.messages).split(denied).length - 1).toBe(3)
+        expect((yield* test.sessions.list({ parentID: plain })).data).toEqual([])
+
+        // The user attaches the skill; the wizard grants its profile.
+        const attached = yield* test.create("attached")
+        yield* test.prompt(attached, script({ tool: probe }, { text: "end" }), ["loginom-automation"])
+        const wizard = yield* test.create("wizard")
+        expect(yield* test.wizard(wizard, "loginom-automation", script({ tool: probe }, { text: "end" }))).toEqual({
+          output: { granted: true },
+        })
+        for (const session of [attached, wizard])
+          for (const request of yield* test.requests(session))
+            expect(names(request).every((name) => dashboardTools.includes(name))).toBe(true)
+        for (const session of [plain, attached, wizard]) expect(test.ran(session)).toBe(0)
+        // Not one request reached the Host.
+        expect(host.log).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "control: an ordinary Location of the same config leases the Host and offers the terminal, subagents and the MCP server",
+    () =>
+      Effect.gen(function* () {
+        const host = scriptedHost()
+        const test = yield* boot(undefined, dashboardOptions(false, host))
+        const session = yield* test.create("ordinary")
+        yield* test.prompt(session, script({ text: "end" }))
+        const [first] = yield* test.requests(session)
+        expect(names(first)).toEqual(expect.arrayContaining(["shell", "subagent", "read"]))
+        expect(system(first)).toContain("Loginom is available")
+        expect(JSON.stringify(first)).toContain(guide)
+        expect(host.requests("acquire")).toHaveLength(1)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a dashboard Location refuses an attached agent before the model; its subsessions and forks keep the profile",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot(undefined, dashboardOptions(true))
+        const parent = yield* test.create("parent")
+        const exit = yield* test.sessions
+          .prompt({ sessionID: parent, text: script({ text: "end" }), agents: [{ name: "general" }] })
+          .pipe(Effect.exit)
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain(denied)
+        expect(yield* test.sessions.messages({ sessionID: parent })).toEqual([])
+        expect(yield* test.requests(parent)).toEqual([])
+        expect((yield* test.sessions.list({ parentID: parent })).data).toEqual([])
+
+        // A subsession (a subagent command creates one without the `subagent` tool) and a fork live in the same
+        // Location, so its profile holds there too.
+        yield* test.prompt(parent, script({ text: "parent end" }))
+        const child = yield* test.sessions.create({ parentID: parent, title: "child" })
+        const fork = yield* test.sessions.fork({ sessionID: parent })
+        for (const session of [child.id, fork.id]) {
+          yield* test.prompt(session, script({ tool: probe }, { text: "end" }))
+          const seen = yield* test.requests(session)
+          expect(seen).toHaveLength(2)
+          for (const request of seen) expect(names(request).every((name) => dashboardTools.includes(name))).toBe(true)
+          expect(JSON.stringify(seen.at(-1)?.messages)).toContain(denied)
+          expect(test.ran(session)).toBe(0)
+        }
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

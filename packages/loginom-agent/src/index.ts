@@ -10,6 +10,7 @@ import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { Dashboard } from "./dashboard"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
@@ -107,14 +108,22 @@ export default Plugin.define({
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
     // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
     // a scheduled wake joins a running execution as a steer prompt. Memory only, so a restart drops every grant.
-    const granted = new Map<string, Grant>()
+    const granted = new Map<string, Profile>()
     const pending = new Map<string, { sessionID: string; profile: Grant }>()
-    const profile = (sessionID: string): Profile => granted.get(sessionID) ?? "default"
+    // A dashboard's work folder confines every session of its Location to `loginom-dashboard` for good (B2.9b, 0.4
+    // `baseProfile`): no skill, attachment or wizard grant changes it, and a subsession or a fork lives here too.
+    const dashboard = Dashboard.latch(ctx.location.directory)
+    const profile = (sessionID: string): Profile =>
+      dashboard() ? "loginom-dashboard" : (granted.get(sessionID) ?? "default")
 
     // Skill sources (G6): the bundled catalog owns the product's skill IDs and names, so only it grants access.
     const resources = process.env.LOGINOM_AI_AGENT_RESOURCES
     const catalog = await bundled(resources)
     await ctx.skill.transform((editor) => apply(editor, catalog, hub))
+    // A dashboard session sees none of its Location's MCP servers: no tools, resources or prompts (0.4 `allowsMcp`).
+    await ctx.mcp.transform((editor) => {
+      if (dashboard()) editor.list().forEach(([name]) => editor.remove(name))
+    })
 
     // A tool that needs a grant never enters the CodeMode catalog, which the model sees without a grant (spike S1).
     // Only tools registered without `codemode: false` are touched: a Promise-API update re-wraps the tool's executor.
@@ -138,7 +147,10 @@ export default Plugin.define({
     const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
     // Why the Host refused a session's lease; the model is told (B2.5d).
     const refused = new Map<string, string>()
+    // A dashboard session never leases the Host (0.4 `turnLifecycle.acquireRun`): without a lease it has no Dock
+    // catalog and no Loginom hints either.
     const hold = (sessionID: string) => {
+      if (dashboard()) return Promise.resolve(undefined)
       const current =
         leases.get(sessionID) ??
         ServiceHost.acquire(sessionID).then(
@@ -384,6 +396,9 @@ export default Plugin.define({
     // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
     // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
     await ctx.session.hook("prompt", async (event) => {
+      // An attached agent asks for a subagent, which a dashboard session does not run (0.4 refused its subtask).
+      if (event.prompt.agents?.length && dashboard())
+        throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
       tasks.set(event.sessionID, event.messageID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
