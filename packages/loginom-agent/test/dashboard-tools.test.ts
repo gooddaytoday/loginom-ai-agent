@@ -11,6 +11,7 @@ import { readdir } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import { Agent } from "@opencode/schema/agent"
+import { Permission } from "@opencode/schema/permission"
 import { Session } from "@opencode/schema/session"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Tool } from "@opencode/schema/tool"
@@ -280,6 +281,49 @@ for (const [when, at] of [
     },
     timeout,
   )
+
+test(
+  "a stop withdraws the call's own question once it is open, and no other",
+  async () => {
+    await using folder = await dashboardFolder()
+    await using host = await serviceHost(folder)
+    const controller = new AbortController()
+    const context = call(controller.signal)
+    const question = Promise.withResolvers<void>()
+    const listed: number[] = []
+    const replies: unknown[] = []
+    const request = (id: string, callID: string) => ({
+      id: Permission.ID.make(id),
+      sessionID: context.sessionID,
+      action: "dashboard_publish",
+      resources: [],
+      source: { type: "tool" as const, messageID: context.messageID, id: callID },
+    })
+    const tools = dashboardTools(folder.work, folder.resources, {
+      permission: {
+        // The user stops the call while its question is still being evaluated; the question stays open until a reply.
+        assert: async () => {
+          setTimeout(() => controller.abort(), 0)
+          return question.promise
+        },
+        list: async () => {
+          listed.push(listed.length + 1)
+          return listed.length === 1 ? [] : [request("per_other", "call_other"), request("per_own", context.id)]
+        },
+        reply: async (input) => {
+          replies.push(input)
+          question.reject(new Error("declined"))
+        },
+      },
+      bound: async () => {},
+    })
+    await expect(tools.publish.execute({}, context)).rejects.toThrow()
+    expect(listed).toEqual([1, 2])
+    expect(replies).toEqual([{ sessionID: context.sessionID, requestID: "per_own", decision: "reject" }])
+    expect(host.requests("dashboardPublish")).toEqual([])
+  },
+  timeout,
+)
 
 async function until<T>(read: () => Promise<T | undefined>, deadline = Date.now() + 60_000): Promise<T> {
   const value = await read()
