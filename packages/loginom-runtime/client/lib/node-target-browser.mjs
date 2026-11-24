@@ -525,8 +525,8 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
-      // Select exactly this node cell by a body pixel owned by it (never its
-      // Setting/Launch controls), then the native Delete-selected command.
+      // Reuse the exact node selection, or select it by an owned body pixel
+      // (never its Setting/Launch controls) before the Delete-selected command.
       const selection=()=>page.evaluate(id=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
         const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id),cells=d.FmxGraph.getSelectionCells();
         return ns.length===1&&ns[0].FLocked!==true&&cells.length===1&&cells[0]===ns[0].FCell&&cells[0].edge!==true;},p.ref.node_id);
@@ -539,7 +539,9 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(ns.length!==1||ns[0].FLocked)throw Error('Exact unlocked node to delete required');
         const edges=new Set([...(ns[0].FCell.edges??[]),...(ns[0].FPorts??[]).flatMap(list=>list.FCollection??[]).flatMap(port=>port.FCell?.edges??[])]);
         if(edges.size!==known)throw Error('Node to delete has a connection Dock cannot verify ('+edges.size+' native, '+known+' recognized); nothing was deleted');
-        const n=ns[0],dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
+        const n=ns[0],cells=g.getSelectionCells();
+        if(cells.length===1&&cells[0]===n.FCell&&cells[0].edge!==true)return null;
+        const dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
         if(!dom||!g.container.contains(dom)||!box?.width||!box.height)throw Error('Node body to delete unavailable');
         for(const dx of [.5,.25,.75,.1,.9])for(const dy of [.5,.25,.75,.1,.9]){
           const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y),cell=g.getCellAt(x-gb.x+g.container.scrollLeft,y-gb.y+g.container.scrollTop);
@@ -547,18 +549,38 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         }
         throw Error('Native node body hit unavailable');
       },{id:p.ref.node_id,known});
-      if(remaining()<=1000)throw new Error('Insufficient deadline for owned node selection');
-      // Selection alone is not a graph effect; only the Delete command is.
-      await ensureContext();await page.mouse.click(body.x,body.y);
+      if(body){
+        if(remaining()<=1000)throw new Error('Insufficient deadline for owned node selection');
+        // Selection alone is not a graph effect; only the Delete command is.
+        await ensureContext();await page.mouse.click(body.x,body.y);
+      }
       await wait('owned_node_selection',selection,1000);
-      const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
-      await wait('single_node_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      const modelTid=task.request.workflow_ref.prefix+';ModelForm';
+      const remove=find(modelTid+';btnRemoveSelected'),canvas=find(modelTid+';cmpDiagram');
+      const deleteCommand=async()=>{
+        if(await remove.count()!==1||!await remove.isEnabled())return null;
+        if(await remove.isVisible()){
+          try{await point(remove);return 'toolbar';}catch{return null;}
+        }
+        const hidden=await remove.evaluate((button,toolbarTid)=>{
+          const toolbar=button.ownerDocument.querySelectorAll('[data-tid='+JSON.stringify(toolbarTid)+']');
+          const box=button.getBoundingClientRect();
+          return toolbar.length===1&&button.parentElement?.closest('[data-tid]')===toolbar[0]
+            &&button.matches('a.x-btn.x-toolbar-item')&&!button.matches('.x-item-disabled,.x-btn-disabled,[aria-disabled="true"]')
+            &&button.getAttribute('data-qtip')==='Удалить выбранное... (Delete)'&&box.width===0&&box.height===0;
+        },modelTid+';tlbModel',{timeout:remaining()});
+        return hidden&&await canvas.evaluate(element=>element.ownerDocument.activeElement===element,undefined,{timeout:remaining()})?'delete_key':null;
+      };
+      const command=await wait('single_node_delete_toolbar_reachable',deleteCommand);
       const selectedGraph=await wait('owned_node_selection_graph_ready',async()=>{
         try{return await read(page,task);}catch(error){if(String(error.message).includes('Graph is blocked'))return null;throw error;}
       },1000);
-      if(!await selection()||!sameGraph(before,selectedGraph))throw new Error('Owned node selection or graph changed before deletion');
+      if(!sameGraph(before,selectedGraph)||await deleteCommand()!==command||!await selection())throw new Error('Owned node selection, graph or Delete command changed before deletion');
+      await ensureContext();const timeout=remaining();
       gestureBefore=selectedGraph;
-      effectPossible=true;await remove.click({timeout:remaining()});transient='delete';
+      effectPossible=true;transient='delete';
+      if(command==='delete_key')await canvas.press('Delete',{timeout});
+      else await remove.click({timeout});
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
       // Observed Loginom 7.4.2 single-node text only; any other dialog is cancelled.
