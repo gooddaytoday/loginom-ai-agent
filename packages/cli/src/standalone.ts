@@ -13,6 +13,8 @@ import { LOGINOM_AI_AGENT_CHANNEL, LOGINOM_AI_AGENT_VERSION } from "./version"
 // after this.
 
 const headless = ["--headless", "--no-headless"]
+// A dashboard's run starts a new session in its folder (B2.9i), as in 0.4 (`v0.4.0:.../cli/standalone-dashboard.ts`).
+const dashboardConflicts = ["--continue", "-c", "--session", "-s", "--fork", "--command", "--dir", "--attach"]
 
 /**
  * Runs help, version, `diagnostics export` and the `loginom` commands and exits the process; returns only for a command
@@ -46,8 +48,9 @@ export async function early(args: string[]) {
  * `provider/model#variant`, the way `evals` and `run-check.py` pass them to 0.4. The headless flags are dropped; a `run`
  * records its browser mode and `run --command <skill>` in `env` (B2.7a4b): OpenCode 2's server starts the Host
  * (`loginom-agent/src/host.ts`), and the private server of the run inherits the mode, while the run attaches the skill to
- * its prompt (`run/product.ts`). Another command, such as that server's own `serve`, leaves both as it found them. Fails
- * with `CLI_ARGUMENT_INVALID` (exit code 2).
+ * its prompt (`run/product.ts`). `run --dashboard <id>` records its snapshot ID the same way (B2.9i); the run prepares
+ * the dashboard's folder and runs there. Another command, such as that server's own `serve`, leaves them as it found
+ * them. Fails with `CLI_ARGUMENT_INVALID` (exit code 2).
  */
 export function forward(args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env) {
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
@@ -55,12 +58,29 @@ export function forward(args: string[], cwd: string, env: NodeJS.ProcessEnv = pr
   if (headless.every((flag) => options.includes(flag)))
     throw new Error("CLI_ARGUMENT_INVALID: --headless and --no-headless exclude each other")
   const rest = options.filter((value) => !headless.includes(value))
+  // Checked on every option: a headless flag right after `--dashboard` is no snapshot ID.
+  const dashboard = options.findIndex((value) => value === "--dashboard" || value.startsWith("--dashboard="))
+  const id = options[dashboard] === "--dashboard" ? options[dashboard + 1] : options[dashboard]?.slice(12)
+  if (
+    dashboard >= 0 &&
+    (rest[0] !== "run" ||
+      !id ||
+      id.startsWith("-") ||
+      options.some((value) => dashboardConflicts.some((flag) => value === flag || value.startsWith(flag + "="))))
+  )
+    throw new Error(
+      "CLI_ARGUMENT_INVALID: run --dashboard needs a snapshot ID and starts a new session in the dashboard's folder, " +
+        `without ${dashboardConflicts.join(", ")}`,
+    )
   if (rest[0] !== "run") return { args: [...rest, ...args.slice(boundary)] }
   if (options.includes("--headless")) env.LOGINOM_AI_AGENT_HEADLESS = "1"
   else delete env.LOGINOM_AI_AGENT_HEADLESS
   const command = take(rest, "--command")
   if (command === undefined) delete env.LOGINOM_AI_AGENT_RUN_COMMAND
   else env.LOGINOM_AI_AGENT_RUN_COMMAND = command
+  const snapshot = take(rest, "--dashboard")
+  if (snapshot === undefined) delete env.LOGINOM_AI_AGENT_RUN_DASHBOARD
+  else env.LOGINOM_AI_AGENT_RUN_DASHBOARD = snapshot
   const dir = take(rest, "--dir")
   // `default` is the model's own setting, as OpenCode 2 reads a `#default` variant.
   const variant = take(rest, "--variant")
