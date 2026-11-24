@@ -87,6 +87,22 @@ test('managed existing viewport navigation cannot renew the original opening dea
   assert.equal(f.calls.includes('capture'),false);
 });
 
+test('reopening an unconfigured JavaScript node refuses settings drift before a schema gesture',async()=>{
+  const page_tid='MF;TF-1;WizrdMCF;JavaScriptColumnsWizard';
+  const schema={verified:true,inventory_complete:true,form:'JavaScriptColumnsWizard',page_tid,
+    node_context:{...node,verified:true,surface:'wizard'},generation:{checked:false},
+    grids:[{tid:page_tid+';grdTargetColumns;tbl',count:0,total:0,fields:[]}]};
+  const expectedSettings=javascriptSourceSettingsDigest(javascriptManagedSourceSettings(schema));
+  for(const changed of [{...schema,generation:{checked:true}},{...schema,inventory_complete:false},
+    {...schema,grids:[...schema.grids,{tid:page_tid+';grdSourceColumns;tbl',count:0,total:0,fields:[]}]}]){
+    const f=fixture({schemaOverride:changed});
+    const adapter=await f.sourceAdapter(owner);
+    await assert.rejects(()=>adapter.open({owner,deadline,schemaMode:'code',expectedSettings}),/unconfigured settings changed/);
+    assert.deepEqual(f.calls,['type','open','page','schema','close','dispose']);
+    assert.equal(adapter.uncertain,false);
+  }
+});
+
 for(const [fault,field] of [['generation','settings.generation_checked'],['grids','mappings.grids'],
   ['grid_tid','mappings.grid_tid'],['grid_fields','mappings.grid_fields'],
   ['field_type','mappings.DataType_supported'],['reciprocity','mappings.reciprocity_verified'],['store','mappings.store_available']])

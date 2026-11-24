@@ -11,6 +11,7 @@ import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
 import {waitManagedJavascriptDoneSettlement} from './javascript-managed-done-settlement.mjs';
 import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
+import {isUnconfiguredJavascriptSchema} from './javascript-declared-schema.mjs';
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 import {makeJavascriptManagedStageCode} from './javascript-managed-stage.mjs';
 import {waitManagedJavascriptCodeSettlement} from './javascript-managed-code-settlement.mjs';
@@ -180,7 +181,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     throw error;
   };
   return {
-    async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns}) {
+    async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns, expectedSettings}) {
       check(owner, operationDeadline);
       need(['preserve', 'code', 'declared'].includes(schemaMode), 'Managed JavaScript schema mode unavailable');
       if(schemaMode==='declared')validateJavascriptDeclaredPrimitiveColumns(columns);
@@ -243,7 +244,11 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         && schema.node_context.surface === 'wizard'
         && ['document_id', 'workflow_id', 'node_id'].every(key => schema.node_context[key] === task.owner[key]),
       'Managed JavaScript source schema owner changed',()=>sourceSettingsDiagnostic(schema,task.owner));
-      try{javascriptManagedSourceSettings(schema);}
+      try{
+        const settings=javascriptManagedSourceSettings(schema);
+        if(expectedSettings!==undefined)need(isUnconfiguredJavascriptSchema(schema)
+          &&javascriptSourceSettingsDigest(settings)===expectedSettings,'Managed JavaScript unconfigured settings changed');
+      }
       catch(error){return discardAdmission(task,firstPage.page,error);}
       const generation = schemaMode === 'code'
         ? await driver.dispatchManagedJavascriptGeneration({task, execute, record, receiptOptions}) : null;

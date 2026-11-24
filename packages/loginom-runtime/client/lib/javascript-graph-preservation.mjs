@@ -3,16 +3,20 @@ const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
 // A request ref may list its three keys in any order; graph refs are canonical.
 const sameRef=(ref,node)=>['document_id','workflow_id','node_id'].every(key=>ref?.[key]===node?.[key]);
 
-export function verifyJavascriptUnconnectedInput(graph,node,ownedVariableLinks=[]){
+export function javascriptUnconnectedInputVerified(graph,node,ownedVariableLinks=[]){
   const variableLinks=graph?.variable_links??[];
-  need(graph?.complete===true&&graph.document_id===node.document_id
+  return graph?.complete===true&&graph.document_id===node.document_id
     &&graph.workflow_ref?.workflow_id===node.workflow_id&&Array.isArray(graph.nodes)
     &&graph.nodes.filter(item=>sameRef(item.ref,node)).length===1
     &&Array.isArray(graph.links)&&Array.isArray(graph.foreign_links)&&graph.foreign_links.length===0
     &&[graph.links,graph.service_links??[],graph.rest_connection_links??[]].every(edges=>Array.isArray(edges)
       &&edges.every(edge=>typeof edge?.target==='string'&&edge.target!==node.node_id))
     &&Array.isArray(variableLinks)&&variableLinks.every(edge=>typeof edge?.target==='string')
-    &&same(variableLinks.filter(edge=>edge.target===node.node_id),ownedVariableLinks),
+    &&same(variableLinks.filter(edge=>edge.target===node.node_id),ownedVariableLinks);
+}
+
+export function verifyJavascriptUnconnectedInput(graph,node,ownedVariableLinks){
+  need(javascriptUnconnectedInputVerified(graph,node,ownedVariableLinks),
   'JavaScript unconnected input requires a complete owned graph without incoming table, service or unowned variable links');
   return true;
 }

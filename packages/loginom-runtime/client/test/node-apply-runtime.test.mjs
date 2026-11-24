@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
+import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
@@ -151,6 +153,78 @@ test('validation and missing drivers cannot create a graph or journal effects',a
  const f=fixture();f.handler.validate=()=>{throw Error('unsupported schema')};await assert.rejects(f.runtime.runNodeApply(request()),/unsupported/);
  assert.equal(f.events.length,0);assert.equal(f.calls.length,0);
 });
+
+const admissionHandlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+const inputSource={document_id:'doc',workflow_id:'wf',node_id:'source'};
+const targetRef={...inputSource,node_id:'existing'};
+const admissionRequest=(type,mode,parameters)=>({
+ ...request(),target:{kind:'new',type},mode,parameters,inputs:[{source:inputSource,output:0,input:0}],
+});
+async function assertAdmissionRefusal(r,error){
+ const f=fixture();
+ f.handlers.set(r.target.type,admissionHandlers.get(r.target.type));
+ await assert.rejects(f.runtime.runNodeApply(r),error);
+ assert.deepEqual(f.events,[]);
+ assert.deepEqual(f.calls,[]);
+ assert.deepEqual(f.graph.nodes,[]);
+}
+
+test('LGD export requires the matching variables link for a new destination binding before target',async()=>{
+ const settings={compression:'lz4',checksum:'none',overwrite:'reject'};
+ const r=admissionRequest('exports.lgd','native',{lgd_export:{...settings,bindings:{destination:{variable:'Path'}}}});
+ const link={source:inputSource,output:0,kind:'variables',input:0};
+ for(const variable_inputs of [undefined,[],[{...link,kind:'control'}],[{...link,input:1}]]){
+  const candidate=variable_inputs===undefined?r:{...r,variable_inputs};
+  await assertAdmissionRefusal(candidate,/destination binding requires variables input 0/);
+ }
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers));
+ const literal={lgd_export:{...settings,destination:'/test-2/output.lgd'}};
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers));
+});
+
+for(const [operator,operand] of [['>','value'],['in','values']])test('new filter requires a control link for a variable '+operand+' before target',async()=>{
+ const condition={field:{kind:'input_field',name:'Amount'},type:'integer',operator,[operand]:{kind:'variable',name:'Limit'}};
+ const r=admissionRequest('transform.filter_data','conditions',{groups:[[condition]]});
+ const link={source:inputSource,output:0,kind:'control',input:0};
+ for(const variant of [r,{...r,variable_inputs:[],bindings:[]},{...r,variable_inputs:[{...link,kind:'variables'}]}]){
+  await assertAdmissionRefusal(variant,/filter variable operands require control input 0/);
+ }
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,variable_inputs:[link]},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'existing',type:r.target.type,ref:targetRef},inputs:[]},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,finish:'close'},admissionHandlers));
+ const literal={groups:[[{...condition,[operand]:operand==='value'?5:[5]}]]};
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,parameters:literal},admissionHandlers));
+});
+
+test('new filter with explicit bindings remains admissible with a control link',()=>{
+ const r=admissionRequest('transform.filter_data','conditions',{groups:[[{field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>'}]]});
+ r.bindings=[{parameter:'/groups/0/0/value',variable:{kind:'control',input:0,name:'Limit'}}];
+ r.variable_inputs=[{source:inputSource,output:0,kind:'control',input:0}];
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,admissionHandlers));
+});
+
+for(const [type,mode,parameters] of [
+ ['transform.date_time','calendar',{fields:[{field:{kind:'input_field',name:'A'},transformations:[{operation:'year',name:'Year',label:'Year'}]}]}],
+ ['transform.sliding_window','lag',{windows:[{field:'A',history:1,horizon:0}],incomplete_records:'keep_incomplete'}],
+ ['preprocessing.smoothing','hodrick_prescott',{smoothing:[{field:'A',lambda:1}]}],
+ ['preprocessing.sampling','sequential',{count:5,position:'first'}],
+ ['preprocessing.data_partition','sequential',{train_count:5,test_count:3,allocation_order:'test_train_unused'}],
+])test(type+' refuses Close with a table input mapping before target',async()=>{
+ const r=admissionRequest(type,mode,parameters);
+ const mappings=[{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'A'},name:'Renamed'}]}];
+ const close={...r,finish:'close',mappings};
+ await assertAdmissionRefusal(close,/Close cannot commit input mappings/);
+ const existing={...close,target:{kind:'existing',type,ref:targetRef},parameters:{},inputs:[]};
+ await assertAdmissionRefusal(existing,/Close cannot commit input mappings/);
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...close,mappings:[]},admissionHandlers));
+ assert.doesNotThrow(()=>validateNodeApplyRequest({...r,mappings},admissionHandlers));
+ if(type.startsWith('transform.')||type==='preprocessing.smoothing'){
+  const output=[{direction:'output',port:0,autosync:false}];
+  assert.doesNotThrow(()=>validateNodeApplyRequest({...close,mappings:output},admissionHandlers));
+ }
+});
+
 test('same ID cannot be shared with graph operation or changed handler',async()=>{
  const f=fixture();await f.runtime.runNodeApply(request());
  const {document_id,workflow_ref,target,inputs}=request();
