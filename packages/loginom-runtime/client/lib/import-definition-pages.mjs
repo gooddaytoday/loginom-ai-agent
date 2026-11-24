@@ -91,26 +91,56 @@ export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true
   if(p.status!=='complete_definition_page'||p.offset!==offset||schemaId!==undefined&&p.schema_id!==schemaId
     ||total!==undefined&&p.total_columns!==total)throw new Error('Addressed output definition changed');
   if(!field)return state;
-  const identity={offset,ready,stage,schemaId:p.schema_id,total:p.total_columns};
+  const {root_ref,root_tid,stage:fieldStage}=state.wizard;
+  const owned=s=>s.wizard?.root_ref===root_ref&&s.wizard?.root_tid===root_tid&&s.wizard?.stage===fieldStage&&ready(s);
+  const identity={offset,ready:owned,stage:fieldStage,schemaId:p.schema_id,total:p.total_columns};
+  const samePage=s=>{
+    const page=s.wizard?.output_columns?.page;
+    return owned(s)&&page?.status==='complete_definition_page'&&page.offset===offset
+      &&page.schema_id===p.schema_id&&page.total_columns===p.total_columns;
+  };
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===field.index&&f.name===field.name&&f.label===field.label);
   const cellOf=s=>s.ui.elements.find(e=>e.ref===rowOf(s)?.name_ref);
+  const gridOf=s=>{
+    const grids=s.ui.elements.filter(e=>e.ref===s.wizard.output_columns.definition_scroll_ref
+      &&e.scroll?.ref===e.ref&&e.allowed_actions.includes('scroll'));
+    return grids.length===1?grids[0]:null;
+  };
+  const isCovered=cell=>['point_not_observed','outside_viewport'].includes(cell.interaction?.state);
+  const scrollDelta=(cell,grid)=>{
+    if(!grid)return 0;
+    const center=cell.bounding_box.y+cell.bounding_box.height/2;
+    if(center<grid.bounding_box.y)return -400;
+    if(center>grid.bounding_box.y+grid.bounding_box.height)return 400;
+    // The grid box includes clipped or covered areas. Aim for the part of the
+    // owned grid that the browser actually hit-tested in this observation.
+    const targetY=grid.interaction?.point?.y;
+    return isCovered(cell)&&Number.isFinite(targetY)?Math.max(-400,Math.min(400,Math.round(center-targetY))):0;
+  };
+  const canScroll=(grid,delta)=>delta>0?grid.scroll.top<grid.scroll.max_top:delta<0&&grid.scroll.top>0;
   for(let attempt=0;attempt<128;attempt++){
-    const row=rowOf(state),cell=cellOf(state);
-    if(!row||!cell)throw Error('Addressed output field disappeared');
+    const cell=cellOf(state);
+    if(!cell)throw Error('Addressed output field disappeared');
     if(cell.allowed_actions.includes(fieldAction))return state;
-    const grids=state.ui.elements.filter(e=>e.ref===state.wizard.output_columns.definition_scroll_ref&&e.scroll?.ref===e.ref&&e.allowed_actions.includes('scroll'));
-    if(grids.length!==1)throw Error('Output field scroll owner unavailable');
-    const grid=grids[0],center=cell.bounding_box.y+cell.bounding_box.height/2;
-    const direction=center<grid.bounding_box.y?-1:center>grid.bounding_box.y+grid.bounding_box.height?1:0;
-    if(!direction)throw Error('Output field is obscured');
+    const grid=gridOf(state),delta=scrollDelta(cell,grid);
+    if(!canScroll(grid,delta)){
+      if(!isCovered(cell))throw Error(grid?'Output field is obscured':'Output field scroll owner unavailable');
+      return channel.observe({condition:'addressed output field becomes unobscured',
+        outputColumnPage:{offset,limit:8},ready:s=>samePage(s)&&cellOf(s)?.allowed_actions.includes(fieldAction)===true});
+    }
     const before=grid.scroll.top;
     await channel.perform({condition:'reveal addressed output field for interaction',initialObservation:state,
-      ready:s=>ready(s)&&s.wizard?.output_columns?.page?.schema_id===identity.schemaId&&!!rowOf(s),
-      identity:()=>({schema_id:identity.schemaId,field,scroll_owner:grid.ref}),
-      resolve:()=>({verb:'scroll',ref:grid.ref,delta_y:direction*400})});
+      ready:s=>{
+        if(!samePage(s))return false;
+        const currentCell=cellOf(s),currentGrid=gridOf(s);
+        return currentGrid?.ref===grid.ref&&!!currentCell&&!currentCell.allowed_actions.includes(fieldAction)
+          &&scrollDelta(currentCell,currentGrid)===delta&&canScroll(currentGrid,delta);
+      },
+      identity:()=>({root_ref,schema_id:identity.schemaId,field,scroll_owner:grid.ref}),
+      resolve:()=>({verb:'scroll',ref:grid.ref,delta_y:delta})});
     state=await observeOutputDefinitionPage(channel,identity);
     const after=state.ui.elements.find(e=>e.ref===grid.ref)?.scroll;
-    if(!after||direction*(after.top-before)<=0)throw Error('Output field scroll made no progress');
+    if(!after||Math.sign(delta)*(after.top-before)<=0)throw Error('Output field scroll made no progress');
   }
   throw Error('Output field scroll budget exceeded');
 }

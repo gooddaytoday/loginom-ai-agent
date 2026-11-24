@@ -16,7 +16,8 @@ async function fixture(mode,{close=true}={}) {
   read:async held=>({...browser.observe({context:browser.context,owner,epoch:1,held}),settings}),
   discard:async()=>{calls.push('discard');return {closed:close,owner};}})});
  const receipt=await admission.admit({});
- return {receipt,snapshot:{owner,schema,settings},parameters:{schema_mode:mode==='code'?'declared':'code'},owner,record,deadline,events,calls};
+ return {receipt,snapshot:{owner,schema,settings},parameters:{schema_mode:mode==='code'?'declared':'code'},owner,record,deadline,events,calls,
+  request:{finish:'done',inputs:[]}};
 }
 for(const mode of ['code','declared'])test('actual owned admission/discard produces one acknowledged mode refusal '+mode,async()=>{
  const f=await fixture(mode);let error;
@@ -33,6 +34,7 @@ for(const mode of ['code','declared'])test('actual owned admission/discard produ
    handlers:new Map([['programming.javascript',{revision:'test',modes:['script'],validate(){},configure(){assert.fail('Must not configure');}}]]),
    drivers:{verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),prepareTarget:async()=>{throw error;}}});
   assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+  assert.equal(result.effect_possible,true);
   const foreign=structuredClone(error.nodePhaseRefusal);foreign.proof.owner.node_id='foreign';
   assert.equal(verifiedJavascriptExistingSchemaRefusal(foreign,request),false);
  }
@@ -58,5 +60,5 @@ test('actual unconfirmed discard prevents source admission and schema-refusal pr
 test('lost or late refusal ACK keeps the original deadline and cannot produce typed cleanup proof',async()=>{
  const f=await fixture('code');f.deadline=Date.now()+20;
  f.record=async event=>{await new Promise(resolve=>setTimeout(resolve,60));return event;};
- await assert.rejects(()=>admitJavascriptExistingSchema(f),error=>{assert.match(error.message,/ACK deadline/);assert.equal(error.nodePhaseRefusal,undefined);return true;});
+ await assert.rejects(()=>admitJavascriptExistingSchema(f),error=>{assert.match(error.message,/journal deadline/);assert.equal(error.nodePhaseRefusal,undefined);return true;});
 });

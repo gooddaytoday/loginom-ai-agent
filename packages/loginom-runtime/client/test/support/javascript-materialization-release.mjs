@@ -5,18 +5,34 @@ import {mock} from 'node:test';
 import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
 const fault=process.argv[2]??'safe',events=[],calls=[];
-const guarded=fault.startsWith('effects-'),declared=fault.startsWith('declared-'),sourceExecution=['source-execute','source-reapply'].includes(fault)||declared||guarded,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
+const recovering=fault.startsWith('recover-'),refusing=fault.startsWith('refuse-');
+const variableSource=['declared-variable-source','recover-variable','refuse-variable'].includes(fault);
+const tableRecovery=fault==='recover-table'||fault==='refuse-configured-input';
+const guarded=fault.startsWith('effects-'),declared=fault.startsWith('declared-')||variableSource||tableRecovery;
+const sourceExecution=['source-execute','source-reapply'].includes(fault)||declared||guarded||recovering||refusing,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
 const columns=[{name:'Key',label:'Key',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}];
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
+const variables={...node,node_id:'variables'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
 const source=(fault.includes('late')?'/*'+'padding '.repeat(700)+'*/\n':'')
- +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared?'import * as fs from "builtIn/FS";\n':'')+'import {OutputTable} from "builtIn/Data";\n';
+ +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared&&!variableSource&&!tableRecovery?'import * as fs from "builtIn/FS";\n':'')
+ +(variableSource?'import {InputVariables,OutputTable} from "builtIn/Data";\nconst count=InputVariables.Items.Count.Value;\n':'import {OutputTable} from "builtIn/Data";\n');
 const callback=Promise.withResolvers();
 let wizard=false,stopped=false,operation,sourceAdapter;
 const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[
  {ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
 let graphReads=0;
 if(sourceExecution)graph.nodes=[];
+if(variableSource)graph.nodes.push({ref:variables,type:'variables.user',label:'Scenario variables',
+ position:{x:64,y:64},inputs:[],outputs:[],variable_outputs:[{kind:'variables',port:4,port_guid:'count-output'}]});
+if(recovering||refusing){
+ graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:{x:320,y:280},inputs:[0],outputs:[0],
+  ...(variableSource?{variable_inputs:[{kind:'variables',port:0,port_guid:'js-variable-input'}]}:{})});
+ if(variableSource)graph.variable_links=[{source:variables.node_id,output:4,target:node.node_id,input:0,kind:'variables',
+  source_port_guid:'count-output',target_port_guid:'js-variable-input'}];
+ if(tableRecovery)graph.nodes.push({ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]});
+}
+let persistedMode=fault==='refuse-configured-input'?'code':'blank',persistedSource='';
 if(guarded&&fault.includes('existing'))graph.nodes=[{ref:node,type:'programming.javascript',label:'Existing',position:{x:320,y:280},inputs:[0],outputs:[0]}];
 const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped&&fault==='owner'?'foreign':'js',verified:true,
  surface:wizard?'wizard':'graph',locked:stopped&&fault==='locked'},wizard:wizard?{status:'observed',root_ref:'wizard',root_tid:'W',
@@ -30,7 +46,7 @@ const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped
   if(result.wizard.status==='observed')result.wizard.stage=mappingDirection+'_mapping';
   result.node_mapping={...result.node_mapping,mapping_wizard:input?'TuneDataSourceMappingWizard':'DataSetOutputSocketWizard',
    node_context:{...node,verified:true,surface:'wizard',[mappingDirection+'_port']:{direction:mappingDirection,port:0,port_guid:input?'in-port':'out-port'}},
-   source_fields:input?[]:[field],target_fields:input?[]:[{...field,source:field}]};
+   source_fields:input&&!tableRecovery?[]:[field],target_fields:input&&!tableRecovery?[]:[{...field,source:field}]};
  }
  return result;};
 const procedure=await import('../../lib/node-procedure.mjs');
@@ -46,7 +62,24 @@ mock.module(new URL('../../lib/node-procedure.mjs',import.meta.url),{namedExport
 const managed=await import('../../lib/javascript-managed-source-adapter.mjs');
 mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.meta.url),{namedExports:{...managed,
  createJavascriptManagedSourceAdapter:()=>{
-  let active=false;const a={open:async({owner})=>{active=true;if(sourceExecution&&executed){nativeActive=false;calls.push('Settings-after-Execute');}
+  let active=false,draftMode;const a={open:async({owner,schemaMode='preserve',expectedSettings})=>{active=true;if(sourceExecution&&executed){nativeActive=false;calls.push('Settings-after-Execute');}
+   if(recovering||refusing){
+    calls.push('Open-'+schemaMode);
+    const schemaFor=mode=>{
+     const fields=mode==='declared'?[{record_id:'declared-key',Index:0,Name:'Key',DisplayName:'Key',DataType:4,DataKind:1,
+      UsageType:0,DefaultUsageType:0,Required:false,Broken:false}]:[];
+     return {verified:true,inventory_complete:true,form:'JavaScriptColumnsWizard',page_tid:'page',
+      node_context:{...owner,verified:true,surface:'wizard'},generation:{checked:mode==='code'},grids:[
+       {tid:'page;grdSourceColumns;tbl',count:0,total:0,fields:[]},
+       {tid:'page;grdTargetColumns;tbl',count:fields.length,total:fields.length,fields}]};
+    };
+    if(schemaMode!=='preserve')assert.equal(expectedSettings,
+     (await import('../../lib/javascript-source-admission.mjs')).javascriptSourceSettingsDigest(managed.javascriptManagedSourceSettings(schemaFor(persistedMode))));
+    draftMode=schemaMode==='preserve'?persistedMode:schemaMode;
+    const schema=schemaFor(draftMode);
+    return {owner,schema,settings:managed.javascriptManagedSourceSettings(schema),
+     ...(draftMode==='declared'?{declaredColumns:[{...columns[0],index:0,usage_type:0,default_usage_type:0,required:false}]}:{})};
+   }
    const schema=declared?{verified:true,inventory_complete:true,form:'JavaScriptColumnsWizard',page_tid:'page',
     node_context:{...owner,verified:true,surface:'wizard'},generation:{checked:false},grids:[
      {tid:'page;grdSourceColumns;tbl',count:0,total:0,fields:[]},
@@ -54,8 +87,10 @@ mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.met
       UsageType:0,DefaultUsageType:0,Required:false,Broken:false}]}]}:sourceExecution?{verified:true,node_context:{...owner,verified:true,surface:'wizard'},generation:{checked:true},grids:[]}:{};
    return {owner,settings:declared?managed.javascriptManagedSourceSettings(schema):sourceExecution?{generation:true,grids:[]}:{generation:true},schema,
     ...(declared?{declaredColumns:[{...columns[0],index:0,usage_type:0,default_usage_type:0,required:false}]}:{})};},
-   read:async handle=>({owner:handle.owner,settings:handle.settings,source}),replace:async()=>({draft_exact:true,source_sha256:createHash('sha256').update(source).digest('hex')}),
-   commit:async()=>{calls.push('Done');active=false;return {owned_done_settled:true,graph_owner_verified:true};},
+   read:async handle=>({owner:handle.owner,settings:handle.settings,source:recovering||refusing?persistedSource:source}),
+   replace:async()=>({draft_exact:true,source_sha256:createHash('sha256').update(source).digest('hex')}),
+   commit:async()=>{calls.push('Done');active=false;if(recovering){persistedMode=draftMode;persistedSource=source;}
+    return {owned_done_settled:true,graph_owner_verified:true};},
    discard:async handle=>{active=false;return {closed:true,owner:handle.owner};},
    get active(){return active||stopped&&fault==='opening';},get uncertain(){return stopped&&fault==='source-uncertain';}};
   sourceAdapter=a;return a;
@@ -80,6 +115,7 @@ const request={operation_id:'apply-js',contract_revision:'1.0.0',document_id:'do
 if(fault==='callback-active')request.budgets={configure_ms:500,execute_ms:500,total_ms:500};
 if(sourceExecution){request.inputs=[];request.parameters.input_state='unconnected';request.read.ports=[0];}
 if(declared){request.parameters.schema_mode='declared';request.parameters.columns=columns;}
+if(variableSource)request.variable_inputs=[{source:variables,output:4,input:0,kind:'variables'}];
 if(['declared-done-downstream','declared-stale-output'].includes(fault))request.read.ports=[];
 if(fault==='declared-done-downstream')request.finish='done';
 if(guarded&&fault.includes('existing')){
@@ -87,12 +123,26 @@ if(guarded&&fault.includes('existing')){
  if(fault.includes('replace'))request.parameters.expected_source_sha256=createHash('sha256').update(source).digest('hex');
  else {delete request.parameters.source_text;delete request.parameters.schema_mode;}
 }
+if(recovering||refusing){
+ request.target={kind:'existing',type:'programming.javascript',ref:node};
+ request.parameters.expected_source_sha256=createHash('sha256').update('').digest('hex');
+ if(tableRecovery){
+  request.inputs=[{source:{...node,node_id:'input'},input:0,output:0}];
+  delete request.parameters.input_state;
+ }
+ if(fault==='refuse-variable')delete request.variable_inputs;
+ if(fault==='refuse-blank'){request.parameters={input_state:'unconnected'};}
+ if(fault!=='recover-variable'){request.finish='done';request.read.ports=[];}
+}
 const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
  nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   operation=options.operation;return support.nodeApplyDriverFactory(options);},
  nodeTargetAdapterFactory:()=>({preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
-  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0]});
-   else if(e.kind==='connect')graph.links.push(e.parameters.edge);else assert.fail('Unexpected graph mutation '+e.kind);
+  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0],
+   ...(variableSource?{variable_inputs:[{kind:'variables',port:0}]}:{})});
+   else if(e.kind==='connect'&&e.parameters.edge.kind==='variables'){
+    graph.variable_links=[{...e.parameters.edge,source_port_guid:'count-output',target_port_guid:'js-variable-input'}];
+   }else if(e.kind==='connect')graph.links.push(e.parameters.edge);else assert.fail('Unexpected graph mutation '+e.kind);
    return {status:'SUCCEEDED',cleanup_complete:true};},observe:async()=>{
   const g=structuredClone(graph);if(stopped&&fault==='graph'&&graphReads++)g.nodes[0].label='foreign edit';return g;},
   verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow})}),
@@ -107,6 +157,29 @@ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map()
 runtime.startNodeApply(request);
 let job;
 do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
+if(recovering||refusing){
+ const result=job.outcome.output;
+ assert.equal(result.status,recovering?'SUCCEEDED':'FAILED',JSON.stringify(result));
+ assert.equal(result.pending_phase??null,null);
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(runtime.hasUnsettledWork(),false);
+ assert.equal(graph.nodes.filter(item=>item.type==='programming.javascript').length,1);
+ if(recovering){
+  assert.deepEqual(result.node,node);
+  assert.equal(result.configuration.readback.schema_mode,request.parameters.schema_mode);
+  assert.equal(executionCount,fault==='recover-variable'?1:0);
+  assert.equal(graph.links.length,tableRecovery?1:0);
+  assert.equal((graph.variable_links??[]).length,variableSource?1:0);
+ }else{
+  const receipt=events.find(event=>event.phase==='node_phase_refused')?.receipt;
+  assert.equal(receipt?.settings_unchanged,true);
+  assert.equal(receipt?.effect_possible,true);
+  assert.equal(result.effect_possible,true);
+  assert.deepEqual(calls,['Open-preserve']);
+  assert.equal(graph.links.length,0);
+ }
+ console.log(JSON.stringify({outcome:result}));process.exit(0);
+}
 if(sourceExecution){
  if(fault==='declared-execution-error'){
   const result=job.outcome.output;assert.equal(result.cleanup_complete,true,JSON.stringify(result));
@@ -142,6 +215,12 @@ if(sourceExecution){
  assert.equal(job.outcome.output.execution.execution_id,'execution-'+count);
  if(declared)assert.equal(calls.at(-1),'Execute','No source/mapping wizard may reopen after the sole execution');
  assert.equal(job.outcome.output.configuration.readback.input_state,'unconnected');
+ if(variableSource){
+  const mapping=job.outcome.output.configuration.readback.input_mapping;
+  assert.equal(mapping.no_incoming_links_verified,true);
+  assert.deepEqual(mapping.fields,[]);
+  assert.deepEqual(operation.targetPhase.result.variable_links,graph.variable_links);
+ }
  if(['source-reapply','declared-reapply'].includes(fault)){
   const second={...request,operation_id:'reapply-js',target:{kind:'existing',type:'programming.javascript',ref:node},
    parameters:{...request.parameters,expected_source_sha256:createHash('sha256').update(source).digest('hex')}};

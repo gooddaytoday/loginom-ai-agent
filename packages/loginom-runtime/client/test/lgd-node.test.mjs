@@ -136,7 +136,8 @@ test('LGD replacement requires an explicitly authorized own destination in every
  assert.doesNotThrow(()=>validateLgdExportParameters({},'native',existing,own));
 });
 test('LGD destination bindings require one exact variable and never accept a conflicting literal',()=>{
- const r=request('exports.lgd'),settings={compression:'lz4',checksum:'compressed',overwrite:'reject',bindings:{destination:{variable:'LgdPath'}}};
+ const r={...request('exports.lgd'),variable_inputs:[{kind:'variables',input:0,output:0}]};
+ const settings={compression:'lz4',checksum:'compressed',overwrite:'reject',bindings:{destination:{variable:'LgdPath'}}};
  assert.doesNotThrow(()=>validateLgdExportParameters({lgd_export:settings},'native',r));
  for(const bindings of [{destination:{variable:''}},{compression:{variable:'LgdPath'}},{destination:{variable:'LgdPath',value:'/test-2/out.lgd'}}])
   assert.throws(()=>validateLgdExportParameters({lgd_export:{...settings,bindings}},'native',r));

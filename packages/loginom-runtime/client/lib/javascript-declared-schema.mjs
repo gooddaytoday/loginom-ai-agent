@@ -3,6 +3,14 @@ const kinds={'Неопределенное':0,'Непрерывный':1,'Дис
 const usages={'Не задано':0,'Активное':3,'Выходное':4,'Группа':6,'Показатель':7,'Транзакция':8,'Элемент':9};
 const need=(value,message)=>{if(!value)throw Error(message);};
 
+export function isUnconfiguredJavascriptSchema(schema) {
+  if(schema?.verified!==true||schema.inventory_complete!==true||schema.form!=='JavaScriptColumnsWizard'
+    ||schema.generation?.checked!==false||typeof schema.page_tid!=='string'||!Array.isArray(schema.grids))return false;
+  const targets=schema.grids.filter(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl');
+  return targets.length===1&&targets[0].count===0&&targets[0].total===0
+    &&Array.isArray(targets[0].fields)&&targets[0].fields.length===0;
+}
+
 // Compare complete observed native declarations, never infer them from the JS
 // output. DefaultUsageType is the editor's setting; UsageType remains separate.
 export function readJavascriptDeclaredColumns(schema,columns) {

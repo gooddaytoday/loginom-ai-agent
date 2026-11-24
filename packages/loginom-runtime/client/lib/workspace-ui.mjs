@@ -421,17 +421,47 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // cannot be preempted; charge immediately after each native operation.
       const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
       // Checking all ~570 parts against every document element took 114 of
-      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
-      // matches only that element or its descendant: prefilter those once,
-      // keep other parts verbatim, then apply the full list to candidates.
-      // Same elements, same document order.
-      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
-      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
-      const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
-        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
-          .filter(element=>element.matches(guardSelector))
-        : document.querySelectorAll(guardSelector);
-      charge();for (const element of guards)if(addressedImportField(element))include(element);
+      // 306 ms per Files read (LAB-1188 profile). Broaden the wizard tid,
+      // but retain the descendant's selector so preview cells aren't candidates.
+      const guardParts=guardSelector.split(','),wizardTid='[data-tid*="WizrdMCF"]';
+      const guardCandidate=part=>{
+        const leading=/^\[data-tid[\^$*]?="[^"\\]*WizrdMCF[^"\\]*"\]/.exec(part);
+        if(!leading)return part;
+        const tail=part.slice(leading[0].length);
+        if(/^(?:\[data-tid[\^$*]?="[^"\\]*"\])*$/.test(tail))return wizardTid;
+        return /^ [a-z.#][\w.#-]*$/i.test(tail)?wizardTid+tail:part;
+      };
+      const tidPatterns=[],descendantOwners=[],nativeGuards=[],candidateSelectors=new Set();
+      for(const part of guardParts){
+        const literal=preparedNodeWizard&&/^\[data-tid([\^$*]?)="([^"\\\r\n\f\0]+)"\]( \[data-tid\])?$/.exec(part);
+        const descendants=literal?.[3];
+        candidateSelectors.add(descendants?'[data-tid]':guardCandidate(part));
+        if(!literal){nativeGuards.push(part);continue;}
+        const [,operator,value]=literal,escaped=value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        (descendants?descendantOwners:tidPatterns).push((operator===''||operator==='^'?'^':'')+escaped
+          +(operator===''||operator==='$'?'(?![\\s\\S])':''));
+      }
+      const tidGuard=tidPatterns.length?new RegExp(tidPatterns.join('|')):null,nativeGuard=nativeGuards.join(',');
+      const ownerGuard=descendantOwners.length?new RegExp(descendantOwners.join('|')):null;
+      const splitGuards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0);
+      const nativeMatches=splitGuards&&(tidGuard||ownerGuard)?new Set(document.querySelectorAll(nativeGuard)):null;
+      charge();
+      const guards=splitGuards
+        ? [...document.querySelectorAll([...candidateSelectors].join(','))]
+          .filter(element=>{
+            const tid=element.getAttribute('data-tid')??'';
+            // querySelectorAll is in document order. Collect typed descendants
+            // from their matching owner before visiting those descendants.
+            // A global "owner [data-tid]" union repeatedly walks the large,
+            // still-mounted import preview to find these unrelated controls.
+            if(ownerGuard?.test(tid)){
+              charge();for(const child of element.querySelectorAll('[data-tid]')){charge();nativeMatches.add(child);}
+            }
+            return addressedImportField(element)
+              &&(nativeMatches?nativeMatches.has(element)||tidGuard?.test(tid):element.matches(nativeGuard));
+          })
+        : [...document.querySelectorAll(guardSelector)].filter(addressedImportField);
+      charge();for (const element of guards)include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
       const tableOwners=document.querySelectorAll('[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid*=";ViewsForm;BrowseView-"]');
@@ -1480,6 +1510,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     scanStage='output_definitions';
     const factorLoadingsMapping=factorWizard&&wizard.stage==='binning_ranges_mapping';
+    let wideTextOutputGrid=null;
     if(wizard.status==='observed' && (['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
       const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
@@ -1536,6 +1567,26 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const body=unique('grdTargetColumns;tbl'),filter=unique('TargetFilter'),tableMode=unique('rbTable'),linksMode=unique('rbLinks');
       const roleGrid=forms[0]==='TuneDataSourceInputPortWizard';
       const auto=unique('btnAutoSyncThroughColumns');
+      const boundId=body?.getAttribute('id');
+      const textOutput=preparedNodeWizard && wizard.stage==='output_mapping' && forms[0]==='ColumnsMappingEngineOutputPortWizard';
+      const view=definitionPrefix&&(mappingPage||textOutput)&&boundId?globalThis.Ext?.getCmp?.(boundId):null;
+      const store=view?.el?.dom===body?view.getStore?.():null;
+      const localStore=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.();
+      if(textOutput && localStore) {
+        const count=store.getCount?.();
+        if(Number.isInteger(count) && count>64 && count<=1000) {
+          const importForms=document.querySelectorAll('[data-tid='+JSON.stringify(wizard.root_tid+';ImportTextFileParamsWizard')+']');charge();
+          if(importForms.length===1 && wizardForms[0].contains(importForms[0])) {
+            wideTextOutputGrid=body;
+            if(requestedRoot===wizardForms[0]) {
+              // Buffered rows can exhaust the ref cache during a read. Keep
+              // the still-owned root available for the bounded read retry.
+              const liveRef=new WeakRef(requestedRoot);
+              state.refs.delete(rootRef);state.refs.set(rootRef,liveRef);
+            }
+          }
+        }
+      }
       wizard.output_columns.auto_sync=auto?{status:'observed',value:auto.classList.contains('x-btn-pressed'),ref:refOf(auto)}:{status:'unobserved'};
       if(body && filter && tableMode && linksMode) {
         const containers=[...body.querySelectorAll('.x-grid-item-container')];charge();
@@ -1560,7 +1611,6 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const container=containers[0],cb=boxOf(container),bb=boxOf(body);
           const direct=[...container.children];charge();
           const bodyChildren=[...body.children];charge();
-          const boundId=body.getAttribute('id');
           const valid=boundId && inside(container,body) && geometryCheck(cb.y,bb.y,'container_top',container) && geometryCheck(cb.x,bb.x,'container_left',container)
             && direct.length===rows.length && direct.every(e=>rows.includes(e))
             && bodyChildren.every(e=>e===container || !visible(e))
@@ -1597,7 +1647,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const b=boxOf(e),p=boxOf(parent);
           return b.width>0 && b.height>0 && geometryInside(b,p,e,rightTolerance);
         };
-        const container=containers[0],boundId=body?.getAttribute('id');
+        const container=containers[0];
         const noEditors=!all.some(e=>{charge();return ((getTid(e)??'').startsWith(base+'grdTargetColumns;tbl;celleditor')
           || (['EditColumnDefForm','EditTuneColumnDefForm'].some(form=>getTid(e)===wizard.root_tid+';'+form||getTid(e)===form)))&&visible(e);});
         let complete=body && container && containers.length===1 && rows.length>0 && rows.length<=1000 && rows.length===fields.length
@@ -1634,9 +1684,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           && rows.length<=1000 && inputs.length===1 && String(inputs[0].value??'')===''
           && (roleGrid||tableMode?.classList.contains('x-form-cb-checked')) && !linksMode?.classList.contains('x-form-cb-checked')
           && noEditors && !dialogs.length && !select('.bg-mask-message,.x-mask-msg').some(visible)) {
-          const view=globalThis.Ext?.getCmp?.(boundId),store=view?.el?.dom===body?view.getStore?.():null;
-          const records=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.()
-            ?store.getData?.()?.items:null;
+          const records=localStore?store.getData?.()?.items:null;
           const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(forms[0]),groupIndices=new Map();
           // Grouped CollectionProxy totals count active fields or retain the
           // last load after a local removal. Accept only a complete unfiltered
@@ -2379,9 +2427,9 @@ function readRenderedInputMapping(observation) {
       if(importFieldBase===columnBase&&definitionElements.length>6000) {
         const error=new Error('Import definition inventory exceeds 1000 fields');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error;
       }
-      // Full native schema validation adds at most 1000 ms for 1000 fields.
-      // Generic scans retain 500 ms, and the element/work limits stay fixed.
-      if(importFieldBase===columnBase)maxMs+=Math.ceil(definitionElements.length/6);
+      // Native hit-testing also scales with the rendered preview. Allow up
+      // to 4 ms per field; generic time and the element/work limits stay fixed.
+      if(importFieldBase===columnBase)maxMs+=4*Math.ceil(definitionElements.length/6);
       const definitionTids=new Map();
       for(const element of definitionElements) {
         const tid=getTid(element),matches=definitionTids.get(tid)??[];matches.push(element);definitionTids.set(tid,matches);
@@ -3483,16 +3531,32 @@ function readRenderedInputMapping(observation) {
       const parent=horizontalOwner(element);
       return parent ? {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth} : null;
     };
-    const interactionOf = (element, accept) => {
+    const scrollHitBounds=memoRead(parent=>{
+      if(!parent||parent===document.body)return {left:-Infinity,right:Infinity,top:-Infinity,bottom:Infinity};
+      const bounds=scrollHitBounds(parent.parentElement),style=getComputedStyle(parent);
+      const clipsX=['auto','scroll','hidden'].includes(style.overflowX);
+      const clipsY=['auto','scroll','hidden'].includes(style.overflowY);
+      if(!clipsX&&!clipsY)return bounds;
+      const box=boxOf(parent);
+      if(![box.x,box.y,box.width,box.height].every(Number.isFinite))return bounds;
+      return {left:clipsX?Math.max(bounds.left,box.x):bounds.left,right:clipsX?Math.min(bounds.right,box.x+box.width):bounds.right,
+        top:clipsY?Math.max(bounds.top,box.y):bounds.top,bottom:clipsY?Math.min(bounds.bottom,box.y+box.height):bounds.bottom};
+    });
+    const interactionOf = (element, accept, clip, centerOnly=false) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
       if (box.x>=width || box.y>=height || box.x+box.width<=0 || box.y+box.height<=0) return {state:'outside_viewport',point:null};
-      const left=Math.max(0,box.x),right=Math.min(width,box.x+box.width),top=Math.max(0,box.y),bottom=Math.min(height,box.y+box.height);
+      const left=Math.max(0,box.x,clip?.left??0),right=Math.min(width,box.x+box.width,clip?.right??width),
+        top=Math.max(0,box.y,clip?.top??0),bottom=Math.min(height,box.y+box.height,clip?.bottom??height);
+      if(clip&&(left>=right||top>=bottom))return {state:'point_not_observed',point:null,covering:[]};
       const covering=[],seenCovering=new Set();
-      for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
+      const fractions=centerOnly?[0.5]:[0.5,0.25,0.75];
+      for (const y of fractions) for (const x of fractions) {
         charge();
-        const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
+        const point=centerOnly?{x:box.x+box.width/2,y:box.y+box.height/2}:{x:left+(right-left)*x,y:top+(bottom-top)*y};
+        if(centerOnly&&(point.x<0||point.x>=width||point.y<0||point.y>=height))break;
+        const hit=document.elementFromPoint(point.x,point.y);
         if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
@@ -3600,18 +3664,26 @@ function readRenderedInputMapping(observation) {
         ||preparedGraphTid&&getTid(element)?.startsWith(preparedGraphTid+';')
           &&/^(?:Input|Output)_(?:Data|Var)-[0-9]+$/.test(getTid(element).slice(preparedGraphTid.length+1))).slice(0,240):[]);
     const retainedControls=new Set([...requiredControls,...controls.filter(element=>!requiredControls.has(element)).slice(0,240-requiredControls.size)]);
+    const wideImport=preparedNodeWizard&&wizard.stage==='text_import_format'&&wizard.import_columns?.truncated===true;
     const elements = controls.filter(element=>retainedControls.has(element)).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
-      // Data-preview scrollers carry navigation identity, never row values.
-      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
+      // Scrollers carry navigation identity. The wide mapping grid's label
+      // would otherwise walk every buffered row.
+      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)||element===wideTextOutputGrid?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
       // A date string-format cell also holds the flag checkbox image: never
       // choose a point on that image, it would toggle the flag instead of editing.
-      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
+      const importCell=preparedNodeWizard&&importColumnCellRefs.has(state.ids.get(element));
+      const wideOutputCell=wideTextOutputGrid&&outputColumnCells.has(state.ids.get(element))&&wideTextOutputGrid.contains(element);
+      // The action guard already requires the center for the wizard's fixed
+      // controls. Native hit-testing of addressed cells uses their clipped box.
+      const centerOnly=(wideImport&&!importCell||wideTextOutputGrid&&!wideOutputCell)&&wizardForms[0].contains(element);
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined,
+        importCell||wideOutputCell?scrollHitBounds(element.parentElement):undefined,centerOnly);
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);

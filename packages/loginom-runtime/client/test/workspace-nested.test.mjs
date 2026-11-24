@@ -9,7 +9,7 @@ import {Page} from './support/workspace-ui-fixture.mjs';
 
 // LAB-1543 DOM: entering keeps TF-1 and changes breadcrumbs; service GUIDs
 // repeat. Leaving can retain the selected owner's breadcrumb.
-function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,loseDispatchReply=false,entryOnSelection=false,foreignSelection=false}={}) {
+function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,loseDispatchReply=false,entryOnSelection=false,foreignSelection=false,playwrightErrors=false}={}) {
   class PackageTreeNode {}; class WorkFlowTreeNode {}; class ModelForm {};
   const prefix='MF;TF-1',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
   const element=(tid,text='')=>({tid,textContent:text,isConnected:true,getAttribute:()=>tid,
@@ -63,7 +63,10 @@ function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,
   const context=vm.createContext({document,location:{origin:'https://app.loginom.ai'},getComputedStyle:()=>({visibility:'visible'}),
     __loginomDockPreparationV1:preparation,bg:{app}});
   const page={evaluate:(fn,args)=>{
-      const value=vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context);
+      let value;
+      // Playwright rethrows a page error as "page.evaluate: Error: <message>\n    at ...".
+      try{value=vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context);}
+      catch(error){if(playwrightErrors)throw Error('page.evaluate: Error: '+error.message+'\n    at eval (eval at evaluate (:291:30), <anonymous>:4:43)');throw error;}
       if(loseDispatchReply&&args?.mode==='dispatch'){loseDispatchReply=false;throw Error('lost dispatch reply');}
       return value;
     },
@@ -218,5 +221,42 @@ test('NW1 same operation never repeats a completed navigation; foreign/stale ref
   assert.equal(f.clicks(),1);
   const stale=await f.navigate(f.ref,'enter','different');
   assert.equal(stale.status,'NOT_READY');assert.equal(stale.effect_possible,false);
+  assert.equal(f.clicks(),1);
+});
+
+// Review 2 of #1280: graph navigation is a NEW operation too. Behind another
+// operation's pending or replaced session restore it makes no gesture and
+// asks for a reload, like dock_prepare's reserve.
+for(const restore of [{pending:true},{pending:false,replaced:true}])test('NW1 graph navigation is refused behind an unresolved session restore: '+JSON.stringify(restore),async()=>{
+  const f=fixture({entryOnSelection:true});
+  f.preparation.receipts.set('restoring',{phase:'reserved',restore:{prompt:{},...restore}});
+  const refused=await f.navigate(f.ref);
+  assert.equal(refused.status,'NOT_READY',JSON.stringify(refused));assert.equal(refused.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(refused.connection_restore,'restore_unresolved');assert.equal(refused.effect_possible,false);
+  assert.equal(refused.next_step.new_operation_id_required,true);assert.match(refused.message,/reload the Loginom page/);
+  assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+  f.preparation.receipts.get('restoring').restore={prompt:{},pending:false};
+  assert.equal((await f.navigate(f.ref,'enter','after-settle')).status,'READY');
+});
+
+// Review 4 of #1280: the refusal stays structural with Playwright's error prefix.
+test('NW1 graph navigation refusal behind a session restore survives the Playwright error prefix',async()=>{
+  const f=fixture({entryOnSelection:true,playwrightErrors:true});
+  f.preparation.receipts.set('restoring',{phase:'reserved',restore:{prompt:{},pending:false,replaced:true}});
+  const refused=await f.navigate(f.ref);
+  assert.equal(refused.status,'NOT_READY',JSON.stringify(refused));assert.equal(refused.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(refused.connection_restore,'restore_unresolved');assert.equal(refused.effect_possible,false);
+  assert.equal(refused.next_step.new_operation_id_required,true);
+  assert.equal(f.clicks(),0);assert.equal(f.selections(),0);
+});
+
+// Review 3 of #1280: replaying a completed navigation is an operation too.
+for(const restore of [{pending:true},{pending:false,replaced:true}])test('NW1 replay of a completed navigation is refused behind an unresolved session restore: '+JSON.stringify(restore),async()=>{
+  const f=fixture(),entered=await f.navigate(f.ref);
+  assert.equal(entered.status,'READY',JSON.stringify(entered));
+  f.preparation.receipts.set('restoring',{phase:'reserved',restore:{prompt:{},...restore}});
+  const replay=await f.navigate(f.ref);
+  assert.equal(replay.status,'NOT_READY',JSON.stringify(replay));assert.equal(replay.reason,'NATIVE_MESSAGE_BOX_BLOCKED');
+  assert.equal(replay.connection_restore,'restore_unresolved');assert.equal(replay.workflow_ref,undefined);
   assert.equal(f.clicks(),1);
 });
