@@ -320,6 +320,20 @@ test("admission preserves an interrupted slot when its cleanup or release bindin
   } finally { await rm(item.root, { recursive: true, force: true }) }
 })
 
+test("startup refuses a released profile receipt bound to a different command", async () => {
+  const item = await interruptedSlotRelease()
+  try {
+    const profile = { key: `profile:${item.file.slots[0]!.profileDir}`, lockRoot: item.lockRoot }
+    const previous = (await readResourceReservation(profile))!
+    const receipt = path.join(item.lockRoot, `${new Bun.CryptoHasher("sha256").update(profile.key).digest("hex")}.reservation.json`)
+    await writeLeaseReceipt(receipt, { ...previous, commandId: "unrelated-fixture-command" })
+    const server = { key: `server:${identity.containerId}`, lockRoot: item.lockRoot }
+    const before = await readResourceReservation(server)
+    await expect(reopenEnvironmentLeases(item.file, identity, item.lockRoot)).rejects.toThrow("STARTUP_OWNERSHIP_UNCONFIRMED")
+    expect(await readResourceReservation(server)).toEqual(before)
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
 async function releaseFixtureServer(item: Awaited<ReturnType<typeof interruptedSlotRelease>>) {
   const reopened = (await reopenEnvironmentLeases(item.file, identity, item.lockRoot))!
   try {
