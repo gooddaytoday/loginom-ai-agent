@@ -174,6 +174,8 @@ test('text export context retains the diagram port and its separate wizard index
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
  p.opening.port.FPortIndex=0;
  p.portTree.FIndex=0;
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);
+ collection.FItems.reverse();
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
 });
 

@@ -477,61 +477,28 @@ function textExportFixture(wizardIndex=0) {
  return f;
 }
 
-for(const index of [0,1])test('text export waits for its owned tree index to initialize to '+index,async()=>{
+for(const index of [0,1])test('text export confirms its owned slot without materializing lazy FIndex '+index,async()=>{
  const f=textExportFixture(index);f.portTree.FIndex=null;
- const evaluate=f.page.evaluate;let samples=0;
- f.page.evaluate=async(fn,arg)=>{
-  const result=await evaluate(fn,arg);
-  if(arg.mode==='finish'&&result.reason==='port_wizard_index_pending'&&++samples===3)f.portTree.FIndex=index;
-  return result;
- };
+ f.task.deadline=Date.now()+150;
  const r=await f.run();
  assert.equal(r.status,'SUCCEEDED',r.error);
  assert.equal(r.native_index,0);assert.equal(r.wizard_index,index);
- assert.equal(samples,3);assert.equal(f.gestures.length,2);
- assert.equal(r.trace.find(t=>t.event==='input_port_wizard_index_pending').samples,3);
+ assert.equal(f.portTree.FIndex,null);assert.equal(f.gestures.length,2);
+ f.portTree.FIndex=1-index;
+ const replay=await f.run();assert.equal(replay.status,'SUCCEEDED',replay.error);
+ assert.equal(replay.wizard_index,index);assert.equal(f.gestures.length,2);
 });
 
-for(const fault of ['persistent','port','wizard','collection','wrong-index','verified'])test('text export index settlement retains fail-closed '+fault,async()=>{
+for(const fault of ['port','wizard','collection','slot'])test('text export retains its verified slot and owner: '+fault,async()=>{
  const f=textExportFixture();
- if(fault==='verified')assert.equal((await f.run()).status,'SUCCEEDED');
- f.portTree.FIndex=null;f.task.deadline=Date.now()+150;
- const evaluate=f.page.evaluate;let samples=0;
- f.page.evaluate=async(fn,arg)=>{
-  const result=await evaluate(fn,arg);
-  if(arg.mode==='finish'&&result.reason==='port_wizard_index_pending'&&++samples===1){
-   if(fault==='port')f.port.data={};
-   if(fault==='wizard')f.card.Controller.FController=Object.assign(Object.create(Object.getPrototypeOf(f.wizard)),f.wizard);
-   if(fault==='collection'){
-    const group=f.portTree.ParentNode;group.FSubNodes={...group.FSubNodes};f.portTree.FCollection=group.FSubNodes;
-   }
-   if(fault==='wrong-index')f.portTree.FIndex=1;
-  }
-  return result;
- };
- const r=await f.run();
- assert.equal(r.status,'AMBIGUOUS');assert.equal(r.verified,false);assert.equal(f.gestures.length,2);
- if(fault==='verified')assert.equal(samples,0);
-});
-
-test('text export bounds index settlement at 15 seconds without extending the task deadline',async t=>{
- t.mock.timers.enable({apis:['Date'],now:100000});
- const f=textExportFixture();f.portTree.FIndex=null;
- const deadline=f.task.deadline;
- let started;
- const evaluate=f.page.evaluate;
- f.page.evaluate=async(fn,arg)=>{
-  const result=await evaluate(fn,arg);
-  if(result?.reason==='port_wizard_index_pending')started??=Date.now();
-  return result;
- };
- f.page.waitForTimeout=async ms=>{
-  t.mock.timers.tick(ms);
-  if(started&&Date.now()-started>=15000)f.portTree.FIndex=0;
- };
- const r=await f.run();
- assert.equal(r.status,'AMBIGUOUS');assert.match(r.error,/Port wizard index did not settle/);
- assert.equal(Date.now()-started,15000);assert.equal(f.task.deadline,deadline);assert.equal(f.gestures.length,2);
+ assert.equal((await f.run()).status,'SUCCEEDED');
+ if(fault==='port')f.port.data={};
+ if(fault==='wizard')f.card.Controller.FController=Object.assign(Object.create(Object.getPrototypeOf(f.wizard)),f.wizard);
+ if(fault==='collection'){
+  const group=f.portTree.ParentNode;group.FSubNodes={...group.FSubNodes};f.portTree.FCollection=group.FSubNodes;
+ }
+ if(fault==='slot')f.portTree.FCollection.FItems.unshift({FModelNodePort:{}});
+ const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(r.verified,false);assert.equal(f.gestures.length,2);
 });
 
 for(const hidden of [true,false])for(const wizardIndex of [0,1])test(`text export binds its cached input tree at index ${wizardIndex}, hidden=${hidden}`,async()=>{
@@ -556,25 +523,24 @@ for(const hidden of [true,false])for(const wizardIndex of [0,1])test(`text expor
  assert.equal(f.gestures.length,2);
 });
 
-test('text export rejects an index inconsistent with its cached input collection',async()=>{
+test('text export uses the owned collection slot even when the numeric index cache is stale',async()=>{
  const f=textExportFixture();
  await f.page.evaluate(()=>{globalThis.bg.app.IsFileConnectionHidden=true;},null);
  f.portTree.FIndex=2;
- assert.match((await f.run()).error,/Opened port wizard owner differs/);
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.wizard_index,0);
 });
 
-for(const fault of ['missing','foreign-root','foreign-collection','foreign-parent','wrong-slot','duplicate-port','duplicate-tree','unbounded','fractional','negative'])test('text export rejects unproven cached tree ownership: '+fault,async()=>{
+for(const fault of ['missing','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree','unbounded','non-array'])test('text export rejects unproven cached tree ownership: '+fault,async()=>{
  const f=textExportFixture(1),group=f.portTree.ParentNode;
  if(fault==='missing')delete group.FSubNodes;
  if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
  if(fault==='foreign-collection')f.portTree.FCollection={};
  if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
- if(fault==='wrong-slot')group.FSubNodes.FItems.reverse();
+ if(fault==='missing-tree')group.FSubNodes.FItems[1]={FModelNodePort:{}};
  if(fault==='duplicate-port')group.FSubNodes.FItems[0].FModelNodePort=f.port.data;
  if(fault==='duplicate-tree')group.FSubNodes.FItems[0]=f.portTree;
  if(fault==='unbounded')group.FSubNodes.FItems.length=101;
- if(fault==='fractional')f.portTree.FIndex=0.5;
- if(fault==='negative')f.portTree.FIndex=-1;
+ if(fault==='non-array')group.FSubNodes.FItems={0:f.portTree,length:1};
  assert.match((await f.run()).error,/Opened port wizard owner differs/);
 });
 test('unresolved opposite-direction port opening prevents a new gesture',async()=>{
