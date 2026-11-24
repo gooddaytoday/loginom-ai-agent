@@ -82,7 +82,24 @@ export async function openReferenceFile(snapshot,{signal}={}) {
     checkAbort(signal);
     file=await open(snapshot.canonical_path,constants.O_RDONLY|(constants.O_NOFOLLOW??0)|(constants.O_NONBLOCK??0));
     await verify();
-    return {verify,close:()=>file.close()};
+    return {
+      verify,
+      async readBytes(maxBytes) {
+        if(!Number.isSafeInteger(maxBytes)||maxBytes<0)fail('LOGINOM_INPUT_INVALID');
+        if(snapshot.size>maxBytes)fail('LOGINOM_FILE_TOO_LARGE');
+        const bytes=Buffer.alloc(snapshot.size);
+        let offset=0;
+        while(offset<bytes.length) {
+          checkAbort(signal);
+          const {bytesRead}=await file.read(bytes,offset,bytes.length-offset,offset);
+          if(!bytesRead)fail('LOGINOM_FILE_CHANGED');
+          offset+=bytesRead;
+        }
+        await verify();
+        return bytes;
+      },
+      close:()=>file.close(),
+    };
   } catch(error) { await file?.close();mapError(error,true); }
 }
 

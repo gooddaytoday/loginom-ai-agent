@@ -2,11 +2,13 @@ import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { mkdir, open, readFile, readdir, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
+import { inspectReferenceFile, openReferenceFile } from "../../../loginom-runtime/client/lib/file-reference.mjs"
 import { resolveTextImportEncoding } from "../../../loginom-runtime/client/lib/text-import-encoding.mjs"
 import type { XlsxOptions } from "./loginom-file-xlsx"
 
 const MiB = 1024 * 1024
 const MAX_BYTES = 8 * MiB
+export const MAX_BYTE_ADMISSION = 16 * MiB
 const BLOCK = 256 * 1024
 const SQLITE_HEADER = Buffer.from("SQLite format 3\x00")
 // Include the binary bytes after BGDATA so a text column named BGDATA cannot match.
@@ -150,10 +152,19 @@ export async function loadProfile(id: string, dir: string): Promise<Stored> {
 // Private backend receipt: the model supplies only an ID, never a row count.
 export async function exactScanReceipt(id: string, dir: string) {
   const p = await loadProfile(id, dir)
-  await unchanged(p)
-  if (p.scan?.status !== "exact" || p.scan.first_violation || !Number.isSafeInteger(p.scan.records)
-    || p.scan.records! < 0 || !/^[a-f0-9]{64}$/.test(p.scan.sha256 ?? "")) return undefined
-  return { profile_id: p.profile_id, records: p.scan.records!, sha256: p.scan.sha256!,
+  const scan = p.scan
+  const exact =
+    scan?.status === "exact" &&
+    !scan.first_violation &&
+    Number.isSafeInteger(scan.records) &&
+    scan.records! >= 0 &&
+    /^[a-f0-9]{64}$/.test(scan.sha256 ?? "")
+  await unchanged(p).catch(async (error) => {
+    if (p.format !== "xlsx" || !exact || !(await matchesExactWorkbookBytes(p.source, p.identity, () => scan.sha256)))
+      throw error
+  })
+  if (!exact) return undefined
+  return { profile_id: p.profile_id, records: scan.records!, sha256: scan.sha256!,
     bytes: p.identity.size, identity: p.identity, basis: "backend_exact_scan" as const,
     ...(p.format === "xlsx" ? { xlsx: { sheet_name: p.sheet!.name, sheet_index: p.sheets!.findIndex(s => s.name === p.sheet!.name) + 1,
       header_rows: p.header_rows!, blank_rows: p.blank_rows! } } : {}) }
@@ -161,12 +172,13 @@ export async function exactScanReceipt(id: string, dir: string) {
 
 // Only exact scans for this original identity constrain full-file staging.
 // Neither the model nor a quick profile can supply a trusted full-file digest.
-export async function exactFileDigest(expected: Identity, dir: string) {
+export async function exactFileDigest(expected: Identity, dir: string, format?: "xlsx") {
   const names = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return []
     throw error
   })
   const digests = new Set<string>()
+  let matchedFormat = format === undefined
   for (const name of names) {
     if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue
     const profile = await loadProfile(name.slice(0, -5), dir)
@@ -179,9 +191,46 @@ export async function exactFileDigest(expected: Identity, dir: string) {
     if (profile.scan?.status !== "exact") continue
     if (!/^[a-f0-9]{64}$/.test(profile.scan.sha256 ?? "")) throw Error("LOGINOM_FILE_CHANGED")
     digests.add(profile.scan.sha256!)
+    matchedFormat ||= profile.format === format
   }
   if (digests.size > 1) throw Error("LOGINOM_FILE_CHANGED")
-  return digests.values().next().value
+  return matchedFormat ? digests.values().next().value : undefined
+}
+
+// A trusted exact scan can resolve a timestamp change on the same small workbook.
+// Check the held handle and path around the read, then bind any bytes being admitted to that scan too.
+export async function matchesExactWorkbookBytes(
+  path: string,
+  expected: Pick<Identity, "canonical_path" | "file_id" | "size">,
+  digest: () => string | undefined | Promise<string | undefined>,
+  admissionBytes?: Buffer,
+) {
+  if (expected.size > MAX_BYTE_ADMISSION || !/^\d+:[1-9]\d*$/.test(expected.file_id)) return false
+  try {
+    const current = await inspectReferenceFile(path)
+    if (
+      current.canonical_path !== expected.canonical_path ||
+      current.file_id !== expected.file_id ||
+      current.size !== expected.size
+    )
+      return false
+
+    const sha256 = await digest()
+    if (!sha256 || !/^[a-f0-9]{64}$/.test(sha256)) return false
+    const file = await openReferenceFile({ ...current, sha256 })
+    try {
+      const bytes = await file.readBytes(MAX_BYTE_ADMISSION)
+      return (
+        (await realpath(path)) === current.canonical_path &&
+        (!admissionBytes || bytes.equals(admissionBytes)) &&
+        createHash("sha256").update(bytes).digest("hex") === sha256
+      )
+    } finally {
+      await file.close()
+    }
+  } catch {
+    return false
+  }
 }
 
 function decode(bytes: Buffer, encoding: Encoding, partial = false) {

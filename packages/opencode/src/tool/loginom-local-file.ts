@@ -25,7 +25,7 @@ import {
   type FileReference,
   type ReferenceSnapshot,
 } from "@loginom-ai-agent/loginom-host/file-reference"
-import { exactFileDigest } from "./loginom-file-profile-core"
+import { exactFileDigest, matchesExactWorkbookBytes, MAX_BYTE_ADMISSION } from "./loginom-file-profile-core"
 
 const sampleReceipt = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ path: Schema.String, manifest: Schema.Struct({ sha256: Schema.String }) })),
@@ -90,7 +90,7 @@ export const admitLoginomLocalFile = Effect.fn("Loginom.admitLocalFile")(functio
     try: () => inspectReferenceFile(source.canonicalPath),
     catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
   })
-  if (identity.size > 16 * 1024 * 1024) {
+  if (identity.size > MAX_BYTE_ADMISSION) {
     const key = JSON.stringify([ctx.sessionID, userMessage, identity])
     const cache = admittedReferences.get(host) ?? new Map()
     admittedReferences.set(host, cache)
@@ -101,10 +101,10 @@ export const admitLoginomLocalFile = Effect.fn("Loginom.admitLocalFile")(functio
     return result
   }
   const bytes = yield* Effect.tryPromise({
-    try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
+    try: () => fileSnapshot(source.canonicalPath, MAX_BYTE_ADMISSION),
     catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
   })
-  yield* source.verifyAttachment()
+  yield* source.verifyAttachment(bytes)
   const artifacts = yield* Effect.tryPromise({
     try: () =>
       host.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [
@@ -169,19 +169,19 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
     .access(canonicalPath, { readable: true })
     .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))
   const history = yield* sessions.messages({ sessionID: ctx.sessionID })
+  const profiles = join(Global.Path.data, "file-profiles", ctx.sessionID)
   // A completed tool result is the session-owned record of issuance. A filename
   // or a manifest sitting in file-profiles alone cannot grant access.
   const sampled = yield* Effect.gen(function* () {
-    const dir = join(Global.Path.data, "file-profiles", ctx.sessionID)
     if (
       path.split(/[\\/]/).includes("..") ||
       relative(sourcePath, canonicalPath) !== "" ||
-      relative(dir, dirname(sourcePath)) !== "" ||
-      relative(dir, dirname(canonicalPath)) !== ""
+      relative(profiles, dirname(sourcePath)) !== "" ||
+      relative(profiles, dirname(canonicalPath)) !== ""
     )
       return false
-    const realDir = yield* fs.realPath(dir).pipe(Effect.orElseSucceed(() => undefined))
-    if (!realDir || relative(dir, realDir) !== "") return false
+    const realDir = yield* fs.realPath(profiles).pipe(Effect.orElseSucceed(() => undefined))
+    if (!realDir || relative(profiles, realDir) !== "") return false
     const receipts = history.flatMap((message) =>
       message.info.role !== "assistant"
         ? []
@@ -222,15 +222,29 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
       yield* checkDeny(attachedPath)
       yield* checkDeny(receipt.identity.canonical_path)
       return {
-        verify: () =>
+        verify: (bytes?: Buffer) =>
           Effect.tryPromise({
-            try: () => verifyAttachmentReceipt(id, attachedPath, owner),
+            try: () =>
+              verifyAttachmentReceipt(id, attachedPath, owner).catch(async (error) => {
+                if (
+                  error.message === "LOGINOM_FILE_CHANGED" &&
+                  (await matchesExactWorkbookBytes(
+                    attachedPath,
+                    receipt.identity,
+                    () => exactFileDigest(receipt.identity, profiles, "xlsx"),
+                    bytes,
+                  ))
+                )
+                  return
+                throw error
+              }),
             catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + attachedPath),
           }),
       }
     }),
   )
-  const verifyAttachment = () => Effect.forEach(attached, (entry) => (entry ? entry.verify() : Effect.void))
+  const verifyAttachment = (bytes?: Buffer) =>
+    Effect.forEach(attached, (entry) => (entry ? entry.verify(bytes) : Effect.void))
   yield* verifyAttachment()
   if (!sampled && !attached.some(Boolean))
     yield* Effect.gen(function* () {
