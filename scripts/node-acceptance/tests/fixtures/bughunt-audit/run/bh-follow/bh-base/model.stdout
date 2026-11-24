@@ -1,0 +1,15 @@
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_apply", "state": {"status": "completed", "input": {"target": {"kind": "new", "type": "transform.sorting"}, "operation_id": "create-one"}, "output": "{\"status\": \"SUCCEEDED\", \"node\": {\"node_id\": \"sort-one\"}}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_read", "state": {"status": "completed", "input": {"node": {"b": 2, "a": 1}}, "output": "{\"status\": \"FAILED\", \"error\": {\"code\": \"BAD_INPUT\"}}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_read", "state": {"status": "completed", "input": {"node": {"a": 1, "b": 2}}, "output": "{\"status\": \"REJECTED\", \"code\": \"DENIED\"}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_operation_recover", "state": {"status": "completed", "input": {}, "output": "{}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_browser_recovery", "state": {"status": "completed", "input": {}, "output": "{}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_operation_inspect", "state": {"status": "completed", "input": {}, "output": "{}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_delete", "state": {"status": "completed", "input": {"node": {"node_id": "sort-one"}}, "output": "{\"status\": \"SUCCEEDED\"}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_read", "state": {"status": "completed", "input": {"node": "export"}, "output": "{\"status\": \"SUCCEEDED\", \"output\": {\"file_artifacts\": [{\"destination\": \"/synthetic/forbidden-result.csv\"}], \"ports\": [{\"path\": \"/synthetic/not-a-delivery.csv\"}]}}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "bash", "state": {"status": "completed", "input": {"command": "echo synthetic"}, "output": "{}"}}}
+{"type": "tool_use", "part": {"type": "tool", "tool": "write", "state": {"status": "completed", "input": {"content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxhidden-marker", "filePath": "/synthetic/note.txt"}, "output": "{}"}}}
+{"type": "step_finish", "part": {"tokens": {"input": 10, "output": 5, "reasoning": 1, "cache": {"read": 3, "write": 2}}, "cost": 0.01}}
+{"type": "step_finish", "part": {"tokens": {"input": 5, "output": 4, "reasoning": 2, "cache": {"read": 5}}, "cost": 0.02}}
+{"type": "text", "part": {"text": "Earlier text"}}
+{"type": "text", "part": {"text": "Final synthetic answer"}}
+{"type": "session.status", "status": {"type": "idle"}}

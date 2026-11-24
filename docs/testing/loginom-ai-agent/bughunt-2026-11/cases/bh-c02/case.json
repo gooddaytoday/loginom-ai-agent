@@ -1,0 +1,19 @@
+{
+  "budget": {
+    "max_tool_calls": 65,
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "One new filter this turn; preserve GUIDs of import/calculator/group/export. Base runs first in the same chat.",
+  "base": "bh-c01",
+  "input_files": []
+}
