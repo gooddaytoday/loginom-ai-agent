@@ -70,8 +70,10 @@ export function enrichOutputFields(c){
  for(const m of c.mappings)for(const source of m.unmatched){
   const f=c.input_fields[m.port].find(f=>f.name===source);need(f,'Enrich non-key source disappeared');
   const base=(c.prefixes.enabled?c.prefixes.name:'')+f.name;
-  let result=base,index=1;
-  while(names.has(result.toLowerCase()))result=base+'_'+index++;
+  // Loginom increments a trailing number before trying the next free name.
+  const suffix=/[0-9]+$/.exec(base),stem=suffix?base.slice(0,suffix.index):base+'_';
+  let result=base,index=suffix?BigInt(suffix[0])+1n:1n;
+  while(names.has(result.toLowerCase()))result=stem+index++;
   names.add(result.toLowerCase());
   fields.push({name:result,label:(c.prefixes.enabled?c.prefixes.label:'')+f.label,type:f.type,used:true});
  }

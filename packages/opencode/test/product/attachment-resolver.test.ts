@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { Effect } from "effect"
+import { createAttachmentReceipt, attachmentReceiptSource } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { MessageID, SessionID } from "@/session/schema"
 import { attachmentResolver } from "../../src/product/attachment-resolver"
 
@@ -55,6 +56,23 @@ describe("attachmentResolver", () => {
     expect(
       resolver.subtaskText({ type: "file", mime: "application/x-loginom-package", url: "data:;base64,AA==" }),
     ).toEqual([])
+  })
+
+  test("binary references direct the model to admission instead of CSV/XLSX profiling", async () => {
+    const { filepath, url } = await attached("source.db", "binary data")
+    const reference = await createAttachmentReceipt(filepath)
+    const parts = await Effect.runPromise(
+      resolver.referenceParts(
+        { type: "file", mime: "application/octet-stream", url: url.href, source: attachmentReceiptSource(reference) },
+        filepath,
+        url,
+        owner,
+      ),
+    )
+    const text = parts?.filter((part) => part.type === "text").map((part) => part.text).join("\n")
+    expect(text).toContain(filepath)
+    expect(text).toContain("loginom_file_admit")
+    expect(text).not.toContain("loginom_file_profile")
   })
 
   test("the original bytes of a CLI attachment are the only source of the preview and the data URL", async () => {

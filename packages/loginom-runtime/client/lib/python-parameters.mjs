@@ -1,4 +1,4 @@
-import {inspectPythonSourcePolicy} from './python-source-policy.mjs';
+import {inspectPythonSourcePolicy,PYTHON_SOURCE_LIMITS} from './python-source-policy.mjs';
 
 // Executable rewrite advice for the module-member allowlist refusals.
 const pythonRefusalHint=reason=>{
@@ -42,6 +42,9 @@ export function validatePythonParameters(p,mode,r){
   }
   if(p.source_text!==undefined){
     const policy=inspectPythonSourcePolicy(p.source_text);
+    if(policy.reason==='source_bounds')throw Error('Python: source refused by '+policy.policy+' (source_bounds). '
+      +'source_text must be valid Unicode with LF line endings and no NUL, at most '
+      +PYTHON_SOURCE_LIMITS.utf16+' characters and '+PYTHON_SOURCE_LIMITS.lines+' lines.');
     need(policy.status==='ADMITTED','source refused by '+policy.policy+' ('+policy.reason+(policy.line?' at line '+policy.line:'')+')'+pythonRefusalHint(policy.reason)+'. Imports: builtin_data, builtin_pandas_utils, pandas, numpy, math, cmath, datetime, decimal, fractions, statistics, re, json, itertools, functools, collections, random; ASCII code outside strings and comments; known file, network, process, environment and reflection names (read_*, to_*, load, dump, io, lib, dunder names, also inside strings) are refused');
   }
   need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'one optional table input at port 0');

@@ -59,6 +59,7 @@ export async function configureTextImportTitle(channel,title) {
 }
 // Native «Автоопределение столбцов» labels. An omitted mode keeps native settings.
 export const autoDetectLabels={none:'Нет',new:'Только новые',all:'Все'};
+const delimiterLabels={';':'Точка с запятой',',':'Запятая','\t':'Символ табуляции',' ':'Пробел'};
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
 export const fileInfoLabels={none:'Нет',name:'Имя файла',relative_path:'Относительный путь',absolute_path:'Абсолютный путь',
@@ -302,7 +303,7 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
 // The new phase ends at the configured format page. Mapping, finish and run
 // belong to the enclosing node operation; no wizard reopen occurs here.
 export const configureTextImportFields=(channel,parameters,owner,{boundSource=false}={})=>configureImport(channel,parameters,owner,true,undefined,boundSource);
-export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false,boundSource=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema},boundSource);
+export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false,boundSource=false,captureOutputLayout}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema,captureOutputLayout},boundSource);
 export const configureTextImportDraft=(channel,parameters,owner)=>configureImport(channel,parameters,owner,false);
 
 export function bindImportSourceColumns(requested,observed) {
@@ -576,7 +577,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   };
   // Read the existing schema before changing parsing options: Loginom may
   // regenerate definitions when the source, header or delimiter changes.
-  if(patch&&Object.keys(parameters.source).length) {
+  const replacingSource=patch&&!patch.preserveSchema&&!boundSource&&parameters.source.source_path!==undefined
+    &&parameters.source.source_path!==sourceBaseline.fields.source_path.value;
+  if(patch&&Object.keys(parameters.source).length&&!replacingSource) {
     await next('text_import_file','text_import_format');
     await capturePatchSchema();
     await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner:currentOwner,read,ready:isTextImportSourceReady});
@@ -626,7 +629,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(!Object.hasOwn(parameters.source,'rows_to_skip')&&skip?.status==='observed'&&/^[0-9]+$/.test(skip.value))
       parameters.source.rows_to_skip=requested.source.rows_to_skip=Number(skip.value);
     const preview=(await read('text_import_format','initial import preview defaults')).wizard.settings;
-    const labels={delimiter:{'Точка с запятой':';','Запятая':',','Символ табуляции':'\t','Пробел':' '},
+    const labels={delimiter:Object.fromEntries(Object.entries(delimiterLabels).map(([value,label])=>[label,value])),
       decimal_separator:{'Точка (.)':'.','Запятая (,)':','},
       text_qualifier:{'Двойная кавычка (")':'"',"Одинарная кавычка (')":"'",'Обратная кавычка (`)':'`','Нет':''}};
     for(const name of ['delimiter','decimal_separator','null_marker','text_qualifier']) {
@@ -641,12 +644,17 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       throw new ImportInitialSettingsError('Format parameters are incomplete');
   }
   if(patch&&!columnBaseline)await capturePatchSchema();
+  // Capture the retained output layout only after the verified replacement
+  // file can be parsed, before applying format/type/column changes.
+  if(patch?.captureOutputLayout)await patch.captureOutputLayout();
   const formatRequested=k=>Object.hasOwn(parameters.format,k)||k==='analysis_rows'&&parameters.analysis?.rows!==undefined;
+  let delimiterChanged=false;
   // The mode is chosen after parsing settings; analysis and refresh follow it.
   for (const [name, requested] of Object.entries(parameters.format).sort(([a],[b])=>(a==='auto_detect_columns')-(b==='auto_detect_columns'))) {
     const text=name==='auto_detect_columns'?autoDetectLabels[requested]:requested;
     let s = await read('text_import_format'); const f = field(s, name);
     if (f.value === text) continue;
+    if(name==='delimiter')delimiterChanged=f.value!==delimiterLabels[requested];
     if(name==='multiple_delimiters'||name==='variant_as_general_type'){
       await act(s,{verb:'set_checked',ref:f.display_ref,checked:text});
       await read('text_import_format','format checkbox applied',state=>state.wizard.settings?.fields[name]?.value===text);
@@ -675,7 +683,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     } else await setImportFormatField(channel,s,name,text);
   }
   // Loginom Help / import/txt and E2E sColumnDefsTuning.toolbar: RefreshAll, RefreshData.
-  const refreshDefinitions=async(button,what)=>{
+  const refreshDefinitions=async(button,what,expectedCount)=>{
     const suffix='ImportTextFileParamsWizard;ColumnDefsTuning;'+button;
     const refreshReady=state=>{
       const w=state.wizard;
@@ -686,7 +694,12 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     // Refresh can encounter the same late format repaint as Back. Reuse
     // epoch confirmation and the bounded no-effect recovery, never replay a click.
     const confirmIdentity=state=>state.dom_epoch;
-    const before=await read('text_import_format',what+' refresh available',refreshReady,{confirmIdentity});
+    const layoutSettled=state=>expectedCount!==undefined
+      &&state.wizard.import_columns?.page?.status==='complete_definition_page'
+      &&state.wizard.import_columns.page.total_columns===expectedCount;
+    const before=await read('text_import_format',what+' refresh available',
+      state=>layoutSettled(state)||refreshReady(state),{confirmIdentity});
+    if(layoutSettled(before))return;
     await channel.perform({condition:'text_import_format: '+what+' refresh available',
       initialObservation:before,ready:refreshReady,confirmIdentity,
       identity:state=>({owner:identity(state.wizard.owner_context),root_tid:state.wizard.root_tid,stage:state.wizard.stage,
@@ -709,13 +722,16 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       await read('text_import_format','analysis rows applied',state=>state.wizard.settings.fields.analysis_rows?.value===rows);
     }
   }
-  if(analysis?.refresh)await refreshDefinitions(analysis.refresh==='all'?'btnRefreshAll':'btnRefreshData','requested definitions analysis');
+  const refreshReplacement=sourcePathChanged&&!patch.preserveSchema&&analysis?.refresh!=='all';
+  // A full refresh for a replacement file also recalculates types.
+  if(analysis?.refresh&&!refreshReplacement)
+    await refreshDefinitions(analysis.refresh==='all'?'btnRefreshAll':'btnRefreshData','requested definitions analysis');
   let parsedColumns;
   if(patch) {
     const after=(await read('text_import_format')).wizard.settings;
     requireValue(Object.keys(formatBaseline.fields).filter(k=>!formatRequested(k))
       .every(k=>after.fields[k]?.value===formatBaseline.fields[k].value),'Unrequested format parameter changed');
-    if(sourcePathChanged&&!patch.preserveSchema&&analysis?.refresh!=='all') {
+    if(refreshReplacement) {
       // With automatic columns disabled, changing the file keeps the old
       // configured definitions. Refresh only this explicitly replaced source;
       // reconcile below restores retained settings by name, not old position.
@@ -734,8 +750,15 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       :reconcileImportColumnPatch(columnBaseline.fields,parsedSchema.fields,parameters.columns,{schemaChangeRequested:
         Object.keys(parameters.source).length>0||Object.keys(parameters.format).length>0,acceptNewFields:['new','all'].includes(mode)});
   } else if(fieldsOnly) {
-    const parsed=await readImportDefinitionPages(channel,{
+    const readDefinitions=()=>readImportDefinitionPages(channel,{
       ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
+    let parsed=await readDefinitions();
+    // Loginom can acknowledge the new delimiter while retaining the old layout.
+    // Rebuild once before applying the caller's explicit column settings.
+    if(delimiterChanged&&!autoTypesRequested(parameters)&&parsed.total_columns!==parameters.columns.length){
+      await refreshDefinitions('btnRefreshAll','changed delimiter definitions',parameters.columns.length);
+      parsed=await readDefinitions();
+    }
     parsedColumns=parsed.fields;
     if(initialSourcePath) {
       if(parameters.columns)parameters.columns=resolveImportSourceColumns(parameters.columns,parsed.fields).map(c=>{
@@ -991,7 +1014,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     'Saved source differs after reopening: ' + name);
   const reopenedFormat = await next('text_import_file', 'text_import_format');
   const displayValues = {
-    delimiter: { ';': 'Точка с запятой', ',': 'Запятая', '\t': 'Символ табуляции', ' ': 'Пробел' },
+    delimiter: delimiterLabels,
     text_qualifier: { '"': 'Двойная кавычка (")', "'": "Одинарная кавычка (')", '`': 'Обратная кавычка (`)', '': 'Нет' },
     decimal_separator: { '.': 'Точка (.)', ',': 'Запятая (,)' },
   };

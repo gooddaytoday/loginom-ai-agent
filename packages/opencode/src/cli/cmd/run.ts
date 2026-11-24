@@ -456,7 +456,10 @@ export const RunCommand = effectCmd({
             continue
           }
 
-          if (info.isFile() && info.size > 10 * 1024 * 1024) {
+          // These data formats cannot be serialized as provider file parts.
+          // Keep local bytes behind the same owned receipt used for large files.
+          const binary = detected === "application/octet-stream" || detected === "application/vnd.ms-excel"
+          if (info.isFile() && (info.size > 10 * 1024 * 1024 || (!args.attach && binary))) {
             if (args.attach) {
               UI.error("Large local attachments require a local backend with a shared filesystem")
               exitCli(1)

@@ -153,7 +153,8 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
     validateTextImportPatch({source:{source_path:storageProof.destination}});
     return verified({source:structuredClone(storageProof)});
   }
-  const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),'Verified upload operation is missing or ambiguous');
+  const u=one(uploads.filter(u=>u.operation_id===s.upload_operation_id),
+    'Verified upload operation is missing or ambiguous. Use output.upload_operation_id from the successful dock_artifact_deliver receipt.');
   const proof=verifiedLocalDelivery(u.artifact,u.outcome);
   requireValue(u.outcome.operation_id===s.upload_operation_id&&u.artifact.artifact_id===s.artifact_id
     &&proof.destination===(parameters.settings.source?.source_path??proof.destination)
@@ -431,7 +432,7 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
-  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path or delivery[/encoding]; Close, reuse node.';
+  parameterSchema.properties.preview_only.description='Preview unknown format. Close and reuse the receipt node as target.ref.';
   parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id; source_path only.';
   parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source.';
   parameterSchema.properties.settings.description='New source/format+columns/detection; existing patch.';
@@ -633,23 +634,32 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             return configured;
           }
           const request=operation.nodeApply.request;
+          let captureOutputLayout;
           if(request.target.kind==='existing'&&!sourceSwitch&&!request.mappings.some(m=>m.fields!==undefined)
             &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||!operation.importBinding&&p.settings.source)
             // A node without a saved source has no output layout; Next on an
             // empty path would fail natively. The patch refuses or fills first.
             &&(operation.importBinding||(await read('text_import_file','import source before layout capture',isTextImportSourceReady)).wizard.import_source.fields.source_path.value!=='')) {
-            await next('text_import_file','text_import_format');
-            await next('text_import_format','output_mapping');
-            outputLayout=importOutputLayoutSnapshot((await readNativeImportMapping(channel,'import output layout before configuration',
-              s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true)).node_mapping);
-            await previousTextImportStep(channel,{from:'output_mapping',to:'text_import_format',owner,read});
-            await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner,read,ready:isTextImportSourceReady});
+            const capture=async()=>{
+              await next('text_import_format','output_mapping');
+              outputLayout=importOutputLayoutSnapshot((await readNativeImportMapping(channel,'import output layout before configuration',
+                s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true)).node_mapping);
+              await previousTextImportStep(channel,{from:'output_mapping',to:'text_import_format',owner,read});
+            };
+            const source=operation.importBinding?null:await read('text_import_file','import source before replacement',isTextImportSourceReady);
+            if(source&&p.settings.source?.source_path!==undefined&&p.settings.source.source_path!==source.wizard.import_source.fields.source_path.value)
+              captureOutputLayout=capture;
+            else {
+              await next('text_import_file','text_import_format');
+              await capture();
+              await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner,read,ready:isTextImportSourceReady});
+            }
           }
           // A file-page round trip can reset its draft variable selector. Bind
           // only after capturing the old layout; binding changes alone need no capture.
           if(operation.importBinding)await configureImportBinding(channel,operation.importBinding);
           configured=operation.nodeApply.request.target.kind==='existing'
-            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch,boundSource:!!operation.importBinding})
+            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch,boundSource:!!operation.importBinding,captureOutputLayout})
             :await configureTextImportFields(channel,p.settings,owner,{boundSource:!!operation.importBinding});
           if(operation.importBinding)configured={...configured,source:resolveImportBindingSourceReadback(configured.source,operation.importBinding,ctx.node)};
           requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');

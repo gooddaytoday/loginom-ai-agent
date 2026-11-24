@@ -1,31 +1,42 @@
 // Generic completed-port capability. The owning port reader supplies its
 // existing source/execution guards; no Preview/static-import provenance is used.
 // Serialized into that reader, so all dependencies are explicit.
-export async function createNativeVariantReader(source,{deadline,stable,variableValue=false,treeValue=false},decode,collect,pins,treePins) {
+// profiles: {canonical|compact:{functions,constants,datetime}}. The loaded build,
+// reported by collect, selects its complete pin set; the interface selects only
+// the method id and its getter pin.
+export async function createNativeVariantReader(source,{deadline,stable,variableValue=false,treeValue=false,directSource=false},decode,collect,profiles,treePins,sourcePins) {
  const need=(ok,message)=>{if(!ok)throw Error('Variant read: '+message);};
  const session=source.$S,identity=source.$,owner=identity?.$OW,object=identity?.$O;
- const interfaceId=treeValue?166:variableValue?427:116;
- need(typeof variableValue==='boolean'&&typeof treeValue==='boolean'&&!(variableValue&&treeValue)&&identity?.$I===interfaceId&&Number.isInteger(owner)&&Number.isInteger(object),'interface'+interfaceId+' source required');
- const initial=collect(session),from=Date.FromOADate,bias=Date.AddBias;
+ const interfaceId=treeValue?166:variableValue?427:directSource?71:116;
+ need([variableValue,treeValue,directSource].every(v=>typeof v==='boolean')&&Number(variableValue)+Number(treeValue)+Number(directSource)<=1
+  &&identity?.$I===interfaceId&&Number.isInteger(owner)&&Number.isInteger(object),'interface'+interfaceId+' source required');
+ const initial=collect(session),from=Date.FromOADate,bias=Date.AddBias,profile=initial.profile,slots=initial.slots;
+ const pins=Object.hasOwn(profiles??{},profile)?profiles[profile]:null;
+ need(pins&&slots&&pins.datetime,'unsupported runtime build: '+profile);
  const treeHelper=treeValue?source.$FHelper:null,treeGetter=treeValue?bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant:null;
+ const sourceGetter=directSource?bg.rpc?.TIBGDataSource_Proxy?.prototype?.AsVariant:null;
  const hash=async fn=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))).map(n=>n.toString(16).padStart(2,'0')).join('');
  if(treeValue)need(treeHelper?.FBaseProxy===source&&typeof treeGetter==='function'&&await hash(treeGetter)===treePins?.get_as_variant,'tree getter implementation');
+ if(directSource)need(typeof sourceGetter==='function'&&await hash(sourceGetter)===sourcePins?.as_variant,'source getter implementation');
  for(const [key,fn] of Object.entries(initial.functions))need(await hash(fn)===pins.functions[key],'loaded implementation changed: '+key);
  need(Object.keys(initial.functions).length===Object.keys(pins.functions).length&&JSON.stringify(initial.constants)===JSON.stringify(pins.constants),'runtime constants changed');
- need(await hash(from)==='e35fbf955d5d95bd97724063fb6e40fbdbc6235e4cb34b00860d9611ff75949c'
-  &&await hash(bias)==='bbabbc4e121b32ea7f93ff900a4fb7cf47ec5853be1a200fc86b993e62262d19','civil datetime implementation changed');
+ need(await hash(from)===pins.datetime.from_oadate&&await hash(bias)===pins.datetime.add_bias,'civil datetime implementation changed');
  let pending=0,retired=false,uncertain=false,bytes=0;
  const check=message=>{
   stable();need(!retired&&Date.now()<deadline,'retired or deadline');
-  need(session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
-   &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session transport not live');
+  need(session[slots.disposed]===false&&session[slots.pendingDisconnect]===false&&session[slots.transportStatus]===0
+   &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T[slots.socket]?.readyState===1,'session transport not live');
   need(source.$S===session&&source.$===identity&&identity.$OW===owner&&identity.$O===object&&identity.$I===interfaceId,'source changed');
   if(treeValue)need(source.$FHelper===treeHelper&&treeHelper.FBaseProxy===source
    &&bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant===treeGetter,'tree getter changed');
+  if(directSource)need(bg.rpc?.TIBGDataSource_Proxy?.prototype?.AsVariant===sourceGetter,'source getter changed');
   const current=collect(session);
-  need(initial.objects.every((o,i)=>o===current.objects[i])&&JSON.stringify(initial.constants)===JSON.stringify(current.constants)
+  need(current.profile===profile&&initial.objects.every((o,i)=>o===current.objects[i])&&JSON.stringify(initial.constants)===JSON.stringify(current.constants)
    &&Object.keys(initial.functions).every(k=>initial.functions[k]===current.functions[k]),'loaded runtime changed');
-  if(message)for(const [key,fn] of Object.entries(initial.functions))if(key.startsWith('message.'))need(message[key.slice(8)]===fn,'message implementation changed');
+  if(message)for(const [key,fn] of Object.entries(initial.functions))if(key.startsWith('message.')){
+   const name=key.slice(8);
+   need(message[slots.message[name]??name]===fn,'message implementation changed');
+  }
   need(Date.FromOADate===from&&Date.AddBias===bias,'civil datetime implementation changed');
  };
  check();
@@ -39,7 +50,7 @@ export async function createNativeVariantReader(source,{deadline,stable,variable
    let request;
    try{
     request=session.$M.GetDynamicData();check(request);request.set_StaticDataSize(variableValue?20:32);
-    request.InitializeMethodCallMessage(owner,object,treeValue?7230:variableValue?1141:321,0);
+    request.InitializeMethodCallMessage(owner,object,treeValue?7230:variableValue?1141:directSource?166:321,0);
     if(treeValue){request.WriteParameter$a(0,column);request.WriteParameter(4,row);}
     else if(!variableValue){request.WriteParameter(0,row);request.WriteParameter$a(8,column);}
    }catch(error){try{request?.Release();}catch{uncertain=true;}throw error;}
@@ -52,7 +63,7 @@ export async function createNativeVariantReader(source,{deadline,stable,variable
       response=task.getAwaitedResult();if(retired)return;
       check(response);need(response.get_MessageType()===1&&response.get_MessageID()===request.get_MessageID(),'non-value or foreign response');
       response.set_StaticDataSize(12);
-      const data=response.$FData,size=response.$FDataSize;
+      const data=response[slots.data],size=response[slots.dataSize];
       need(data instanceof Uint8Array&&Number.isInteger(size)&&size>=60&&size<=65536&&size<=data.length,'payload bounds');
       bytes+=size;need(bytes<=512*1024,'native byte budget');
       const payload=Array.from(data.subarray(12,size)),decoded=decode(payload,size);

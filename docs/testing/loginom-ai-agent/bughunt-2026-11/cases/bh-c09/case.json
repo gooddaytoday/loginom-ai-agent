@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 160,
+    "max_errors": 0,
+    "max_nodes": 8,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "Two imports plus join/calculator/group/cross/export: minimum seven nodes; an eighth sorting node may be needed for output order."
+}

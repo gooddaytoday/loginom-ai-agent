@@ -21,7 +21,7 @@ export function createEnrichNodeSupport(config){
  const implementation=options=>({
  type:'transform.enrich_data',modes:['left'],revision:'enrich-v1-internal-1',readback:enrichConfigurationReadback,parameterSchema:enrichParametersSchema,
  validate:validateEnrichParameters,preflight:preflightEnrich,configureInputs:(channel,mappings,ctx,request,finishWizard)=>configureEnrichInputs(channel,mappings,ctx,request,finishWizard,
-  {graph:options.operation.targetPhase?.last_graph,node:options.operation.nodeApply.node}),
+  {graph:options.operation.targetPhase?.final_graph,node:options.operation.nodeApply.node}),
  configurationObservation:{condition:'enrich configuration page',readEnrich:true,ready:enrichReady},
  async configure(channel,p,{request}){
   const changed=await configureEnrich(channel,p,{request});if(request.finish==='close')return changed;

@@ -1,20 +1,36 @@
 import {createHash} from 'node:crypto';
 import {nativeRuntimePins} from './collapse-native-runtime-pins.mjs';
 // Only reflects the actually used objects. Never dispatches a native message.
+// The loaded 7.4.2 build is either the canonical or the compact RPC runtime; it is
+// detected from the page itself (never from the caller) and an unknown or mixed
+// build is refused. Evidence keys stay canonical; slots are the build's own names.
 export function collectNativeRuntime(session) {
  const need=(x,m)=>{if(!x)throw Error('Loaded native runtime: '+m);};
  const functions={},message=rpc.TBGMessageDynamicData.prototype,klass=rpc.TBGMessageDynamicData;
- const add=(o,prefix,names)=>{for(const k of names){need(typeof o?.[k]==='function','missing '+prefix+k);functions[prefix+k]=o[k];}};
- add(session,'session.',['DispatchMessageAsync','$DoDispatchMessageAsync','$GetNextMessageID','get_TransportStatus']);
+ const builds={
+  canonical:{session:{},message:{},transport:{},offsets:['$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'],
+   state:{disposed:'$FDisposed',pendingDisconnect:'$FPendingDisconnect',transportStatus:'$FTransportStatus',socket:'$FSocket',data:'$FData',dataSize:'$FDataSize'}},
+  compact:{session:{$DoDispatchMessageAsync:'$2',$GetNextMessageID:'$8'},message:{get_$ParametersOffset:'$6',$DoSetDataSize:'$1',$GrowData:'$3'},
+   transport:{$SendMessage:'$4',$InvalidateResponseAwaiters:'$1',$CancelResponseAwaiters:'$0'},offsets:['$m','$f','$d','$e','$i','$h','$g'],
+   state:{disposed:'$r',pendingDisconnect:'$y',transportStatus:'$F',socket:'$a',data:'$7',dataSize:'$8'}},
+ };
+ // A build is marked by its complete set of distinctive slots; exactly one may match.
+ const marks=Object.entries(builds).filter(([,b])=>b.offsets.every(k=>Number.isInteger(klass[k]))
+  &&typeof session?.[b.session.$DoDispatchMessageAsync??'$DoDispatchMessageAsync']==='function'&&typeof message[b.message.$GrowData??'$GrowData']==='function');
+ need(marks.length===1,'unknown runtime build');
+ const [profile,build]=marks[0];
+ const add=(o,prefix,names,slots={})=>{for(const key of names){const slot=slots[key]??key;need(typeof o?.[slot]==='function','missing '+prefix+slot);functions[prefix+key]=o[slot];}};
+ add(session,'session.',['DispatchMessageAsync','$DoDispatchMessageAsync','$GetNextMessageID','get_TransportStatus'],build.session);
  add(session.$M,'manager.',['GetDynamicData']);
- add(message,'message.',['get_$ParametersOffset','InitializeMethodCallMessage','Release','set_StaticDataSize','$DoSetDataSize','$GrowData','get_MessageType','get_MessageID','set_MessageID','set_Signature','set_MessageType','set_ObjectOwnerID','set_ObjectID','set_MethodID','WriteParameter','WriteParameter$a','CheckSignature','IsSignatureValid','get_Signature','get_MessageFormatVersion']);
+ add(message,'message.',['get_$ParametersOffset','InitializeMethodCallMessage','Release','set_StaticDataSize','$DoSetDataSize','$GrowData','get_MessageType','get_MessageID','set_MessageID','set_Signature','set_MessageType','set_ObjectOwnerID','set_ObjectID','set_MethodID','WriteParameter','WriteParameter$a','CheckSignature','IsSignatureValid','get_Signature','get_MessageFormatVersion'],build.message);
  add(klass,'class.',['Acquire']);
- add(session.$T,'transport.',['SendReceive','$SendMessage','Send','InternalSend','DoReceive','DoReceiveMessage','$InvalidateResponseAwaiters','$CancelResponseAwaiters']);
+ add(session.$T,'transport.',['SendReceive','$SendMessage','Send','InternalSend','DoReceive','DoReceiveMessage','$InvalidateResponseAwaiters','$CancelResponseAwaiters'],build.transport);
  add(BitConverter,'bit.',['FromInt8','FromUInt8','FromInt16','FromUInt16','FromInt32','FromUInt32','FromBigInt','FromInt64','FromUInt64','ToInt8','ToUInt8','ToInt16','ToUInt16','ToInt32','ToUInt32']);
  add(ss.Task.prototype,'task.',['continueWith','getAwaitedResult']);
  add(ss.TaskCompletionSource.prototype,'completion.',['setResult','setException']);
- const constants=Object.fromEntries(['BGRemoteMessageSignature','$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'].map(k=>{need(Number.isInteger(klass[k]),'missing constant '+k);return [k,klass[k]];}));
- return {functions,constants,objects:[session,session.$M,session.$T,session.$T.$FSocket,klass,message,BitConverter,ss.Task.prototype,ss.TaskCompletionSource.prototype]};
+ const keys=['BGRemoteMessageSignature','$FSignatureOffset','$FMessageTypeOffset','$FMessageFormatVersionOffset','$FMessageIDOffset','$FObjectOwnerIDOffset','$FObjectIDOffset','$FMethodIDOffset'];
+ const constants=Object.fromEntries(['BGRemoteMessageSignature',...build.offsets].map((slot,i)=>{need(Number.isInteger(klass[slot]),'missing constant '+slot);return [keys[i],klass[slot]];}));
+ return {profile,slots:{...build.state,message:build.message},functions,constants,objects:[session,session.$M,session.$T,session.$T[build.state.socket],klass,message,BitConverter,ss.Task.prototype,ss.TaskCompletionSource.prototype]};
 }
 export async function bindLoadedNativeRuntime(page,args,collect=collectNativeRuntime) {
  return page.evaluate(({a,code})=>{

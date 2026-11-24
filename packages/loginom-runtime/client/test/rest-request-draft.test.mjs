@@ -33,7 +33,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const headerTable={querySelectorAll:s=>s.includes('colName;')?headerRows.map(r=>r.nameElement):s.includes('colHeaderValue;')?headerRows.map(r=>r.valueElement):headerRows.map(r=>r.deleteElement)};
  const inputs=Object.fromEntries(Object.keys(values).map(k=>[k,{id:k,value:String(values[k]),readOnly:false,disabled:false}]));
  const advancedElement={contains:e=>Object.values(inputs).includes(e)};
- const fields=Object.fromEntries(Object.keys(values).map(k=>[k,{el:{dom:inputs[k]},inputEl:{dom:inputs[k]},getXType:()=>['pedUseResponseStub','pedProduceErrorDescs'].includes(k)?'checkboxfield':k==='pedResponseStub'?'pickerfield':'numberfield',getValue:()=>values[k]}]));
+ const fields=Object.fromEntries(Object.keys(values).map(k=>[k,{el:{dom:inputs[k]},inputEl:{dom:inputs[k]},getXType:()=>options.fieldTypes?.[k]??(['pedUseResponseStub','pedProduceErrorDescs'].includes(k)?'checkbox':k==='pedResponseStub'?'pickerfield':'numberfield'),getValue:()=>values[k]}]));
  const names=options.empty?[]:['RequestId','Key'],columnRows=[...names,...(options.method?['Body']:[])].map((Name,i)=>({id:Name,data:{Index:[17,0,3][i],Name,DataType:options.bodyType??5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=options.inputPage?-1:0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
@@ -113,6 +113,24 @@ test('C10 disables, preserves and reenables native error descriptions on the sam
  const saved=await fixture(null,false,null,{empty:true,savedErrorDescriptions:false}).run();
  assert.equal(saved.verified,true,saved.error);
  assert.equal(saved.configuration.produce_error_descriptions,false);
+});
+
+test('#1246 the checkboxfield alias also reads both saved flags',async()=>{
+ const f=fixture(null,false,null,{empty:true,savedErrorDescriptions:false,fieldTypes:{pedProduceErrorDescs:'checkboxfield',pedUseResponseStub:'checkboxfield'}});
+ const r=await f.run();
+ assert.equal(r.verified,true,r.error);
+ assert.equal(r.configuration.produce_error_descriptions,false);
+ assert.equal(r.configuration.simulation.enabled,false);
+ assert.deepEqual(f.writes,[]);
+});
+
+for(const key of ['pedProduceErrorDescs','pedUseResponseStub'])test('#1246 refuses a radio field in place of '+key,async()=>{
+ const f=fixture(null,false,null,{empty:true,fieldTypes:{[key]:'radio'}});
+ const r=await f.run();
+ assert.equal(r.verified,false);
+ assert.ok(r.error.includes(key),r.error);
+ assert.ok(r.error.includes('radio'),r.error);
+ assert.deepEqual(f.writes,[]);
 });
 
 test('C4 selects and retains a native string binding, then can return to a literal',async()=>{

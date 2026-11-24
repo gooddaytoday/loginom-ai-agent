@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import {randomUUID} from 'node:crypto';
 import { openArchive } from './archive.mjs';
 import { diagnoseConnection } from './diagnostics.mjs';
-import { pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
+import { actionDescribeTool, pinActionCatalog, assertCatalogTarget, validateActionParameters, BUNDLED_CATALOG_RELEASES } from './action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from './executor.mjs';
 import {createCandidateNodeSupport} from './node-support.mjs';
 import {NODE_TYPES} from './node-contracts.mjs';
@@ -29,7 +29,7 @@ import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
 import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
-import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
+import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
@@ -187,6 +187,11 @@ export async function createBridge(config, session, { browserTransport: managedB
         cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
+        getPreparationReceipt: operationId => {
+          const preparation=session.metadata.workspacePreparation;
+          return operationId===preparation?.operation_id&&session.metadata.workspaceReady===true
+            &&preparation.state?.status==='READY'&&preparation.state.operation_id===operationId?preparation.state:null;
+        },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
@@ -457,8 +462,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
             // Full transient loading/geometry diagnostics are retained above.
-            // The model needs readiness, identities and the complete knowledge
-            // bundle; raw diagnostic DOM can push a local-package reply over
+            // The model needs readiness, identities and node discovery;
+            // raw diagnostic DOM can push a local-package reply over
             // the existing wire budget without adding preparation authority.
             const delivered=structuredClone(result);
             if(delivered.workspace?.trace)delivered.workspace.trace=delivered.workspace.trace.map(({blocking_windows,...step})=>step);
@@ -467,7 +472,17 @@ export async function createBridge(config, session, { browserTransport: managedB
             // reply. Geometry duplicates those identities and is diagnostic;
             // retain its full receipt locally without spending delivery space.
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
-            const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
+            const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id};
+            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            if(first&&ready&&reply.isError===true){
+              // Preparation is a discovery step. Node rules/schemas are still
+              // required through describe before apply; do not let the number
+              // of registered node cards crowd out readiness or input grants.
+              delivered.knowledge={...bundle,node_types:bundle.node_types.map(node=>({
+                type:node.type,candidate_node_apply_available:node.candidate_node_apply_available,modes:node.modes}))};
+              delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
+              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
+            }
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
               && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
@@ -522,27 +537,36 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           if (request.params.name === 'dock_action_describe') {
             const invoke=async()=>{
-            if(userProfile){
-              const args=request.params.arguments??{},keys=args.action_keys??(args.action_key?[args.action_key]:[]);
-              if(keys.some(key=>!['package.save_as','package.save_checkpoint'].includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
-            }
-            const args=request.params.arguments??{};
-            const description=actionRuntime.describe(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='modes')));
-            if(args.modes!==undefined&&!args.node_types)throw Error('modes requires node_types');
-            if(userProfile&&description.node_types?.length){
-              requirePreparedWorkspace(session.metadata);
-              description.node_types=await skill.describeNodes(description.node_types,args.modes);
-            }
-            const delivered=userProfile?userActionInventory(description):description;
-            const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
-            const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe'}):content;
-            if(userProfile&&reply.isError!==true&&description.node_types?.length){
-              await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
-                skill_revision:(await skill.prepare()).detail.revision});
-            }
-            await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
-            if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
-            return reply;
+              const args={...request.params.arguments};
+              if(userProfile){
+                // Some providers serialize individual array arguments as JSON text.
+                for(const key of ['action_keys','node_types','modes']){
+                  if(!Object.hasOwn(args,key))continue;
+                  if(typeof args[key]==='string'){
+                    try { args[key]=JSON.parse(args[key]); }
+                    catch { throw Error(`Invalid parameters.${key}: expected a JSON array`); }
+                  }
+                  validateActionParameters(actionDescribeTool.inputSchema.properties[key],args[key],`parameters.${key}`);
+                }
+                const keys=args.action_keys??(args.action_key?[args.action_key]:[]);
+                if(keys.some(key=>!userActionKeys.includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
+              }
+              const description=actionRuntime.describe(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='modes')));
+              if(args.modes!==undefined&&!args.node_types)throw Error('modes requires node_types');
+              if(userProfile&&description.node_types?.length){
+                requirePreparedWorkspace(session.metadata);
+                description.node_types=await skill.describeNodes(description.node_types,args.modes);
+              }
+              const delivered=userProfile?userActionInventory(description):description;
+              const content={content:[{type:'text',text:JSON.stringify(delivered)}]};
+              const reply=userProfile?boundedUserToolReply(content,{tool:'dock_action_describe',modes:args.modes}):content;
+              if(userProfile&&reply.isError!==true&&description.node_types?.length){
+                await recordExecution({phase:'node_types_described',node_types:args.node_types,modes:args.modes??[],
+                  skill_revision:(await skill.prepare()).detail.revision});
+              }
+              await logResult('dock_action_describe',reply.isError===true?JSON.parse(reply.content[0].text):delivered);
+              if(userProfile&&reply.isError!==true)userWorkflows.rememberDescriptions(description,args.modes);
+              return reply;
             };
             return await (userProfile?dockGate(request.params.name,invoke):invoke());
           }
@@ -789,17 +813,22 @@ export async function createBridge(config, session, { browserTransport: managedB
           // a disconnect. They never certify package or transport cleanup.
           try{
             const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
-              code:`async page=>page.evaluate(()=>{
-                const timeline=globalThis.__loginomConnectionTimelineV1;
-                if(!Array.isArray(timeline?.samples))return null;
-                return {resolution_ms:1000,dropped:Number.isSafeInteger(timeline.dropped)?timeline.dropped:0,
-                  samples:timeline.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
-                    at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
-                    remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
-                  }))};
-              })`,
+              code:`async page=>{
+                const timeline=await page.evaluate(()=>{
+                  const recorded=globalThis.__loginomConnectionTimelineV1;
+                  if(!Array.isArray(recorded?.samples))return null;
+                  return {resolution_ms:1000,dropped:Number.isSafeInteger(recorded.dropped)?recorded.dropped:0,
+                    samples:recorded.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
+                      at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
+                      remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
+                    }))};
+                });
+                return {status:'SUCCEEDED',action_key:'connection.timeline',action_revision:'1',phase:'observed',
+                  effect_possible:false,trace:[],error:null,output:{timeline}};
+              }`,
             }},undefined,{timeout:1000});
-            await recordExecution({phase:'native_connection_timeline',timeline:parseCapabilityResult(response)});
+            const timeline=parseCapabilityResult(response,{redactor}).output.timeline;
+            if(timeline)await recordExecution({phase:'native_connection_timeline',timeline});
           }catch{ /* Diagnostic availability cannot change shutdown. */ }
         }
         const normalCleanup = config.closeSavedPackageOnShutdown === true;

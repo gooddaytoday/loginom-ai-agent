@@ -1,4 +1,4 @@
-import {nodeOutputPortSchema} from './node-result-schema.mjs';
+import {nodeOutputPortSchema,replacedLinksSchema} from './node-result-schema.mjs';
 import {budgetUserPreview,previewWireSize,USER_PREVIEW_WIRE_BUDGET} from './user-preview-budget.mjs';
 import {calculatorPrecisionWarnings} from './calculator-precision-warning.mjs';
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, value[key]]));
@@ -14,7 +14,7 @@ export const userResultSchema = {
     effect_possible: { type: 'boolean' }, cleanup_complete: { type: 'boolean' },
     node: { anyOf: [{ type: 'null' }, { type: 'object', required: ['document_id', 'workflow_id', 'node_id'], additionalProperties: false,
       properties: { document_id: { type: 'string' }, workflow_id: { type: 'string' }, node_id: { type: 'string' } } }] },
-    configuration: { type: 'object' },
+    configuration: { type: 'object' }, replaced_links:replacedLinksSchema,
     execution: { type: ['object', 'null'] }, package_saved: { type: 'boolean' }, browser_recovery: { type: 'object' }, output: { type: 'object', properties:{ports:{type:'array',items:{type:'object',allOf:[{if:{anyOf:['exact_table','read_coverage','read_consistency','cell_precision','binding'].map(k=>({required:[k]}))},then:{...nodeOutputPortSchema,required:[...nodeOutputPortSchema.required,'exact_table','read_coverage','read_consistency','cell_precision','binding']}}]}}}, additionalProperties:true },
     error: { type: ['object', 'null'] }, limitations: { type: 'array', items: { type: 'string' } },
   },
@@ -100,7 +100,9 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
         ?'No sorting node was created. First execute/read the SAME upstream node referenced by the rejected inputs[].source and output. Use dock_node_read with a successful local source_operation_id from this preparation; if none exists, use dock_node_apply with its exact existing ref, original type/mode, inputs:[], an empty settings patch from its parameter_schema and finish:"execute". Wait for confirmed success and the needed output, then submit the original sorting request with a NEW operation_id. Do not recreate the source, guess its identity or automatically run REST/JavaScript/export side effects outside the user request. No browser recovery is required.'
         :'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
       :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:
-        outcome.error?.code==='NODE_APPLY_STOPPED'&&outcome.error.message.startsWith('Node procedure readiness timeout: calculator done available;')
+        (outcome.error??node?.error)?.cause?.code==='WIZARD_SOURCE_VALIDATION_FAILED'
+          ?'Loginom rejected the import source; a package can retain a path from another account. Inspect this original operation and complete its offered release/recovery before another change. Then use dock_artifact_deliver for the user file, or dock_storage_source for an available server file, and configure the SAME import node with its returned node ref, a NEW operation_id and the verified source path. Retain field names/types; do not create another source or edit package XML. If the source file is unavailable, ask the user to supply it; do not Execute or claim the package is saved.'
+          :outcome.error?.code==='NODE_APPLY_STOPPED'&&outcome.error.message.startsWith('Node procedure readiness timeout: calculator done available;')
           ?'The input mapping or node wizard did not expose an authorized Done action. The timeout authorized no new gesture; earlier node/link/mapping effects may remain. Inspect this original operation and follow its offered recovery: abandon_operation with a NEW recovery_operation_id, or dock_browser_recovery when offered after refused release. Do not submit another node operation, recreate the target, or save through this pending operation.'
           :'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
@@ -109,7 +111,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
     result_version: 'user-v1', ...pick(result, ['operation_id', 'attempt', 'state', 'cancel_requested', 'server_stop_requested']),
     ...(result.progress&&(result.state === 'running'||result.outcome==null) ? { progress: result.progress } : {}),
     ...pick(outcome, ['status', 'action_key', 'phase', 'effect_possible', 'cleanup_complete']),
-    ...pick(node, ['node', 'execution', 'package_saved', 'configuration', 'browser_recovery']), output,
+    ...pick(node, ['node', 'execution', 'package_saved', 'configuration', 'browser_recovery', 'replaced_links']), output,
     error: result.error ?? outcome?.error ?? null,
     limitations,
     ...(next?{next_step:next}:{}),

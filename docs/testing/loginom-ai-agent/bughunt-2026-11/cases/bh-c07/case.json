@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_tool_calls": 65,
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "convert",
+      "pandas",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  },
+  "notes": "The package contains one self-contained source with no connected inputs. No source rewrite allowed. seed.csv is private oracle input."
+}

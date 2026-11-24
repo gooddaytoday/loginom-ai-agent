@@ -73,6 +73,17 @@ test("final message leaves package cleanup to the host and never links server pa
   expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
 })
 
+test("the final report uses results collected before saving", () => {
+  const finish = skill.slice(skill.indexOf("## Завершение"))
+  expect(finish).toContain("Собери значения для отчёта до Save")
+  expect(finish).toContain("После Save используй проверенные квитанции и выгрузки")
+})
+
+test("node operations run serially in one browser session", () => {
+  expect(skill).toMatch(/Дождись итогового статуса\s+через `loginom_dock_node_wait`/)
+  expect(skill).toContain("даже если узлы независимы")
+})
+
 test("skill markdown links resolve inside the skill, as the bundled manifest requires", async () => {
   // Same link pattern as verifyBundledSkills: an example like [x](/path) escapes the skill.
   for (const name of ["SKILL.md", ...(await readdir(new URL("references/", root), { recursive: true }))

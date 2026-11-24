@@ -1,0 +1,1 @@
+{"type": "tool_use", "part": {"type": "tool", "tool": "loginom_dock_node_read", "state": {"status": "completed", "input": {}, "output": "{}"}}}

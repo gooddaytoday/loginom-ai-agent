@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs';
+import {isPreparedBodyReplacement} from '../lib/node-graph-selection.mjs';
 import {revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
@@ -90,6 +91,17 @@ for(const selectedInitially of [false,true])test('offscreen saved node is reveal
 });
 test('visible saved node does not need viewport gestures',async()=>{
  const f=await execution({offscreen:false});await f.driver.launchGraph();assert.deepEqual(f.calls,['click:body','execute_graph_node:launch']);
+});
+test('pre-launch selection may rebind a proved graph redraw without retrying launch on a stale reference',async()=>{
+ const f=await execution({offscreen:false});
+ const perform=f.channel.perform;
+ f.channel.perform=async options=>{
+  const action=options.resolve(f.snapshot());
+  assert.equal(options.refreshReplacedBody,action.verb==='click'?isPreparedBodyReplacement:undefined);
+  return perform(options);
+ };
+ await f.driver.launchGraph();
+ assert.deepEqual(f.calls,['click:body','execute_graph_node:launch']);
 });
 for(const fault of ['owner','unknown'])test('viewport '+fault+' refuses before selecting or executing',async()=>{
  const f=await execution({fault});await assert.rejects(f.driver.launchGraph());assert.deepEqual(f.calls,['reveal']);

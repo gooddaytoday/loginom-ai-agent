@@ -260,13 +260,31 @@ export async function restRequestCapability(page,t,readContext){
    if(caption==='Дополнительные параметры'){
     const advanced=root+';AdditionalParamsWizard',flag=advanced+';pedUseResponseStub;ValueControl',file=advanced+';pedResponseStub;ValueControl';
     const descriptions=advanced+';pedProduceErrorDescs;ValueControl';
-    const readDescriptions=async()=>{await guard();return page.evaluate(({advanced,descriptions})=>{
-     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),es=exact(descriptions),e=es[0],field=e&&Ext.getCmp(e.id),
-      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
-     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0]||es.length!==1||!roots[0].contains(e)
-      ||field?.el?.dom!==e||field.getXType()!=='checkboxfield'||!field.inputEl?.dom||typeof field.getValue()!=='boolean')throw Error('REST error descriptions field binding unavailable');
-     return field.getValue();
-    },{advanced,descriptions});};
+    const readFields=async keys=>{
+     await guard();
+     control=advanced+';'+keys[0]+';ValueControl';
+     return page.evaluate(({advanced,keys})=>{
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+      const roots=exact(advanced),controller=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+      if(roots.length!==1)throw Error('REST additional parameters page count: '+roots.length);
+      if(controller.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('REST additional parameters page is not active');
+      return keys.map(key=>{
+       const matches=exact(advanced+';'+key+';ValueControl');
+       if(matches.length!==1)throw Error('REST '+key+' control count: '+matches.length);
+       const element=matches[0],field=Ext.getCmp(element.id);
+       if(!roots[0].contains(element))throw Error('REST '+key+' is outside the active page');
+       if(field?.el?.dom!==element)throw Error('REST '+key+' Ext component does not own the control');
+       const xtype=field.getXType(),picker=key==='pedResponseStub';
+       if(picker?xtype!=='pickerfield':!['checkbox','checkboxfield'].includes(xtype))throw Error('REST '+key+' unexpected xtype: '+xtype);
+       if(!field.inputEl?.dom)throw Error('REST '+key+' input is unavailable');
+       const value=field.getValue();
+       if(typeof value!==(picker?'string':'boolean'))throw Error('REST '+key+' unexpected value type: '+typeof value);
+       return value;
+      });
+     },{advanced,keys});
+    };
+    step='read additional parameters';
+    const readDescriptions=async()=>(await readFields(['pedProduceErrorDescs']))[0];
     let observedDescriptions=await readDescriptions();
     if(t.produce_error_descriptions!==undefined&&observedDescriptions!==t.produce_error_descriptions){
      await click(descriptions+';DisplayEl');
@@ -274,15 +292,10 @@ export async function restRequestCapability(page,t,readContext){
      observedDescriptions=await readDescriptions();
     }
     configuration.produce_error_descriptions=observedDescriptions;
-    const readSimulation=async()=>{await guard();return page.evaluate(({advanced,flag,file})=>{
-     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
-      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
-     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('Owned REST additional parameters page changed');
-     const fields=[flag,file].map((tid,i)=>{const es=exact(tid),e=es[0],field=e&&Ext.getCmp(e.id);
-      if(es.length!==1||!roots[0].contains(e)||field?.el?.dom!==e||field.getXType()!==(i?'pickerfield':'checkboxfield')||!field.inputEl?.dom)throw Error('REST simulation field binding unavailable');
-      const value=field.getValue();if(typeof value!==(i?'string':'boolean'))throw Error('REST simulation field value unavailable');return value;});
-     return {enabled:fields[0],file_path:fields[1]};
-    },{advanced,flag,file});};
+    const readSimulation=async()=>{
+     const [enabled,file_path]=await readFields(['pedUseResponseStub','pedResponseStub']);
+     return {enabled,file_path};
+    };
     let observed=await readSimulation();
     if(t.simulation){
      if(t.simulation.enabled&&t.simulation.file_path!==observed.file_path){

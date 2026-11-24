@@ -15,6 +15,7 @@ for(const modified of [false,true])test('bound saved state remains a read, dirty
  const response={content:[{type:'text',text:JSON.stringify(state)}]};assert.equal(parseSavedPackageState(response,options).modified,modified);
  const a=savedPackageStateAdvice(state,{status:'SUCCEEDED',action_key:'package.save_as',operation_id:'save',output:{package_ref:{path:options.packagePath}}});
  assert.equal(a.persisted_content_verified,false);assert.equal(!!a.next_step,modified);if(modified){assert.equal(a.next_step.arguments.action_key,'package.save_checkpoint');assert.equal(a.next_step.arguments.parameters.conflict_policy,'replace');}
+ if(!modified)assert.match(a.instruction,/report from the verified outcome receipts and exports/);
 });
 for(const [name,change] of Object.entries({foreign_path:{path:'/mimo/foreign.lgp'},foreign_account:{account:'other'},readonly:{readonly:true},running:{running:true},unknown_modified:{modified:null},path_race:{race:s=>s.path='/other.lgp'},proxy_race:{race:(_,p)=>p.Package={}},connection_race:{race:(_s,_p,_c,m)=>m.FServerConnection.Session={}},inventory_race:{race:(_s,_p,_c,m)=>m.PackageNodes.Count=2}}))test('reject '+name,async()=>{await assert.rejects(fixture(change).run());});
 test('wrong document/session and malformed paths rejected',async()=>{
