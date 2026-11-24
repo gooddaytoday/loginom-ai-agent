@@ -103,8 +103,10 @@ describe("package names", () => {
 })
 
 describe("environment variable names", () => {
-  // The only OPENCODE_* names the product may mention are keys that third-party providers define.
-  const ALLOWED = new Set(["OPENCODE_API_KEY", "OPENCODE_GO_API_KEY"])
+  // The only OPENCODE_* names the product may mention are keys that third-party providers define, and OPENCODE_ZIG_CPU,
+  // which packages/process-daemon/build.rs reads: apply-identity keeps it on both sides (UNPROCESSED_READERS, CAT-13),
+  // so cli/script/opencode-pty.ts sets it under that name for the product's own pty build.
+  const ALLOWED = new Set(["OPENCODE_API_KEY", "OPENCODE_GO_API_KEY", "OPENCODE_ZIG_CPU"])
   const SOURCES =
     /^(packages\/(ai|app|cli|client|core|desktop|gui-plugins|loginom-host|loginom-runtime|plugin[^/]*|product|schema|script|server|simulation|util)\/(src|script|scripts)\/)/
 
