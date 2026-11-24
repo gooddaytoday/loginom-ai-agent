@@ -21221,3 +21221,204 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Профиль 0.4 с настоящим `loginom-ai-agent.settings` и сохранённым сервером WSL — запись собрана по коду 0.4.
 - Переименование `OPENCODE_ZIG_CPU` не пробовалось; сборка `process-daemon` (cargo, Zig) не запускалась — правка только в
   тесте.
+
+## B2.3c Без автопродолжения хода (В-100)
+
+23.11.2026. Ветка `b23c-no-auto-resume` от `oc2-migration` (`8d0dc9f9f0`), рабочее дерево `.claude/worktrees/b23c`.
+Эталон 0.4 — `v0.4.0` (В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в `PATH` только для своих команд и
+`git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci --ignore-scripts --offline` клиента
+`packages/loginom-runtime/client` — в этом дереве и в дереве базы `<scratchpad>/b23c/base` (`8d0dc9f9f0`, detached).
+Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом коммите. Тесты, мутации и прогоны пакетов — под
+`unshare -n` (поднят только `lo`), со свежими временными `HOME`, `TMPDIR`, `XDG_*` в scratchpad,
+`LOGINOM_AI_AGENT_TEST_NODE` и кэшем rg `LOGINOM_AI_AGENT_RIPGREP_CACHE`. **Модель не вызывалась**: в тестах — `TestLLM`
+ядра и подставной OpenAI-совместимый сервер на `127.0.0.1`; что первый запрос хода дошёл до него, проверяет сам тест
+(`llm.turns.length === 1` до обрыва). Хвосты выпуска (`desktop/script/utils.ts`, журнал CLI, уведомления о лицензиях) не
+трогал.
+
+Прочитано: решение В-100; этот журнал — B2.3 («Вопрос владельцу»), B2.3b, B4.10; план этапа B, итог checkpoint B2;
+ux-spec, «Лента разговора» («Остановленный ход … «Продолжить»»); навык `.opencode/skills/unit-tests`; v2 —
+`core/src/session/execution/restart.ts`, `execution.ts` (заявка, `settled`), `projector.ts` (`projectIdle`),
+`message-updater.ts`, `runner/llm.ts` (`settleStaleToolCalls`), `tool/plugin/subagent.ts`, `server/src/process.ts`
+(`installRestartContinuity`), `fetch.ts`, `sdk/src/internal/host.ts`, клиенты (`client/src/solid/data.ts`,
+`app/src/runtime/server/data.ts`, `tui/src/mini/stream-v2.transport.ts`).
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `70ea9b0eb8` `feat(core): leave a turn the restart cut off to its user in the product (B2.3c)` | опция `SessionRestart`, поле опций сервера, строка продукта; тесты; CAT-07 |
+| следующий | этот раздел |
+
+Файлов кода четыре, все upstream (CAT-07): `core/src/session/execution/restart.ts` (+35 −15),
+`server/src/options.ts` (+2), `server/src/routes.ts` (+1), `cli/src/server-process.ts` (+3). Тесты:
+`cli/test/restart-turn.test.ts` (новый файл форка), `core/test/shell-restart.test.ts` (+79 −1, upstream, уже в CAT-07).
+
+### Как было
+
+`SessionExecution` пишет заявку исполнения (claim) при `session.execution.started` и снимает её терминалом. Падение
+процесса и мягкая остановка (B2.3b: исполнение прерывается с `reason: "shutdown"`, заявка остаётся нарочно) оставляют
+одну и ту же метку. Служба (`serve --service`, только при `lifecycle`) при старте форкает
+`SessionRestart.resumeSuspendedSessions` (`server/src/process.ts:117`). Проход по порядку:
+
+1. снимает заявки детей без задачи; доставляет итоги фоновых задач `shell` и изображений, завершившихся за время
+   перезапуска (`recoverToolJob`, `resume: false` — сессию не будит); команды, которые демон ещё выполняет, снова под
+   наблюдением (`ShellTool.reattach`);
+2. для сессий с заявкой незавершённые вызовы `shell` (служба умерла посреди вызова) закрывает как «перенесён в фон» и
+   ставит их команды под наблюдение (`settleBackgroundedCalls`);
+3. подагенты фоновых задач (`subagent` в v2 всегда фоновый): ребёнку — синтетическое «The server restarted…» и счётчик
+   (`prepareResume`), затем `SubagentJob.start` — ребёнок работает дальше и шлёт родителю отчёт, который будит родителя;
+4. **остальные сессии с заявкой** (ход самой сессии, в том числе ребёнок, запущенный напрямую) — `prepareResume`
+   (синтетическое сообщение «The server restarted while you were working. Continue from where you left off without
+   repeating completed work.» и счётчик попыток) и `execution.resume` — запрос к модели без участия пользователя.
+
+### Решение: ядро, а не плагин
+
+Плагином не получается: синтетическое сообщение и возобновление делает глобальный проход при старте службы, до любой
+location и до загрузки плагинов (плагины грузятся асинхронно, сервер их не ждёт), хука в проходе нет. Плагин мог бы только
+прервать уже начатый ход — после синтетического сообщения и, возможно, после запроса к модели.
+
+Правка — общего вида, по образцу `pluginPackages` (B2.1):
+
+- `restart.ts`: опция `resumeTurns` в `SessionRestart.Options` и узел `configured(options)` (`node = configured()`, как у
+  `Watcher`, `Bus`). При `resumeTurns: false` меняется только шаг 4: вместо `prepareResume` — `leaveToUser`, который
+  публикует `session.execution.interrupted` с `reason: "user"` и `commit: () => store.release(sessionID)` — та же форма, что
+  терминал исчерпанного бюджета (`RESUME_EXHAUSTED`). Шаги 1–3 не тронуты. Терминал публикуется до старта подагентов, так что
+  отчёт быстрого ребёнка застаёт родителя уже в покое.
+- `server/src/options.ts`: поле `resumeTurns` в `ServerOptions`; `server/src/routes.ts`: замена узла `SessionRestart.node`
+  по нему. Без поля — поведение OpenCode: эмбеддеры, `fetch.ts`, `sdk/src/internal/host.ts`, тесты upstream.
+- `cli/src/server-process.ts`: продукт передаёт `resumeTurns: false` при каждом запуске сервера. Desktop запускает
+  `serve --service` этого CLI (`desktop/src/main/service/background-service.ts`), профиль CLI — тот же `index.ts` через
+  `loginom-cli.ts`; частный сервер `run` (`services/standalone.ts`, `serve` без `--service`) прохода не делает вовсе.
+
+Что видно после старта: сессия — `outcome: interrupted` (`projectIdle`), в ленте — отметка `idle` «interrupted», как у хода,
+который остановил пользователь; клиенты (`client/src/solid/data.ts`, Desktop, TUI) переводят сессию в покой. Синтетического
+сообщения нет, запроса к модели нет, заявка и счётчик попыток сняты — следующий старт сессию уже не тронет. Незавершённые
+вызовы инструментов ход закроет сам при следующем исполнении (`settleStaleToolCalls`: «Tool execution interrupted»), как и
+после остановки пользователем.
+
+Продолжение — обычное: следующее сообщение пользователя (`session.prompt`) или синтетическое (`session.synthetic`) будит
+сессию, ход идёт по сохранённой истории. Отдельного HTTP-маршрута «продолжить» в v2 нет (`Session.resume` есть только в
+ядре); кнопке «Продолжить» этапа C хватит любого из двух маршрутов.
+
+### Фоновые терминалы и подагенты
+
+Восстанавливаются, как в OpenCode 2 (шаги 1–3 прохода без изменений). Связь с продолжением хода — в трёх местах, все
+оставлены как в v2:
+
+- **Команда фонового `shell`, которую демон ещё выполняет**, по окончании доставляет сессии итог и будит её
+  (`ShellTool.reattach` → уведомление → `wake`): модель получает итог и отвечает — новый ход без участия пользователя.
+  Итоги, пришедшие во время самого прохода, сессию не будят (она в списке `suspended` до конца прохода): ждут следующего
+  сообщения. Команды, завершившиеся за время перезапуска, — тоже без пробуждения (`resume: false`, как в v2).
+- **Подагент фоновой задачи** продолжает свой ход с синтетическим «The server restarted…» — это запрос к модели ребёнка.
+- **Его отчёт** по окончании будит родителя — запрос к модели родителя, даже если ход родителя остался прерванным.
+
+Так и сказано в В-100 («как в OpenCode 2»), но строгому чтению «после старта модель не вызывается» эти три пути не
+отвечают — **на внимание владельца**. Если нужно, следующим шагом можно не будить прерванную сессию уведомлениями до её
+следующего хода — это другая правка прохода и `ShellTool.reattach`, здесь не делалась.
+
+Ход, прерванный на вызове `shell` (команда в демоне), проверен тестом ядра: вызов закрыт как «перенесён в фон», команда снова
+под наблюдением, ход не продолжен; по концу команды сессия получает итог и просыпается.
+
+### Тесты
+
+| Тест | Что проверяет |
+|---|---|
+| `cli/test/restart-turn.test.ts` «after a crash the service leaves the turn interrupted until a prompt continues it» | настоящая служба продукта из исходников (`serve --service --port 0`, `isolatedEnv`), провайдер `test` из `LOGINOM_AI_AGENT_CONFIG_CONTENT` на подставной сервер. Первый запрос хода (с инструментами) отдаёт один фрагмент и не кончается; служба — `SIGKILL` (код 137); вторая служба на том же корне: дождаться `outcome` сессии — `interrupted`, запросов хода по-прежнему 1, сообщения с `notice: restart` нет, последняя запись ленты — `idle` «interrupted»; `session.prompt` «Продолжи» — ровно второй запрос хода, в нём «Продолжи», `outcome: succeeded`, ответ «Готово.» в ленте; мягкая остановка второй службы — 202 и код 0 |
+| там же «after a soft stop … until a synthetic continues it» | то же, служба кончается `POST /api/experimental/service/stop` (202, код 0; ход прерван с `reason: "shutdown"`, заявка сохранена), продолжение — `session.synthetic` |
+| `core/test/shell-restart.test.ts` «watches the command but leaves the turn interrupted when turns do not resume» | весь app ядра с `TestLLM` и подставным демоном: ход ждёт команду `shell`, мягкий перезапуск с передачей демона; второй сервер с `resumeTurns: false`: вызов `completed` «Command moved to the background (shell ID …)», запросов к модели 1, `outcome: interrupted`, `restart`-сообщения нет; `prompt` «continue» — второй запрос, `succeeded`; конец команды — уведомление `source: shell`, `state: completed`, третий запрос (как в v2) |
+
+Устойчивость: случай ядра `--rerun-each 10` — 10/0; тест CLI `--rerun-each 3` — 6/0 (43 с). Один прогон теста CLI —
+15 с: два холодных старта службы на каждый случай.
+
+### Мутации
+
+`<scratchpad>/b23c/scripts/mutations.sh`: одна правка, тест, байты назад; `git status` до и после совпал. Мутации — до
+коммита, на том же коде.
+
+```text
+mut-M1-product-option-dropped   cli restart-turn       0 pass 2 fail  # без строки в server-process.ts: Expected "interrupted", Received "succeeded"
+mut-M2-continue-as-v2           cli restart-turn       0 pass 2 fail  # restart.ts всегда prepareResume («продолжать как v2»)
+mut-M2-continue-as-v2           core shell-restart     4 pass 1 fail  # новый случай: outcome undefined, ход возобновлён
+mut-M3-routes-unwired           cli restart-turn       0 pass 2 fail  # без замены узла в routes.ts
+mut-M4-no-terminal              core shell-restart     4 pass 1 fail  # leaveToUser без терминала: заявка остаётся, outcome undefined
+mut-M5-shutdown-reason          core shell-restart     4 pass 1 fail  # reason "shutdown": проектор пропускает, outcome undefined
+mut-M6-default-flipped          core shell-restart + session-execution  37 pass 17 fail  # `!== true`: поведение продукта по умолчанию — красны тесты upstream возобновления
+M0-after                        cli restart-turn       2 pass 0 fail
+M0-after                        core shell-restart + session-execution  54 pass 0 fail
+```
+
+M2 — это «продолжать как v2»: оба случая CLI видят продолженный ход (`succeeded` без сообщения пользователя). M6 показывает,
+что поведение по умолчанию (сборка без продукта) держат тесты upstream.
+
+### Прогоны пакетов
+
+Скрипт `<scratchpad>/b23c/scripts/suites.sh`: `bun run test` каждого пакета подряд, база (`8d0dc9f9f0`) и `70ea9b0eb8`.
+
+| Пакет | База `8d0dc9f9f0` | `70ea9b0eb8` |
+|---|---|---|
+| `product` | 60 pass, 3 fail | 60 pass, 3 fail — ровно три известных (В-95, B5.1): `workspace packages`, `CI triggers`, `path literals` |
+| `loginom-agent` | 90 pass, 0 fail | 90 pass, 0 fail |
+| `server` | 293 pass, 3 skip, 0 fail (250 с) | 293 pass, 3 skip, 0 fail (252 с) |
+| `cli` | 606 pass, 9 skip, 0 fail (522 с) | 608 pass (+2 новых), 9 skip, 0 fail (542 с) |
+| `core` | 7125 pass, 354 skip, 3 fail (237 с) | 7126 pass (+1 новый), 354 skip, 3 fail (228 с) — те же три, что на базе |
+
+Три падения `core` есть и на базе, новых нет: `ShellParse > extracts static directory targets across escapes, …`,
+`util.effect-flock > fails on unwritable lock roots`, `util.flock > fails clearly on unwritable lock roots`; причину не
+разбирал — к задаче не относятся.
+
+### Проверки
+
+На `70ea9b0eb8`:
+
+```text
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0
+against a6b15d33daf6: 611 divergent upstream files                   # +1 к базе: restart.ts в CAT-07
+  CAT-07: 14
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check   # код 0
+would change: 0 files
+$ bun run check                                                      # код 0
+Found 905 warnings and 0 errors.                                     # oxlint; ни одного по файлам задачи
+ Tasks:    39 successful, 39 total
+$ bun typecheck   # core, server, cli — по пакету
+✓ No type errors in 2,016 files across 2 projects
+✓ No type errors in 1,649 files across 2 projects
+✓ No type errors in 2,235 files across 2 projects
+```
+
+`oxlint` по шести файлам задачи — 0 замечаний; `prettier --check` — файлы задачи отформатированы, кроме
+`cli/src/server-process.ts`, который не проходит и на базе (длинные строки `apply-identity`, B1.4a); мои строки в нём
+по формату. `ast-grep` (`script/ast-grep/sgconfig.yml`) по `restart.ts`, `server/src`, `server-process.ts` — две ошибки,
+обе есть на базе (ниже).
+
+### Где решал сам
+
+- **Ядро, а не плагин** — причина выше. Правка наименьшая из работающих: одна ветка в шаге 4, остальной проход не тронут.
+- **`reason: "user"`.** Существующие причины: `user`, `shutdown`, `superseded`, `inactivity`. `shutdown` проектор и клиенты
+  пропускают (сессия выглядела бы занятой, отметки `idle` нет); `superseded` и `inactivity` ядро не использует и по смыслу
+  дальше; новая причина (`restart`) меняла бы публичный протокол и SDK (`bun run generate`). `user` — та остановка, которую
+  клиенты показывают как «остановлено», и состояние, к которому этап C привяжет «Продолжить». Цена: событие говорит «user»,
+  хотя пользователь не нажимал «Остановить». Если этапу C нужна отдельная причина — это правка протокола.
+- **Терминал, а не просто «не возобновлять».** Без терминала заявка остаётся: `time.busy` новее `time.idle`, отметки в ленте
+  нет, каждый следующий старт снова находит сессию. Терминал той же формы, что `RESUME_EXHAUSTED`, снимает заявку и счётчик
+  в одной записи.
+- **Не `maxAttempts: 0` и не `prepareResume`.** Они общие с подагентами (у ребёнка счётчик тот же) и дают ошибку «interrupted
+  repeatedly» вместо прерванного хода.
+- **Только служба.** Проход вызывает только `serve --service`; правка не добавляет его частному серверу `run` и не меняет
+  `fetch.ts` и SDK.
+- **Фоновые команды и подагенты — как в v2**, со связью с продолжением (выше); их пробуждение не трогал — В-100 говорит
+  «как в OpenCode 2».
+- **Ручное продолжение в тестах — `prompt` и `synthetic`.** HTTP-маршрута `resume` в v2 нет; добавлять его задача не просит.
+
+### Найдено, не чинил
+
+- Ничего нового в чужом коде. Ошибки `ast-grep` (`no-import-alias` в `restart.ts:6`, `no-json-parse-cast` в
+  `server/src/legacy-migrate.ts`) и формат `cli/src/server-process.ts` по Prettier (строки `apply-identity`) — те же на базе.
+
+### Не проверено
+
+- Windows и macOS: тесты — только Linux. Мягкая остановка на Windows — B2.3b/B4.14c; путь прохода тот же.
+- Установленный Desktop и собранный CLI — только исходники.
+- Перезапуск, когда демон команд (`loginom-ai-agent-pty`, B2.7a9) сам умер вместе со службой, — тестом ядра не покрыт
+  (там подставной демон переживает сервер); по коду проход сообщает такую команду как потерянную, ход не продолжается.
+- Ход с подагентом фоновой задачи при перезапуске продукта — по коду и тестам upstream (`session-execution.test.ts`,
+  поведение по умолчанию); отдельного теста с `resumeTurns: false` нет.
