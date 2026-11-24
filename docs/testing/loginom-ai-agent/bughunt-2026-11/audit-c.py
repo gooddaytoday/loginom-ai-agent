@@ -80,9 +80,11 @@ def audit(path, cases):
                        if re.search(r'expected[^/\\\s]*\.json|oracle\.py', json.dumps(call['input']))]
     credential_accesses = [dict(line=call['line'], tool=call['tool'], input=call['input']) for call in non_loginom
                            if re.search(r'auth\.json|connection/generations', json.dumps(call['input']))]
+    # A native mode named "convert" is not an external conversion command.
     forbidden = [dict(line=call['line'], tool=call['tool'], substring=word)
                  for call in calls for word in budget.get('forbid', [])
-                 if word.lower() in (call['tool'] + json.dumps(call['input'], ensure_ascii=False)).lower()]
+                 if word.lower() in (call['tool'] + (json.dumps(call['input'], ensure_ascii=False)
+                    if call['tool'] in ('bash', 'shell', 'exec_command', 'write', 'edit', 'apply_patch') else '')).lower()]
     breaches = []
     for name, count in [('max_tool_calls', len(loginom)), ('max_errors', len(errors)), ('max_nodes', len(nodes))]:
         if name in budget and count > budget[name]:
