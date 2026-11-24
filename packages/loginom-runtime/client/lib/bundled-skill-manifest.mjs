@@ -129,13 +129,12 @@ function validateSkillFiles(directoryName, files, { external = false, source = f
   const invalid = message => ({ code: 'LOGINOM_SKILL_FRONTMATTER_INVALID', path: 'SKILL.md', message });
   const format = message => (external ? warnings : errors).push(invalid(message));
   const content = files.get('SKILL.md');
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
-  const data = frontmatter && parseMetadata(frontmatter[1]);
-  if (!data || typeof data.name !== 'string' || !safeName(data.name)
-    || typeof data.description !== 'string' || !data.description.trim()) {
+  const header = skillHeader(content);
+  if (!header) {
     errors.push(invalid('SKILL.md needs a valid YAML header with a safe name and a non-empty text description.'));
     return { errors, warnings };
   }
+  const { data, bodyStart } = header;
   if (directoryName !== data.name) format('The skill name must match the folder name.');
   if (data.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.name))
     format('Use 1–64 lowercase ASCII letters, digits and single internal hyphens in the name.');
@@ -151,7 +150,7 @@ function validateSkillFiles(directoryName, files, { external = false, source = f
   if (data.metadata !== undefined && (!data.metadata || typeof data.metadata !== 'object'
     || Array.isArray(data.metadata) || Object.values(data.metadata).some(value => typeof value !== 'string')))
     format('Metadata must be a map with text values.');
-  if (content.slice(frontmatter[0].length).trimEnd().split(/\r?\n/).length > 500)
+  if (content.slice(bodyStart).trimEnd().split(/\r?\n/).length > 500)
     warnings.push({ code: 'LOGINOM_SKILL_LENGTH', path: 'SKILL.md', message: 'Consider moving details into a linked reference to keep SKILL.md under 500 lines.' });
 
   const generated = typeof data.metadata?.['loginom-generated'] === 'string' ? data.metadata['loginom-generated'] : undefined;
@@ -179,6 +178,18 @@ function validateSkillFiles(directoryName, files, { external = false, source = f
       });
     }
   }
+}
+
+function skillHeader(content) {
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+  const data = frontmatter && parseMetadata(frontmatter[1]);
+  if (data && typeof data.name === 'string' && safeName(data.name)
+    && typeof data.description === 'string' && data.description.trim())
+    return { data, bodyStart: frontmatter[0].length };
+}
+
+export function readSkillHeader(content) {
+  return skillHeader(content)?.data;
 }
 
 function parseMetadata(header) {

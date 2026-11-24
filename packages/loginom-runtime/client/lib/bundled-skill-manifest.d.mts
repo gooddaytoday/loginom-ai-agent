@@ -13,13 +13,17 @@ export function verifyBundledSkills(resources: string, options?: { mode?: "insta
   content: string
 }[]>
 
+type SkillMetadata = { name: string; description: string; [key: string]: unknown }
+
 type SkillDiagnostic = { code: string; message: string; path?: string }
 
 export function inspectSkillFolder(directory: string, options?: {
   external?: boolean
   authorizeRead?: (paths: string[]) => Promise<void>
 }): Promise<{
-  data?: { name: string; description: string; [key: string]: unknown }
+  data?: SkillMetadata
   errors: SkillDiagnostic[]
   warnings: SkillDiagnostic[]
 }>
+
+export function readSkillHeader(content: string): SkillMetadata | undefined

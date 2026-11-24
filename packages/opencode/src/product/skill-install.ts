@@ -4,6 +4,7 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Flock } from "@opencode-ai/core/util/flock"
 import { Global } from "@opencode-ai/core/global"
 import { validateSkillFolder } from "@loginom-ai-agent/loginom-host/bundled-skills"
+import { githubSkillURL, prepareGitHubSkill } from "@loginom-ai-agent/loginom-host/skill-install/github"
 import { prepareLocalSkill } from "@loginom-ai-agent/loginom-host/skill-install/index"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -24,7 +25,7 @@ export const SkillInstallTool = Tool.define(
     const flags = yield* RuntimeFlags.Service
     const skills = yield* Skill.Service
     return {
-      description: "Validate a portable Agent Skill folder without installing it. Use install only when the user asks to copy a skill from a local folder; the product will request one-time approval.",
+      description: "Validate a portable Agent Skill folder without installing it. For a requested installation, pass a local folder or an HTTPS GitHub URL. If several candidates are returned, ask the user to choose and pass its exact returned URL. Publication requires one-time approval.",
       parameters: Parameters,
       execute: (args: typeof Parameters.Type, ctx: Tool.Context) =>
         Effect.gen(function* () {
@@ -33,8 +34,9 @@ export const SkillInstallTool = Tool.define(
             throw Error("External skills are disabled in this Loginom process.")
           const instance = yield* InstanceState.context
           const bridge = yield* EffectBridge.make()
-          const source = args.source.startsWith("~/") ? resolve(Global.Path.home, args.source.slice(2)) : resolve(instance.directory, args.source)
-          const directory = yield* fs.realPath(source).pipe(Effect.orElseSucceed(() => source))
+          const github = args.action === "install" && /^[a-z][a-z0-9+.-]*:\/\//i.test(args.source) ? githubSkillURL(args.source) : undefined
+          const source = github ?? (args.source.startsWith("~/") ? resolve(Global.Path.home, args.source.slice(2)) : resolve(instance.directory, args.source))
+          const directory = github ? source : yield* fs.realPath(source).pipe(Effect.orElseSucceed(() => source))
           const askPaths = (permission: "read" | "edit", paths: string[], filepath: string) =>
             ctx.ask({
               permission,
@@ -46,9 +48,13 @@ export const SkillInstallTool = Tool.define(
             bridge.promise(askPaths("read", paths, directory)).then(() => ctx.abort.throwIfAborted())
           if (args.action === "validate")
             yield* ctx.ask({ permission: "skill_install", patterns: [args.action], always: [args.action], metadata: {} })
-          yield* assertExternalDirectoryEffect(ctx, source, { kind: "directory" })
-          if (directory !== source) yield* assertExternalDirectoryEffect(ctx, directory, { kind: "directory" })
-          yield* askPaths("read", [...new Set([source, directory])], directory)
+          if (github) {
+            yield* ctx.ask({ permission: "webfetch", patterns: [github], always: [github], metadata: { url: github } })
+          } else {
+            yield* assertExternalDirectoryEffect(ctx, source, { kind: "directory" })
+            if (directory !== source) yield* assertExternalDirectoryEffect(ctx, directory, { kind: "directory" })
+            yield* askPaths("read", [...new Set([source, directory])], directory)
+          }
           if (args.action === "validate") {
             const result = yield* Effect.tryPromise(() =>
               validateSkillFolder(directory, { authorizeRead }),
@@ -60,19 +66,32 @@ export const SkillInstallTool = Tool.define(
             }
           }
 
+          const staging = {
+            signal: ctx.abort,
+            lock: <T>(name: string, control: string, run: () => Promise<T>) =>
+              Flock.withLock("skill-install:" + name, run, { dir: control, signal: ctx.abort }),
+          }
           return yield* Effect.acquireUseRelease(
-            Effect.tryPromise(() => prepareLocalSkill(directory, Global.Path.home, authorizeRead, {
-              signal: ctx.abort,
-              lock: (name, control, run) => Flock.withLock("skill-install:" + name, run, { dir: control, signal: ctx.abort }),
-            })),
-            (candidate) => Effect.gen(function* () {
+            Effect.tryPromise({
+              try: async () => github
+                ? prepareGitHubSkill(github, Global.Path.home, staging)
+                : { candidate: await prepareLocalSkill(directory, Global.Path.home, authorizeRead, staging), sha: undefined, directory: undefined, alternatives: undefined },
+              catch: (error) => error,
+            }),
+            (prepared) => Effect.gen(function* () {
+              const candidate = prepared.candidate
+              if (!candidate) return {
+                title: "Choose a skill",
+                output: JSON.stringify({ status: "choose", sha: prepared.sha, candidates: prepared.alternatives }),
+                metadata: {},
+              }
               const active = yield* skills.get(candidate.name)
               const override = active?.source === "project" || active?.source === "config" || active?.source === "url"
                 ? active.location
                 : undefined
               const result = (status: string) => ({
                 title: "Install skill",
-                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, warnings: candidate.warnings, override }),
+                output: JSON.stringify({ status, name: candidate.name, path: candidate.path, sha: prepared.sha, warnings: candidate.warnings, override }),
                 metadata: {},
               })
               let previous = candidate.previous
@@ -89,6 +108,7 @@ export const SkillInstallTool = Tool.define(
                     skillInstall: [
                       (previous ? "Замена скилла " : "Установка скилла ") + literal(candidate.name),
                       "Источник: " + literal(source),
+                      ...(prepared.sha ? ["GitHub SHA: " + prepared.sha, "Каталог в репозитории: " + literal(prepared.directory ?? ".")] : []),
                       ...(previous ? ["Текущая ревизия: " + previous.digest] : []),
                       "Ревизия копии: " + candidate.digest,
                       "Описание автора: " + literal(candidate.description),
@@ -98,12 +118,14 @@ export const SkillInstallTool = Tool.define(
                     ],
                   },
                 })
-                const publication = yield* Effect.tryPromise(() => candidate.publish(previous))
+                const publication = yield* Effect.tryPromise({ try: () => candidate.publish(previous), catch: (error) => error })
                 if (typeof publication === "string") return result(publication)
                 previous = publication.previous
               }
             }),
-            (candidate) => Effect.tryPromise(candidate.dispose).pipe(Effect.catch(() => Effect.logWarning("Could not remove the skill staging folder"))),
+            (prepared) => prepared.candidate
+              ? Effect.tryPromise(prepared.candidate.dispose).pipe(Effect.catch(() => Effect.logWarning("Could not remove the skill staging folder")))
+              : Effect.void,
           ).pipe(Effect.orDie)
         }),
     }

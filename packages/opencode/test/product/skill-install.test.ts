@@ -107,6 +107,18 @@ it.live("the chat validates with read permissions and only publishes after one-t
       yield* permissions.reply({ requestID: confirmed.id, reply: "once" })
       expect(JSON.parse((yield* Fiber.join(confirmUpdate)).output).status).toBe("installed")
       expect(yield* Effect.promise(() => Bun.file(installedResource).text())).toBe("id, amount, version-two")
+
+      const networkRefusal = yield* Effect.exit(tool!.execute({
+        action: "install", source: "https://github.com/owner/repository",
+      }, {
+        ...ctx,
+        ask: (request) => permissions.ask({ ...request, sessionID, ruleset: [
+          { permission: "*", pattern: "*", action: "allow" },
+          { permission: "webfetch", pattern: "*", action: "deny" },
+        ] }).pipe(Effect.orDie),
+      }))
+      expect(networkRefusal._tag).toBe("Failure")
+      expect(yield* permissions.list()).toEqual([])
     }),
   ),
 )
