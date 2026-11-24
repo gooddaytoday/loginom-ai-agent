@@ -19,7 +19,7 @@ type Entry = {
 }
 const keyId = (k: Key) => JSON.stringify([k.corpus, k.taskId, k.round])
 const index = new Map<string, Key & { attempts: Entry[] }>()
-const gaps: ({ missing: string } | { resultFile: string; key: Key; accounted: ReturnType<typeof accounting> })[] = []
+const gaps: Record<string, unknown>[] = []
 const seenResults = new Set<string>()
 let preflights = 0
 
@@ -47,10 +47,7 @@ async function readRun(runDir: string, keys: Key[], ledger?: CampaignJournal) {
     const resultFile = path.join(runDir, row.taskId, String(entry.attempt), "result.json")
     if (seenResults.has(resultFile)) throw Error("Duplicate native measurement")
     seenResults.add(resultFile)
-    const file = Bun.file(resultFile)
-    const result: AttemptResult | null = await file.exists() ? await file.json() : null
-    if (result && (result.task_id !== entry.taskId || result.attempt !== entry.attempt || result.slot_id !== entry.slotId))
-      throw Error("Result identity mismatch")
+    const result = await readResult(resultFile, row.taskId, entry.slotId)
     const accounted = ledger?.attempts.find(item => item.resultFile === resultFile)
     if (accounted && keyId(accounted.key) !== keyId(row)) throw Error("Ledger result identity mismatch")
     row.attempts.push({ commandId: native.commandId, sourceCommit: config.source_commit ?? null, slot: entry.slotId, resultFile, result: result && outcome(result),
@@ -58,6 +55,15 @@ async function readRun(runDir: string, keys: Key[], ledger?: CampaignJournal) {
       ...(result?.infra_retry ? { initial: outcome(result.infra_retry.initial) } : {}),
       ...(accounted ? { accounted: accounting(accounted) } : {}) })
   }
+}
+
+async function readResult(file: string, taskId: string, slot?: string) {
+  const resultFile = Bun.file(file)
+  if (!await resultFile.exists()) return null
+  const result: AttemptResult | null = await resultFile.json().catch(() => null)
+  if (!result) { gaps.push({ unreadableResult: file }); return null }
+  if (result.task_id !== taskId || result.attempt !== 1 || (slot !== undefined && result.slot_id !== slot)) throw Error("Result identity mismatch")
+  return result
 }
 
 async function audit() {
@@ -68,6 +74,11 @@ async function audit() {
     const key = { taskId: config.only[0], round: 1 }
     plan(key)
     await readRun(runDir, [key])
+    const resultFile = path.join(runDir, key.taskId, "1/result.json")
+    if (!seenResults.has(resultFile)) {
+      const result = await readResult(resultFile, key.taskId)
+      if (result) gaps.push({ admission: "unconfirmed", key, resultFile, result: outcome(result) })
+    }
     return { purpose: values.purpose, assignment: values.assignment }
   }
   if (!values.manifest || !values.journal || values.run || values.purpose || values.assignment || values.cold)
@@ -78,11 +89,16 @@ async function audit() {
     throw Error("Campaign manifest and ledger disagree")
   if (manifest.seriesPurpose !== undefined && !purposes.includes(manifest.seriesPurpose)) throw Error("Unknown recovery series purpose")
   manifest.keys.forEach(plan)
+  let starts = 0
   for (const batch of ledger.batches) {
+    const before = seenResults.size
     for (const item of await readdir(batch.resultsDir, { withFileTypes: true }).catch(error => { missingFile(error); return [] })) {
       if (item.isDirectory()) await readRun(path.join(batch.resultsDir, item.name), batch.keys, ledger).catch(missingFile)
     }
+    starts += Math.max(batch.startedAttempts ?? 0, seenResults.size - before)
   }
+  const missing = Math.max(ledger.startedAttempts ?? 0, starts) - seenResults.size
+  if (missing > 0) gaps.push({ missingNativeAdmissions: missing, source: values.journal })
   for (const item of ledger.attempts) {
     if (!index.has(keyId(item.key))) throw Error("Unplanned ledger result")
     if (!seenResults.has(item.resultFile)) gaps.push({ resultFile: item.resultFile, key: item.key, accounted: accounting(item) })
@@ -111,7 +127,7 @@ async function coldOutcome(attemptDir: string, source: string) {
   if (digest !== cold.serverLgpSha256) return { source, gap: "package-mismatch" }
   return { source, serverLgpSha256: digest, status: cold.status, allNodesExecuted: cold.allNodesExecuted,
     settingsApplied: cold.settingsApplied, saveRequested: cold.saveRequested, serverLgpUnchanged: cold.serverLgpUnchanged,
-    nodeCount: cold.nodeCount, cleanup: cold.cleanup ?? null }
+    nodeCount: cold.nodeCount, uiCleanup: cold.cleanup ?? null }
 }
 
 const series = await audit()

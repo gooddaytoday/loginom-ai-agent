@@ -30,10 +30,15 @@ test("standalone pilot separates measurement, preflight, CLI, judgement and clea
   const f = await pilot()
   await write(path.join(f.run, "double/1/result.json"), { task_id: "double", slot_id: "slot-a", attempt: 1,
     status: "failed", exit_code: 1, pass: true, score: 100, judge_status: "scored", environment_cleanup: { status: "confirmed" } })
-  const report = await audit("--run", f.run, "--purpose", "pilot", "--assignment", "pilot-ticket")
+  const args = ["--run", f.run, "--purpose", "pilot", "--assignment", "pilot-ticket"]
+  const report = await audit(...args)
   expect(report).toMatchObject({ purpose: "pilot", assignment: "pilot-ticket", planned: { pilot: 1, corpus: 0 }, preflights: 1,
     keys: [{ taskId: "double", round: 1, attempts: [{ commandId: f.journal.commandId,
       result: { status: "failed", exitCode: 1, pass: true, score: 100, judgeStatus: "scored", cleanup: "confirmed" } }] }] })
+  await rm(f.commandJournal)
+  const incomplete = await audit(...args)
+  expect(incomplete.keys[0].attempts).toEqual([])
+  expect(incomplete.gaps).toContainEqual(expect.objectContaining({ admission: "unconfirmed", result: expect.objectContaining({ pass: true, score: 100 }) }))
 })
 
 test("held-out ledger preserves planned, missing-result and retried attempts under the assigned key", async () => {
@@ -49,11 +54,17 @@ test("held-out ledger preserves planned, missing-result and retried attempts und
   await write(journalFile, { campaignId: "paired", manifestHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest)).digest("hex"),
     batches: [first, second].map(f => ({ resultsDir: path.dirname(f.run), keys: [key] })),
     attempts: [{ key, resultFile, counted: true, pass: true, score: 95, cleanupConfirmed: false }] })
-  const report = await audit("--manifest", manifestFile, "--journal", journalFile)
+  const args = ["--manifest", manifestFile, "--journal", journalFile]
+  const report = await audit(...args)
   expect(report).toMatchObject({ purpose: "held-out", preflights: 2,
     keys: [{ ...key, attempts: [{ commandId: first.journal.commandId, result: null },
       { commandId: second.journal.commandId, result: { status: "completed" }, initial: { status: "infra_error" },
         accounted: { counted: true, pass: true, score: 95, cleanupConfirmed: false } }] }, { round: 2, attempts: [] }] })
+  const damaged = path.join(first.run, "double/1/result.json")
+  await Bun.write(damaged, "{")
+  const partial = await audit(...args)
+  expect(partial.gaps).toContainEqual({ unreadableResult: damaged })
+  expect(partial.keys[0].attempts).toMatchObject([{ result: null }, { result: { pass: true } }])
 })
 
 test("cold evidence binds to the saved package and keeps an unrelated verdict out of the pilot", async () => {
@@ -65,7 +76,7 @@ test("cold evidence binds to the saved package and keeps an unrelated verdict ou
     allNodesExecuted: true, settingsApplied: false, saveRequested: false, serverLgpUnchanged: true }
   const args = ["--run", f.run, "--purpose", "pilot", "--assignment", "pilot-ticket", "--cold", cold]
   await write(cold, evidence)
-  expect((await audit(...args)).keys[0].attempts[0].cold).toMatchObject(evidence)
+  expect((await audit(...args)).keys[0].attempts[0].cold).toMatchObject({ ...evidence, uiCleanup: null })
   await write(cold, { ...evidence, serverLgpSha256: "1".repeat(64) })
   expect((await audit(...args)).keys[0].attempts[0]).toMatchObject({ result: { pass: true }, cold: { gap: "package-mismatch" } })
 })
@@ -75,7 +86,7 @@ test("a missing journal is a gap and an old manifest does not relabel its retain
   const manifest = { id: "old", keys: [f.planned] }, resultFile = path.join(f.run, "double/1/result.json")
   await write(manifestFile, manifest)
   await write(journalFile, { campaignId: "old", manifestHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest)).digest("hex"),
-    batches: [{ resultsDir: path.dirname(f.run), keys: [f.planned] }],
+    startedAttempts: 1, batches: [{ resultsDir: path.dirname(f.run), keys: [f.planned], startedAttempts: 1 }],
     attempts: [{ key: f.planned, resultFile, counted: true, pass: false, score: 53, cleanupConfirmed: true }] })
   await rm(f.commandJournal)
   const report = await audit("--manifest", manifestFile, "--journal", journalFile)
@@ -84,6 +95,8 @@ test("a missing journal is a gap and an old manifest does not relabel its retain
   expect(report.gaps).toContainEqual(expect.objectContaining({ resultFile, accounted: { counted: true, pass: false, score: 53, cleanupConfirmed: true } }))
   await rm(path.join(f.run, "config.json"))
   expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missing: path.join(f.run, "config.json") })
+  await rm(f.run, { recursive: true })
+  expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missingNativeAdmissions: 1, source: journalFile })
   await rm(path.dirname(f.run), { recursive: true })
   expect((await audit("--manifest", manifestFile, "--journal", journalFile)).gaps).toContainEqual({ missing: path.dirname(f.run) })
 })
