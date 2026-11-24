@@ -35,6 +35,8 @@ import {
 } from "./permissions"
 import { apply, bundled, hub } from "./skills"
 
+export { Dashboard }
+
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
 const runner = {
   id: "loginom.runner",
@@ -115,6 +117,13 @@ export default Plugin.define({
     const dashboard = Dashboard.latch(ctx.location.directory)
     const profile = (sessionID: string): Profile =>
       dashboard() ? "loginom-dashboard" : (granted.get(sessionID) ?? "default")
+    // A dashboard chat runs only on its own draft (B2.9d): an old chat of a folder that was deleted or prepared again,
+    // or one moved in from elsewhere, is refused before its prompt is admitted, before the model and before any tool.
+    const binding = Dashboard.binding(ctx, dashboard)
+    const bound = async (sessionID: string) => {
+      const refused = await binding.refusal(sessionID)
+      if (refused) throw new Error(refused)
+    }
 
     // Skill sources (G6): the bundled catalog owns the product's skill IDs and names, so only it grants access.
     const resources = process.env.LOGINOM_AI_AGENT_RESOURCES
@@ -268,7 +277,7 @@ export default Plugin.define({
           () => undefined,
           (error: unknown) => error,
         )
-    await ctx.permission.hook("evaluate", (event) => {
+    await ctx.permission.hook("evaluate", async (event) => {
       if (event.metadata?.[marker] === probe) {
         // The policy's deny arrives from OpenCode's hook, which runs before this one (B2.6c).
         if (event.effect !== "deny") event.effect = "allow"
@@ -276,8 +285,15 @@ export default Plugin.define({
       }
       // A dashboard session reaches nothing outside its work folder and writes only in `src`, without a question
       // (B2.9c). It is settled before `settle`, whose own directories (`ownRead`) are outside. A deny that arrives here
-      // is the administrator's policy (B2.6c), and it stays.
-      const word = dashboard() && event.effect !== "deny" ? Dashboard.settle(ctx.location.directory, event) : undefined
+      // is the administrator's policy (B2.6c), and it stays. The draft is checked again here, the last step before
+      // OpenCode reads or writes the file (B2.9d).
+      const live = dashboard() && event.effect !== "deny"
+      const refused = live ? await binding.refusal(event.sessionID) : undefined
+      const word = refused
+        ? { effect: "deny" as const, message: refused }
+        : live
+          ? Dashboard.settle(ctx.location.directory, event)
+          : undefined
       if (word) {
         event.effect = word.effect
         if ("message" in word) event.message = word.message
@@ -349,6 +365,7 @@ export default Plugin.define({
       dock.hide(event)
     }
     await ctx.session.hook("context", async (event) => {
+      await bound(event.sessionID)
       // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
       // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
       // a resume) publishes it before this plugin's `setup` subscribes; its first step waits for the activation (B2.6a2).
@@ -362,9 +379,16 @@ export default Plugin.define({
       const denied = deniedKinds([...settings, ...(session.permissions ?? [])])
       if (denied.length > 0) event.system.push({ type: "text", text: deniedKindsText(denied) })
     })
-    await ctx.session.hook("compaction", hide)
-    await ctx.session.hook("generate", hide)
+    await ctx.session.hook("compaction", async (event) => {
+      await bound(event.sessionID)
+      hide(event)
+    })
+    await ctx.session.hook("generate", async (event) => {
+      await bound(event.sessionID)
+      hide(event)
+    })
     await ctx.tool.hook("execute.before", async (event) => {
+      await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
       // A dashboard session's file tools stay in its work folder (B2.9c); a client counts the refusal as a denied
@@ -388,6 +412,15 @@ export default Plugin.define({
     // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
     await ctx.tool.hook("execute.after", async (event) => {
       calls.delete(`${event.messageID} ${event.id}`)
+      // The folder may have been prepared again while the call ran: its result does not reach the old chat (B2.9d,
+      // 0.4 checked after a read). A write that already landed cannot be undone.
+      if (dashboard() && event.status === "completed") {
+        const refused = await binding.refusal(event.sessionID)
+        if (refused) {
+          event.result = { content: refused }
+          return
+        }
+      }
       if (event.status === "error") {
         // The user's «Отклонить» and a rule's deny reach the model as text, so it explains and the turn goes on (B2.6b,
         // В-75). A Location that shuts down (a reload) cancels its open questions with the same decline; that one stays.
@@ -409,6 +442,7 @@ export default Plugin.define({
     // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
     // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
     await ctx.session.hook("prompt", async (event) => {
+      await bound(event.sessionID)
       // An attached agent asks for a subagent, which a dashboard session does not run (0.4 refused its subtask).
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
@@ -424,8 +458,9 @@ export default Plugin.define({
       else granted.set(event.sessionID, requested)
       await dock.refresh(event.sessionID, requested, undefined, true)
     })
-    await ctx.session.hook("fork", (event) => {
+    await ctx.session.hook("fork", async (event) => {
       granted.delete(event.sessionID)
+      await binding.fork(event.sessionID)
     })
 
     await ctx.rpc.register(runner, {

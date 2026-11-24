@@ -16,6 +16,7 @@ type Data = {
 export type Editor = {
   set: (formatter: Info) => void
   remove: (name: string) => void
+  list: () => string[]
 }
 
 export interface Interface extends State.Transformable<Editor> {
@@ -42,6 +43,7 @@ const layer = Layer.effect(
         remove: (name) => {
           editor.formatters = editor.formatters.filter((formatter) => formatter.name !== name)
         },
+        list: () => editor.formatters.map((formatter) => formatter.name),
       }),
     })
 

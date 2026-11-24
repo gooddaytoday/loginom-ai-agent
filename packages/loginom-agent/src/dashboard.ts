@@ -3,12 +3,17 @@
 // Location's directory, never model input (0.4 `packages/opencode/src/product/dashboard-session.ts`).
 export * as Dashboard from "./dashboard"
 
-import { existsSync, lstatSync, realpathSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, join, relative, resolve, sep } from "node:path"
-import { isDashboardWorkDirectory } from "@loginom-ai-agent/product/dashboard-root"
+import {
+  DASHBOARD_SESSION_MARKER,
+  dashboardSessionMarker,
+  isDashboardWorkDirectory,
+} from "@loginom-ai-agent/product/dashboard-root"
+import type { Plugin } from "@opencode/plugin"
 import { Global } from "@opencode/util/global"
 import { Patch } from "@opencode/util/patch"
-import { Result } from "effect"
+import { Option, Result, Schema } from "effect"
 
 /** The root of the dashboards' folders: the server's own data directory, as in 0.4. */
 export const root = () => join(Global.Path.data, "dashboards")
@@ -24,6 +29,112 @@ export function latch(directory: string) {
   const state = { work: false }
   return () => (state.work ||= isWork(directory))
 }
+
+/**
+ * The draft the dashboard folder of the Location at `directory` holds now (0.4 `draftMarker`): the `draftId` of its
+ * `control/binding.json`, `true` for a folder prepared before drafts had IDs (no file or no `draftId`), or nothing when
+ * the work folder is gone or its binding cannot be read.
+ */
+export function draft(directory: string) {
+  if (!isWork(directory)) return
+  const control = readControl(join(dirname(realpathSync(directory)), "control", "binding.json"))
+  if (Option.isSome(control)) return control.value.draftId ?? true
+}
+
+/**
+ * The draft binding of the sessions a Location runs (B2.9d, 0.4 `Session.getForExecution`): a dashboard chat works
+ * only on the draft its folder held when the chat began, so a chat of a folder that was deleted, or deleted and prepared
+ * again, is refused before the model and before any tool. The binding is the plugin's own, stored by session ID; the
+ * session's metadata, which the public API sets and forks inherit, is read once per dashboard Location, only to adopt
+ * the markers 0.4 kept there. `refusal` answers with the refusal, or nothing when the session may run.
+ * - Outside a dashboard (`dashboard()` is false) a bound session is refused: its folder is gone, or it was moved away.
+ * - In a dashboard, a session without a binding takes one when first seen: a fork its source's, a session moved in from
+ *   elsewhere none (refused here, still free elsewhere), any other the current draft — it has had no input yet, or it
+ *   is a row 0.4 kept without a marker, which 0.4 adopted too.
+ * - `fork` gives a new fork its source's binding wherever it runs, as 0.4's fork carried the marker: a fork of a chat
+ *   moved out of its dashboard is refused too.
+ */
+export function binding(plugin: Pick<Plugin.Context, "location" | "session" | "storage">, dashboard: () => boolean) {
+  const directory = plugin.location.directory
+  // Bindings change only through this Location's plugin or by a move to another Location, which reads storage afresh.
+  const known = new Map<string, Binding | undefined>()
+  const stored = async (sessionID: string) => {
+    if (!known.has(sessionID)) known.set(sessionID, dashboardSessionMarker(await plugin.storage.get(key + sessionID)))
+    return known.get(sessionID)
+  }
+  const bind = async (sessionID: string, value: Binding) => {
+    await plugin.storage.set(key + sessionID, value)
+    known.set(sessionID, value)
+  }
+  // 0.4's markers, once per Location: a binding already stored wins, and the flag is written last.
+  const page = async (cursor?: string): Promise<void> => {
+    const result = await plugin.session.list(cursor ? { cursor, limit: 100 } : { directory, limit: 100 })
+    await Promise.all(
+      result.data.map(async (session) => {
+        const marker = dashboardSessionMarker(session.metadata?.[DASHBOARD_SESSION_MARKER])
+        if (marker !== undefined && (await stored(session.id)) === undefined) await bind(session.id, marker)
+      }),
+    )
+    if (result.data.length > 0 && result.cursor.next) await page(result.cursor.next)
+  }
+  const migration: { done?: Promise<void> } = {}
+  const migrate = () =>
+    (migration.done ??= (async () => {
+      if ((await plugin.storage.get(migrated + directory)) === true) return
+      await page()
+      await plugin.storage.set(migrated + directory, true)
+    })().catch((error: unknown) => {
+      migration.done = undefined
+      throw error
+    }))
+  const adopt = async (sessionID: string, current: Binding) => {
+    const session = await plugin.session.get({ sessionID })
+    const value = session.fork
+      ? await stored(session.fork.sessionID)
+      : (await plugin.session.context({ sessionID })).some((message) => message.type === "location-switched")
+        ? undefined
+        : current
+    if (value !== undefined) await bind(sessionID, value)
+    return value
+  }
+  return {
+    refusal: async (sessionID: string) => {
+      if (!dashboard()) return (await stored(sessionID)) === undefined ? undefined : unbound
+      await migrate()
+      const current = draft(directory)
+      if (current === undefined) return unbound
+      if (((await stored(sessionID)) ?? (await adopt(sessionID, current))) !== current) return unbound
+    },
+    fork: async (sessionID: string) => {
+      const session = await plugin.session.get({ sessionID })
+      const source = session.fork ? await stored(session.fork.sessionID) : undefined
+      if (source !== undefined) await bind(sessionID, source)
+    },
+  }
+}
+
+/** What a chat that does not belong to the dashboard's current draft reads (0.4: `LOGINOM_SCOPE_DENIED`). */
+export const unbound = "LOGINOM_SCOPE_DENIED: this chat does not belong to the dashboard's current draft"
+
+// A binding as 0.4 marked it: a draft ID, `true` for a folder older than draft IDs, or `"deleted"` (B2.9g).
+type Binding = NonNullable<ReturnType<typeof dashboardSessionMarker>>
+// Keys in the plugin's storage: a session's binding, and the Locations whose 0.4 markers were adopted.
+const key = "dashboard.binding:"
+const migrated = "dashboard.migrated:"
+const readControl = (file: string) => {
+  try {
+    return decodeControl(readFileSync(file, "utf8"))
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? Option.some({ draftId: undefined }) : Option.none()
+  }
+}
+const decodeControl = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      draftId: Schema.optional(Schema.String.check(Schema.isPattern(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i))),
+    }),
+  ),
+)
 
 /**
  * The dashboard's word on a permission request in its Location at `directory` (B2.9c; by parity with 0.4, where the

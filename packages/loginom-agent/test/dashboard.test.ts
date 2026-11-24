@@ -4,6 +4,8 @@
 // CLI computed themselves; in OpenCode 2 the server prepares the folders (B2.9h), so only its own root counts.
 // Its paths (B2.9c): the path case of the same file on `Dashboard.pathError`, and what the plugin's hooks ask of it
 // (`settle`, `callError`); the real tools on a server are `server/test/loginom-dashboard-files.test.ts`.
+// Its draft (B2.9d): what `Dashboard.draft` reads from the folder's binding, and that `Dashboard.binding` adopts 0.4's
+// markers once per Location, across a restart too; the binding of chats on a server is the same server file.
 // The root is under the server's data directory, which each case points at a temporary directory of its own
 // (`fixture/temporary-data.ts`) and removes with its folders.
 import { expect, test } from "bun:test"
@@ -231,3 +233,60 @@ test("a dashboard's file tools are checked before they run: a search's path, a w
 })
 
 const patch = (body: string) => `*** Begin Patch\n${body}\n*** End Patch`
+
+test("a dashboard folder's draft is its binding's draftId, true before drafts had IDs, and nothing it cannot read", async () => {
+  await using folder = await dashboardFolder()
+  const file = join(folder.root, "control", "binding.json")
+  expect(Dashboard.draft(folder.work)).toBe(true)
+  await mkdir(join(folder.root, "control"))
+  const draft = crypto.randomUUID()
+  await Bun.write(file, JSON.stringify({ snapshotId: crypto.randomUUID(), draftId: draft }))
+  expect(Dashboard.draft(folder.work)).toBe(draft)
+  await Bun.write(file, JSON.stringify({ snapshotId: crypto.randomUUID() }))
+  expect(Dashboard.draft(folder.work)).toBe(true)
+  for (const text of ["synthetic", "[]", JSON.stringify({ draftId: "draft" }), JSON.stringify({ draftId: 7 })]) {
+    await Bun.write(file, text)
+    expect([text, Dashboard.draft(folder.work)]).toEqual([text, undefined])
+  }
+  await rm(file)
+  await mkdir(file)
+  expect(Dashboard.draft(folder.work)).toBeUndefined()
+  await rm(folder.work, { recursive: true })
+  expect(Dashboard.draft(folder.work)).toBeUndefined()
+})
+
+test("0.4's markers are adopted once per Location: a restart reads no metadata again", async () => {
+  await using folder = await dashboardFolder()
+  await mkdir(join(folder.root, "control"))
+  const draft = crypto.randomUUID()
+  await Bun.write(join(folder.root, "control", "binding.json"), JSON.stringify({ draftId: draft }))
+  // The plugin's storage and the Location's sessions, as the server keeps them across the plugin's restarts.
+  const storage = new Map<string, unknown>()
+  const metadata = { old: { loginom_dashboard: crypto.randomUUID() }, current: { loginom_dashboard: draft } }
+  const listed: unknown[] = []
+  const plugin = {
+    location: { directory: folder.work },
+    storage: {
+      get: async (key: string) => storage.get(key),
+      set: async (key: string, value: unknown) => void storage.set(key, value),
+    },
+    session: {
+      list: async (input: unknown) => {
+        listed.push(input)
+        return { data: Object.entries(metadata).map(([id, value]) => ({ id, metadata: value })), cursor: {} }
+      },
+      get: async () => ({}),
+      context: async () => [],
+    },
+  } as unknown as Parameters<typeof Dashboard.binding>[0]
+  const first = Dashboard.binding(plugin, () => true).refusal
+  expect(await first("current")).toBeUndefined()
+  expect(await first("old")).toBe(Dashboard.unbound)
+  expect(listed).toEqual([{ directory: folder.work, limit: 100 }])
+  // Metadata that names the draft now changes nothing after a restart, and is not even listed.
+  metadata.old = { loginom_dashboard: draft }
+  const restarted = Dashboard.binding(plugin, () => true).refusal
+  expect(await restarted("old")).toBe(Dashboard.unbound)
+  expect(await restarted("current")).toBeUndefined()
+  expect(listed).toHaveLength(1)
+})
