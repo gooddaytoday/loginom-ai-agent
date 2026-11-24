@@ -146,8 +146,9 @@ test('serialized input reconciliation verifies the retained opening without usin
  assert.equal(result.opening_operation_id,'open');assert.equal(f.gestures.length,2);
 });
 
-test('an input opening deadline after the click can be reconciled for cleanup without another click',async()=>{
- const f=fixture('input'),locator=f.page.locator;
+for(const icon of [null,'bg-vendor-icon-exportnative'])test('an input opening deadline after the click can be reconciled for cleanup without another click: '+icon,async()=>{
+ const f=icon?textExportFixture(1):fixture('input'),locator=f.page.locator;
+ if(icon)f.node.FIconCls=icon;
  f.page.locator=selector=>{
   const control=locator(selector),click=control.click;
   control.click=async options=>{
@@ -162,6 +163,7 @@ test('an input opening deadline after the click can be reconciled for cleanup wi
  assert.equal(f.prep.inputPortOpenReceipts.get('open').phase,'open_issued');
  const reconciled=await openPreparedOutputPort(f.page,{...f.task,deadline:Date.now()+10000,reconcile_only:true},f.readNode);
  assert.equal(reconciled.status,'SUCCEEDED',reconciled.error);assert.equal(reconciled.opening_operation_id,'open');
+ assert.equal(reconciled.native_index,0);assert.equal(reconciled.wizard_index,icon?1:0);
  assert.equal(f.gestures.length,2);assert.equal(failed.cleanup_complete,false);
 });
 
@@ -535,10 +537,11 @@ function textExportFixture(wizardIndex=0) {
  return f;
 }
 
-for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree','unbounded','non-array'])
- test('Excel export binds its distinct owned input tree slot: '+fault,async()=>{
+for(const [name,icon] of [['Excel','bg-vendor-icon-exportexcelfile'],['LGD','bg-vendor-icon-exportnative']])
+ for(const fault of ['none','foreign-root','foreign-collection','foreign-parent','missing-tree','duplicate-port','duplicate-tree','unbounded','non-array'])
+ test(name+' export binds its distinct owned input tree slot: '+fault,async()=>{
   const f=textExportFixture(1),group=f.portTree.ParentNode;
-  f.node.FIconCls='bg-vendor-icon-exportexcelfile';
+  f.node.FIconCls=icon;
   if(fault==='foreign-root')group.ParentNode.FInputPortsRootNode={};
   if(fault==='foreign-collection')f.portTree.FCollection={};
   if(fault==='foreign-parent')group.FSubNodes.FParentNode={};
