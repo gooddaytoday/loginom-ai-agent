@@ -21247,11 +21247,14 @@ ux-spec, «Лента разговора» («Остановленный ход 
 | Коммит | Что |
 |---|---|
 | `70ea9b0eb8` `feat(core): leave a turn the restart cut off to its user in the product (B2.3c)` | опция `SessionRestart`, поле опций сервера, строка продукта; тесты; CAT-07 |
-| следующий | этот раздел |
+| `e1187e3b39` `docs(upstream-sync): record leaving a cut-off turn to the user after a restart (B2.3c)` | этот раздел |
+| `6c6a44aef0` `test(core): cover a background subagent when turns do not resume (B2.3c)` | по ревью советника: случай подагента в `session-execution.test.ts` (CAT-07); тест CLI не ждёт кода 137 после `SIGKILL` (на Windows — 1) |
+| следующий | дополнения раздела |
 
 Файлов кода четыре, все upstream (CAT-07): `core/src/session/execution/restart.ts` (+35 −15),
 `server/src/options.ts` (+2), `server/src/routes.ts` (+1), `cli/src/server-process.ts` (+3). Тесты:
-`cli/test/restart-turn.test.ts` (новый файл форка), `core/test/shell-restart.test.ts` (+79 −1, upstream, уже в CAT-07).
+`cli/test/restart-turn.test.ts` (новый файл форка), `core/test/shell-restart.test.ts` (+79 −1, upstream, уже в CAT-07),
+`core/test/session-execution.test.ts` (+70, upstream, теперь в CAT-07).
 
 ### Как было
 
@@ -21311,29 +21314,36 @@ location и до загрузки плагинов (плагины грузят�
   сообщения. Команды, завершившиеся за время перезапуска, — тоже без пробуждения (`resume: false`, как в v2).
 - **Подагент фоновой задачи** продолжает свой ход с синтетическим «The server restarted…» — это запрос к модели ребёнка.
 - **Его отчёт** по окончании будит родителя — запрос к модели родителя, даже если ход родителя остался прерванным.
+  Отчёт ребёнка, закончившего ещё до перезапуска (строка outbox), доставляется во время прохода; родитель с заявкой в это
+  время в списке `suspended`, поэтому отчёт ложится во входящие без пробуждения и ждёт следующего сообщения — как итоги
+  `shell`. Родитель без заявки (был в покое) просыпается в конце прохода, как в v2.
 
 Так и сказано в В-100 («как в OpenCode 2»), но строгому чтению «после старта модель не вызывается» эти три пути не
 отвечают — **на внимание владельца**. Если нужно, следующим шагом можно не будить прерванную сессию уведомлениями до её
 следующего хода — это другая правка прохода и `ShellTool.reattach`, здесь не делалась.
 
-Ход, прерванный на вызове `shell` (команда в демоне), проверен тестом ядра: вызов закрыт как «перенесён в фон», команда снова
+Подагент проверен тестом ядра: ход родителя прерван без исполнения, «The server restarted…» получил только ребёнок, его
+отчёт будит родителя один раз. Ход, прерванный на вызове `shell` (команда в демоне), — тоже тестом ядра: вызов закрыт как «перенесён в фон», команда снова
 под наблюдением, ход не продолжен; по концу команды сессия получает итог и просыпается.
 
 ### Тесты
 
 | Тест | Что проверяет |
 |---|---|
-| `cli/test/restart-turn.test.ts` «after a crash the service leaves the turn interrupted until a prompt continues it» | настоящая служба продукта из исходников (`serve --service --port 0`, `isolatedEnv`), провайдер `test` из `LOGINOM_AI_AGENT_CONFIG_CONTENT` на подставной сервер. Первый запрос хода (с инструментами) отдаёт один фрагмент и не кончается; служба — `SIGKILL` (код 137); вторая служба на том же корне: дождаться `outcome` сессии — `interrupted`, запросов хода по-прежнему 1, сообщения с `notice: restart` нет, последняя запись ленты — `idle` «interrupted»; `session.prompt` «Продолжи» — ровно второй запрос хода, в нём «Продолжи», `outcome: succeeded`, ответ «Готово.» в ленте; мягкая остановка второй службы — 202 и код 0 |
+| `cli/test/restart-turn.test.ts` «after a crash the service leaves the turn interrupted until a prompt continues it» | настоящая служба продукта из исходников (`serve --service --port 0`, `isolatedEnv`), провайдер `test` из `LOGINOM_AI_AGENT_CONFIG_CONTENT` на подставной сервер. Первый запрос хода (с инструментами) отдаёт один фрагмент и не кончается; служба — `SIGKILL` (код не проверяется: 137 на POSIX, 1 на Windows); вторая служба на том же корне: дождаться `outcome` сессии — `interrupted`, запросов хода по-прежнему 1, сообщения с `notice: restart` нет, последняя запись ленты — `idle` «interrupted»; `session.prompt` «Продолжи» — ровно второй запрос хода, в нём «Продолжи», `outcome: succeeded`, ответ «Готово.» в ленте; мягкая остановка второй службы — 202 и код 0 |
 | там же «after a soft stop … until a synthetic continues it» | то же, служба кончается `POST /api/experimental/service/stop` (202, код 0; ход прерван с `reason: "shutdown"`, заявка сохранена), продолжение — `session.synthetic` |
 | `core/test/shell-restart.test.ts` «watches the command but leaves the turn interrupted when turns do not resume» | весь app ядра с `TestLLM` и подставным демоном: ход ждёт команду `shell`, мягкий перезапуск с передачей демона; второй сервер с `resumeTurns: false`: вызов `completed` «Command moved to the background (shell ID …)», запросов к модели 1, `outcome: interrupted`, `restart`-сообщения нет; `prompt` «continue» — второй запрос, `succeeded`; конец команды — уведомление `source: shell`, `state: completed`, третий запрос (как в v2) |
+| `core/test/session-execution.test.ts` «leaves a suspended parent interrupted but resumes its background subagent when turns do not resume» | харнесс upstream (`buildExecution` с `{ resumeTurns: false }`): родитель и ребёнок с заявками, задача `subagent` идёт; после прохода исполнялся только ребёнок, `interrupted` — один, `{ sessionID: parent, reason: "user" }`, синтетическое `notice: restart` — только у ребёнка, заявка родителя снята; ребёнок кончил — родитель исполнен один раз, во входящих отчёт `source: subagent`, `state: completed` |
 
-Устойчивость: случай ядра `--rerun-each 10` — 10/0; тест CLI `--rerun-each 3` — 6/0 (43 с). Один прогон теста CLI —
+Устойчивость: случай `shell-restart` `--rerun-each 10` — 10/0; случай подагента `--rerun-each 10` — 10/0; тест CLI
+`--rerun-each 3` — 6/0 (43 с). Один прогон теста CLI —
 15 с: два холодных старта службы на каждый случай.
 
 ### Мутации
 
-`<scratchpad>/b23c/scripts/mutations.sh`: одна правка, тест, байты назад; `git status` до и после совпал. Мутации — до
-коммита, на том же коде.
+`<scratchpad>/b23c/scripts/mutations.sh`: одна правка, тест, байты назад; `git status` до и после совпал. M1–M6 — до
+первого коммита; после них в коде только пробел (`restartMessage = (`) и Prettier тестов. Мутации случая подагента — на
+коде `6c6a44aef0`, тем же `mutate.py`.
 
 ```text
 mut-M1-product-option-dropped   cli restart-turn       0 pass 2 fail  # без строки в server-process.ts: Expected "interrupted", Received "succeeded"
@@ -21345,6 +21355,11 @@ mut-M5-shutdown-reason          core shell-restart     4 pass 1 fail  # reason "
 mut-M6-default-flipped          core shell-restart + session-execution  37 pass 17 fail  # `!== true`: поведение продукта по умолчанию — красны тесты upstream возобновления
 M0-after                        cli restart-turn       2 pass 0 fail
 M0-after                        core shell-restart + session-execution  54 pass 0 fail
+# случай подагента в session-execution.test.ts
+mut-M2-continue-as-v2           0 pass 1 fail   # родитель тоже исполнен проходом
+mut-M4-no-terminal              0 pass 1 fail   # interrupted нет, заявка родителя осталась
+mut-M7-children-not-resumed     0 pass 1 fail   # при resumeTurns: false ребёнок не возобновлён (recoverSubagent пропущен) — ждёт 30 с
+M0-after2                       1 pass 0 fail
 ```
 
 M2 — это «продолжать как v2»: оба случая CLI видят продолженный ход (`succeeded` без сообщения пользователя). M6 показывает,
@@ -21361,6 +21376,11 @@ M2 — это «продолжать как v2»: оба случая CLI вид
 | `server` | 293 pass, 3 skip, 0 fail (250 с) | 293 pass, 3 skip, 0 fail (252 с) |
 | `cli` | 606 pass, 9 skip, 0 fail (522 с) | 608 pass (+2 новых), 9 skip, 0 fail (542 с) |
 | `core` | 7125 pass, 354 skip, 3 fail (237 с) | 7126 pass (+1 новый), 354 skip, 3 fail (228 с) — те же три, что на базе |
+
+На `6c6a44aef0` (код окончательный) повторены: `product` — 60 pass, 3 fail (те же три); `core` — 7127 pass (+2 новых),
+354 skip, 3 fail (те же три, 234 с); `cli/test/restart-turn.test.ts` — 2 pass, 0 fail. `core/test/session-execution.test.ts`
+вместе с `shell-restart.test.ts` — 55 pass, 0 fail. `server`, `loginom-agent` и остальной `cli` после `70ea9b0eb8` не
+менялись.
 
 Три падения `core` есть и на базе, новых нет: `ShellParse > extracts static directory targets across escapes, …`,
 `util.effect-flock > fails on unwritable lock roots`, `util.flock > fails clearly on unwritable lock roots`; причину не
@@ -21384,6 +21404,9 @@ $ bun typecheck   # core, server, cli — по пакету
 ✓ No type errors in 1,649 files across 2 projects
 ✓ No type errors in 2,235 files across 2 projects
 ```
+
+На `6c6a44aef0`: `catalog-check.py --summary` — код 0, 612 файлов (+1: `session-execution.test.ts` в CAT-07);
+`apply-identity.py --check` — `would change: 0 files`; `oxlint` по двум изменённым тестам — 0 замечаний.
 
 `oxlint` по шести файлам задачи — 0 замечаний; `prettier --check` — файлы задачи отформатированы, кроме
 `cli/src/server-process.ts`, который не проходит и на базе (длинные строки `apply-identity`, B1.4a); мои строки в нём
@@ -21411,7 +21434,8 @@ $ bun typecheck   # core, server, cli — по пакету
 
 ### Найдено, не чинил
 
-- Ничего нового в чужом коде. Ошибки `ast-grep` (`no-import-alias` в `restart.ts:6`, `no-json-parse-cast` в
+- Ничего нового в чужом коде. Три падения `core` на базе — известны с B1 (журнал, таблицы `core` выше: «прогон под
+  root»). Ошибки `ast-grep` (`no-import-alias` в `restart.ts:6`, `no-json-parse-cast` в
   `server/src/legacy-migrate.ts`) и формат `cli/src/server-process.ts` по Prettier (строки `apply-identity`) — те же на базе.
 
 ### Не проверено
@@ -21420,5 +21444,5 @@ $ bun typecheck   # core, server, cli — по пакету
 - Установленный Desktop и собранный CLI — только исходники.
 - Перезапуск, когда демон команд (`loginom-ai-agent-pty`, B2.7a9) сам умер вместе со службой, — тестом ядра не покрыт
   (там подставной демон переживает сервер); по коду проход сообщает такую команду как потерянную, ход не продолжается.
-- Ход с подагентом фоновой задачи при перезапуске продукта — по коду и тестам upstream (`session-execution.test.ts`,
-  поведение по умолчанию); отдельного теста с `resumeTurns: false` нет.
+- Подагент с настоящим ребёнком и моделью при перезапуске службы продукта — только харнесс ядра (`session-execution`,
+  подставной `drain`), не через `serve --service`.
