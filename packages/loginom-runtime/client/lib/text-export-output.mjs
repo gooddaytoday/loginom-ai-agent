@@ -117,8 +117,8 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard,fold
   const value=JSON.stringify({workflow:s.workflow_ref,directory:s.file_storage.directory});
   if(binding===null)binding=value;else need(value===binding,'Export search folder changed');
  };
- const lookup=async()=>{
-  const r=await read({discover_roots:true,storage_name:name});bind(r,false);
+ const lookup=async(snapshot)=>{
+  const r=snapshot??await read({discover_roots:true,storage_name:name});bind(r,false);
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
   need(matches.length<=1,'Export file row is ambiguous');if(!matches.length)return;
   const found=await read({root_ref:matches[0].ref,storage_name:name});bind(found);
@@ -171,6 +171,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard,fold
   guard();
   const found=await lookup();if(found)return found;
   s=await table();bind(s);
+  const rendered=folder&&await lookup(s);if(rendered)return rendered;
   const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
   if(!anchors.length)throw unavailable(s,'no_scroll_owner');
   const e=anchors[0],scroll=e.scroll;
