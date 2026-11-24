@@ -78,13 +78,15 @@ export async function readPreparedNodeContext(page, binding) {
           &&o.document_id===b.document_id&&o.workflow_id===b.workflow_ref.workflow_id&&o.node_id===b.node.node_id
           &&o.wizard===model&&o.nodeTree===nodeTree&&o.portTree===portTree);
         const o=openings[0],input=o?.direction==='input',groupType=input?app.ModelInputPortsTreeNode:app.ModelOutputPortsTreeNode,roots=exact(b.workflow_ref.prefix+';WizrdMCF');
-        const exportInput=input&&o.portIndex===0&&(o.kind==='variables'
-          ?o.nativeIndex===1&&o.node.FIconCls==='bg-vendor-icon-exportnative'
+        const collectionInput=input&&o.portIndex===0&&(o.kind==='variables'
+          ?o.port.FType===0&&o.port.FSubType===3
+            &&(o.nativeIndex===0&&o.node.FIconCls==='bg-vendor-icon-importtextfile'
+              ||o.nativeIndex===1&&o.node.FIconCls==='bg-vendor-icon-exportnative')
           :o.nativeIndex===0&&['bg-vendor-icon-exporttextfile','bg-vendor-icon-exportexcelfile','bg-vendor-icon-exportnative'].includes(o.node.FIconCls));
-        if(o?.portCollection&&!exportInput)return reject('wizard_model');
+        if(o?.portCollection&&!collectionInput)return reject('wizard_model');
         const portCollection=group?.FSubNodes,items=portCollection?.FItems;
-        const wizardIndex=exportInput?(Array.isArray(items)?items.indexOf(portTree):-1):(o?.wizardIndex??o?.nativeIndex);
-        if(exportInput&&(!Number.isInteger(wizardIndex)||wizardIndex<0||wizardIndex>=100
+        const wizardIndex=collectionInput?(Array.isArray(items)?items.indexOf(portTree):-1):(o?.wizardIndex??o?.nativeIndex);
+        if(collectionInput&&(!Number.isInteger(wizardIndex)||wizardIndex<0||wizardIndex>=100
           ||wizardIndex!==(o.wizardIndex??o.nativeIndex)
           ||group!==nodeTree.FInputPortsRootNode||portCollection!==o.portCollection||portCollection?.FParentNode!==group||portTree?.FCollection!==portCollection
           ||!Array.isArray(items)||items.length>100||items[wizardIndex]!==portTree
@@ -95,7 +97,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||o.workflow!==workflowNode||o.packageNode!==packageNode||o.node.FGuid!==o.node_id
           ||o.node.data!==o.nodeData||o.port.data!==o.portData||o.port.FGuid!==o.portGuid||o.node.data!==nodeTree.FModelNode
           ||o.port.data!==portTree.FModelNodePort||o.port.parent!==o.node||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
-          ||!exportInput&&portTree.FIndex!==wizardIndex||!o.enginePort||(input||o.kind==='variables'?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
+          ||!collectionInput&&portTree.FIndex!==wizardIndex||!o.enginePort||(input||o.kind==='variables'?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
         outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,wizard_index:wizardIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
         // Breadcrumb overflow may hide the node itself. Retain context only

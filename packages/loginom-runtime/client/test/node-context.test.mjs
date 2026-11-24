@@ -149,12 +149,16 @@ test('D52 input breadcrumb binding requires the exact native node, port and open
  }
 });
 
-for(const icon of ['exporttextfile','exportexcelfile'])test(icon+' context retains the diagram port and its separate wizard index',async()=>{
+for(const icon of ['exporttextfile','exportexcelfile','importtextfile'])test(icon+' context retains the diagram port and its separate wizard index',async()=>{
  const f=fixture(),p=f.enterInputBreadcrumbs();
  p.opening.node.FIconCls='bg-vendor-icon-'+icon;
  p.opening.port.FPortIndex=0;
  p.opening.wizardIndex=1;
  p.portTree.FIndex=1;
+ if(icon.startsWith('import')){
+  p.opening.kind='variables';p.opening.port.FType=0;p.opening.port.FSubType=3;
+  p.portTree.FIndex=null;
+ }
  const collection={FParentNode:p.group,FItems:[{},p.portTree]};
  p.group.FSubNodes=collection;p.portTree.FCollection=collection;p.opening.portCollection=collection;
  p.group.ParentNode.FInputPortsRootNode=p.group;
@@ -196,7 +200,7 @@ test('LGD variable wizard context rechecks the retained input collection and slo
  p.group.FSubNodes=collection;p.portTree.FCollection=collection;
  p.group.ParentNode.FInputPortsRootNode=p.group;
  p.opening.node.FIconCls='bg-vendor-icon-exportnative';
- p.opening.port.FPortIndex=1;
+ Object.assign(p.opening.port,{FType:0,FSubType:3,FPortIndex:1});
  p.portTree.FIndex=null;
  Object.assign(p.opening,{kind:'variables',nativeIndex:1,wizardIndex:0,portCollection:collection});
 
@@ -206,6 +210,11 @@ test('LGD variable wizard context rechecks the retained input collection and slo
  assert.equal(result.input_port.native_index,1);
  assert.equal(result.input_port.wizard_index,0);
 
+ p.opening.port.FSubType=4;
+ p.portTree.FIndex=0;
+ assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ p.opening.port.FSubType=3;
+ p.portTree.FIndex=null;
  const replacement={...collection};
  p.group.FSubNodes=replacement;p.portTree.FCollection=replacement;
  assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);

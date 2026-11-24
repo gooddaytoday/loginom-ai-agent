@@ -24,7 +24,8 @@ export function makeVariablePortMappingCode(binding,options){
 // Fixed native UI procedure. Only the owned input wizard is edited; cached
 // ConnectedRecord identity is retained across every metadata/order gesture.
 export async function configureVariablePortMapping(page,task,readNode,openPort,decode=decodePortCell){
- const b=task.binding,mapping=task.mapping,root=b.workflow_ref.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';let effect=false;
+ const b=task.binding,mapping=task.mapping,root=b.workflow_ref.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';
+ let effect=false,readOpening;
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable mapping deadline');return n;};
  const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
  const inspect=(mode,extra={})=>page.evaluate(({task,mode,extra,decoderCode})=>{
@@ -143,8 +144,13 @@ export async function configureVariablePortMapping(page,task,readNode,openPort,d
  try{
   let graph=await readNode(page,b);while(graph.surface_pending||graph.verified&&graph.locked){await page.waitForTimeout(Math.min(80,remaining()));graph=await readNode(page,b);}
   if(!graph.verified||graph.surface!=='graph'||graph.locked)throw Error('Owned variable mapping graph required');
-  const opened=await openPort(page,{...task,direction:'input',kind:mapping.kind,port:mapping.port,operation_id:task.operation_id+':port'},readNode);
-  effect=opened.effect_possible===true;if(opened.status!=='SUCCEEDED')throw Error(opened.error);
+  const openingId=task.operation_id+':port';
+  const opened=await openPort(page,{...task,direction:'input',kind:mapping.kind,port:mapping.port,operation_id:openingId},readNode);
+  effect=opened.effect_possible===true;
+  const portGuid=opened.port_guid??opened.trace?.find(e=>e.event==='input_port_reserved')?.port_guid;
+  if(effect&&task.read_only===true&&mapping.kind==='variables'&&mapping.port===0&&typeof portGuid==='string')
+   readOpening={opening_operation_id:openingId,port_guid:portGuid,node:b.node};
+  if(opened.status!=='SUCCEEDED')throw Error(opened.error);
   const before=await settle(task.expected_mapping?value=>JSON.stringify(value)===JSON.stringify(task.expected_mapping):null);let current=before;
   if(!task.read_only){
    const requested=mapping.fields??mapping.changes??[],all=mapping.fields!==undefined;
@@ -196,5 +202,6 @@ export async function configureVariablePortMapping(page,task,readNode,openPort,d
    await page.waitForTimeout(Math.min(80,remaining(),Math.max(1,end-Date.now())));
   }
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:graph,mapping:current,source_identity_verified:true};
- }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,error:String(error.message).slice(0,500)};}
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,effect_possible:effect,cleanup_complete:!effect,
+  ...(readOpening?{read_opening:readOpening}:{}),error:String(error.message).slice(0,500)};}
 }

@@ -579,6 +579,11 @@ for(const fault of ['none','foreign-root','foreign-collection','foreign-parent',
    assert.equal(result.port,0);assert.equal(result.native_index,1);assert.equal(result.wizard_index,0);
    assert.equal(f.portTree.FIndex,null);
    assert.equal((await f.run()).replayed,true);
+   f.port.FSubType=4;
+   f.portTree.FIndex=1;
+   assert.equal((await f.run()).status,'AMBIGUOUS');
+   f.port.FSubType=3;
+   f.portTree.FIndex=null;
    items.reverse();
    assert.equal((await f.run()).status,'AMBIGUOUS');
   }else assert.equal(result.status,'AMBIGUOUS');
@@ -864,8 +869,52 @@ function importVariablesBusy(){
  const f=fixture('input'),panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-importtextfile';
  f.task.kind='variables';f.port.FType=0;f.port.FSubType=3;
  f.portDom.tid='MF;TF;Graph;Node;Input_Var-0';f.portDom.getAttribute=()=>f.portDom.tid;
- return {f,panel};
+ const group=f.portTree.ParentNode;
+ const collection={FParentNode:group,FItems:[f.portTree]};
+ group.FSubNodes=collection;group.ParentNode.FInputPortsRootNode=group;f.portTree.FCollection=collection;
+ return {f,panel,collection};
 }
+
+for(const fault of ['none','wrong-group','wrong-collection','duplicate-port'])test('Import variable input proves its native slot with an unmaterialized index: '+fault,async()=>{
+ const {f,collection}=importVariablesBusy();
+ f.flags.graphMasks=[];f.portTree.FIndex=null;
+ if(fault==='wrong-group')f.portTree.ParentNode.ParentNode.FInputPortsRootNode={};
+ if(fault==='wrong-collection')f.portTree.FCollection={};
+ if(fault==='duplicate-port')collection.FItems.push({FModelNodePort:f.port.data});
+ const r=await f.run();
+ if(fault==='none'){
+  assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.wizard_index,0);
+  assert.equal(f.portTree.FIndex,null);
+  assert.equal((await f.run()).status,'SUCCEEDED');
+ }else assert.equal(r.status,'AMBIGUOUS');
+ assert.equal(f.gestures.length,2);
+});
+
+for(const fault of ['none','open-wizard','foreign-graph','changed-port','write-opening','menu','missing'])test('release an Import variable mapping read on its original quiet graph: '+fault,async()=>{
+ const {f}=importVariablesBusy(),workflow=f.card.Controller.Node.data.node;
+ f.flags.graphMasks=[];f.flags.foreignWizard=true;f.task.read_only=fault!=='write-opening';
+ assert.equal((await f.run()).status,'AMBIGUOUS');
+ const opening=f.prep.inputPortOpenReceipts.get('open');
+ if(fault!=='open-wizard'){
+  f.wizard.FView.el.dom.visible=false;
+  f.card.Controller.FController=fault==='foreign-graph'?{...f.graph}:f.graph;
+  f.card.Controller.Node.data.node=workflow;
+  f.flags.loading=0;f.menu.visible=fault==='menu';
+ }
+ if(fault==='changed-port')f.port.data={};
+ if(fault==='missing')f.prep.inputPortOpenReceipts.clear();
+ const result=await openPreparedOutputPort(f.page,{...f.task,release_read:true,port_guid:'port'},f.readNode);
+ assert.equal(result.status,fault==='none'?'SUCCEEDED':'NOT_APPLIED',result.error);
+ assert.equal(opening.phase,fault==='none'?'released':'open_issued');
+ assert.equal(f.gestures.length,2);
+ if(fault==='none'){
+  const repeated=await openPreparedOutputPort(f.page,{...f.task,release_read:true,port_guid:'port'},f.readNode);
+  assert.equal(repeated.status,'SUCCEEDED');
+  f.flags.foreignWizard=false;f.portTree.FModelNodePort=f.port.data;f.task.operation_id='next';
+  assert.equal((await f.run()).status,'SUCCEEDED');
+ }
+});
+
 for(const stage of ['begin','menu_issued','open_issued'])test('Import variables input waits for its exact native graph mask at '+stage,async()=>{
  const {f,panel}=importVariablesBusy();let waits=0;
  if(stage!=='begin')f.flags.graphMasks=[];

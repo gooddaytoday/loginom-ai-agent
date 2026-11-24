@@ -24,7 +24,10 @@ function savedImport(kind='bound',active=true,pathOverride){
   ui:{dialogs:[],masks:[],truncated:{masks:false,dialogs:false},elements:opened?[{ref:'ui-cancel',tid:'W;btnClose',allowed_actions:['click']}]:[
    {ref:'ui-settings',tid:'N;Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:workflow.navigation_path}}]}});
  operation.nodeTargetAdapter={observe:async()=>structuredClone(graph)};
- const options={operation,now:Date.now,receiptOptions:()=>({}),isBoundFileInput:p=>p.startsWith('/own/inputs/'),
+ const options={operation,now:Date.now,receiptOptions:(id,action_key,signature)=>{
+  operation.lastReceipt={id,operation_id:id,action_key,signature};
+  return {};
+ },isBoundFileInput:p=>p.startsWith('/own/inputs/'),
   resolveBoundFileSource:async p=>{witnesses++;if(!available)throw Error('BINDING_SOURCE_UNVERIFIED: fresh witness required');return {kind:'storage',verified:true,destination:p};},
   onRecord:async event=>{if(event.phase==='node_step_prepared')pending=event;return structuredClone(event);},
   execute:async()=>{
@@ -42,8 +45,32 @@ function savedImport(kind='bound',active=true,pathOverride){
   }};
  const ctx={document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000};
  const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
- return {options,operation,r,actions,ctx,mapping,variables,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
+ return {options,operation,r,graph,actions,ctx,mapping,variables,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
 }
+
+for(const incoming of ['absent','matching','foreign'])test('preflight binds an existing text import with '+incoming+' variable link',async()=>{
+ const f=savedImport();
+ f.allowWitness();
+ f.r.finish='done';
+ f.r.bindings=[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'CsvPath'}}];
+ f.r.variable_inputs=[{source:f.graph.nodes[0].ref,kind:'variables',input:0,output:4}];
+ f.graph.nodes.push({ref:f.r.target.ref,type:'imports.text',locked:false,
+  variable_inputs:[{kind:'variables',port:0,port_guid:'input'}]});
+ if(incoming==='absent')f.graph.variable_links=[];
+ if(incoming==='foreign')f.graph.variable_links[0].source='foreign';
+ const preflight=f.driver().beforeTarget(f.ctx);
+ if(incoming==='foreign'){
+  await assert.rejects(preflight,error=>error.nodePhaseRefusal?.status==='NOT_APPLIED'&&/BINDING_PORT_MISMATCH/.test(error.message));
+  assert.deepEqual(f.actions,[]);
+ }else{
+  await preflight;
+  assert.deepEqual(f.actions,incoming==='absent'?['user_runtime_read']:['variable_mapping_read','user_runtime_read']);
+  assert.equal(f.operation.importBinding.file.destination,'/own/inputs/a.csv');
+  assert.deepEqual(f.operation.preTargetGraph,f.graph);
+  assert.equal(f.operation.preTargetImportRead.port_guid,'source-port');
+  assert.deepEqual(f.operation.preTargetImportRead.reference,f.operation.lastReceipt);
+ }
+});
 
 for(const kind of ['no-variables','literal','other-source','outside'])test('saved '+kind+' keeps legacy Execute without a Files witness',async()=>{
  const f=savedImport(kind);await f.driver().beforeTarget?.(f.ctx);
