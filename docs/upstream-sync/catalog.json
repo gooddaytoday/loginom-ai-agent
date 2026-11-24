@@ -48,7 +48,8 @@
         "packages/server/src/routes.ts", "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts",
         "packages/core/test/shell-restart.test.ts", "packages/server/test/schedule.test.ts",
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
-        "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts"
+        "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
+        "packages/core/src/session/execution/restart.ts", "packages/core/test/session-execution.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },

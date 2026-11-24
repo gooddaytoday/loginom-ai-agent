@@ -150,6 +150,7 @@ function makeRoutes<AuthError, AuthServices>(
     InstructionDiscovery.node.replace(InstructionDiscovery.configured({ project: options.config?.project })),
     ShellSelect.node.replace(ShellSelect.configured({ gitbash: options.windows?.gitbash })),
     PluginProduct.node.replace(PluginProduct.configured(options.pluginPackages)),
+    SessionRestart.node.replace(SessionRestart.configured({ resumeTurns: options.resumeTurns })),
     Mcp.node.replace(
       Mcp.configured({
         clientInfo: {

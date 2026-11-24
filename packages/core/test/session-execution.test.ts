@@ -1400,6 +1400,76 @@ describe("SessionRestart background recovery", () => {
     }),
   )
 
+  // `resumeTurns: false` (the Loginom AI Agent server, В-100): the parent's own turn is left to the user, while the child
+  // of its running subagent job resumes as above and its report wakes the parent, as in OpenCode 2.
+  it.effect("leaves a suspended parent interrupted but resumes its background subagent when turns do not resume", () =>
+    Effect.gen(function* () {
+      const database = yield* Database.Service
+      const bus = yield* Bus.Service
+      const jobs = yield* Job.Service
+      const parent = Session.ID.make("ses_subagent_left_parent")
+      const child = Session.ID.make("ses_subagent_left_child")
+      yield* seedSessions(database, [parent], { time_suspended: Date.now() })
+      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
+      yield* jobs.start({
+        id: child,
+        type: "subagent",
+        recovery: {
+          kind: "subagent",
+          parentSessionID: parent,
+          childSessionID: child,
+          agent: "explore",
+          description: "Inspect recovery",
+        },
+        run: Effect.never,
+      })
+      yield* jobs.background(child)
+
+      const resumed = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const parentWoken = yield* Deferred.make<void>()
+      const drained: Session.ID[] = []
+      const interrupted: SessionEvent.Execution.Interrupted[] = []
+      const notices: SessionEvent.Synthetic[] = []
+      yield* bus.project(SessionEvent.Execution.Interrupted, (event) => Effect.sync(() => void interrupted.push(event)))
+      yield* bus.project(SessionEvent.Synthetic, (event) => Effect.sync(() => void notices.push(event)))
+      const scope = yield* Scope.make()
+      yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
+      const restarted = yield* Job.make.pipe(Effect.provideService(Scope.Scope, scope))
+      const context = yield* buildExecution(
+        scope,
+        ({ sessionID }) =>
+          Effect.gen(function* () {
+            drained.push(sessionID)
+            if (sessionID === child) {
+              yield* Deferred.succeed(resumed, undefined)
+              yield* Deferred.await(release)
+              return
+            }
+            yield* Deferred.succeed(parentWoken, undefined)
+          }),
+        { resumeTurns: false },
+        restarted,
+      )
+      yield* Context.get(context, SessionRestart.Service).resumeSuspendedSessions
+      yield* Deferred.await(resumed)
+
+      // The parent's turn ended interrupted without a drain; only the child got the restart notice.
+      expect(drained).toEqual([child])
+      expect(interrupted.map((event) => event.data)).toEqual([{ sessionID: parent, reason: "user" }])
+      expect(notices.map((event) => [event.data.sessionID, event.data.metadata?.notice])).toEqual([[child, "restart"]])
+      expect(yield* claims(database)).toEqual({ [parent]: false, [child]: true })
+
+      // The child's report wakes the parent once.
+      yield* Deferred.succeed(release, undefined)
+      yield* Deferred.await(parentWoken)
+      expect(drained.filter((id) => id === parent)).toHaveLength(1)
+      expect(yield* SessionInbox.list(database.db, parent)).toMatchObject([
+        { payload: { metadata: { source: "subagent", childID: child, state: "completed" } } },
+      ])
+    }),
+  )
+
   it.effect("delivers a subagent result persisted before restart without rerunning the child", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service

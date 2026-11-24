@@ -37,6 +37,11 @@ export interface Options {
    * never accumulate: the budget is per-turn, not per-session.
    */
   readonly maxAttempts?: number
+  /**
+   * `false` leaves each turn the restart found unfinished to its user: it ends interrupted, with no restart notice and
+   * no model request. Background shell commands and running subagent children are recovered either way.
+   */
+  readonly resumeTurns?: boolean
 }
 
 const DEFAULT_MAX_ATTEMPTS = 10
@@ -114,6 +119,17 @@ export const layer = (options?: Options) =>
           metadata: { notice: "restart" },
         })
         return true
+      })
+
+      // Ends a turn left to its user as a stop would: the terminal releases the claim and resets the counter. A
+      // "shutdown" reason would keep the session looking busy; "user" is the existing stop the clients show as such.
+      const leaveToUser = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
+        yield* bus.publish(
+          SessionEvent.Execution.Interrupted,
+          { sessionID, reason: "user" },
+          { commit: () => store.release(sessionID) },
+        )
+        return false
       })
 
       const restartMessage = (background: Job.Background, recovery: Exclude<Job.Recovery, { kind: "subagent" }>) => {
@@ -454,7 +470,7 @@ export const layer = (options?: Options) =>
           const resumed = yield* execution.active
           const direct = yield* Effect.filter(
             (yield* store.listSuspended()).filter((sessionID) => !resumed.has(sessionID) && !children.has(sessionID)),
-            prepareResume,
+            options?.resumeTurns === false ? leaveToUser : prepareResume,
           )
           yield* Effect.forEach(
             direct,
@@ -481,17 +497,21 @@ export const layer = (options?: Options) =>
     }),
   )
 
-export const node = makeGlobalNode({
-  service: Service,
-  layer: layer(),
-  deps: [
-    SessionStore.node,
-    SessionExecution.node,
-    Bus.node,
-    Job.node,
-    Session.node,
-    Instance.node,
-    Database.node,
-    Shell.daemonNode,
-  ],
-})
+export function configured(options?: Options) {
+  return makeGlobalNode({
+    service: Service,
+    layer: layer(options),
+    deps: [
+      SessionStore.node,
+      SessionExecution.node,
+      Bus.node,
+      Job.node,
+      Session.node,
+      Instance.node,
+      Database.node,
+      Shell.daemonNode,
+    ],
+  })
+}
+
+export const node = configured()

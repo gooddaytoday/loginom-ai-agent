@@ -47,6 +47,8 @@ export const ServerOptions = Schema.Struct({
   ),
   /** `false` loads built-in plugins only: config and plugin-directory packages are listed as failed, never imported. */
   pluginPackages: Schema.optional(Schema.Boolean),
+  /** `false`: at start, a turn the previous process left unfinished ends interrupted instead of continuing. */
+  resumeTurns: Schema.optional(Schema.Boolean),
   fs: Schema.optional(
     Schema.Struct({
       filewatcher: Schema.optional(Schema.Boolean),
