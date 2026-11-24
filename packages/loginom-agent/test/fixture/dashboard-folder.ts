@@ -1,4 +1,4 @@
-// A dashboard to draft (B2.9e), 0.4 `publicationFolder` of `v0.4.0:packages/opencode/test/tool/dashboard.test.ts`: the
+// A dashboard to draft or publish (B2.9e, B2.9f), 0.4 `publicationFolder` of `v0.4.0:packages/opencode/test/tool/dashboard.test.ts`: the
 // dashboard package prepares the folder from a snapshot (`prepareDashboard`) under the server's data root, which points
 // at a temporary directory of its own (`temporaryData`), the installation's resources beside it. A draft builds with the
 // template's own dependencies — `npm ci` in `packages/dashboard/template` and the pinned Node in
@@ -14,7 +14,8 @@ import { temporaryData } from "./temporary-data"
 const template = resolve(import.meta.dir, "../../../dashboard/template")
 const playwright = resolve(import.meta.dir, "../../../loginom-runtime/client/node_modules/playwright-core")
 
-export async function dashboardFolder() {
+// `origin` is the Loginom stand of the snapshot, where a publication is looked up; the default fails at once.
+export async function dashboardFolder(origin = "http://127.0.0.1:0") {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node || !existsSync(join(template, "node_modules")) || !existsSync(playwright))
     throw Error(
@@ -36,32 +37,41 @@ export async function dashboardFolder() {
     join(resources, "dashboard/selfcheck.mjs"),
     'console.log(JSON.stringify({ ok: true, state: "ready", errors: [] }))',
   )
-  const id = crypto.randomUUID()
-  const folder = await prepareDashboard({
-    readPublication: async () => null,
-    id,
-    origin: "http://127.0.0.1:0",
-    dashboards: Dashboard.root(),
-    template,
-    fetch: Object.assign(
-      async () =>
-        Response.json({
-          id,
-          created: new Date().toISOString(),
-          published: false,
-          nodeName: "Заказы",
-          binding: {
-            packagePath: "/fixture/orders-" + id + ".lgp",
-            workflowGuid: crypto.randomUUID(),
-            nodeGuid: crypto.randomUUID(),
-          },
-          parameters: [],
-          sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
-        }),
-      { preconnect: () => undefined },
-    ),
-  })
-  return { work: folder.directory, resources, [Symbol.asyncDispose]: () => data[Symbol.asyncDispose]() }
+  // A snapshot of a node; the same `binding` prepares the same folder again, with a new draft (0.4 `prepare`).
+  const prepare = async (binding?: { packagePath: string; workflowGuid: string; nodeGuid: string }) => {
+    const id = crypto.randomUUID()
+    const folder = await prepareDashboard({
+      readPublication: async () => null,
+      id,
+      origin,
+      dashboards: Dashboard.root(),
+      template,
+      fetch: Object.assign(
+        async () =>
+          Response.json({
+            id,
+            created: new Date().toISOString(),
+            published: false,
+            nodeName: "Заказы",
+            binding: binding ?? {
+              packagePath: "/fixture/orders-" + id + ".lgp",
+              workflowGuid: crypto.randomUUID(),
+              nodeGuid: crypto.randomUUID(),
+            },
+            parameters: [],
+            sample: { schema: [{ name: "total", type: "number" }], rows: [[7]] },
+          }),
+        { preconnect: () => undefined },
+      ),
+    })
+    return folder.directory
+  }
+  return {
+    work: await prepare(),
+    resources,
+    prepare,
+    [Symbol.asyncDispose]: () => data[Symbol.asyncDispose](),
+  }
 }
 
 // The draft's link in a tool's output, and what that link answers now.
