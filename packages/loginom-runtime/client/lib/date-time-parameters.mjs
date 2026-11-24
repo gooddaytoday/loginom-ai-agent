@@ -28,6 +28,7 @@ export function validateDateTimeParameters(p,mode,request){
  need(request.target.kind!=='new'||Array.isArray(p.fields)&&p.fields.length>0,'new node requires fields');
  need(request.mappings.every(m=>(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'configured-field mappings required');
  need(request.mappings.every(m=>m.direction!=='output'||m.fields===undefined&&m.changes===undefined||m.autosync!==true),'explicit output layout requires autosync disabled');
+ need(request.finish!=='close'||request.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
  if(p.fields===undefined)return;
  need(Array.isArray(p.fields)&&p.fields.length<=128,'invalid fields');
  need(request.target.kind!=='new'||p.fields.some(f=>Array.isArray(f?.transformations)&&f.transformations.length>0),'new node requires a transformation');
