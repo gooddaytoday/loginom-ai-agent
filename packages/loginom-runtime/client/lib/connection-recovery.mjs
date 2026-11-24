@@ -50,6 +50,8 @@ export async function guardLoginomConnection(page, binding, storageSession) {
    if(!unchanged())return {reason:'owner'};
    if(mode==='reserve'){
     if(a.pending&&!retry)return {reason:'attempted'};
+    // dock_prepare may already have pressed this exact prompt.
+    if(prompt&&typeof prep.receipts?.values==='function'&&[...prep.receipts.values()].some(r=>r?.restore?.prompt===prompt))return {reason:'attempted'};
     a.pending=true;a.prompt=prompt;return {reserved:true};
    }
    if(connected&&form.FReconnecting===false){a.pending=false;return {connected:true,restored:true};}

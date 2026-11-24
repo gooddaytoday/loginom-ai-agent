@@ -472,3 +472,18 @@ for(const stage of ['opening','Close'])test('context cancellation waits for its 
   release();await assert.rejects(pending,error=>error===reason);
   assert.equal(f.calls.filter(call=>call==='input.Close').length,1);assert.equal(f.session.cleanupUnconfirmed,false);
 });
+
+// bh-v11 live (lab1993-v11r): the model sent node keys in another order. The
+// graph refs are canonical, so a key-order comparison reported the node as
+// disappeared after the wizard closed and kept the context read unsettled.
+test('JavaScript graph preservation matches node refs regardless of key order',async()=>{
+ const {verifyJavascriptMappingGraph,verifyJavascriptUnconnectedInput}=await import('../lib/javascript-graph-preservation.mjs');
+ const ref={document_id:'document',workflow_id:'workflow',node_id:'node'};
+ const graph={complete:true,document_id:'document',workflow_ref:{workflow_id:'workflow'},
+  nodes:[{ref,type:'programming.javascript',locked:false,dom_epoch:1}],links:[],foreign_links:[]};
+ const reordered={document_id:'document',node_id:'node',workflow_id:'workflow'};
+ assert.equal(verifyJavascriptMappingGraph(graph,{...graph,nodes:[{...graph.nodes[0],dom_epoch:2}]},reordered),true);
+ assert.equal(verifyJavascriptUnconnectedInput(graph,reordered),true);
+ assert.throws(()=>verifyJavascriptMappingGraph(graph,graph,{...reordered,node_id:'other'}),/node disappeared/);
+ assert.throws(()=>verifyJavascriptMappingGraph(graph,{...graph,nodes:[]},reordered),/node disappeared/);
+});

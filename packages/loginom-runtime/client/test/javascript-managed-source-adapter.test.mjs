@@ -87,6 +87,22 @@ test('managed existing viewport navigation cannot renew the original opening dea
   assert.equal(f.calls.includes('capture'),false);
 });
 
+test('reopening an unconfigured JavaScript node refuses settings drift before a schema gesture',async()=>{
+  const page_tid='MF;TF-1;WizrdMCF;JavaScriptColumnsWizard';
+  const schema={verified:true,inventory_complete:true,form:'JavaScriptColumnsWizard',page_tid,
+    node_context:{...node,verified:true,surface:'wizard'},generation:{checked:false},
+    grids:[{tid:page_tid+';grdTargetColumns;tbl',count:0,total:0,fields:[]}]};
+  const expectedSettings=javascriptSourceSettingsDigest(javascriptManagedSourceSettings(schema));
+  for(const changed of [{...schema,generation:{checked:true}},{...schema,inventory_complete:false},
+    {...schema,grids:[...schema.grids,{tid:page_tid+';grdSourceColumns;tbl',count:0,total:0,fields:[]}]}]){
+    const f=fixture({schemaOverride:changed});
+    const adapter=await f.sourceAdapter(owner);
+    await assert.rejects(()=>adapter.open({owner,deadline,schemaMode:'code',expectedSettings}),/unconfigured settings changed/);
+    assert.deepEqual(f.calls,['type','open','page','schema','close','dispose']);
+    assert.equal(adapter.uncertain,false);
+  }
+});
+
 for(const [fault,field] of [['generation','settings.generation_checked'],['grids','mappings.grids'],
   ['grid_tid','mappings.grid_tid'],['grid_fields','mappings.grid_fields'],
   ['field_type','mappings.DataType_supported'],['reciprocity','mappings.reciprocity_verified'],['store','mappings.store_available']])
@@ -550,4 +566,47 @@ test('D17 only the read-only selection capture can report an opening with no eff
    });
   assert.equal(events.length,failCapture?0:1);assert.equal(reads,failCapture?1:2);
  }
+});
+
+// bh-v11: after a failed JS execution the captured selection can be blocked.
+// The body gesture is refused before its journal or click; only the read-only
+// lease is held, so a disposed lease reports an opening with no effect.
+for(const disposeFails of [false,true])test('unusable selection snapshot releases its lease before any body gesture'+(disposeFails?' unless dispose fails':''),async()=>{
+ const modes=[],events=[];
+ await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
+  channel:{observe:async()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}})},
+  execute:async code=>{const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode);
+   if(mode==='capture')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+   if(mode==='dispose'){if(disposeFails)throw Error('lost reply');return {disposed:true};}
+   throw Error('unexpected browser call '+mode);},
+  record:async e=>{events.push(e);return e;},receiptOptions:()=>({})}),error=>{
+   if(disposeFails){assert.equal(error.message,'lost reply');assert.equal(error.nodePhaseRefusal,undefined);return true;}
+   assert.match(error.message,/body gesture/);
+   assert.deepEqual(error.nodePhaseRefusal,{phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;
+  });
+ assert.deepEqual(modes,['capture','dispose']);assert.equal(events.length,0);
+});
+
+test('bh-v11 source read refused before the body gesture leaves the read registry settled',async()=>{
+ const {createJavascriptSourceReadRegistry}=await import('../lib/javascript-source-read-registry.mjs');
+ const {createJavascriptSourceReadSession}=await import('../lib/javascript-source-read-session.mjs');
+ const request={kind:'source',operation_id:'read-source',document_id:'document',
+  workflow_ref:prepared.workflow_ref,node};
+ const modes=[];
+ const execute=async code=>{const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode??'type');
+  if(mode==='capture')return {ready:false,blocked:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0};
+  if(mode==='dispose')return {disposed:true};
+  if(!mode)return {verified:true,node_id:'node',icon_class:'bg-vendor-icon-javascript'};
+  throw Error('unexpected browser call '+mode);};
+ const registry=createJavascriptSourceReadRegistry({openSession:async req=>{
+  const sessionDeadline=Date.now()+300000;
+  const adapter=createJavascriptManagedSourceAdapter({page:{},prepared,node,uiEpoch:9,deadline:sessionDeadline,
+   targetOrigin:'http://test',execute,record:async e=>e,receiptOptions:()=>({}),
+   channel:()=>({observe:async()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}})})});
+  return createJavascriptSourceReadSession({request:req,uiEpoch:9,deadline:sessionDeadline,adapter,
+   redactor:createRedactor(),record:async e=>e});
+ }});
+ await assert.rejects(registry.read(request),/body gesture/);
+ assert.equal(registry.busy,false);assert.equal(registry.unsettled,false);
+ assert.deepEqual(modes,['type','capture','dispose']);
 });

@@ -43,6 +43,7 @@ export function validateLgdExportParameters(p,mode,r,directories=null){
  if(r.target.kind==='new'){
   for(const k of ['compression','checksum','overwrite'])need(Object.hasOwn(s,k),'new export requires '+k);
   need(Object.hasOwn(s,'destination')||bindings,'new export requires destination or bindings.destination');
+  if(bindings)need(r.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0),'destination binding requires variables input 0');
  }
  if('destination'in s)validateLgdExportDestination(s.destination,directories);
  for(const k of ['compression','checksum','overwrite'])need(!(k in s)||lgdExportSettingsSchema.properties[k].enum.includes(s[k]),'unsupported '+k);
