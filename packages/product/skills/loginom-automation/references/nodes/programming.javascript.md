@@ -34,12 +34,15 @@ formulas are not JS nodes. Describe JS after admission. Tasked reading/repair of
 existing JS permits schema/source/context. Never delete existing JS automatically
 or move unrelated standard operations into it.
 
-## Источник без входа
+## Источник без табличного входа
 
 Для неподключённого источника: inputs:[] и parameters.input_state:"unconnected".
-Runtime проверит отсутствие входящих связей и пустой native input mapping;
-пустая подключённая таблица — другой случай. Этот же input_state нужен при
-повторном выполнении/изменении источника. Declared output: apply execute maps first,
+Runtime проверит отсутствие табличной связи и пустой native input mapping.
+При создании можно подключить переменный вход через variable_inputs (kind:"variables",
+input:0). Импортируй InputVariables из "builtIn/Data" и читай
+`InputVariables.Items.<Имя>.Value`, например `InputVariables.Items.Count.Value`.
+При повторном выполнении/изменении источника без связей укажи тот же input_state.
+Declared output: apply execute maps first,
 then runs once, including existing nodes. Code output without FS/Fetch runs twice:
 materialize, map, reactivate. Cold/downstream runs once. Preserve partial failures;
 never retry unknown effects.
