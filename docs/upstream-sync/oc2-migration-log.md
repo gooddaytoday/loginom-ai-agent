@@ -20965,3 +20965,259 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Поздняя папка и форматтеры (выше), сжатие до первого обращения к перенесённой сессии — по коду.
 - Windows и macOS (регистр путей, junction в `realpath` папки) — только Linux.
 - Desktop (Location окна дашборда — B4, ВШ-6), настоящая модель.
+
+## Исправление G2 и автозапуск WSL
+
+23.11.2026. Срочная задача этапа B после независимой проверки checkpoint B2: вернуть зелёный G2 и не запускать при старте
+Desktop серверы WSL из настроек 0.4. Ветка `bfix-g2-wsl` от `oc2-migration` (`5b87dfc0d3`), рабочее дерево
+`.claude/worktrees/bfix`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
+`PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, `.husky/_` есть; `npm ci
+--ignore-scripts --offline` клиента `packages/loginom-runtime/client` и шаблона `packages/dashboard/template` — в этом
+дереве и в дереве базы `<scratchpad>/bfix/base` (`5b87dfc0d3`, detached). Хук `pre-commit` (`bun run secrets staged`) —
+`clean` на каждом коммите. Тесты, мутации и пробы — под `unshare -n` (поднят только `lo`), со свежими временными `HOME`,
+`TMPDIR`, `XDG_*` в scratchpad, `LOGINOM_AI_AGENT_TEST_NODE` и кэшем rg `LOGINOM_AI_AGENT_RIPGREP_CACHE` (архив
+`ripgrep-15.1.0`, тот же sha256, что в `~/.cache/loginom-bootstrap`). **Модель не вызывалась**, сети в прогонах нет;
+`wsl` на машине нет — вместо него подставные программы в `PATH`. `desktop/script/utils.ts`, журнал CLI и уведомления о
+лицензиях (параллельные хвосты выпуска) не трогал.
+
+Прочитано: план этапа B (checkpoint B2, «независимая проверка черновика»), журнал — B4.11e, B2.7a9; `guarantees.md`;
+`catalog.md` (CAT-12, CAT-13); `procedure.md` (внешние имена); `apply-identity.py` (`UNPROCESSED_READERS`); навык
+`.opencode/skills/unit-tests`, `AGENTS.md` пакетов `gui-plugins`, `app` (Tests); v2 —
+`gui-plugins/src/wsl/{main,servers,machine,runtime,sidecar,remote-cli}.ts`, `desktop/src/main/plugin/storage.ts`; 0.4 —
+`desktop/src/main/{store-keys,index}.ts`, `desktop/src/main/wsl/{servers,startup,runtime,sidecar}.ts`.
+
+### Коммиты
+
+| Коммит | Что |
+|---|---|
+| `4eb1ec1a5b` `test(product): allow OPENCODE_ZIG_CPU, the process-daemon build variable apply-identity keeps (G2)` | п. 1: `names.test.ts` |
+| `49853c5dc1` `fix(gui-plugins): main starts no saved WSL server while the window hides WSL` | п. 2: `wsl/main.ts`, новый `wsl/main.test.ts`, CAT-12 и CAT-13 в `catalog.md` |
+| следующий | этот раздел |
+
+Файл кода один — `packages/gui-plugins/src/wsl/main.ts` (−1 строка, +3 строки комментария); тесты —
+`packages/gui-plugins/src/wsl/main.test.ts` (новый), `packages/product/test/names.test.ts`.
+
+### 1. G2: `names.test.ts`
+
+На базе `product` — 59 pass, 4 fail. Новое падение одно:
+
+```text
+(fail) environment variable names > source code reads no OPENCODE_* variable except third-party provider keys
++   "packages/cli/script/opencode-pty.ts: OPENCODE_ZIG_CPU",
++   "packages/cli/script/opencode-pty.ts: OPENCODE_ZIG_CPU",
+$ git log --oneline -S OPENCODE_ZIG_CPU -- packages/cli/script/opencode-pty.ts
+d6c1cb7ed7 feat(cli): embed loginom-ai-agent-pty built from process-daemon in the product CLI (B2.7a9)
+```
+
+Переменную читает только сборка `process-daemon`: `packages/process-daemon/build.rs:10` (`cargo:rerun-if-env-changed`) и
+`:102` (`env::var`); задают её `.github/workflows/release-process-daemon.yml:180` и `cli/script/opencode-pty.ts:110`
+(`cargo build` своего pty, B2.7a9). `build.rs` — файл upstream, с `a6b15d33da` не менялся.
+
+**Выбор — исключение в тесте, не переименование.** Условие задания «если читает сборка `process-daemon` — переименуй»
+буквально выполнено, но имя уже решено оставить: `apply-identity.py` держит его в `UNPROCESSED_READERS` вместе с
+`OPENCODE_REAL_ZIG` («renaming one side would silently drop the setting»), `test_tools.py:208` проверяет, что строка
+workflow остаётся, `procedure.md` и CAT-13 пишут «не менялись». Переименование трогало бы `build.rs` (upstream; `.rs`
+скрипт не обрабатывает — ручная правка при каждой синхронизации), workflow, `opencode-pty.ts`, `cli/test/product-pty.test.ts`,
+`UNPROCESSED_READERS` и его тест, README `process-daemon`, `procedure.md` и CAT-13 — против одной строки списка. Меньшее —
+список; если владелец решит иначе, переименовывать на всех этих сторонах сразу.
+
+Правка (`4eb1ec1a5b`): `ALLOWED` в `names.test.ts` — плюс `OPENCODE_ZIG_CPU`, в комментарии причина (`build.rs`,
+`UNPROCESSED_READERS`, CAT-13). Название теста прежнее: на него ссылаются план и этот журнал. В `catalog.md` дописаны CAT-12
+(«Проверка при обновлении»: код читает ещё переменную сборки `OPENCODE_ZIG_CPU`) и CAT-13 (её задаёт и `opencode-pty.ts`,
+поэтому она в допустимых именах теста). `OPENCODE_REAL_ZIG` в список не добавлял: в коде пакетов его никто не читает.
+
+Остальные три падения `product` — известные (В-95, B5.1), те же, что на базе:
+
+```text
+(fail) workspace packages > --filter arguments in CI and scripts name existing workspace packages
++   ".github/workflows/loginom-macos.yml: --filter loginom-ai-agent",
++   ".github/workflows/loginom-macos.yml: --filter @opencode-ai/desktop",
+(fail) CI triggers > path filters match tracked files, so a trigger cannot silently stop firing
++   ".github/workflows/loginom-windows.yml: packages/opencode/**",            # и 4 пути windows-native-check.yml
+(fail) path literals in build and CI code > packages/<name> and sibling-package references resolve to existing paths
++   ".github/workflows/loginom-windows.yml: packages/opencode",               # windows-native-check.yml, script/test-windows-profile.ps1
+```
+
+После правки: `names.test.ts` — 9 pass, 0 fail; `product` — 60 pass, 3 fail (ровно эти три).
+
+### 2. Серверы WSL из настроек 0.4
+
+**Подтвердилось: при старте главный процесс запускает `wsl` и, если в дистрибутиве есть CLI, сервер; ничего не ставит и
+не скачивает.**
+
+- 0.4 писал эти записи: `v0.4.0:packages/desktop/src/main/store-keys.ts:5` (`WSL_SERVERS_KEY = "wslServers"` в
+  `loginom-ai-agent.settings`), `wsl/servers.ts:450` (`{ servers: [{ id, distro }] }`). Окно 0.4 на Windows показывало
+  серверы WSL (`renderer/index.tsx:177`), установку в дистрибутив 0.4 не делал («Install Loginom AI Agent in the WSL
+  distribution manually», `wsl/runtime.ts:268`), а при старте запускал все сохранённые (`index.ts:509`,
+  `wslServerIdsToStartOnInitialize` в `wsl/startup.ts`) — той же командой `serve --hostname 0.0.0.0` (`wsl/sidecar.ts:38`).
+- v2: хранилище `servers` плагина берёт `wslServers` из того же файла (`gui-plugins/src/wsl/main.ts:25-28`); схема
+  `{ servers: unknown[] }` принимает запись 0.4 как есть. Главный процесс Desktop регистрирует `wsl` (`gui-plugins/src/main.ts`,
+  `os: ["windows"]`), окно — нет (B4.11e). В конце `setup` стоял `controller.startConfiguredServers()`: для каждой записи —
+  событие `start`, эффекты `spawn` и `check-cli` (`machine.ts`, `start`). `spawn` — `spawnWslSidecar`: поиск CLI
+  (`resolveCli`: `wsl -d <дистрибутив> --exec sh -lc <discoverScript>`, только `[ -x "$HOME/.loginom-ai-agent/bin/opencode" ]`),
+  при находке — `wsl -d <дистрибутив> --exec bash -se` со скриптом `exec <cli> serve --hostname 0.0.0.0 --port <порт>` и
+  проверка здоровья по `127.0.0.1`. `check-cli` — тот же поиск и `<cli> --version`. Установка (`installCli`:
+  `curl … anomalyco/opencode/v2/install | bash` внутри дистрибутива) — только эффект `install-cli` события `update`, то есть Ipc
+  `installOpencode`, который вызывает только вход окна.
+- Проба (`<scratchpad>/bfix/probe/startup-probe.ts`: настоящий `setup` из `wsl/main.ts` с записью 0.4 в настройках и
+  подставными `wsl`, `wsl.exe`, `powershell.exe` в `PATH`, которые пишут свои аргументы и stdin; через 1,5 с — что записано):
+
+```text
+# база, в дистрибутиве CLI нет
+== wsl -d Ubuntu --exec sh -lc cli="" … [ -x "$HOME/.loginom-ai-agent/bin/opencode" ] …   # дважды: spawn и check-cli
+["error","[wsl] wsl sidecar failed to start",{"distro":"Ubuntu","message":"error.opencodeNotInstalled"}]
+# база, подставной wsl отвечает путём /home/u/.loginom-ai-agent/bin/opencode
+== wsl -d Ubuntu --exec sh -lc cli="" …                                                    # дважды
+== wsl -d Ubuntu --exec bash -se
+   stdin: export LOGINOM_AI_AGENT_CLIENT=desktop
+   stdin: exec '/home/u/.loginom-ai-agent/bin/opencode' --log-level warn serve --hostname 0.0.0.0 --port 34697
+== wsl -d Ubuntu --exec sh -lc if [ -x '/home/u/.loginom-ai-agent/bin/opencode' ]; then … --version …
+# после правки (обе пробы)
+--- calls
+(none)
+--- state servers
+[{"config":{"id":"wsl:Ubuntu","distro":"Ubuntu"},"runtime":{"kind":"stopped"}}]
+```
+
+  Итого у пользователя 0.4 на Windows с сохранённым сервером WSL v2 при каждом старте будил дистрибутив и, если там лежал
+  CLI по пути 0.4, поднимал его `serve` на всех интерфейсах дистрибутива — без интерфейса, который это показал бы или
+  остановил. Запись B4.11e «хранилища читают … `wslServers` настроек, которых продукт не писал» для `wslServers` неверна:
+  0.4 их писал.
+
+**Правка (`49853c5dc1`), один файл кода.** В `gui-plugins/src/wsl/main.ts` убран вызов `controller.startConfiguredServers()`
+в конце `setup`, на его месте комментарий: окно не грузит WSL, главный процесс не запускает сохранённые серверы, записи
+остаются, вернуть вызов вместе со строкой окна. Ipc, хранилище и остановка при выходе — как были; метод
+`startConfiguredServers` в `servers.ts` (upstream) и его тест не тронуты. Записи `wslServers` в настройках не меняются и не
+удаляются. Хранилище плагина по-прежнему один раз копирует запись в состояние `plugin.wsl` при первом чтении (конструктор
+контроллера читает серверы), а настройки сохраняют свою копию — это `read` в `desktop/src/main/plugin/storage.ts`
+(«the old location keeps its copy for builds that still read it»); подставное хранилище теста этого не показывает, вывод —
+по коду. Каталог: CAT-12, пункт «Встроенные плагины GUI (B4.11e)» — что убрано, почему, тест и что делать при обновлении;
+`catalog.json` не менялся (файл уже расходился с upstream строками `apply-identity` и принадлежит маске `packages/**`,
+`catalog-check` — те же 610 файлов).
+
+**Тест** `gui-plugins/src/wsl/main.test.ts` (новый): настоящий `setup` главного входа WSL; в настройках запись 0.4
+`wslServers: { servers: [{ id: "wsl:Ubuntu", distro: "Ubuntu" }] }`; в `PATH` первыми — подставные `wsl`, `wsl.exe`,
+`powershell.exe` (все программы, которые запускает рантайм WSL), каждая только пишет, что её запустили. Проверяется: ни одна
+не запущена; ни одного `provider.changed()` и записи журнала; Ipc отдаёт сервер с записью 0.4 в состоянии `stopped`
+(запись дошла до контроллера, тест не пустой); в хранилище ничего не записано, запись настроек — тот же объект. Запуск виден
+сразу после `setup` (журнал, `changed`, состояние `starting`); процессу подставного `wsl` тест даёт 500 мс. `wsl` нет — он и
+не нужен: на Linux подставные программы запускаются через `PATH`, на Windows тест проверяет то же без них (настоящий
+`wsl.exe` после правки не вызывается).
+
+Мутации (`<scratchpad>/bfix/scripts/mutations.sh`: одна правка, тест, возврат байтов; `git status` до и после совпал):
+
+```text
+mut-M1-start-back          src/wsl/main.test.ts  0 pass 1 fail   # вызов upstream возвращён; Expected: false Received: true (подставной wsl запущен)
+mut-M2-start-in-dev-only   src/wsl/main.test.ts  0 pass 1 fail   # `if (packaged) controller.startConfiguredServers()`
+mut-M3-start-after-tick    src/wsl/main.test.ts  0 pass 1 fail   # `setTimeout(() => …startConfiguredServers(), 50)` — 67 мс
+mut-M4-another-opencode-name  test/names.test.ts 8 pass 1 fail   # в opencode-pty.ts добавлен OPENCODE_REAL_ZIG
+mut-M5-allowlist-from-base    test/names.test.ts 8 pass 1 fail   # OPENCODE_ZIG_CPU убран из ALLOWED
+M0-after                   src/wsl/main.test.ts  1 pass 0 fail
+M0-after                   test/names.test.ts    9 pass 0 fail
+git status same as before:  M packages/gui-plugins/src/wsl/main.ts ?? packages/gui-plugins/src/wsl/main.test.ts   # мутации — до коммита
+```
+
+M1 — это код базы с итоговым тестом. Первая версия теста (до правок под `lint:changed`) на коде базы тоже была красной:
+`Expected: false, Received: true` за 12 мс.
+
+### Охранные тесты G1–G6
+
+Строки «Как запускать» `guarantees.md` на `49853c5dc1` (`<scratchpad>/bfix/scripts/all.sh`): каждая из каталога пакета
+командой, как в документе (`loginom-host` — `xvfb-run -a bun test`, `dashboard` — `bun run test`, `selftest.sh` — из корня),
+подряд, без других нагрузок.
+
+| Гарантия | Тесты (строка «Как запускать») | Итог | Падения |
+|---|---|---|---|
+| G2 | `product` `bun test` (`names`, `identity`, `cli-profile`, `repo-paths`) | 60 pass, 3 fail | `repo-paths` ×3 — известные, В-95 → B5.1; `names` зелёный |
+| G2 | `cli` `flag-identity`, `service-identity` | 8 pass, 0 fail | — |
+| G1, G4, G6 | `loginom-agent` `bun test` | 90 pass, 0 fail | — |
+| G1, G6 | `server` `loginom-access` | 12 pass, 0 fail | — |
+| G1 | `server` `loginom-dashboard-files` | 13 pass, 0 fail | — |
+| G1 | `server` `loginom-local-file` | 41 pass, 1 skip, 0 fail | — |
+| G1 | `server` `loginom-package-docs` | 42 pass, 1 skip, 0 fail (79 с) | — |
+| G1 | `server` `loginom-dock-catalog` | 19 pass, 0 fail | — |
+| G3, G4 | `server` `loginom-host-lease` | 8 pass, 0 fail | — |
+| G3 | `cli` `loginom-host` | 1 pass, 0 fail | — |
+| G5 | `cli` `cli-resources` | 13 pass, 0 fail | — |
+| G1, G3, G4, G5, G6 | `loginom-host` `xvfb-run -a bun test` | 547 pass, 12 skip, 2 fail | известные базовые падения стенда под root («Базовые падения стенда»): `cli-manifest` «archive verification preserves manifest modes under a private umask», `managed-work-entry` «Expected refusal»; три `bundled-ripgrep` B1.5 не упали — кэш rg задан |
+| — (строка без номера гарантии; дашборды) | `dashboard` `bun run test` | `test:coverage` 50 + 36 pass; итог 91 pass, 2 skip, 3 fail | известные: `folder.test.mjs` «a partial source copy is retried completely…» (2 подтеста и тест), под root `chmod 0` не даёт `EACCES` (B1.7) |
+| миграция | `scripts/upstream-sync/selftest.sh` | `SELFTEST PASS`, код 0 | — |
+
+Новых падений нет. Тесты G2, которых нет в строках «Как запускать» (`cli-profile`, `cli-profile-service`, `legacy-profile`
+пакета `cli`), прошли в полном `cli` ниже.
+
+### Приёмка
+
+Полные прогоны пакетов (`<scratchpad>/bfix/scripts/run.sh`), каждый `bun test` из каталога пакета под `unshare -n`:
+
+| Пакет | `5b87dfc0d3` | `49853c5dc1` |
+|---|---|---|
+| `product` | 59 pass, 4 fail (`names` + три `repo-paths`) | 60 pass, 3 fail (три `repo-paths`, В-95) |
+| `gui-plugins` | 1137 pass, 1 skip, 0 fail | 1138 pass (+1 новый), 1 skip, 0 fail |
+| `desktop` | 612 pass, 4 skip, 0 fail | 612 pass, 4 skip, 0 fail |
+| `cli` | 606 pass, 9 skip, 0 fail (510 с) | 606 pass, 9 skip, 0 fail (502 с) |
+
+Первый прогон базы шёл без бинарника Electron и с пустым кэшем rg: `desktop` 592 pass, 3 fail, 3 ошибки «Electron failed to
+install correctly», `cli` 603 pass, 1 fail «bundled ripgrep of the server» (тест скачивает rg, сети нет; так в B4.7c). После
+распаковки Electron и с кэшем rg оба дерева прогнаны заново, цифры выше — эти.
+
+```text
+$ cd packages/gui-plugins && bun typecheck && bun run typecheck:tsc
+✓ No type errors in 1,427 files across 1 project               # tsc -b — код 0
+$ bun run lint:changed 5b87dfc0d3                                # oxlint и anti-slop для новых и изменённых файлов GUI
+lint:changed: 0 problem(s) in 0 of 2 changed files since 5b87dfc0d3
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary    # код 0
+against a6b15d33daf6: 610 divergent upstream files               # как на базе: main.ts уже расходился (apply-identity)
+  CAT-12: 204
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                            # код 0
+$ bun run check                                                  # код 0, под unshare -n, 49853c5dc1
+Found 905 warnings and 0 errors.                                 # как в B2.9d
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+`catalog-check.py`, `apply-identity --check` и `product` повторены на итоговом дереве с этим разделом — тот же вывод.
+
+### Где решал сам
+
+- **G2 — список, а не переименование** (выше, п. 1): имя уже оставлено решением B1.4a (`UNPROCESSED_READERS`, CAT-13);
+  переименование — девять файлов, в том числе upstream `build.rs`.
+- **WSL — убран вызов, а не условие и не правка регистрации.** Регистрацию в `gui-plugins/src/main.ts` B4.11e уже пробовал:
+  без главного входа WSL краснеет `desktop/electron.vite.config.test.ts` (node-pty) и меняется состав, который держит
+  `app/test-browser/builtin-plugins.test.ts`. Условие «WSL скрыт» главному процессу прочитать неоткуда: список окна —
+  `src/renderer.ts`, а главный процесс код окна не импортирует (`gui-plugins/AGENTS.md`); условие на константе было бы мёртвым
+  кодом. Удалённая строка с комментарием — меньшее и обратимое изменение.
+- **Ipc главного входа оставлен.** `startServer`, `installOpencode` и прочие методы вызывает только вход окна, которого в
+  продукте нет; сторонний плагин вызывает только свой главный вход (B4.11e). Закрывать их — шире задания.
+- **Ожидание 500 мс в тесте.** «Ничего не произошло» в другом процессе без окна ожидания не проверить; сам запуск тест видит
+  синхронно (журнал, `changed`, `starting`), а окно лишь подтверждает, что подставной `wsl` не стартовал. Под мутациями
+  подставной `wsl` появлялся за 12–67 мс.
+- **Electron в деревьях.** `bun install` заблокировал postinstall `electron`, без бинарника `desktop` даёт 3 падения и 3
+  ошибки загрузки («Electron failed to install correctly», так было в первом прогоне базы). Бинарник 44.9.1 распакован
+  `install.js` пакета из кэша `/root/.cache/electron` под `unshare -n` в `node_modules` обоих деревьев (вне git).
+
+### Найдено, не чинил
+
+- Раздел B4.11e и пункт CAT-12 «Встроенные плагины GUI (B4.11e)» говорят о WSL «в 0.4 их не было» и «`wslServers` настроек,
+  которых продукт не писал». Для WSL это неверно: 0.4 на Windows показывал серверы WSL, писал `wslServers` и запускал их при
+  старте (п. 2). План этапа B это уже отмечает («скрытие B4.11e расходится с эталоном»); чужой раздел журнала не правил, в
+  CAT-12 свою фразу дописал рядом. Решение «WSL как в 0.4 или скрыт» — за владельцем; при возврате — вызов в
+  `wsl/main.ts`, строка окна и этот тест на обратное.
+- Хранилище `wsl` по-прежнему копирует запись 0.4 в состояние `plugin.wsl` при старте (по коду `storage.ts`); удалить её
+  оттуда может только `Storage.remove` — его никто не вызывает. Безвредно, отмечаю для решения о возврате WSL.
+- `ssh/main.ts` при старте, по B4.11e, ничего не подключает; тестом это не закреплено, 0.4 `ssh.servers` не писал
+  (`git grep` по `v0.4.0` пуст). Не проверял.
+- `prettier --check` не проходит `gui-plugins/src/wsl/main.ts` и `product/test/names.test.ts` — и на базе, по чужим строкам
+  (`apply-identity` в `main.ts`, длинные выражения в `names.test.ts`); свои строки отформатированы, чужие не трогал.
+- `bun install` в новом рабочем дереве оставляет `desktop` без бинарника Electron (postinstall заблокирован), и полный
+  `desktop` даёт 3 ложных падения и 3 ошибки — стоит упомянуть в `guarantees.md` рядом с `npm ci` (B5.1).
+
+### Не проверено
+
+- Windows и настоящий `wsl.exe`: тест вызывает `setup` главного входа напрямую; хост главного процесса Desktop на Linux
+  WSL не грузит (`os: ["windows"]`), поэтому старт настоящего Desktop с записью 0.4 не прогонялся. Установленный артефакт —
+  тоже нет, только исходники.
+- Профиль 0.4 с настоящим `loginom-ai-agent.settings` и сохранённым сервером WSL — запись собрана по коду 0.4.
+- Переименование `OPENCODE_ZIG_CPU` не пробовалось; сборка `process-daemon` (cargo, Zig) не запускалась — правка только в
+  тесте.
