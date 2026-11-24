@@ -1,3 +1,4 @@
+import type { AcceptanceProbe } from "../../loginom-runtime/src/start-input.mjs"
 import { fork } from "node:child_process"
 import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
@@ -32,7 +33,7 @@ export async function launchNodeHost(
     strictRecovery?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
-    acceptanceSaveReadPackage?: string
+    acceptanceProbe?: AcceptanceProbe
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -169,7 +170,7 @@ export async function launchNodeHost(
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),
-        ...(input.acceptanceSaveReadPackage !== undefined ? { acceptanceSaveReadPackage: input.acceptanceSaveReadPackage } : {}),
+        ...(input.acceptanceProbe !== undefined ? { acceptanceProbe: input.acceptanceProbe } : {}),
         ...(input.browserRecovery !== undefined ? { browserRecovery: input.browserRecovery } : {}),
       },
       // Restored startup acknowledges local activation independently of the Help catalog.

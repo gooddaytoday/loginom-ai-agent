@@ -11,7 +11,7 @@ export class SandboxFailure extends EvalFailure {
 
 /** A fixed Linux filesystem boundary for the installed eval CLI, not a tool permission policy. */
 export async function sandboxCommand(input: {
-  saveRead?: boolean; cmd: string[]; profileDir: string; workdir: string; env: Record<string, string | undefined>
+  probe?: boolean; cmd: string[]; profileDir: string; workdir: string; env: Record<string, string | undefined>
 }) {
   if (input.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== undefined && input.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== "false")
     throw new SandboxFailure("HTTP-only transport requires an explicit false switch")
@@ -47,7 +47,7 @@ export async function sandboxCommand(input: {
     "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
     "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/dev/shm", "--tmpfs", "/tmp", "--dir", "/home/eval",
     "--ro-bind", installation, installation, "--bind", profile, profile, "--bind", workspace, workspace, "--chdir", workspace]
-  if (input.saveRead) cmd.push("--dir", "/run/loginom-eval-save-read")
+  if (input.probe) cmd.push("--dir", "/run/loginom-eval-save-read")
   if (shared) cmd.push("--bind", shared, shared)
   for (const file of ["/etc/ld.so.cache", "/etc/nsswitch.conf", "/etc/resolv.conf", "/etc/hosts", "/etc/passwd", "/etc/group", "/etc/fonts", "/etc/ssl/certs"])
     cmd.push("--ro-bind", await realpath(file), file)

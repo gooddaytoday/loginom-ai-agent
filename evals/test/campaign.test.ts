@@ -310,6 +310,8 @@ test("campaign durably records a batch before exposing its parameters and reuses
       corpora: { ordinary: { entrypoint: "src/run.ts", tasks: "tasks" } } }
     manifest.keys.push({ corpus: "ordinary", taskId: "second", round: 1, experiment: {
       family: "save", pair: "test", arm: "before", order: 1, condition: "P5" } })
+    manifest.keys.push({ corpus: "ordinary", taskId: "export", round: 1, experiment: {
+      family: "execute", pair: "test", arm: "before", order: 1, condition: "P3" } })
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
@@ -317,7 +319,7 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(saved.verificationAttempted).not.toBe(true)
     expect(saved.verificationDir).toBeUndefined()
     const env = await Bun.file(config.batchEnvFile).text()
-    expect(loadConfig(["--skip-judge", "--dry-run"], parseEnv(env)).campaign?.control?.saveReadTasks).toEqual(["second"])
+    expect(loadConfig(["--skip-judge", "--dry-run"], parseEnv(env)).campaign?.control?.probeTasks).toEqual(new Map([["second", "P5"], ["export", "P3"]]))
     expect(env).toContain('EVAL_AGENT_MODEL="pinned/model"')
     expect(env).toContain(`EVAL_ENTRYPOINT=${JSON.stringify(path.join(config.harnessRoot, "src/run.ts"))}`)
     expect(env).toContain(`EVAL_TASKS=${JSON.stringify(path.join(config.harnessRoot, "tasks"))}`)

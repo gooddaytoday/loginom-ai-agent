@@ -1,3 +1,4 @@
+import type { AcceptanceProbe } from "../../loginom-runtime/src/start-input.mjs"
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
@@ -24,7 +25,7 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
-  acceptanceSaveReadPackage?: string
+  acceptanceProbe?: AcceptanceProbe
   // Private owner policy. The runtime derives the path from its confirmed Save.
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability for temporary browser recovery tools.

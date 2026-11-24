@@ -275,11 +275,12 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const storageBefore = config.dryRun ? [] : await storageEntryExists(input.source, `${name}.result.csv`)
     .then(exists => exists ? [`${name}.result.csv`] : [], () => null)
   const since = Date.now()
+  const condition = input.slot && config.campaign?.control?.probeTasks?.get(task.id)
   const run = await runAgent({
     command: input.command,
     expectedSkillDigest: input.expectedSkillDigest,
     taskId: task.id,
-    acceptanceSaveReadPackage: input.slot && config.campaign?.control?.saveReadTasks?.includes(task.id) ? packagePath : undefined,
+    acceptanceProbe: condition ? { condition, packagePath } : undefined,
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,

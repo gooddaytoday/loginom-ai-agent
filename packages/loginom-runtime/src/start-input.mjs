@@ -34,15 +34,20 @@ export function validateStartInput(input) {
   if (typeof validationHttpCache !== "boolean" || (validationHttpCache && (input.validation !== true || input.chat === "readiness")))
     throw Error("LOGINOM_START_INVALID")
   if (cleanup !== null && !validAcceptancePackage(cleanup)) throw Error("LOGINOM_START_INVALID")
-  const acceptanceSaveReadPackage = input.acceptanceSaveReadPackage
-  if (acceptanceSaveReadPackage !== undefined && (!validAcceptancePackage(acceptanceSaveReadPackage) ||
+  const acceptanceProbe = input.acceptanceProbe
+  if (acceptanceProbe !== undefined && (!validAcceptanceProbe(acceptanceProbe) ||
     input.validation === true || !/^[a-f0-9]{64}$/.test(input.chat) || !input.connection?.username ||
-    !acceptanceSaveReadPackage.startsWith(`/${input.connection.username}/`))) throw Error("LOGINOM_START_INVALID")
+    !acceptanceProbe.packagePath.startsWith(`/${input.connection.username}/`))) throw Error("LOGINOM_START_INVALID")
   return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache,
-    ...(acceptanceSaveReadPackage !== undefined ? { acceptanceSaveReadPackage } : {}) }
+    ...(acceptanceProbe !== undefined ? { acceptanceProbe } : {}) }
 }
 
-export function validAcceptancePackage(path) {
+export function validAcceptanceProbe(value) {
+  return value != null && Object.keys(value).length === 2 && ["P3", "P5"].includes(value.condition) &&
+    validAcceptancePackage(value.packagePath)
+}
+
+function validAcceptancePackage(path) {
   return typeof path === "string" && path.length <= 1024 && packagePath.test(path) &&
     !path.split("/").some(segment => segment === "." || segment === "..")
 }

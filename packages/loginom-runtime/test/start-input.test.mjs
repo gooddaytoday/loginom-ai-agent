@@ -75,10 +75,12 @@ test("browser recovery never reaches validation or Help readiness", () => {
   assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
 })
 
-test("P5 reaches only the assigned chat with its own account's package", () => {
-  const input = { ...base, chat: "a".repeat(64), connection: { username: "owner" }, acceptanceSaveReadPackage: "/owner/task.lgp" }
-  assert.equal(validateStartInput(input).acceptanceSaveReadPackage, "/owner/task.lgp")
-  for (const patch of [{ validation: true }, { chat: "dashboard-uuid" }, { acceptanceSaveReadPackage: "/another/task.lgp" },
-    { acceptanceSaveReadPackage: "/owner/../another/task.lgp" }])
+test("only named probes reach the assigned chat and its own account's package", () => {
+  const probe = { condition: "P3", packagePath: "/owner/task.lgp" }
+  const input = { ...base, chat: "a".repeat(64), connection: { username: "owner" }, acceptanceProbe: probe }
+  assert.deepEqual(validateStartInput(input).acceptanceProbe, probe)
+  for (const patch of [{ validation: true }, { chat: "dashboard-uuid" }, { acceptanceProbe: { ...probe, condition: "custom" } },
+    { acceptanceProbe: { ...probe, phase: "finish" } }, { acceptanceProbe: { ...probe, packagePath: "/another/task.lgp" } },
+    { acceptanceProbe: { ...probe, packagePath: "/owner/../another/task.lgp" } }])
     assert.throws(() => validateStartInput({ ...input, ...patch }), /LOGINOM_START_INVALID/)
 })

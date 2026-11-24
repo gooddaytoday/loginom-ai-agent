@@ -1,3 +1,4 @@
+import type { AcceptanceProbe } from "../../loginom-runtime/src/start-input.mjs"
 import { expect, test } from "bun:test"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -31,7 +32,7 @@ async function fixture(
   help: "shipped" | "held" | "missing" | "tampered" = "shipped",
   holdStart = false,
   failClose = false,
-  acceptanceSaveReadPackage?: string,
+  acceptanceProbe?: AcceptanceProbe,
 ) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
@@ -70,7 +71,7 @@ async function fixture(
         const cache=join(message.input.stateDir,'http-cache');
         const cacheHit=message.input.validationHttpCache===true && existsSync(join(cache,'fixture-hit'));
         if(message.input.validationHttpCache===true){mkdirSync(cache,{recursive:true});writeFileSync(join(cache,'fixture-hit'),'owned fixture cache');}
-        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid,saveRead:message.input.acceptanceSaveReadPackage,httpCache:message.input.validationHttpCache===true,cacheHit}));
+        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid,saveRead:message.input.acceptanceProbe,httpCache:message.input.validationHttpCache===true,cacheHit}));
         if (!${holdStart}) ready();
       }
       if (message.operation === 'dashboardRead') process.send({id:message.id,result:null});
@@ -78,7 +79,7 @@ async function fixture(
     });`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, acceptanceSaveReadPackage })
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, acceptanceProbe })
   return {
     host,
     catalog,
@@ -102,12 +103,12 @@ async function fixture(
   }
 }
 
-test("only the designated chat receives the post-Save read fault once", async () => {
-  const path = "/user/task.lgp", f = await fixture("", "shipped", false, false, path)
+test("only the designated chat receives its assigned probe once", async () => {
+  const path = "/user/task.lgp", f = await fixture("", "shipped", false, false, { condition: "P3", packagePath: path })
   const session = "created-session", chat = createHash("sha256").update(session).digest("hex")
   const start = async () => JSON.parse(await readFile(f.marker, "utf8"))
   try {
-    f.host.bindAcceptanceSaveRead(session)
+    f.host.bindAcceptanceProbe(session)
     const checked = await f.host.api.check(f.candidate)
     expect(await start()).not.toHaveProperty("saveRead")
     await f.host.api.save({ revision: 0, validationId: checked.validationId })
@@ -122,12 +123,12 @@ test("only the designated chat receives the post-Save read fault once", async ()
     await expect(f.host.runtime(1, chat)).rejects.toThrow("LOGINOM_BROWSER_UNAVAILABLE")
     await rm(f.marker + ".refuse")
     await f.host.runtime(1, chat)
-    expect((await start()).saveRead).toBe(path)
+    expect((await start()).saveRead).toEqual({ condition: "P3", packagePath: path })
     f.host.markRuntimeStale(chat)
     await f.host.retireRuntime(chat)
     await f.host.runtime(1, chat)
     expect(await start()).not.toHaveProperty("saveRead")
-    expect(() => f.host.bindAcceptanceSaveRead(session)).toThrow()
+    expect(() => f.host.bindAcceptanceProbe(session)).toThrow()
   } finally { await f.close() }
 }, 15_000)
 

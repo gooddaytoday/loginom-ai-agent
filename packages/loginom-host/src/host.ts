@@ -1,3 +1,4 @@
+import type { AcceptanceProbe } from "../../loginom-runtime/src/start-input.mjs"
 import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
@@ -214,14 +215,14 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
-  acceptanceSaveReadPackage?: string
+  acceptanceProbe?: AcceptanceProbe
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
-  let saveReadPackage = options.acceptanceSaveReadPackage
-  let saveReadChat: string | undefined
+  let pendingProbe = options.acceptanceProbe
+  let probeChat: string | undefined
   const inputs = inputStore(join(root, "inputs"))
   const references = fileReferences(join(root, "file-references"))
   await references.cleanup()
@@ -458,8 +459,8 @@ export async function createLoginomHost(options: {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     // Mutate cache state only after the existing resource-verification admission.
     const httpCache = validationHttpCache && await prepareValidationCache(connection)
-    const acceptanceSaveReadPackage = purpose === "chat" && chat === saveReadChat ? saveReadPackage : undefined
-    if (acceptanceSaveReadPackage) saveReadPackage = undefined
+    const acceptanceProbe = purpose === "chat" && chat === probeChat ? pendingProbe : undefined
+    if (acceptanceProbe) pendingProbe = undefined
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -471,7 +472,7 @@ export async function createLoginomHost(options: {
         connection,
         validation,
         validationHttpCache: httpCache,
-        ...(acceptanceSaveReadPackage ? { acceptanceSaveReadPackage } : {}),
+        ...(acceptanceProbe ? { acceptanceProbe } : {}),
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
@@ -486,8 +487,8 @@ export async function createLoginomHost(options: {
       },
       signal,
     ).catch((error: unknown) => {
-      if (acceptanceSaveReadPackage && error instanceof RuntimeStartupError && error.cleanupConfirmed)
-        saveReadPackage = acceptanceSaveReadPackage
+      if (acceptanceProbe && error instanceof RuntimeStartupError && error.cleanupConfirmed)
+        pendingProbe = acceptanceProbe
       return startupFailure(error)
     })
   }
@@ -682,9 +683,9 @@ export async function createLoginomHost(options: {
         dispatching: states.some((state) => state.dispatching),
       }
     },
-    bindAcceptanceSaveRead(session: string) {
-      if (!saveReadPackage || saveReadChat || !session) throw new Error("LOGINOM_HANDSHAKE_INVALID")
-      saveReadChat = createHash("sha256").update(session).digest("hex")
+    bindAcceptanceProbe(session: string) {
+      if (!pendingProbe || probeChat || !session) throw new Error("LOGINOM_HANDSHAKE_INVALID")
+      probeChat = createHash("sha256").update(session).digest("hex")
     },
     browserRecovery: options.browserRecovery === true,
     references,

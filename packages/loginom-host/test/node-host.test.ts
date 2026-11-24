@@ -137,10 +137,10 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
 
 test("private CLI startup can bind its P5 package to a single new session", async () => {
   const host = await launchNodeHost({ node: fixture.node, entry: fixture.entry, root: join(fixture.directory, "p5"),
-    resources: fixture.directory, headless: true, acceptanceSaveReadPackage: "/user/task.lgp" })
+    resources: fixture.directory, headless: true, acceptanceProbe: { condition: "P5", packagePath: "/user/task.lgp" } })
   try {
-    expect(await host.request("acceptance.bindSaveRead", "session-one")).toBe(true)
-    await expect(host.request("acceptance.bindSaveRead", "session-two")).rejects.toThrow()
+    expect(await host.request("acceptance.bindProbe", "session-one")).toBe(true)
+    await expect(host.request("acceptance.bindProbe", "session-two")).rejects.toThrow()
   } finally { await host.close() }
 }, 15_000)
 

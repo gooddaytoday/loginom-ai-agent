@@ -353,8 +353,9 @@ export async function prepareCampaignBatch(manifest: CampaignManifest, journal: 
   if ([entrypoint, tasks].some(file => !file.startsWith(config.harnessRoot + path.sep))) throw Error("CAMPAIGN_CORPUS_PATH")
   const environment = { ...campaignEnvironment(manifest, config), EVAL_ENTRYPOINT: entrypoint, EVAL_TASKS: tasks,
     EVAL_ONLY: batch.keys.map(key => key.taskId).join(","), EVAL_LABEL: batch.id, EVAL_RESULTS_DIR: batch.resultsDir,
-    EVAL_CAMPAIGN_P5_TASKS: batch.keys.filter(key => manifest.keys.some(assigned =>
-      keyId(assigned) === keyId(key) && assigned.experiment?.condition === "P5")).map(key => key.taskId).join(","),
+    ...Object.fromEntries(["P3", "P5"].map(condition => [`EVAL_CAMPAIGN_${condition}_TASKS`,
+      batch.keys.filter(key => manifest.keys.some(assigned => keyId(assigned) === keyId(key) &&
+        assigned.experiment?.condition === condition)).map(key => key.taskId).join(",")])),
     EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: journal.consecutiveErrors, EVAL_CAMPAIGN_ERROR_LIMIT: campaignLimits(manifest).consecutiveErrors,
     EVAL_CAMPAIGN_LAST_PROGRESS_AT: journal.lastProgressAt, EVAL_CAMPAIGN_NO_PROGRESS_MS: campaignLimits(manifest).noProgressMs,
     EVAL_CAMPAIGN_JOURNAL: path.join(config.stateDir, "journal.json"), EVAL_CAMPAIGN_LOCK: config.controllerLock,

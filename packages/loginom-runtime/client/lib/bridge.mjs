@@ -184,7 +184,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       pinnedActions = pinned;
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
-      actionRuntime = createActionRuntime({ pinned,
+      actionRuntime = createActionRuntime({ pinned, acceptanceProbe:config.acceptanceProbe,
         cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,

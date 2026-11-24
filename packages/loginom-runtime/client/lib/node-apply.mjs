@@ -135,7 +135,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity}) {
+  signal, stopSignal, now=Date.now, resume=false, deadlineAt=Infinity, probe}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -381,6 +381,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     requireValue(value?.verified===true && value.cleanup_complete===true, 'Node phase did not verify '+name);
     verify(value);
+    if(probe?.condition==='P3'&&probe.operationId===operation.id&&!probe.attempted&&name==='finish'
+      &&request.finish==='execute'&&value.execution_started===true&&value.execution_group?.execution_id===value.execution_id
+      &&['document_id','workflow_id','node_id'].every(k=>value.execution_group.node?.[k]===state.node[k])){
+      const configuration=state.phases.find(p=>p.phase==='configure')?.value.configuration;
+      const destination=probe.packagePath.slice(0,-4)+'.result.csv';
+      if(configuration?.destination===destination&&configuration.configured?.destination_check?.verified===true
+        &&configuration.configured.destination_check.destination===destination){
+        probe.attempted=true;
+        const ack=await acknowledge({phase:'acceptance_fault_triggered',condition:'P3',target_phase:name,
+          receipt_id:pending.receipt_id,node:state.node,destination,execution_id:value.execution_id,
+          group_record_id:value.execution_group.group_record_id}).catch(()=>null);
+        if(ack)throw Error('The export execution acknowledgement was unavailable');
+      }
+    }
     const receipt={phase:name,receipt_id:pending.receipt_id,status:'verified',effect_possible:value.effect_possible===true,value:structuredClone(value)};
     await acknowledge({phase:'node_phase_completed',signature,receipt});
     // Anticipated mutation is uncertainty until the verified receipt arrives.
@@ -442,6 +456,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
+    // One admitted operation owns one immutable target. A later export to the
+    // same filename cannot inherit this assignment if the first stops early.
+    if(probe?.condition==='P3'&&!probe.operationId&&request.target.type==='exports.text'&&request.finish==='execute'
+      &&request.parameters.destination===probe.packagePath.slice(0,-4)+'.result.csv')probe.operationId=operation.id;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>openRecovery?.wizard_open?openRecovery.value:drivers.openWizard(ctx));

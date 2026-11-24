@@ -74,17 +74,24 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
   // The closed eval sandbox supplies private input on fd 0. Leave it open
   // at EOF so the ordinary prompt reader sees the original user message.
   const marker = "/run/loginom-eval-save-read"
-  let acceptanceSaveReadPackage: string | undefined
+  let acceptanceProbe: Parameters<typeof launchNodeHost>[0]["acceptanceProbe"]
   if (mode === "run" && process.platform === "linux" && existsSync(marker)) {
     rmdirSync(marker)
     if (dashboard || !headless) {
       failure("CLI_ARGUMENT_INVALID", 2)
       return
     }
-    acceptanceSaveReadPackage = readFileSync(0, "utf8")
+    const input = readFileSync(0, "utf8")
+    // P5 uses the original absolute package-path frame.
+    try {
+      acceptanceProbe = input.startsWith("/") ? { condition: "P5", packagePath: input } : JSON.parse(input)
+    } catch {
+      failure("CLI_ARGUMENT_INVALID", 2)
+      return
+    }
   }
   const host = await launchNodeHost({
-    acceptanceSaveReadPackage,
+    acceptanceProbe,
     node: bundle.node,
     entry: bundle.entry,
     resources: bundle.resources,
@@ -226,8 +233,8 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
         setRunDashboard(dashboardPrompt(target.action))
         cleanup.detach = () => setRunDashboard()
       }
-      const run = acceptanceSaveReadPackage === undefined ? RunCommand :
-        createRunCommand(session => host.request("acceptance.bindSaveRead", session))
+      const run = acceptanceProbe === undefined ? RunCommand :
+        createRunCommand(session => host.request("acceptance.bindProbe", session))
       await parser.command(run).parseAsync(target ? ["--dir", target.directory, ...filtered] : filtered)
     } else {
       const { TuiThreadCommand, setTuiLoginomHost, setTuiStartupWarning } = await import("./cmd/tui")
