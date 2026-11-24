@@ -2168,7 +2168,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -3068,6 +3068,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const inspect = async ({ operationId, signal } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
+    if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
+      const receipt=getPreparationReceipt(operationId);
+      if(receipt)return {status:'SUCCEEDED',action_key:'operation.inspect',action_revision:'1',operation_id:operationId,
+        phase:'retained_preparation_receipt',effect_possible:false,output:{state:'resolved',receipt:structuredClone(receipt),
+          next_steps:[{tool:'dock_action_describe',instruction:'Request selected node_types and modes for complete rules. This is the retained preparation receipt, not a fresh workspace observation.'}]},error:null,trace:[]};
+    }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
     if (!operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending());

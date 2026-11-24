@@ -13,6 +13,21 @@ import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
 
+test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
+ const page=new Page(),receipt={status:'READY',operation_id:'shared'};
+ const engine=runtime(page,{getPreparationReceipt:id=>id==='shared'?receipt:null,
+  nodeApplyHandlers:new Map([['imports.text',{revision:'fixture',modes:['delimited'],validate(){},configure(){}}]])});
+ const request={operation_id:'shared',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'imports.text'},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:1000}};
+ engine.startNodeApply(request);
+ const worker=await engine.waitNodeApply('shared');
+ assert.equal(worker.state,'settled');assert.equal(worker.error.code,'NODE_WORKER_REJECTED');
+ await assert.rejects(engine.inspect({operationId:'shared'}),/Operation is not known in this session/);
+ assert.deepEqual(engine.nodeApplyStatus('shared'),worker);
+});
+
 for(const action of ['package.save_checkpoint','package.save_as'])
 for(const fault of ['none','retry-restore','recover-owner','recover-awaiting','reopened','stale-navigation','path','graph','guid','type','account','document','native-session','dirty'])
 test(action+' reconciles a lost Save As response without repeating Save: '+fault,async()=>{
