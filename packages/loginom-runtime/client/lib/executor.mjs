@@ -2684,7 +2684,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const deadline=now()+NODE_RELEASE_BUDGET_MS;
     await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
     return releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
-      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline,signal,now});
+      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),
+      settleChild:operation.nodeApplyDrivers?.settleBeforeTarget,deadline,signal,now});
   }:undefined;
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&(earlyNodePhase(operation)
     ||operation.nodeApply?.pending&&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))

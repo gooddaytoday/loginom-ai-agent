@@ -560,3 +560,89 @@ test('C1 lost capture response cannot authorize release',async()=>{
  assert.equal(f.operation.groupingPreview.capture_refused,undefined);
  assert.deepEqual(f.events,[]);
 });
+
+// LAB-1998: the body gesture can refuse before its journal (a blocked producer
+// selection). Only the read-only capture ran, so the lease is released and the
+// preflight reports a target refusal with no effect instead of a lost transport.
+for(const type of ['transform.group_data','transform.sorting','join_input_1'])for(const disposeLost of [false,true])
+test(type+' blocked producer selection releases its lease before the body journal'+(disposeLost?' unless dispose is lost':''),async()=>{
+ const f=preflightFixture(type),original=f.options.execute,records=[],modes=[];
+ f.options.operation.cleanupConfirmed=true;
+ f.options.onRecord=async r=>{records.push(r);return structuredClone(r);};
+ f.options.receiptOptions=()=>assert.fail('no body receipt');
+ f.options.execute=async code=>{
+  if(code.includes('runManagedJavascriptSelectionBody'))assert.fail('no body gesture');
+  if(code.includes('runManagedJavascriptSelectionRead')){
+   const mode=code.match(/"mode":"(\w+)"/)[1];modes.push(mode);
+   if(mode==='capture')return {ready:false,blocked:true,node_selected:false,body_point:{x:10,y:10},node_tid:f.context.tid};
+   if(mode==='dispose'){if(disposeLost)throw Error('lost dispose reply');return {disposed:true};}
+  }
+  return original(code);
+ };
+ await assert.rejects(f.run(),error=>{
+  if(disposeLost){assert.equal(error.message,'lost dispose reply');assert.equal(error.nodePhaseRefusal,undefined);return true;}
+  assert.match(error.message,/Invalid managed JavaScript body gesture/);
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;
+ });
+ assert.deepEqual(modes,['capture','dispose']);
+ assert.deepEqual(records.filter(r=>String(r.phase).startsWith('javascript_managed_body')),[]);
+ assert.equal(f.options.operation.transportUncertain,undefined);
+ assert.equal(f.options.operation.nodeEffectPossible,undefined);
+ assert.equal(f.options.operation.cleanupConfirmed,true);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
+});
+
+// A failure after the body journal stays a possible click for every preflight.
+for(const type of ['transform.group_data','transform.sorting'])test(type+' lost body after its journal keeps the transport uncertain',async()=>{
+ const f=preflightFixture(type),original=f.options.execute,records=[];
+ f.options.onRecord=async r=>{records.push(r);return structuredClone(r);};
+ f.options.receiptOptions=(id,action_key,signature)=>({receipt_namespace:'test',receipt_id:id,receipt_signature:signature});
+ f.options.execute=async code=>{
+  if(code.includes('"mode":"dispose"'))assert.fail('an uncertain lease is never disposed');
+  if(code.includes('runManagedJavascriptSelectionRead'))return {ready:false,node_selected:false,body_point:{x:10,y:10},node_tid:f.context.tid};
+  if(code.includes('runManagedJavascriptSelectionBody'))throw Error('lost body transport');
+  return original(code);
+ };
+ await assert.rejects(f.run(),error=>{assert.equal(error.nodePhaseRefusal,undefined);return /lost body transport/.test(error.message);});
+ assert.equal(f.options.operation.transportUncertain,true);assert.equal(f.options.operation.nodeEffectPossible,true);
+ assert.equal(records.filter(r=>r.phase==='javascript_managed_body_prepared').length,1);
+});
+
+// The same refusal through the public node.apply runtime: the job settles as
+// NOT_APPLIED with no pending phase instead of a permanent AMBIGUOUS gate.
+for(const disposeLost of [false,true])test('node.apply Group after a blocked JS producer settles without a background gate'+(disposeLost?' unless dispose is lost':''),async()=>{
+ const {createActionRuntime}=await import('../lib/executor.mjs');
+ const {createGroupingNodeSupport}=await import('../lib/grouping-node.mjs');
+ const f=preflightFixture('transform.group_data'),original=f.options.execute,config={targetOrigin:'http://localhost',targetBuild:'7.4.2'};
+ const modes=[],execute=async code=>{
+  if(code.includes('runManagedJavascriptSelectionBody'))assert.fail('no body gesture');
+  if(code.includes('runManagedJavascriptSelectionRead'))modes.push(code.match(/"mode":"(\w+)"/)[1]);
+  if(code.includes('runManagedJavascriptSelectionRead')){
+   if(code.includes('"mode":"capture"'))return {ready:false,blocked:true,node_selected:false,body_point:{x:10,y:10},node_tid:f.context.tid};
+   if(code.includes('"mode":"dispose"')){if(disposeLost)throw Error('lost dispose reply');return {disposed:true};}
+  }
+  return original(code);
+ };
+ const request={...structuredClone(f.options.operation.parameters),operation_id:'group-after-js',contract_revision:'1.0.0',mode:'aggregate',finish:'execute',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const graph={complete:true,interaction_ready:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:'document',
+  nodes:[{ref:f.binding.node,type:'programming.javascript',label:'JS',locked:false,position:{x:100,y:100},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,
+  execute,onRecord:async e=>structuredClone(e),
+  nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:async()=>{},
+   activateWorkflow:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
+   verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+    document_id:request.document_id,workflow_ref:request.workflow_ref})}),
+  nodeApplyHandlers:new Map([['transform.group_data',{revision:'1',modes:['aggregate'],validate:()=>{},configure:()=>assert.fail('No target configuration')}]]),
+  nodeApplyDriverFactory:({operation})=>({
+   ...createGroupingNodeSupport(config).nodeApplyDriverFactory({...f.options,operation,execute,now:Date.now,
+    readReceipt:async()=>assert.fail('no receipt read')}),
+   verifySource:async()=>({verified:true,cleanup_complete:true,effect_possible:false})})});
+ runtime.startNodeApply(request);
+ const job=await runtime.waitNodeApply(request.operation_id,{timeoutMs:5000});
+ assert.deepEqual(modes,['capture','dispose']);
+ if(disposeLost){assert.equal(job.outcome.status,'AMBIGUOUS');return;}
+ assert.equal(job.outcome.status,'NOT_APPLIED',JSON.stringify(job.outcome));
+ assert.equal(job.outcome.effect_possible,false);assert.equal(job.outcome.cleanup_complete,true);
+ assert.equal(job.outcome.output?.pending_phase??null,null);
+});

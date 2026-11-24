@@ -51,3 +51,39 @@ test('DataToVar closes the source inspection before refusing a nonnumeric or mis
  }
  const f=fixture({foreign:true});await assert.rejects(f.run());assert.deepEqual(f.events,[]);
 });
+
+// LAB-1998: a blocked saved-JS producer refuses its body gesture before the
+// journal; only the read-only capture ran, so the lease is released and the
+// refusal has no effect. A failure after the journal stays uncertain.
+for(const fault of ['blocked','dispose-lost','after-journal'])test('saved JS DataToVar producer selection settles only a refusal before its journal: '+fault,async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'source'},modes=[],records=[];
+ const source={binding:{node,workflow_ref:{prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1'}},
+  port:{index:0,native_index:0,port_guid:'p'},
+  state:{origin:'http://localhost/app',loginom_build:'7.4.2',node_outputs:{verified:true},prepared_node_context:{...node,verified:true,surface:'graph'}}};
+ const operation={id:'op',deadline:Date.now()+60000,cleanupConfirmed:true,parameters:{finish:'execute',parameters,mappings:[]}};
+ const options={operation,onRecord:async e=>{records.push(e);return e;},
+  receiptOptions:(id,key,signature)=>({receipt_namespace:'test',receipt_id:id,receipt_signature:signature}),
+  execute:async code=>{
+   if(code.includes('runManagedJavascriptSelectionBody'))throw Error('lost body transport');
+   const mode=code.match(/"mode":"(\w+)"/)?.[1];modes.push(mode);
+   if(mode==='capture')return {ready:false,blocked:fault!=='after-journal',node_selected:false,body_point:{x:10,y:10},node_tid:'MF;TF-1;Graph;JS'};
+   if(mode==='dispose'){if(fault==='dispose-lost')throw Error('lost dispose reply');return {disposed:true};}
+   assert.fail('unexpected browser call');
+  }};
+ await assert.rejects(preflightExecutedDataToVarSource(options,{},source),error=>{
+  if(fault==='blocked'){assert.match(error.message,/Invalid managed JavaScript body gesture/);
+   assert.deepEqual(error.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});}
+  else assert.equal(error.nodePhaseRefusal,undefined);
+  if(fault==='dispose-lost')assert.equal(error.message,'lost dispose reply');
+  if(fault==='after-journal')assert.equal(error.message,'lost body transport');
+  return true;
+ });
+ if(fault==='after-journal'){
+  assert.deepEqual(modes,['capture']);assert.equal(records.filter(r=>r.phase==='javascript_managed_body_prepared').length,1);
+  assert.equal(operation.transportUncertain,true);assert.equal(operation.nodeEffectPossible,true);assert.equal(operation.cleanupConfirmed,false);
+  return;
+ }
+ assert.deepEqual(modes,['capture','dispose']);assert.deepEqual(records,[]);
+ assert.equal(operation.transportUncertain,undefined);assert.equal(operation.nodeEffectPossible,undefined);
+ assert.equal(operation.cleanupConfirmed,true);
+});
