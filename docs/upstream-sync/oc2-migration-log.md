@@ -20188,7 +20188,7 @@ Found 905 warnings and 0 errors.                                       # как 
 `.claude/worktrees/b29b`. Эталон 0.4 — `v0.4.0` (`a63462dde1`, В-99). Bun 1.4.4 переносной и Node 24.19.0 — первыми в
 `PATH` только для своих команд и `git commit`; `bun install --frozen-lockfile` — код 0, 1607 пакетов, `.husky/_` есть;
 `npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` в этом дереве и в дереве базы
-`<scratchpad>/b29b/base` (`5fd8e2f598`, detached). Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом
+`<scratchpad>/b29b/base` (`5fd8e2f598`, detached; после приёмки удалено). Хук `pre-commit` (`bun run secrets staged`) — `clean` на каждом
 коммите. Тесты, мутации, проба CLI и полные прогоны — под `unshare -n` (поднят только `lo`), с временными `HOME`,
 `TMPDIR`, `XDG_*` в scratchpad и `LOGINOM_AI_AGENT_TEST_NODE`. **Модель не вызывалась:** в тестах сервера — `TestLLM`,
 в пробе CLI — `--model test/test-model` на подставном сервере `127.0.0.1`; сети нет. Решение оркестратора по разрешениям
@@ -20200,7 +20200,8 @@ Found 905 warnings and 0 errors.                                       # как 
 | Коммит | Что |
 |---|---|
 | `0acedddf40` `feat(loginom-agent): dashboard session profile (B2.9b)` | код: `packages/loginom-agent/src/dashboard.ts` (новый, 23 строки), `access.ts` (+24 −4), `index.ts` (+17 −2); тесты: `packages/loginom-agent/test/dashboard.test.ts` (новый, 5), `access.test.ts` (+4), `describe` B2.9b в `packages/server/test/loginom-access.test.ts` (+3) и его фикстура `packages/server/test/fixture/mcp-guide.cjs` (новый) |
-| следующий | этот раздел, строка G1 и «Как запускать» в `guarantees.md` |
+| `09fa69fe04` `docs(upstream-sync): record B2.9b dashboard profile and its G1 mutations` | этот раздел, строка G1, строка 7 и «Как запускать» в `guarantees.md` |
+| следующий | уточнения этого раздела: область MCP, `product` в приёмке, защёлка в «Не проверено» |
 
 Файлов кода три (предел — пять), все — пакета форка; файлов upstream не правил, `catalog.json` не менялся.
 
@@ -20225,7 +20226,10 @@ Found 905 warnings and 0 errors.                                       # как 
   вызывающих (`session.execution.started`, хук `context`, `loginom_file_admit`, каталог Dock): без аренды `dock.refresh`
   не читает каталог, а `dock.system` не даёт подсказок Loginom, — `dock.ts` не менялся.
 - **Без MCP.** Преобразование `ctx.mcp.transform` убирает в Location дашборда все серверы: с ними уходят инструменты,
-  ресурсы, prompts и инструкции серверов в контексте модели.
+  ресурсы, prompts и инструкции серверов в контексте модели. Реестр серверов с `transform` у каждой Location свой
+  (`core/src/mcp/index.ts:1130`, `makeLocationNode`); общий пул (`core/src/mcp/pool.ts`, `makeGlobalNode`) только делит
+  соединения между Location, и последняя отпустившая его закрывает. Поэтому окно дашборда MCP других Location не
+  отключает — прочитано в коде, все тесты поднимают одну Location на сервер.
 - **Вложение агента** в промпте Location дашборда — `LOGINOM_SCOPE_DENIED` из хука `prompt` до записи сообщения и до
   модели.
 - `permissions.ts`, правила и `settle` не менялись: разрешения дашборда — B2.9c, f, g, а запрет администратора приходит
@@ -20295,7 +20299,11 @@ Found 905 warnings and 0 errors.                                       # как 
 | `loginom-agent` | 76 pass, 0 fail | 85 pass (+9 новых), 0 fail |
 | `server` | 277 pass, 3 skip, 0 fail | 280 pass (+3 новых), 3 skip, 0 fail |
 
-`loginom-access.test.ts` отдельно — 12 pass, 0 fail; с `--rerun-each 3` — 36 pass, 0 fail (25 с).
+`loginom-access.test.ts` отдельно — 12 pass, 0 fail; с `--rerun-each 3` — 36 pass, 0 fail (25 с). `product` (там
+`repo-paths.test.ts` сверяет пути, названные в `guarantees.md`), тем же способом после коммита документов: база и
+`09fa69fe04` — по 59 pass, 4 fail, одни и те же — `names.test.ts` (`OPENCODE_ZIG_CPU` в `cli/script/opencode-pty.ts`) и
+три `repo-paths.test.ts` (`--filter` и пути `packages/opencode` в workflows macOS и Windows и в
+`script/test-windows-profile.ps1`): они старше задачи, к правке документов отношения не имеют, не чинил.
 
 ```text
 $ cd packages/loginom-agent && bun typecheck
@@ -20306,7 +20314,7 @@ $ python3 -I scripts/upstream-sync/catalog-check.py --summary        # код 0,
 against a6b15d33daf6: 609 divergent upstream files
   CAT-05: 0 (pending: B2.5, B2.6, B2.9)
 $ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
-would change: 0 files                                                 # код 0
+would change: 0 files                                                 # код 0, и на 09fa69fe04
 $ bun run check                                   # код 0, под unshare -n, на 0acedddf40
 Found 905 warnings and 0 errors.                  # как в B2.8
 sdk-docs: … 11 guide blocks match their source; 0 problem(s)
@@ -20319,12 +20327,14 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - **Инструменты дашборда — поимённо, не `dashboard_*`.** Задание называет префикс; 0.4 перечислял три имени. Имя
   MCP-инструмента — `<сервер>_<инструмент>`, и сервер `dashboard` прошёл бы префикс. Выбран меньший список — имена 0.4.
-- **Защёлка вместо постоянной при старте плагина.** Постоянная открывает дыру: после перезапуска старый чат удалённого
-  дашборда активирует Location при отсутствующей папке (`false`), пересоздание того же дашборда возвращает папку по тому
-  же пути — и новый чат в этой Location получает обычный профиль. Проверка при каждом обращении без защёлки освобождает
-  сессию, когда папку удалили. Защёлка: папка, появившаяся позже, ограничивает сессии сразу; исчезнувшая не освобождает
-  их до выгрузки плагина. Остаётся: после перезапуска чат, чья папка исчезла, получает обычный профиль, пока папки нет, —
-  это закрывает привязка B2.9d (`LOGINOM_SCOPE_DENIED` старому чату).
+- **Защёлка вместо постоянной при старте плагина — подтвердить владельцу** (AGENTS.md: усложнение ради редкого случая
+  безопасности). Постоянная, по коду, открывает дыру: после перезапуска старый чат удалённого дашборда активирует
+  Location при отсутствующей папке (`false`), пересоздание того же дашборда возвращает папку по тому же пути — и новый
+  чат в этой Location получает обычный профиль. Сценарий выведен из кода, запуском не проверен (ниже, «Не проверено»);
+  цена защёлки — три строки и несколько системных вызовов на проверку, пока папка не найдена. Проверка при каждом
+  обращении без защёлки освобождает сессию, когда папку удалили. Защёлка: папка, появившаяся позже, ограничивает сессии
+  сразу; исчезнувшая не освобождает их до выгрузки плагина. Остаётся: после перезапуска чат, чья папка исчезла, получает
+  обычный профиль, пока папки нет, — это закрывает привязка B2.9d (`LOGINOM_SCOPE_DENIED` старому чату).
 - **MCP при поздней папке.** Преобразование MCP смотрит на защёлку, когда реестр серверов собирается. Если папка
   появилась после активации Location, серверы останутся до следующей перезагрузки MCP: их инструменты скрывает
   `permits`, но инструкции серверов останутся в контексте. Перезагрузку MCP по срабатыванию защёлки не добавлял — путь
@@ -20346,7 +20356,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 - Тесты пакета `server` и `loginom-agent`, которые пишут в каталог данных плагина (`Global.Path.data`: профили файлов
   B2.5b1, теперь папки дашбордов), без временных `XDG_*` пишут в настоящий `~/.local/share/loginom-ai-agent-dev`:
-  preload с изоляцией, как у `core/script/test.ts`, у этих пакетов нет. Записал в «Как запускать» `guarantees.md`.
+  preload с изоляцией, как у `core/script/test.ts`, у этих пакетов нет. Записал в «Как запускать» `guarantees.md`; для
+  CI на дереве v2 (B5.1) это нужно решить там же — временными `XDG_*` в шаге или preload пакета.
 - `ServiceHost` — один на процесс. Тест сервера, упавший по таймауту, не закрывает его, и следующий тест с Host в том же
   файле падает на `LOGINOM_HOST_ALREADY_STARTED`, а папки дашбордов остаются (так было в первом прогоне мутаций, пока
   сценарий звал терминал). В своих тестах убрал причину таймаута; общий механизм не трогал.
@@ -20356,6 +20367,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Отсутствие аренды из CLI: у запуска из исходников Host нет, записи аренды не появляются ни в дашборде, ни в контроле.
   С готовым Host — только тест сервера на Host по сценарию; настоящий Node host не запускал.
 - Ответ HTTP на вложение агента (вероятно, 500) — проверен только вызов в процессе.
-- Поздняя папка и MCP (выше) — тестом не покрыто.
+- Поздняя папка и MCP (выше) — тестом не покрыто. Как и сам сценарий, ради которого защёлка: активация Location у
+  отсутствующей папки после перезапуска и пересоздание дашборда по тому же пути — выведен из кода.
+- Несколько Location одного сервера и MCP — только по коду (выше, «Без MCP»).
 - Windows и macOS (junction, регистр путей) — только в объёме тестов 0.4, на Linux.
 - Desktop: Location окна дашборда — B4 (ВШ-6).
