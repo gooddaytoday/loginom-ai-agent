@@ -2,7 +2,7 @@
 // the exact already-observed graph/process state remains unchanged. No file
 // discovery/download or partially edited wizard is replayed by continuation.
 export const exportContinuationSurface=s=>structuredClone(Object.fromEntries(['dom_epoch','prepared_node_context','node_processes','wizard'].map(k=>[k,s[k]])));
-export function verifyExportContinuation({node,finish,surface,checkpoint}){
+function boundExportExecution({node,finish,surface,checkpoint}){
  const before=finish?.continuation_surface,group=finish?.execution_group;
  const sameNode=c=>c?.verified===true&&c.surface==='graph'&&['document_id','workflow_id','node_id'].every(k=>typeof node?.[k]==='string'&&node[k]===c[k]);
  const valid=s=>s?.wizard?.status==='absent'&&sameNode(s.prepared_node_context)&&typeof s.dom_epoch?.document==='string'&&Number.isSafeInteger(s.dom_epoch.revision)
@@ -11,5 +11,16 @@ export function verifyExportContinuation({node,finish,surface,checkpoint}){
   ||!group||finish.execution_id!==group.execution_id||!sameNode({...group.node,verified:true,surface:'graph'})||before.node_processes.root_id!==group.root_id)return false;
  if(checkpoint&&(checkpoint.phase!=='execute'||checkpoint.read_only!==true||checkpoint.cleanup_complete!==true||checkpoint.execution_id!==group.execution_id))return false;
  const matches=surface.node_processes.processes.filter(p=>p.parent_id===null&&p.process_id===group.group_id&&p.record_id===group.group_record_id&&p.error===false);
- return matches.length===1&&JSON.stringify(exportContinuationSurface(surface))===JSON.stringify(before);
+ return matches.length===1;
+}
+export function verifyExportContinuation(args){
+ return boundExportExecution(args)&&JSON.stringify(exportContinuationSurface(args.surface))===JSON.stringify(args.finish.continuation_surface);
+}
+// The original group may advance while its finish acknowledgement is missing.
+export function verifyStartedExportGroup({node,finish,surface}){
+ const before=finish.continuation_surface;
+ return boundExportExecution({node,finish,surface:before})&&boundExportExecution({node,finish,surface})
+  &&surface.dom_epoch.document===before.dom_epoch.document&&surface.dom_epoch.revision>=before.dom_epoch.revision
+  &&surface.prepared_node_context.tid===before.prepared_node_context.tid&&surface.node_processes.root_id===before.node_processes.root_id
+  &&[before,surface].every(s=>s.node_processes.processes.filter(p=>p.parent_id===null&&p.process_id===finish.execution_group.group_id).length===1);
 }

@@ -158,13 +158,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
   };
   let state=operation.nodeApply;
   let continuingConfigure=false;
-  let continuingOpen=false,openRecovery,continuingFinish=false;
+  let continuingOpen=false,openRecovery,continuingFinish=false,startedExportFinish;
   if(state) {
     requireValue(state.signature===signature, 'node.apply operation ID was used with different parameters or handler');
     continuingConfigure=resume&&state.pending?.phase==='configure'&&request.target.type==='transform.date_time'
       &&typeof drivers.verifyPendingConfigure==='function';
     continuingOpen=resume&&state.pending?.phase==='open'&&typeof drivers.verifyPendingOpen==='function';
-    continuingFinish=resume&&state.pending?.phase==='finish'&&typeof drivers.verifyPendingFinish==='function';
+    const continuingExport=resume&&drivers.canResumeStartedExport?.(state);
+    continuingFinish=resume&&state.pending?.phase==='finish'&&(continuingExport||typeof drivers.verifyPendingFinish==='function');
     if(state.pending&&!continuingConfigure&&!continuingOpen&&!continuingFinish)throw Error('Inspect the unresolved original node phase before continuing');
     if(state.result)return structuredClone(state.result);
     requireValue(resume && (state.cleanup_complete===true||continuingConfigure||continuingOpen||continuingFinish), 'Explicit inspected resume is required');
@@ -175,6 +176,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       openRecovery=await drivers.verifyPendingOpen(state,{signal});
       requireValue(openRecovery?.verified===true&&typeof openRecovery.wizard_open==='boolean','Original open boundary is not verified');
       await acknowledge({phase:'node_open_recovery_checked',signature,receipt_id:state.pending.receipt_id,recovery:openRecovery});
+    }else if(continuingExport){
+      startedExportFinish=await drivers.resumeStartedExport(state,{signal});
     }else if(continuingFinish){
       // A refused finish proof is final for this operation; only release remains.
       const recovery=await drivers.verifyPendingFinish(state,{signal}).catch(error=>{state.finish_resume_refused=true;throw error;});
@@ -511,8 +514,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     if((!separateOutput||request.finish!=='close')&&!javascriptConfigurationOnly)
       await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
     }
-    const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
-      ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
+    const finish=await phase('finish',ctx=>startedExportFinish??((readingOnly||separateOutput&&request.finish!=='close')
+      ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx)),{verify:value=>{
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
       if(existingOutputRead)requireValue(value.execution_started===false&&id(value.execution_id),'Current-output reading must preserve its native execution without Execute');

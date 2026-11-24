@@ -10,7 +10,7 @@ import {validateTextExportParameters,requireTextExportBindingSource} from './tex
 import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
-import {exportContinuationSurface,verifyExportContinuation} from './text-export-continuation.mjs';
+import {exportContinuationSurface,verifyExportContinuation,verifyStartedExportGroup} from './text-export-continuation.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
@@ -100,7 +100,17 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
   let channel,signal,driver,execution,configuration,inputMapping,variableMapping=null,recoveryReads=0;
-  const enter=ctx=>{signal=ctx.signal;operation.deadline=ctx.deadline;return channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,
+  let startedFinish,confirmedStepId;
+  const record=async event=>{
+   const saved=await onRecord(event);
+   if(event.phase==='node_step_completed'){
+    const r=event.outcome;
+    confirmedStepId=saved?.phase===event.phase&&saved.operation_id===operation.id&&saved.internal_operation_id===r.operation_id
+     &&['operation_id','action_key','status','effect_possible','cleanup_complete'].every(k=>saved.outcome?.[k]===r[k])?r.operation_id:null;
+   }
+   return saved;
+  };
+  const enter=ctx=>{signal=ctx.signal;operation.deadline=ctx.deadline;return channel??=createNodeProcedure({operation,execute,record,now,maxSteps:4096,targetOrigin,targetBuild,
    signal:{throwIfAborted:()=>signal?.throwIfAborted(),get aborted(){return signal?.aborted;},get reason(){return signal?.reason;}},
    preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
    wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});};
@@ -108,14 +118,41 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
    enter(ctx);if(mode==='close')return closePreparedWizard(channel);
    const verb=mode==='execute'?'execute_wizard':'finish_wizard',key=mode==='execute'?'btnExecute':'btnDone';
    const initial=port?await channel.observe({condition:'export input Done at complete definition page',outputColumnPage:{offset:Math.floor((definition.total_columns-1)/8)*8,limit:8},ready:s=>s.wizard?.stage==='input_mapping'&&s.wizard.output_columns?.page?.status==='complete_definition_page'}):undefined;
-   await channel.perform({condition:'export '+mode,...(initial?{initialObservation:initial}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb)),identity:()=>ctx.node,
+   const gesture=await channel.perform({condition:'export '+mode,...(initial?{initialObservation:initial}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb)),identity:()=>ctx.node,
     resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))).ref})});
+   const launchConfirmed=mode==='execute'&&gesture.effect_possible===true&&confirmedStepId===gesture.operation_id;
    const graph=await channel.observe({condition:'export returns to owned graph',ready:s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'});
    const e=mode==='execute'?await driver.identify():null;
-   const continuation=e?exportContinuationSurface(await channel.observe({condition:'export execution continuity checkpoint',readProcesses:true,ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true})):null;
-   return verified({effect_possible:true,mode,settings_applied:true,execution_started:mode==='execute',node_context:graph.prepared_node_context,...(e?{execution_id:e.execution_id,execution_group:e,continuation_surface:continuation}:{}),port});
+   const surface=e?await channel.observe({condition:'export execution continuity checkpoint',readProcesses:true,ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true}):null;
+   const value=verified({effect_possible:true,mode,settings_applied:true,execution_started:mode==='execute',node_context:graph.prepared_node_context,...(e?{execution_id:e.execution_id,execution_group:e,continuation_surface:exportContinuationSurface(surface)}:{}),port});
+   // readPreparedNodeContext binds the native package and tab even before the first Save.
+   const pkg=surface?.package_identity;
+   if(launchConfirmed&&operation.nodeApply.pending?.phase==='finish'&&surface.active_tab_ref
+    &&(typeof pkg?.path==='string'&&pkg.path.length>0||pkg?.path===null&&typeof pkg.name==='string'&&pkg.name.length>0)){
+    const config=operation.nodeApply.phases.find(p=>p.phase==='configure')?.value.configuration;
+    const check=config?.configured?.destination_check,requested=operation.nodeApply.request.parameters.destination;
+    if(check?.verified===true&&typeof config.destination==='string'&&check.destination===config.destination
+     &&(!requested||requested===config.destination))
+     startedFinish={pending:operation.nodeApply.pending,value,signal:ctx.signal,stopSignal:ctx.stopSignal,tab:surface.active_tab_ref,package:pkg};
+   }
+   return value;
   };
+  const canResumeStartedExport=state=>!!startedFinish&&state.pending?.phase==='finish'&&state.pending===startedFinish.pending
+   &&!state.result&&!operation.transportUncertain&&!startedFinish.signal?.aborted&&!startedFinish.stopSignal?.aborted
+   &&state.resumes<3&&now()<Math.min(state.deadline,state.pending.deadline);
   return {
+   canResumeStartedExport,
+   async resumeStartedExport(state,{signal:resumeSignal}){
+    need(canResumeStartedExport(state),'Original export finish is no longer available');
+    const original=startedFinish;
+    startedFinish=undefined;
+    enter({signal:resumeSignal,deadline:Math.min(state.deadline,state.pending.deadline)});
+    const surface=await channel.observe({condition:'original export execution checkpoint',readProcesses:true,
+     ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true});
+    need(surface.active_tab_ref===original.tab&&surface.package_identity?.path===original.package.path&&surface.package_identity?.name===original.package.name
+     &&verifyStartedExportGroup({node:state.node,finish:original.value,surface}),'Original export execution checkpoint differs');
+    return original.value;
+   },
    verifySource:async()=>verified({source_kind:'upstream_table',not_applicable:true}),
    async mapPorts(mappings,ctx){
     need(mappings.length===0,'Requested export mappings unsupported');
@@ -181,7 +218,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
    },
    async configureExport(ctx,p){enter(ctx);const r=await configureTextExport(channel,p,{...ctx,mode:operation.nodeApply.request.mode,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,variableMapping,close:closePreparedWizard});configuration=r.configuration;return r;},
    finish,
-   async waitExecution(ctx){enter(ctx);need(driver,'Export execution baseline missing');
+   async waitExecution(ctx){startedFinish=undefined;enter(ctx);need(driver,'Export execution baseline missing');
     try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});}
     catch(error){
      if(!ctx.stopSignal?.aborted||error!==ctx.stopSignal.reason||operation.transportUncertain)throw error;

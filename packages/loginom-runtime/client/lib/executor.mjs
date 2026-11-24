@@ -2720,6 +2720,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         requires:['fresh_same_node_and_settled_open_receipt'],provides:['continuation_of_original_operation'],
         instruction:'Reobserve the original node; retry only opening if no wizard is open, otherwise continue its owned wizard.'},...(release?[release]:[])],internal_resume_available:true};
     }
+    if(operation.nodeApplyDrivers?.canResumeStartedExport?.(operation.nodeApply)){
+      const release=nodeReleaseStep(operation);
+      return {recovery_options:['resume',...(release?['abandon_operation']:[])],next_steps:[{tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
+        requires:['original_export_execution_group'],provides:['continuation_of_original_operation'],
+        instruction:'Resume the original export to verify its execution and read its file. If verification fails, release the operation.'},...(release?[release]:[])],internal_resume_available:true};
+    }
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='finish'&&!operation.nodeApply.finish_resume_refused
       &&typeof operation.nodeApplyDrivers?.verifyPendingFinish==='function'&&!operation.transportUncertain){
       const release=nodeReleaseStep(operation);
@@ -3065,7 +3071,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const openContinuation=operation?.nodeApply?.pending?.phase==='open'&&!operation.transportUncertain
       &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function';
     const finishContinuation=operation?.nodeApply?.pending?.phase==='finish'&&!operation.transportUncertain
-      &&!operation.nodeApply.finish_resume_refused&&typeof operation.nodeApplyDrivers?.verifyPendingFinish==='function';
+      &&!operation.nodeApply.finish_resume_refused&&(typeof operation.nodeApplyDrivers?.verifyPendingFinish==='function'
+        ||operation.nodeApplyDrivers?.canResumeStartedExport?.(operation.nodeApply));
     return !operation||pending!==operation||!configureContinuation&&!openContinuation&&!finishContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
   };
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),

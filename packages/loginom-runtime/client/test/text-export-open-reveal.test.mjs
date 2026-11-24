@@ -1,18 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {createArtifactStore} from '../lib/artifacts.mjs';
+import {compactNodeResult} from '../lib/user-results.mjs';
 import {Page,runtime} from './support/executor-fixture.mjs';
 import {createTextExportNodeSupport} from '../lib/text-export-node.mjs';
 
 // D30, LAB-82 head189 q3: bbox=(1256,172,42,78), viewport=1280x800.
 // The observed point (1268,211) is valid, but the full body centre (1277,211)
 // is obscured. Model the browser boundary; run the real export/channel drivers.
-function fixture({fault,finish='execute',targetKind='existing',owner,receiptOptions,onRecord}={}) {
+function fixture({fault,finish='execute',targetKind='existing',owner,receiptOptions,onRecord,now=Date.now}={}) {
  const node=owner?.parameters.target.ref??{document_id:'doc',workflow_id:'flow',node_id:'export'};
  const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
  const deadline=Date.now()+10000,records=[],gestures=[],processes=[],receipts=new Map();
  let pending,consoleOpen=false,menu=false,revealed=false,wizard=false,shown=false;
  const element=(tid,allowed_actions=['click'],extra={})=>({tid,ref:'ui-'+tid.replace(/[^a-zA-Z0-9-]/g,'-'),signature:{tid},enabled:true,allowed_actions,...extra});
- const snapshot=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,
+ const changedSurface={};
+ const snapshot=()=>({active_tab_ref:'ui-export-tab',package_identity:{name:'Task',path:'/user/task.lgp'},origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,
   dom_epoch:{document:'browser',revision:revealed?2:1},scan:{complete:true},geometry:{viewport:{width:1280,height:800}},
   navigation_context:{status:'observed',path:workflow.navigation_path},
   prepared_node_context:{...node,node_id:revealed&&fault==='owner'?'foreign':node.node_id,tid:'body',verified:true,surface:wizard?'wizard':'graph',locked:false},
@@ -24,10 +31,10 @@ function fixture({fault,finish='execute',targetKind='existing',owner,receiptOpti
    ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),element('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[]),
    element(workflow.prefix+';NavigationBar;NavigationPanel'),element(workflow.prefix+';ModelForm;cmpDiagram'),
    element('body',['click'],{ref:revealed?'ui-fresh-body':'ui-clipped-body',graph_node:{part:'body'},interaction:{state:'point_observed',point:{x:revealed?700:1268,y:211}},bounding_box:{x:revealed?679:1256,y:172,width:42,height:78}}),
-   element('body;Setting',['begin_wizard'],{wizard_open:{node:{node_label:'Export'},workflow_path:workflow.navigation_path}})]}});
+   element('body;Setting',['begin_wizard'],{wizard_open:{node:{node_label:'Export'},workflow_path:workflow.navigation_path}})]},...changedSurface});
  const operation=owner??{id:'export',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{target:{kind:targetKind,ref:node},finish}}};
  const support=createTextExportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
- const driver=support.nodeApplyDriverFactory({operation,now:Date.now,
+ const driver=support.nodeApplyDriverFactory({operation,now,
   receiptOptions:receiptOptions??((id,key,signature)=>({id,action_key:key,signature})),
   readReceipt:async ref=>({state:'completed',receipt:receipts.get(ref.operation_id)}),
   onRecord:async e=>{records.push(e);if(e.phase==='node_step_prepared')pending=e;return onRecord?onRecord(e):structuredClone(e);},
@@ -60,10 +67,11 @@ function fixture({fault,finish='execute',targetKind='existing',owner,receiptOpti
     processes.push({parent_id:null,process_id:id,record_id:'record-'+id,state:'completed',error:false,children_loaded:true,expanded:true,rendered:true},
      {parent_id:id,process_id:id+'.1',record_id:'child-'+id,state:'completed',error:false,rendered:true,process_tid:'process-row'});
    }
+   if(action.verb==='execute_wizard'&&fault==='transport')throw Error('Execute reply unavailable');
    receipts.set(step.internal_operation_id,receipt);
    return receipt;
   }});
- return {run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline}),operation,records,gestures,deadline,driver,processes,node,workflow};
+ return {run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline}),operation,records,gestures,deadline,driver,processes,node,workflow,changedSurface};
 }
 
 for(const finish of ['execute','done'])test('existing Export reveals a partially clipped body before fresh selection/open: '+finish,async()=>{
@@ -87,24 +95,50 @@ test('new Export keeps its complete drawing reveal',async()=>{
  assert.equal(f.records.find(e=>e.action?.verb==='reveal_prepared_node').action.target,'drawing');
 });
 
-test('P3 loses only the assigned export finish ACK after a single physical Execute',async()=>{
+const deniedBefore=['unconfirmed Execute journal','cancelled','expired','transport','unconfirmed destination','missing package identity'];
+const refusedFresh=['wrong record','wrong tab','wrong package','different unsaved package','new document','wrong node','finish ACK still missing'];
+for(const scenario of ['control','P3','second node','lost marker ACK','lost finish receipt','same group after repaint','unsaved package after repaint',...deniedBefore,...refusedFresh])
+test('export finish after one Execute: '+scenario,async t=>{
  const {node,workflow}=fixture();
  const destination='/user/task.result.csv',packagePath='/user/task.lgp';
- for(const scenario of ['control','P3','second node','lost marker ACK']){
+ const absent=['lost finish receipt','same group after repaint','unsaved package after repaint'].includes(scenario)||deniedBefore.includes(scenario)||refusedFresh.includes(scenario);
+ const csv=Buffer.from('x;double\n10;20\n20;40\n');
+ const dir=await mkdtemp(join(tmpdir(),'export-resume-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const store=await createArtifactStore({directory:dir,sessionId:'session',storageDirectories:{exports:'/user',inputs:'/user',packages:'/user'}});
+ let finishWrites=0,clockOffset=0,firstFinish;
   const records=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,links:[],foreign_links:[],
    nodes:[node,{...node,node_id:'first'}].map(ref=>({ref,type:'exports.text',label:ref.node_id,position:{x:100,y:100},inputs:[],outputs:[]}))};
   const ok=async()=>({verified:true,cleanup_complete:true});
   let page;
-  const app=runtime(new Page(),{now:Date.now,acceptanceProbe:scenario==='control'?undefined:{condition:'P3',packagePath},onRecord:async e=>{
+  const app=runtime(new Page(),{now:()=>Date.now()+clockOffset,acceptanceProbe:scenario==='control'||absent?undefined:{condition:'P3',packagePath},onRecord:async e=>{
+    if(scenario==='unconfirmed Execute journal'&&e.phase==='node_step_completed'&&
+     records.some(p=>p.internal_operation_id===e.internal_operation_id&&p.action?.verb==='execute_wizard'))return {...e,outcome:{...e.outcome,operation_id:'foreign'}};
+    if(absent&&e.phase==='node_phase_completed'&&e.receipt.phase==='finish'){
+     if(++finishWrites===1){
+      firstFinish=structuredClone(e.receipt);
+      if(scenario==='cancelled')app.cancelNodeApply('export');
+      if(scenario==='expired')clockOffset=11000;
+      throw Error('Finish journal acknowledgement unavailable');
+     }
+     if(scenario==='finish ACK still missing')return {...e,receipt:{...e.receipt,receipt_id:'another'}};
+    }
     if(e.phase==='acceptance_fault_triggered'&&scenario==='lost marker ACK')return {...e,receipt_id:'another'};
     records.push(e);return e;},
    nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true}),
    nodeApplyHandlers:new Map([['exports.text',{revision:'1',modes:['delimited'],validate:()=>{},
-    configure:async()=>({verified:true,cleanup_complete:true,configuration:{destination,configured:{destination_check:{verified:true,destination}}}})}]]),
+    configure:async()=>({verified:true,cleanup_complete:true,configuration:{destination,configured:{destination_check:{verified:scenario!=='unconfirmed destination',destination}}}})}]]),
    nodeApplyDriverFactory:options=>{
-    page=fixture({owner:options.operation,receiptOptions:options.receiptOptions,onRecord:options.onRecord});
+    page=fixture({owner:options.operation,now:options.now,fault:scenario==='transport'?scenario:undefined,receiptOptions:options.receiptOptions,onRecord:options.onRecord});
+    if(scenario==='missing package identity')page.changedSurface.package_identity=null;
+    if(['unsaved package after repaint','different unsaved package'].includes(scenario))page.changedSurface.package_identity={path:null,name:'Task'};
     return {...page.driver,mapPorts:options.operation.id==='first'?async()=>{throw Error('Input mapping unavailable');}:ok,
-     readOutput:async(read,ctx)=>({verified:true,cleanup_complete:true,status:'complete',ports:[],evidence_ref:'output',execution_id:ctx.execution.execution_id})};
+     readOutput:async(read,ctx)=>{
+      const execution_id=ctx.execution.execution_id,output={verified:true,cleanup_complete:true,status:'complete',ports:[],evidence_ref:ctx.receipt_id,execution_id};
+      if(!absent)return output;
+      const lease=await store.stageOutput({...node,destination,execution_id,session_id:store.outputSessionId});
+      await writeFile(lease.path,csv);await lease.verify('task.result.csv',csv.length);
+      return {...output,file_artifacts:[await lease.retain()]};
+     }};
    }});
   const request={operation_id:'export',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'exports.text',ref:node},
    inputs:[],mappings:[],parameters:{destination},finish:'execute',mode:'delimited',read:{ports:[],sample_rows:0,require_exact_numbers:false},
@@ -116,9 +150,41 @@ test('P3 loses only the assigned export finish ACK after a single physical Execu
   }
   app.startNodeApply(request);
   const job=await app.waitNodeApply('export',{timeoutMs:2000});
-  assert.equal(job.outcome?.status,scenario==='P3'?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(job.outcome?.error));
+  assert.equal(job.outcome?.status,scenario==='P3'||absent?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(job.outcome?.error));
   const marker=records.filter(e=>e.phase==='acceptance_fault_triggered');
   assert.equal(marker.length,scenario==='P3'?1:0);
+  if(deniedBefore.includes(scenario)){
+   const advice=(await app.inspect({operationId:'export'})).output;
+   assert.equal(advice.next_steps.some(s=>s.tool==='dock_node_resume'),false);
+   assert.throws(()=>app.startNodeApply({operation_id:'export'},{resume:true}));
+   assert.deepEqual(await store.outputFiles(compactNodeResult(job)),[]);
+  }else if(absent){
+   const advice=(await app.inspect({operationId:'export'})).output;
+   assert.deepEqual(advice.next_steps[0].arguments,{operation_id:'export'});
+   assert.equal(advice.next_steps[0].tool,'dock_node_resume');
+   if(['same group after repaint','unsaved package after repaint'].includes(scenario))page.changedSurface.dom_epoch={document:'browser',revision:4};
+   if(scenario==='wrong record')page.processes[0].record_id='another';
+   if(scenario==='wrong tab')page.changedSurface.active_tab_ref='another';
+   if(scenario==='different unsaved package')page.changedSurface.package_identity={path:null,name:'Other'};
+   if(scenario==='wrong package')page.changedSurface.package_identity={name:'Other',path:'/user/other.lgp'};
+   if(scenario==='new document')page.changedSurface.dom_epoch={document:'new',revision:2};
+   if(scenario==='wrong node')page.changedSurface.prepared_node_context={...node,node_id:'another',verified:true,surface:'graph'};
+   app.startNodeApply({operation_id:'export'},{resume:true});
+   const result=compactNodeResult(await app.waitNodeApply('export',{timeoutMs:2000}));
+   if(refusedFresh.includes(scenario)){
+    assert.deepEqual([result.state,result.status],['settled','AMBIGUOUS']);
+    assert.deepEqual(await store.outputFiles(result),[]);
+    assert.equal(page.gestures.filter(g=>g.startsWith('execute_wizard:')).length,1);
+    assert.equal((await app.inspect({operationId:'export'})).output.next_steps[0].arguments.strategy,'abandon_operation');
+    return;
+   }
+   assert.deepEqual([result.state,result.status],['settled','SUCCEEDED'],JSON.stringify(result));
+   assert.deepEqual(records.find(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='finish').receipt,firstFinish);
+   const files=await store.outputFiles(result);
+   assert.equal(files.length,1);assert.deepEqual(await readFile(files[0].path),csv);
+   assert.equal(result.output.file_artifacts[0].execution_id,'doc:root:1');
+   assert.equal(result.output.file_artifacts[0].sha256,createHash('sha256').update(csv).digest('hex'));
+  }
   if(scenario==='P3'){
    const before=records.findIndex(e=>e.phase==='node_phase_prepared'&&e.receipt.receipt_id==='export:finish');
    const gesture=records.find(e=>e.phase==='node_step_prepared'&&e.action.verb==='execute_wizard');
@@ -130,10 +196,11 @@ test('P3 loses only the assigned export finish ACK after a single physical Execu
    const release=await app.recover('export',{strategy:'abandon_operation',recoveryOperationId:'release'});
    assert.equal(release.output.resolution,'released_after_proof',JSON.stringify(release));
    assert.equal(release.output.original_outcome.output.execution.status,'unknown');
+   assert.throws(()=>app.startNodeApply({operation_id:'export'},{resume:true}),/released/);
+   assert.deepEqual(await store.outputFiles(compactNodeResult(await app.waitNodeApply('export',{timeoutMs:0}))),[]);
    assert.deepEqual(marker.map(e=>[e.condition,e.operation_id,e.receipt_id,e.execution_id,e.node]),[['P3','export','export:finish','doc:root:1',node]]);
   }
-  assert.equal(records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='finish'),scenario!=='P3');
+  assert.equal(records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='finish'),scenario!=='P3'&&!deniedBefore.includes(scenario));
   assert.equal(page.gestures.filter(g=>g.startsWith('execute_wizard:')).length,1);
   assert.equal(page.processes.filter(p=>p.parent_id===null).length,1);
- }
 });
