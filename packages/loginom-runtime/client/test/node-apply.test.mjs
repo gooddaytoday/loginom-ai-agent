@@ -390,6 +390,11 @@ test('source validation preserves a bounded cause and partial effects without fi
  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.pending_phase,'configure');
  assert.equal(result.error.cause.code,'WIZARD_SOURCE_VALIDATION_FAILED');assert.equal(result.error.cause.message.length,240);
  assert.ok(!JSON.stringify(result).includes('must not escape'));assert.ok(!f.calls.includes('finish'));
+ const reply=compactNodeResult({operation_id:'apply1',state:'settled',outcome:{status:result.status,effect_possible:true,cleanup_complete:false,error:result.error,output:result}});
+ assert.equal(reply.next_step.tool,'dock_operation_inspect');
+ assert.match(reply.next_step.instruction,/SAME import node/);
+ assert.match(reply.next_step.instruction,/dock_artifact_deliver.*dock_storage_source/);
+ assert.match(reply.next_step.instruction,/XML/);
  const count=f.calls.length;await assert.rejects(f.run(request(),{resume:true}),/unresolved/);assert.equal(f.calls.length,count);
 });
 test('native step diagnostics survive a previously unlisted Loginom failure code',async()=>{
