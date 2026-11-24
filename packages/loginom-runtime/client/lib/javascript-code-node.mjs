@@ -110,7 +110,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor,requireWizardErrorDetails=false}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function'&&typeof requireWizardErrorDetails==='boolean','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v7',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v7',modes:['script'],variable_inputs:{variables:[0]},
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);

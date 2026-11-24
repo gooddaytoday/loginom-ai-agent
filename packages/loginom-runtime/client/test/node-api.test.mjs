@@ -9,9 +9,10 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // #1281: optional inputs[].replace_existing adds 222 bytes to apply and resume
  // (+444 full, +222 compact). #1282: json_field object-array guidance adds
  // 16 bytes twice (+32 full, 0 compact). #1277 changes replies only (+0).
+ // #1310 lists control input support (+272 full, +136 compact).
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,203681,'fb170fa5a0d723f633667e2babe09f975d11de7a88df52b3ea2fa58432fadc2c'],
-  [nodeApiTools.map(userNodeTool),14608,'dd74c97fbc7fc48bf8e7418109b329367aaf02c0b550fba5c79f8442225b006f'],
+  [nodeApiTools,203953,'00326113bc4946310d75934f49e1dc029673e873e17296cf7d9767c01c7670da'],
+  [nodeApiTools.map(userNodeTool),14744,'8adf1c8913e8b9885174dd29465a2f6e1febbeb6cd22cee6f824126a90cb0a3e'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);

@@ -23,7 +23,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -2696,7 +2696,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
-    if(strategy!=='abandon_operation')throw new Error('Use the enclosing node procedure to resume this internal phase; only abandon_operation can release a stopped node operation');
+    if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
     if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
     running=true;
@@ -2886,7 +2886,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return { tool: 'dock_browser_recovery', arguments: { action: 'start', operation_id: operation.id },
       reason: trigger.reason, step: structuredClone(trigger.step),
       instruction: 'Dock recovery for this step is exhausted. Start browser recovery for this operation and complete only this '
-        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface.' };
+        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface. If '
+        + 'dock_browser_recovery refuses start for this step, the operation stays blocked: do not repeat dock_operation_recover or start; '
+        + 'report it as a blocker.' };
   }
   const browserRecoveryApi = {
     browserRecoveryBasis(operationId) {
@@ -3099,7 +3101,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         ||['workflow','target'].includes(phase))return;
       if(nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
     },
-    validate:request=>{const h=validateNodeApplyRequest(request,nodeApplyHandlers).handler;return h.output_wizard==='separate'?JSON.stringify({revision:h.revision,output_wizard:'separate'}):h.revision;},
+    validate:(request,{fresh})=>{
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:fresh&&!operations.has(request.operation_id)});
+      return handler.output_wizard==='separate'?JSON.stringify({revision:handler.revision,output_wizard:'separate'}):handler.revision;
+    },
     progress:id=>{
       const state=operations.get(id)?.nodeApply;
       return state?structuredClone({node:state.node,execution:state.execution,
@@ -3454,7 +3459,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { action: structuredClone(action), session_manifest: structuredClone(pinned.pins) };
     },
     requestFailure(error) {
-      return { status: pending ? 'AMBIGUOUS' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
+      const variableError=error?.cause instanceof NodeVariableInputError?error.cause:error;
+      const variableInputRefusal=!pending&&!nodeJobs.active&&variableError instanceof NodeVariableInputError;
+      return { status: pending ? 'AMBIGUOUS' : variableInputRefusal ? 'NOT_APPLIED' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
         output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
@@ -3462,6 +3469,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         ...(!pending&&!nodeJobs.active&&error?.message==='Choose a single action or a batch description'
           ?{next_step:{tool:'dock_action_describe',instruction:'Use action_key alone for one action, OR action_keys:[...] with optional node_types:[...] for a batch. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text","transform.join_data","exports.text"]}. Remove action_key from the batch request; do not combine it with action_keys or node_types. This is a description request; no browser mutation or recovery is needed.'}}:{}),
+        ...(variableInputRefusal?{cleanup_complete:true,next_step:variableError.nextStep}:{}),
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
     inspect,
@@ -4075,14 +4083,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // phases own the same runtime gate; they cannot re-enter public run/act.
     async runNodeApply(request,{signal,stopSignal,resume=false,scanReceipt}={}) {
       request=structuredClone(request);
-      signal?.throwIfAborted();checkId(request.operation_id);
-      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers);
+      signal?.throwIfAborted();
+      const operationId=request.operation_id;
+      checkId(operationId);
+      let operation=operations.get(operationId);
+      const {handler}=validateNodeApplyRequest(request,nodeApplyHandlers,{fresh:!operation&&!resume});
       if(typeof nodeApplyDriverFactory!=='function')throw new Error('Local node drivers are not installed');
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.apply',{request,handler_revision:handler.revision,...(handler.output_wizard==='separate'?{output_wizard:'separate'}:{})});
-      const operationId=request.operation_id;
       if(auxiliary.has(operationId))throw new Error('Operation ID conflicts with a recovery or UI operation');
-      let operation=operations.get(operationId);
       if(operation&&operation.signature!==signature)throw new Error('operation_id was already used with different parameters or handler');
       if(pending&&pending!==operation)throw new Error('Another Dock operation remains pending');
       if(operation&&!resume)return inspectApply(operation);

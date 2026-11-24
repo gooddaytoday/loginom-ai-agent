@@ -566,7 +566,7 @@ test('a refused release names the user action and keeps the original operation p
 });
 test('only abandon_operation may release a stopped node operation',async()=>{
  const f=fixture({release:proved()});await stop(f,'finish');
- await assert.rejects(f.runtime.recover('apply',{strategy:'restore_control',recoveryOperationId:'repair'}),/enclosing node procedure/);
+ await assert.rejects(f.runtime.recover('apply',{strategy:'restore_control',recoveryOperationId:'repair'}),/Only abandon_operation can release a stopped node operation; every other strategy is refused/);
  assert.ok(!f.calls.some(c=>c.startsWith('release:')));
 });
 test('a released stopped read keeps its completed execution and applied configuration',async()=>{

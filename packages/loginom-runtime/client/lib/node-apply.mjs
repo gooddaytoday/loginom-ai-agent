@@ -19,10 +19,46 @@ const object = (v, keys) => requireValue(v && typeof v === 'object' && !Array.is
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v,k)), 'Invalid node.apply contract');
 const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 
+export class NodeVariableInputError extends Error {
+  constructor(request, capabilities, path, message, correction) {
+    const prefix='Invalid parameters.'+path+': ';
+    const reason=String(message);
+    super(reason.startsWith(prefix)?reason:prefix+reason);
+    const ports=(capabilities.variables??[]).map(port=>'variables input '+port);
+    if(capabilities.control)ports.push('control input 0');
+    const supported=request.target.type+' ('+request.mode+') '
+      +(ports.length?'accepts '+ports.join(', ')+'.':'accepts no variable inputs.');
+    this.nextStep={tool:'dock_node_apply',original_operation_id:request.operation_id,
+      instruction:supported+' '+correction+' Submit the complete corrected request with a NEW operation_id.'};
+  }
+}
+
+function variableInputCapabilities(handler,mode) {
+  const supported=handler.variable_inputs;
+  return !supported?.modes||supported.modes.includes(mode)?supported??{}:{};
+}
+
+function validateFreshVariableInputs(request,capabilities,mappings) {
+  const inputs=request.variable_inputs??[];
+  const supports=(kind,port)=>kind==='control'?capabilities.control===true&&port===0:capabilities.variables?.includes(port);
+  for(const {kind,input} of inputs) {
+    if(!supports(kind,input))throw new NodeVariableInputError(request,capabilities,'variable_inputs',
+      'Unsupported '+kind+' input '+input,'Remove the unsupported connection.');
+  }
+  for(const {kind,port} of mappings) {
+    const label=kind+' input '+port;
+    if(!supports(kind,port))throw new NodeVariableInputError(request,capabilities,'mappings',
+      'Unsupported mapping for '+label,'Remove the unsupported mapping.');
+    if(request.target.kind==='new'&&!inputs.some(input=>input.kind===kind&&input.input===port))
+      throw new NodeVariableInputError(request,capabilities,'mappings','Missing connection for '+label,
+        'Add a matching variable_inputs connection for '+label+' or remove its mapping.');
+  }
+}
+
 /** This shell is private until every required live driver and audit is admitted.
  * It does not interpret recipes and never invokes another executor or a model.
  */
-export function validateNodeApplyRequest(request, handlers) {
+export function validateNodeApplyRequest(request, handlers, {fresh=false}={}) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
     'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[]),...(Object.hasOwn(request??{},'bindings')?['bindings']:[])]);
   validateVariableBindings(request.bindings,request.target?.type);
@@ -39,14 +75,15 @@ export function validateNodeApplyRequest(request, handlers) {
   requireValue(handler.modes.includes(request.mode), 'Unsupported node configuration mode');
   requireValue(['done','execute','close'].includes(request.finish), 'Choose Done, Execute or Close explicitly');
   requireValue(Array.isArray(request.mappings) && request.mappings.length <= 16, 'Bounded port mappings required');
-  if(request.target.type==='variables.column_union')requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
+  const hasVariableMappings=request.mappings.some(m=>m?.kind!==undefined);
+  if(request.target.type==='variables.column_union'&&(!fresh||!hasVariableMappings))requireValue(request.mappings.length===0,'Variables column union supports automatic mapping only; custom variable/control/table mappings are unsupported');
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
       && Object.keys(mapping).every(k=>['direction','port','kind','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
-    if(mapping.kind!==undefined){validateVariablePortMapping(mapping);requireValue(request.mode!==NODE_READ_MODE&&request.target.type!=='variables.user'&&request.finish!=='close','Variable mapping cannot configure a builtin, reread or cancelled draft');}
+    if(mapping.kind!==undefined)validateVariablePortMapping(mapping);
     const key = (mapping.kind??'table')+':'+mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
@@ -95,9 +132,25 @@ export function validateNodeApplyRequest(request, handlers) {
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
-  // A handler rejects unsupported mapping/read modes and parameters here, before
-  // even the target phase can create a node. Validation must be pure.
-  handler.validate(request.parameters, request.mode, request.mappings.some(m=>m.kind!==undefined)?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request);
+  const legacyRequest=hasVariableMappings?{...request,mappings:request.mappings.filter(m=>m.kind===undefined)}:request;
+  const capabilities=variableInputCapabilities(handler,request.mode);
+  if(fresh)validateFreshVariableInputs(request,capabilities,request.mappings.filter(m=>m.kind!==undefined));
+  if(hasVariableMappings&&(request.mode===NODE_READ_MODE||request.target.type==='variables.user'||request.finish==='close')){
+    const message='Variable mapping cannot configure a builtin, reread or cancelled draft';
+    if(fresh)throw new NodeVariableInputError(request,capabilities,'mappings',message,
+      'Remove the variable mapping, or use Done or Execute to configure a supported node.');
+    throw Error(message);
+  }
+  // Saved checkpoints were admitted with table-only handler validation. Keep
+  // that path for replay and recovery, and pass the complete request at admission.
+  try {
+    handler.validate(request.parameters,request.mode,fresh?request:legacyRequest);
+  } catch(error) {
+    if(!fresh||!hasVariableMappings)throw error;
+    handler.validate(request.parameters,request.mode,legacyRequest);
+    throw new NodeVariableInputError(request,capabilities,'mappings',error.message,
+      'Remove or correct the variable mapping according to the handler error.');
+  }
   return {graph,handler};
 }
 

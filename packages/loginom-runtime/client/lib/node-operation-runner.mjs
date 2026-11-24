@@ -43,7 +43,8 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    if(closing)throw Error('Node operation runner is closing');
    request=structuredClone(request);checkId(request.operation_id);
    if(resume&&Object.keys(request).length===1)request=structuredClone(find(request.operation_id).request);
-   const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);
+   const old=jobs.get(request.operation_id);
+   const signature=digest({request,handler_revision:validate(request,{fresh:!old&&!resume})});
    if(old) {
     if(old.signature!==signature)throw Error('Node operation ID was used with different parameters');
     if(!resume||old.state==='running'||old.outcome?.status==='SUCCEEDED'||old.outcome?.output?.execution?.status==='cancelled'
