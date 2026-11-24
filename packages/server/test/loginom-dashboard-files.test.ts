@@ -1,3 +1,4 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { describe, expect } from "bun:test"
@@ -5,12 +6,14 @@ import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
+import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Session } from "@opencode/core/session"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
+import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
-import { Context, Effect, Layer, Schema } from "effect"
+import { Cause, Context, Effect, Exit, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
 import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
@@ -27,24 +30,27 @@ import { pluginsLoaded } from "./fixture/routes"
 
 // Paths of a dashboard session (guarantee G1, B2.9c) on a real server with OpenCode's own file tools and a scripted
 // model: 0.4 `v0.4.0:packages/opencode/test/tool/dashboard-guard.test.ts` without its LSP cases (OpenCode 2 has no LSP
-// runtime in its file tools) and without the two cases of the draft binding (B2.9d). A session reads only its work
-// folder and writes only in its `src`, by the real path, and is never asked: a client answers every question once, as
-// `run --auto` does, and records what it was asked. A refused call tells the model why and the turn goes on (B2.6b).
-// The dashboard's folder lies under the plugin's data root, the case's own temporary directory (`temporaryData`):
-// `<data>/dashboards/files-*/{work/{src,sample.json,snapshot.json},control/binding.json}`. A user message carries its
-// script as `SCRIPT<json>SCRIPT`: one entry per step.
+// runtime in its file tools). A session reads only its work folder and writes only in its `src`, by the real path, and
+// is never asked: a client answers every question once, as `run --auto` does, and records what it was asked. A refused
+// call tells the model why and the turn goes on (B2.6b). The draft binding (B2.9d) is the second `describe`, with the
+// formatter that never runs in a dashboard. The dashboard's folder lies under the plugin's data root, the case's own
+// temporary directory (`temporaryData`): `<data>/dashboards/files-*/{work/{src,sample.json,snapshot.json},
+// control/binding.json}`. A user message carries its script as `SCRIPT<json>SCRIPT`: one entry per step; a step's `act`
+// runs one of the case's actions just before the model's call reaches the server.
 
-type Step = { tool: string; input?: unknown } | { text: string }
+type Step = { tool: string; input?: unknown; act?: string } | { text: string }
 const script = (...steps: Step[]) => `SCRIPT<${JSON.stringify(steps)}>SCRIPT`
 // Each case boots one or more server Locations and runs up to 30 scripted steps.
 const timeout = 30_000
 const ok = "completed"
 const no = Dashboard.deniedText
+// The dashboard's `control/binding.json` as its preparation writes it, with the draft it holds (B2.9h).
+const binding = (draftId: string) => JSON.stringify({ draftId, note: "control synthetic" }, null, 2) + "\n"
 
 // `git` makes the dashboard's folder a git repository, so Core counts `control` and `..` as the project's own and asks
 // no `external_directory` question: only the plugin's own check stands. `at` opens the Location in the work folder, at
 // an alias outside that links to it, or in an ordinary project. `user` is the user's config, `work` a config file at the
-// work folder's root (B2.9h writes one), `policies` the administrator's (B2.6c). `model` is the model's ID: OpenCode
+// work folder's root, `policies` the administrator's (B2.6c). `model` is the model's ID: OpenCode
 // offers `patch` instead of `edit` and `write` to GPT models.
 type Options = {
   git?: boolean
@@ -90,13 +96,14 @@ const boot = (options: Options = {}) =>
           else process.env.LOGINOM_AI_AGENT_RESOURCES = previous
         }),
     )
+    const draft = crypto.randomUUID()
     const folder = yield* Effect.promise(async () => {
       await fs.mkdir(Dashboard.root(), { recursive: true })
       const root = await fs.mkdtemp(path.join(Dashboard.root(), "files-"))
       const work = path.join(root, "work")
       const control = path.join(root, "control")
       const files = {
-        [path.join(control, "binding.json")]: "control synthetic\n",
+        [path.join(control, "binding.json")]: binding(draft),
         [path.join(work, "sample.json")]: "sample synthetic\n",
         [path.join(work, "snapshot.json")]: "snapshot synthetic\n",
         [path.join(work, "src", "main.tsx")]: "main synthetic\n",
@@ -117,8 +124,17 @@ const boot = (options: Options = {}) =>
       await fs.mkdir(path.join(global, "config"), { recursive: true })
       if (options.git) await initGit(root)
       if (options.at === "alias") await fs.symlink(work, path.join(dir, "alias"), "dir")
-      return { root, work, control }
+      return { root, work, control, binding: binding(draft) }
     })
+    // The folder deleted, and prepared again with a new draft unless there is none (B2.9g, B2.9h).
+    const recreate = (next?: string) => {
+      rmSync(folder.root, { recursive: true, force: true })
+      if (next === undefined) return
+      mkdirSync(path.join(folder.work, "src"), { recursive: true })
+      mkdirSync(folder.control)
+      writeFileSync(path.join(folder.control, "binding.json"), binding(next))
+      writeFileSync(path.join(folder.work, "sample.json"), "replacement synthetic\n")
+    }
     const directory =
       options.at === "alias"
         ? path.join(dir, "alias")
@@ -127,7 +143,8 @@ const boot = (options: Options = {}) =>
           : folder.work
     const location = Location.Ref.make({ directory: AbsolutePath.make(directory) })
     const llm = yield* TestLLM.Test.pipe(Effect.provide(TestLLM.testLayer()))
-    yield* llm.serve(respond)
+    const acts = new Map<string, () => void>()
+    yield* llm.serve((request) => respond(request, acts))
     const model = SessionRunnerModel.resolved(
       LanguageModel.make({
         id: options.model ?? "loginom-dashboard-files-model",
@@ -176,11 +193,11 @@ const boot = (options: Options = {}) =>
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
-    const call = (route: string, body?: unknown) =>
+    const call = (route: string, body?: unknown, method = body === undefined ? "GET" : "POST") =>
       Effect.promise(async () => {
         const response = await handler(
           new Request(`http://opencode.local${route}`, {
-            method: body === undefined ? "GET" : "POST",
+            method,
             headers: { "content-type": "application/json" },
             body: body === undefined ? undefined : JSON.stringify(body),
           }),
@@ -193,11 +210,12 @@ const boot = (options: Options = {}) =>
     yield* pluginsLoaded(context, directory)
     // A session whose every question is answered once, as `run --auto` answers (`cli/src/run/noninteractive.ts`,
     // `replyPermission`); `asked` lists the actions it was asked.
-    const create = (title: string) =>
+    const create = (title: string, metadata?: Record<string, string>, place = location) =>
+      sessions
+        .create({ title, agent: Agent.ID.make("build"), model: model.ref, location: place, metadata })
+        .pipe(Effect.flatMap((session) => answer(session.id)))
+    const answer = (id: Session.ID) =>
       Effect.gen(function* () {
-        const id = yield* sessions
-          .create({ title, agent: Agent.ID.make("build"), model: model.ref, location })
-          .pipe(Effect.map((s) => s.id))
         const asked: string[] = []
         yield* call(`/api/session/${id}/permission?${at}`).pipe(
           Effect.map((response) => response.body.data as { id: string; action: string }[]),
@@ -249,8 +267,41 @@ const boot = (options: Options = {}) =>
       })
     const text = (file: string) => Effect.promise(() => Bun.file(file).text())
     const exists = (file: string) => Effect.promise(() => Bun.file(file).exists())
-    return { dir, directory, folder, create, run, text, exists }
+    // A prompt with a text answer: `admitted` once its turn is over, or the text it failed with when not admitted.
+    const admit = (sessionID: Session.ID) =>
+      sessions.prompt({ sessionID, text: script({ text: "end" }) }).pipe(
+        Effect.andThen(sessions.wait(sessionID)),
+        Effect.exit,
+        Effect.map((exit) => (Exit.isFailure(exit) ? String(Cause.squash(exit.cause)) : "admitted")),
+      )
+    // Requests the model received, every session's.
+    const requests = llm.requests().pipe(Effect.map((items) => items.length))
+    // A plugin of the case whose hooks run before the product's, as an SDK plugin's do.
+    const harness = (effect: (ctx: PluginContext) => Effect.Effect<void, never, Scope.Scope>) =>
+      Context.get(context, SdkPlugins.Service)
+        .register(define({ id: "test.loginom-dashboard-files", effect }))
+        .pipe(Effect.andThen(pluginsLoaded(context, directory)))
+    return {
+      dir,
+      directory,
+      folder,
+      create,
+      answer,
+      run,
+      text,
+      exists,
+      recreate,
+      acts,
+      sessions,
+      admit,
+      requests,
+      harness,
+      call,
+      at,
+    }
   })
+
+type PluginContext = Parameters<Parameters<typeof define>[0]["effect"]>[0]
 
 // Expects every call's outcome, the refusals the model read, a turn that went on to its final answer, no question.
 function settled(
@@ -335,7 +386,7 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           [path.join(work, "src", "main.tsx"), "edited"],
           [path.join(work, "src", "a", "b.ts"), "nested"],
           [path.join(work, "sample.json"), "sample synthetic\n"],
-          [path.join(test.folder.control, "binding.json"), "control synthetic\n"],
+          [path.join(test.folder.control, "binding.json"), test.folder.binding],
         ] as const)
           expect([file, yield* test.text(file)]).toEqual([file, content])
         for (const file of [
@@ -386,7 +437,7 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
           [path.join(work, "src", "main.tsx"), "main synthetic\n"],
           [path.join(work, "sample.json"), "sample synthetic\n"],
           [path.join(work, "snapshot.json"), "snapshot synthetic\n"],
-          [path.join(test.folder.control, "binding.json"), "control synthetic\n"],
+          [path.join(test.folder.control, "binding.json"), test.folder.binding],
         ] as const)
           expect([file, yield* test.text(file)]).toEqual([file, content])
         for (const file of [path.join(work, "src", "d.tsx"), path.join(test.folder.control, "new.json")])
@@ -528,35 +579,254 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
+})
 
+describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", () => {
   it.live(
-    "a formatter config the model writes in src never runs once the folder's config turns formatters off (B2.9h writes it); without it, the user's formatter would",
+    "an old chat of a folder deleted and prepared again is refused before its prompt, the model and any tool; a fresh chat works on the new draft, and neither metadata nor a fork brings the old one back",
     () =>
       Effect.gen(function* () {
-        // 0.4's four Prettier cases: `edit` cannot create a file in OpenCode 2, so three. The user's formatter runs
-        // Prettier, which loads `src/.prettierrc.cjs`; that config would leave a marker outside the work folder.
+        // 0.4 `prompt.test.ts` «…retires every old chat across recreation», its part about old chats; `session.update`
+        // with foreign metadata stands for 0.4's `import`, `httpapi-sync` and `session` marker cases.
+        const test = yield* boot()
+        const chat = yield* test.create("old")
+        const kept = yield* test.create("kept")
+        const write = [[{ tool: "write", input: { path: "src/old.tsx", content: "old" } }, ok]] as const
+        settled(yield* test.run(chat.id, write), write, chat.asked)
+        // A prompt that never ran still binds its chat to the draft it was admitted on.
+        yield* test.sessions.prompt({ sessionID: kept.id, text: "Сохрани этот запрос", resume: false })
+        const draft = crypto.randomUUID()
+        test.recreate(draft)
+        const before = yield* test.requests
+        for (const old of [chat, kept])
+          expect([old.id, yield* test.admit(old.id)]).toEqual([old.id, expect.stringContaining(Dashboard.unbound)])
+        // A side question and a manual compaction of the old chat reach no model either.
+        expect(
+          Exit.isFailure(yield* test.sessions.generate({ sessionID: chat.id, prompt: "x" }).pipe(Effect.exit)),
+        ).toBe(true)
+        yield* test.sessions.compact({ sessionID: chat.id }).pipe(Effect.exit)
+        yield* test.sessions.wait(chat.id)
+        expect(yield* test.requests).toBe(before)
+        expect((yield* test.sessions.messages({ sessionID: kept.id })).length).toBe(0)
+
+        const fresh = yield* test.create("fresh")
+        const calls = [
+          [{ tool: "write", input: { path: "src/fresh.tsx", content: "fresh" } }, ok],
+          [{ tool: "read", input: { path: "sample.json" } }, ok],
+        ] as const
+        const result = yield* test.run(fresh.id, calls)
+        settled(result, calls, fresh.asked)
+        expect(result.results).toContain("replacement synthetic")
+        expect(yield* test.text(path.join(test.folder.work, "src", "fresh.tsx"))).toBe("fresh")
+
+        // The binding is not metadata: naming the new draft there changes nothing.
+        const update = yield* test.call(
+          `/api/session/${kept.id}?${test.at}`,
+          { metadata: { loginom_dashboard: draft } },
+          "PATCH",
+        )
+        expect(update.status).toBe(204)
+        expect(yield* test.admit(kept.id)).toContain(Dashboard.unbound)
+        // A fork keeps its source's draft.
+        const forks = {
+          old: (yield* test.sessions.fork({ sessionID: chat.id })).id,
+          fresh: (yield* test.sessions.fork({ sessionID: fresh.id })).id,
+        }
+        expect(yield* test.admit(forks.old)).toContain(Dashboard.unbound)
+        const forked = yield* test.requests
+        expect(yield* test.admit(forks.fresh)).toBe("admitted")
+        expect(yield* test.requests).toBe(forked + 1)
+
+        // The folder deleted: its chats are refused too, and so is one begun after.
+        test.recreate()
+        const gone = yield* test.requests
+        const after = yield* test.create("after")
+        for (const id of [fresh.id, forks.fresh, after.id])
+          expect([id, yield* test.admit(id)]).toEqual([id, expect.stringContaining(Dashboard.unbound)])
+        expect(yield* test.requests).toBe(gone)
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a folder prepared again during a turn: the old chat's next call is refused before it runs, a read and a write alike, and its turn ends before the model",
+    () =>
+      Effect.gen(function* () {
+        // 0.4 `dashboard-guard.test.ts` «a read with an expired dashboard context is denied before requesting
+        // permission» and «an admitted dashboard tool cannot capture a replacement draft as its write target».
+        const test = yield* boot()
+        test.acts.set("recreate", () => test.recreate(crypto.randomUUID()))
+        for (const [label, step] of [
+          ["read", { tool: "read", input: { path: "sample.json" }, act: "recreate" }],
+          ["write", { tool: "write", input: { path: "src/captured.tsx", content: "captured" }, act: "recreate" }],
+          // `edit` reads its target before it asks: refused before the call, it tells nothing of the new folder.
+          [
+            "edit",
+            { tool: "edit", input: { path: "src/captured.tsx", oldString: "x", newString: "y" }, act: "recreate" },
+          ],
+        ] as const) {
+          const session = yield* test.create(label)
+          const before = yield* test.requests
+          yield* test.sessions.prompt({ sessionID: session.id, text: script(step, { text: "end" }) })
+          yield* test.sessions.wait(session.id)
+          const messages = yield* test.sessions.messages({ sessionID: session.id })
+          const parts = messages.flatMap((message) =>
+            message.type === "assistant" ? message.content.flatMap((part) => (part.type === "tool" ? [part] : [])) : [],
+          )
+          expect([
+            label,
+            parts.map((part) => (part.state.status === "error" ? part.state.error.message : part.state.status)),
+          ]).toEqual([label, [Dashboard.unbound]])
+          // The request that made the call is the last: the next one is refused before the model.
+          expect([label, (yield* test.requests) - before, (yield* test.sessions.get(session.id)).outcome]).toEqual([
+            label,
+            1,
+            "failed",
+          ])
+          expect([label, session.asked]).toEqual([label, []])
+          expect([label, yield* test.exists(path.join(test.folder.work, "src", "captured.tsx"))]).toEqual([
+            label,
+            false,
+          ])
+        }
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "the draft is checked again at the write's own permission request, the last step before the file, and on the result",
+    () =>
+      Effect.gen(function* () {
+        // The case's plugin prepares the folder again where no tool runs between: at the write's `edit` request, before
+        // the product's hook, and after a read, before the product's `execute.after`.
+        const test = yield* boot()
+        yield* test.harness((ctx) =>
+          Effect.gen(function* () {
+            yield* ctx.permission.hook("evaluate", (event) =>
+              Effect.sync(() => {
+                if (event.action === "edit" && event.resources.includes("src/race.tsx"))
+                  test.recreate(crypto.randomUUID())
+              }),
+            )
+            yield* ctx.tool.hook("execute.after", (event) =>
+              Effect.sync(() => {
+                if (event.tool === "read" && event.status === "completed") test.recreate(crypto.randomUUID())
+              }),
+            )
+          }),
+        )
+        const writer = yield* test.create("writer")
+        const written = yield* test.run(writer.id, [
+          [{ tool: "write", input: { path: "src/race.tsx", content: "race" } }, ok],
+        ])
+        expect(written.outcomes).toEqual([Dashboard.unbound])
+        expect(yield* test.exists(path.join(test.folder.work, "src", "race.tsx"))).toBe(false)
+        const reader = yield* test.create("reader")
+        const read = yield* test.run(reader.id, [[{ tool: "read", input: { path: "sample.json" } }, ok]])
+        expect(read.outcomes).toEqual([ok])
+        const output = (yield* test.sessions.messages({ sessionID: reader.id })).flatMap((message) =>
+          message.type === "assistant" ? message.content.flatMap((part) => (part.type === "tool" ? [part] : [])) : [],
+        )
+        expect(JSON.stringify(output)).not.toContain("synthetic")
+        expect(JSON.stringify(output)).toContain(Dashboard.unbound)
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "0.4's markers move to the plugin's storage once, when the dashboard Location first checks a chat; metadata is not read after that",
+    () =>
+      Effect.gen(function* () {
+        // 0.4 `prompt.test.ts` «execution adopts an older dashboard row once and preserves its current metadata»: a row
+        // 0.4 kept without a marker is adopted on the draft, and its metadata stays as it was.
+        const test = yield* boot()
+        const draft = JSON.parse(test.folder.binding).draftId
+        const marker = (value: string) => ({ loginom_dashboard: value, note: "latest" })
+        const rows = {
+          current: yield* test.create("current", marker(draft)),
+          old: yield* test.create("old", marker(crypto.randomUUID())),
+          deleted: yield* test.create("deleted", marker("deleted")),
+          unmarked: yield* test.create("unmarked", { note: "latest" }),
+        }
+        const before = yield* test.requests
+        expect(yield* test.admit(rows.current.id)).toBe("admitted")
+        expect(yield* test.admit(rows.old.id)).toContain(Dashboard.unbound)
+        expect(yield* test.admit(rows.deleted.id)).toContain(Dashboard.unbound)
+        expect(yield* test.admit(rows.unmarked.id)).toBe("admitted")
+        expect(yield* test.requests).toBe(before + 2)
+        expect((yield* test.sessions.get(rows.unmarked.id)).metadata).toEqual({ note: "latest" })
+        // After that, metadata is not read: neither for a row that names the draft now, nor for a chat begun later.
+        yield* test.call(`/api/session/${rows.old.id}?${test.at}`, { metadata: marker(draft) }, "PATCH")
+        expect(yield* test.admit(rows.old.id)).toContain(Dashboard.unbound)
+        const later = yield* test.create("later", marker("deleted"))
+        expect(yield* test.admit(later.id)).toBe("admitted")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a chat moved into a dashboard is refused there and stays free where it came from; a dashboard chat moved out is refused outside",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const project = Location.Ref.make({ directory: AbsolutePath.make(path.join(test.dir, "project")) })
+        const work = AbsolutePath.make(test.folder.work)
+        const ordinary = yield* test.create("ordinary", undefined, project)
+        expect(yield* test.admit(ordinary.id)).toBe("admitted")
+        yield* test.sessions.move({ sessionID: ordinary.id, directory: work })
+        yield* test.sessions.wait(ordinary.id)
+        expect((yield* test.sessions.get(ordinary.id)).location.directory).toBe(work)
+        expect(yield* test.admit(ordinary.id)).toContain(Dashboard.unbound)
+        yield* test.sessions.move({ sessionID: ordinary.id, directory: project.directory })
+        yield* test.sessions.wait(ordinary.id)
+        expect(yield* test.admit(ordinary.id)).toBe("admitted")
+
+        const chat = yield* test.create("dashboard")
+        expect(yield* test.admit(chat.id)).toBe("admitted")
+        yield* test.sessions.move({ sessionID: chat.id, directory: project.directory })
+        yield* test.sessions.wait(chat.id)
+        expect((yield* test.sessions.get(chat.id)).location.directory).toBe(project.directory)
+        expect(yield* test.admit(chat.id)).toContain(Dashboard.unbound)
+        // Its fork there is a copy of a dashboard chat, and refused too.
+        const fork = yield* test.sessions.fork({ sessionID: chat.id })
+        expect(yield* test.admit(fork.id)).toContain(Dashboard.unbound)
+        // Back in its folder, it runs on its draft again.
+        yield* test.sessions.move({ sessionID: chat.id, directory: work })
+        yield* test.sessions.wait(chat.id)
+        expect(yield* test.admit(chat.id)).toBe("admitted")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "no formatter runs in a dashboard, whatever the config says: a formatter config the model writes in src is never executed; the same formatter runs in an ordinary Location",
+    () =>
+      Effect.gen(function* () {
+        // 0.4 `dashboard-guard.test.ts` «dashboard write/edit/apply_patch does not execute source Prettier
+        // configuration» (4): `edit` cannot create a file in OpenCode 2, so three. The user's formatter runs Prettier,
+        // which loads `src/.prettierrc.cjs`; that config would leave a marker outside the work folder. A config file at
+        // the work folder's root, above the user's, turns formatters on too.
         const prettier = Bun.fileURLToPath(import.meta.resolve("prettier/bin/prettier.cjs"))
-        const user = {
-          formatter: { prettier: { command: [process.execPath, prettier, "--write", "$FILE"], extensions: [".tsx"] } },
+        const formatter = {
+          prettier: { command: [process.execPath, prettier, "--write", "$FILE"], extensions: [".tsx"] },
         }
         const config = (marker: string) =>
           `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "synthetic-boundary-proof"); module.exports = {};`
-        for (const [label, work, model] of [
-          ["off", { formatter: false }, undefined],
-          ["off, patch", { formatter: false }, "gpt-5-dashboard-files"],
-          ["control", undefined, undefined],
+        for (const [label, options] of [
+          ["user's formatter", { user: { formatter } }],
+          ["user's formatter, patch", { user: { formatter }, model: "gpt-5-dashboard-files" }],
+          ["the folder's config turns it on", { work: { formatter } }],
+          ["the folder's config, plugins activated again", { work: { formatter } }],
+          ["control: ordinary Location", { user: { formatter }, at: "ordinary" }],
         ] as const) {
-          const test = yield* boot({ user, work, model })
+          const test = yield* boot(options)
+          // A plugin registered later activates the Location's plugins again: the product's removal still comes last.
+          if (label.includes("again")) yield* test.harness(() => Effect.void)
           const marker = path.join(test.dir, "formatter-marker")
           const session = yield* test.create(label)
           const calls =
-            model === undefined
+            "model" in options
               ? ([
-                  [{ tool: "write", input: { path: "src/.prettierrc.cjs", content: config(marker) } }, ok],
-                  [{ tool: "write", input: { path: "src/main.tsx", content: "export const value=1" } }, ok],
-                  [{ tool: "edit", input: { path: "src/main.tsx", oldString: "value", newString: "amount" } }, ok],
-                ] as const)
-              : ([
                   [
                     {
                       tool: "patch",
@@ -567,21 +837,29 @@ describe("loginom.product dashboard paths (G1, B2.9c)", () => {
                     ok,
                   ],
                 ] as const)
-          settled(yield* test.run(session.id, calls), calls, session.asked)
-          expect([label, yield* test.exists(marker)]).toEqual([label, work === undefined])
-          if (work)
+              : ([
+                  [{ tool: "write", input: { path: "src/.prettierrc.cjs", content: config(marker) } }, ok],
+                  [{ tool: "write", input: { path: "src/main.tsx", content: "export const value=1" } }, ok],
+                  [{ tool: "edit", input: { path: "src/main.tsx", oldString: "value", newString: "amount" } }, ok],
+                ] as const)
+          const result = yield* test.run(session.id, calls)
+          const control = "at" in options
+          if (!control) settled(result, calls, session.asked)
+          expect([label, result.outcomes]).toEqual([label, calls.map(() => ok)])
+          expect([label, yield* test.exists(marker)]).toEqual([label, control])
+          if (!control)
             expect([label, yield* test.text(path.join(test.folder.work, "src", "main.tsx"))]).toEqual([
               label,
-              model === undefined ? "export const amount=1" : "export const value=1\n",
+              "model" in options ? "export const value=1\n" : "export const amount=1",
             ])
         }
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
-    // Three server Locations, and Prettier runs as a child process in the control.
+    // Five server Locations, and Prettier runs as a child process in the control.
     60_000,
   )
 })
 
-function respond(request: LLMRequest) {
+function respond(request: LLMRequest, acts: ReadonlyMap<string, () => void>) {
   const user = request.messages.findLastIndex((message) => message.role === "user" && text(message).includes("SCRIPT<"))
   if (user < 0 || request.tools.length === 0) return TestLLM.text("ok", "text_ok")
   const body = text(request.messages[user])
@@ -589,6 +867,7 @@ function respond(request: LLMRequest) {
   const step = steps[request.messages.slice(user + 1).filter((message) => message.role === "assistant").length]
   if (!step) return TestLLM.text("done", "text_done")
   if ("text" in step) return TestLLM.text(step.text, `text_${crypto.randomUUID()}`)
+  if (step.act) acts.get(step.act)?.()
   return TestLLM.toolCall(`call_${crypto.randomUUID()}`, step.tool, step.input ?? {})
 }
 
