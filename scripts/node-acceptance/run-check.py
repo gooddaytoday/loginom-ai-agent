@@ -27,6 +27,11 @@ SCENARIOS = {
     'C1': dict(model_timeout=2700),
     '5-REST': dict(model_timeout=2700),
 }
+# Model under test. Default is the established shared-OAuth model; RUN_CHECK_AUTH
+# points to an auth.json linked (never copied) into each profile for other providers.
+MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'
+VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6.1-sol' else '')
+AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
 D76_STATUS = 'PASS с ограничением платформы D76'
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
@@ -306,7 +311,19 @@ def scenario(name, case_root=None, *, cases=None):
         src = Path(cases).resolve() / name
         if (src / 'task.md').is_file():
             assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
-            return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=True)
+            # Optional case.json: `base` continues a sibling case in the same chat;
+            # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
+            extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
+            if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
+            base = extra.get('base')
+            if base is not None and (base == name or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', base) or not (Path(cases).resolve() / base / 'task.md').is_file()):
+                raise ValueError(f'{name}/case.json: base must name another case in the same directory')
+            files = extra.get('input_files')
+            if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
+                raise ValueError(f'{name}/case.json: input_files must list files in data/')
+            return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
+                        attach_all=True, **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
@@ -2653,11 +2670,14 @@ class Runner:
                 parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
                 variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
-        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
+        command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', MODEL, *(['--variant', VARIANT] if VARIANT else []), '--dangerously-skip-permissions']
         if session: command += ['--session', session]
         # Initial requests need their inputs even when the prose omits names.
         # Continuations only admit new, explicitly requested files (r3/r4).
-        files = ([spec['data'] / name for name in dict.fromkeys(filenames)] if session else
+        # Private --cases attach every data/ file (any format) on their first turn;
+        # their continuations attach only case.json input_files.
+        files = (([] if session or not spec['data'].is_dir() else sorted(p for p in spec['data'].iterdir() if p.is_file())) if spec.get('attach_all') else
+                 [spec['data'] / name for name in dict.fromkeys(filenames)] if session else
                  sorted(p for p in spec['data'].iterdir() if p.suffix in ['.csv', '.xlsx']))
         # README exceptions: p14 tests Excel, and the regression base uses only
         # train.csv; its other fixtures belong to later operator scenarios.
@@ -2726,6 +2746,7 @@ class Runner:
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         if spec.get('two_turn'):
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
+            assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
             # Unique physical name prevents collisions with prior attempts (#1157).
             source = workspace / 'rows.csv'
             unique = workspace / (self.out.name + '-' + folder.parent.name + '-rows.csv')
@@ -3509,14 +3530,14 @@ class Runner:
                 folder.mkdir()
                 profile, workspace = folder / 'profile', folder / 'workspace'
                 workspace.mkdir()
-                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp')
+                r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
-                    (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
+                    (profile / 'data/auth.json').symlink_to(AUTH)
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))

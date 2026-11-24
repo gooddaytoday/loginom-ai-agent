@@ -249,3 +249,11 @@ test('smoothing HP two-file prepare delivers full knowledge and native workspace
  t.diagnostic(result.stdout.match(/smoothing-hp prepare envelope bytes: [0-9]+/)[0]);
  assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
 });
+
+test('seven-file prepare delivers readiness, original operation and all authorized inputs',async t=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+  new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+  env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_SEVEN_FILES:'1'}});
+ t.diagnostic(result.stdout.match(/seven-file prepare envelope bytes: [0-9]+/)[0]);
+ assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
+});

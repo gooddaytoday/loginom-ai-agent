@@ -95,7 +95,7 @@ test('output-port cancellation binds both the native opening receipt and observe
 
 // An open column-kind list is read as the sole observation root: only its
 // options are delivered and the wizard Close control is not.
-const listCleanup=({owned=true,escapeCloses=true}={})=>{
+const listCleanup=({owned=true,escapeCloses=true,json=false,foreignRoot=false}={})=>{
  const root='MF;TF-1;WizrdMCF',node={document_id:'doc',workflow_id:'flow',node_id:'node'};
  const base=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},
   wizard:{status:'observed',root_ref:'wizard',root_tid:root,stage:'text_import_format',
@@ -105,9 +105,13 @@ const listCleanup=({owned=true,escapeCloses=true}={})=>{
   list:()=>{const s=base();s.observation_root={ref:'list'};s.ui.elements=['Неопределенное','Дискретный'].map((label,i)=>({ref:'opt'+i,
    tid:listRoot+';ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1;tbl;celleditor;cbx;boundlist;'+label,role:'option',label,
    wizard_combo:{kind:'option',field:{name:'data_kind',scope:'import_column',root_ref:listOwner,owner_ref:'cell',input_ref:'input'},list_ref:'list',label},
-   allowed_actions:['click','press','select_wizard_option']}));return s;},
-  wizard:()=>{const s=base();s.ui.elements=[{ref:'close',tid:root+';btnClose',allowed_actions:['click']}];return s;},
-  confirm:()=>{const s=base();s.ui.dialogs=[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}];
+   allowed_actions:['click','press','select_wizard_option']}));
+   if(json){s.wizard.stage='json_tree';const list=listRoot+';JSONToTreeWizard;pedSourceColumn;ValueControl;boundlist';
+    s.observation_root.identity={anchor_tid:foreignRoot?'foreign;boundlist':list};
+    s.ui.elements=[{ref:'opt0',tid:list+';Ответ_сервера',role:'option',label:'Ответ сервера',allowed_actions:['click','press']}];}
+   return s;},
+  wizard:()=>{const s=base();if(json)s.wizard.stage='json_tree';s.ui.elements=[{ref:'close',tid:root+';btnClose',allowed_actions:['click']}];return s;},
+  confirm:()=>{const s=base();if(json)s.wizard.stage='json_tree';s.ui.dialogs=[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}];
    s.ui.masks=[{ref:'wizard',kind:'modal_background'}];
    s.ui.elements=['yes','no'].map(name=>({ref:name,tid:'msgbox;tlb;'+name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},
     allowed_actions:name==='yes'?['click','confirm_wizard_close']:['click']}));return s;},
@@ -145,4 +149,16 @@ test('a wizard list that stays open after one Escape keeps the previous refusal'
  const {channel,actions,initial}=listCleanup({escapeCloses:false});
  await assert.rejects(closePreparedWizard(channel,{initialObservation:initial()}),/Close control is unavailable or ambiguous/);
  assert.deepEqual(actions.map(a=>a.verb),['press']);
+});
+
+for(const release of [true,false])test('JSON column list without wizard_combo is dismissed before owned Close (release='+release+')',async()=>{
+ const {channel,actions,initial}=listCleanup({json:true});
+ const result=await closePreparedWizard(channel,release?{initialObservation:initial()}:{});
+ assert.equal(result.draft_discarded,true);
+ assert.deepEqual(actions.map(a=>a.verb),['press','click','confirm_wizard_close']);assert.equal(actions[0].key,'Escape');
+});
+for(const options of [{owned:false},{foreignRoot:true},{escapeCloses:false}])test('JSON list cancellation retains refusal for '+JSON.stringify(options),async()=>{
+ const {channel,actions,initial}=listCleanup({json:true,...options});
+ await assert.rejects(closePreparedWizard(channel,{initialObservation:initial()}),/Close control is unavailable or ambiguous/);
+ assert.deepEqual(actions.map(a=>a.verb),options.escapeCloses===false?['press']:[]);
 });
