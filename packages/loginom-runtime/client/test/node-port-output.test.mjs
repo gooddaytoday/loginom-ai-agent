@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/node-port-output.mjs';
+import {decodePortCell,makeNodePortOutputCode,readNodePortOutput,variantCapability} from '../lib/node-port-output.mjs';
+import {collectNativeRuntime} from '../lib/collapse-native-runtime.mjs';
+import {nativeRuntimePins} from '../lib/collapse-native-runtime-pins.mjs';
+import {directNativeRuntimePins} from '../lib/direct-source-native-pins.mjs';
 import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
 import {adaptCell} from '../lib/variant-native-values.mjs';
 
@@ -646,6 +649,29 @@ const observedCapability=tag=>({read:`async(source,options,decode)=>({pending:0,
  const frame=[...${JSON.stringify(collapseObserved[tag][0])},...Array(${48-collapseObserved[tag][0].length}).fill(0)],d=decode(frame,60);
  return {row,column,tag:d.tag,payload:frame.slice(0,d.consumed_bytes),frame_size:60,...(d.tag===7?{civilTime:{value:'2026-11-07T12:00:00.000',timezone:'America/New_York'}}:{})};}})`,
  decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:'()=>({})',pins:{}});
+test('typed interface71 output passes the shipped per-build pin profiles and its source getter pin to its exact reader',async()=>{
+ const f=fixture({rows:[[false]],types:[6],batch:async(_source,_offset,_count,...out)=>{
+  [ [[false]],[],[],[],[],[],[[false]] ].forEach((value,index)=>{out[index].value=value;});
+ }}),observed=observedCapability(11);
+ // Shipped capability; only the browser transport is replaced by the observed frame.
+ const variant={...variantCapability,decode:observed.decode,adapt:observed.adapt};
+ const expected=JSON.stringify({profiles:{
+  canonical:{...nativeRuntimePins,datetime:{from_oadate:'e35fbf955d5d95bd97724063fb6e40fbdbc6235e4cb34b00860d9611ff75949c',add_bias:'bbabbc4e121b32ea7f93ff900a4fb7cf47ec5853be1a200fc86b993e62262d19'}},
+  compact:{...directNativeRuntimePins,datetime:{from_oadate:'14292d68490bb88f1854f21afa81b1e59ec81176f80c2f7abd37adf722c52ce8',add_bias:'7b799065c792dfb45686d73a8a751a0a0de4ed564827860fa1fa8b2d69fd4486'}}},
+  source:{as_variant:'cbad2c6d75a8fa3b54bc73acc3002172622c8ac329b5be6f505e4440294f855a'}});
+ assert.notEqual(JSON.stringify(nativeRuntimePins.functions),JSON.stringify(directNativeRuntimePins.functions));
+ variant.read=`async(source,options,decode,collect,pins,treePins,sourcePins)=>{
+  if(source.$.$I!==71||options.directSource!==true||options.treeValue||options.variableValue||treePins!==undefined)throw Error('wrong direct source mode');
+  if(JSON.stringify({profiles:pins,source:sourcePins})!==${JSON.stringify(expected)})throw Error('wrong direct source pins');
+  if(collect.toString()!==${JSON.stringify(collectNativeRuntime.toString())})throw Error('wrong runtime collector');
+  return (${observed.read})(source,options,decode);
+ }`;
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true},
+  {origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.equal(result.output.sample[0][0].cell_type,'boolean');assert.equal(result.output.sample[0][0].value,true);
+ assert.deepEqual(f.rpcCalls,[]);assert.ok(f.disposed.includes('dataSource'));
+});
 for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value with subtype for observed native tag '+tag,async()=>{
  const options={origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},rows=[[1,tag===1?null:'shown']];
  if(tag!==1){
