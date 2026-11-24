@@ -101,13 +101,19 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
  'return_tabs_active','return_tabs_package','return_tabs_deadline','return_tabs_cancelled',
  'observation_initial','observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name','observation_time_exhausted','observation_work','observation_elements','observation_traversal','observation_missing_trace','observation_mixed_limits','observation_action','observation_phase','observation_gesture','observation_incomplete','observation_ambiguous','observation_unclean','observation_preconditions','observation_transport','observation_deadline','observation_cancelled',
- 'verified_return_observation','retain_failure','retain_private','retain_storage_private','offscreen_refresh','offscreen_refresh_refused','offscreen_refresh_duplicate'])test('native export read and real save: '+kind,async()=>{
+ 'verified_return_observation','retain_failure','retain_private','retain_storage_private','offscreen_refresh','offscreen_refresh_refused','offscreen_refresh_duplicate'])test('native export read and real save: '+kind,()=>checkNativeExportRead(kind));
+test('export survives a missing offscreen refresh diagnostic',()=>checkNativeExportRead('offscreen_refresh','export_file_refresh_geometry'));
+test('export survives a missing scan refusal diagnostic',()=>checkNativeExportRead('observation_time','export_file_observation_scan_refused'));
+for(const fault of [undefined,'export_file_observation_unsettled'])test('unsettled file table restores its graph: '+(fault?'diagnostic failed':'diagnostic recorded'),()=>checkNativeExportRead('unsettled_table',fault));
+test('export stays pending without its verified bytes receipt',()=>checkNativeExportRead('success','export_file_bytes_verified'));
+test('retained export stays pending without its completion receipt',()=>checkNativeExportRead('success','export_file_read_completed'));
+async function checkNativeExportRead(kind,journalFault){
  const success=['success','late_file_rows','late_file_second_table','late_file_scan_retry','return_tabs_stale','observation_time','offscreen_refresh'].includes(kind),storage=kind.includes('scroll')||['foreign_storage','folder_end'].includes(kind);
  const downloadSucceeded=kind==='P4'||success||kind.startsWith('return_tabs_')||kind==='verified_return_observation'||kind.startsWith('retain_');
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted','return_tabs_deadline','return_tabs_cancelled','observation_deadline','observation_cancelled','observation_document'].includes(kind);
  let observationAttempts=0,outputRowSearches=0,emptyTableReads=0;
  let files=false,downloads=0,releases=0,retained=0,failed=false,tabReads=0,freshRoots=0;const gestures=[],records=[];
- let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
+ let faultObserved=false,scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
  const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:1},
@@ -127,7 +133,9 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
     :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('task.result.csv'),'csv',{label:'task.result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
   file_storage:files?{status:'observed',directory}:undefined});
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
-  onRecord:async e=>{records.push(e);if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
+  onRecord:async e=>{
+   if(journalFault===e.phase&&!faultObserved){faultObserved=true;throw Error('journal write failed');}
+   records.push(e);if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
   artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
    release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{
     if(kind==='retain_failure')throw Object.assign(Error('Artifact size or SHA does not match the admitted identity'),{code:'OTHER_ERROR',storage_entry:{reason:'folder_end'}});
@@ -215,6 +223,10 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
    }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
+   if(files&&kind==='unsettled_table'){
+    output.ui.elements=output.ui.elements.filter(e=>e.ref!=='ui-csv');
+    if(task.root_ref==='ui-file-table')output.file_storage.status='unobserved';
+   }
    if(kind.startsWith('late_file_')&&files&&emptyTableReads<2){
     output.ui.elements=output.ui.elements.filter(e=>e.ref!=='ui-csv');
     if(task.root_ref==='ui-file-table'){
@@ -252,7 +264,7 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
    return {status:'SUCCEEDED',output};
   }};
  const cancellation=new AbortController();
- const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000,signal:cancellation.signal};
+ const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+(kind==='unsettled_table'?45000:10000),signal:cancellation.signal};
  const read=context=>readNativeExportFile(options,context,{destination:binding.destination,configured:{destination_check:{verified:true,destination:binding.destination,existed:false}}},
   {verified:true,owner_verified:true,status:'completed',execution_id:'exec'});
  if(kind==='P4'){
@@ -272,6 +284,28 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
   assert.equal((await read(ctx)).artifact_id,'artifact');assert.equal(outputRowSearches,1);assert.equal(downloads,1);assert.equal(retained,1);return;
  }
  const result=await read(ctx).catch(e=>e);
+ if(journalFault)assert.equal(faultObserved,true);
+ if(kind==='success'&&journalFault){
+  assert.ok(result instanceof Error);
+  assert.equal(result.nodePhaseRefusal,undefined);
+  const afterRetain=journalFault==='export_file_read_completed';
+  assert.deepEqual([downloads,retained,releases,files],[1,afterRetain?1:0,0,!afterRetain]);
+  assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),afterRetain);
+  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),false);
+  const {job}=await stoppedExport(undefined,{readOutput:async()=>{throw result;}});
+  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(job.outcome.output.pending_phase,'read');
+  assert.deepEqual(job.outcome.output.output,{status:'not_refreshed',evidence_ref:null,ports:[]});
+  return;
+ }
+ if(kind==='unsettled_table'){
+  assert.deepEqual(result.nodePhaseRefusal?.proof.failure,{step:'storage_navigation',code:null,kind:'Error',reason:null},String(result.stack));
+  assert.equal(records.some(e=>e.phase==='export_file_observation_unsettled'),!journalFault);
+  assert.equal(downloads,0);
+ }
+ if(journalFault&&success){
+  assert.deepEqual([result.destination,result.execution_id,result.bytes,result.sha256,downloads,retained,files],
+   [binding.destination,binding.execution_id,57,'a'.repeat(64),1,1,false],String(result.stack));
+ }
  if(kind.startsWith('late_file_')&&!success){
   assert.equal(downloads,0);assert.equal(retained,0);assert.ok(result instanceof Error);
   if(kind==='late_file_deadline'){assert.equal(result.nodePhaseRefusal?.proof.failure.code,'EXPORT_SEARCH_TIME_EXHAUSTED');assert.equal(files,false);assert.equal(releases,1);}
@@ -304,7 +338,8 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
   assert.equal(gestures.filter(t=>t.endsWith('btnFilestorage')).length,kind==='observation_initial'?0:1,'never repeat the storage-opening gesture');
   assert.equal(downloads,success?1:0);
   const scans=records.filter(r=>r.phase==='export_file_observation_scan_refused');
-  assert.equal(scans.length,kind==='observation_time_exhausted'?3:['observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name','observation_deadline','observation_cancelled'].includes(kind)?1:0);
+  const expected=kind==='observation_time_exhausted'?3:['observation_time','observation_document','observation_root','observation_duplicate','observation_folder','observation_name','observation_deadline','observation_cancelled'].includes(kind)?1:0;
+  assert.equal(scans.length,expected-(journalFault==='export_file_observation_scan_refused'?1:0));
   assert.ok(scans.every(r=>r.scope==='region'&&r.limit_kind==='time'&&r.scan_stage==='controls'));
   if(kind==='observation_time_exhausted')assert.equal(scans.at(-1).retry,false);
  }
@@ -344,4 +379,4 @@ for(const kind of ['success','late_file_rows','late_file_second_table','late_fil
   assert.equal(gestures.filter(t=>t.endsWith('FileStorageForm;colName_user')).length,success?1:0);
   assert.equal(downloads,success?1:0);
  }
-});
+}

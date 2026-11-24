@@ -214,6 +214,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const reserve=Math.min(EXPORT_RETURN_RESERVE_MS,Math.floor((ctx.deadline-Date.now())/2));
  const searchGuard=()=>{guard();if(Date.now()>=ctx.deadline-reserve)throw Object.assign(Error('Export file search time exhausted'),{code:'EXPORT_SEARCH_TIME_EXHAUSTED'});};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
+ const recordDiagnostic=async(phase,data)=>{try{await onRecord({phase,operation_id:operation.id,...data});}catch{}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async(options,rootName=options.storage_name)=>{
   for(let attempt=0;attempt<3;attempt++){
@@ -234,7 +235,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     if(timeRefusal){
      // Rediscover this exact DOM root before another no-effect detail read.
      // Keep the requested name and original node deadline; never replay navigation.
-     await record('export_file_observation_scan_refused',{attempt:attempt+1,
+     await recordDiagnostic('export_file_observation_scan_refused',{attempt:attempt+1,
       scope:options.discover_roots?'roots':options.root_ref?'region':'workspace',
       limit_kind:'time',scan_stage:['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(scan.scan_stage)?scan.scan_stage:'unknown',
       retry:attempt<2});
@@ -250,7 +251,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const quiet=s=>s.authenticated&&s.origin===targetOrigin&&s.loginom_build===targetBuild&&!s.ui.dialogs.length&&!s.ui.masks.length;
  const ready=async(observe,condition)=>{
   try{return await waitForExportStorageObservation({observe,condition,guard,quiet});}
-  catch(error){const s=error.exportStorageObservation;if(s)await record('export_file_observation_unsettled',{
+  catch(error){const s=error.exportStorageObservation;if(s)await recordDiagnostic('export_file_observation_unsettled',{
    observed:{authenticated:s.authenticated,origin:s.origin,build:s.loginom_build,workflow:s.workflow_ref,storage:s.file_storage,
     dialogs:s.ui.dialogs.map(d=>({kind:d.kind,ref:d.ref})),masks:s.ui.masks.map(m=>({kind:m.kind,target_tid:m.target_tid})),epoch:s.dom_epoch},
    quiet:quiet(s),condition:condition(s)});throw error;}
@@ -370,7 +371,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     }
     return {viewport:{width:innerWidth,height:innerHeight},ancestors};
    },${JSON.stringify({tid:refresh.tid,ref:refresh.ref})})`);
-   await record('export_file_refresh_geometry',{geometry});
+   await recordDiagnostic('export_file_refresh_geometry',{geometry});
    // Files shrinks, but toolbar children overflow its hidden body. Re-enter the same
    // assigned directory through visible native navigation to reload its list.
    const current=await inDirectory(directory);
