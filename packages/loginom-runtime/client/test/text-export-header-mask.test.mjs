@@ -5,9 +5,10 @@ import {createNodeProcedure} from '../lib/node-procedure.mjs';
 
 const root='MF;TF-1;WizrdMCF',tid=root+';ExportTextFilePreviewWizard;edtCaptionType;ValueControl';
 const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'export'}};
-function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=false,interrupt}={}){
+function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=false,interrupt,redrawOption=false}={}){
  let clock=1,reads=0,attempts=0,busy=0,header=2,stage='text_export_params',opened=false;
- const records=[],clicks=[],ac=new AbortController();
+ let optionRef='ui-option';
+ const records=[],clicks=[],selections=[],ac=new AbortController();
  const operation={id:'header',deadline:10000,action:{action_key:'node.apply',revision:'1'}};
  const context={verified:true,...binding.node,surface:'wizard',tid:root};
  const snapshot=(masked=false)=>({origin:'https://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,
@@ -17,7 +18,7 @@ function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=
    {ref:'ui-picker-'+reads,tid:tid+';trg_picker',kind:'control',enabled:true,visible:true,allowed_actions:['click'],
     bounding_box:{x:634,y:427,width:22,height:21},interaction:masked?{state:'point_not_observed',point:null,covering:[{tag:'div',tid:root,anchor_tid:root,role:null}]}:{state:'point_observed',point:{x:645,y:437.5}},
     wizard_combo:{kind:'picker',field:{name:'header',root_ref:'ui-wizard',owner_ref:'ui-field',input_ref:'ui-input',value:'Метки полей'}}},
-   ...(opened?[{ref:'ui-option',tid:tid+';boundlist;1',label:'Имена полей',allowed_actions:['select_wizard_option']}]:[])]}});
+   ...(opened?[{ref:optionRef,tid:tid+';boundlist;1',label:'Имена полей',allowed_actions:['select_wizard_option']}]:[])]}});
  const record=async e=>{records.push(structuredClone(e));if(e.phase==='node_step_refresh_authorized'){
   if(interrupt==='cancel')ac.abort(Error('cancelled'));
   if(interrupt==='deadline')operation.deadline=clock;
@@ -29,6 +30,19 @@ function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=
     reads++;const s=snapshot(busy>0);if(busy>0&&!persistent)busy--;
     if(attempts&&change)change(s);if(attempts&&lateChange&&!s.ui.masks.length)lateChange(s);return {status:'SUCCEEDED',output:s};
    }
+   const action=records.findLast(e=>e.phase==='node_step_prepared').action;
+   const success={operation_id:code.reference.id,action_key:'ui.act',status:'SUCCEEDED',phase:'completed',effect_possible:true,cleanup_complete:true,trace:[{event:'ui_gesture_applied'}]};
+   if(action.verb==='select_wizard_option'){
+    assert.equal(opened,true);
+    assert.equal(action.ref,optionRef);
+    if(redrawOption&&optionRef==='ui-option'){
+     optionRef='ui-option-redrawn';
+     return {operation_id:code.reference.id,action_key:'ui.act',status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,
+      trace:[{event:'ui_observation_started'},{event:'ui_action_failed',code:'UI_EPOCH_CHANGED'}],error:{code:'UI_EPOCH_CHANGED'},output:snapshot()};
+    }
+    selections.push(action.ref);header=1;opened=false;
+    return success;
+   }
    attempts++;
    if(attempts<=refusals){
     busy=2;const output=snapshot(true);
@@ -36,12 +50,11 @@ function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=
     return {operation_id:code.reference.id,action_key:'ui.act',status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,
      trace:[{event:'ui_observation_started'},{event:'ui_action_failed',code:'UI_REFERENCE_OBSCURED'}],error:{code:'UI_REFERENCE_OBSCURED'},output,...receipt};
    }
-   clicks.push(records.filter(e=>e.phase==='node_step_prepared').at(-1).action);opened=true;
-   return {operation_id:code.reference.id,action_key:'ui.act',status:'SUCCEEDED',phase:'completed',effect_possible:true,cleanup_complete:true,trace:[{event:'ui_gesture_applied'}]};
+   clicks.push(action);opened=true;
+   return success;
   }});
  const native=()=>({verified:true,stage,values:stage==='text_export_params'?{destination:{value:'/test-2/header.csv'}}:{header:{value:header,tid},delimiter:{value:','}},node_context:context});
  const run=()=>configureTextExport({observe:opts=>channel.observe(opts),perform:async opts=>{
-  if(opts.condition==='choose export header'){assert.equal(opened,true);header=1;return {status:'SUCCEEDED'};}
   if(!optIn)opts.refreshWizardBusy=false;
   return channel.perform(opts);
  }},{header:'names'},{...binding,finish:'close',signal:ac.signal,deadline:Date.now()+60000},{operation,
@@ -49,14 +62,34 @@ function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=
    if(code.includes('function exportNext')){stage='text_export_format';return {status:'SUCCEEDED',cleanup_complete:true,output:{existed:false}};}
    return native();
   },onRecord:record,receiptOptions:(id,key,signature)=>({receipt_namespace:'test',receipt_id:id,receipt_signature:signature})});
- return {run,records,clicks,get attempts(){return attempts},get reads(){return reads}};
+ return {run,records,clicks,selections,get attempts(){return attempts},get reads(){return reads}};
 }
+
+test('export selects the redrawn header option once without reopening its picker',async()=>{
+ const f=fixture({refusals:0,redrawOption:true}),result=await f.run();
+ assert.equal(result.configuration.configured.text_export_format.values.header.value,1);
+ assert.equal(f.clicks.length,1);
+ assert.deepEqual(f.selections,['ui-option-redrawn']);
+});
+
+test('after a redraw export refuses to select without one matching option in its own list',async()=>{
+ for(const replacements of [[],[{tid:root+';otherField;boundlist;1'}],[{label:'Метки полей'}],[{allowed_actions:['click']}],[{},{ref:'ui-duplicate'}]]){
+  const f=fixture({refusals:0,redrawOption:true,lateChange:s=>{
+   const option=s.ui.elements.find(e=>e.ref==='ui-option-redrawn');
+   if(option)s.ui.elements=s.ui.elements.filter(e=>e!==option).concat(replacements.map(fields=>({...option,...fields})));
+  }});
+  await assert.rejects(f.run());
+  assert.equal(f.records.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='select_wizard_option').length,1);
+  assert.deepEqual(f.selections,[]);
+  assert.equal(f.clicks.length,1);
+ }
+});
 
 test('D54 header picker waits for its late wizard loading mask and rebinds a fresh click',async()=>{
  const f=fixture(),result=await f.run();
  assert.equal(result.configuration.configured.text_export_format.values.header.value,1);
  assert.equal(f.attempts,2);assert.equal(f.clicks.length,1);
- const prepared=f.records.filter(e=>e.phase==='node_step_prepared');
+ const prepared=f.records.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='click');
  assert.equal(new Set(prepared.map(e=>e.internal_operation_id)).size,2);
  assert.notEqual(prepared[0].action.ref,prepared[1].action.ref);
  assert.ok(f.records.filter(e=>e.phase==='node_observation_sample').some(e=>e.outcome.output.ui.masks.length));

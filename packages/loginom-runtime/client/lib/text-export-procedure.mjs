@@ -168,8 +168,9 @@ export async function configureTextExport(channel,p,ctx,options){
      resolve:s=>({verb:'click',ref:picker(s).ref})});
     s=await channel.observe({condition:'export option '+key,ready:s=>s.wizard?.stage===stage&&s.ui.elements.some(e=>e.allowed_actions.includes('select_wizard_option'))});
     const labels={encoding:{'UTF-8':'UTF-8 (65001)','Windows-1251':'Кириллическая (1251)','Windows-1252':'Западноевропейская (1252)','UTF-16 LE':'UTF-16 LE (1200)','UTF-16 BE':'UTF-16 BE (1201)'}[value],delimiter:{';':'Точка с запятой',',':'Запятая','\t':'Символ табуляции'}[value],header:{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value],line_ending:{LF:'Unix (LF)',CRLF:'Windows (CRLF)'}[value],text_qualifier:'Двойная кавычка (")',decimal_separator:{'.':'Точка (.)',',':'Запятая (,)'}[value],date_separator:{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[value],time_separator:{':':'Двоеточие (:)','.':'Точка (.)'}[value],null_marker:value===''?'Пустая строка':value};
-    const label=labels[key]??value,choice=one(s.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));
-    await channel.perform({condition:'choose export '+key,initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
+    const label=labels[key]??value;
+    const choice=s=>one(s.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));
+    await channel.perform({condition:'choose export '+key,initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key,value}),resolve:s=>({verb:'select_wizard_option',ref:choice(s).ref})});
    }
    const after=await native();need(after.values[key].value===expected,'Export setting differs: '+key);
    for(const other of Object.keys(current.values))if(other!==key){
