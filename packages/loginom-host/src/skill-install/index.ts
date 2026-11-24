@@ -137,6 +137,7 @@ export async function prepareLocalSkill(
       )
       if (other) throw Error("Ambiguous skill installation path: " + other)
       if (!(await directory(path))) return
+      if (!admitted.has(path)) throw new InstalledPathsChanged("The installed skill appeared while checking read access. Retry the installation.")
       return revision(path, signal, admitted)
     }
     const findBackup = async () => {
@@ -150,16 +151,18 @@ export async function prepareLocalSkill(
       return backup
     }
     const admitted = new Set<string>()
+    const authorize = async (required: string[]) => {
+      const remaining = required.filter((resource) => !admitted.has(resource))
+      if (!remaining.length) return
+      await options.authorizeInstalled?.(path, remaining)
+      remaining.forEach((resource) => admitted.add(resource))
+    }
     const authorizeCurrent = async () => {
       if (!(await directory(agents)) || !(await directory(control))) throw Error("The installation directory changed.")
       const existing = (await directory(skills)) && (await directory(path)) ? path : await findBackup()
       if (!existing) return
-      const required = readPaths(existing, await tree(existing, signal))
-        .map((resource) => join(path, relative(existing, resource)))
-        .filter((resource) => !admitted.has(resource))
-      if (!required.length) return
-      await options.authorizeInstalled?.(path, required)
-      required.forEach((resource) => admitted.add(resource))
+      await authorize([path])
+      await authorize(readPaths(existing, await tree(existing, signal)).map((resource) => join(path, relative(existing, resource))))
     }
     const withCurrentAccess = async <T>(run: () => Promise<T>) => {
       await authorizeCurrent()
@@ -177,6 +180,7 @@ export async function prepareLocalSkill(
       const backup = await findBackup()
       if (!backup) return existing
       if (!existing) {
+        if (!admitted.has(path)) throw new InstalledPathsChanged("The previous skill copy appeared while checking read access. Retry the installation.")
         await directory(skills, true)
         await move(backup, path)
         return current(admitted)

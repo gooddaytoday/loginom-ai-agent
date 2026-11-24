@@ -68,6 +68,28 @@ test("local preparation blocks a second skill and linked files outside the sourc
   }
 })
 
+test.skipIf(process.platform === "win32")("an unreadable installed directory is authorized before its entries are resolved", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-install-root-access-"))
+  try {
+    const source = join(root, "columns")
+    const home = join(root, "home")
+    const installed = join(home, ".agents/skills/columns")
+    await mkdir(installed, { recursive: true })
+    await Bun.write(join(source, "SKILL.md"), "---\nname: columns\ndescription: Checks columns.\n---\n")
+    await symlink("missing-private-resource", join(installed, "unreadable-entry"))
+    await expect(prepareLocalSkill(source, home, async () => {}, {
+      lock,
+      async authorizeInstalled(path, resources) {
+        expect(path).toBe(installed)
+        expect(resources).toEqual([installed])
+        throw Error("installed root access refused")
+      },
+    })).rejects.toThrow("installed root access refused")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("concurrent replacement candidates get consent for the installed revision", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-replace-race-"))
   try {

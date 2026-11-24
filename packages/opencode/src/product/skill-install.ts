@@ -72,7 +72,7 @@ export const SkillInstallTool = Tool.define(
               Flock.withLock("skill-install:" + name, run, { dir: control, signal: ctx.abort }),
             authorizeInstalled: (path: string, resources: string[]) =>
               bridge.promise(Effect.gen(function* () {
-                yield* assertExternalDirectoryEffect(ctx, path, { kind: "directory" })
+                if (resources.includes(path)) yield* assertExternalDirectoryEffect(ctx, path, { kind: "directory" })
                 yield* askPaths("read", resources, path)
               })).then(() => ctx.abort.throwIfAborted()),
           }
