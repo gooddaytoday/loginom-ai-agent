@@ -522,7 +522,7 @@ test('text export bounds index settlement at 15 seconds without extending the ta
  const evaluate=f.page.evaluate;
  f.page.evaluate=async(fn,arg)=>{
   const result=await evaluate(fn,arg);
-  if(result.reason==='port_wizard_index_pending')started??=Date.now();
+  if(result?.reason==='port_wizard_index_pending')started??=Date.now();
   return result;
  };
  f.page.waitForTimeout=async ms=>{
