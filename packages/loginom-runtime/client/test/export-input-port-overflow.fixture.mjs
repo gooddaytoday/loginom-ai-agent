@@ -4,7 +4,8 @@
 export const exportInputPortOverflow={
   viewport:{"width":1280,"height":800},
   panel:{"x":182,"y":35,"width":1054,"height":36},
-  inputPort:{direction:'input',port:0,native_index:1,port_guid:'export-input',opening_operation_id:'export-open'},
+  // #1270 reports the diagram native index and wizard collection index separately.
+  inputPort:{direction:'input',port:0,native_index:1,wizard_index:1,port_guid:'export-input',opening_operation_id:'export-open'},
   crumbs:[
     {"tid":"MF;TF-5;cnrNaviMode;b.s_Сервер","label":"","visible":true,"rect":{"x":182,"y":41,"width":47,"height":24}},
     {"tid":"MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты","label":"Пакеты","visible":true,"rect":{"x":229,"y":41,"width":94.875,"height":24}},
