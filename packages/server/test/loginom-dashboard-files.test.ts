@@ -631,10 +631,11 @@ describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", (
         expect(yield* test.admit(forks.fresh)).toBe("admitted")
         expect(yield* test.requests).toBe(forked + 1)
 
-        // The folder deleted: its chats are refused too.
+        // The folder deleted: its chats are refused too, and so is one begun after.
         test.recreate()
         const gone = yield* test.requests
-        for (const id of [fresh.id, forks.fresh])
+        const after = yield* test.create("after")
+        for (const id of [fresh.id, forks.fresh, after.id])
           expect([id, yield* test.admit(id)]).toEqual([id, expect.stringContaining(Dashboard.unbound)])
         expect(yield* test.requests).toBe(gone)
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
@@ -652,6 +653,11 @@ describe("loginom.product dashboard draft binding and formatters (G1, B2.9d)", (
         for (const [label, step] of [
           ["read", { tool: "read", input: { path: "sample.json" }, act: "recreate" }],
           ["write", { tool: "write", input: { path: "src/captured.tsx", content: "captured" }, act: "recreate" }],
+          // `edit` reads its target before it asks: refused before the call, it tells nothing of the new folder.
+          [
+            "edit",
+            { tool: "edit", input: { path: "src/captured.tsx", oldString: "x", newString: "y" }, act: "recreate" },
+          ],
         ] as const) {
           const session = yield* test.create(label)
           const before = yield* test.requests

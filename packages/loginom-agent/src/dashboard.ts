@@ -48,11 +48,11 @@ export function draft(directory: string) {
  * session's metadata, which the public API sets and forks inherit, is read once per dashboard Location, only to adopt
  * the markers 0.4 kept there. `refusal` answers with the refusal, or nothing when the session may run.
  * - Outside a dashboard (`dashboard()` is false) a bound session is refused: its folder is gone, or it was moved away.
- * - In a dashboard, a session without a binding takes one when first seen: a fork its source's, a session moved in from
- *   elsewhere none (refused here, still free elsewhere), any other the current draft — it has had no input yet, or it
- *   is a row 0.4 kept without a marker, which 0.4 adopted too.
- * - `fork` gives a new fork its source's binding wherever it runs, as 0.4's fork carried the marker: a fork of a chat
- *   moved out of its dashboard is refused too.
+ * - `fork` gives a new fork its source's binding wherever it runs, as 0.4's fork carried the marker: a fork of an old
+ *   chat is refused in its dashboard, and a fork of a chat moved out of its dashboard is refused there too.
+ * - In a dashboard, a session without a binding takes one when first seen: a session moved in from elsewhere none
+ *   (refused here, still free elsewhere), any other the current draft — it has had no input yet, or it is a row 0.4
+ *   kept without a marker, which 0.4 adopted too.
  */
 export function binding(plugin: Pick<Plugin.Context, "location" | "session" | "storage">, dashboard: () => boolean) {
   const directory = plugin.location.directory
@@ -88,14 +88,10 @@ export function binding(plugin: Pick<Plugin.Context, "location" | "session" | "s
       throw error
     }))
   const adopt = async (sessionID: string, current: Binding) => {
-    const session = await plugin.session.get({ sessionID })
-    const value = session.fork
-      ? await stored(session.fork.sessionID)
-      : (await plugin.session.context({ sessionID })).some((message) => message.type === "location-switched")
-        ? undefined
-        : current
-    if (value !== undefined) await bind(sessionID, value)
-    return value
+    const context = await plugin.session.context({ sessionID })
+    if (context.some((message) => message.type === "location-switched")) return
+    await bind(sessionID, current)
+    return current
   }
   return {
     refusal: async (sessionID: string) => {
