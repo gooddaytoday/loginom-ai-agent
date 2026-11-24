@@ -154,9 +154,9 @@ export async function reopenEnvironmentLeases(file: SlotFile, identity: ServerId
       .map(async name => ({ receipt: path.join(file.controller.stateDir, name), manifest: record(await readLeaseReceipt(path.join(file.controller.stateDir, name))) })))
     for (const slot of selected) {
       const key = `profile:${slot.profileDir}`, current = await readResourceReservation({ key, lockRoot })
-      if (current?.state === "released") continue
       if (!current || current.commandId !== previous.commandId || current.journal !== previous.journal ||
         JSON.stringify(current.identity) !== JSON.stringify(identity)) throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+      if (current.state === "released") continue
       const matches = manifests.filter(({ manifest }) => manifest.state === "retained" && manifest.commandId === previous.commandId &&
         manifest.journal === previous.journal && JSON.stringify(manifest.slot) === JSON.stringify(slot) && JSON.stringify(manifest.identity) === JSON.stringify(identity) &&
         typeof manifest.token === "string" && Array.isArray(manifest.resources) && manifest.resources.length === 1 &&
