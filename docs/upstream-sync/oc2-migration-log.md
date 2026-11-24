@@ -19938,11 +19938,13 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - В v2 этих швов нет. Профиль, пути и привязку к черновику плагин строит на своих хуках (`permission.evaluate`,
   `execute.before`, `context`, `prompt`, `mcp.transform`, `storage`). Правок `core` разведка не требует, и после d и g
   `pending: B2.9` у CAT-05 снимается без путей upstream. Файлы upstream правят только задачи CLI: i и j
-  (`cli/src/run/{run,noninteractive}.ts`, `tui/src/mini/tool.ts`), с записью в каталог, как в B2.7a4.
+  (`cli/src/run/{run,noninteractive}.ts`, `cli/src/mini-host.ts`, `tui/src/mini/tool.ts`), с записью в `catalog.md`
+  (CAT-08, CAT-11, CAT-12), как B2.7a4 записал `run/run.ts` и `noninteractive.ts`.
 - Подготовка цели до чата уезжает в RPC плагина: Host теперь в службе. Это блок `standalone-run.ts` (CLI) и логика
   Desktop `dashboard-target.ts` с 9 тестами. Desktop в B4 (ВШ-6) остаются очередь ссылок и мост к RPC.
-- Нарезка — 9 задач, B2.9b…B2.9j. Оценка — 7–9,5 агенто-дня; план — 3–5 (ниже, «Оценка»). В шлюз B входят три
-  задачи — b, c, d: профиль дашборда — открытая часть G1 (`guarantees.md`).
+- Нарезка — 9 задач, B2.9b…B2.9j. Оценка — 7–9,5 агенто-дня; строка дельты плана — 3–5 (ниже, «Оценка»). В шлюз B
+  я отношу три задачи — b, c, d: профиль дашборда — открытая часть G1 (`guarantees.md`). Это моё решение, его нужно
+  подтвердить (ниже, «Где решал сам»).
 - Вопрос владельцу один: разрешения в сессии дашборда. Он блокирует B2.9f и B2.9g; B2.9b начинать можно.
 
 ### Поправки к плану
@@ -20019,8 +20021,9 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   (`loginom-host/src/adapter.ts`). Запрос `dashboard.read` до чата знает `node-entry.ts:129`.
 - **Остановить ход после инструмента плагину нечем.** В `Tool.Result` нет такого признака. `session.interrupt` кончает
   исполнение как `interrupted`, и `run` сообщает ошибку `aborted` (`cli/src/run/noninteractive.ts:351-361`).
-- **Форматтер.** Без ключа `formatter` в конфиге форматтеров нет: `ConfigFormatterPlugin` при `!configured` ничего не
-  ставит. С ключом `patch` зовёт `formatter.file` (`patch.ts:261`), а домена форматтеров у плагина нет.
+- **Форматтер.** Без ключа `formatter` в конфиге форматтеров нет: `resolve` в `core/src/config/plugin/formatter.ts:64-76`
+  тогда возвращает `undefined`, и `ConfigFormatterPlugin` ничего не ставит. Встроенный конфиг продукта (B2.8) этого
+  ключа не задаёт (`grep formatter` по `cli/src`, `product`, `loginom-agent/src` — пусто). С ключом `patch` зовёт `formatter.file` (`patch.ts:261`), а домена форматтеров у плагина нет.
 - **Модель-сценарий в тестах CLI.** `cli/test/fixture/product-run.ts` (`scriptedModel`) отвечает вызовами инструментов и
   записывает тела запросов. Проверка из CLI без настоящей модели работает так же, как в 0.4.
 
@@ -20032,12 +20035,12 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 |---|---|---|---|---|---|---|
 | **B2.9b** Профиль | Location, чья папка — рабочая папка дашборда (`isDashboardWorkDirectory` под `Global.Path.data/dashboards`), получает базовый профиль `loginom-dashboard` на всю сессию. `permits` — только `read`, `glob`, `grep`, `edit`, `write`, `patch`, `skill`, `dashboard_*`. Навык и вложение базу не меняют (`next`, хук `prompt`). Нет аренды Host, каталога Dock и подсказок Loginom (`hold`, `dock.refresh`, `dock.system`; B2.3 «сессия дашборда без аренды»). MCP-серверы Location убраны. Вложения агентов в промпте отклоняются | `loginom-agent/src/{access,index}.ts`, новый `loginom-agent/src/dashboard.ts` | B2.2, B2.3, B2.5d, B2.6a (сделаны) | M | `tool-policy.test.ts` (2), `task-scope.test.ts` (2) → `access.test.ts`; `dashboard-session.test.ts` (4 о признаке папки) → `loginom-agent/test/dashboard.test.ts`; `turn-lifecycle.test.ts` (1), дашборд из `profile-tools.test.ts`, `prompt.test.ts` «persisted subtask» → `server/test/loginom-access.test.ts`. CLI: `run --model test/…` в папке-фикстуре — в запросе нет `shell`, `subagent`, `loginom_*` и MCP, записи аренды Host нет | **да**, G1 («профиль дашборда — B2.9»); мутация: база не применяется |
 | **B2.9c** Пути | Чтение — только внутри `work/`, запись — только в `work/src/`, по реальному пути: ссылки, `..` через ссылку, висячие ссылки, `control/`. Выход наружу — отказ без вопроса (`external_directory` в дашборде — deny). Хуки `permission.evaluate` (ресурсы `read`, `edit`) и `execute.before` (`glob`, `grep`: `path` и шаблон с `..`). Форматтер файлов дашборда (ниже, «Где решал сам») | `dashboard.ts`, `index.ts`, `permissions.ts` | b | M | `dashboard-session.test.ts` (1 о путях, в том числе внутри git-репозитория) → `loginom-agent/test/dashboard.test.ts`; `dashboard-guard.test.ts` (17 тестов без 2 о LSP) → `server/test/loginom-dashboard-files.test.ts` на инструментах v2. CLI: модель-сценарий зовёт `read ../control/binding.json` и `write notes.txt` — ошибка инструмента без вопроса, и с `--auto` тоже; `write src/App.tsx` проходит | **да**, G1; мутация: проверка пути всегда пропускает |
-| **B2.9d** Привязка к черновику | Сессия дашборда привязана к `draftId` из `control/binding.json`. Привязка хранится в `ctx.storage`, не в metadata; маркер 0.4 из metadata читается один раз. Старый чат после пересоздания или удаления папки получает `LOGINOM_SCOPE_DENIED` до модели и до инструмента. Сверка — до записи и после неё. Форк и `move` сессии в папку дашборда | `dashboard.ts`, `index.ts` | b; c (те же файлы, после неё) | S | `prompt.test.ts`: «adopts an older dashboard row once…» и «…retires every old chat across recreation» (часть о старых чатах); `dashboard-guard.test.ts`: «expired dashboard context», «cannot capture a replacement draft». Вместо `import.test.ts`, `httpapi-sync.test.ts`, `session.test.ts` (маркер) — `session.update` с чужой metadata привязку не меняет. CLI: `run --session <старый>` после пересоздания — отказ, запросов к модели не прибавилось | **да**, G1; мутация: привязка не сверяется |
+| **B2.9d** Привязка к черновику | Сессия дашборда привязана к `draftId` из `control/binding.json`. Привязка хранится в `ctx.storage`, не в metadata. Маркеры 0.4 из metadata плагин переносит в хранилище один раз — при первом старте в Location дашборда, для всех её сессий (`ctx.session.list`); позже metadata не читается. Старый чат после пересоздания или удаления папки получает `LOGINOM_SCOPE_DENIED` до модели и до инструмента. Сверка — до записи и после неё. Форк и `move` сессии в папку дашборда | `dashboard.ts`, `index.ts` | b; c (те же файлы, после неё) | S | `prompt.test.ts`: «adopts an older dashboard row once…» и «…retires every old chat across recreation» (часть о старых чатах); `dashboard-guard.test.ts`: «expired dashboard context», «cannot capture a replacement draft». Вместо `import.test.ts`, `httpapi-sync.test.ts`, `session.test.ts` (маркер) — `session.update` с чужой metadata привязку не меняет. CLI: `run --session <старый>` после пересоздания — отказ, запросов к модели не прибавилось | **да**, G1; мутация: привязка не сверяется |
 | **B2.9e** `dashboard_draft` | Черновик из `src/` (`draftDashboard`, ресурсы из `LOGINOM_AI_AGENT_RESOURCES`). Инструмент есть только в Location дашборда, с `codemode: false`. Сервер черновика гасится при выгрузке плагина. У `loginom-agent` — зависимость `@loginom-ai-agent/dashboard` | новый `dashboard-tools.ts`, `index.ts`, `loginom-agent/package.json` (+`bun.lock`) | b | S | `dashboard.test.ts`: 2 теста `dashboard_draft`. CLI: без ресурсов — `DASHBOARD_RESOURCES_MISSING`; в обычной папке инструмента нет | нет |
 | **B2.9f** `dashboard_publish` | Подготовка (`withDashboardStage`, `preparePublish`). Последняя версия читается через аренду Host с `scope bind loginom-dashboard`. Вопрос `dashboard_publish` — узел, путь пакета и конфликт (`ctx.permission.assert` с metadata). Затем сверка черновика и `finishPublish`. Как спрашивать — по ответу на вопрос владельцу | `dashboard-tools.ts`, `permissions.ts`, `index.ts` | e, d; **вопрос 1** | M | `dashboard.test.ts`: публикация ×3 ответа, пересоздание, «approval belongs to the draft» (публикация), прерывание сборки, предел вывода, отказы Host ×4, новая версия на сервере; `dashboard-session.test.ts` «publication requires confirmation…». Host — `server/test/fixture/loginom-dock-host.ts`. CLI: с `--auto` Host-фикстура получает одну публикацию | нет |
 | **B2.9g** `dashboard_delete` | Список версий; вопрос на каждый новый набор; прогресс — в metadata инструмента. Затем удаление папки и отзыв черновика, привязка — `deleted`. Конец хода после удаления: хук `context` убирает инструменты, ход кончается одним ответом модели | `dashboard-tools.ts`, `permissions.ts`, `index.ts` | f; **вопрос 1** | M | `dashboard.test.ts`: 9 тестов удаления (14 случаев с циклами), «approval belongs» (удаление); `prompt.test.ts` «successful dashboard deletion ends its turn» — в v2: в следующем запросе нет инструментов. CLI: без терминала — отказ (j) | нет |
-| **B2.9h** RPC подготовки цели | `loginom.dashboard`. `prepare(id, defer)`: статус подключения, ожидание готовности и каталога поколения, `dashboard.read` Host до чата, `prepareDashboard` в `Global.Path.data/dashboards` из шаблона ресурсов. Ответ — папка, действие, уведомление или код: `LOGINOM_CONFIG_REQUIRED`, `DASHBOARD_SNAPSHOT_*`, `DASHBOARD_BINDING_CONFLICT`, `DASHBOARD_PUBLICATION_*`. `find(id)` — для Desktop. Зовут CLI (i) и Desktop (ВШ-6) | новый `dashboard-target.ts`, `host.ts` (запрос Host до чата), `index.ts` | b | M | 9 тестов Desktop `dashboard-target.test.ts` → тест RPC в `server/test` (Studio-фикстура, Host по сценарию). CLI — в i | нет |
-| **B2.9i** `run --dashboard <id>` | `Standalone.forward`: флаг и конфликты (`--continue`, `-c`, `--session`, `-s`, `--fork`, `--command`, `--dir`, `--attach`; не для TUI) → код 2. `run/product.ts`: `prepare` до создания сессии, уведомления 0.4 в stderr, коды. `run/run.ts`: Location — рабочая папка, промпт с `dashboardPrompt(action)` (синтетических частей промпта в v2 нет — способ выбрать в задаче) | `cli/src/standalone.ts`, `cli/src/run/{product,run}.ts` | h, e | M | `standalone-dashboard.test.ts`: флаги (3), неверные аргументы и нет подключения без проекта (1), `--headless` вместо ID (1), основной путь (1, без удаления) → `cli/test/cli-dashboard.test.ts`. CLI: `run --dashboard <id> --model test/… -- "Покажи суммы."` — код 0; в запросе `dashboardPrompt("create")` и рабочая папка, есть `dashboard_draft`, нет `shell`. Повтор: `DASHBOARD_SNAPSHOT_UNAVAILABLE`, код 1, без запроса к модели | нет (приёмка плана: «сессия дашборда из CLI работает») |
+| **B2.9h** RPC подготовки цели | `loginom.dashboard`. `prepare(id, defer)`: статус подключения, ожидание готовности и каталога поколения, `dashboard.read` Host до чата, `prepareDashboard` в `Global.Path.data/dashboards` из шаблона ресурсов. Ответ — папка, действие, уведомление или код: `LOGINOM_CONFIG_REQUIRED`, `DASHBOARD_SNAPSHOT_*`, `DASHBOARD_BINDING_CONFLICT`, `DASHBOARD_PUBLICATION_*`. `find(id)` — для Desktop. Зовут CLI (i) и Desktop (ВШ-6) на Location своего рабочего каталога: CLI — PWD `run`, как `loginom.preflight`; Desktop — Location окна. Папки дашборда до `prepare` нет, RPC работает с `Global.Path.data` | новый `dashboard-target.ts`, `host.ts` (запрос Host до чата), `index.ts` | b | M | 9 тестов Desktop `dashboard-target.test.ts` → тест RPC в `server/test` (Studio-фикстура, Host по сценарию). CLI — в i | нет |
+| **B2.9i** `run --dashboard <id>` | `Standalone.forward`: флаг и конфликты (`--continue`, `-c`, `--session`, `-s`, `--fork`, `--command`, `--dir`, `--attach`; не для TUI) → код 2. `run/product.ts`: `prepare` до создания сессии, уведомления 0.4 в stderr, коды. `run/run.ts`: Location — рабочая папка, промпт с `dashboardPrompt(action)` (синтетических частей промпта в v2 нет — способ выбрать в задаче) | `cli/src/standalone.ts`, `cli/src/run/{product,run}.ts` | h, e | M | `standalone-dashboard.test.ts`: флаги (3), неверные аргументы и нет подключения без проекта (1: неверные аргументы отклоняет `forward` до сервера; при «нет подключения» `prepare` идёт на Location PWD — создаёт ли v2 при этом проект, проверить в i, в 0.4 не создавал), `--headless` вместо ID (1), основной путь (1, без удаления) → `cli/test/cli-dashboard.test.ts`. CLI: `run --dashboard <id> --model test/… -- "Покажи суммы."` — код 0; в запросе `dashboardPrompt("create")` и рабочая папка, есть `dashboard_draft`, нет `shell`. Повтор: `DASHBOARD_SNAPSHOT_UNAVAILABLE`, код 1, без запроса к модели | нет (приёмка плана: «сессия дашборда из CLI работает») |
 | **B2.9j** Подтверждения в CLI | `dashboard_delete`: ввод «Удалить <случайное>» в управляющем терминале — и с `--auto`. Отмена, EOF, Ctrl+C, нет TTY — отказ. Публикация без `--auto` — отказ с текстом 0.4. Вывод удаления блоком | `cli/src/run/{noninteractive,product}.ts`, `cli/src/mini-host.ts` (чтение терминала), `tui/src/mini/tool.ts` | i, g | S | `standalone-dashboard.test.ts`: подтверждение публикации (`auto` ложь и истина), pty-случаи (11, Linux) со `standalone-dashboard-pty.py` → `cli/test` | нет |
 | — | Очередь ссылок `loginom-ai-agent://dashboard` и мост Desktop к RPC h | — | h | — | `deep-links.test.ts` | B4, ВШ-6 (В-97 п. 9) |
 | — | Показ, «Изменить в чате», `dashboard-links`, `dashboard-handoff`, `dashboard-publication` | — | — | — | — | этап C |
@@ -20047,7 +20050,8 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 
 ### Оценка
 
-S — 0,5 дня, M — 1–1,5.
+Размер в таблице нарезки — по объёму кода и тестов, дни — по каждой задаче отдельно: b 1–1,5, c 1–1,5, d 0,5, e 0,5,
+f 1, g 1–1,5, h 0,5–1, i 1, j 0,5–1.
 
 | | Задачи | Дни |
 |---|---|---|
@@ -20055,14 +20059,14 @@ S — 0,5 дня, M — 1–1,5.
 | Плагин вне шлюза | e, f, g, h | 3–4 |
 | CLI | i, j | 1,5–2 |
 | **B2.9 всего** | 9 | **7–9,5** |
-| План (В-88) | — | 3–5 |
+| План, строка дельты B2.9 (оценку этапа В-98 сменил на 54–87, пересмотр — на checkpoint B2) | — | 3–5 |
 | Предложение B1.2b | — | 2–3 |
 
-Больше плана на 4–4,5 дня. Причины:
+Больше строки плана на 4–4,5 дня; перерасход — к пересмотру на checkpoint B2 (В-98). Причины:
 
 1. **Швов 0.4 в v2 нет.** `getForExecution`, `ctx.dashboardWork`, `workspaceWriter` и разрешения ядра 0.4 нужно
-   заменить хуками плагина. Около 2,8 тыс. строк тестов переписываются на фикстуры сервера v2, а не копируются, как в
-   B2.5.
+   заменить хуками плагина. Около 2,8 тыс. строк тестов переписываются на фикстуры сервера v2, как в B2.5, а не
+   копируются.
 2. **Подготовка цели Desktop переезжает в плагин (h).** Это 52 строки кода и 257 строк тестов, при оценке плана их
    не было. ВШ-6 в B4 (1–1,5 дня) от этого уменьшится.
 3. **CLI (i, j, 1,5–2 дня) план считал частью «плагинной» оценки.** Если владелец согласится, что в CLI удаление
@@ -20093,16 +20097,17 @@ S — 0,5 дня, M — 1–1,5.
 - **Шлюз.** В-86 дашборды не называет, Desktop-часть В-97 п. 9 выносит из приёмки шлюза. Но в строке G1
   `guarantees.md` «профиль дашборда — B2.9» записан как неперенесённая часть гарантии. Поэтому в шлюз B отнесены
   задачи профиля, путей и привязки (b, c, d) — с мутациями. Инструменты, RPC и CLI — вне шлюза, в объёме этапа B по
-  В-85.
+  В-85. Подтвердить владельцу: так b, c, d попадают и в checkpoint B2 (G1 с мутациями).
 - **Корень дашбордов — у сервера** (`Global.Path.data/dashboards`), CLI и Desktop получают папку через RPC h. Находка
   B1.4c (`dashboardDataRoot` по умолчанию `prod`) этим снимается. Сама функция остаётся в `product` без вызовов, не
   удалял.
 - **Привязку хранит плагин, а не metadata сессии.** Metadata меняет публичный API и наследует форк, а 0.4 защищал маркер
-  в четырёх местах (`setMetadata`, fork, import, повтор событий). Маркер 0.4 читается только при переносе.
+  в четырёх местах (`setMetadata`, fork, import, повтор событий). Маркеры 0.4 плагин переносит в хранилище один раз,
+  при первом старте в Location дашборда; после этого подмена metadata привязку не меняет.
 - **Пути закрывает только плагин, правок upstream нет.** В 0.4 запись шла под блокировкой снимка (`withSnapshot`,
   синхронная SQLite-транзакция). Плагин записью ядра не владеет, поэтому вместо блокировки — сверка до записи и после
   неё. Остаётся узкая гонка с пересозданием папки: одна запись старого чата может попасть в новый черновик того же
-  дашборда. Записываю это в c и d как ограничение.
+  дашборда. Записываю это в c и d как ограничение. Подтвердить владельцу: ослабление касается задачи из G1.
 - **Форматтер.** В v2 он работает только при ключе `formatter` в конфиге пользователя; встроенный prettier ищет
   `package.json` с зависимостью вверх от папки Location. Закрыть в c одним из двух способов: конфиг проекта
   `formatter: false` в рабочей папке (`h` пишет его при подготовке, модель туда писать не может) или запрет имён
@@ -20151,7 +20156,8 @@ packages/loginom-agent/src/permissions.ts:67:  { action: "dashboard_delete", res
 Строки и тесты файлов — `git show a63462dde1:<путь> | wc -l`, имена тестов — `grep` по `test(`, `it.instance(`,
 `it.live(` в тех же файлах.
 
-Проверки дерева на `f53d289278` (коммит раздела; хук `pre-commit` — `clean`). Перед `check` выполнен
+Проверки дерева на `f53d289278` (коммит раздела; хук `pre-commit` — `clean`). Следующие коммиты ветки меняют только
+этот раздел журнала; `catalog-check.py` на них повторён — тот же вывод. Перед `check` выполнен
 `npm ci --ignore-scripts --offline` клиента `packages/loginom-runtime/client` (Node 24.19.0), как в прежних разделах:
 
 ```text
