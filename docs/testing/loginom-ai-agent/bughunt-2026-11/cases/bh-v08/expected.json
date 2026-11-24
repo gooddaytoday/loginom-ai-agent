@@ -1,0 +1,47 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.calculator"
+    },
+    {
+      "type": "exports.excel"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-v08-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Ticket",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Ticket": 103,
+          "Amount": 5
+        },
+        {
+          "Ticket": 101,
+          "Amount": 11
+        },
+        {
+          "Ticket": 104,
+          "Amount": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "transform.sorting"
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "UseLocale",
+            "type": "boolean",
+            "value": true,
+            "label_any": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.sorting"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  },
+  "binding_inventory": [
+    {
+      "node": {
+        "type": "transform.sorting"
+      },
+      "parameter": "/compare_with_locale",
+      "mode": "variable",
+      "variable": {
+        "kind": "control",
+        "input": 0,
+        "name": "UseLocale",
+        "type": "boolean",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.user",
+        "output": 4
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.sorting",
+      "output_port": 0,
+      "export_destination": "bh-v05-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Ticket",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Word",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Ticket": 102,
+          "Word": "Арка"
+        },
+        {
+          "Ticket": 101,
+          "Word": "Банк"
+        },
+        {
+          "Ticket": 103,
+          "Word": "Банк"
+        },
+        {
+          "Ticket": 105,
+          "Word": "Гора"
+        },
+        {
+          "Ticket": 104,
+          "Word": "Яхта"
+        }
+      ]
+    }
+  ]
+}

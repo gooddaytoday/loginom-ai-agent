@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "integration.rest_request"
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "ReportStage",
+            "type": "string",
+            "value": "trial-1983",
+            "label_any": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "integration.rest_request"
+        },
+        "input": 0,
+        "kind": "variables"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "bh-v10-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "HeaderValue",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "HeaderValue": "trial-1983"
+        }
+      ]
+    }
+  ]
+}

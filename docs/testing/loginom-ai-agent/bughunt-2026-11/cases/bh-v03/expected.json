@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "BatchSize",
+            "type": "integer",
+            "value": 3,
+            "label_any": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  },
+  "binding_inventory": [
+    {
+      "node": {
+        "type": "transform.filter_data"
+      },
+      "parameter": "/groups/0/0/value",
+      "mode": "variable",
+      "variable": {
+        "kind": "control",
+        "input": 0,
+        "name": "BatchSize",
+        "type": "integer",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.user",
+        "output": 4
+      },
+      "field": {
+        "kind": "row_number"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "export_destination": "bh-v03-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Ticket",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Ticket": 103,
+          "Amount": 5
+        },
+        {
+          "Ticket": 101,
+          "Amount": 11
+        },
+        {
+          "Ticket": 104,
+          "Amount": 0
+        }
+      ]
+    }
+  ]
+}

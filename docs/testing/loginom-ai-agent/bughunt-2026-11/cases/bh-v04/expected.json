@@ -1,0 +1,99 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "transform.group_data"
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "SortSummary",
+            "type": "boolean",
+            "value": true,
+            "label_any": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.group_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  },
+  "binding_inventory": [
+    {
+      "node": {
+        "type": "transform.group_data"
+      },
+      "parameter": "/sort_result",
+      "mode": "variable",
+      "variable": {
+        "kind": "control",
+        "input": 0,
+        "name": "SortSummary",
+        "type": "boolean",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.user",
+        "output": 4
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "export_destination": "bh-v04-result.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Team",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Team": "East",
+          "Total": 13.0
+        },
+        {
+          "Team": "North",
+          "Total": 20.0
+        },
+        {
+          "Team": "West",
+          "Total": 37.0
+        }
+      ]
+    }
+  ]
+}
