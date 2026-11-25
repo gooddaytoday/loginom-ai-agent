@@ -23395,3 +23395,183 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 - Мутация: строка с `` `packages/nowhere/src/x.ts` `` в `packages/ui/AGENTS.md` — тест красный
   (`packages/ui/AGENTS.md: packages/nowhere/src/x.ts`); откатил.
 - `catalog-check.py` — код 0; `apply-identity.py --check` — `would change: 0 files`; `bun run check` — код 0 (39 из 39 задач).
+
+## B6.0 Разведка шлюза
+
+25.11.2026. Ветка `b60-gate-scout` от `oc2-migration` (`0cfc0a30dd`), рабочее дерево `.claude/worktrees/b60`. Bun 1.4.4 переносной
+и Node 24.19.0 — первыми в `PATH` только для своих команд; `bun install --frozen-lockfile` — код 0, `.husky/_` есть. Код не менялся,
+только этот раздел. Настоящая модель не вызывалась; сети к app.loginom.ai и к DeepSeek не было. Секреты не выводились: проверялись
+только наличие и длина полей. Прочитано: план этапа B (B6), В-86, В-99, В-106…В-109, `RUNBOOK.md`, `registry.json`, `inventory.md`,
+`run-check.py` и `run-check.md`, `guarantees.md`, `windows-release-coverage.md`, журнал (B2.7a4, B2.7a4b, B2.7b, B2.7b2, B3.3, B4.14a, B4.14c).
+
+Файла `docs/product/loginom-agent/decisions.md` в `oc2-migration` нет (он живёт в `prototype-source`); решения прочитаны там.
+
+### 1. Набор шлюза: 25 узлов
+
+В-86 берёт узлы с `independent_oracle_pass` в `inventory.md`: строк 25. В `registry.json` ровно 25 узлов с
+`readiness.analytical_validation.status == independent_oracle_pass` — те же. Все `queue_class: implemented`. Оговорка реестра для
+всех: «только сценарии и SHA из `acceptance.scoped_results`, полная матрица типа не заявлена»; критерий шлюза — приёмка одного
+сценария на узел, а не вся матрица. Сценарий — последний принятый в реестре; точное имя в `run-check.py` проверяет группа командой
+`--prepare-only`.
+
+| # | Узел (slug) | Тип | Сценарий приёмки | Известные ограничения |
+|---|---|---|---|---|
+| 1 | calculator | transform.calculator | s1, s3 | n18 не завершён; JS-режим вне набора |
+| 2 | row-filter | transform.filter_data | s3 / conditions | `row_number` не принят в составном срезе; Variant не поддержан |
+| 3 | sorting | transform.sorting | s1 | n18 не завершён |
+| 4 | grouping | transform.group_data | s1 | n18 не завершён |
+| 5 | join | transform.join_data | s3 / left; right, full, difference | n18 не завершён |
+| 6 | transform-crosstable | transform.cross_table | s5 / pivot | n18 не завершён |
+| 7 | replacement | transform.replace_columns | regex-replace; convert | 64 ячейки convert, exact — регрессия |
+| 8 | date-time | transform.date_time | date-time-iso, ISO-empty | нагрузка и общий бюджет пакета исключались |
+| 9 | missing-values | preprocessing.data_recovery | zero; empty; threshold | при пороге 20% mean оставляет NULL |
+| 10 | text-export | exports.text | CP1251 (s8) | символы вне CP1251 в живой фикстуре не входили |
+| 11 | exports-excel | exports.excel | exports-excel | общий PASS карточки не установлен (n18) |
+| 12 | imports-excel | imports.excel | sheet, wide, single | 25 вариантов `task-*.md`, тяжёлые фикстуры |
+| 13 | preprocessing-datapartition | preprocessing.data_partition | partition-random, modes-smoke | третья попытка встретила UI_SCAN_LIMIT |
+| 14 | preprocessing-sampling | preprocessing.sampling | sampling-random, modes-smoke | один cold-отказ при load1=2,28 |
+| 15 | preprocessing-elimoutlier | preprocessing.elim_outlier | SD, IQR | — |
+| 16 | preprocessing-smoothing | preprocessing.smoothing | smoothing-hp | all-NULL — native отказ вне критерия |
+| 17 | research-autocorrelation | research.auto_correlation | acf-update | n18 не завершён |
+| 18 | research-corranalysis | research.corr_analysis | corr-pairs | — |
+| 19 | transform-slidingwindow | transform.sliding_window | n21 / lag | после исключённого бюджета пакета — повтор PASS |
+| 20 | trees-jsontotree | trees.from_json | tree-repeat, tree-no-repeat | n18 не завершён |
+| 21 | trees-treetodata | trees.to_table | tree-repeat, tree-no-repeat | n18 не завершён |
+| 22 | datamining-clustering | datamining.clustering | task.md | принят на `5093834370` (0.4), текущий SHA не проверялся |
+| 23 | datamining-linregression | datamining.lin_regression | task.md (enter) | принят на `91a8671f`, 2 из 3; apply не проверялся |
+| 24 | datamining-logregression | datamining.log_regression | forward, backward, stepwise, enter | 24 `task-*.md`, самый длинный набор |
+| 25 | integration-restrequest | integration.rest_request | rest-get-plain | нужен доступный адрес REST; сеть стенда |
+
+Узлы 22 и 23 принимались на старых SHA и в `run-check.py` ходят по пути `nodes/<slug>/acceptance/task.md` (`--cases`/путь), а не по
+имени; для них `--prepare-only` в B6.1 обязателен до первого модельного прогона.
+
+### 2. Что готово на новом CLI и чего нет
+
+Готово (журнал): `run --headless --format json` с событиями и кодами 0.4 (B2.7a4; командная строка `run-check.py:2656` проходит в
+`cli-run.test.ts`), `loginom setup --stdin-json` и `status` (B2.7b), `evals` на v2 (B2.7b2), полная сборка `build-cli.ts` за ~2 мин
+(код 0 на `c5881e8a19`, B2.7a2). Не проверено ни разу: живой `loginom setup` и `--headless` Chromium против настоящего Loginom, бизнес-сценарий
+узла из собранного CLI на настоящей модели (условие checkpoint B2, не выполнено). Поэтому первая задача B6.1 — калибровочный
+прогон одной группы; если он падает, это находка B2, а не узла.
+
+Два расхождения, которые меняют работу:
+
+1. **Bun.** `run-check.py:2307` берёт `~/.cache/loginom-bootstrap/bun-linux-x64/bun`: там Bun 1.3.14. `build-cli.ts` на `oc2-migration`
+   требует Bun 1.4.4 (`LOGINOM_BUN_NOTICE_REVISION_MISMATCH`), `package.json` — `bun@1.4.4`. Меньший вариант без правки кода:
+   собрать один раз Bun 1.4.4 (`cd packages/loginom-host && bun script/build-cli.ts <новый каталог> --no-archive`) и давать
+   `run-check.py start --build <каталог>`; `--head` должен совпадать с `sourceCommit` манифеста, `sourceDirty=false`.
+   `RUNBOOK.md` по-прежнему называет Bun 1.3.14 — устарел (общий документ, не правил).
+2. **Пара.** `run-check.py` читает `worker.json` и `reviewer.json` (стр. 3500, 3621), а не `checker.json`. `reviewer.json` только
+   проверяется на форму (`pair_login`), прогон идёт под `worker.json`; холодная проверка — под тем же аккаунтом (стр. 3554).
+   «Независимый проверяющий» поэтому = отдельный прогон `run-check` под парой, где `worker.json` — аккаунт проверяющего.
+
+### 3. Правки `run-check.py` под DeepSeek (задачи, код не менялся)
+
+| № | Файл:строка | Что |
+|---|---|---|
+| T1 | `scripts/node-acceptance/run-check.py:2656` | `--model openai/gpt-6.1-sol` → `deepseek/deepseek-flash`; `--variant medium` убрать (в `models.json` у `deepseek-flash` нет `variants`; шим `run` дописывает `#medium` и отказал бы). Модель вынести в одну константу рядом с `D87` |
+| T2 | `run-check.py:3519` | убрать ссылку `data/auth.json` на `~/.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json`: общий OAuth на v2 отключён (`SHARED_AUTH_UNSUPPORTED`, B2.7b2). Ключ идёт переменной `DEEPSEEK_API_KEY` (читает `packages/ai/src/providers/deepseek.ts`); `self.env` (стр. 2199) и `env` (стр. 3637) уже наследуют окружение. Перед T1 проверить без модели, что `auth list --standalone --format json` с этой переменной показывает `deepseek` при `LOGINOM_AI_AGENT_PURE=1` |
+| T3 | `run-check.py:3520` | не писать `provider.openai.models.gpt-6.1-sol`: модель есть в `packages/product/models.json` (`deepseek-flash`, контекст 1 000 000, `tool_call`, `reasoning`) |
+| T4 | `run-check.py:2739`, `2742` | `config['model']` и `state/model.json` (два хода, `two_turn`): `deepseek/deepseek-flash`, `variant` пусто |
+| T5 | `scripts/node-acceptance/run-check-two-turn.py:90`, `:147` | `--model` и проверка `dict(providerID='openai', modelID='gpt-6.1-sol', variant='medium')` — на `deepseek`/`deepseek-flash`, без `variant`; снять `require_medium` |
+| T6 | `scripts/node-acceptance/run-check.md:512`, `docs/node-development/RUNBOOK.md` (п. 5), `workflow/acceptance-cli.md:3` | модель, вход, Bun 1.4.4; общие документы — по согласованию с владельцем (AGENTS.md: изменения общих контрактов) |
+| T7 | новый `scripts/node-acceptance/make-pair.py` (или опция `--pair-env`) | собрать `worker.json` и `reviewer.json` во временном каталоге 0700 из переменных окружения `kit secret-exec`; поля `loginom.{url,username,password}` и `package_directory` (в уже существующих парах — `/<имя пользователя>`). Удалять после `wait` |
+| T8 | запуск | `kit secret-exec --env DEEPSEEK_API_KEY=bw://loginom-newapp/deepseek-api-key --env CHK_USER=bw://loginom-newapp/app-loginom-checker#username --env CHK_PASS=bw://loginom-newapp/app-loginom-checker#password -- <обёртка>`; значения нигде не печатать, `request.json` их не содержит (проверено чтением кода: пишется `vars(args)`, пара — путём) |
+
+Тесты `scripts/node-acceptance/tests/*` строк `gpt-6.1-sol`/`openai` не содержат. `evals/src` — тоже нет.
+
+Наблюдения по секретам (длины/наличие, значения не выводились):
+- `bw://loginom-newapp/deepseek-api-key` — есть, непустой.
+- `bw://loginom-newapp/app-loginom-checker`: `username` — есть (6 знаков), `password`, `notes`, `uri` и пользовательское поле `note` — **пустые**. В задании названы поля `username` и `note`; настоящее имя поля — `notes`, и оно пустое. Пароля проверяющего в менеджере нет.
+- Записей-исполнителя в `loginom-newapp` нет (`app-loginom-worker`, `-executor`, `-reviewer` — «нет записи»). `kit secret-inbox` — одна чужая запись (`ChatGPT API MEMORY`), к задаче не относится.
+- На этой машине в `~/.config/loginom-multica/cards/` лежат две старые пары `worker.json`/`reviewer.json` на app.loginom.ai (октябрь, Multica). Они чужие (RUNBOOK: чужие аккаунты не трогать), живость не проверялась, не использовались.
+
+### 4. Нарезка B6.1
+
+Правила нарезки: `run-check` держит бюджет пакета `85 * 60` секунд на один `start` (стр. 2196, включая сборку и все сценарии); при
+ожидаемых ~25 мин на сценарий в один `start` входит не больше 3 узлов. Нагрузка — 6 vCPU, 11 ГБ (`nproc`, `free`) на этой машине;
+`--host-load-max` по умолчанию 8 (load1 и load5), `--spacing` 60 с на процесс — между старами фаз одного `run-check`, не между
+процессами. Снимок load average на момент разведки — 9,7 (идут другие агенты): с порогом 8 любой прогон встанет в очередь.
+
+Группы (по 3 узла, один `start` на группу и раунд; группа H — самая тяжёлая по счёту, I — внешняя сеть):
+
+| Группа | Узлы | Почему вместе |
+|---|---|---|
+| A | calculator, row-filter, sorting | простые табличные, быстрые |
+| B | grouping, join, transform-crosstable | n18-узлы, средняя нагрузка |
+| C | replacement, date-time, missing-values | предобработка |
+| D | text-export, exports-excel, imports-excel | файловые; Excel-фикстуры тяжёлые |
+| E | preprocessing-datapartition, preprocessing-sampling, preprocessing-elimoutlier | схожие фикстуры |
+| F | preprocessing-smoothing, research-autocorrelation, research-corranalysis | ряды и корреляции |
+| G | transform-slidingwindow, trees-jsontotree, trees-treetodata | малые |
+| H | datamining-clustering, datamining-linregression, datamining-logregression | счёт, старые SHA, не пересмотрены |
+| I | integration-restrequest | внешний адрес; один, чтобы его сбой не съел бюджет пакета других |
+
+Порядок. Раунд 0 — калибровка: группа A, один `start`, чтобы измерить время фаз и проверить DeepSeek/вход. Дальше — раунд 1 всех
+групп, раунд 2 всех групп; раунд 3 — только узлы с одним PASS из двух (критерий «не меньше 2 из 3»: третий прогон нужен лишь при
+расхождении, это меньшее чтение критерия). Пределы: 9 групп × 2 раунда = 18 `start`, плюс до 9 при расхождениях (25 узлов × 3 = 75 прогонов — верхняя граница).
+
+Параллельность. Рекомендую **3 одновременных `start`** на одной машине: 6 vCPU, Chromium и Node host на каждый прогон; 4 — предел.
+Лимит DeepSeek неизвестен (владелец ключа не назвал); при ответах 429 снизить до 2. Один аккаунт проверяющего на все параллельные
+прогоны: пакеты разведены (`<out>-<сценарий>.lgp`), но число одновременных сеансов одного пользователя на app.loginom.ai не проверялось — калибровка это покажет. Очередь `--host-load-max` оставить 8, не повышать: раньше исключённые прогоны (бюджет пакета, load1=2,28) — именно его последствия.
+
+Оценка времени (оценка, не измерение: длительностей живых прогонов в дереве нет; допущение — ~25 мин на сценарий: setup 1–2, модель 10–20,
+cold 3–5, плюс сборка 2–4 мин один раз на SHA):
+
+| Вариант | Прогонов | Времени, 3 параллельно |
+|---|---|---|
+| минимум: 2 прогона на узел | 50 | 50 × 25 / 3 ≈ 7 ч |
+| верхняя граница: 3 прогона на узел | 75 | ≈ 10,5 ч |
+| с 20% повторов (отказ старта, UNKNOWN) и очередью по нагрузке | 60–90 | 9–13 ч, то есть 1,5–2 рабочих дня |
+| при 2 параллельных | 50–75 | 10,5–16 ч |
+| при DeepSeek на 35 мин на сценарий (хуже) | 75 | до 15 ч, плюс повторы — около 3 дней |
+
+В плане на B6 — 5–8 дней вместе с B6.2 и B6.3; B6.1 по этой оценке укладывается в 2–3 дня при исправном входе и модели. Риск:
+калибровка в раунде 0 может показать, что бизнес-сценарий из CLI на DeepSeek не проходит вовсе (условие checkpoint B2 не выполнено) — тогда сначала чинить B2.
+
+### 5. B6.2 и B6.3
+
+В плане B6.3 — «Модульные `AGENTS.md` под новые пути» (его ведёт другая задача, ссылка в заметке сессии). Здесь по заданию B6.2 разрезан:
+
+**B6.2a Гарантии и тесты на SHA кандидата.** Платформа Linux, Bun 1.4.4, Node 24.19.0, `LOGINOM_AI_AGENT_TEST_NODE`, `npm ci` клиента и шаблона дашбордов.
+- G1…G6: команды из `docs/upstream-sync/guarantees.md` («Как запускать») без пропусков, зелёные; затем мутация каждой гарантии (таблица мутаций в
+  разделах B2.* журнала) на SHA кандидата — не перенос старых «красных».
+- Тесты миграции: `packages/cli` `bun test` для `migrate` (B3.1, B3.1b, B3.1c, B3.2), `connection-migration`, `scripts/upstream-sync/selftest.sh`.
+- Охранные `product`: известны ровно три падения (`workspace packages`, `CI triggers`, `path literals`, В-95, B5.1; после B5.1 — ноль); любое иное — новое, найти автора.
+- `cd packages/loginom-host && xvfb-run -a bun test` — полностью; базовые падения под root (5 по `guarantees.md`) не прятать.
+- `node --test` клиента `packages/loginom-runtime/client` — полностью; числа до/после на одном стенде.
+
+**B6.2b B3.3 на артефакте кандидата.** Тот же `scripts/live-profiles/live.mjs` (+ `windows.ps1`, `stand.sh`): профили 0.3.9 и 0.4.0 (`v0.4.0`,
+В-99) из установленных сборок релизов, затем установленный артефакт кандидата (AppImage / CLI) поднимает их: сессии, учётные данные и подключения на месте,
+повтор ничего не меняет. Linux — на этой машине; Windows `winstand` под **обычным** пользователем (B0.2 шёл под администратором). Не нужна модель: профиль пишет подставная.
+
+**B6.2c SEC-01 и Windows.** Противоречие: план — «SEC-01 и чек-лист Windows в объёме В-86», сам В-86 — «SEC-01 в установленном Desktop — в шлюзе C».
+Выбор (меньший): в B6.2c входят SEC-01 уровня B4.14a (кодек `safeStorage`: `credentials` из `loginom-host/src/connection/credentials.ts`, Electron 42.11.18 и 44.9.1,
+Linux; на Windows — DPAPI под обычным пользователем, B4.14c) повторённый на кандидате; шаги чек-листа Windows (`windows-release-coverage.md`, раздел 4) 1–3 (CAND, REL и SHA256),
+4 (PKG-01/02, подпись; UI-01 отменён В-10), 5 только SEC-01 и перезапуск, 8 (CLI из ZIP, вход, одна задача), 10 (REMOVE-01). Вне B: UI-02 и CON-01…08 через форму Desktop, шаги 6, 7 и 9
+(обновление с 0.4.x — шлюз C). Состав не согласован с владельцем — вопрос 3.
+
+Итог — отчёт по `docs/testing/loginom-ai-agent/report-template.md` (установленные артефакты отдельно от проверок по исходникам). B6.2 ждёт B5 (CAND/REL) только в частях b и c;
+часть a можно прогонять на SHA заранее, но зачётный — SHA кандидата.
+
+### 6. Вопросы владельцу (блокирующие)
+
+1. **Пароль проверяющего.** В `bw://loginom-newapp/app-loginom-checker` есть `username`, но пустые `password`, `notes`, `uri` и поле `note`. Нужен пароль в этой записи (`kit secret-put`) и подтверждение, что личная папка — `/<username>` (так в прежних парах). Без этого B6.1 не стартует.
+2. **Исполнитель (`worker`) на app.loginom.ai.** В `bw://loginom-newapp` такой записи нет. Предлагаю меньший вариант: зачётными считать прогоны под аккаунтом проверяющего (В-107), отдельный `worker` не заводить; `reviewer.json` пары — копия того же аккаунта. Подтвердить или дать второй аккаунт (понадобится, если одного не хватит под 3 параллельных сеанса).
+3. **Объём B6.2c** (пункт выше): SEC-01 уровня B4.14a и шаги Windows 1–5(SEC-01)–8–10, остальное — шлюз C. Новые критерии приёмки без согласования не ввожу.
+
+Не блокируют, но решить до раунда 1: лимит запросов по ключу DeepSeek (сколько параллельных); можно ли править `RUNBOOK.md` и `workflow/acceptance-cli.md` под модель и Bun 1.4.4 (T6).
+
+### Где решал сам
+
+- Сценарий узла для шлюза — последний принятый по реестру, а не вся матрица (иначе 250+ вариантов).
+- «Независимый проверяющий» понят как прогон `run-check` под отдельной парой, потому что `reviewer.json` читается только для проверки формы.
+- Третий прогон — только при расхождении двух: критерий «не меньше 2 из 3» этого не запрещает.
+- Сборка под Bun 1.4.4 отдельно и `--build`, а не правка `bootstrap`-пути в `run-check.py`: меньше кода, SHA проверяется манифестом.
+- B6.2 разрезан на a, b, c; B6.3 плана (AGENTS.md) не затронут.
+
+### Не проверено
+
+- Время прогонов: оценка по допущению, без живого измерения. Лимиты DeepSeek и сеансов одного пользователя на app.loginom.ai.
+- `DEEPSEEK_API_KEY` в собранном CLI с `LOGINOM_AI_AGENT_PURE=1`: найдено только в `packages/ai/src/providers/deepseek.ts`, процессом не проверялось (T2).
+- Существование точных имён сценариев в `run-check.py` для узлов 7–25 (часть найдена: s1, s3, s5, n21, partition-random, sampling-random, smoothing-hp, acf-update, corr-pairs, rest-get-plain, tree-repeat, tree-no-repeat, date-time-iso, exports-excel, regex-replace, cp1251; остальные — пути к `task.md`).
+- Живость и права аккаунтов (проверяющий, прежние пары): сеть к app.loginom.ai не использовалась.
