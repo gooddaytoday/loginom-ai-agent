@@ -6,7 +6,7 @@ Reads may add a visualizer. `NOT_APPLIED`/`effect_possible=false`: ask CSV, skip
 
 Missing CSV: `next_step`; SAME node, no XML.
 
-Execute with known schema/format. Otherwise preview and compare ORIGINAL text locally.
+Known schema/format: Execute. Else preview and compare ORIGINAL text.
 Server download only by request or contradiction. User bans win.
 `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
@@ -28,8 +28,7 @@ Fallback: UTF-8, header 1, skip 0, comma, decimal point, empty NULL, double quot
 
 ## File list
 
-Same-schema: one Import; each needs delivery/fresh
-ref (`dock_storage_list`). `source.kind:"verified_sources"`; order `sources` by
+Same schema: one Import; require delivery/fresh ref (`dock_storage_list`). `source.kind:"verified_sources"`; order `sources` by
 `settings.source.source_paths`. `settings.source.file_info`:
 `name`/`relative_path`/`absolute_path` adds string FileName; suffix `_time` adds
 datetime FileTime (`none` disables). Outside CSV `columns`.

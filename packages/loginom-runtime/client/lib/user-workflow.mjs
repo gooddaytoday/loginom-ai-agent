@@ -1,8 +1,5 @@
 // The user supplies an issued workflow identity. Long UI paths remain pinned
 // locally; the normal node contract and all live identity guards stay intact.
-import {createHash,randomUUID} from 'node:crypto';
-import {mkdir,readFile,rename,unlink,writeFile} from 'node:fs/promises';
-import {join} from 'node:path';
 import {NODE_ADD_ONLY_MODE} from './node-contracts.mjs';
 
 export const userActionKeys=['package.save_checkpoint','package.save_as'];
@@ -31,7 +28,7 @@ export function userActionInventory(value) {
   }
   for(const node of copy.node_types??[])if(node.type==='exports.text'&&node.parameter_schema){
     node.creation_defaults={required_parameters:['destination'],parameters:{...exportCreationDefaults}};
-    node.parameter_schema.description='New or just added with add_only: supply destination; other settings use creation_defaults. Existing configured nodes use a patch. Overwrite defaults to reject.';
+    node.parameter_schema.description='New: supply destination; omitted settings use creation_defaults. Existing: patch explicit parameters only. Overwrite defaults to reject.';
   }
   return copy;
 }
@@ -94,23 +91,11 @@ export function userNodeTool(tool) {
   return copy;
 }
 
-export function createUserWorkflowBindings({defaultsDirectory,origin}={}) {
+export function createUserWorkflowBindings() {
   const references = new Map();
   const described=new Set();
   let describedDocument;
   const deliveryArtifacts=new Map(),uploads=new Map();
-  const createdNodes=new Map(),defaultOperations=new Map();
-  let defaultsWorkspace;
-  const savePath=(account,path)=>defaultsDirectory&&origin&&account&&typeof path==='string'&&path.startsWith('/')
-    ?join(defaultsDirectory,createHash('sha256').update(JSON.stringify([origin,account,path])).digest('hex')+'.json'):null;
-  const defaultsType=type=>type==='imports.text'||type==='exports.text';
-  const defaultsTarget=request=>{
-    const ref=request.target?.ref;
-    return request.target?.kind==='existing'&&ref?.document_id===defaultsWorkspace?.document_id
-      &&ref?.document_id===request.document_id&&ref?.workflow_id===request.workflow_ref?.workflow_id
-      &&createdNodes.get(ref.node_id)===request.target.type;
-  };
-
   const key = (document, workflow) => JSON.stringify([document, workflow]);
   const samePath = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
     && a.every((part, i) => part.tid === b[i].tid && part.label === b[i].label);
@@ -137,64 +122,6 @@ export function createUserWorkflowBindings({defaultsDirectory,origin}={}) {
       if(artifact&&outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&outcome.upload_completion_verified===true
         &&typeof outcome.destination==='string'&&outcome.destination.startsWith('/'))
         uploads.set(result.upload_operation_id,{artifact_id:artifact,destination:outcome.destination});
-    },
-    async rememberWorkspace(state){
-      this.remember(state);
-      const {loginom_account,document_id}=state,path=state.package_ref?.path??null;
-      if(defaultsWorkspace?.document_id===document_id&&defaultsWorkspace.loginom_account===loginom_account
-        &&defaultsWorkspace.path===path&&!state.created_draft)return;
-      defaultsWorkspace={document_id,loginom_account,path};
-      createdNodes.clear();
-      defaultOperations.clear();
-      const file=savePath(loginom_account,path);
-      if(!file)return;
-      try{
-        const entries=JSON.parse(await readFile(file,'utf8'));
-        if(!Array.isArray(entries))return;
-        for(const [guid,type] of entries.filter(entry=>Array.isArray(entry)&&entry.length===2
-          &&typeof entry[0]==='string'&&defaultsType(entry[1])))createdNodes.set(guid,type);
-      }catch{/* Missing or invalid provenance leaves existing-node patch semantics. */}
-    },
-    recordNodePhase(event){
-      const id=event.operation_id;
-      if(event.phase==='node_apply_prepared'){
-        const request=event.request;
-        if(request?.mode===NODE_ADD_ONLY_MODE&&defaultsType(request.target?.type)
-          ||request?.finish!=='close'&&request&&defaultsTarget(request))
-          defaultOperations.set(id,request);
-        return;
-      }
-      const request=defaultOperations.get(id);
-      if(!request)return;
-      if(event.phase==='node_phase_prepared'&&request.mode!==NODE_ADD_ONLY_MODE
-        &&['finish','node_finish'].includes(event.receipt?.phase)){
-        createdNodes.delete(request.target.ref.node_id);
-        defaultOperations.delete(id);
-      }
-      if(event.phase==='node_checkpoint'||event.phase==='node_operation_released'){
-        const result=event.result,node=result?.node,proof=event.receipt?.proof;
-        const created=event.phase==='node_checkpoint'?result?.status==='SUCCEEDED':
-          result?.released_phase==='target'&&proof?.verified===true&&proof.cleanup_complete===true&&proof.target_state==='found'
-          &&node&&['document_id','workflow_id','node_id'].every(key=>proof.node?.[key]===node[key]);
-        if(request.mode===NODE_ADD_ONLY_MODE&&created&&result.cleanup_complete===true
-          &&result.configuration?.status==='not_requested'&&node?.document_id===defaultsWorkspace?.document_id
-          &&typeof node?.node_id==='string')
-          createdNodes.set(node.node_id,request.target.type);
-        defaultOperations.delete(id);
-      }
-    },
-    async rememberSavedDefaults(path){
-      if(!defaultsWorkspace)return;
-      defaultsWorkspace.path=path;
-      const file=savePath(defaultsWorkspace.loginom_account,path);
-      if(!file)return;
-      // An empty snapshot replaces an earlier snapshot of this path.
-      await mkdir(defaultsDirectory,{recursive:true,mode:0o700});
-      const temporary=file+'.'+randomUUID();
-      try{
-        await writeFile(temporary,JSON.stringify([...createdNodes]),{mode:0o600,flag:'wx'});
-        await rename(temporary,file);
-      }finally{await unlink(temporary).catch(()=>{});}
     },
     remember({ document_id, workflow_ref, previous_workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
@@ -228,7 +155,7 @@ export function createUserWorkflowBindings({defaultsDirectory,origin}={}) {
       const ports=request.finish!=='execute'||['variables.from_table','exports.text','exports.excel','exports.lgd'].includes(request.target.type)?[]:
         request.target.type==='research.quality'?[0,1,2,3,4]:request.target.type==='preprocessing.coarse_classes'?[0,1,2]:['datamining.assn_rules','transform.filter_data','integration.rest_request','datamining.clustering'].includes(request.target.type)?[0,1]:[0];
       let parameters=request.parameters;
-      const firstConfiguration=request.mode!==NODE_ADD_ONLY_MODE&&(request.target.kind==='new'||defaultsTarget(request));
+      const firstConfiguration=request.mode!==NODE_ADD_ONLY_MODE&&request.target.kind==='new';
       if(firstConfiguration&&request.target.type==='exports.text'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters))
         parameters={...exportCreationDefaults,...parameters};
       if(firstConfiguration&&request.target.type==='imports.text'&&parameters?.settings&&parameters.preview_only!==true){

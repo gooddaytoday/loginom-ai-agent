@@ -2726,6 +2726,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
       instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
         :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+  const addOnlyWindowStep=operation=>{
+    const effect=operation?.targetPhase?.pending,receipt=effect?.receipt;
+    if(effect?.kind!=='create'||effect.parameters.add_only!==true||receipt?.add_only_window_pending!==true
+      ||!receipt.add_only_window_node_id||receipt.cleanup_complete!==false)return null;
+    return {tool:'dock_operation_inspect',arguments:{operation_id:operation.id},
+      instruction:'Ask the user to close the window for this node and wait for the graph to settle. Then inspect this same operation and use abandon_operation with a new recovery_operation_id.'};
+  };
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Only abandon_operation can release a stopped node operation; every other strategy is refused for it. If abandon_operation is refused too, follow its next_step instead of another strategy');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
@@ -2749,6 +2756,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
         operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const manualStep=addOnlyWindowStep(operation);
         const trigger=browserRecoveryTrigger(operation,null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
@@ -2756,7 +2764,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           // With browser recovery the agent clears the blocker itself; the user is not asked to.
           output:{original_operation_pending:pending===operation,...(error?.userAction
             ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
-            ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
+            ...(manualStep?{next_step:manualStep}:trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -2848,6 +2856,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // the same node failing again after a recovery (T3). Unconfirmed calls never qualify.
   const recoveryAdvice = operation => {
     const advice = dockRecoveryAdvice(operation);
+    const manualStep=addOnlyWindowStep(operation);
+    if(manualStep)return {...advice,next_steps:[manualStep,...advice.next_steps.filter(step=>step.tool!==manualStep.tool)]};
     const trigger = browserRecoveryTrigger(operation, advice);
     if (trigger) return { ...advice, browser_recovery: trigger.reason,
       next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] };
@@ -2895,7 +2905,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   function browserRecoveryTrigger(operation, advice) {
     const exported = exportRecoveryTrigger(operation);
     if (exported) return exported;
-    if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
+    if (!browserRecovery || !operation || addOnlyWindowStep(operation) || pending !== operation || operation.action.capability !== 'node.apply'
       || operation.transportUncertain || !earlyNodePhase(operation)&&typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
     // Export draft release must not hand an unsettled file-read lease to the
     // generic node route. Its settled download refusal has the separate T4 path.
@@ -2962,6 +2972,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
         catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
       }
+      if(addOnlyWindowStep(operation))return {stopped:false,reason:addOnlyWindowStep(operation).instruction};
       if(operation.targetPhase?.pending){
         // Target gestures use their own page ledger, not parent lastReceipt.
         // Read only that original effect; graph repair cannot settle its call.

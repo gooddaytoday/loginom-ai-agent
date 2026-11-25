@@ -209,8 +209,8 @@ test('add_only creates any admitted palette type through the graph without a con
  assert.deepEqual(f.calls,['create']);
 });
 
-test('add_only pending window can be inspected, abandoned and followed by a new action',async()=>{
- const f=fixture(),mutate=f.adapter.mutate;
+for(const browserRecovery of [false,true])test('add_only pending window tells the user to close it, browser recovery='+browserRecovery,async()=>{
+ const f=fixture({browserRecovery}),mutate=f.adapter.mutate;
  let windowOpen=true;
  f.adapter.mutate=async effect=>{
   await mutate(effect);
@@ -233,7 +233,14 @@ test('add_only pending window can be inspected, abandoned and followed by a new 
  assert.equal(job.outcome.cleanup_complete,false);
  assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|uncertain/);
  assert.deepEqual((await f.runtime.inspect({operationId:args.operation_id})).output.recovery_options,['abandon_operation']);
- assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'early'})).status,'AMBIGUOUS');
+ const early=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'early'});
+ assert.equal(early.status,'AMBIGUOUS');
+ assert.equal(early.output.next_step.tool,'dock_operation_inspect');
+ assert.match(early.output.next_step.instruction,/ask the user to close/i);
+ const waiting=await f.runtime.inspect({operationId:args.operation_id});
+ assert.equal(waiting.output.next_steps[0].tool,'dock_operation_inspect');
+ assert.ok(!waiting.output.next_steps.some(step=>step.tool==='dock_browser_recovery'));
+ if(browserRecovery)assert.throws(()=>f.runtime.browserRecoveryBasis(args.operation_id),/No browser recovery trigger/);
  windowOpen=false;
  f.graph.nodes[0].ref.node_id='replacement';
  assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'wrong-owner'})).status,'AMBIGUOUS');
@@ -1114,9 +1121,9 @@ test('terminal readback refusal releases the runtime gate and remains stable thr
 for(const variant of ['autolinks','late-foreign-link','unsettled'])test('add_only proves the quiet unconnected graph: '+variant,async()=>{
  const f=fixture(),mutate=f.adapter.mutate,observe=f.adapter.observe;
  const scoped=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
- const input={source:'source',output:0,target:'new',input:0};
- const output={source:'new',output:0,target:'sink',input:0};
- const variable={source:'source',output:0,target:'new',input:0,kind:'variables'};
+ const input={source:'source',output:0,target:'new',input:0,native_link_guid:'auto-input'};
+ const output={source:'new',output:0,target:'sink',input:0,native_link_guid:'auto-output'};
+ const variable={source:'source',output:0,target:'new',input:0,kind:'variables',native_link_guid:'auto-variable'};
  const old={source:'source',output:0,target:'sink',input:0};
  f.graph.nodes.push(...['source','sink'].map(name=>({ref:scoped(name),type:'transform.calculator',label:name,inputs:[0],outputs:[0]})));
  f.graph.links.push(old);
@@ -1128,7 +1135,7 @@ for(const variant of ['autolinks','late-foreign-link','unsettled'])test('add_onl
     f.graph.links.push(input,output);
     f.graph.variable_links.push(variable);
    }
-   return result;
+   return {...result,after:structuredClone(f.graph),drop_link_guids:[input,output,variable].map(link=>link.native_link_guid)};
   }
   const link=effect.parameters.edge,field=link.kind==='variables'?'variable_links':'links';
   f.graph[field]=f.graph[field].filter(e=>JSON.stringify(e)!==JSON.stringify(link));
@@ -1209,4 +1216,37 @@ test('add_only foreign native window blocks graph confirmation until dismissed',
  assert.equal(released.output.original_outcome.output.node.node_id,'new');
  assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
  assert.deepEqual(f.calls,['create']);
+});
+
+test('add_only releases rather than resuming when a user linked the node after closing the wizard',async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ f.graph.nodes.push({ref:source,type:'imports.text',label:'Source',inputs:[],outputs:[0],locked:false});
+ const receipt={status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true,add_only_window_node_id:'new'};
+ let closed=false;
+ f.adapter.mutate=async effect=>{
+  const result=await mutate(effect);
+  if(effect.kind!=='create')return result;
+  f.graph.nodes.at(-1).locked=false;
+  return receipt;
+ };
+ f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
+  document_id:'doc',workflow_ref:workflow});
+ f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:false,receipt});
+ f.adapter.verifyAddOnlyCleanup=async()=>closed;
+ const args={...request(),mode:'add_only'};
+ await f.runtime.startNodeApply(args);
+ assert.equal((await f.runtime.waitNodeApply(args.operation_id,{timeoutMs:1000})).outcome.status,'AMBIGUOUS');
+ const link={source:'source',output:0,target:'new',input:0,native_link_guid:'user-link'};
+ f.graph.links.push(link);
+ closed=true;
+ const inspected=await f.runtime.inspect({operationId:args.operation_id});
+ assert.equal(inspected.output.internal_resume_available,false);
+ await assert.rejects(f.runtime.runNodeApply(args,{resume:true}),/Resume requires/);
+ assert.deepEqual(f.calls,['create']);
+ assert.deepEqual(f.graph.links,[link]);
+ const released=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'keep-user-link'});
+ assert.equal(released.status,'SUCCEEDED',released.error?.message);
+ assert.equal(released.output.original_outcome.output.configuration.status,'unknown');
+ assert.deepEqual(f.graph.links,[link]);
 });

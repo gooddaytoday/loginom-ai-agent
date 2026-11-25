@@ -173,7 +173,7 @@ export function describeNodeTypes(types, pins = {}, actions = new Map(), candida
     const identity = { type, contract_revision: NODE_CONTRACT_REVISION, pins, candidate_handler_revision:candidate?.revision??null,
       ...(type==='programming.javascript'?{knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256}:{}) };
     return { ...card, ...(card.target_modes?.includes('new')!==false?{
-      add_only: 'Add unconnected.'
+      add_only: 'Bare. existing: explicit params.'
     }:{}), catalog_add_available: admitted, platform_availability: 'requires_live_preflight',
       full_node_apply_available: false, cache_key: createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
       candidate_node_apply_available:!!candidate,

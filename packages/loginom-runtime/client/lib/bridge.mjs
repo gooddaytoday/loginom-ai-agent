@@ -106,8 +106,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     throw Error('Invalid private browser recovery policy');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
-  const userWorkflows = createUserWorkflowBindings({defaultsDirectory:config.nodeDefaultsDirectory,
-    origin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined});
+  const userWorkflows = createUserWorkflowBindings();
   let userBundleDelivered = false;
   // Identity of a READY new draft whose user-v1 reply this bridge refused.
   let undeliveredDraft = null;
@@ -194,11 +193,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             &&preparation.state?.status==='READY'&&preparation.state.operation_id===operationId?preparation.state:null;
         },
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
-        artifactStore:session.artifactStore, allowCandidate: replay, onRecord:async event=>{
-          const saved=await recordExecution(event);
-          if(userProfile)userWorkflows.recordNodePhase(event);
-          return saved;
-        }, redactor,
+        artifactStore:session.artifactStore, allowCandidate: replay, onRecord:recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
@@ -445,7 +440,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 &&ownedUnsavedDraft.tab_tid===state.workflow_ref?.tab_tid&&ownedUnsavedDraft.account===state.loginom_account
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft.state=structuredClone(state);
-              if (userProfile && session.metadata.workspaceReady === true) await userWorkflows.rememberWorkspace(state);
+              if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
             if(localPackageUpload&&workspace.status!=='READY')throw Error('Local package opening was not verified: '+workspace.reason);
@@ -682,11 +677,6 @@ export async function createBridge(config, session, { browserTransport: managedB
             }
             if (userProfile && savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key))
               for (const continuation of saveContinuations) userWorkflows.remember(continuation);
-            if(userProfile&&savedOutcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)
-              &&savedOutcome.output?.save_completed===true&&savedOutcome.output.package_ref?.path){
-              try{await userWorkflows.rememberSavedDefaults(savedOutcome.output.package_ref.path);}
-              catch{session.metadata.localDiagnosticsIncomplete=true;}
-            }
             const reply = actionReply(userProfile?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
             }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });

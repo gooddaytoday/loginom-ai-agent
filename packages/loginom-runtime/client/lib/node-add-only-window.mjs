@@ -19,9 +19,11 @@ export function bindAddOnlyDrop({request,origin,build,effect,types}) {
   if(!Array.isArray(nodes)||nodes.length!==effect.before.nodes.length
     ||!nodes.every(n=>effect.before.nodes.some(known=>known.ref.node_id===n.FGuid)))
     throw Error('Native graph changed before add-only drop');
+  const links=model.FDiagram.FLinks?.FCollection;
   return {request,origin,build,app,preparation,receipt,card,controller,model,workflow,
     nodes:new Map(nodes.map(n=>[n.FGuid,n])),icon:types[effect.parameters.type].icon_class,
-    created:null,closing:new Set()};
+    linksBefore:new Set(Array.isArray(links)&&links.length<=400?links.map(link=>link.FGuid):[]),
+    created:null,createdLinkGuids:[],closing:new Set()};
 }
 
 // Serialized into the authenticated browser. Return an exact DOM element only
@@ -49,7 +51,14 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false,wizardClo
   if(added.length>1||b.created&&added[0]!==b.created)
     throw Error('Native add-only node ownership changed');
   if(!added[0]?.FGuid)return {};
-  const node=b.created=added[0],surface=controller.FController,tree=controller.Node?.data?.node;
+  const node=added[0],surface=controller.FController,tree=controller.Node?.data?.node;
+  if(!b.created){
+    b.created=node;
+    const links=model.FDiagram?.FLinks?.FCollection;
+    if(Array.isArray(links)&&links.length<=400)b.createdLinkGuids=links.filter(link=>
+      typeof link.FGuid==='string'&&link.FGuid&&!b.linksBefore.has(link.FGuid)
+      &&(link.FSourcePort?.parent===node||link.FTargetPort?.parent===node)).map(link=>link.FGuid);
+  }
   const wizardRoot=exact(prefix+';WizrdMCF').filter(visible);
   // The quiet graph proves the type by GUID and rendered icon. Only a window
   // gesture needs the node settings object, which can be absent on a bare node.

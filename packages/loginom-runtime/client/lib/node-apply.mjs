@@ -770,7 +770,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         &&proof.node?.workflow_id===request.workflow_ref.workflow_id&&id(proof.node.node_id)), 'Pre-target release proof differs');
     const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:proof.node,execution:state.execution,output:state.output,
-      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:proof.warnings??[],
+      package_saved:false,cleanup_complete:true,configuration:{status:request.mode===NODE_ADD_ONLY_MODE&&proof.node?'unknown':'not_requested'},warnings:proof.warnings??[],
       checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
       error:{code:'NODE_OPERATION_RELEASED',message:'Early node phase released after confirmed browser completion and a quiet original graph; the stopped phase was not repeated.'},
       next_step:request.mode===NODE_READ_MODE?{tool:'dock_node_read',original_operation_id:operation.id,

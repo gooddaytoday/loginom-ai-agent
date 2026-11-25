@@ -15,7 +15,7 @@ export async function readGraph(page, task) {
   const finishes=[...(page[Symbol.for('loginom-dock.operation-receipts.v1')]?.values()??[])]
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
-  return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector, finishes }) => {
+  return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector, track_link_guids=false, finishes }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -190,9 +190,19 @@ export async function readGraph(page, task) {
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
     const links=[],variable_links=[],foreign_links=[],rest_connection_links=[];
+    const linkGuids=new Map();
+    const nativeLinks=diagram.FLinks?.FCollection;
+    if(track_link_guids&&Array.isArray(nativeLinks)&&nativeLinks.length<=400){
+      for(const link of nativeLinks){
+        const shape=link.FCell&&graph.view.getState(link.FCell)?.shape?.node;
+        if(!shape||typeof link.FGuid!=='string'||!link.FGuid)continue;
+        linkGuids.set(shape,linkGuids.has(shape)?null:link.FGuid);
+      }
+    }
     for(const e of containers[0].querySelectorAll('[data-tid]')) {
       const tid=e.getAttribute('data-tid'), parts=tid.split(';Graph;'); if(parts.length!==2)continue;
       const body=parts[1];if(!/^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body))continue;
+      const nativeIdentity=linkGuids.get(e)?{native_link_guid:linkGuids.get(e)}:{};
       const endpoints=body.split('|');
       const prefix=parts[0]+';Graph;',s=byTid.get(prefix+endpoints[0]+';'+endpoints[1]),t=byTid.get(prefix+endpoints[2]+';'+endpoints[3]);
       const vs=variableByTid.get(prefix+endpoints[0]+';'+endpoints[1]),vt=variableByTid.get(prefix+endpoints[2]+';'+endpoints[3]);
@@ -202,8 +212,8 @@ export async function readGraph(page, task) {
           &&vt.port.FCell.edges?.includes(edge)&&graph.view.getState(edge)?.shape?.node===e);
         if(edges?.length!==1)fail('Variable link native reciprocity changed');
         variable_links.push({source:vs.node,output:vs.descriptor.port,target:vt.node,input:vt.descriptor.port,kind:vt.kind,
-          source_port_guid:vs.port.FGuid,target_port_guid:vt.port.FGuid});
-      }else if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index});}else {
+          source_port_guid:vs.port.FGuid,target_port_guid:vt.port.FGuid,...nativeIdentity});
+      }else if(s&&t){if(s.kind!==t.kind)fail('Incompatible tree/table link');links.push({source:s.node,output:s.index,target:t.node,input:t.index,...nativeIdentity});}else {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
@@ -211,7 +221,7 @@ export async function readGraph(page, task) {
             || source?.node.FIconCls==='bg-vendor-icon-sqliteunidacdbconnection' && target?.node.FIconCls==='bg-vendor-icon-dbimport')
           && source.port.FCell.edges?.filter(edge=>edge.source===source.port.FCell && edge.target===target.port.FCell
             && graph.view.getState(edge)?.shape?.node===e).length===1)
-          rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0'});
+          rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0',...nativeIdentity});
       }
     }
     links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));foreign_links.sort();
@@ -529,6 +539,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const yes=find('msgbox;tlb;yes');
       await wait('single_link_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
+      if(p.edge.native_link_guid){
+        const exactSelected=await page.evaluate(({tid,guid})=>{
+          const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
+          const cells=d.FmxGraph.getSelectionCells();
+          return cells.length===1&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid
+            &&d.FLinks.FCollection.some(link=>link.FGuid===guid&&link.FCell===cells[0]);
+        },{tid:linkTid,guid:p.edge.native_link_guid});
+        if(!exactSelected||JSON.stringify(await nativeLinks())!==JSON.stringify(linkIdentities))
+          throw Error('Owned link identity changed before native confirmation');
+      }
       await yes.click({timeout:remaining()});transient=false;
     }else if(kind==='delete_node'){
       // Reuse the exact node selection, or select it by an owned body pixel
@@ -652,7 +672,12 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       after=await read(page,task);
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
-    outcome={status:'SUCCEEDED',effect_possible:true,after};
+    let dropLinkGuids;
+    if(addOnly){
+      const handle=await dropBinding.getProperty('createdLinkGuids');
+      try{dropLinkGuids=await handle.jsonValue();}finally{await handle.dispose();}
+    }
+    outcome={status:'SUCCEEDED',effect_possible:true,after,...(addOnly?{drop_link_guids:dropLinkGuids}:{})};
   }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(dropBinding)await dropBinding.dispose().catch(()=>{});
@@ -874,7 +899,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
   const graphBlockers='[role="dialog"],.bg-mask-message,.x-mask-msg';
   const nativeWindowBlockers='[role="dialog"],.x-window,[role="alertdialog"],[aria-modal="true"],[data-tid$=";WizrdMCF"]';
   const task = extra => ({request,types:NODE_TYPES,origin,build,
-    ...(requireNoNativeWindow?{window_blocker_selector:nativeWindowBlockers}:{}),...extra});
+    ...(requireNoNativeWindow?{window_blocker_selector:nativeWindowBlockers,track_link_guids:true}:{}),...extra});
   const readCode = t => `async page => (${readGraph.toString()})(page,${JSON.stringify(t)})`;
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
