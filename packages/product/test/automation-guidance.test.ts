@@ -11,13 +11,20 @@ test("stepwise edits use the current graph and verify only the requested step", 
   expect(step).toContain("Соседние узлы не меняй")
   expect(step).toContain("Подпись узла меняй только по просьбе")
   expect(step).toContain("Имя файла не задаёт подпись импорта")
-  expect(step).toContain("одной строкой спроси")
+  expect(step).toContain("Неоднозначную ссылку уточни одной строкой")
   expect(step).toContain('finish:"execute"')
   expect(step).toContain("сводки порта")
-  expect(step).toContain("Полную таблицу читай только по просьбе")
-  expect(step).toContain("сколько строк")
+  expect(step).toContain("числе строк")
   expect(step).toContain("пропусти запуск")
   expect(step).toContain("что мешает запуску")
+})
+
+test("stepwise verification and data processing stay in Loginom", () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  expect(step).toContain("Данные пользователя считай, проверяй и преобразуй только в Loginom")
+  expect(step).toContain("Без bash, Python и awk")
+  expect(step).toContain("Если Loginom не открывает файл, сообщи причину и предложи пересохранить его")
+  expect(step).toContain("Сам файл не исправляй")
 })
 
 test("a step self-check requests only the port row count, even for a small input", async () => {
