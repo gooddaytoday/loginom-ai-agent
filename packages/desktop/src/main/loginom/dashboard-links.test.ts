@@ -10,9 +10,9 @@ const servers: ReturnType<typeof Bun.serve>[] = []
 
 afterEach(() => servers.splice(0).forEach((server) => server.stop(true)))
 
-/** A service that answers its `n`-th request, counting from 0, with `answer(n)`, and logs the requests. */
+/** A service that answers its `n`-th request, counting from 0, with `answer(n)`, and logs every request. */
 function service(answer: (n: number) => Response) {
-  const requests: { path: string; search: string; authorization: string | null; body: unknown }[] = []
+  const requests: { method: string; path: string; search: string; authorization: string | null; body: unknown }[] = []
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -21,10 +21,11 @@ function service(answer: (n: number) => Response) {
       const url = new URL(request.url)
 
       requests.push({
+        method: request.method,
         path: url.pathname,
         search: url.search,
         authorization: request.headers.get("authorization"),
-        body: await request.json(),
+        body: request.method === "POST" ? await request.json() : undefined,
       })
 
       return answer(requests.length - 1)
@@ -183,6 +184,7 @@ describe("dashboard links (B4.15)", () => {
 
     expect(target.requests).toEqual(
       [first, first, first, second].map((id) => ({
+        method: "POST",
         path: "/api/rpc/loginom.dashboard/prepare",
         search: "",
         authorization: `Basic ${Buffer.from("loginom-ai-agent:secret").toString("base64")}`,

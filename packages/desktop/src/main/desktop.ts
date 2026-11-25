@@ -20,7 +20,8 @@ const runIpc = Effect.fn("Desktop.runIpc")(function* () {
   const plugins = yield* Plugins.Service
   const background = yield* BackgroundService.Service
   // Loginom AI Agent (B4.15): dashboard links received so far, and later ones, are prepared once the service is ready.
-  lifecycle.dashboards.connect(() => Effect.runPromise(background.connection))
+  const runPromise = Effect.runPromiseWith(yield* Effect.context())
+  lifecycle.dashboards.connect(() => runPromise(background.connection))
   marks.layers = Date.now()
   yield* Effect.logInfo("layers ready", { marks })
   const ipc = yield* Ipc.registerIpcHandlers
