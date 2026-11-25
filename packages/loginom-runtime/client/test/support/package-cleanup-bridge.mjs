@@ -9,6 +9,7 @@ import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
@@ -149,7 +150,9 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       }})});
     return f.runtime;
   }
-  return {tools:executor.executorTools,describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+  return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
+    serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
+    describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
       return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
@@ -514,6 +517,37 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.save_operation_id,saved.operation_id);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+test('storage return refusal is only an extra MCP text block',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'storage-return-bridge-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'storage-return',events:[],catalog,storageReturn:'refused'};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+  const client=new AgentClient({name:'test',version:'1'});
+  const [a,b]=InMemoryTransport.createLinkedPair();
+  try{
+    await bridge.server.connect(b);await client.connect(a);
+    assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+    for(const [name,action_key,output,args] of [
+      ['dock_storage_source','storage.source',{source:{server_source_ref:'file-ref'}},{path:'/test-2/full.csv'}],
+      ['dock_storage_list','storage.list',{entries:[{server_source_ref:'file-ref'}]},{path:'/test-2'}],
+      ['dock_storage_download_wait','storage.download',{path:'/cache/full.csv'},{timeout_ms:1000}],
+    ]){
+      f.storageReceipt={result_version:'user-v1',operation_id:'storage',status:'SUCCEEDED',action_key,
+        effect_possible:false,cleanup_complete:true,output};
+      const reply=await client.callTool({name,arguments:{operation_id:'storage',...args}});
+      assert.deepEqual(reply.structuredContent,f.storageReceipt);
+      assert.deepEqual(reply.content,[{type:'text',text:JSON.stringify(f.storageReceipt)},
+        {type:'text',text:'The original workflow tab was not restored, so call dock_prepare(intent="existing_workflow") before Save.'}]);
+    }
+  }finally{await client.close();await bridge.close();}
+});
 
 const cases=['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'];
 const productCases=['product-success','product-unsettled','product-gate-unsettled','product-native-blocked','product-evidence-directory','product-journal-directory','product-no-save','product-multiple-paths','product-busy','product-native-error','product-native-malformed'];
