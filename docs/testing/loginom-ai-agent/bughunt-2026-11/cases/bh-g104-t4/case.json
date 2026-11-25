@@ -1,0 +1,16 @@
+{
+  "base": "bh-g104-t3",
+  "input_files": [],
+  "budget": {
+    "max_errors": 0,
+    "max_nodes": 0,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "pandas",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  }
+}

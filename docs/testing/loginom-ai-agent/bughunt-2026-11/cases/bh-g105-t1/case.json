@@ -1,0 +1,16 @@
+{
+  "input_files": [
+    "events.csv"
+  ],
+  "budget": {
+    "max_errors": 0,
+    "max_nodes": 1,
+    "forbid": [
+      "sqlite3",
+      "openpyxl",
+      "python3 -",
+      "curl ",
+      "wget "
+    ]
+  }
+}
