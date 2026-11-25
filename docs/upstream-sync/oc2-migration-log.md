@@ -24641,3 +24641,29 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
 - Собранный `loginom-ai-agent-cli` — вход тот же (`loginom-cli.ts`). Windows (`CONIN$`, Ctrl+C через `process.emit`) и
   macOS — только Linux (pty и процессные тесты — только Linux, как в 0.4).
 - Двойная обработка вопроса (выше, «Найдено») — по коду.
+
+## Чистая установка: зависимости
+
+База: `oc2-migration` (тесты — на `5d0e3f83c1`, ветка `byaml-clean-install` затем приведена к `950e5da9ce`; между ними только CI и `scripts/node-acceptance`, зависимостей не менялось). Дерево `.claude/worktrees/byaml`, Bun 1.4.4, Node 24.19.0, `HOME=/root`, root.
+
+**Находка не воспроизводится на `oc2-migration`.** Раздела «B4.16 Сторож службы» в этом журнале нет: B4.16 лежит на ветке `b416-service-watchdog` (`ac4b67a97e`), в `oc2-migration` не влита. На `oc2-migration` `credential-migration.ts` не импортирует `yaml`, а `yaml` импортируют только `loginom-host/src/bundled-skills.ts` (объявлен: `"yaml": "2.9.1"`) и `loginom-runtime/client/lib/bundled-skill-manifest.mjs` (объявлен в `client/package.json`: `2.9.1`). Версия в `bun.lock` — `yaml@2.9.1`. Выбор: меньший вариант — зависимости не менять, `bun.lock` не трогать. Если падение есть на `b416-service-watchdog`, чинить там, где появился импорт.
+
+**Чистая установка.** `bun install --frozen-lockfile` (1607 пакетов, `.husky/_` есть), `npm ci` в `packages/loginom-runtime/client` и `packages/dashboard/template` — без ошибок.
+
+| Пакет | Результат |
+|---|---|
+| `desktop` | 626 тестов, 0 fail, 4 skip |
+| `loginom-host` | 563 теста, 2 fail, 13 skip |
+| `loginom-agent` | 125 pass, 0 fail |
+| `server` | 318 тестов, 1 fail, 3 skip |
+| `cli` | 622 теста, 0 fail, 9 skip |
+| `product` | ровно три известных: `workspace packages`, `CI triggers`, `path literals` |
+| `dashboard` | падают 2 теста `a partial source copy is retried completely` (new project, known project) |
+
+Падений «не найден модуль» и «не объявлена зависимость» нет (`Cannot find`/`Could not resolve` в логах — 0). Статический обход импортов `src`, `test`, `script` восьми пакетов дал только тестовые и запускаемые отдельно: `@modelcontextprotocol/sdk` и `playwright-core` в `desktop/test/loginom` (приёмочные стенды, не в `bun test`), `@opencode/util` в `service-identity.test.ts` (тест проходит, разрешается через workspace). Не объявлял: не падают.
+
+**Падения не про зависимости (не чинились).**
+- права root: `dashboard` — ожидаемый `EACCES` не наступает (root читает всё); `loginom-host` `archive verification preserves manifest modes under a private umask` — `Expected promise that rejects`, тот же признак;
+- `loginom-host` `actual managed entry reads live bridge work…` (`managed-work-entry.test.ts:239`, «Expected refusal») — причина не разбиралась, возможно тоже права root;
+- таймаут под нагрузкой: `server` `skill.test.ts` `lists configured skills` (5000 мс, три набора шли параллельно).
+Новых падений относительно базы нет: код не менялся, база — это и есть этот прогон.
