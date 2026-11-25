@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rename, rm, stat, symlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Flock } from "../../core/src/util/flock"
@@ -10,7 +10,7 @@ const lock = <T>(name: string, control: string, run: () => Promise<T>) =>
   Flock.withLock("skill-install:" + name, run, { dir: control })
 
 test("publication copies the prepared tree and survives moving the original", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-install-"))
+  const root = await mkdtemp(join(await realpath(tmpdir()), "loginom-install-"))
   try {
     const source = join(root, "columns")
     const home = join(root, "home")
@@ -81,7 +81,7 @@ test("local preparation blocks a second skill and linked files outside the sourc
 })
 
 test.skipIf(process.platform === "win32")("an unreadable installed directory is authorized before its entries are resolved", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-install-root-access-"))
+  const root = await mkdtemp(join(await realpath(tmpdir()), "loginom-install-root-access-"))
   try {
     const source = join(root, "columns")
     const home = join(root, "home")

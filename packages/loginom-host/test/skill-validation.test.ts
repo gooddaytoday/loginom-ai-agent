@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readdir, rm, symlink } from "node:fs/promises"
+import { mkdtemp, readdir, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { readSkillDocument, validateSkillFolder } from "../src/bundled-skills"
@@ -140,7 +140,7 @@ test("rejects reserved names while returning the original Markdown body for disc
 })
 
 test("reports the exact unreadable resource when it disappears during read approval", async () => {
-  const root = await mkdtemp(join(tmpdir(), "loginom-skill-unreadable-"))
+  const root = await mkdtemp(join(await realpath(tmpdir()), "loginom-skill-unreadable-"))
   try {
     const folder = join(root, "columns")
     expect((await validateSkillFolder(folder)).errors).toMatchObject([
