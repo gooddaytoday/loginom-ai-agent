@@ -100,19 +100,26 @@ export async function runNonInteractivePrompt(input: Input) {
   }
 
   const replyPermission = async (request: PermissionRequest) => {
-    if (!input.auto) product?.reject()
-    if (!input.auto)
+    // Loginom AI Agent (B2.9j): a dashboard's deletion is asked in the controlling terminal, `--auto` or not, and the
+    // product CLI declines a publication without `--auto` with 0.4's text (`product.ts`). The user's own decline sends no
+    // feedback, so the deletion reports the removals confirmed so far; a run cancelled at the question does not answer.
+    const asked = request.action === "dashboard_delete"
+    const approved = asked ? await RunProduct.confirm(request, input.signal) : input.auto
+    if (approved === undefined) return
+    if (!approved) product?.reject()
+    if (!approved && !asked)
       UI.println(
         UI.Style.TEXT_WARNING_BOLD + "!",
         UI.Style.TEXT_NORMAL +
-          `permission requested: ${request.action} (${request.resources.join(", ")}); auto-rejecting`,
+          ((product && RunProduct.refusal(request)) ??
+            `permission requested: ${request.action} (${request.resources.join(", ")}); auto-rejecting`),
       )
     await input.client.permission
       .reply({
         sessionID: request.sessionID,
         requestID: request.id,
-        decision: input.auto ? "once" : "reject",
-        ...(input.auto ? {} : { message: PERMISSION_REJECTED_FEEDBACK }),
+        decision: approved ? "once" : "reject",
+        ...(approved || asked ? {} : { message: PERMISSION_REJECTED_FEEDBACK }),
       })
       .catch(() => {})
   }

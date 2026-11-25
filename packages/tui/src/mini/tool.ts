@@ -1193,6 +1193,9 @@ export function toolStructuredFinal(commit: StreamCommit): boolean {
 
 export function toolInlineInfo(part: SessionMessageAssistantTool, directory?: string): ToolInline {
   const ctx = frame(part, directory)
+  // Loginom AI Agent (B2.9j): the result of a dashboard's deletion is shown whole, as a block, as in 0.4.
+  if (ctx.name === "dashboard_delete" && ctx.status === "completed")
+    return { ...fallbackInline(ctx), mode: "block", body: ctx.output }
   const draw = rule(ctx.name)?.run
   try {
     if (draw) {

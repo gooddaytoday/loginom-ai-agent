@@ -6,9 +6,18 @@
 // correct, 2 for a missing Loginom connection, 4 for a Loginom operation left to recovery, 130 for a cancelled run.
 export * as RunProduct from "./product"
 
+import { randomBytes } from "node:crypto"
+import { EOL } from "node:os"
 import path from "node:path"
+import { createInterface } from "node:readline"
 import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
-import { isRpcError, type JsonValue, type LocationRef, type OpenCodeClient } from "@opencode/client/promise"
+import {
+  isRpcError,
+  type JsonValue,
+  type LocationRef,
+  type OpenCodeClient,
+  type PermissionRequest,
+} from "@opencode/client/promise"
 import { Option, Schema } from "effect"
 
 type RunError = { type: string; message: string; status?: number }
@@ -125,6 +134,94 @@ export async function dashboard(input: {
         "\n",
     )
   return { directory: reply.directory, prompt: dashboardPrompt(reply.action) }
+}
+
+/** Whether this is `run --dashboard <id>`, whose `--file` is read in the dashboard's folder once it is prepared (B2.9j). */
+export function dashboarding() {
+  return enabled() && process.env.LOGINOM_AI_AGENT_RUN_DASHBOARD !== undefined
+}
+
+/** 0.4's text for a publication `run` declines without `--auto` (B2.9j); other requests keep OpenCode 2's. */
+export function refusal(request: Pick<PermissionRequest, "action" | "resources">) {
+  if (request.action !== "dashboard_publish") return undefined
+  return (
+    `Публикация отклонена: dashboard_publish (${request.resources.join(", ")}) требует явного согласия. ` +
+    "Для подтверждения в CLI укажите --auto."
+  )
+}
+
+/**
+ * Asks about a dashboard's deletion as 0.4's `run` did (B2.9j; `v0.4.0:packages/opencode/src/cli/cmd/run.ts`,
+ * `run/runtime.stdin.ts`): every time, `--auto` or not (В-102), in the controlling terminal even when stdin is a pipe.
+ * The user types a random phrase, so neither input typed ahead nor an earlier phrase approves it; «Отмена» or any other
+ * line, end of input or no terminal declines it. Ctrl+C cancels the run, and a cancelled run gives no answer
+ * (`undefined`): its cancellation stops the call, which withdraws the question, so the model is not asked again.
+ */
+export async function confirm(request: Pick<PermissionRequest, "resources" | "metadata">, signal: AbortSignal) {
+  if (signal.aborted) return undefined
+  const { resolveInteractiveStdin } = await import("../mini-host")
+  const terminal = await Promise.try(resolveInteractiveStdin).catch(() => undefined)
+  if (!terminal) {
+    process.stderr.write("Удаление отклонено: требуется управляющий терминал.\n")
+    return false
+  }
+  const phrase = "Удалить " + randomBytes(4).toString("hex")
+  const answer = Promise.withResolvers<boolean | undefined>()
+  const decline = () => answer.resolve(false)
+  const cancel = () => answer.resolve(undefined)
+  // Raw input turns Ctrl+C into a key; the process's SIGINT handlers then cancel the run, as without the question.
+  const interrupt = () => {
+    cancel()
+    process.emit("SIGINT")
+  }
+  // End of input can emit readline's buffered text as a line without an Enter.
+  const eof = (chunk: Buffer | string) => {
+    if (chunk.toString().includes("\x04")) decline()
+  }
+  const reader = createInterface({
+    input: terminal.stdin,
+    output: process.stderr.isTTY ? process.stderr : undefined,
+    terminal: true,
+  })
+  terminal.stdin.prependListener("end", decline)
+  terminal.stdin.prependListener("data", eof)
+  process.stderr.write(
+    [...deletion(request), `Введите «${phrase}» для подтверждения или «Отмена» для отказа.`, ""].join(EOL),
+  )
+  try {
+    reader.once("line", (line) => answer.resolve(line === phrase))
+    reader.once("close", decline).once("error", decline).once("SIGINT", interrupt)
+    signal.addEventListener("abort", cancel, { once: true })
+    if (signal.aborted) return undefined
+    if (terminal.stdin.readableEnded || terminal.stdin.destroyed) return false
+    const approved = await answer.promise
+    return signal.aborted ? undefined : approved
+  } finally {
+    signal.removeEventListener("abort", cancel)
+    reader.close()
+    terminal.stdin.off("end", decline).off("data", eof)
+    terminal.cleanup()
+  }
+}
+
+// What a deletion removes, as 0.4 showed it; names from the dashboard's snapshot are quoted with control characters escaped.
+function deletion(request: Pick<PermissionRequest, "resources" | "metadata">) {
+  const literal = (value: string | undefined) =>
+    JSON.stringify(value ?? "").replace(
+      /[\p{Cc}\p{Cf}\u2028\u2029]/gu,
+      (char) => `\\u{${char.codePointAt(0)!.toString(16)}}`,
+    )
+  const count = request.metadata?.publicationCount
+  const confirmed = request.metadata?.confirmedRemoved
+  return [
+    `Узел: ${literal(request.resources[0])}`,
+    `Пакет: ${literal(request.resources[1])}`,
+    ...(Number.isSafeInteger(count) ? [`Опубликованных версий к удалению: ${count}`] : []),
+    ...(typeof confirmed === "number" && Number.isSafeInteger(confirmed) && confirmed > 0
+      ? [`Уже подтверждено удаление версий: ${confirmed}`]
+      : []),
+    "Локальный черновик и неопубликованные правки будут удалены.",
+  ]
 }
 
 const exits: Record<string, number> = { LOGINOM_CONFIG_REQUIRED: 2, LOGINOM_RECOVERY_REQUIRED: 4, CLI_CANCELLED: 130 }

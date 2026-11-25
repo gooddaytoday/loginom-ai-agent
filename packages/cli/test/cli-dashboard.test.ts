@@ -1,9 +1,9 @@
-// Loginom AI Agent (B2.9i): `run --dashboard <id>` of the product CLI, the cases of 0.4
-// `test/cli/standalone-dashboard.test.ts` (`v0.4.0:packages/opencode`, decision В-99) without its confirmations of
-// publication and deletion (B2.9j). 0.4 prepared the dashboard's folder with the Host of its own process; on OpenCode 2
-// the run asks the server's product plugin (`loginom.dashboard`, B2.9h) before its session and runs in that folder. Each
-// run is the product CLI entry from source in a profile of its own, with a scripted model, a Host entry of the test's
-// own (Node from `LOGINOM_AI_AGENT_TEST_NODE`) and a Studio on 127.0.0.1 that gives each snapshot once.
+// Loginom AI Agent (B2.9i, B2.9j): `run --dashboard <id>` of the product CLI, the cases of 0.4
+// `test/cli/standalone-dashboard.test.ts` (`v0.4.0:packages/opencode`, decision В-99) with its confirmations of
+// publication and deletion. 0.4 prepared the dashboard's folder with the Host of its own process; on OpenCode 2 the run
+// asks the server's product plugin (`loginom.dashboard`, B2.9h) before its session and runs in that folder. Each run is
+// the product CLI entry from source in a profile of its own, with a scripted model, a Host entry of the test's own (Node
+// from `LOGINOM_AI_AGENT_TEST_NODE`) and a Studio on 127.0.0.1 that gives each snapshot once.
 import { describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
@@ -48,7 +48,19 @@ describe("run --dashboard arguments", () => {
     const env: NodeJS.ProcessEnv = {}
     const refused = (args: string[]) =>
       expect(() => Standalone.forward(args, "/w", env)).toThrow("CLI_ARGUMENT_INVALID: run --dashboard")
-    for (const flag of ["--dir", "--attach", "--continue", "-c", "--session", "-s", "--fork", "--command"]) {
+    // `--worktree` (B2.9j) would move the session out of the dashboard's folder; 0.4's `run` had no such flag.
+    for (const flag of [
+      "--dir",
+      "--attach",
+      "--continue",
+      "-c",
+      "--session",
+      "-s",
+      "--fork",
+      "--command",
+      "--worktree",
+      "-w",
+    ]) {
       refused(["run", "--dashboard", id, flag])
       refused(["run", flag + "=value", "--dashboard=" + id])
     }
@@ -94,8 +106,18 @@ describe.skipIf(process.platform !== "linux")("run --dashboard with the server's
 
     const args = ["--headless", "--format", "json", "--model", "test/test-model", "--"]
     const snapshot = fixture.studio.publish(binding, false)
+    // A new worktree is refused before the preparation (B2.9j): Studio is not asked, so the snapshot is not spent.
+    for (const worktree of ["--worktree", "-w"]) {
+      const refused = await fixture.run(["--dashboard", snapshot.id, worktree, ...args, "Покажи суммы."])
+      expect({ code: refused.code, stdout: refused.stdout }).toEqual({ code: 2, stdout: "" })
+      expect(refused.stderr).toStartWith("CLI_ARGUMENT_INVALID: run --dashboard")
+    }
+    expect(fixture.studio.seen).toEqual([])
+    // `--file` is read in the dashboard's folder once it is prepared, as 0.4 did (B2.9j), not in PWD.
+    await fs.mkdir(path.join(fixture.project, "src"))
+    await fs.writeFile(path.join(fixture.project, "src/main.tsx"), "export const decoy = 'PWD'\n")
     const asked = (await fixture.host()).length
-    const created = await fixture.run(["--dashboard", snapshot.id, ...args, "Покажи суммы."])
+    const created = await fixture.run(["--dashboard", snapshot.id, "--file", "src/main.tsx", ...args, "Покажи суммы."])
     expect({ code: created.code, stderr: created.stderr }).toEqual({ code: 0, stderr: "" })
     expect(created.events.find((event) => event.type === "text")?.part.text).toBe("Создаю dashboard.")
     // The server's Host was asked as 0.4's CLI asked its own: the status, readiness, then the latest publication with the
@@ -118,6 +140,11 @@ describe.skipIf(process.platform !== "linux")("run --dashboard with the server's
     const first = fixture.llm.requests[0]
     expect(JSON.stringify(first?.messages)).toContain("Working directory: " + work)
     expect(JSON.stringify(first?.messages)).toContain("Покажи суммы.\\n\\n" + dashboardPrompt("create"))
+    expect(JSON.stringify(first?.messages)).toContain("Attached file: main.tsx")
+    expect(JSON.stringify(first?.messages)).toContain(
+      JSON.stringify(await fs.readFile(path.join(work, "src/main.tsx"), "utf8")).slice(1, -1),
+    )
+    expect(JSON.stringify(first?.messages)).not.toContain("decoy")
     // The dashboard's profile: its files and its tools, no shell, subagent, Loginom or MCP.
     const tools = (first?.tools as { function: { name: string } }[]).map((tool) => tool.function.name)
     expect(tools).toContain("dashboard_draft")
@@ -220,6 +247,210 @@ describe.skipIf(process.platform !== "linux")("run --dashboard with the server's
     expect(fixture.llm.hits.count).toBe(0)
     expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
   }, 120_000)
+
+  // 0.4 «standalone dashboard starts from the snapshot and preserves explicit publication approval», its publication
+  // (B2.9j): without `--auto` the run declines the question with 0.4's text and nothing is written; with `--auto` the
+  // Host gets one publication. With «Разрешено» a publication asks nothing, so the run writes it without `--auto` (В-102).
+  test("standalone dashboard preserves explicit publication approval", async () => {
+    const steps: Step[] = []
+    await using fixture = await dashboardFixture(steps)
+    for (const mode of ["ask", "auto", "allowed"]) {
+      if (mode === "allowed")
+        await productProfile(fixture.profile, fixture.llm.url, {
+          permissions: [{ action: "dashboard_publish", resource: "*", effect: "allow" }],
+        })
+      steps.push({ tools: [{ name: "dashboard_publish", input: {} }] }, { text: "Готово." })
+      const published = (await fixture.host()).filter((entry) => entry.method === "dashboardPublish").length
+      const result = await fixture.run([
+        "--dashboard",
+        fixture.studio.publish(binding, false).id,
+        "--headless",
+        ...(mode === "auto" ? ["--auto"] : []),
+        "--format",
+        "json",
+        "--model",
+        "test/test-model",
+        "--",
+        "Опубликуй.",
+      ])
+      const writes = (await fixture.host()).filter((entry) => entry.method === "dashboardPublish").length - published
+      expect({ mode, code: result.code, writes }).toEqual({
+        mode,
+        code: mode === "ask" ? 1 : 0,
+        writes: mode === "ask" ? 0 : 1,
+      })
+      expect(
+        result.events.find((event) => event.type === "tool_use" && event.part.tool === "dashboard_publish")?.part.state
+          .status,
+      ).toBe(mode === "ask" ? "error" : "completed")
+      if (mode !== "ask") continue
+      expect(result.events).toContainEqual(
+        expect.objectContaining({ type: "error", error: expect.objectContaining({ name: "CLI_PERMISSION_REJECTED" }) }),
+      )
+      expect(result.stderr).toContain(
+        "Публикация отклонена: dashboard_publish (Узел, /user/fixture/campaign.lgp) требует явного согласия. " +
+          "Для подтверждения в CLI укажите --auto.",
+      )
+    }
+    expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+  }, 300_000)
+
+  // 0.4 «ordinary dashboard run %s» (B2.9j): a deletion asks for a random phrase in the controlling terminal every time,
+  // with `--auto` too, and in the first group with «Разрешено» as well (В-102). On OpenCode 2 the run stays in PWD, so
+  // the folder it deletes is not its working directory (0.4 moved to the dashboards' root), and the model answers once
+  // more after the call, where 0.4 stopped: without tools after a deletion (B2.9g), with them after a refusal (B2.6b).
+  test.each([
+    [
+      "waits for a separate terminal choice before deleting",
+      [
+        ["pretyped", ""],
+        ["cancel", "--auto"],
+        ["eof", "--yolo"],
+        ["incomplete", "--dangerously-skip-permissions"],
+        ["interrupt", ""],
+        ["no-tty", "--auto"],
+        ["delete", ""],
+        ["stale", ""],
+        ["pipe-delete", ""],
+      ],
+    ],
+    [
+      "reports denied and partially completed deletion",
+      [
+        ["partial", ""],
+        ["denied", ""],
+      ],
+    ],
+  ] as const)(
+    "ordinary dashboard run %s",
+    async (description, cases) => {
+      const steps: Step[] = []
+      await using fixture = await dashboardFixture(steps)
+      if (description.startsWith("waits"))
+        await productProfile(fixture.profile, fixture.llm.url, {
+          permissions: [{ action: "dashboard_delete", resource: "*", effect: "allow" }],
+        })
+      const deleteBinding = { ...binding, packagePath: "/user/fixture/delete.lgp" }
+      const work = path.join(
+        fixture.profile,
+        "data/dashboards",
+        "delete-" + (await bindingKey(deleteBinding)).slice(0, 8),
+        "work",
+      )
+      const state = { deletions: 0, phrase: "" }
+      for (const [choice, auto] of cases) {
+        const success = choice === "delete" || choice === "pipe-delete"
+        const human = choice === "pipe-delete"
+        const mode = choice === "denied" ? "DASHBOARD_ACCESS_DENIED" : choice === "partial" ? "partial" : undefined
+        if (mode) await fs.writeFile(path.join(fixture.root, "delete"), mode)
+        steps.splice(
+          0,
+          steps.length,
+          { tools: [{ name: "dashboard_delete", input: {} }] },
+          ...(choice === "denied" ? [{ text: "Удалить дашборд не удалось." }] : []),
+        )
+        const requests = fixture.llm.requests.length
+        const command = fixture.command([
+          "--dashboard",
+          fixture.studio.publish(deleteBinding, false, "Узел\n\u001b[31m\u009b\u202e").id,
+          "--headless",
+          "--title=Удаление",
+          "--model",
+          "test/test-model",
+          ...(choice === "delete" ? ["--file", "src/main.tsx"] : []),
+          ...(human ? [] : ["--format", "json"]),
+          ...(auto ? [auto] : []),
+          "--",
+          "Удали дашборд.",
+        ])
+        const queued = choice === "pretyped" ? "Удалить" : choice === "stale" ? state.phrase : ""
+        const child = Bun.spawn(
+          [
+            "python3",
+            "-I",
+            path.join(import.meta.dir, "standalone-dashboard-pty.py"),
+            choice === "denied" ? "delete" : choice,
+            queued,
+            ...command.argv,
+          ],
+          { cwd: command.cwd, env: command.env, stdout: "pipe", stderr: "inherit" },
+        )
+        const [output, code] = await Promise.all([
+          new Response(child.stdout).json() as Promise<{
+            stdout: string
+            stderr: string
+            cwd: string | null
+            phrase: string | null
+            exit: number
+          }>,
+          child.exited,
+        ])
+        expect(code, choice).toBe(0)
+        expect(output.exit, JSON.stringify(output)).toBe(success ? 0 : choice === "interrupt" ? 130 : 1)
+        if (choice === "no-tty") {
+          expect(output.cwd).toBeNull()
+          expect(output.stderr).toContain("Удаление отклонено: требуется управляющий терминал.")
+        }
+        if (choice !== "no-tty") {
+          expect(output.cwd).toBe(fixture.project)
+          // Control and format characters of the snapshot's name are shown escaped.
+          expect(output.stderr).toContain('Узел: "Узел\\n\\u001b[31m\\u{9b}\\u{202e}"')
+          expect(output.stderr).toContain(`Пакет: "${deleteBinding.packagePath}"`)
+          expect(output.stderr).toContain("Опубликованных версий к удалению: 2")
+          expect(output.stderr).toContain("Локальный черновик и неопубликованные правки будут удалены.")
+        }
+        expect(output.stderr + output.stdout).not.toContain("ENOENT")
+        if (human) {
+          // The result as a block; the model's answer after it, without tools, is what the scripted model gives a title.
+          expect(output.stderr).toContain("Дашборд удалён. Опубликованных версий и локального черновика больше нет.")
+          expect(output.stdout).toBe("Fixture title\n")
+        }
+        if (!human) {
+          const events = output.stdout
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          const call = events.find((event) => event.type === "tool_use" && event.part.tool === "dashboard_delete")
+          if (choice === "denied") expect(call?.part.state.output).toContain("Недостаточно прав")
+          if (choice === "partial") {
+            expect(call?.part.state.status).toBe("error")
+            expect(call?.part.state.error).toContain("Подтверждено удаление версий: 1. Локальный черновик сохранён.")
+          }
+          if (success)
+            expect(call?.part.state).toMatchObject({
+              status: "completed",
+              output: expect.stringContaining("Дашборд удалён"),
+            })
+          if (!success)
+            expect(events).toContainEqual(
+              expect.objectContaining({
+                type: "error",
+                error: expect.objectContaining({
+                  name:
+                    choice === "denied"
+                      ? "CLI_TOOL_FAILED"
+                      : choice === "interrupt"
+                        ? "CLI_CANCELLED"
+                        : "CLI_PERMISSION_REJECTED",
+                }),
+              }),
+            )
+        }
+        if (choice === "stale") expect(output.phrase).not.toBe(state.phrase)
+        if (success) state.phrase = output.phrase ?? ""
+        if (choice === "partial") expect(output.stderr).toContain("Уже подтверждено удаление версий: 1")
+        expect(fixture.llm.requests.length - requests, choice).toBe(success || choice === "interrupt" ? 1 : 2)
+        if (success || mode) state.deletions++
+        expect((await fixture.host()).filter((entry) => entry.method === "dashboardDelete")).toHaveLength(
+          state.deletions,
+        )
+        expect(await Bun.file(path.join(work, "src/main.tsx")).exists(), choice).toBe(!success)
+        expect(await fs.readdir(fixture.profile)).not.toContain(".writer")
+        if (mode) await fs.rm(path.join(fixture.root, "delete"))
+      }
+    },
+    300_000,
+  )
 })
 
 const binding = {
@@ -227,11 +458,17 @@ const binding = {
   workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7",
   nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930",
 }
+const versions = [
+  { name: "20261119T120000Z.json", sourceHash: "a".repeat(64) },
+  { name: "20261119T130000Z.json", sourceHash: "b".repeat(64) },
+]
 
-// A profile whose model follows `steps`, the installation's dashboard template, and a Host entry that logs each request
+// A profile whose model follows `steps`, the installation's dashboard resources, and a Host entry that logs each request
 // and answers by the files of the case: `generation` (1 without it), `ready` (a code it refuses readiness with, or
 // `hold`), `read` (the latest publication as JSON, or a code it refuses to read it with; without it nothing is published)
-// and `recoveries` (the journal keeps one).
+// and `recoveries` (the journal keeps one). A dashboard's tools reach the publications on a run of their own (B2.9f,
+// B2.9g): two published versions; a publication is answered `changed`, as 0.4's test answered it, and a deletion by
+// `delete` (`partial` removes one version, a code fails it, without it all are gone).
 async function dashboardFixture(steps: Step[]) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "cli-dashboard-")))
   const project = path.join(root, "project")
@@ -245,8 +482,21 @@ async function dashboardFixture(steps: Step[]) {
   await fs.mkdir(path.join(resources, "bin"), { recursive: true })
   await fs.mkdir(path.join(resources, "host"))
   await fs.mkdir(path.join(resources, "dashboard"))
+  await fs.mkdir(path.join(resources, "runtime/client/node_modules"), { recursive: true })
   await fs.symlink(node(), path.join(resources, "bin", "node"))
   await fs.symlink(path.join(cli, "../dashboard/template"), path.join(resources, "dashboard", "template"), "dir")
+  // What a publication's build needs of the installation (`dashboard/agent/resources.ts`); the draft is not opened.
+  await fs.symlink(
+    path.join(cli, "../loginom-runtime/client/node_modules/playwright-core"),
+    path.join(resources, "runtime/client/node_modules/playwright-core"),
+    "dir",
+  )
+  for (const name of ["dashboard/draft.js", "dashboard/selfcheck.mjs", "chrome"])
+    await fs.writeFile(path.join(resources, name), "fixture")
+  await fs.writeFile(
+    path.join(resources, "resource-manifest.json"),
+    JSON.stringify({ node: "bin/node", browser: "chrome" }),
+  )
   await fs.writeFile(
     path.join(resources, "host", "node-host.mjs"),
     `import { appendFileSync, existsSync, readFileSync } from "node:fs";
@@ -271,10 +521,21 @@ async function dashboardFixture(steps: Step[]) {
         if (ready === "hold") return;
         return ready ? refuse(ready) : reply(status());
       }
-      if (m.method === "dashboard.read") {
+      if (m.method === "dashboard.read" || m.method === "dashboardRead") {
         const answer = read(${file("read")});
         if (!answer) return reply(null);
         return answer.startsWith("{") ? reply(JSON.parse(answer)) : refuse(answer);
+      }
+      if (m.method === "acquire") return reply({ generation: 1 });
+      if (m.method === "scope") return reply(m.input.scope);
+      if (m.method === "release" || m.method === "interrupt") return reply(true);
+      if (m.method === "dashboardPublish") return reply({ status: "changed", latest: null });
+      if (m.method === "dashboardVersions") return reply({ generation: 1, versions: ${JSON.stringify(versions)} });
+      if (m.method === "dashboardDelete") {
+        const mode = read(${file("delete")});
+        if (mode === "partial")
+          return reply({ status: "changed", confirmedRemoved: 1, remaining: m.input.expected.slice(1) });
+        return reply(mode ? { status: "failed", reason: mode, confirmedRemoved: 0 } : { status: "empty" });
       }
       refuse("LOGINOM_HOST_NOT_READY");
     });`,
@@ -282,20 +543,22 @@ async function dashboardFixture(steps: Step[]) {
   await productProfile(profile, llm.url)
   const env = isolatedEnv(root, { LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_RESOURCES: resources })
   // The product CLI entry from source; the run's directory is the project's, as a shell gives it in PWD.
-  const start = (args: string[], overrides: Record<string, string> = {}) =>
-    Bun.spawn([process.execPath, "src/loginom-cli.ts", "run", ...args], {
-      cwd: cli,
-      env: { ...env, LOGINOM_AI_AGENT_CLI_ROOT: undefined, PWD: project, ...overrides },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    })
+  const command = (args: string[], overrides: Record<string, string> = {}) => ({
+    argv: [process.execPath, "src/loginom-cli.ts", "run", ...args],
+    cwd: cli,
+    env: { ...env, LOGINOM_AI_AGENT_CLI_ROOT: undefined, PWD: project, ...overrides },
+  })
+  const start = (args: string[], overrides: Record<string, string> = {}) => {
+    const run = command(args, overrides)
+    return Bun.spawn(run.argv, { cwd: run.cwd, env: run.env, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+  }
   return {
     root,
     project,
     profile,
     studio,
     llm,
+    command,
     start,
     run: (args: string[], overrides: Record<string, string> = {}) => finished(start(args, overrides)),
     host: async () =>
@@ -336,12 +599,16 @@ function studioFixture() {
     seen,
     lookup,
     origin: server.url.origin,
-    publish(binding: { packagePath: string; workflowGuid: string; nodeGuid: string }, published: boolean) {
+    publish(
+      binding: { packagePath: string; workflowGuid: string; nodeGuid: string },
+      published: boolean,
+      nodeName = "Узел",
+    ) {
       const snapshot = {
         id: crypto.randomUUID(),
         created: "2026-11-24T00:00:00.000Z",
         binding,
-        nodeName: "Узел",
+        nodeName,
         sample: { schema: [{ name: "count", type: 1 }], rows: [[42]] },
         parameters: [],
         published,

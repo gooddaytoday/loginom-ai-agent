@@ -36,7 +36,8 @@ type FilePart = { text: string } | { attachment: { uri: string; name: string } }
 type Prepared = {
   directory: string
   message: string
-  files: FilePart[]
+  /** Read later, in the dashboard's folder, for `run --dashboard` (`execute`). */
+  files?: FilePart[]
 }
 
 class RunTargetError extends Error {
@@ -76,7 +77,10 @@ async function run(input: RunCommandInput, signal: AbortSignal) {
   if (signal.aborted) return
   const message = mergeInput(argument, piped)
   if (!message?.trim()) fail("You must provide a message")
-  const files = await Promise.all(input.file.map((file) => prepareFile(file, root)))
+  // Loginom AI Agent (B2.9j): `run --dashboard` reads `--file` in the dashboard's folder, as 0.4 did, once it is prepared.
+  const files = RunProduct.dashboarding()
+    ? undefined
+    : await Promise.all(input.file.map((file) => prepareFile(file, root)))
   return execute(input, { directory, message, files }, input.server.endpoint, signal)
 }
 
@@ -94,6 +98,7 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
     ? await RunProduct.dashboard({ client, location: { directory: prepared.directory }, format: input.format, signal })
     : { directory: prepared.directory, prompt: undefined }
   if (!dashboard) return
+  const files = prepared.files ?? (await Promise.all(input.file.map((file) => prepareFile(file, dashboard.directory))))
   const location = { directory: dashboard.directory }
   const worktree =
     input.worktree === undefined
@@ -143,9 +148,9 @@ async function execute(input: RunCommandInput, prepared: Prepared, endpoint: End
     message: [
       prepared.message,
       ...(dashboard.prompt ? [dashboard.prompt] : []),
-      ...prepared.files.flatMap((file) => ("text" in file ? [file.text] : [])),
+      ...files.flatMap((file) => ("text" in file ? [file.text] : [])),
     ].join("\n\n"),
-    files: prepared.files.flatMap((file) => ("attachment" in file ? [file.attachment] : [])),
+    files: files.flatMap((file) => ("attachment" in file ? [file.attachment] : [])),
     agent: target.agent,
     model: target.model,
     thinking: input.thinking ?? false,
