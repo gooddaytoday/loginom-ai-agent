@@ -1,0 +1,53 @@
+import { describe, expect, test } from "bun:test"
+import { resolve } from "node:path"
+import { trackedSnapshot } from "./tracked"
+
+// B5.1i: the Windows candidate builds on a runner nothing else exercises before CI. The order that Desktop requires
+// (the CLI in packages/cli/dist before the Desktop build, the unpacked app before the installer) is guarded here.
+const { read } = trackedSnapshot(resolve(import.meta.dir, "../../.."))
+const script = read("script/build-windows.ps1")
+const doc: any = (Bun as any).YAML.parse(read(".github/workflows/loginom-windows.yml"))
+
+describe("build-windows.ps1", () => {
+  test("names only packages and scripts of this repository", () => {
+    expect(script).not.toContain("package:win")
+    expect(script).not.toMatch(/--filter", "(opencode|@opencode-ai\/desktop)"/)
+    for (const filter of ["@opencode/desktop", "@opencode/cli", "@loginom-ai-agent/loginom-host"])
+      expect(script).toContain(`"--filter", "${filter}"`)
+  })
+
+  test("builds the Desktop CLI, then Desktop, then the installer around the unpacked app", () => {
+    const order = [
+      'LOGINOM_AI_AGENT_TARGET = "windows-x64-baseline"',
+      '"script/build.ts", "--skip-install"',
+      '-Arguments @("run", "build")',
+      '-Arguments @("run", "pack")',
+      "LOGINOM_AI_AGENT_DESKTOP_APP = $unpacked",
+      '"script/build-cli.ts"',
+    ].map((text) => script.indexOf(text))
+    expect(order.every((index) => index >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(script.lastIndexOf('-Arguments @("run", "pack")')).toBeGreaterThan(order[4]!)
+  })
+
+  test("both CLI builds embed the pty from loginom-pty.yml", () => {
+    expect(script).toContain("$env:LOGINOM_AI_AGENT_PTY_BIN = $pty")
+    const steps: any[] = doc.jobs["build-package-test"].steps
+    expect(doc.jobs["build-package-test"].needs).toBe("pty")
+    expect(doc.jobs.pty.uses).toBe("./.github/workflows/loginom-pty.yml")
+    const download = steps.findIndex((step) => step.with?.name === "loginom-ai-agent-pty-x86_64-pc-windows-msvc")
+    const build = steps.findIndex((step) => step.run?.includes("build-windows.ps1"))
+    expect(download).toBeGreaterThan(-1)
+    expect(build).toBeGreaterThan(download)
+    expect(steps[build].run).toContain("loginom-ai-agent-pty.exe")
+  })
+
+  test("can be dispatched and called, and uploads the candidates before the installed checks", () => {
+    expect(Object.keys(doc.on)).toEqual(expect.arrayContaining(["workflow_call", "workflow_dispatch"]))
+    const names: string[] = doc.jobs["build-package-test"].steps.map((step: any) => step.name ?? "")
+    expect(names.indexOf("Upload short-lived unsigned candidates")).toBeGreaterThan(-1)
+    expect(names.indexOf("Upload short-lived unsigned candidates")).toBeLessThan(
+      names.indexOf("Install, execute and remove the CLI ZIP candidate"),
+    )
+  })
+})
