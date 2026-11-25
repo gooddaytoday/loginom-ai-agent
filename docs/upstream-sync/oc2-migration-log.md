@@ -24729,3 +24729,65 @@ sdk-docs: … 11 guide blocks match their source; 0 problem(s)
   `desktop/src/main/proxy-env` 0.4, которого в v2 нет. Системный прокси службы — после шлюза B (В-97, п. 6).
   Шаги WinINET-прокси и проверка прокси службы убраны из задания `native` с комментарием, они вернутся вместе с
   прокси службы. Задание `timings` (только `workflow_dispatch`) не менялось.
+
+## B5.1m — тесты продукта на Linux
+
+25.11.2026. Ветка `b51m-product-checks` от `oc2-migration` (`b2ed31b6f6`), дерево `.claude/worktrees/b51m`. Строка B5.0:
+«Тесты продукта на Linux». Workflow не запускались (раннеров GitHub здесь нет), модель не вызывалась; Bun 1.4.4 первым в
+`PATH`, Node 24.19.0, `HOME` и `XDG_*` — во временный каталог.
+
+### Что изменено
+
+- `.github/workflows/test.yml` (имя `loginom-checks`), одно задание `unit` на `ubuntu-24.04`, 60 минут. Запуск: `push` в
+  `oc2-migration` и `loginom` (без фильтра путей), `pull_request` в `loginom`, `workflow_dispatch`. Шаги: `setup-bun`,
+  `setup-loginom-inputs` (закреплённый Node, Chromium), `npm ci` шаблона дашборда, `install-deps chromium`, `xvfb` и
+  `sysctl kernel.apparmor_restrict_unprivileged_userns=0`; затем `bun test` в `product`, `bun run test` в `loginom-agent`,
+  `loginom-host` (под `xvfb-run`), `dashboard`, `cli` (под `xvfb-run`), контракты адресов и ссылок узлов клиента (список
+  из `test.yml` 0.4) и полный набор `packages/loginom-runtime/test/*.test.mjs` с закреплённым Node в точности как в 0.4:
+  `timeout --kill-after=10s 5m nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2`.
+- `.github/workflows/check-test.yml`: оба вызова `bun turbo test` (affected и полный) получили `--filter='!…'` для пяти
+  пакетов `test.yml`; шаг `npm ci` шаблона дашборда оттуда убран (дашборд исключён). `turbo test --dry` — 43 пакета до, 38 после.
+- `packages/product/test/loginom-checks.test.ts` (4 теста): `test.yml` запускается на `push` в `oc2-migration`, состав
+  пакетов `test.yml` (по шагам `bun test` / `bun run test` в `packages/<имя>`) равен пяти ожидаемым, оба вызова `turbo test`
+  исключают ровно этот набор.
+- `packages/product/test/ci-workflows.test.ts`: `test` добавлен в список своих workflow.
+- `catalog.json` не менялся: `.github/**` уже в `CAT-02`; `catalog-check.py` код 0.
+
+### Выбор меньшего (записано)
+
+- **Имя файла.** Задание называет `loginom-checks.yml`, но `bridge.test.mjs` (без правки теста) читает бюджет набора из
+  `.github/workflows/test.yml` и ищет там `timeout --kill-after=… nice -n 19 … --test --test-timeout=…`. Файла `test.yml`
+  в форке не было, тест красный. Выбран один файл `test.yml` с именем `loginom-checks` (без второго «заглушечного» файла).
+  Переименование в `loginom-checks.yml` потребует правки `bridge.test.mjs` — решение владельца.
+- `evals` unit не включён: у `evals` свой `bun.lock` и отдельная установка, а в строке B5.0 это «при наличии»; задача B5.1m
+  на него не опирается.
+- Весь клиент `loginom-runtime/client` (594 файла) не дублируется: его гонит `loginom-client-full.yml`. В `test.yml` — как в 0.4:
+  набор `packages/loginom-runtime/test` и 12 контрактных файлов.
+- Проверки, которые 0.4 держал в этом же задании (`environment-proxy`, `no-proxy-contract`, `update-feed`, HttpApi) не переносились:
+  не в строке B5.1m.
+
+### Проверки (реальный вывод)
+
+- YAML: `python3 -c 'import yaml'` разобрал оба workflow; `Bun.YAML.parse` — в тесте.
+- `packages/product`: 75 pass, 3 fail — ровно `workspace packages`, `CI triggers`, `path literals` (В-95, B5.1; причины — в
+  `loginom-macos.yml` и `loginom-windows.yml`, не в новых файлах). До правки: 71 pass, 3 fail.
+- Мутации `loginom-checks.test.ts` (каждая краснит, затем откат): убран один `--filter` из `check-test.yml`; в `test.yml` убрана
+  ветка `oc2-migration`; в `test.yml` один пакет подменён другим; в `check-test.yml` добавлен лишний `--filter`.
+- Те же команды, что в шагах (пользователь root, Chromium без песочницы невозможен):
+  `loginom-agent` 125 pass, 0 fail; `cli` (под `xvfb-run`) 623 pass, 11 skip, 0 fail; `loginom-host` 548 pass, 2 fail
+  (`archive verification preserves manifest modes under a private umask`, `actual managed entry reads live bridge work`:
+  права и отказ в правах, ожидаемо для root; в B5.1c то же: 546 pass, 3 fail); `dashboard` Node-часть 90 pass, 4 fail, 1 отмена
+  (EACCES и таймаут, как в B5.1c); контракты клиента 0 fail; набор `loginom-runtime/test` 116 pass, 5 fail, 1 отмена: 6 тестов
+  «Chromium sandboxing failed» (запуск от root) и таймаут `managed-login-diagnostics`. Код пакетов в этой задаче не менялся,
+  база и дерево совпадают по SHA кода; красные — те же классы (root), что в B5.1c.
+- `bridge.test.mjs`: 18 pass, 0 fail, без правки теста, закреплённым Node, `timeout --kill-after=10s 5m` без `nice`
+  (54 с). С `nice -n 19` на нагруженной машине (load 12–38) дочерние процессы (40 с бюджета, один ~12 с в покое) не укладываются:
+  `exit 124`. Это нагрузка машины, а не код.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 из 39 задач turbo).
+
+### Только CI
+
+Не root: проверки прав (`EACCES`, `private umask`, отказ в правах) и запуск Chromium с песочницей; Chromium
+(`install-deps`, закреплённая ревизия) и `sysctl` для user namespaces; `xvfb-run` для `cli` и `loginom-host` (`resume-oracle`
+без дисплея пропускается локально, в CI он обязателен); время под `nice -n 19` и 5 минут на набор runtime; `npm ci` шаблона и
+клиента; первый настоящий прогон на `push` в `oc2-migration` в форке.
