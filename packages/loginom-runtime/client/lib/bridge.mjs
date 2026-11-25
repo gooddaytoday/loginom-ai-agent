@@ -197,9 +197,9 @@ export async function createBridge(config, session, { browserTransport: managedB
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         browserRecovery: config.browserRecovery === true && userProfile,
-        targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
+        targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, { onPendingReconnect, ...options } = {}) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options?.storageSession) : code,
+          code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding, options.storageSession, onPendingReconnect) : code,
         } }, undefined, options);
         try{return parseCapabilityResult(response,{redactor});}
         catch(error){

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
-import {createActionRuntime} from '../lib/executor.mjs';
+import {createActionRuntime,parseCapabilityResult,withBrowserReceipt} from '../lib/executor.mjs';
+import {createStorageBinding,withStorageIdentity} from '../lib/storage-policy.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
@@ -410,6 +411,71 @@ const stop=async(f,phase)=>{
  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(job.outcome.output.pending_phase,phase);
  return job;
 };
+
+for(const fault of [null,'foreign wizard','lost browser reply'])test('release after the filter value fill stops: '+fault,async()=>{
+ const type='transform.filter_data',origin='http://test',build='7.4.2';
+ const connection={Connected:true,UserName:'test',FRemoteSession:{},FSession:{}};
+ const form={FReconnecting:false,FMapTree:{FServerConnection:connection,PackageNodes:{Count:0}}};
+ const globals={document:{},location:{origin},Ext:{Msg:{cfg:{}}},__loginomDockPreparationV1:{id:'doc'},
+  bg:{app:{Version:build,Application:{FInstance:{FMainForm:form}}}}};
+ const binding=createStorageBinding({sessionId:'test',origin,build,documentId:'doc',account:'test',
+  directories:{packages:'/test',inputs:'/test',exports:'/test'}});
+ let restores=0,fills=0;
+ const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg}),
+  waitForFunction:async()=>{throw Error('native reconnect still pending');},
+  locator:selector=>({waitFor:async()=>{},isVisible:async()=>true,count:async()=>1,click:async()=>{restores++;},
+   innerText:async()=>selector.includes('p.h;p.t')?'Восстановление сессии':selector.includes('tlb;yes')
+    ?'Восстановить':'Обнаружен разрыв связи. Восстановить сессию?'})};
+ const snapshot={origin,loginom_build:build,workflow_ref:workflow,dom_epoch:{document:'doc'},scan:{complete:true},
+  wizard:{status:'observed',root_tid:'W',root_ref:'wizard',stage:'row_filter'},
+  ui:{elements:[{ref:'ui-filter-value',allowed_actions:['fill']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+ const ui=surface({wizard:true,foreign:fault==='foreign wizard'});
+ const f=fixture({type,execute:async(code,options)=>{
+  const reading=code.includes('"receipt_read":true'),acting=code.includes('"mode":"act"');
+  if(reading)assert.ok(options.timeout>10000);
+  if(acting&&fault==='lost browser reply'){fills++;throw Error('Browser response lost after fill');}
+  if(!reading&&!acting)code='async page=>({status:"SUCCEEDED",output:{value:{status:"SUCCEEDED",output:'+JSON.stringify(snapshot)+'}}})';
+  try{return await vm.runInNewContext('('+withStorageIdentity(code,binding,options?.storageSession,options?.onPendingReconnect)+')')(page);}
+  catch(error){return parseCapabilityResult({isError:true,content:[{type:'text',text:String(error)}]});}
+ },release:()=>releasePendingNode({operation:f.context().operation,channel:ui.channel,readReceipt:f.context().readReceipt})});
+ f.handler.configure=async()=>{
+  const {operation,execute,onRecord,receiptOptions}=f.context();
+  const channel=createNodeProcedure({operation,execute,record:onRecord,targetOrigin:origin,targetBuild:build,
+   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+  await channel.observe({condition:'bound typed filter input',ready:()=>true});
+  if(fault!=='lost browser reply'){connection.Connected=false;form.FReconnecting=true;}
+  await channel.act({verb:'fill',ref:'ui-filter-value',text:'100'});
+ };
+ const apply=request();apply.target.type=type;f.runtime.startNodeApply(apply);
+ const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(job.outcome.output.pending_phase,'configure');
+ assert.equal(job.outcome.status,'AMBIGUOUS');
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ if(fault==='lost browser reply'){
+  const inspected=await f.runtime.inspect({operationId:'apply'});
+  assert.deepEqual(inspected.output.recovery_options,[]);
+  assert.match(inspected.output.next_steps[0].instruction,/report.*blocked/i);
+  await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-filter'}),/Release proof unavailable/);
+  assert.deepEqual(ui.gestures,[]);assert.equal(fills,1);return;
+ }
+ assert.equal(restores,1,JSON.stringify(job.outcome.error));
+ assert.equal(fills,0);
+ const waiting=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-before-reconnect'});
+ assert.equal(waiting.status,'AMBIGUOUS');
+ assert.match(waiting.output.next_step.instruction,/original Loginom session to reconnect/);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ assert.deepEqual(ui.gestures,[]);
+ connection.Connected=true;form.FReconnecting=false;
+ const inspected=await f.runtime.inspect({operationId:'apply'});
+ assert.deepEqual(inspected.output.recovery_options,['abandon_operation']);
+ const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-filter'});
+ assert.equal(released.status,fault?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(released));
+ assert.equal(f.runtime.hasUnsettledWork(),!!fault);
+ assert.deepEqual(ui.gestures,fault?[]:[{verb:'click',ref:'ui-close'}]);
+ assert.equal(restores,1);
+ assert.equal(fills,0);
+ if(!fault)assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+});
 
 for(const [type,stage,port,nativeIndex] of [
  ['exports.text','wizard',0,0],['exports.excel','wizard',0,0],['exports.lgd','wizard',0,0],

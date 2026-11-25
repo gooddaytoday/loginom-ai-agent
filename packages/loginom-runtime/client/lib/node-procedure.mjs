@@ -1318,7 +1318,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }`:code, { id, signature, action_key: 'ui.act' });
       let result;
       if(variablesUnionInputChange)operation.variablesUnionInputChangeDispatched=true;
-      try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
+      try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000,
+        ...(action.verb==='fill'&&before.wizard?.stage==='row_filter'?{fillOperationId:id}:{}) }); }
       catch (error) {
         operation.transportUncertain = true;
         operation.cleanupConfirmed = false;
