@@ -323,7 +323,7 @@ def verify_excel(path):
     expected = sales(4)["tables"][0]
     rows = workbook_rows(path)
     headers = next(rows)
-    assert set(headers.values()) == {c["label"] for c in expected["columns"]}, "Unexpected Excel header"
+    assert Counter(headers.values()) == Counter(c["label"] for c in expected["columns"]), "Unexpected Excel header"
     actual = [{name: json_value(row.get(cell)) for cell, name in headers.items()} for row in rows]
     assert len(actual) == len(expected["rows"]), "Unexpected Excel row count"
     for got, want in zip(actual, expected["rows"]):
