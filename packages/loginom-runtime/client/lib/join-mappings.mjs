@@ -10,35 +10,51 @@ export const effectiveJoinInput=(mapping,native)=>{
  return resolved.fields??native.target_fields;
 };
 const schema=fields=>fields.map(({name,label,type})=>({name,label,type}));
-export async function configureJoinInputs(channel,mappings,ctx,request,finishWizard){
- const observations=[];
- // Validate both effective schemas before committing either port. Keep the
- // second wizard open for its commit; the node wizard is still opened once.
- for(const port of [0,1]){
+function preflightJoinSchemas(request,preflight){
+ const proof=preflight?.proofs;
+ need(preflight?.verified===true&&proof?.length===2,'Both Join source preflight receipts required');
+ return proof.map((p,port)=>{
+  const input=request.inputs.find(i=>i.input===port);
+  need(input&&p?.verified===true&&p.cleanup_complete===true&&p.parameters_valid===true&&p.settings_changed===false
+   &&p.port===input.output&&p.preview?.verified===true&&p.preview.inventory_complete===true
+   &&p.preview.port===input.output&&p.preview.node_id===input.source.node_id
+   &&p.node_context?.verified===true&&p.node_context.surface==='graph'
+   &&['document_id','workflow_id','node_id'].every(k=>p.source?.[k]===input.source[k]&&p.node_context[k]===input.source[k])
+   &&Array.isArray(p.schema),'Join source preflight receipt differs from requested input '+port);
+  return p.schema;
+ });
+}
+export async function configureJoinInputs(channel,mappings,ctx,request,finishWizard,{preflight}={}){
+ const newNode=request.target.kind==='new';
+ // The verified upstream previews already provide both planned schemas for
+ // a new Join. Saved inputs can have names and types set by their mappings.
+ const planned=newNode?preflightJoinSchemas(request,preflight):[];
+ const mappingFor=port=>mappings.find(m=>m.port===port)??{direction:'input',port};
+ if(!newNode)for(const port of [0,1]){
   await channel.openInputPort(port);
   const s=await channel.observe({condition:'join input '+port+' schema',readMappings:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified&&s.node_mapping.node_context.input_port?.port===port});
-  const mapping=mappings.find(m=>m.port===port)??{direction:'input',port};
-  let fields,error;try{fields=effectiveJoinInput(mapping,s.node_mapping);}catch(e){error=e;}
-  observations.push({port,native_mapping:s.node_mapping,fields,mapping});
+  let error;try{planned[port]=effectiveJoinInput(mappingFor(port),s.node_mapping);}catch(e){error=e;}
   if(port===0||error)await closePreparedWizard(channel);
   if(error)throw error;
  }
  try{
   if(request.parameters.keys){
-   resolveJoinKeys(request.parameters,observations.map(o=>o.fields));
-   const fields=joinOutputFields({input_fields:observations.map(o=>o.fields),...request.parameters,mode:request.mode});
+   resolveJoinKeys(request.parameters,planned);
+   const fields=joinOutputFields({input_fields:planned,...request.parameters,mode:request.mode});
    need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Join output source names conflict; rename an input field explicitly');
    const output=request.mappings.find(m=>m.direction==='output');
    if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Join output mapping is incomplete');
   }
- }catch(e){await closePreparedWizard(channel);throw e;}
+ }catch(e){if(!newNode)await closePreparedWizard(channel);throw e;}
  const results=[];
  for(const port of [1,0]){
-  if(port===0)await channel.openInputPort(port);
+  if(newNode||port===0)await channel.openInputPort(port);
   const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified&&s.node_mapping.node_context.input_port?.port===port;
   let s=await channel.observe({condition:'join input '+port+' before configuration',readMappings:true,ready});
-  const planned=observations[port],requested=planned.mapping,sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
-  need(JSON.stringify(schema(effectiveJoinInput(requested,s.node_mapping)))===JSON.stringify(schema(planned.fields)),'Join input changed after validation');
+  const requested=mappingFor(port),sources=s.node_mapping.source_fields.map(f=>({...f,used:true}));
+  try{
+   need(JSON.stringify(schema(effectiveJoinInput(requested,s.node_mapping)))===JSON.stringify(schema(planned[port])),'Join input changed after validation');
+  }catch(e){await closePreparedWizard(channel);throw e;}
   const changes=[];
   if(requested.fields){
    changes.push(await configureOutputFields(channel,requested,sources));
