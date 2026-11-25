@@ -9,6 +9,8 @@ test("stepwise edits use the current graph and verify only the requested step", 
   expect(step).toContain("Перед каждым шагом наблюдай текущий граф")
   expect(step).toContain("Ручные правки между сообщениями")
   expect(step).toContain("Соседние узлы не меняй")
+  expect(step).toContain("Подпись узла меняй только по просьбе")
+  expect(step).toContain("Имя файла не задаёт подпись импорта")
   expect(step).toContain("одной строкой спроси")
   expect(step).toContain('finish:"execute"')
   expect(step).toContain("сводки порта")
