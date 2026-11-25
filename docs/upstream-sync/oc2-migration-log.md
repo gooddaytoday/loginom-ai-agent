@@ -23964,3 +23964,56 @@ issue и PR форка (расписание начнёт работать то�
 
 Поведение GitHub с условием на задании `workflow_dispatch` и `schedule` (по документации — `skipped`). Тесты других пакетов не
 гонялись: код вне `packages/product` не менялся.
+
+## B5.1c — базовый CI форка
+
+25.11.2026. Ветка `b51c-fork-ci` от `oc2-migration` (`569014e83b`), дерево `.claude/worktrees/b51c`. Строка B5.0: «Базовый CI
+форка». Workflow не запускались (раннеров GitHub здесь нет), модель не вызывалась; Bun 1.4.4 первым в `PATH`, Node 24.19.0,
+`HOME` и `XDG_*` — во временный каталог.
+
+### Что изменено
+
+- `.github/workflows/check.yml`: PR также в `loginom`; раннер `ubuntu-24.04` вместо `blacksmith-4vcpu-ubuntu-2404`. Шаги
+  (`lint`, `typecheck:tsc`, `lint:changed`) без изменений.
+- `.github/workflows/check-test.yml`: `pull_request` только в `loginom`; `unit` — одна ветка Linux на `ubuntu-24.04` (ветка
+  Windows на `blacksmith-*` в форке зависла бы; Windows закрывают `windows-native-check` и `loginom-windows`, B5.1e, i, j);
+  `affected`, `build`, `e2e` и `e2e-suite` — под `github.repository == 'anomalyco/opencode'`, как `deploy*`. Перед тестами
+  `unit` добавлены `setup-loginom-inputs` (закреплённый Node, экспорт `LOGINOM_AI_AGENT_TEST_NODE`) и `npm ci` шаблона
+  дашборда (тест `dashboard` его собирает).
+- `turbo.json`: `@loginom-ai-agent/loginom-host#test` и `@loginom-ai-agent/dashboard#test` с `passThroughEnv`
+  `LOGINOM_AI_AGENT_TEST_NODE` (без него turbo не передаёт переменную, `"$LOGINOM_AI_AGENT_TEST_NODE"` в скрипте пуст).
+  `dry=json` показывает `passThroughEnv` и `dependsOn: ["transit"]` у обоих.
+- `packages/product/test/ci-base.test.ts` (6 тестов): runner, ветки PR, Linux-only `unit`, условие upstream на четырёх
+  заданиях, `passThroughEnv` в `turbo.json`.
+- `catalog.json` не менялся: `.github/**` и `turbo.json` уже в `CAT-02`; `catalog-check.py` код 0 (615 файлов, как до правки).
+
+### Выбор меньшего (записано)
+
+- Матрица Windows убрана из `unit` совсем, а не за условием репозитория: в форке её запускать некуда.
+- `check.yml` на `push` по-прежнему только `dev` (в задании только PR); `lint:changed` оставлен — он может покраснеть на файлах
+  GUI-пакетов форка при первом прогоне (проверит только CI).
+- `.node-version` в дереве нет (план B5.1m его упоминает) — закреплённый Node берётся из `packages/product/loginom-release.json`
+  через `setup-loginom-inputs`, как в `loginom-client-full.yml`.
+- `npm ci` клиента `loginom-runtime` в `unit` не добавлен: у пакета нет скрипта `test` (только `test:upstream`), turbo его не
+  запускает; это задача B5.1m.
+- Шаги проверки сгенерированных клиента и OpenAPI, `codemode`, `workerd SDK` оставлены как у upstream.
+
+### Проверки (реальный вывод)
+
+- YAML: `python3 -c 'import yaml'` разобрал оба файла; `Bun.YAML` — в тесте. `actionlint` нет.
+- `packages/product`: 69 pass, 3 fail — ровно `workspace packages`, `CI triggers`, `path literals` (В-95, B5.1); новых нет.
+  До добавления моего теста: 63 pass, 3 fail.
+- Мутации `ci-base.test.ts` (каждая — 1 красный из 6, затем откат): раннер `blacksmith`; убрано `loginom` из PR `check.yml`;
+  убрано условие upstream с `build`; в матрицу `unit` добавлен Windows; убран `passThroughEnv` у `dashboard`.
+- `bun turbo test --continue` для `dashboard` и `loginom-host` (`LOGINOM_AI_AGENT_TEST_NODE` задан, `npm ci` шаблона и клиента
+  выполнены): `loginom-host` 546 pass, 3 fail; `dashboard` Node-часть 91 pass, 3 fail, 1 отмена. Падения — проверки отказа в
+  правах (`EACCES`, `Expected refusal`, `private umask`) и таймаут, ожидаемо при запуске от root (uid 0); на раннере GitHub
+  пользователь не root. Против базы не сравнивал (файлы тестов и код те же, правки только в CI-конфигурации), на не-root
+  не перезапускал — это риск: первый прогон на раннере измерит базу.
+- `catalog-check.py` код 0; `apply-identity.py --check` — 0 файлов; `bun run check` код 0 (39 из 39 задач turbo).
+
+### Только CI
+
+Поведение раннера (`setup-loginom-inputs` на `ubuntu-24.04`, загрузка Chromium, кэш), время `turbo test --affected` на 4 vCPU,
+пропуск `affected`/`build`/`e2e` в форке, красные тесты клиента (38) и `tools` (8) из базы B5.0, `lint:changed`, шаги
+`check:generated`, проверка пакетов `codemode` и `sdk`.

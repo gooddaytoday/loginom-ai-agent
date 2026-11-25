@@ -57,6 +57,17 @@
       "dependsOn": ["transit"],
       "outputs": []
     },
+    // The Node tests of these packages run under the pinned Node that setup-loginom-inputs exports.
+    "@loginom-ai-agent/loginom-host#test": {
+      "dependsOn": ["transit"],
+      "outputs": [],
+      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE"]
+    },
+    "@loginom-ai-agent/dashboard#test": {
+      "dependsOn": ["transit"],
+      "outputs": [],
+      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE"]
+    },
     "@opencode/desktop#test": {
       "outputs": [],
       "cache": false
