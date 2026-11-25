@@ -36,10 +36,11 @@ async function runDatabaseStep(options,ctx,kind,makeCode,parameters,config){
  if(checkpoint&&!operation.targetPhase&&!operation.nodeApply?.node&&operation.nodeApply?.pending?.phase==='target'
    &&result.cleanup_complete===true&&checkpoint.graph?.complete===true&&checkpoint.graph.interaction_ready===true
    &&checkpoint.graph.document_id===ctx.document_id&&JSON.stringify(checkpoint.graph.workflow_ref)===JSON.stringify(ctx.workflow_ref)
-   &&checkpoint.connection?.name===parameters.connection?.name){
+   &&(checkpoint.navigation_refused===true||checkpoint.connection?.name===parameters.connection?.name)){
   operation.preTargetGraph=structuredClone(checkpoint.graph);
-  operation.preTargetWarnings=['The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)
-   +' remains in the module. Its graph reference and the import node were not created.'];
+  operation.preTargetWarnings=[checkpoint.navigation_refused===true
+   ?'Loginom refused to open the module connections. The original workflow was restored before any SQLite connection or import node was created.'
+   :'The tested SQLite connection '+JSON.stringify(checkpoint.connection.name)+' remains in the module. Its graph reference and the import node were not created.'];
   operation.cleanupConfirmed=true;operation.nodeApply.cleanup_complete=true;
  }
  if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true)

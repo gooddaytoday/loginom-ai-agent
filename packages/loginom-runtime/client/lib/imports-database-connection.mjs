@@ -99,7 +99,24 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
     await wait('SQLite connection fields',resolveFields);await reachableInput(fields+'pedDatabasePath;ValueControl');await quiet();
    }finally{await opening.dispose();}
   };
-  const moduleTid=t.workflow_ref.navigation_path.at(-2).tid,form=t.workflow_ref.prefix+';ConnectionsViewWizard',wizard=t.workflow_ref.prefix+';WizardModelConnectionForm';
+  const moduleCrumb=t.workflow_ref.navigation_path.at(-2),moduleTid=moduleCrumb.tid;
+  const form=t.workflow_ref.prefix+';ConnectionsViewWizard',wizard=t.workflow_ref.prefix+';WizardModelConnectionForm';
+  const graphTid=t.workflow_ref.prefix+';ModelForm;cmpDiagram';
+  const graphTask={request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types};
+  const idleGraph=g=>g.complete===true&&g.interaction_ready===true&&g.document_id===t.document_id
+   &&JSON.stringify(g.workflow_ref)===JSON.stringify(t.workflow_ref)&&g.nodes.every(n=>n.locked===false);
+  const graphShape=({dom_epoch,nodes,...g})=>JSON.stringify({...g,nodes:nodes.map(({dom_epoch,...n})=>n)});
+  const moduleEntry=label=>wait('module entry '+label,async()=>{
+   const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll((es,label)=>es.filter(e=>e.textContent.trim()===label).map(e=>e.getAttribute('data-tid')),label);
+   return es.length===1?es[0]:null;
+  });
+  const returnToWorkflow=async()=>{
+   await click(await moduleEntry(t.workflow_ref.navigation_path.at(-1).label),true);
+   await wait('original workflow graph',()=>find(graphTid).isVisible());await quiet();
+  };
+  await quiet();
+  const entryGraph=await readPlacementGraph(page,graphTask);
+  need(idleGraph(entryGraph),'complete idle graph required before opening connections');
   // The SQLite settings page tid is resolved from its own unique path field.
   let fields=null;
   const resolveFields=async()=>{
@@ -108,8 +125,7 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   };
   if(t.existing_target){
    need(t.existing_target.document_id===t.document_id&&t.existing_target.workflow_id===t.workflow_ref.workflow_id,'existing import owner differs');
-   const graph=await readPlacementGraph(page,{request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types});
-   need(graph.complete===true&&graph.interaction_ready===true&&graph.document_id===t.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(t.workflow_ref),'complete owned graph required for existing SQLite');
+   const graph=entryGraph;
    const targets=graph.nodes.filter(n=>n.ref.node_id===t.existing_target.node_id);
    need(targets.length===1&&targets[0].type==='imports.database'&&['document_id','workflow_id','node_id'].every(k=>targets[0].ref[k]===t.existing_target[k]),'existing SQLite identity differs');
    const edges=(graph.rest_connection_links??[]).filter(e=>e.target===t.existing_target.node_id&&e.input==='connection:0');
@@ -134,10 +150,58 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    }
   }
   await click(moduleTid);
-  const connections=await wait('module connections entry',async()=>{
-   const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll(es=>es.filter(e=>e.textContent.trim()==='Подключения').map(e=>e.getAttribute('data-tid')));return es.length===1?es[0]:null;
-  });
-  await click(connections,true);await wait('connections list',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
+  const connections=await moduleEntry('Подключения');
+  const opening=await page.evaluateHandle(({b,tid})=>{
+   const controller=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+   const view=controller.FController,root=view?.FView?.el?.dom;
+   const tiles=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+   if(controller.Node.data.node!==b.module||view?.constructor?.name!=='ListViewForm'||!root?.isConnected
+    ||tiles.length!==1||!root.contains(tiles[0]))throw Error('Module connections entry owner differs');
+   return {module:b.module,controller,view,root,tile:tiles[0]};
+  },{b:owner,tid:connections});
+  try{
+   await click(connections,true);
+   const errorText='При переходе на "'+moduleCrumb.label+'.Подключения" возникла ошибка.';
+   const result=await wait('connections list',async()=>{
+    if(await find(form+';cntTile;ListView;tbl').isVisible())return {opened:true};
+    const handle=await page.evaluateHandle(({b,build,errorText})=>{
+     const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+     const windows=[...document.querySelectorAll('.x-window')].filter(visible);
+     if(!windows.length)return null;
+     const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+     const dialog=windows[0],native=Ext.getCmp(dialog.id);
+     const find=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')].filter(visible);return es.length===1&&dialog.contains(es[0])?es[0]:null;};
+     const title=find('msgbox;p.h;p.t'),message=find('msgbox;cnt'),ok=find('msgbox;tlb;ok');
+     const button=ok&&Ext.getCmp(ok.id);
+     if(c!==b.controller||c.Node.data.node!==b.module||c.FController!==b.view||b.view.FView.el.dom!==b.root
+      ||!b.root.isConnected||!b.tile.isConnected||!b.root.contains(b.tile)||windows.length!==1
+      ||native?.el?.dom!==dialog||title?.textContent.trim()!=='Loginom '+build
+      ||message?.innerText.trim().split(/\r?\n/,1)[0].trim()!==errorText||ok?.textContent.trim()!=='OK'
+      ||button?.el?.dom!==ok||button.disabled!==false)throw Error('Connections navigation dialog owner differs');
+     return ok;
+    },{b:opening,build:t.build,errorText});
+    const button=handle.asElement();
+    if(button)return {button};
+    await handle.dispose();
+    return null;
+   });
+   if(!result.opened){
+    // The connection wizard never opened. Dismiss only this navigation error,
+    // then prove that no graph effect preceded the refusal.
+    try{await result.button.click({timeout:remaining()});}finally{await result.button.dispose();}
+    await quiet();
+    need(await page.evaluate(b=>{
+     const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+     return c===b.controller&&c.Node.data.node===b.module&&c.FController===b.view&&b.view.FView.el.dom===b.root&&b.root.isConnected;
+    },opening),'module owner changed after connections navigation refusal');
+    await returnToWorkflow();
+    const graph=await readPlacementGraph(page,graphTask);
+    need(idleGraph(graph)&&graphShape(entryGraph)===graphShape(graph),'original idle graph changed after connections navigation refusal');
+    return {verified:false,cleanup_complete:true,effect_possible:true,pre_target_checkpoint:{graph,navigation_refused:true},
+     error:'Database connection: '+errorText};
+   }
+  }finally{await opening.dispose();}
+  await quiet();
   const tiles=()=>page.locator('[data-tid^='+JSON.stringify(form+';cntTile;ListView;headercontainer;title_')+']').evaluateAll(es=>es.map(e=>({tid:e.getAttribute('data-tid'),name:e.textContent.replace(/^Метка:/,'').trim()})));
   const before=await tiles();need(before.length<=200,'connection inventory exceeds bound');
   const existing=before.filter(c=>c.name===t.connection.name);need(existing.length<=1,'connection label is ambiguous');
@@ -202,10 +266,7 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   need(JSON.stringify(persisted)===JSON.stringify(observed),'saved connection readback differs');
   await click(wizard+';btnDone');await wait('connection readback closed',()=>find(form+';cntTile;ListView;tbl').isVisible());
   await click(moduleTid);
-  const workflow=await wait('original workflow entry',async()=>{
-   const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll((es,label)=>es.filter(e=>e.textContent.trim()===label).map(e=>e.getAttribute('data-tid')),t.workflow_ref.navigation_path.at(-1).label);return es.length===1?es[0]:null;
-  });
-  await click(workflow,true);const graphTid=t.workflow_ref.prefix+';ModelForm;cmpDiagram';await wait('original workflow graph',()=>find(graphTid).isVisible());await quiet();
+  await returnToWorkflow();
   const connection={name:persisted.name,database_path:persisted.database_path,kind:'sqlite',connection_test:'passed'};
   if(reusedReference){
    const graph=await readPlacementGraph(page,{request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types});
@@ -274,7 +335,6 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   },Math.max(64,...beforeGraph.map(n=>n.y))+150);
   let target=await chooseTarget(),placementGuard,placementCheckpoint;
   if(!target){
-   const graphTask={request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types};
    const before=await readPlacementGraph(page,graphTask);
    need(before.complete===true&&before.interaction_ready===true,'complete idle graph required for placement');
    placementGuard=async()=>{await guard();need(sameGraph(before,await readPlacementGraph(page,graphTask)),'Graph changed during connection placement');};
