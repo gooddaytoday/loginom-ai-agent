@@ -2105,7 +2105,8 @@ def check_case_graph(expected, observed):
 
 
 def graph_only(spec, expected):
-    return spec.get('attach_all') and 'graph' in expected and not expected['outputs']
+    return (spec.get('attach_all') and 'graph' in expected and not expected.get('outputs')
+            and not any(expected.get(key) is not None for key in ('refusal', 'execution_error', 'rejection')))
 
 
 def fs_effect_execution_evidence(journals):
@@ -3256,12 +3257,18 @@ class Runner:
         self.current['read-path'] = '/'.join(sorted((set(self.current.get('read-path', '').split('/')) | paths) - {''}))
         delivered = any(ports([o for _, o in replies]))
         assert not (lgd_corrupt and delivered), 'LGD_CORRUPT_PORTS_FORBIDDEN'
+        # Some graph turns assert native tables without exporting them as CSV.
+        graph_without_tables = only_graph and not expected.get('tables')
+        port_optional = graph_without_tables or rejection or refusal or execution_error or lgd_corrupt
         invalid = (port_failure(replies, folder / 'model.stdout')
-                   if not spec.get('variable_only') and (not (rejection or refusal or execution_error or lgd_corrupt) or delivered) else None)
+                   if not spec.get('variable_only') and (delivered or not port_optional) else None)
         if invalid:
             self.current.update(failure_class='PORT_READ_INVALID', detail='Port source or native binding/exactness/Preview cleanup absent or invalid', location=invalid, failure_load=list(os.getloadavg()))
             self.current['port-read'] = 'FAIL'
-        self.current.setdefault('port-read', '— (expected execution error)' if execution_error and not delivered else 'PASS')
+        elif graph_without_tables and not delivered:
+            self.current.setdefault('port-read', '— (graph only)')
+        elif self.current.get('port-read') in (None, '— (graph only)'):
+            self.current['port-read'] = '— (expected execution error)' if execution_error and not delivered else 'PASS'
         if expected.get('proposed_tree_output'):
             trees = [(owner, port) for _, reply in replies for owner, port in ports(reply) if port.get('port_kind') == 'tree']
             assert trees, 'TREE_READ_MISSING'

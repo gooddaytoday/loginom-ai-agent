@@ -2065,7 +2065,70 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     'bh-t0-import', stage, profile, workspace, '/own/run.lgp', {'package_directory': '/own'}, root / 'build')
             self.assertEqual((session, expected['outputs'], actual, delimiter), ('chat', [], None, None))
             self.assertEqual(instance.current['graph'], 'PASS')
+            self.assertEqual(instance.current['save'], 'PASS')
+            self.assertEqual(instance.current['cleanup'], 'main PASS')
+            self.assertEqual(instance.current['port-read'], '— (graph only)')
+            self.assertNotIn('failure_class', instance.current)
             self.assertEqual(runner.read(stage / 'graph-observed.json')['location'], 'execution-events.jsonl:1')
+
+    def test_private_graph_turn_port_validation_follows_expected_outputs(self):
+        graph = dict(nodes=[dict(id='sales', type='imports.text')])
+        columns = [dict(name='Value', type='integer')]
+        output = dict(output_node_type='imports.text', output_port=0, export_destination='/own/sales.csv',
+                      columns=columns, rows=[dict(Value=1)], ordered=True)
+        for contract, read, port_status in [
+            (dict(outputs=[]), None, '— (graph only)'),
+            (dict(outputs=[]), False, 'FAIL'),
+            (dict(outputs=[], tables=[output]), None, 'FAIL'),
+            (dict(outputs=[output]), None, 'FAIL'),
+            (dict(outputs=[output]), True, 'PASS'),
+        ]:
+            with self.subTest(contract=list(contract), outputs=bool(contract['outputs']), read=read), \
+                    tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                case = root / 'cases/bh-sales'
+                case.mkdir(parents=True)
+                (case / 'task.md').write_text('Подготовь таблицу.')
+                runner.write(case / 'expected.json', dict(graph=graph, **contract))
+                out = root / 'run'
+                profile, workspace, stage = (out / name for name in ('profile', 'workspace', case.name))
+                for folder in (profile, workspace, stage):
+                    folder.mkdir(parents=True)
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = out, {}, dict(cases=case.parent), {}
+
+                def phase(name, command, folder, **kwargs):
+                    self.assertEqual(name, 'model')
+                    ports = [] if read is None else [dict(port=0, schema=columns, sample=[dict(Value=1)],
+                                                          freshness_basis='completed_execution_port_source')]
+                    receipts = [dict(status='SUCCEEDED', cleanup_complete=read, output=dict(ports=ports)),
+                                dict(status='SUCCEEDED', action_key='package.save_checkpoint',
+                                     output=dict(save_completed=True))]
+                    events = [dict(type='tool_use', sessionID='chat',
+                                   part=dict(state=dict(status='completed', output=json.dumps(receipt))))
+                              for receipt in receipts]
+                    (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)) + '\n')
+                    native = dict(complete=True, nodes=[dict(ref=dict(node_id='sales'), type='imports.text')], links=[])
+                    event = dict(recorded_at='2099-01-01T00:00:00.000Z', phase='node_target_checkpoint',
+                                 target_state=dict(final_graph=native))
+                    (profile / 'execution-events.jsonl').write_text(json.dumps(event) + '\n')
+                    runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True))
+                    runner.write(profile / 'runtime-close-model.json', dict(closed_ack=True))
+                    if contract['outputs']:
+                        self.assertIn('/own/run-run-bh-sales-sales.csv', command[-1])
+                        (profile / 'run-run-bh-sales-sales.csv').write_text('Value\n1\n')
+
+                with patch.object(instance, 'phase', side_effect=phase):
+                    instance.model(case.name, stage, profile, workspace, '/own/run.lgp',
+                                   {'package_directory': '/own'}, root / 'build')
+                self.assertEqual(instance.current['graph'], 'PASS')
+                self.assertEqual(instance.current['csv'], 'PASS' if contract['outputs'] else '— (graph only)')
+                self.assertEqual(instance.current['port-read'], port_status)
+                if port_status == 'FAIL':
+                    self.assertEqual(instance.current['failure_class'], 'PORT_READ_INVALID')
+                    self.assertEqual(instance.current['location'], f'{stage / "model.stdout"}:1')
+                else:
+                    self.assertNotIn('failure_class', instance.current)
 
     def test_private_case_attaches_every_data_format_with_configured_model(self):
         with tempfile.TemporaryDirectory() as directory:
