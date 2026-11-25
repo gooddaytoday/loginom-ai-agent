@@ -87,7 +87,7 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
     return {graph:true,node_id:node.FGuid};
   }
   if(!owner)return {};
-  const owned={owned_window:true};
+  const owned={owned_window:true,node_id:node.FGuid};
   if(b.closing.has(closeKind)||controls.length!==1)return owned;
   const control=controls[0],component=ext?.getCmp?.(control.id);
   if(component?.el?.dom!==control||component.disabled===true
@@ -117,7 +117,8 @@ export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph
       try{
         const control=controlHandle.asElement();
         if(control){
-          onOwnedWindow();
+          const id=await surface.getProperty('node_id');
+          try{onOwnedWindow(await id.jsonValue());}finally{await id.dispose();}
           const checked=await page.evaluateHandle(readSurface,{binding,expectedControl:control,claim:true});
           try{
             const sameControl=await checked.getProperty('control');
@@ -129,7 +130,7 @@ export async function settleAddOnlyDrop(page,binding,{readSurface,readQuietGraph
           quietSince=undefined;
         }else{
           const state=await surface.jsonValue();
-          if(state?.owned_window)onOwnedWindow();
+          if(state?.owned_window)onOwnedWindow(state.node_id);
           const graph=state?.graph?await readQuietGraph():null;
           if(!graph?.interaction_ready||!graph.nodes.some(n=>n.ref.node_id===state.node_id)){
             quietSince=undefined;

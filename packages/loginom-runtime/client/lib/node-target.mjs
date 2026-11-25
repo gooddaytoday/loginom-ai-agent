@@ -145,12 +145,14 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
 
 async function reconcileTargetEffect(adapter,effect,graph,deadline,signal){
   const recovery=await adapter.reconcile(effect,graph,deadline,signal);
+  const receipt=recovery?.receipt;
   if(effect.kind==='create'&&effect.parameters.add_only===true
     &&recovery?.completed===true&&recovery.verified===true&&recovery.cleanup_complete===false
-    &&recovery.receipt?.add_only_window_pending===true
-    &&verifyNodeTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches)
-    &&await adapter.verifyAddOnlyCleanup?.(graph,deadline)===true)
-    return {...recovery,cleanup_complete:true,add_only_window_reobserved:true};
+    &&receipt?.add_only_window_pending===true&&receipt.add_only_window_node_id){
+    const proof=verifyNodeTargetEffect({...effect,receipt},graph,adapter.positionMatches);
+    if(proof?.node_id===receipt.add_only_window_node_id&&await adapter.verifyAddOnlyCleanup?.(graph,deadline)===true)
+      return {...recovery,cleanup_complete:true,add_only_window_reobserved:true};
+  }
   return recovery;
 }
 

@@ -43,7 +43,7 @@ function fixture(t, fault, addOnly=false) {
  const reveal=async args=>{await args.guard();return {fully_visible:fault!=='hidden',point:{x:900,y:480}};};
  const window={
   settle:async(_page,_binding,{onOwnedWindow})=>{
-   if(fault==='owned_window')onOwnedWindow?.();
+   if(fault==='owned_window')onOwnedWindow?.('new-js');
    if(fault==='foreign_window'||fault==='owned_window')throw Error('Native window did not settle');
    t.mock.timers.tick(16000);
    const graph=await read();
@@ -85,6 +85,7 @@ for(const [fault,cleanup,dispatched,error] of [
  assert.equal(reply.effect_possible,dispatched);
  assert.equal(reply.cleanup_complete,cleanup);
  assert.equal(reply.add_only_window_pending,cleanup?undefined:true);
+ assert.equal(reply.add_only_window_node_id,cleanup?undefined:'new-js');
  assert.equal(f.counts().drags,Number(dispatched));
  assert.match(reply.error,error);
 });

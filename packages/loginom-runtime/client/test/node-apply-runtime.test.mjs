@@ -216,14 +216,14 @@ test('add_only pending window can be inspected, abandoned and followed by a new 
   await mutate(effect);
   if(effect.parameters.add_only){
    f.graph.nodes[0].locked=false;
-   return {status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true};
+   return {status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true,add_only_window_node_id:'new'};
   }
   return {status:'SUCCEEDED',cleanup_complete:true};
  };
  f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,
   document_id:'doc',workflow_ref:workflow});
  f.adapter.reconcile=async()=>({completed:true,verified:true,cleanup_complete:false,
-  receipt:{status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true}});
+  receipt:{status:'AMBIGUOUS',cleanup_complete:false,add_only_window_pending:true,add_only_window_node_id:'new'}});
  f.adapter.verifyAddOnlyCleanup=async()=>!windowOpen;
  const args={...request(),mode:'add_only'};
  await f.runtime.startNodeApply(args);
@@ -235,6 +235,9 @@ test('add_only pending window can be inspected, abandoned and followed by a new 
  assert.deepEqual((await f.runtime.inspect({operationId:args.operation_id})).output.recovery_options,['abandon_operation']);
  assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'early'})).status,'AMBIGUOUS');
  windowOpen=false;
+ f.graph.nodes[0].ref.node_id='replacement';
+ assert.equal((await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'wrong-owner'})).status,'AMBIGUOUS');
+ f.graph.nodes[0].ref.node_id='new';
  const afterClose=await f.runtime.inspect({operationId:args.operation_id});
  assert.ok(afterClose.output.recovery_options.includes('abandon_operation'));
  const released=await f.runtime.recover(args.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release'});

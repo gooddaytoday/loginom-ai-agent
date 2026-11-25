@@ -226,7 +226,7 @@ export async function readGraph(page, task) {
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap, addOnlyWindow) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
-  let dropBinding,ownedWindowPending=false;
+  let dropBinding,ownedWindowNodeId;
   const addOnly=task.effect.kind==='create'&&task.effect.parameters.add_only===true;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
@@ -607,7 +607,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
     let after=addOnly?await addOnlyWindow.settle(page,dropBinding,{
-      readSurface:addOnlyWindow.read,remaining,onOwnedWindow:()=>{ownedWindowPending=true;},readQuietGraph:async()=>{
+      readSurface:addOnlyWindow.read,remaining,onOwnedWindow:id=>{ownedWindowNodeId=id;},readQuietGraph:async()=>{
         try{return await read(page,task);}
         catch(error){
           if(['Graph is blocked','Workflow navigation changed','Visible port identity is not rendered','Node identity is not rendered']
@@ -633,7 +633,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         pendingNode=id;return null;
       }
     },0,settleJavascript);
-    ownedWindowPending=false;
+    ownedWindowNodeId=undefined;
     if(kind==='create'){
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
@@ -659,8 +659,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
   if(moveGeometry)outcome.move_geometry=moveGeometry;
   if(deletion)outcome.deletion=deletion;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
-  if(ownedWindowPending){
-    if(outcome.cleanup_complete===true)outcome.add_only_window_pending=true;
+  if(ownedWindowNodeId){
+    if(outcome.cleanup_complete===true){
+      outcome.add_only_window_pending=true;
+      outcome.add_only_window_node_id=ownedWindowNodeId;
+    }
     outcome.cleanup_complete=false;
   }
   return outcome;

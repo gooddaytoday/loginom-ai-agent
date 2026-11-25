@@ -81,7 +81,7 @@ function fixture({window='wizard',sticky=false,modelData=true,preexistingWindow=
     waitForTimeout:async ms=>{time+=ms;},
   };
   const run=()=>settleAddOnlyDrop(page,binding,{readSurface:readAddOnlyDrop,readQuietGraph:async()=>settledGraph,
-    onOwnedWindow:()=>ownership.push(true),now:()=>time,remaining:()=>{
+    onOwnedWindow:id=>ownership.push(id),now:()=>time,remaining:()=>{
       if(time>=deadline)throw Error('Graph deadline');
       return deadline-time;
     }});
@@ -104,6 +104,7 @@ test('add_only never repeats Close while native settlement is unconfirmed',async
   const f=fixture({sticky:true});
   await assert.rejects(f.run(),/Graph deadline/);
   assert.equal(f.clicks.length,1);
+  assert.deepEqual([...new Set(f.ownership)],['new']);
 });
 
 test('add_only observes a quiet node before Loginom has loaded its settings object',async()=>{
@@ -126,7 +127,7 @@ for(const [name,options,error] of [
   const f=fixture(options);
   await assert.rejects(f.run(),error);
   assert.deepEqual(f.clicks,[]);
-  assert.equal(f.ownership.length,options.swapControl?1:0);
+  assert.deepEqual(f.ownership,options.swapControl?['new']:[]);
 });
 
 test('add_only settlement has a 15 second cap under a longer target deadline',async()=>{
