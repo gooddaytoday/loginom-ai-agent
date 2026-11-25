@@ -92,7 +92,7 @@ it.live("the chat validates with read permissions and only publishes after one-t
           { permission: "read", pattern: relative(instance.worktree, resource), action: "deny" },
         ] }).pipe(Effect.orDie),
       }))
-      expect(denied._tag).toBe("Failure")
+      expect(Exit.isFailure(denied) && Cause.squash(denied.cause)).toBeInstanceOf(PermissionV1.DeniedError)
 
       const installation = { action: "install", source: "columns" }
       const installed = join(home, ".agents/skills/columns")
@@ -130,7 +130,8 @@ it.live("the chat validates with read permissions and only publishes after one-t
       expect(request.metadata.skillInstall).toContain("Папка установки: " + JSON.stringify(installed))
       expect(yield* Effect.promise(() => Bun.file(join(installed, "SKILL.md")).exists())).toBe(false)
       yield* permissions.reply({ requestID: request.id, reply: "reject" })
-      expect((yield* Fiber.join(rejected))._tag).toBe("Failure")
+      const rejectedResult = yield* Fiber.join(rejected)
+      expect(Exit.isFailure(rejectedResult) && Cause.squash(rejectedResult.cause)).toBeInstanceOf(PermissionV1.RejectedError)
       expect(yield* Effect.promise(() => Bun.file(join(installed, "SKILL.md")).exists())).toBe(false)
 
       const approved = yield* Effect.forkChild(tool.execute(installation, ctx))
@@ -163,7 +164,8 @@ it.live("the chat validates with read permissions and only publishes after one-t
       expect(replacement.metadata.skillInstall).toContain('Замена скилла "columns"')
       expect((replacement.metadata.skillInstall as string[]).some((line) => line.startsWith("Текущая ревизия: "))).toBe(true)
       yield* permissions.reply({ requestID: replacement.id, reply: "reject" })
-      expect((yield* Fiber.join(declinedUpdate))._tag).toBe("Failure")
+      const declined = yield* Fiber.join(declinedUpdate)
+      expect(Exit.isFailure(declined) && Cause.squash(declined.cause)).toBeInstanceOf(PermissionV1.RejectedError)
       const installedResource = join(installed, "references/columns.md")
       expect(yield* Effect.promise(() => Bun.file(installedResource).text())).toBe("id, amount")
       const confirmUpdate = yield* Effect.forkChild(tool.execute(installation, ctx))

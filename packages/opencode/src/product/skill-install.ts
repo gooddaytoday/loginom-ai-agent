@@ -47,7 +47,10 @@ export const SkillInstallTool = Tool.define(
           const instance = yield* InstanceState.context
           const bridge = yield* EffectBridge.make()
           const withAbort = <A>(effect: Effect.Effect<A>) =>
-            Effect.tryPromise(() => bridge.promise(effect, ctx.abort)).pipe(Effect.orDie)
+            Effect.tryPromise({
+              try: () => bridge.promise(effect, ctx.abort),
+              catch: (error) => error,
+            }).pipe(Effect.orDie)
           const github = url ? githubSkillURL(args.source) : undefined
           const source = github ?? (args.source.startsWith("~/") ? resolve(Global.Path.home, args.source.slice(2)) : resolve(instance.directory, args.source))
           const directory = github ? source : yield* fs.realPath(source).pipe(Effect.orElseSucceed(() => source))
@@ -71,9 +74,10 @@ export const SkillInstallTool = Tool.define(
             yield* withAbort(askPaths("read", [...new Set([source, directory])], directory))
           }
           if (args.action === "validate") {
-            const result = yield* Effect.tryPromise(() =>
-              validateSkillFolder(directory, { authorizeRead }),
-            ).pipe(Effect.orDie)
+            const result = yield* Effect.tryPromise({
+              try: () => validateSkillFolder(directory, { authorizeRead }),
+              catch: (error) => error,
+            }).pipe(Effect.orDie)
             return {
               title: "Validate skill folder",
               output: JSON.stringify({ path: source, name: result.data?.name, errors: result.errors, warnings: result.warnings }),
