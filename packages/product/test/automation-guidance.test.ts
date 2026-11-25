@@ -18,6 +18,16 @@ test("stepwise edits use the current graph and verify only the requested step", 
   expect(step).toContain("что мешает запуску")
 })
 
+test("a step self-check requests only the port row count, even for a small input", async () => {
+  const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
+  const workflow = await Bun.file(new URL("../skills/loginom-automation/references/workflow.md", import.meta.url)).text()
+  expect(step).toContain("`read.sample_rows:0`")
+  expect(step).toContain("даже для маленькой таблицы")
+  expect(step).toContain("`row_count`")
+  expect(chain).not.toContain("sample_rows:100")
+  expect(workflow).toContain("Для самопроверки шага используй `read.sample_rows:0`")
+})
+
 test("automation guidance requires a user request for package saving", async () => {
   expect(skill).toContain("Пакет сохраняй только по явной просьбе пользователя")
   expect(skill).not.toContain("После удаления сохрани пакет")
