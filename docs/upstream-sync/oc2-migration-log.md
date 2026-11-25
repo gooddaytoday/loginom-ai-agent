@@ -24864,3 +24864,15 @@ Run 45688737120 форка на `oc2-migration` `df77bb443a`: `secrets` — succ
 Правка: у шага `Configure git identity` появился `id: ready`, а у шагов пакетов после охранных тестов условие
 `!cancelled() && steps.ready.outcome == 'success'`. Каждый пакет теперь показывает свой результат, задание остаётся
 красным, пока красный любой шаг. Охранные тесты `loginom-checks`, `ci-base` и `ci-workflows` — 12 pass.
+
+## B5.1m-ci2 CLI на GitHub: flag-identity
+
+Run 45689615930 форка (`fe60098d89`), задание `loginom-checks` с независимыми шагами. Прошли `loginom-agent`,
+`loginom-host`, `dashboard`, контракты и полный набор `loginom-runtime` с закреплённым Chromium — на раннере не от root.
+Значит, локальные красные этих пакетов — запуск от root (B5.1c, B5.1m). `Test product guards` — ровно три известных (В-95).
+
+`Test CLI`: 622 pass, 1 fail — `flag-identity.test.ts`: `debug paths` создаёт каталог конфигурации, а тест подставлял
+`LOGINOM_AI_AGENT_CONFIG_DIR=/product/config-dir`. На раннере `EACCES: mkdir '/product'`. Локально под root тест молча
+создал `/product/config-dir` в корне машины 22.11; пустой каталог удалён. Правка: пути продукта в тесте — внутри
+временного домашнего каталога пробы (`{root}`). 3 pass, `/product` больше не появляется. Восемь падений CLI после
+слияния B2.7a4c локально — таймауты под нагрузкой: на раннере их нет.
