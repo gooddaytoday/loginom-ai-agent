@@ -23387,3 +23387,11 @@ sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 fil
 
 - Три правила 0.4 о системном прокси CLI и `SYSTEM_PROXY_NOT_APPLIED`: в v2 `applyCliSystemProxy` нет. Не знаю, перенесено ли
   иначе; в `packages/cli/AGENTS.md` не писал.
+
+### Приёмка
+
+- `bun test` в `packages/product` (Bun 1.4.4): 63 pass, 3 fail — ровно известные `workspace packages > --filter arguments…`,
+  `CI triggers > path filters…`, `path literals…` (В-95, B5.1); `agents-paths.test.ts` — 3 pass.
+- Мутация: строка с `` `packages/nowhere/src/x.ts` `` в `packages/ui/AGENTS.md` — тест красный
+  (`packages/ui/AGENTS.md: packages/nowhere/src/x.ts`); откатил.
+- `catalog-check.py` — код 0; `apply-identity.py --check` — `would change: 0 files`; `bun run check` — код 0 (39 из 39 задач).
