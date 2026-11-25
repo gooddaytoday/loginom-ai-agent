@@ -23741,3 +23741,115 @@ $ grep -c blacksmith .github/workflows/*.yml                             # check
 - Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
   метаданные репозитория выше (отступ от условия «только документация»).
 - Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
+
+## B1.2t Проверка закреплённых выпусков
+
+25.11.2026. Ветка `b12t-pin-check` от `oc2-migration` = `0cfc0a30dd`, коммит `5ed6a760f2`. Поручение — В-108
+(PR kartamyshev-dev/loginom-ai-agent-test#1): по В-93 сканер не проверяет историю закреплённых в `.gitleaks-upstream`
+коммитов, поэтому SHA коммита форка в этом файле освобождал бы его историю от проверки.
+
+### Что сделано
+
+- `packages/script/src/secret-scan.ts`: режим `pins [REVISION]` (`bun run secrets pins`). Каждый SHA из
+  `.gitleaks-upstream` должен быть коммитом тега `v*` репозитория `https://github.com/anomalyco/opencode`. Адрес задан
+  константой `opencode`, список тегов берётся командой `git ls-remote --tags <адрес> 'refs/tags/v*'` с
+  `GIT_TERMINAL_PROMPT=0` и пределом 60 с. У аннотированного тега засчитывается строка `^{}`, SHA объекта тега — нет.
+  Без `REVISION` читается файл рабочего дерева, с `REVISION` — блоб из коммита (`ls-tree`/`cat-file`, без checkout).
+  Пустой файл или его отсутствие — код 0 без сети. Несовпадение — код 1, в сообщении все такие SHA. Сбой `ls-remote` —
+  код 1 и `Pin check incomplete`.
+- `.github/workflows/secrets.yml`: шаг `Verify pinned OpenCode releases` между «Verify scanner behavior» и «Scan only
+  incoming commits» — `pins "$HEAD"`, где `HEAD` = `pull_request.head.sha || github.sha`.
+- `docs/security/secret-protection.md`: раздел «Проверка закреплённых выпусков: решение В-108» (граница доверия и что
+  не закрыто), абзац «Модель доверия» и пункт в «CI и ветка loginom».
+- Тесты: четыре в `secret-scan.test.ts` и один в `secret-workflow.test.ts`. Подставной OpenCode — локальный голый
+  репозиторий: лёгкий тег `v1.0.0`, аннотированный `v1.1.0`, вершина `dev` с тегом `latest` и коммит, которого там нет.
+
+Файлов кода два, все затронутые файлы — файлы форка (в `a6b15d33da` их нет), поэтому `catalog.json` не меняется.
+
+### Где решал сам
+
+- **Отдельный режим, а не включение по `CI`.** Шаг «Verify scanner behavior» в GitHub идёт с `CI=true`. Если бы
+  `range`/`push` сами ходили в сеть в CI, тесты с подставными пинами обращались бы к GitHub. Явный режим и отдельный
+  шаг workflow — меньшее изменение; `run:` шага скана, который исполняет `secret-workflow.test.ts`, не менялся.
+- **На PR сверяется файл head PR, а не checkout базы.** Скан PR идёт по файлу базы, поэтому при проверке только базы
+  PR с чужим пином прошёл бы, а покраснел бы push CI `loginom` уже после слияния. Head читается как данные Git, без
+  checkout. Файл базы проверен раньше: он попал в `loginom` как head PR и прошёл push CI `loginom`.
+- **Шаблон `refs/tags/v*` — как в задании, не сужал.** В настоящем репозитории под него попадают не только выпуски:
+  42 из 1114 тегов (снимки `v0.0.0-…`, `v0.1.0-beta*`, `v0.0.*-feature-bench`, `vscode-v*`). Все это теги официального
+  репозитория; записано в границе доверия.
+- **Подмена адреса в тестах — `url.<голый>.insteadOf` через `GIT_CONFIG_COUNT/KEY/VALUE` и `GIT_ALLOW_PROTOCOL=file`.**
+  В коде адрес не настраивается. Если переписывание не сработает, Git откажет `transport 'https' not allowed`, а не
+  пойдёт в GitHub. Ключ `insteadOf` совпадает с константой посимвольно.
+- **stderr `ls-remote` не печатается**, как и сырая диагностика остального сканера; сообщение называет адрес.
+- **Раздела `## B1.2s` на базе нет.** Есть упоминания (`a080f7725c` + правка сканера B1.2s в разделе B1.2a, предел
+  теста в B1.8). Правка сканера B1.2s описана в `secret-protection.md`, раздел В-93; по ней и работал.
+- **`zip`**: на машине его нет. Как в B1.8, взят `zip` 3.0, ранее распакованный из deb в scratchpad. Без него 12
+  архивных тестов `secret-scan.test.ts` падают с `Executable not found in $PATH: "zip"` и на базе.
+
+### Проверки
+
+Bun 1.4.4 первым в `PATH`, `TMPDIR` — scratchpad, `HOME=/root`, `XDG_*` не заданы.
+
+```text
+$ bun install --frozen-lockfile                       # .husky/_ появился
+1607 packages installed [1.68s]
+# packages/script, bun test --timeout 30000 (как в CI)
+база 0cfc0a30dd:  71 pass, 0 fail, Ran 71 tests across 5 files. [173.53s]
+5ed6a760f2:       76 pass, 0 fail, Ran 76 tests across 5 files. [399.61s]   # +5 новых; параллельно шли catalog-check и apply-identity
+$ bun check --no-script                               # packages/script, как шаг CI
+✓ No type errors in 10 files [549.13ms]
+# packages/product, bun test: на базе и после — 60 pass, 3 fail, те же три известных
+(fail) workspace packages > --filter arguments in CI and scripts name existing workspace packages
+(fail) CI triggers > path filters match tracked files, so a trigger cannot silently stop firing
+(fail) path literals in build and CI code > packages/<name> and sibling-package references resolve to existing paths
+$ python3 -I scripts/upstream-sync/catalog-check.py --summary   # код 0
+against a6b15d33daf6: 612 divergent upstream files
+$ python3 -I scripts/upstream-sync/apply-identity.py --repo . --check
+would change: 0 files                                           # код 0
+$ prettier --check <4 файла кода и тестов>
+All matched files use Prettier code style!
+$ bun run lint:changed 0cfc0a30dd                               # смотрит только GUI-пакеты
+lint:changed: no changed TypeScript files since 0cfc0a30dd
+$ bun run secrets range a080f7725c HEAD                         # HEAD = 5ed6a760f2, код 0, 113,8 с
+{"status":"clean","commits":545,"archives":6,"current_files":0,"skipped":[],"upstream_commits":6784,"upstream_findings":606,"upstream_missing":0,"elapsed_ms":113134}
+$ bun run check                                                 # код 0, на 5ed6a760f2, один раз
+Found 905 warnings and 0 errors.                                # как в B4.15; в secret-scan*.ts — ни одного
+sdk-docs: 270 declarations, 1009 members and 292 parameters documented in 21 files; 11 guide blocks match their source; 0 problem(s)
+ Tasks:    39 successful, 39 total
+```
+
+Настоящая проверка — четыре запроса `ls-remote` только к GitHub (три вызова `pins` и список тегов), без переписываний
+адреса, модель не вызывалась:
+
+```text
+$ git config --show-origin --get-regexp '^url\.'      # пусто; из GIT_* в окружении только GIT_EDITOR
+$ bun --no-install packages/script/src/secret-scan.ts pins        # код 0
+{"status":"verified","pins":1,"elapsed_ms":543}
+$ bun --no-install packages/script/src/secret-scan.ts pins HEAD   # код 0
+{"status":"verified","pins":1,"elapsed_ms":313}
+$ bun run secrets pins                                            # код 0
+{"status":"verified","pins":1,"elapsed_ms":326}
+$ git ls-remote --tags https://github.com/anomalyco/opencode 'refs/tags/v*' | grep 'refs/tags/v2.3.0'
+a6b15d33daf6ab7d35569f6d711fdb630b9f04e7	refs/tags/v2.3.0          # лёгкий тег; 1115 строк = 1114 тегов + одна ^{}
+```
+
+Мутации — по одной, затем `bun test --timeout 30000 -t 'pin check'` (5 тестов), файл восстанавливается:
+
+| Мутация | Красный тест |
+|---|---|
+| M1 проверка всегда проходит (`foreign` пуст) | «…no release tag names fails…», «PR pin check runs before the scan…» |
+| M2 аннотированный тег не разворачивается (только строки без `^{}`) | «…annotated release tag passes…» |
+| M3 сбой сети — успех (`process.exit(0)`) | «an empty pin file passes … without contacting OpenCode» |
+| M4 любой ref, а не теги `v*` (`ls-remote` без `--tags` и шаблона) | «…no release tag names fails…» |
+| M5 пустой файл тоже идёт в сеть | «an empty pin file passes … without contacting OpenCode» |
+| M6 проверяется только первый пин | «…no release tag names fails…» |
+| M7 CI читает файл checkout (`pins` без `"$HEAD"`) | «PR pin check runs before the scan…» |
+| M8 шаг CI убран (переименован) | «PR pin check runs before the scan…» |
+
+### Не проверено
+
+- Шаг в GitHub Actions не запускался (без push). Его `run:` исполняет тест workflow локально, адрес подменён
+  `insteadOf`; сеть раннера к GitHub и время `ls-remote` там — нет.
+- Для PR шаг заработает только после попадания правки в `loginom`: `pull_request_target` берёт workflow из базы.
+- На push ветка может удалить шаг в своём workflow; барьер — PR-проверка из базы и защита `loginom`.
+- Локальные hooks пины не сверяют: ветка может локально вписать свой SHA и пройти hooks, остановит её CI.

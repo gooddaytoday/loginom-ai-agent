@@ -8,12 +8,29 @@ type Archive = { oid: string; file: string; current?: boolean; blob?: Uint8Array
 class ScanFailure extends Error {}
 const archivePaths = ["lgp", "zip", "tgz", "gz", "tar", "7z", "xz", "bz2", "zst"].map((ext) => `:(icase)*.${ext}`)
 const archivePattern = /\.(lgp|zip|tgz|tar\.gz|gz|tar|7z|xz|bz2|zst)$/i
+// В-108: a pin must be a release commit of official OpenCode. The address is code, not repository policy, so a branch
+// cannot point the check elsewhere by editing a file it controls.
+const opencode = "https://github.com/anomalyco/opencode"
 
 async function main() {
   const started = performance.now()
   const mode = Bun.argv[2]
-  if (!["staged", "range", "push", "audit"].includes(mode))
-    throw new ScanFailure("Usage: bun run secrets <staged|push REMOTE|range BASE HEAD|audit>")
+  if (!["staged", "range", "push", "audit", "pins"].includes(mode))
+    throw new ScanFailure("Usage: bun run secrets <staged|push REMOTE|range BASE HEAD|audit|pins [REVISION]>")
+  if (mode === "pins") {
+    const pins = (await upstreamPins(Bun.argv[3])).map((pin) => pin.sha)
+    // No pins exempt nothing, so there is nothing to ask the network about.
+    const released = pins.length ? releaseCommits() : new Set<string>()
+    const foreign = pins.filter((pin) => !released.has(pin))
+    if (foreign.length)
+      throw new ScanFailure(
+        `Pin check failed: .gitleaks-upstream pins ${foreign.join(", ")}, not the commit of any OpenCode release tag v* at ${opencode}.`,
+      )
+    console.log(
+      JSON.stringify({ status: "verified", pins: pins.length, elapsed_ms: Math.round(performance.now() - started) }),
+    )
+    return 0
+  }
   // A large merge must not cut rename detection short: gitleaks relays Git's warning and the scan stops.
   const count = Number(process.env.GIT_CONFIG_COUNT || 0)
   process.env[`GIT_CONFIG_KEY_${count}`] = "diff.renameLimit"
@@ -349,9 +366,14 @@ async function indexSnapshot(directory: string, env: NodeJS.ProcessEnv) {
   gitInput(undefined, ["-C", directory, "-c", "core.autocrlf=false", "add", "--all", "--force"], env)
 }
 
-async function upstreamPins() {
-  if (!existsSync(".gitleaks-upstream")) return []
-  return (await Bun.file(".gitleaks-upstream").text())
+async function upstreamPins(revision?: string) {
+  // CI reads an incoming PR's pin file as Git data, without checking the PR out.
+  const blob =
+    revision === undefined
+      ? undefined
+      : blobs("ls-tree", "-z", "--full-tree", commit(revision), "--", ".gitleaks-upstream").get(".gitleaks-upstream")
+  if (revision === undefined ? !existsSync(".gitleaks-upstream") : !blob) return []
+  return (blob ? git("cat-file", "blob", blob) : await Bun.file(".gitleaks-upstream").text())
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
@@ -370,6 +392,26 @@ async function upstreamPins() {
         throw new ScanFailure("Secret scan incomplete: .gitleaks-upstream must list full commit SHAs.")
       return { sha: line, present: true }
     })
+}
+
+function releaseCommits() {
+  const result = Bun.spawnSync(["git", "ls-remote", "--tags", opencode, "refs/tags/v*"], {
+    // Without a terminal a moved or private repository must fail rather than wait for credentials.
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    stdin: "ignore",
+    stderr: "ignore",
+    timeout: 60_000,
+  })
+  if (!result.success) throw new ScanFailure(`Pin check incomplete: cannot list release tags of ${opencode}.`)
+  const tags = result.stdout
+    .toString()
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("\t"))
+  // An annotated tag is listed twice: its tag object, then the commit it points to as "<ref>^{}".
+  const annotated = new Set(tags.filter((tag) => tag[1].endsWith("^{}")).map((tag) => tag[1].slice(0, -3)))
+  return new Set(tags.filter((tag) => !annotated.has(tag[1])).map((tag) => tag[0]))
 }
 
 function blobs(...args: string[]) {
