@@ -73,6 +73,17 @@ test.skipIf(process.platform !== "linux")("a built CLI is bundled with its versi
   expect(await Bun.file(`${dest}.version`).text()).toBe("1.2.3-dev")
 })
 
+// electron-vite loads electron.vite.config.ts, and so script/utils.ts, with the Node on PATH, not with Bun. A Bun-only
+// import there (`exists` of node:fs/promises) broke the Linux candidate build on CI (B5.1h).
+test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE)("script/utils.ts loads under Node", () => {
+  const result = Bun.spawnSync([process.env.LOGINOM_AI_AGENT_TEST_NODE!, "-e", 'import("./script/utils.ts")'], {
+    cwd: path.resolve(import.meta.dir, ".."),
+    stderr: "pipe",
+  })
+  expect(result.stderr.toString()).not.toContain("SyntaxError")
+  expect(result.exitCode).toBe(0)
+})
+
 async function temporary() {
   const root = await mkdtemp(path.join(os.tmpdir(), "desktop-bundled-cli-"))
   roots.push(root)
