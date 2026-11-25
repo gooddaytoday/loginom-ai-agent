@@ -3541,20 +3541,86 @@ test('output columns bind names labels and types to real rows, excluding summary
   }
 });
 
+function outputColumnEditorFixture(){
+  const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
+  page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
+  const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
+  page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
+  const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
+  page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
+  const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
+  for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
+    const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
+    input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
+  }
+  return {page,base,form,table,dialog,inputs};
+}
+
+async function observeOutputColumnBatch({page,base},label='Sum'){
+  const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
+  const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:base.slice(0,-1)};
+  const binding={node:structuredClone(node),workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+  const run=options=>primitive(page,{expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},
+    async()=>structuredClone(node));
+  const snapshot=(await run({mode:'observe',root_ref})).output;
+  const action={verb:'set_wizard_fields',fields:Object.entries({name:'QuantitySum',label}).map(([name,text])=>({
+    ref:snapshot.wizard.column_parameters.fields[name].input_ref,text}))};
+  validateNodeUiAction(action,snapshot,binding);
+  return {node,snapshot,act:()=>run({mode:'act',snapshot,action})};
+}
+
+test('W1 rejects an output batch when the native owner changes on Tab after the name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{if(key==='Tab'&&element===inputs.edtName)node.node_id='foreign';};
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,true);
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
+test('W13 refuses a different output batch owner between observation and action in the same DOM epoch',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {node,snapshot,act}=await observeOutputColumnBatch(editor);
+  node.node_id='foreign';
+
+  const result=await act();
+  assert.equal(result.status,'NOT_APPLIED');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(result.effect_possible,false);
+  assert.deepEqual(clone(result.output.dom_epoch),clone(snapshot.dom_epoch));
+  assert.equal(result.output.prepared_node_context.node_id,'foreign');
+  assert.deepEqual(page.events,[]);
+  assert.equal(inputs.edtName.value,'Quantity');
+  assert.equal(inputs.edtDisplayName.value,'Quantity|Сумма');
+});
+
+test('R5 preserves an unlinked output label the application changed to the new name',async()=>{
+  const editor=outputColumnEditorFixture(),{page,inputs}=editor;
+  const {act}=await observeOutputColumnBatch(editor);
+  page.onPress=(key,element)=>{
+    if(key==='Tab'&&element===inputs.edtName)inputs.edtDisplayName.value=inputs.edtName.value;
+  };
+
+  const result=await act();
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  assert.equal(inputs.edtName.value,'QuantitySum');
+  assert.equal(inputs.edtDisplayName.value,'QuantitySum');
+  assert.equal(page.events.filter(event=>event==='click').length,1);
+  assert.equal(page.events.filter(event=>event==='keyboard_type').length,1);
+});
+
 test('output column typed editing preserves the selected row and all other parameters',async()=>{
   for(const mode of ['name','label','linked_name','linked_wrong','unlinked_changed','type_changed','selection_changed','missing_type',
     'combo','combo_kind_changed','combo_busy','batch_linked','batch_linked_satisfied','batch_unlinked_changed','batch_linked_signature_changed']) {
-    const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
-    page.add('button',base+'DerivedDataSourceOutputSocketWizard;btnAddMappingColumn','',undefined,form);
-    const table=page.add('table',null,'',undefined,form);table.attrs.class='x-grid-item-selected';
-    page.add('td',base+'DerivedDataSourceOutputSocketWizard;colName_Quantity','Quantity',undefined,table);
-    const label=page.add('td',base+'DerivedDataSourceOutputSocketWizard;colDisplayName_Quantity','Quantity|Сумма',undefined,table);
-    page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
-    const dialog=page.add('div',base+'EditColumnDefForm');dialog.attrs.class='x-window';const inputs={};
-    for(const [key,value] of [['edtName','Quantity'],['edtDisplayName','Quantity|Сумма'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано']]) {
-      const owner=page.add('div',base+'EditColumnDefForm;'+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);
-      input.value=value;input.box={x:300,y:200+Object.keys(inputs).length*40,width:120,height:25};inputs[key]=input;
-    }
+    const editor=outputColumnEditorFixture(),{page,base,form,table,dialog,inputs}=editor;
     if(mode.startsWith('combo')) {
       const stem=base+'EditColumnDefForm;cbxDataType;';
       const list=page.add('div',stem+'boundlist','',{x:600,y:300,width:140,height:40});
@@ -3574,28 +3640,21 @@ test('output column typed editing preserves the selected row and all other param
     }
     if(mode.startsWith('linked_')||mode.startsWith('batch_linked'))inputs.edtDisplayName.value='Quantity';
     if(mode==='missing_type')inputs.cbxDataType.remove();
-    const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
     if(mode.startsWith('batch_')){
-      const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node',tid:base.slice(0,-1)};
-      const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
-      const run=options=>primitive(page,{expected_build:build,expected_origin:origin,
-        prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},async()=>structuredClone(node));
-      const snapshot=(await run({mode:'observe',root_ref})).output;
-      const action={verb:'set_wizard_fields',fields:['name','label'].map((name,i)=>({
-        ref:snapshot.wizard.column_parameters.fields[name].input_ref,text:i&&mode!=='batch_linked_satisfied'?'Sum':'QuantitySum'}))};
-      validateNodeUiAction(action,snapshot,node);
+      const {act}=await observeOutputColumnBatch(editor,mode==='batch_linked_satisfied'?'QuantitySum':'Sum');
       page.onPress=(key,element)=>{
         if(key!=='Tab'||element!==inputs.edtName)return;
         inputs.edtDisplayName.value=mode==='batch_unlinked_changed'?'App choice':'QuantitySum';
         if(mode==='batch_linked_signature_changed')inputs.edtDisplayName.attrs.name='foreign-signature';
       };
-      const result=await run({mode:'act',snapshot,action});
+      const result=await act();
       const verified=['batch_linked','batch_linked_satisfied'].includes(mode);
       assert.equal(result.status,verified?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
       assert.equal(page.events.filter(e=>e==='keyboard_type').length,mode==='batch_linked'?2:1);
       assert.equal(inputs.edtDisplayName.value,mode==='batch_linked'?'Sum':mode==='batch_unlinked_changed'?'App choice':'QuantitySum');
       continue;
     }
+    const full=await page.observe(),root_ref=full.wizard.column_parameters.root_ref;
     const read=await page.execute({mode:'observe',root_ref});
     const target=read.output.ui.elements.find(e=>e.wizard_field?.scope==='output_column' && e.wizard_field.name===(mode==='label'?'label':'name'));
     if(mode==='missing_type'){assert.equal(target,undefined);continue;}
