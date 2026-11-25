@@ -43,8 +43,16 @@ class MakePairTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(name, result.stderr)
                 self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_empty_password_variable_marks_the_account_passwordless(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertNotEqual(run(FAKE | {'LOGINOM_REVIEWER_PASS': ''}, tmp=tmp).returncode, 0)
+            result = run(FAKE | {'LOGINOM_WORKER_PASS': ''}, tmp=tmp)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            directory = Path(result.stdout.strip())
+            worker = json.loads((directory / 'worker.json').read_text())['loginom']
+            self.assertEqual((worker['password'], worker['passwordless_login']), ('', True))
+            self.assertNotIn('passwordless_login', json.loads((directory / 'reviewer.json').read_text())['loginom'])
+            self.assertNotEqual(run({k: v for k, v in FAKE.items() if k != 'LOGINOM_WORKER_USER'} | {'LOGINOM_WORKER_USER': ''}, tmp=tmp).returncode, 0)
 
     def test_remove_refuses_a_foreign_directory(self):
         with tempfile.TemporaryDirectory() as tmp:

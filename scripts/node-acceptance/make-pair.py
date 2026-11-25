@@ -19,14 +19,16 @@ ROLES = ('worker', 'reviewer')
 
 
 def build(env=os.environ):
-    missing = [f'LOGINOM_{role.upper()}_{field}' for role in ROLES for field in ('USER', 'PASS') if not env.get(f'LOGINOM_{role.upper()}_{field}')]
+    # A password variable that is set but empty means a passwordless account (B6.1-A, В-107); an unset one is still a refusal.
+    missing = [f'LOGINOM_{role.upper()}_USER' for role in ROLES if not env.get(f'LOGINOM_{role.upper()}_USER')] + [f'LOGINOM_{role.upper()}_PASS' for role in ROLES if f'LOGINOM_{role.upper()}_PASS' not in env]
     if missing:
         raise SystemExit('make-pair: missing environment variables: ' + ', '.join(missing))
     directory = Path(tempfile.mkdtemp(prefix='loginom-pair-'))
     directory.chmod(0o700)
     for role in ROLES:
         user = env[f'LOGINOM_{role.upper()}_USER']
-        document = dict(loginom=dict(url=env.get('LOGINOM_URL') or 'https://app.loginom.ai', username=user, password=env[f'LOGINOM_{role.upper()}_PASS']), package_directory='/' + user)
+        password = env[f'LOGINOM_{role.upper()}_PASS']
+        document = dict(loginom=dict(url=env.get('LOGINOM_URL') or 'https://app.loginom.ai', username=user, password=password, **({'passwordless_login': True} if not password else {})), package_directory='/' + user)
         descriptor = os.open(directory / (role + '.json'), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w') as handle:
             json.dump(document, handle)
