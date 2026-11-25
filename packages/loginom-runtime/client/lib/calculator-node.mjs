@@ -46,6 +46,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
   revision:implementation.revision,modes:implementation.modes??[implementation.mode],output_wizard:'separate',
   configurationReadback:implementation.readback,parameter_schema:implementation.parameterSchema,
+  ...(implementation.variableInputs?{variable_inputs:implementation.variableInputs}:{}),
   ...(implementation.bindingSchema?{binding_schema:implementation.bindingSchema}:{}),
   ...(implementation.fullUiOutput===true?{fullUiOutput:true}:{}),
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}

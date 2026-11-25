@@ -7,6 +7,7 @@ import {javascriptParametersSchema} from './node-api.mjs';
 
 export function createPythonNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'programming.python',mode:'script',revision:'python-v1-internal-1',parameterSchema:javascriptParametersSchema,
+ variableInputs:{variables:[0]},
  validate:validatePythonParameters,readback:pythonConfigurationReadback,
  configurationObservation:{condition:'python wizard',ready:s=>['input_mapping','python_columns','python_code'].includes(s.wizard?.stage)},
  configure:configurePython,

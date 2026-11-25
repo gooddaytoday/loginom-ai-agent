@@ -20,6 +20,15 @@ const request=(type,mode,parameters,extra={})=>({
 const calculator=extra=>request('transform.calculator','expression',{
  expressions:[{target:{kind:'new'},name:'Result',label:'Result',type:'real',formula:'1',replace:false}],
 },extra);
+const python=extra=>request('programming.python','script',{
+ schema_mode:'declared',columns:[{name:'AboveThreshold',label:'Above threshold',type:'boolean',data_kind:'Дискретный',usage:'Не задано'}],
+ source_text:`from builtin_data import InputTable, InputVariables, OutputTable
+threshold = InputVariables.Items["Threshold"].Value
+for i in range(InputTable.RowCount):
+    OutputTable.Append()
+    OutputTable.Set("AboveThreshold", InputTable.Get(i, "Value") > threshold)
+`,
+},extra);
 
 function fixture(){
  const calls=[];
@@ -40,6 +49,8 @@ for(const [name,args,path,hint] of [
   {variable_inputs:[variable()]}),'variable_inputs',/accepts no variable inputs/],
  ['database import with a variable input',request('imports.database','table',{},
   {inputs:[],variable_inputs:[variable()]}),'variable_inputs',/accepts no variable inputs/],
+ ['Python variable input 1',python({variable_inputs:[variable('variables',1)]}),'variable_inputs',/accepts variables input 0/],
+ ['Python control input',python({variable_inputs:[variable('control')]}),'variable_inputs',/accepts variables input 0/],
  ['unsupported mapping port',calculator({mappings:[mapping('variables',1)]}),'mappings',/variables input 0/],
  ['new mapping without its connection',calculator({mappings:[mapping()]}),'mappings',/Add.*variable_inputs.*variables input 0/],
  ['handler refusal for typed mapping',request('variables.replace','exact',{},{
@@ -101,6 +112,7 @@ for(const [name,args] of [
  ['JavaScript variable connection',request('programming.javascript','script',{
   schema_mode:'code',source_text:'import {OutputTable} from "builtIn/Data";\n',
  },{variable_inputs:[variable()]})],
+ ['Python with table and variable connections',python({variable_inputs:[variable()]})],
  ['variables Calculator mapping on control input',request('variables.calculator','expression',{
   expressions:[{target:{kind:'new'},name:'Count',label:'Count',type:'integer',formula:'1'}],
  },{inputs:[],variable_inputs:[variable('control')],mappings:[mapping('control')]})],
