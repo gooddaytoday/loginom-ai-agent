@@ -9,7 +9,7 @@ import {nodeApplyInputSchema} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
-import {excelExportNext,configureExcelExport} from '../lib/exports-excel-procedure.mjs';
+import {excelExportNext,configureExcelExport,preflightExcelExportDestination} from '../lib/exports-excel-procedure.mjs';
 import {excelExportReadback} from '../lib/exports-excel-node.mjs';
 
 test('Excel readback distinguishes both saved variable bindings from resolved values',()=>{
@@ -22,6 +22,26 @@ test('Excel readback distinguishes both saved variable bindings from resolved va
 });
 
 const directories={packages:'/operator/packages',inputs:'/operator/inputs',exports:'/operator/exports'};
+test('Excel checks the exact destination and refuses a reject conflict before the graph phase',async()=>{
+ const destination=directories.exports+'/report.xlsx',calls=[];
+ const request={target:{kind:'new',type:'exports.excel'},finish:'execute',parameters:{excel_export:{destination}}};
+ const inspect=async path=>{calls.push(path);return {destination:path,exists:true};};
+ await assert.rejects(preflightExcelExportDestination(request,inspect),error=>{
+  assert.equal(error.nodePhaseRefusal?.phase,'source');
+  assert.equal(error.nodePhaseRefusal?.cleanup_complete,true);
+  assert.match(error.message,/report\.xlsx.*Ask.*user/);
+  return true;
+ });
+ assert.deepEqual(calls,[destination]);
+ request.parameters.excel_export.overwrite='replace';
+ assert.deepEqual(await preflightExcelExportDestination(request,inspect),{destination,exists:true,overwrite:'replace'});
+ request.parameters.excel_export.overwrite='reject';
+ assert.deepEqual(await preflightExcelExportDestination(request,async path=>({destination:path,exists:false})),{destination,exists:false,overwrite:'reject'});
+ await assert.rejects(preflightExcelExportDestination(request,async()=>({destination:'/somewhere/report.xlsx',exists:false})),/destination/i);
+ request.finish='close';
+ assert.equal(await preflightExcelExportDestination(request,()=>assert.fail('Close has no destination check')),null);
+});
+
 test('XLSX native exports retain the selected directory and extension guards',()=>{
  for(const extension of ['csv','tsv','xlsx','xls']){
   const destination=directories.exports+'/result.'+extension;

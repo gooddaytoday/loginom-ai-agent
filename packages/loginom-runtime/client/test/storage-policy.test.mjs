@@ -1,9 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { storagePath, storageDirectories, requireStorageDestination, storageTidSuffix, createStorageBinding, withStorageIdentity } from '../lib/storage-policy.mjs';
+import {readStorageDestination} from '../lib/storage-policy.mjs';
 import vm from 'node:vm';
 
 const directories = { packages: '/operator/Мои пакеты', inputs: '/operator/Данные', exports: '/operator/Результаты' };
+test('export existence comes from the complete native store of the exact owned folder',async()=>{
+ const binding=createStorageBinding({sessionId:'session',origin:'http://loginom.local',build:'7.4.2',documentId:'doc',account:'operator',directories});
+ const directory=directories.exports,destination=directory+'/Sales report.xlsx',workflow={prefix:'MF;TF-1',tab_tid:'tab'};
+ const record=name=>({isModel:true,data:{FileName:name,FilePath:directory+'/'+name,id:directory+'/'+name}});
+ const records=[record('Sales_report.xlsx')];
+ let loading=false,total=null;
+ const store={$className:'bg.filedialog.FileStore',isLoading:()=>loading,getRange:()=>records,
+  getCount:()=>records.length,getTotalCount:()=>total??records.length,getData:()=>({items:records})};
+ const grid={id:'grid'},tab={classList:{contains:name=>name==='x-tab-active'}};
+ const form={constructor:{name:'FileStorageForm'},FView:{el:{dom:{contains:e=>e===grid}}},
+  FFileSenderManager:{constructor:{name:'FileSenderManager'},CurrentDirectory:directory+'/'}};
+ const connection={Connected:true,UserName:'operator'};
+ const main={Items:{Workspace:{getActiveTab:()=>({Controller:{FController:form}})}},FMapTree:{FServerConnection:connection}};
+ const document={querySelectorAll:selector=>selector==='[data-tid="tab"]'?[tab]:[grid]};
+ const globals={document,location:{origin:binding.origin},__loginomDockPreparationV1:{document,id:'doc'},
+  bg:{app:{Version:binding.loginom_build,Application:{FInstance:{FMainForm:main}}}},
+  Ext:{getCmp:id=>id==='grid'?{el:{dom:grid},getStore:()=>store}:null}};
+ const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg})};
+ const read=()=>readStorageDestination(page,{binding,workflow,directory,destination});
+ assert.equal((await read()).exists,false);
+ records.push(record('Sales report.xlsx'));
+ assert.equal((await read()).exists,true);
+ total=3;assert.equal((await read()).verified,false);
+ total=null;loading=true;assert.equal((await read()).verified,false);
+ loading=false;connection.Connected=false;assert.equal((await read()).verified,false);
+ connection.Connected=true;form.FFileSenderManager.CurrentDirectory='/somewhere/';assert.equal((await read()).verified,false);
+});
+
 test('explicit storage directories preserve user names and restrict each purpose', () => {
   assert.equal(requireStorageDestination('/operator/Результаты/Сводка, 1.csv', directories, 'exports'), '/operator/Результаты/Сводка, 1.csv');
   assert.equal(requireStorageDestination('/operator/Данные', directories, 'inputs', { directory: true }), directories.inputs);

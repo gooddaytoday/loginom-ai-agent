@@ -14,6 +14,7 @@ import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {javascriptCodeReadback} from '../lib/javascript-code-node.mjs';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 import {existingOutputExecution} from '../lib/node-execution-evidence.mjs';
+import {observeStepwiseSourceFreshness} from '../lib/node-source-freshness.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
@@ -85,6 +86,28 @@ function nativeExecution({running=false,active=true}={}){
    {process_id:'1.1',record_id:'child',parent_id:'1',error:false,progress_state,
     owner:{verified:true,node_id:node.node_id,source:'native_process_model_identity'}}]};
 }
+test('source reuse is journaled only for the same completed active execution and exact port',async()=>{
+ const execution_id='doc:root:1',port_guid='port0',operationId='next';
+ const input={source:node,output:0,input:0};
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf'},target:{kind:'new',type:'transform.sorting'},inputs:[input]};
+ const history=[{sequence:1,request:{operation_id:'source',document_id:'doc',workflow_ref:request.workflow_ref},
+  cleanup_confirmed:true,outcome:{status:'SUCCEEDED',cleanup_complete:true,operation_id:'source',output:{operation_id:'source',node,status:'SUCCEEDED',cleanup_complete:true,
+   execution:{status:'completed',execution_id},output:{verified:true,execution_id,ports:[{port:0,port_guid,execution_id,fresh:true}]}}}}];
+ const records=[],record=async e=>{records.push(e);return structuredClone(e);};
+ const ports={verified:true,node_context:{...node,verified:true,surface:'graph'},ports:[{index:0,port_guid,active:true}]};
+ const observe=async()=>({processes:nativeExecution(),ports});
+ await observeStepwiseSourceFreshness({request,operationId,history,observe,record});
+ assert.equal(records.at(-1).proof.status,'fresh');
+ assert.equal(records.at(-1).proof.execution_id,execution_id);
+ assert.equal(records.at(-1).proof.port_guid,port_guid);
+ await observeStepwiseSourceFreshness({request,operationId,history,observe:async()=>({processes:nativeExecution({active:false}),ports}),record});
+ assert.equal(records.at(-1).proof.status,'unverified');
+ await observeStepwiseSourceFreshness({request,operationId,history,observe:async()=>({processes:nativeExecution(),ports:{...ports,ports:[{index:0,port_guid:'other',active:true}]}}),record});
+ assert.equal(records.at(-1).proof.status,'unverified');
+ const two={...history[0],sequence:2,request:{...history[0].request,target:{kind:'existing',ref:node}},outcome:{status:'FAILED'}};
+ await observeStepwiseSourceFreshness({request,operationId,history:[...history,two],observe:()=>assert.fail('Older execution cannot prove freshness'),record});
+ assert.equal(records.at(-1).proof.status,'unverified');
+});
 for(const running of [false,true])test('production current-output read '+(running?'waits for native completion':'preserves execution')+' without Execute or wizard',async()=>{
  const request=buildNodeReadRequest({...args,execution:undefined},source());
  const output={port:0,port_guid:'p',fresh:true,execution_id:'doc:root:1',schema,sample_complete:true};

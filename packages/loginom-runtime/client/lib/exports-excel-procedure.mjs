@@ -4,6 +4,23 @@ import {EXCEL_EXPORT_FIELDS,validateExcelExportDestination,validateExcelSheetNam
 import {withBrowserReceipt} from './executor.mjs';
 import {createHash} from 'node:crypto';
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const destinationConflict=destination=>Error('Excel destination exists: '+destination+
+ '. Ask the user whether to replace the entire workbook or choose another path.');
+export async function preflightExcelExportDestination(request,inspect){
+ const settings=request.parameters.excel_export;
+ if(request.target.type!=='exports.excel'||request.finish==='close'||settings?.destination===undefined)return null;
+ const {destination,overwrite='reject'}=settings;
+ const observed=await inspect(destination);
+ need(observed?.destination===destination&&typeof observed.exists==='boolean','Exact Excel destination could not be verified');
+ const proof={destination,exists:observed.exists,overwrite};
+ if(proof.exists&&overwrite==='reject'){
+  const error=destinationConflict(destination);
+  error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+   verification:'excel_export_destination_preflight',proof};
+  throw error;
+ }
+ return proof;
+}
 // A binding needs exactly one connected non-NULL string variable of that name
 // whose observed value is itself an admissible destination or sheet name.
 export function requireExcelBindingSources(bindings,variableMapping,storageDirectories){
@@ -70,7 +87,7 @@ export async function configureExcelExport(channel,p,ctx,options){
  const destination=validateExcelExportDestination(current.values.destination.value,options.storageDirectories);
  const result=await runExcelExportNext({binding,before:current,variableMapping:options.variableMapping,destination,overwrite:p.overwrite??'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
  need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel export Next uncertain');
- if(result.output.rejected){const closed=await options.close(channel);const e=Error('Excel destination exists; reject policy preserved it');e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:closed.cleanup_complete,settings_unchanged:true,verification:'text_export_conflict_rejected'};throw e;}
+ if(result.output.rejected){const closed=await options.close(channel);const e=destinationConflict(destination);e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:closed.cleanup_complete,settings_unchanged:true,verification:'text_export_conflict_rejected'};throw e;}
  configured.destination_check=result.output;
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{initial,configured,destination}};
 }

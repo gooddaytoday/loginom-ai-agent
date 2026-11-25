@@ -11,6 +11,7 @@ import {createActionRuntime} from '../lib/executor.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 import {createTextImportNodeSupport,verifyDeferredTextImportSources} from '../lib/text-import-node.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
+import {createExcelExportNodeSupport} from '../lib/exports-excel-node.mjs';
 
 async function sourceNavigation(t,fault,options={}) {
  const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[],deadlines=[];
@@ -52,6 +53,36 @@ async function sourceNavigation(t,fault,options={}) {
  const result=await r.serverDownload({operation_id:'source',path:'/worker/full.csv'},'dock_storage_source');
  return {result,records,deadlines,page,refreshed,runtime:r,native,showGraph:()=>{opened=false;}};
 }
+
+test('a confirmed Excel destination conflict leaves the node and links uncreated',async t=>{
+ const support=createExcelExportNodeSupport({storageDirectories:{packages:'/worker',inputs:'/worker',exports:'/worker'}});
+ const steps=[];
+ const f=await sourceNavigation(t,undefined,{...support,
+  nodeTargetAdapterFactory:()=>({observe:async()=>{steps.push('graph');throw Error('Unexpected graph observation');}}),
+ });
+ const destination='/worker/report.xlsx',evaluate=f.page.evaluate.bind(f.page);
+ f.page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes('directory,destination})'))return evaluate(fn,arg);
+  assert.equal(arg.destination,destination);
+  steps.push('destination');
+  return {verified:true,destination,exists:true};
+ };
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
+ const request={operation_id:'export-conflict',contract_revision:'1.0.0',document_id:'d',workflow_ref,
+  target:{kind:'new',type:'exports.excel'},inputs:[{source:{document_id:'d',workflow_id:'flow',node_id:'table'},output:0,input:0}],
+  mode:'xlsx',parameters:{excel_export:{destination,sheet_name:'Report',header:'labels',overwrite:'reject'}},mappings:[],finish:'execute',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const outcome=await f.runtime.runNodeApply(request);
+ assert.equal(outcome.status,'NOT_APPLIED',JSON.stringify(outcome.error));
+ assert.equal(outcome.cleanup_complete,true);assert.equal(outcome.effect_possible,false);
+ assert.equal(outcome.output.node,null);assert.equal(outcome.output.pending_phase,null);
+ assert.match(outcome.error.message,/report\.xlsx.*Ask.*user/);
+ assert.deepEqual(steps,['destination']);
+ assert.equal(f.records.find(e=>e.phase==='node_phase_refused')?.receipt.proof.destination,destination);
+ assert.deepEqual(await f.runtime.runNodeApply(request),outcome);
+ assert.deepEqual(steps,['destination']);
+});
 
 test('Import binding consumes its observed file witness after Files returns to the graph',async t=>{
  const node={document_id:'d',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};

@@ -175,6 +175,14 @@ for(const mode of ['done','execute'])test('Import reports its observed Finish ca
  assert.match(result.warnings.join(' '),/node1/);
  assert.deepEqual(await f.run(p),result);
 });
+test('a Text Import caption confirmed on the first apply does not suggest a second apply',async()=>{
+ const f=fixture(),p=request(),finish=f.drivers.finish;
+ f.drivers.finish=async mode=>({...await finish(mode),node_label:p.target.label});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.match(result.warnings.join(' '),/observed caption "Import"/);
+ assert.doesNotMatch(result.warnings.join(' '),/NEW dock_node_apply/);
+});
 test('full shell orders configuration before execution and binds empty fresh output',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);

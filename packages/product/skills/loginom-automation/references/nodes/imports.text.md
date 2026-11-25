@@ -67,9 +67,8 @@ Mixed: `settings.format.variant_as_general_type:true` and
 `settings.analysis.refresh:"types"` on SAME Import; no Calculator/JS. Use false
 and refresh to redetect strings. Check values/types/NULL.
 
-Caption: `settings.node_title:{mode:"automatic"}` follows basename;
-`{mode:"custom",label:"Sales"}` persists; omit preserves.
-Read `configuration.readback.node_title`.
+New: pass the caption in `target.label`. `settings.node_title` overrides it
+(automatic uses basename). Verify `configuration.readback.node_title`.
 
 ## Path from variable
 
