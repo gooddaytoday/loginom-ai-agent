@@ -23575,3 +23575,169 @@ Linux; на Windows — DPAPI под обычным пользователем, 
 - `DEEPSEEK_API_KEY` в собранном CLI с `LOGINOM_AI_AGENT_PURE=1`: найдено только в `packages/ai/src/providers/deepseek.ts`, процессом не проверялось (T2).
 - Существование точных имён сценариев в `run-check.py` для узлов 7–25 (часть найдена: s1, s3, s5, n21, partition-random, sampling-random, smoothing-hp, acf-update, corr-pairs, rest-get-plain, tree-repeat, tree-no-repeat, date-time-iso, exports-excel, regex-replace, cp1251; остальные — пути к `task.md`).
 - Живость и права аккаунтов (проверяющий, прежние пары): сеть к app.loginom.ai не использовалась.
+
+## B5.0 Разведка CI и выпуска
+
+25.11.2026. Задача B5.0, ветка `b50-ci-scout` от `oc2-migration` (`0cfc0a30dd`), рабочее дерево `.claude/worktrees/b50`.
+Эталон 0.4 — `v0.4.0` (В-99). Только чтение и этот раздел; кода нет, workflow не запускались (Actions не вызывал, сеть не
+использовал), модель не вызывалась. Bun 1.4.4 переносной первым в `PATH`; `bun install --frozen-lockfile` — код 0,
+`.husky/_` есть. Прочитано: план этапа B (B5, B6, пометки «B5» и «B5.1»), журнал (все места B5/B5.1), `README.md`,
+`ci-release.md`, `windows-release-coverage.md`, решения В-86, В-95, В-97, В-98, В-99, 25 файлов `.github/workflows/*`,
+`.github/actions/*`, workflow `v0.4.0` (`release.yml`, `test.yml`, `typecheck.yml`).
+
+### Итог
+
+- Из 25 workflow в дереве продукту нужны 6 (`secrets`, `loginom-windows`, `loginom-macos`, `loginom-client-full`,
+  `windows-native-check`, часть `check-test`/`check`). Ещё 8 upstream-заданий на PR или push в форке либо зависнут в очереди
+  (раннеры `blacksmith-*` в публичном форке не существуют), либо начнут закрывать чужие issue и PR (`triage-*`), либо упадут
+  без секретов — их выключаем условием `github.repository == 'anomalyco/opencode'`, как upstream уже сделал в `deploy*`,
+  `nightly-beta` и `plan` в `release.yml`. Не чиним.
+- Три падения `repo-paths.test.ts` (В-95) целиком лежат в CI-файлах: `loginom-macos.yml` (`--filter`), `loginom-windows.yml`
+  и `windows-native-check.yml` (пути `packages/opencode`, `packages/desktop/src/main/apps*`), `script/test-windows-profile.ps1`.
+  Закрываются задачами e, i, k ниже; после k тест 9/0.
+- **Находки, которых не было в плане:**
+  - `script/build-windows.ps1` вызывает `bun run package:win`, такого скрипта в Desktop v2 нет (есть `pack` с
+    `LOGINOM_AI_AGENT_TARGET`; на Windows он сначала собирает распакованное приложение, установщик NSIS строится вторым
+    вызовом с `LOGINOM_AI_AGENT_DESKTOP_APP`). Фильтр установки `--filter opencode` — пакета нет (`@opencode/cli`). Сборка
+    Windows в CI на v2 не пройдёт даже после порядка «CLI, потом Desktop».
+  - `build-cli.ts` (`loginom-host`) кладёт CLI в произвольный каталог, а Desktop читает только `packages/cli/dist`
+    (`desktop/script/build.ts:11`): «CLI первым» значит собрать `packages/cli/dist` и только потом Desktop.
+  - `loginom-macos.yml` зовёт `packages/desktop/scripts/build-macos.ts`, `check-macos.ts`: их в v2 нет (0.4: 3 файла плюс
+    тесты, В-98 передал их B5), фильтры `loginom-ai-agent`, `@opencode-ai/desktop`, `opencode` — несуществующие пакеты.
+  - Тест `loginom-runtime/client/test/bridge.test.mjs` читает `.github/workflows/test.yml` (0.4) и ищет в нём шаг
+    `timeout … --test --test-timeout=`; в v2 файла нет, поэтому клиент даёт на одно падение больше базы. Нужен workflow с
+    этим шагом (задача m), а не правка теста.
+  - Порт ACL профиля Windows не сделан: `cli/src/profile.ts:192` — «Windows ACL check (`profile-windows.ts` in 0.4) is not
+    ported yet». `test-windows-profile.ps1` собирает `packages/opencode/test/cli/profile-windows.test.ts`, которого нет.
+    Это не только путь в CI, а отсутствующая проверка G2 на Windows (вопрос 2).
+  - Windows-ветка Rust `process-daemon` и `+crt-static` ни разу не компилировались (B2.7a9, B0.4b); upstream-проверка
+    `check-process-daemon.yml` проверяет ARM64 и Miri, продуктовой сборки pty в CI нет. `release-process-daemon.yml` ищет
+    пакет `opencode-pty`, у нас `loginom-ai-agent-pty` — сломан переименованием.
+  - Строка плана журнала «`loginom-windows.yml:184`: сменить путь кодека на `loginom-host/src/connection/credentials.ts`»
+    устарела: шаг сейчас собирает `packages/desktop/src/main/loginom/credentials.ts`, и файл существует (`git ls-files`).
+    Исполнителю задачи j сверить с B4.14a, какой из двух файлов — кодек Desktop.
+  - `windows-native-check.yml` на Bun 1.3.14 (корень закреплён 1.4.4, lockfile v2-формата): `--frozen-lockfile` может
+    отказать. Срабатывает на push любой ветки при изменении `packages/loginom-host/**` — на первый push ветки переноса.
+
+### Карта workflow: 0.4 → v2
+
+«Форк» — публичный `kartamyshev-dev/loginom-ai-agent-test`, ветка по умолчанию `loginom` (один запрос `gh api repos/…`
+на чтение метаданных: `private: false`, `default_branch: loginom`; других запросов к GitHub не было).
+
+| Workflow v2 | Аналог в `v0.4.0` | Что запускается в форке | Решение | Задача |
+|---|---|---|---|---|
+| `secrets.yml` | то же | push любой ветки и тега, PR в `loginom` (`pull_request_target`) | оставить; зелёный (B1.8) | — |
+| `loginom-windows.yml` | CAND Windows | PR по путям (`packages/**` форка и `packages/opencode/**`), dispatch | починить: CLI до Desktop, пути, Bun, сборка v2 | i, j |
+| `loginom-macos.yml` | CAND macOS | push `macos-build`/`loginom`, PR, dispatch; PR только в `dev`/`loginom` или `v040-batch-*` | переписать под `pack.ts` и `build-cli.ts` | k, l |
+| `loginom-client-full.yml` | то же | PR по путям клиента, dispatch (справочный) | оставить | — |
+| `windows-native-check.yml` | NAT | push любой ветки по путям `loginom-host/**` и др. | починить пути, Bun 1.4.4; шаг профиля — вопрос 2 | e |
+| `check.yml` | `typecheck.yml` | push `dev`, PR в `dev`/`beta` — для `loginom` не стартует; раннер `blacksmith` | переносить: раннер `ubuntu-24.04`, PR в `loginom` | c |
+| `check-test.yml` | `test.yml` (unit, desktop) | PR на любую ветку; `unit` на `blacksmith` зависнет; `build`, `e2e` — только push `dev`/`beta` | переносить `unit` на `ubuntu-24.04`; `affected`, `build`, `e2e` выключить | c |
+| `release.yml` | `release.yml` | `schedule`/push `beta`; первое задание `plan` с `github.repository == 'anomalyco/opencode'`, всё остальное пропускается | **не трогать**; выпуск продукта — новый `loginom-release.yml` | n, o |
+| `check-process-daemon.yml` | нет | PR/push по `packages/process-daemon/**`; macOS на `blacksmith-6vcpu-macos-15` зависнет | оставить Linux и Windows, macOS на `macos-15` | f |
+| `release-process-daemon.yml` | нет | PR по `build.rs`, `npm/**`, `script/npm-packages.mjs`; теги `process-daemon-v*` | выключить (имя `opencode-pty`, npm upstream) | a |
+| `check-docs.yml` | нет | PR по `services/site/**`, `protocol/openapi.json`, `cli/src/config/**`; `blacksmith` | выключить | a |
+| `check-nix.yml`, `bot-nix-hashes.yml` | нет | PR в `dev` / push `dev`; Nix продукта нет; `bot-nix-hashes` уже с условием репозитория | выключить `check-nix` | a |
+| `check-bot-scope.yml` | `check-bot-scope.yml` | любой PR, `ubuntu-24.04`, действует только на ветки бота | оставить | — |
+| `triage-contributor/-pr-standards.yml` | `pr-standards.yml` и др. | `pull_request_target` на любой PR форка | выключить | b |
+| `triage-close-issues/-close-prs/-compliance-close.yml` | `close-*.yml` | `schedule` из ветки по умолчанию (после слияния): закроют issue и PR форка | выключить | b |
+| `deploy.yml`, `deploy-site.yml`, `deploy-files.yml`, `deploy-update.yml`, `nightly-beta.yml` | нет | push `dev`/`production`; уже с `github.repository == 'anomalyco/opencode'` | оставить как есть (пропускаются) | — |
+| нет | `release.yml` (cut, verify, build Linux, windows, macos, linux-matrix, release, mirror-updates) | — | заменить `loginom-release.yml` (candidate и тег `v*`); подпись фида и зеркало S3 — этап G | n, o |
+| нет | `test.yml` (evals-unit, chromium-direct, windows-runtime, windows-cli-ipc, probe-cleanup, unit, desktop, e2e) | — | на Linux — m; Windows-наборы (chromium-direct, windows-runtime, windows-cli-ipc) не переносятся в B (к сведению ниже) | m |
+
+Сверка с разделом B1.8 («какие workflow стартуют при push»): список совпал; новое — раннеры `blacksmith-*` не заменены нигде,
+кроме уже защищённых `deploy*`.
+
+### Нарезка
+
+Правила: не больше пяти файлов на задачу (workflow считаются), каждая правка файла upstream — минимальная, общего вида и в
+`catalog.json`; приёмка любой задачи включает `bun test` в `packages/product` (охранные `names`, `repo-paths`; известных
+падений три до задач e, i, k) и `catalog-check.py`. «Только CI» — то, что локально проверить нельзя: поведение раннеров
+GitHub, Windows MSVC, macOS, время и кэш.
+
+| Задача | Что | Файлы | Зависит от | Размер, дни | Приёмка | Только в CI |
+|---|---|---|---|---|---|---|
+| **B5.1a** Выключить upstream | условие `github.repository == 'anomalyco/opencode'` на всех заданиях `check-nix`, `check-docs`, `release-process-daemon`; охранный тест `product`: у каждого workflow либо условие, либо имя в явном списке продукта (после синхронизации новый upstream-workflow без решения краснеет) | 3 workflow, `product/test/ci-workflows.test.ts`, `catalog.json` | — | S, 0,3 | тест `product` зелёный и красный на мутации (убрано условие); разбор YAML `Bun.YAML` | в форке задания `skipped`, ничего не висит в очереди |
+| **B5.1b** Выключить `triage-*` | то же условие на 5 файлах | `triage-contributor`, `-pr-standards`, `-close-issues`, `-close-prs`, `-compliance-close` | — | S, 0,2 | тест из a (расширенный список) | не закрывают issue и PR форка (расписание — только после слияния в `loginom`) |
+| **B5.1c** Базовый CI форка | `check.yml` (lint, `typecheck:tsc`) и `unit` из `check-test.yml` на `ubuntu-24.04`, PR в `loginom`; `affected`, `build`, `e2e` выключены условием; `passThroughEnv` (`LOGINOM_AI_AGENT_TEST_NODE`) в `turbo.json` для `loginom-host` и `dashboard` | `check.yml`, `check-test.yml`, `turbo.json`, `catalog.json` | — (после d меньше шума) | M, 0,7–1 | на PR зелёные `typecheck` и `unit (linux)`; список красных тестов `turbo test` совпадает с базой журнала (клиент 38 и `tools` 8 на 0.4, плюс известные) — первый прогон измеряет базу | всё: первый красный прогон на раннере; время `turbo test` (4 vCPU) |
+| **B5.1d** `XDG_*` в тестах | тесты `server` пишут в каталог данных запускающего (`tool-output`, `shell`, `artifacts`; B2.9b): `Global.Path.data` вычисляется при импорте, поэтому изоляция — preload `bunfig.toml` пакета (временные `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `HOME`), либо помощник `temporary-data.ts`; в `check-test.yml` то же через `env` задания (вместе с c) | `server/bunfig.toml`, preload, до трёх тестов | — | S, 0,5 | `bun test` в `packages/server` с `HOME` на пустой каталог: после прогона в нём ничего нет, и каталог `data` запускающего не менялся (проверка `find -newer`); тест на сам preload | Windows: `APPDATA`, `LOCALAPPDATA` — в `loginom-windows` (i) |
+| **B5.1e** `windows-native-check` и ACL | `bun-version-file`, пути v2 (`desktop/src/main/files/apps.ts`), убрать из `paths` `packages/opencode/**`; шаг профиля: `script/test-windows-profile.ps1` привязать к тесту ACL из вопроса 2, иначе шаг и файл убрать и записать пробел G2; закрывает часть `CI triggers` и `path literals` | `windows-native-check.yml`, `script/test-windows-profile.ps1` (или удалить), `catalog.json` | вопрос 2 | S, 0,4 | `CI triggers` и `path literals` не называют эти файлы; YAML разбирается | оба раннера (2022, 2025): `bun install --frozen-lockfile --linker hoisted`, `typecheck`, тесты `loginom-host`, прокси WinINET |
+| **B5.1f** pty под платформы | reusable `loginom-pty.yml`: Linux x64 `cargo zigbuild --target x86_64-unknown-linux-gnu.2.30` с Zig 0.16.0 и `script/release-bin/zig` (baseline CPU), macOS arm64, Windows x64 (`+crt-static`, `OPENCODE_ZIG_CPU=baseline`); проверка `readelf` ≤ GLIBC 2.30 (npm-бинарник требует 2.29), `--version` = `loginom-ai-agent-pty <версия>`, дымовая сессия `play`; артефакт `loginom-ai-agent-pty-<цель>`, потребители ставят `LOGINOM_AI_AGENT_PTY_BIN`; композитное действие `setup-rust-pty` (Rust 1.90.0, Zig 0.16.0, кэш `Swatinem/rust-cache`); `check-process-daemon.yml`: macOS на `macos-15` | `loginom-pty.yml`, `actions/setup-rust-pty/action.yml`, `check-process-daemon.yml` | — | M, 1–1,5 | на тестовой ветке три артефакта; Linux `readelf` ≤ 2.30; `--version` на каждой ОС; кэш Cargo: второй прогон без скачивания 57 крейтов | всё; Windows MSVC и Zig на Windows — первый настоящий прогон `daemon/windows.rs` (B0.4b не проверял) |
+| **B5.1g** Уведомления о лицензиях pty | `collectBuildNotices` дополнить крейтами Rust (`cargo metadata --locked`, файлы лицензий из реестра/`CARGO_HOME`, версия и SPDX), лицензиями Ghostty и Zig-часть; записать в `licenses/` артефакта; убрать исключение «Non-npm resources» для этих входов; std Rust и Ghostty-зависимости — явное исключение, пока не покрыты | `loginom-host/script/collect-build-notices.ts`, `test/build-notices.test.ts`, `licenses/…`, `build-cli.ts` | — (данные — после f) | M, 1 | тест: каждый крейт из `Cargo.lock` имеет запись; мутация (крейт убран) краснит; в артефакте CLI есть файл лицензий pty | Windows: путь `CARGO_HOME`; сборка из кэша Cargo даёт те же записи |
+| **B5.1h** Linux: CLI и Desktop | `loginom-linux.yml`: Node и Chromium (`setup-loginom-inputs`), pty из f, CLI `build-cli.ts` → `packages/cli/dist`, затем Desktop `build` и `pack` (AppImage, deb), `xvfb-run` для тестов Desktop и `safe-storage-smoke.cjs` Linux (`--no-sandbox` под root), `cli-manifest` проверен `verify-cli-candidate.ts` | `loginom-linux.yml`, при необходимости 1–2 скрипта | f | M, 1–1,5 | артефакты CLI `tar.gz` и AppImage/deb с `SHA256`; `loginom-ai-agent-cli --version`; сборка падает без CLI (`desktop/script/build.ts`), а не берёт npm | время сборки; `xvfb`; память `NODE_OPTIONS` (B4.9: 6 ГБ кучи) |
+| **B5.1i** Windows CAND: сборка | `build-windows.ps1` на v2: фильтры (`@opencode/desktop`, `@opencode/cli`, `@loginom-ai-agent/loginom-host`), CLI → `packages/cli/dist` до Desktop, затем `pack` (распакованное приложение) и второй вызов с `LOGINOM_AI_AGENT_DESKTOP_APP` для NSIS (без `package:win`); `loginom-windows.yml`: пути `paths`, порядок шагов, pty из f вместо cargo на раннере; пути кодека (сверить с B4.14a); `updater-fixtures` остаются dispatch-only | `script/build-windows.ps1`, `loginom-windows.yml`, `catalog.json` | f | M, 1–1,5 | `CI triggers` и `path literals` не называют `loginom-windows.yml`; `build-package-test` собирает неподписанные EXE и CLI ZIP; CLI собран раньше Desktop | **установщик Windows собирается и запускается только на Windows (windows-2022)**; MSVC; `+crt-static`; кэш Cargo; 120 мин |
+| **B5.1j** Windows CAND: проверки | шаги после сборки на v2: установленный CLI (`install.cmd`, `verify-cli-candidate`), DPAPI Electron 44 (шаг `safeStorage`), установленный smoke Desktop (`windows-installed-smoke.ps1`, отрицательный контроль), тесты пакетов `desktop`, `loginom-host`, `bun typecheck`; сверка путей скриптов B4.14c | `loginom-windows.yml`, до 3 скриптов smoke | i | M, 1–1,5 | `build-package-test` зелёный, отрицательный контроль красный как задумано; артефакты `loginom-windows-unsigned-*` | всё: ключ DPAPI и права обычного пользователя на раннере-администраторе (B4.14c: smoke от обычной учётной записи) |
+| **B5.1k** macOS: сборка | `loginom-macos.yml` на v2: фильтры, pty из f (arm64), CLI (`build-cli.ts`, darwin arm64) → `packages/cli/dist`, Desktop `build` и `pack` (.app, DMG/ZIP через `electron-builder`), ad-hoc подпись как в 0.4; порт `check-macos.ts` и вход `build-macos.ts` — только то, что не покрывает `pack.ts` (0.4: ~3 файла плюс тесты, ранжировать при старте); три скрипта приёмки `loginom-host` с `readonly` заменить на `query_only` | `loginom-macos.yml`, 1–3 скрипта | f | M–L, 1,5–2 | `repo-paths`: 9/0 (закрыт `--filter`); артефакты `.dmg`/`.zip`/CLI `tar.gz` с SHA256; `--version` | **всё**: macOS не запускался нигде (журнал: офлайн-проверка комплекта Bun, помощник связки ключей) |
+| **B5.1l** Подпись macOS | `pack.ts` ставит `identity=null`; `sign-desktop-macos.sh` переподписывает Node и Chromium ресурсов и меняет хеши в `resource-manifest.json`; помощник `loginom-keychain` подписан ad-hoc — после обновления может не отдать сохранённое подключение. Вариант A (рекомендуется, вопрос 1): ad-hoc как 0.4, проверка в CI, что подпись не ломает хеши и помощник читает запись после «обновления» (повторная подпись); вариант B — Developer ID и нотаризация | `.github/release/sign-desktop-macos.sh` (или свой), `loginom-macos.yml`, тест хешей `resource-manifest` | k, вопрос 1 | S–M, 0,7 (A) / 1,5+ (B) | `codesign --verify --deep --strict`; `resource-manifest.json` совпадает с файлами после подписи; помощник читает ранее записанное | всё; Keychain и нотаризация (B) — только macOS |
+| **B5.1m** Тесты продукта на Linux | `loginom-checks.yml` по `test.yml` 0.4: `packages/product`, `loginom-host`, `cli`, `loginom-agent`, `dashboard` (`npm ci` шаблона), клиент `loginom-runtime` через `node --test` с закреплённым Node (`.node-version`) и шагом `timeout --kill-after=… nice -n 19 "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000`, как ждёт `bridge.test.mjs`; `evals` unit при наличии; не дублирует `turbo test` из c (исключить эти пакеты там) | `loginom-checks.yml`, `check-test.yml` (исключения), `catalog.json` | c, d | M, 1 | `bridge.test.mjs` зелёный без правки теста; `names`, `repo-paths` в CI; красные совпадают с базой | время; Chromium (`install-deps`) на раннере; `xvfb` для Desktop |
+| **B5.2a** Манифест выпуска | порт `scripts/release/{manifest,write-manifest,verify-artifact}.ts` 0.4 и тестов `artifact`, `notes` под имена и пути v2 (CLI `cli-manifest.json`, Desktop `resource-manifest.json`); SHA256 каждого артефакта против manifest; `release-notes.ts` отклоняет неполный набор | `desktop/scripts/release/{manifest,write-manifest,verify-artifact}.ts` и 2 теста | — (для проверки — артефакты h, i, k) | M, 1 | тесты: совпадение, подмена байта, лишний и отсутствующий файл, чужой коммит; мутации красные | запуск на настоящих артефактах трёх платформ — в o |
+| **B5.2b** `loginom-release.yml` и G5 | candidate (dispatch, ref без публикации) и тег `v*`: вызывает h, i, k как reusable, скачивает артефакты, `write-manifest` и `verify-artifact`, SHA256 против manifest, G5: `cli-resources.test.ts` и комплектность ресурсов на каждой платформе плюс отрицательный контроль (из копии артефакта убран файл — проверка красная); итоговый `SHA256SUMS.txt`; без draft, без подписи фида, без зеркала S3 (этап G) | `loginom-release.yml`, `loginom-linux/-windows/-macos.yml` (`workflow_call`), `catalog.json` | h, i, j, k, a2 | M, 1–1,5 | REL зелёный на SHA кандидата на трёх платформах, мутация G5 красная; `README.md` и `ci-release.md` обновить по факту | всё; тег `v*` в форке — решение владельца (выпуск — отдельная команда) |
+
+Порядок и параллельность:
+
+1. **Волна 1, все независимы, делать параллельно:** a, b, d, e (после вопроса 2), f, g, B5.2a. c можно начать сразу
+   (после d меньше ложных красных).
+2. **Волна 2** (после f): h, i, k — параллельно, три разных workflow. После c и d — m.
+3. **Волна 3:** j (после i), l (после k и вопроса 1).
+4. **Финал:** B5.2b (после h, j, k и B5.2a). Критический путь: f → i → j → B5.2b, около 5–6 агенто-дней последовательно.
+
+Пересечения по файлам: c и m правят `check-test.yml` (c первым); i, j правят `loginom-windows.yml`, k и l — `loginom-macos.yml`
+(последовательно); B5.2b правит три платформенных workflow (после h, j, k). Остальное не пересекается.
+
+### Оценка
+
+Сумма по задачам 11–15 агенто-дней (a 0,3; b 0,2; c 0,8; d 0,5; e 0,4; f 1,2; g 1; h 1,2; i 1,2; j 1,2; k 1,8; l 0,7;
+m 1; B5.2a 1; B5.2b 1,2) против 3–5 дней в плане. Вывод в календарь: 6–8 дней при двух-трёх исполнителях и 3–5 циклах
+по 1–2 часа на Windows и macOS. Основной риск — первый настоящий прогон Windows MSVC и macOS: каждый красный круг — час-два
+ожидания. Оценку этапа (В-98, 54–87) на checkpoint B2 пересматривали без B5; к ней добавить 8–12 дней.
+
+### Вопросы владельцу (только блокирующие)
+
+1. **Подпись выпуска (блокирует l).** A) как 0.4: Windows без подписи, macOS ad-hoc, без нотаризации; Developer ID и
+   сертификат Windows — этап G (рекомендую: так принято в `ci-release.md` для 0.4, секретов в форке нет); B) Developer ID и
+   нотаризация уже в B5 — нужны секреты в форке и учётная запись Apple.
+2. **ACL профиля CLI на Windows (блокирует e, влияет на G2).** `profile-windows.ts` 0.4 не портирован (хвост B2.7c,
+   `cli/src/profile.ts:192`). A) портировать проверку и её тест (S, 0,5–1 день) до e — тогда `test-windows-profile.ps1`
+   живёт (рекомендую: G2 входит в шлюз B, а в 0.4 NAT, CAND и REL это проверяли); B) принять пробел до этапа G: шаг и
+   скрипт убираются, пробел записывается.
+
+Не вопросы (выбрал меньшее, записано): выпуск продукта — новый `loginom-release.yml`, upstream `release.yml` не правим
+(он уже выключен условием `plan` и весит 820 строк чужого npm/docker/homebrew); `triage-*` и прочие upstream выключаем
+условием, не удаляем (синхронизация не вернёт их молча — тест a); сборка pty в CI отдельным workflow, а не правкой
+`release-process-daemon.yml`.
+
+### К сведению
+
+- Windows-наборы 0.4 `chromium-direct`, `windows-runtime`, `windows-cli-ipc`, `probe-cleanup` в B5 не переносятся
+  (Chromium и Host на Windows закрывают установленный smoke j и NAT e); в `windows-release-coverage.md` это пробел 5.
+  Если владельцу нужны как гейт — отдельная задача M, 1–1,5.
+- Подпись фида, S3-зеркало, draft-релиз и `LOGINOM_UPDATES_*` — этап G (публикация — отдельная команда владельца).
+- Linux-матрица установки DEB (Ubuntu 22.04/24.04/26.04, Debian 12/13) — установленная приёмка этапа G, не B5.
+- Каталог: после B5.1a…n в `catalog.json` — по записи на каждый изменённый upstream-файл (`check*.yml`, `triage-*`,
+  `release-process-daemon.yml`, `turbo.json`).
+
+### Команды и вывод
+
+```text
+$ git worktree add .claude/worktrees/b50 -b b50-ci-scout 0cfc0a30dd      # код 0
+$ bun --version; bun install --frozen-lockfile                           # 1.4.4; код 0, 1607 пакетов
+$ ls .husky                                                              # _  pre-commit  pre-push
+$ cd packages/product && bun test test/repo-paths.test.ts                # 6 pass, 3 fail — известные (В-95)
+  workspace packages > --filter arguments …   loginom-macos.yml: --filter loginom-ai-agent, @opencode-ai/desktop
+  CI triggers > path filters …                loginom-windows.yml: packages/opencode/**; windows-native-check.yml:
+                                              packages/desktop/src/main/apps{,.test}.ts, packages/opencode/src/cli/profile-windows.ts,
+                                              packages/opencode/test/cli/profile-windows.test.ts
+  path literals …                             loginom-windows.yml, windows-native-check.yml, script/test-windows-profile.ps1: packages/opencode
+$ git ls-files | grep -E "profile-windows|desktop/src/main/apps"       # profile-windows нет; apps.ts — desktop/src/main/files/apps.ts
+$ grep -rn "package:win" script .github packages/desktop/package.json   # script/build-windows.ps1:101; в package.json скрипта нет
+$ grep -c blacksmith .github/workflows/*.yml                             # check, check-nix, check-docs, check-test, release, check-process-daemon, bot-nix-hashes, deploy*
+```
+
+### Не проверено
+
+- Поведение GitHub: что задание на метке `blacksmith-*` в публичном форке встаёт в очередь, а не падает (по описанию
+  раннеров, не запускал); первый push ветки с `windows-native-check` и `loginom-windows`; цену минут macOS и Windows.
+- `actionlint` на машине нет; YAML разобран `Bun.YAML`, условия `if:` заданий, кроме `github.repository`, не исполнял.
+- Содержимое секретов и переменных форка (`gh secret list`) не смотрел; вопрос 1 это учитывает. Единственный сетевой запрос —
+  метаданные репозитория выше (отступ от условия «только документация»).
+- Состав 57 крейтов и лицензий (g) считал по журналу B2.7a9, не по `Cargo.lock`.
