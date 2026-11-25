@@ -94,7 +94,7 @@ function filterRows(readback) {
   return readback.rows.map(({record_id, cells, ...row}) => row);
 }
 
-async function filterThreshold({page, adapter, request, readFilterBrowser}, ref, edit, deadline, readOnly = false) {
+async function filterThreshold({page, adapter, request, readFilterBrowser, record}, ref, edit, deadline, readOnly = false) {
   const remaining = () => Math.max(1, deadline - Date.now());
   const graph = await adapter.observe(request, deadline, {readBindings:true});
   const binding = graph.native_bindings.find(node => node.node_id === ref.node_id);
@@ -106,44 +106,73 @@ async function filterThreshold({page, adapter, request, readFilterBrowser}, ref,
   const canvas = locator(page, prefix + ';ModelForm;cmpDiagram');
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid) + ']').click({timeout:remaining()});
   await canvas.locator('[data-tid=' + JSON.stringify(nodeTid + ';Setting') + ']').click({timeout:remaining()});
-  const ready = await Promise.race([
-    panel.waitFor({state:'visible', timeout:remaining()}).then(() => 'panel'),
-    locator(page, 'msgbox;tlb;yes').waitFor({state:'visible', timeout:remaining()}).then(() => 'confirm'),
-  ]);
-  if (ready === 'confirm') {
-    requireProof((await locator(page, 'msgbox').innerText({timeout:remaining()})).includes('Настройка узла приведет к его деактивации'), 'FILTER_DIALOG_UNEXPECTED');
-    await locator(page, 'msgbox;tlb;yes').click({timeout:remaining()});
-    await panel.waitFor({state:'visible', timeout:remaining()});
-  }
-  const read = () => page.evaluate(readFilterBrowser, prefix);
-  const before = await read();
-  const rows = filterRows(before);
-  const candidates = before.rows.filter(row => row.kind === 'condition' && row.field?.kind === 'input_field'
-    && row.field.name === edit.field && ['integer', 'real'].includes(row.type)
-    && row.variable_mode === 0 && Number.isFinite(row.value) && row.operator_code <= 5 && row.cells?.value);
-  requireProof(candidates.length === 1, 'FILTER_CONDITION_ABSENT_OR_AMBIGUOUS');
-  const row = candidates[0];
-  if (readOnly) {
-    await locator(page, wizard + ';btnClose').click({timeout:remaining()});
+  const close = locator(page, wizard + ';btnClose');
+  try {
+    const ready = await Promise.race([
+      panel.waitFor({state:'visible', timeout:remaining()}).then(() => 'panel'),
+      locator(page, 'msgbox;tlb;yes').waitFor({state:'visible', timeout:remaining()}).then(() => 'confirm'),
+    ]);
+    if (ready === 'confirm') {
+      requireProof((await locator(page, 'msgbox').innerText({timeout:remaining()})).includes('Настройка узла приведет к его деактивации'), 'FILTER_DIALOG_UNEXPECTED');
+      await locator(page, 'msgbox;tlb;yes').click({timeout:remaining()});
+      await panel.waitFor({state:'visible', timeout:remaining()});
+    }
+    const read = () => page.evaluate(readFilterBrowser, prefix);
+    const candidates = readback => (readback.rows ?? []).filter(row => row.kind === 'condition' && row.field?.kind === 'input_field'
+      && row.field.name === edit.field && ['integer', 'real'].includes(row.type)
+      && row.variable_mode === 0 && Number.isFinite(row.value) && row.operator_code <= 5);
+    const renderDeadline = Math.min(deadline, Date.now() + 15_000);
+    let before = await read();
+    let matches = candidates(before);
+    while ((!before.verified || matches.length === 0 || !readOnly && matches.length === 1 && !matches[0].cells?.value)
+        && Date.now() < renderDeadline) {
+      await page.waitForTimeout(100);
+      before = await read();
+      matches = candidates(before);
+    }
+    await record({phase:readOnly ? 'persisted_filter_observation' : 'filter_before',
+      verified:before.verified, reason:before.reason, rows:before.rows});
+    const rows = filterRows(before);
+    requireProof(matches.length === 1 && (readOnly || matches[0].cells?.value), 'FILTER_CONDITION_ABSENT_OR_AMBIGUOUS');
+    const row = matches[0];
+    if (readOnly) {
+      await close.click({timeout:remaining()});
+      await panel.waitFor({state:'hidden', timeout:remaining()});
+      return rows;
+    }
+    requireProof(row.value !== edit.value && (row.type === 'real' || Number.isSafeInteger(edit.value)), 'FILTER_LITERAL_INVALID');
+    await locator(page, row.cells.value).click({timeout:remaining()});
+    const editor = page.locator('[data-tid^=' + JSON.stringify(wizard + ';FilterDataWizard;FilterDataPanel;VariantPropEdit;ValueContainer;') + '] input:visible');
+    await editor.waitFor({state:'visible', timeout:remaining()});
+    const editorDeadline = Math.min(deadline, Date.now() + 5000);
+    let editing = await read();
+    while (editing.editor?.record_id !== row.record_id && Date.now() < editorDeadline) {
+      await page.waitForTimeout(100);
+      editing = await read();
+    }
+    await record({phase:'filter_editor', verified:editing.verified, reason:editing.reason, editor:editing.editor});
+    requireProof(editing.verified && editing.editor?.record_id === row.record_id, 'FILTER_EDITOR_UNVERIFIED');
+    const decimal = editing.numeric_inputs[0]?.decimal_separator ?? editing.decimal_separator;
+    requireProof(['.', ','].includes(decimal), 'FILTER_NUMBER_LOCALE');
+    await editor.fill(String(edit.value).replace('.', decimal), {timeout:remaining()});
+    await editor.press('Tab', {timeout:remaining()});
+    const actual = filterRows(await read());
+    const expected = rows.map((item,i) => i === row.index ? {...item, value:edit.value} : item);
+    requireProof(isDeepStrictEqual(actual, expected), 'FILTER_READBACK_MISMATCH');
+    await locator(page, wizard + ';btnDone').click({timeout:remaining()});
     await panel.waitFor({state:'hidden', timeout:remaining()});
-    return rows;
+    return {status:'SUCCEEDED', cleanup_complete:true, change:{node_id:ref.node_id, field:edit.field, before:row.value, after:edit.value}, rows:expected};
+  } catch (error) {
+    try {
+      if (await close.isVisible()) {
+        await close.click({timeout:3000});
+        await close.waitFor({state:'hidden', timeout:3000});
+      }
+    } catch (cleanupError) {
+      await record({phase:'filter_cleanup_error', error:cleanupError.message});
+    }
+    throw error;
   }
-  requireProof(row.value !== edit.value && (row.type === 'real' || Number.isSafeInteger(edit.value)), 'FILTER_LITERAL_INVALID');
-  await locator(page, row.cells.value).click({timeout:remaining()});
-  const editor = page.locator('[data-tid^=' + JSON.stringify(wizard + ';FilterDataWizard;FilterDataPanel;VariantPropEdit;ValueContainer;') + '] input:visible');
-  await editor.waitFor({state:'visible', timeout:remaining()});
-  const editing = await read();
-  requireProof(editing.verified && editing.editor?.record_id === row.record_id && editing.editor.field === 'CompareValue', 'FILTER_EDITOR_UNVERIFIED');
-  const decimal = editing.numeric_inputs[0]?.decimal_separator ?? editing.decimal_separator;
-  requireProof(['.', ','].includes(decimal), 'FILTER_NUMBER_LOCALE');
-  await editor.fill(String(edit.value).replace('.', decimal), {timeout:remaining()});
-  await editor.press('Tab', {timeout:remaining()});
-  const actual = filterRows(await read());
-  const expected = rows.map((item,i) => i === row.index ? {...item, value:edit.value} : item);
-  requireProof(isDeepStrictEqual(actual, expected), 'FILTER_READBACK_MISMATCH');
-  await locator(page, wizard + ';btnDone').click({timeout:remaining()});
-  await panel.waitFor({state:'hidden', timeout:remaining()});
-  return {status:'SUCCEEDED', cleanup_complete:true, change:{node_id:ref.node_id, field:edit.field, before:row.value, after:edit.value}, rows:expected};
 }
 
 export async function runManualEdit(root, output, {login, packagePath, edit, positionProof}) {
@@ -176,7 +205,7 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
     const deadline = Date.now() + 90_000;
     let filterReceipt;
     const editFilter = async (ref, value, end) => {
-      filterReceipt = await filterThreshold({page, adapter, request, readFilterBrowser}, ref, value, end);
+      filterReceipt = await filterThreshold({page, adapter, request, readFilterBrowser, record}, ref, value, end);
       return filterReceipt;
     };
     const effect = await applyManualEdit(edit, {adapter, request, verifyEffect:verifyNodeTargetEffect, deadline, editFilter, record, positionProof});
@@ -196,7 +225,7 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
       requireProof(Object.values(delta).every(items => items.length === 0), 'PERSISTED_GRAPH_MISMATCH');
       if (filterReceipt) {
         const ref = resolveManualNode(graph, edit.node).ref;
-        const rows = await filterThreshold({page, adapter, request, readFilterBrowser}, ref, edit, Date.now() + 30_000, true);
+        const rows = await filterThreshold({page, adapter, request, readFilterBrowser, record}, ref, edit, Date.now() + 30_000, true);
         await record({phase:'persisted_filter', rows});
         requireProof(isDeepStrictEqual(rows, filterReceipt.rows), 'PERSISTED_FILTER_MISMATCH');
       }
@@ -212,13 +241,14 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
     const execute = code => new Function('page', 'return (' + code + ')(page)')(page);
     const operationId = 'manual-' + phase;
     const cleanupOptions = {sessionId, account:login.username, packagePath, loginomUrl, loginomBuild:build, operationId};
-    let ready, value, failure, cleanup;
+    let ready, value, failure, cleanup, readOnly;
     try {
       ready = await execute(makeWorkspacePrepareCode({loginomUrl, compatibility, sessionId, operationId,
         intent:'open_package', packagePath}));
-      await record({phase:phase + '_open', status:ready.status, reason:ready.reason});
-      requireProof(ready.status === 'READY' && ready.package_ref?.path === packagePath
-        && !ready.workflow_ref.navigation_path.some(item => item.label.endsWith('(только чтение)')), 'OPEN_UNCONFIRMED');
+      const pathMatches = ready.package_ref?.path === packagePath;
+      readOnly = ready.workflow_ref?.navigation_path.some(item => item.label.endsWith('(только чтение)')) === true;
+      await record({phase:phase + '_open', status:ready.status, reason:ready.reason, path_matches:pathMatches, read_only:readOnly});
+      requireProof(ready.status === 'READY' && pathMatches && !readOnly, 'OPEN_UNCONFIRMED');
       value = await work({page, execute, request:{document_id:ready.document_id, workflow_ref:ready.workflow_ref},
         adapter:createNodeTargetBrowserAdapter({execute, origin, build, pinned, record})});
     } catch (error) {
@@ -227,7 +257,8 @@ export async function runManualEdit(root, output, {login, packagePath, edit, pos
       try {
         const code = ready?.status === 'READY'
           ? makePackageCleanupCode({...cleanupOptions, documentId:ready.document_id, tabTid:ready.workflow_ref.tab_tid,
-            diagnosticDiscard:phase === 'edit' && Boolean(failure)})
+            diagnosticReadOnly:readOnly, diagnosticDiscard:phase === 'edit' && Boolean(failure),
+            diagnosticWaitForIdle:phase === 'edit' && Boolean(failure)})
           : makeFailedOpenCleanupCode(cleanupOptions);
         cleanup = await execute(code);
         await record({phase:phase + '_cleanup', cleanup});

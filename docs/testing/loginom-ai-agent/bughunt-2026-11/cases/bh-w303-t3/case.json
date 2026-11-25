@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "move",
     "node": {
-      "label": "Фильтр строк"
+      "type": "transform.filter_data"
     },
     "position": {
       "x": 320,

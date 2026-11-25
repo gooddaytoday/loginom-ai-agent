@@ -12,8 +12,7 @@
       },
       {
         "id": "group",
-        "type": "transform.group_data",
-        "label": "Группировка"
+        "type": "transform.group_data"
       }
     ],
     "links": [
@@ -34,7 +33,6 @@
     {
       "output_node_type": "transform.group_data",
       "output_port": 0,
-      "output_node_label": "Группировка",
       "columns": [
         {
           "name": "Region",

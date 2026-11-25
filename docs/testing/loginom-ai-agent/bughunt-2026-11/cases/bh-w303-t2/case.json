@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "filter_threshold",
     "node": {
-      "label": "Фильтр строк"
+      "type": "transform.filter_data"
     },
     "field": "Revenue",
     "value": 200

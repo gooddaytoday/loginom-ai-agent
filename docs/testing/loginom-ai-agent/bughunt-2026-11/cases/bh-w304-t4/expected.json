@@ -12,8 +12,7 @@
       },
       {
         "id": "sort",
-        "type": "transform.sorting",
-        "label": "Сортировка"
+        "type": "transform.sorting"
       }
     ],
     "links": [
@@ -35,7 +34,6 @@
     {
       "output_node_type": "transform.sorting",
       "output_port": 0,
-      "output_node_label": "Сортировка",
       "columns": [
         {
           "name": "Region",

@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "delete_node",
     "node": {
-      "label": "Фильтр строк"
+      "type": "transform.filter_data"
     }
   }
 }

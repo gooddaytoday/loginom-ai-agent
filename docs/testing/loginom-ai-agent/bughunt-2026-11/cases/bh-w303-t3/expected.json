@@ -12,8 +12,7 @@
       },
       {
         "id": "filter",
-        "type": "transform.filter_data",
-        "label": "Фильтр строк"
+        "type": "transform.filter_data"
       }
     ],
     "links": [
@@ -35,7 +34,6 @@
     {
       "output_node_type": "transform.filter_data",
       "output_port": 0,
-      "output_node_label": "Фильтр строк",
       "columns": [
         {
           "name": "Region",

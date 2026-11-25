@@ -10,7 +10,7 @@
       "type": "imports.text"
     },
     "target": {
-      "label": "Сортировка"
+      "type": "transform.sorting"
     },
     "output": 0,
     "input": 0

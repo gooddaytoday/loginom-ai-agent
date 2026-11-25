@@ -7,7 +7,7 @@
   "manual_edit": {
     "kind": "rename",
     "node": {
-      "label": "Группировка"
+      "type": "transform.group_data"
     },
     "label": "Итоги"
   }

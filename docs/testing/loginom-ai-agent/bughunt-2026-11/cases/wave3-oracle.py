@@ -8,9 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 VARIABLES = ('variables', 'variables.user', 'Переменные сценария')
 SOURCE = ('sales', 'imports.text', None)
-SORT = ('sort', 'transform.sorting', 'Сортировка')
-FILTER = ('filter', 'transform.filter_data', 'Фильтр строк')
-GROUP = ('group', 'transform.group_data', 'Группировка')
+SORT = ('sort', 'transform.sorting', None)
+FILTER = ('filter', 'transform.filter_data', None)
+GROUP = ('group', 'transform.group_data', None)
 TOTAL = ('group', 'transform.group_data', 'Итоги')
 EXCEL = ('excel', 'exports.excel', None)
 SALES_COLUMNS = [('Region', 'string'), ('Revenue', 'integer')]
@@ -50,7 +50,7 @@ def expected(chain, turn):
     if chain == 2:
         if turn == 2:
             return dict(graph=graph((GROUP,), by_group, retain), outputs=[output(GROUP, groups, TOTAL_COLUMNS)])
-        nodes = (TOTAL, EXCEL, SORT) if turn == 4 else (TOTAL, EXCEL)
+        nodes = (TOTAL, EXCEL, ('sort', 'transform.sorting', 'Сортировка')) if turn == 4 else (TOTAL, EXCEL)
         retain = (*retain, 'group', 'excel', 'sort') if turn == 4 else (*retain, 'group')
         result = dict(graph=graph(nodes, (*by_group, ('group', 'excel')), retain),
                       outputs=[output(TOTAL, groups, TOTAL_COLUMNS)])
