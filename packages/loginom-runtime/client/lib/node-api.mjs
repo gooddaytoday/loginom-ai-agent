@@ -257,6 +257,12 @@ nodeApplyInputSchema.allOf=[
  {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']},read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['target','read']},
   then:{properties:{read:{properties:{sample_rows:{const:100},require_exact_numbers:{const:true}}}}}}
 ];
+nodeApplyInputSchema.allOf=[{if:{properties:{mode:{const:NODE_ADD_ONLY_MODE}},required:['mode']},
+   then:{properties:{target:{properties:{kind:{const:'new'}}},finish:{const:'done'},parameters:{maxProperties:0},
+     inputs:{maxItems:0},variable_inputs:{maxItems:0},bindings:{maxItems:0},mappings:{maxItems:0},
+     read:{properties:{ports:{maxItems:0},variable_ports:{maxItems:0},sample_rows:{const:0},require_exact_numbers:{const:false}},
+       not:{required:['coverage']}}}},
+   else:{allOf:nodeApplyInputSchema.allOf}}];
 // Only the published representation shares repeated schemas. Runtime guards
 // retain the canonical inline schema: validateActionParameters does not resolve
 // JSON Schema references. Definitions preserve descriptions as well as bounds.
@@ -269,12 +275,6 @@ const packApplySchema=schema=>JSON.parse(JSON.stringify(schema,(key,value)=>{
  return reference?{$ref:'#/$defs/'+reference}:value;
 }));
 const nodeApplyPublishedSchema={...packApplySchema(nodeApplyInputSchema),
- allOf:[{if:{properties:{mode:{const:NODE_ADD_ONLY_MODE}},required:['mode']},
-   then:{properties:{target:{properties:{kind:{const:'new'}}},finish:{const:'done'},parameters:{maxProperties:0},
-     inputs:{maxItems:0},variable_inputs:{maxItems:0},bindings:{maxItems:0},mappings:{maxItems:0},
-     read:{properties:{ports:{maxItems:0},variable_ports:{maxItems:0},sample_rows:{const:0},require_exact_numbers:{const:false}},
-       not:{required:['coverage']}}}},
-   else:{allOf:packApplySchema(nodeApplyInputSchema.allOf)}}],
  $defs:Object.fromEntries(Object.entries(applyDefinitions).map(([key,schema])=>[key,packApplySchema(schema)]))};
 const operation=object({operation_id:id});
 const deliveryId={...id,maxLength:80};

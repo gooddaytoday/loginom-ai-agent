@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {nodeApiTools,deliveryApiTools,dispatchNodeApi,clusteringParametersSchema} from '../lib/node-api.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
-import {userNodeTool} from '../lib/user-workflow.mjs';
+import {createUserWorkflowBindings,userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
@@ -10,9 +10,10 @@ test('model schema inventory pins W1 variable inputs and excludes private cold w
  // (+444 full, +222 compact). #1282: json_field object-array guidance adds
  // 16 bytes twice (+32 full, 0 compact). #1277 changes replies only (+0).
  // #1310 lists control input support (+272 full, +136 compact).
+ // LAB-2021 adds the graph-only mode and its empty request constraints.
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,203953,'00326113bc4946310d75934f49e1dc029673e873e17296cf7d9767c01c7670da'],
-  [nodeApiTools.map(userNodeTool),14744,'8adf1c8913e8b9885174dd29465a2f6e1febbeb6cd22cee6f824126a90cb0a3e'],
+  [nodeApiTools,204993,'8ca7f715069682532f2e9b5610f7202249fc537191badb9da563986fd288b421'],
+  [nodeApiTools.map(userNodeTool),14839,'6d59bccb09e8d3fd7d56aa2711c7ccfc2bef03461ab1fd6273177cb3f75763a0'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -47,6 +48,26 @@ test('W1 variable_inputs is optional and dispatched independently from table inp
  assert.equal(f.calls.length,2);
 });
 
+test('public add_only reaches the graph handler with empty settings, including for CSV export',async()=>{
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const workflows=createUserWorkflowBindings();
+ const workflow_ref={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};
+ workflows.remember({document_id:'doc',workflow_ref});
+ const base={operation_id:'add-only',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf'},
+  target:{kind:'new',type:'exports.text'},inputs:[],mode:'add_only',parameters:{},finish:'done'};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,new Map(),{fresh:true})};
+ for(const type of ['exports.text','programming.javascript','programming.python','transform.sorting']){
+  const compact={...base,target:{...base.target,type}};
+  assert.equal(workflows.checkNodeDescription(compact),null);
+  const {graph}=await dispatchNodeApi(runtime,'dock_node_apply',workflows.expandNode(compact));
+  assert.equal(graph.target.type,type);
+ }
+ for(const patch of [{finish:'execute'},{parameters:{encoding:'UTF-8'}},{read:{ports:[0]}},
+  {target:{kind:'existing',type:'exports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'node'}}}]){
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',workflows.expandNode({...base,...patch})),/Invalid/);
+ }
+});
 test('public apply mode reaches only the existing LinRegression handler',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');

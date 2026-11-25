@@ -21,7 +21,7 @@ export function bindAddOnlyDrop({request,origin,build,effect,types}) {
     throw Error('Native graph changed before add-only drop');
   return {request,origin,build,app,preparation,receipt,card,controller,model,workflow,
     nodes:new Map(nodes.map(n=>[n.FGuid,n])),icon:types[effect.parameters.type].icon_class,
-    created:null,closing:new WeakSet()};
+    created:null,closing:new Set()};
 }
 
 // Serialized into the authenticated browser. Return an exact DOM element only
@@ -60,7 +60,7 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   const blocked=[...document.querySelectorAll('[role="dialog"],.x-window,[aria-modal="true"]')].filter(visible);
   const dialogs=blocked.filter(e=>e!==wizardRoot[0]&&!blocked.some(other=>other!==e&&other!==wizardRoot[0]&&other.contains(e)));
   const atGraph=surface===model&&tree===workflow&&wizardRoot.length===0;
-  let owner, controls=[];
+  let owner, closeKind, controls=[];
   if(dialogs.length===1){
     const dialog=dialogs[0],window=ext?.getCmp?.(dialog.id);
     if(window?.el?.dom!==dialog)return {};
@@ -70,6 +70,7 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
       seen.add(parent);
       if(ownsWizard&&parent===nativeWizard||parent.FModelNode===node.data&&parent.FModelNode!==undefined){
         owner=dialog;
+        closeKind='dialog';
         break;
       }
     }
@@ -78,11 +79,12 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
       /;(?:cancel|btnCancel|btnClose)$/.test(e.getAttribute('data-tid'))&&visible(e));
   }else if(dialogs.length===0&&ownsWizard){
     owner=wizardRoot[0];
+    closeKind='wizard';
     controls=exact(prefix+';WizrdMCF;btnClose').filter(e=>owner.contains(e)&&visible(e));
   }else if(dialogs.length===0&&atGraph){
     return {graph:true,node_id:node.FGuid};
   }
-  if(!owner||b.closing.has(owner)||controls.length!==1)return {};
+  if(!owner||b.closing.has(closeKind)||controls.length!==1)return {};
   const control=controls[0],component=ext?.getCmp?.(control.id);
   if(component?.el?.dom!==control||component.disabled===true
     ||control.closest('.x-item-disabled,.x-btn-disabled,[aria-disabled="true"]'))return {};
@@ -90,7 +92,7 @@ export function readAddOnlyDrop({binding:b,expectedControl,claim=false}) {
   if(!control.contains(document.elementFromPoint(x,y)))return {};
   if(claim){
     if(control!==expectedControl)throw Error('Native add-only Close control changed');
-    b.closing.add(owner);
+    b.closing.add(closeKind);
   }
   return {control};
 }
