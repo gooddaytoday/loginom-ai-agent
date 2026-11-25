@@ -472,8 +472,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     signal?.throwIfAborted();
     return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
-   async recoveryReleasePending(state,{signal}={}){
-    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+   ...(implementation?.type==='transform.filter_data'?{recoveryChannel:enter}:{}),
+   async recoveryReleasePending(state,{signal,deadline=now()+NODE_RELEASE_BUDGET_MS}={}){
     enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
     return verifyRecoveredPendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});

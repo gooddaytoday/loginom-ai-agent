@@ -265,8 +265,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           required_result: 'The save receipt is valid, but the open package state could not be read. Remove what blocks the '
             + 'scenario (dialogs, masks, notifications) and return to the saved package graph. Do not save or change the package.' } };
       },
-      async browserRecoveryHandoff(operationId) {
-        if (!pendingSaveRecovery(operationId)) return actionRuntime.browserRecoveryHandoff(operationId);
+      async browserRecoveryHandoff(operationId,options) {
+        if (!pendingSaveRecovery(operationId)) return actionRuntime.browserRecoveryHandoff(operationId,options);
         return actionRuntime.hasUnsettledWork() ? { stopped: false, reason: 'Another Dock operation is unsettled' }
           : { stopped: true, proof: { receipt_state: 'save_settled' } };
       },

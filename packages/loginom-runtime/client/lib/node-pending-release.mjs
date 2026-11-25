@@ -1,3 +1,4 @@
+import {existingOutputExecution,identifyNewExecution} from './node-execution-evidence.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {returnFromNodeViews} from './node-output-procedure.mjs';
 import {boundWizardDeactivationConfirmation} from './node-wizard-open.mjs';
@@ -217,6 +218,53 @@ async function verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup
  requireValue(graph.nodes.filter(n=>same(n.ref,node)).length===1,'The released node is absent from its graph');
  return {verified:true,cleanup_complete:true,effect_possible:!!openingConfirmation||cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,
   node_context:second.prepared_node_context,graph,cleanup};
+}
+
+// The before-handoff inventory distinguishes a recovered result from an old active output.
+export async function verifyRecoveredTableOutput({operation,channel,baseline,proof,deadline,signal,now}) {
+ const {request,node}=operation.nodeApply;
+ const current=async()=>{
+  const snapshot=await channel.readExistingProcesses(),fresh=identifyNewExecution(baseline,snapshot);
+  const execution=existingOutputExecution(snapshot,node);
+  requireValue(execution.status==='completed'&&['root_id','group_id','group_record_id'].every(k=>execution[k]===fresh[k]),
+   'The new execution is not the active completed execution of the recovered node');
+  return execution;
+ };
+ const checkTime=()=>{signal?.throwIfAborted();requireValue(now()<deadline,'Recovered output verification deadline elapsed');};
+ checkTime();
+ if(!baseline)return null;
+ let output=null;
+ try{
+  const execution=await current(),ports=[];
+  for(const port of request.read.ports){
+   checkTime();
+   const {output:p}=await channel.readOutputPort({port,execution,sampleRows:0,requireExactNumbers:false});
+   requireValue(!p.port_kind&&typeof p.port_guid==='string'&&p.port_guid.length&&!ports.some(other=>other.port_guid===p.port_guid)
+    &&p.schema?.length&&new Set(p.schema.map(f=>f.name)).size===p.schema.length
+    &&p.schema.every((f,i)=>f.index===i&&f.name&&f.type),'Incomplete table port schema');
+   const mapping=request.mappings.find(m=>!m.kind&&m.direction==='output'&&m.port===port);
+   // A changes patch or source-column edit does not define the complete output layout.
+   requireValue(!mapping?.changes&&!request.parameters.settings?.columns&&!request.parameters.source_switch,
+    'Requested output definition requires independent configuration readback');
+   if(mapping?.fields){
+    const fields=mapping.fields.filter(f=>!f.excluded);
+    requireValue(fields.length===p.schema.length&&fields.every((f,i)=>f.source.kind==='configured_field'
+     &&(f.name??f.source.name)===p.schema[i].name&&(f.label===undefined||f.label===p.schema[i].label)),
+    'Requested output fields differ');
+   }
+   ports.push({port,port_guid:p.port_guid,schema:p.schema});
+  }
+  if(same(await current(),execution))output={execution,ports};
+ }catch(error){
+  if(operation.transportUncertain||operation.portReadCleanupComplete===false)throw error;
+ }
+ checkTime();
+ if(operation.portReadCleanupComplete===true){
+  const final=await verifyQuietNodeGraph({operation,channel,node,deadline,now,cleanup:proof.cleanup});
+  requireValue(same(proof.graph,final.graph)&&same(proof.node_context,final.node_context),'Recovered graph changed during output verification');
+ }
+ checkTime();
+ return output;
 }
 
 // Every launch-class gesture prepared in a stopped finish must have a settled

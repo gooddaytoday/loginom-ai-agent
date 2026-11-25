@@ -10,7 +10,8 @@ import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePac
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import {findNativeStorageRow} from './text-export-output.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
-import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {captureExecutionBaseline} from './node-execution-evidence.mjs';
+import {NODE_RELEASE_BUDGET_MS,verifyRecoveredTableOutput} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
@@ -2912,7 +2913,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               : ' Complete the settings and ports in the original request before returning to the graph.'
             : '') } };
     },
-    async browserRecoveryHandoff(operationId) {
+    async browserRecoveryHandoff(operationId,{signal}={}) {
       const operation = operations.get(operationId);
       if (!operation || pending !== operation && !exportRecoveryTrigger(operation))
         return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
@@ -2937,11 +2938,29 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       // Completion stops the callback; UI cleanup is proved afresh after browser recovery.
       if (state?.state !== 'none' && state?.state !== 'completed')
         return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable') };
+      const stopped=operation.nodeApply,request=stopped.request,channel=operation.nodeApplyDrivers?.recoveryChannel;
+      if(channel&&stopped.execution.status==='not_requested'&&stopped.execution.execution_id===null
+        &&request.target.kind==='existing'&&request.finish==='execute'&&request.read.ports.length
+        &&!request.read.variable_ports?.length&&['open','configure'].includes(stopped.pending?.phase)
+        &&!Object.hasOwn(operation,'recoveryBaseline')){
+        const deadline=now()+10000,previous=operation.deadline;
+        operation.recoveryBaseline=null;
+        try{
+          let snapshot;
+          try{snapshot=await channel({...request,node:stopped.node,signal,deadline}).readExistingProcesses();}
+          catch(error){operation.transportUncertain=true;throw error;}
+          // A completed inventory that is not a baseline still allows the ordinary handoff.
+          try{if(now()<deadline)operation.recoveryBaseline=captureExecutionBaseline(snapshot,stopped.node);}
+          catch{operation.recoveryBaseline=null;}
+        }finally{operation.deadline=previous;}
+        signal?.throwIfAborted();
+      }
       leased = operation.id;
       return { stopped: true, proof: { receipt_id: operation.lastReceipt?.id ?? null, receipt_state: state.state,
-        cleanup_complete: state.receipt?.cleanup_complete ?? null } };
+        cleanup_complete: state.receipt?.cleanup_complete ?? null,
+        ...(operation.recoveryBaseline?{execution_baseline:structuredClone(operation.recoveryBaseline)}:{}) } };
     },
-    async verifyBrowserRecovery({ operationId, step, attested, signal }) {
+    async verifyBrowserRecovery({ operationId, step, attested, signal, remainingMs=NODE_RELEASE_BUDGET_MS }) {
       const operation = operations.get(operationId);
       if (!operation || leased !== operationId) throw new Error('The browser lease does not belong to this operation');
       if (step.kind === 'export') return verifyRecoveredExport(operation, step, attested, signal);
@@ -2951,51 +2970,90 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       let result;
       const receiptBefore = operation.lastReceipt;
       const journal = { started: false };
+      const checkOutput=Object.hasOwn(operation,'recoveryBaseline');
+      const deadline=now()+Math.min(remainingMs,NODE_RELEASE_BUDGET_MS);
+      // releaseNodeApply settles its state after its own journal entry. Keep that
+      // settlement private until the recovered output receipt is also acknowledged.
+      const releaseOperation=checkOutput?{...operation,nodeApply:{...operation.nodeApply}}:operation;
+      const verifyBoundary=()=>{
+        if(!checkOutput)return;
+        signal?.throwIfAborted();
+        if(now()>=deadline||pending!==operation||leased!==operationId)throw Error('Recovery verification deadline or ownership changed');
+      };
+      let recoveredOutput;
       try {
+        verifyBoundary();
         observations.clear();
         // Release-proof runs even when the stopped phase has no own verifier;
         // the stopped procedure and its predicate are not called again (§8).
         const drivers = operation.nodeApplyDrivers;
-        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, signal,
-          record: event => { journal.started = true; return onRecord(event); },
+        result = await releaseNodeApply({ operation:releaseOperation, handlers: nodeApplyHandlers, signal,
+          record: event => { verifyBoundary(); journal.started = true; return onRecord(event); },
           releaseBeforeTarget:earlyRelease(operation,signal),
-          drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
+          drivers: { ...drivers, releasePending: async (state,ctx)=>{
+            const release=drivers.recoveryReleasePending??drivers.releasePending;
+            if(!checkOutput)return release(state,ctx);
+            const proof=await release(state,{...ctx,deadline});
+            verifyBoundary();
+            if(proof?.verified!==true||proof.cleanup_complete!==true||proof.node_context?.surface!=='graph'
+              ||proof.node_context.locked!==false||!['document_id','workflow_id','node_id'].every(k=>proof.node_context[k]===state.node[k]))
+              throw Error('Quiet graph proof differs from the stopped node');
+            const channel=drivers.recoveryChannel({...state.request,node:state.node,signal,deadline});
+            recoveredOutput=await verifyRecoveredTableOutput({operation,channel,baseline:operation.recoveryBaseline,proof,deadline,signal,now});
+            return proof;
+          } } });
       } catch (error) {
         // Only a refusal before any gesture, or after gestures whose own receipts settled with cleanup,
         // is a settled unresolved result; anything else leaves the release outcome unknown.
         const gestured = operation.lastReceipt !== receiptBefore;
         const receipt = gestured && !operation.transportUncertain ? await readReceipt(operation).catch(() => null) : null;
-        const uncertainRelease = operation.transportUncertain === true || journal.started
+        const uncertainRelease = operation.transportUncertain === true || checkOutput && operation.portReadCleanupComplete === false || journal.started
           || gestured && (receipt?.state !== 'completed' || receipt.receipt?.cleanup_complete !== true);
         return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000), uncertain: uncertainRelease };
       } finally { running = false; }
+      verifyBoundary();
       const request = operation.nodeApply.request;
-      const readable = step.kind!=='node_target'&&reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
+      const readable = checkOutput||step.kind!=='node_target'&&reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
       const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'continuable',
         source_operation_id: operation.id, step: structuredClone(step), reason,
         facts: [step.kind==='node_target'?'pretarget_released_on_quiet_graph':'node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'], attested_by_model: structuredClone(attested),
         node: structuredClone(result.node), request: structuredClone(request),
         configuration: structuredClone(result.configuration), execution: structuredClone(result.execution) };
+      if(checkOutput){
+        receipt.recovered_output=recoveredOutput;
+        if(recoveredOutput)receipt.facts.push('fresh_owned_execution_verified','requested_table_schemas_verified');
+      }
       receipt.next_step = readable ? { tool: 'dock_node_read', original_operation_id: operation.id,
-        instruction: 'The runtime verified that the same node rests unlocked on the quiet graph. To read an already active result '
+        instruction: (checkOutput?(recoveredOutput?'The new execution and requested table schemas were verified. '
+          :'A fresh execution with every requested table schema was not verified. A current read cannot establish recovery freshness. ')
+          +'The original settings remain unverified. Do not execute the node again. ':'')
+          +'The runtime verified that the same node rests unlocked on the quiet graph. To read an already active result '
           + 'or wait for an already running execution, call dock_node_read with a NEW operation_id and source_operation_id:"'
           + receipt.id + '" and use the default execution policy. Do not re-apply the failed procedure.' } : result.next_step;
       const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: request.contract_revision,
         phase: 'browser_recovery_receipt', receipt };
+      const expected=fingerprint('ack',checkOutput?journalCopy(event):event);
       const ack = await onRecord(event);
-      if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
+      if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== expected)
         throw new Error('Browser recovery receipt journal acknowledgement differs');
-      // The lock is released only after the receipt is durable.
-      operation.outcome = nodeApplyOutcome(operation, result); operation.cleanupConfirmed = true;
-      // Redelivery of the original request reports its own failure and the linked recovery.
-      operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts };
-      await remember(operation, 'operation_abandoned', operation.outcome);
-      pending = null; nodeJobs.settle(operation.id, operation.outcome);
+      verifyBoundary();
+      const outcome=nodeApplyOutcome(operation,result);
+      outcome.output.browser_recovery={receipt_id:receipt.id,status:receipt.status,facts:receipt.facts};
+      if(checkOutput){
+        outcome.output.next_step=receipt.next_step;
+        releaseOperation.nodeApply.result.next_step=receipt.next_step;
+        releaseOperation.nodeApply.result.browser_recovery=outcome.output.browser_recovery;
+      }
+      await remember(operation,'operation_abandoned',outcome);
+      verifyBoundary();
+      operation.nodeApply=releaseOperation.nodeApply;
+      operation.outcome=outcome;operation.cleanupConfirmed=true;
+      pending=null;nodeJobs.settle(operation.id,outcome);
       recoveryReceipts.set(receipt.id, receipt);
       recoveredSteps.set(step.key, { operation_id: operation.id, code, receipt_id: receipt.id });
       leased = null;
       return { status: 'continuable', facts: receipt.facts, receipt_id: receipt.id, next_step: receipt.next_step,
-        original_operation: { operation_id: operation.id, status: operation.outcome.status, phase: operation.outcome.phase,
+        ...(checkOutput?{recovered_output:recoveredOutput}:{}), original_operation: { operation_id: operation.id, status: operation.outcome.status, phase: operation.outcome.phase,
           configuration: receipt.configuration, execution: receipt.execution } };
     },
     async stopBrowserRecovery({ operationId, uncertain }) {
@@ -3384,6 +3442,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           while(sourceId){
             const operation=operations.get(sourceId), recovery=recoveryReceipts.get(sourceId);
             if(operation&&recovery)throw Error('Cannot execute from an ambiguous source operation ID');
+            if(recovery&&Object.hasOwn(recovery,'recovered_output'))throw Error('Cannot execute again from this browser recovery receipt');
             if(recovery?.execution?.status==='unknown')throw Error('Cannot execute after recovery with unknown execution');
             const request=operation?.parameters??recovery?.request;
             if(request?.mode!==NODE_READ_MODE||request.parameters.execution_policy!=='existing')break;

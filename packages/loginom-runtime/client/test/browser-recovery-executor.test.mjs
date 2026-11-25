@@ -10,6 +10,10 @@ import { actions } from './support/executor-fixture.mjs';
 import { compactNodeResult } from '../lib/user-results.mjs';
 import { createExcelImportNodeSupport } from '../lib/imports-excel-node.mjs';
 import { createJavascriptCodeNodeSupport } from '../lib/javascript-code-node.mjs';
+import { createNodeReadDrivers } from '../lib/node-read-driver.mjs';
+import { createTextImportNodeSupport } from '../lib/text-import-node.mjs';
+import { createFilterNodeSupport } from '../lib/filter-node.mjs';
+import { existingOutputExecution } from '../lib/node-execution-evidence.mjs';
 import { createRedactor } from '../lib/redact.mjs';
 
 const node = { document_id: 'doc', workflow_id: 'wf', node_id: 'new' };
@@ -26,15 +30,15 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
 function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
-  nodeType = 'imports.text', stopPhase = 'finish' } = {}) {
+  nodeType = 'imports.text', stopPhase = 'finish',now=Date.now } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
-  const adapter = { observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
+  const adapter = { verifyWorkflow: async () => ({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow}), observe: async () => { calls.push('graph'); return structuredClone(graph); }, preflight: async () => {},
     positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
     reconcile: async () => ({ verified: true, cleanup_complete: true }),
     mutate: async e => { calls.push(e.kind); if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Source',
       position: e.parameters.position, inputs: [], outputs: [0] }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
-  const ok = name => async () => { calls.push(name); return { verified: true, cleanup_complete: true, effect_possible: false }; };
+  const ok = name => async () => { calls.push(name); if(name==='open'&&stopPhase==='open')throw Error('Managed wizard opening stopped'); return { verified: true, cleanup_complete: true, effect_possible: false }; };
   const state = { release, failFinish: stopPhase === 'finish' };
   const drivers = { verifySource: ok('source'), mapPorts: ok('mapping'), openWizard: ok('open'),
     finish: async mode => {
@@ -50,19 +54,20 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     releasePending: async s => { calls.push('release:' + s.pending.phase); return state.release(s); },
     ...(releasePendingPhases ? { releasePendingPhases } : {}),
     ...(recoveryReleasePending ? { recoveryReleasePending } : {}) };
-  const mode = nodeType === 'programming.javascript' ? 'script' : nodeType === 'imports.excel' ? 'xlsx' : 'delimited';
+  const mode = nodeType === 'programming.javascript' ? 'script' : nodeType === 'imports.excel' ? 'xlsx' : nodeType === 'transform.filter_data' ? 'conditions' : 'delimited';
   const handler = { revision: '1', modes: [mode], validate: () => {}, configure: async () => {
     const result = await ok('configure')();
-    if (stopPhase === 'configure' && state.receipt) state.receiptOptions('apply:configure', 'node.excel.configure.internal', 'signature');
+    if (stopPhase === 'configure' && state.receipt) state.receiptOptions('apply:configure', nodeType==='transform.filter_data'?'ui.act':'node.excel.configure.internal', 'signature');
     if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
     return result;
   } };
-  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,now,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
+      if (state.transport && code.includes('node.apply.transport')) return {status:'SUCCEEDED',output:{value:await state.transport(code)}};
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
       const receipt = { status: stopPhase === 'configure' ? 'AMBIGUOUS' : 'SUCCEEDED',
-        action_key: stopPhase === 'configure' ? 'node.excel.configure.internal' : 'node.finish', action_revision: '1',
+        action_key: stopPhase === 'configure' ? (nodeType==='transform.filter_data'?'ui.act':'node.excel.configure.internal') : 'node.finish', action_revision: '1',
         operation_id: 'apply:' + stopPhase, phase: 'verified',
         effect_possible: true, output: {}, error: null, trace: [], cleanup_complete: state.receipt.cleanup };
       if ('operation_id' in state.receipt) receipt.operation_id = state.receipt.operation_id;
@@ -70,19 +75,32 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
       return { status: 'SUCCEEDED', action_key: 'operation.receipt', action_revision: '1', operation_id: 'apply', phase: 'observed',
         effect_possible: false, error: null, trace: [], output: { state: state.receipt.state ?? 'completed', receipt } };
     },
-    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([[nodeType, handler]]),
+    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['imports.text', handler],[nodeType, handler]]),
     nodeApplyDriverFactory: options => {
       state.receiptOptions = options.receiptOptions; state.operation = options.operation; state.readReceipt = options.readReceipt;
+      if (options.operation.parameters.mode === 'read_existing_output' && nodeType === 'transform.filter_data')
+        return createNodeReadDrivers(options,{targetOrigin:'http://test',targetBuild:'7.4.2'});
       if (options.operation.parameters.mode === 'read_existing_output' && state.readDriver) return { ...drivers, ...state.readDriver(options.operation) };
       if (nodeType === 'programming.javascript') {
         const js = createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()})
           .nodeApplyDriverFactory(options);
         drivers.releasePending = js.releasePending; drivers.releasePendingPhases = js.releasePendingPhases;
       }
+      if (state.transport) {
+        const support=nodeType==='imports.text'?createTextImportNodeSupport:createFilterNodeSupport;
+        const real=support({targetOrigin:'http://test',targetBuild:'7.4.2'}).nodeApplyDriverFactory(options);
+        drivers.recoveryChannel=ctx=>({...real.recoveryChannel(ctx),observe:async ({ready})=>{
+          const page={wizard:{status:'absent'},ui:{dialogs:[],masks:[]},prepared_node_context:{...node,verified:true,surface:'graph',locked:false}};
+          assert.ok(ready(page));return page;
+        }});
+        if(nodeType==='transform.filter_data')drivers.recoveryReleasePending=(state,{signal,deadline})=>
+          verifyRecoveredPendingNode({operation:options.operation,channel:drivers.recoveryChannel({...state.request,node:state.node,signal,deadline}),
+            readReceipt:options.readReceipt,deadline,now:options.now});
+      }
       return drivers;
     },
-    onRecord: async e => { events.push(e); return e; } });
-  return { runtime, calls, events, state, request: (id, target) => ({...request(id, target), mode,
+    onRecord: async e => { events.push(e); return state.ack ? state.ack(e) : e; } });
+  return { runtime, calls, events, graph, state, request: (id, target) => ({...request(id, target), mode,
     target: {...request(id, target).target, type: nodeType}}) };
 }
 
@@ -93,6 +111,164 @@ async function stopAtFinish(f, id = 'apply', target) {
   assert.equal(job.outcome.output.pending_phase, 'finish');
   return job;
 }
+
+async function recoverTable(change,{nodeType='transform.filter_data',stopPhase='configure',cache=true,badHandoff=false,lostBaseline=false}={}) {
+  const controller=new AbortController();
+  let clock=Date.now();
+  const now=()=>clock;
+  const f=fixture({nodeType,stopPhase,now}),ports=nodeType==='imports.text'?[0]:[0,1];
+  const target={kind:'existing',type:nodeType,ref:node};
+  f.graph.nodes.push({...graphOf().nodes[0],type:target.type,outputs:ports});
+  const progress_state={verified:true,source:'native_progress_record',state:'completed'};
+  const group = id => [{process_id:id,record_id:'group'+id,parent_id:null,children_loaded:true,state:'completed',error:false,progress_state},
+    {process_id:id+'.1',record_id:'child'+id,parent_id:id,state:'completed',error:false,progress_state,
+      owner:{verified:true,node_id:node.node_id,source:'native_process_model_identity'}}];
+  const snapshot={verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context:{...node,verified:true,surface:'graph',locked:false},
+    native_state:{active:true,running:false,locked:false},processes:group('1')};
+  const schemas = [[{index:0,name:'Accepted',label:'Accepted',type:'integer'}],[{index:0,name:'Rejected',label:'Rejected',type:'integer'}]];
+  const portReads=[];
+  f.state.transport=code=>{
+    if(code.includes('async function readNodeProcesses')){
+      if(lostBaseline)throw Error('process history reply lost');
+      return cache?structuredClone(snapshot):{verified:false,reason:'console_not_ready'};
+    }
+    if(code.includes('async function readNodePortOutput')){
+      const native=existingOutputExecution(snapshot,node);
+      const port=JSON.parse(code.match(/,({"port":\d+,"execution":.*?}),{"origin":/)[1]).port;
+      assert.ok(code.includes('"process_record_id":"'+native.process_record_id+'"'));
+      portReads.push(port);
+      if(f.state.latePort===port)clock+=90001;
+      return {verified:true,cleanup_complete:true,node_context:snapshot.node_context,output:{port,port_guid:'p'+port,fresh:true,
+        freshness_basis:'completed_execution_port_source',execution_id:native.execution_id,schema:schemas[port],sample_rows:0,sample:[],sample_complete:true}};
+    }
+    throw Error('Unexpected native observation');
+  };
+  const req=f.request('apply',target);
+  if(stopPhase==='configure')f.state.receipt={cleanup:false};
+  if(nodeType==='imports.text')req.parameters={settings:{source:{encoding:'UTF-8'}},
+    source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}};
+  req.read.ports=ports;
+  req.mappings=ports.map(port=>({direction:'output',port,fields:[{source:{kind:'configured_field',name:'Id'},name:schemas[port][0].name}]}));
+  const support=nodeType==='imports.text'?createTextImportNodeSupport:createFilterNodeSupport;
+  support({}).nodeApplyHandlers.get(nodeType).validate(req.parameters,req.mode,req);
+  f.runtime.startNodeApply(req);
+  assert.equal((await f.runtime.waitNodeApply('apply',{timeoutMs:1000})).outcome.output.pending_phase,stopPhase);
+  await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release'});
+  const recovery=createBrowserRecovery({enabled:true,gate:createSerialGate(),executor:f.runtime,now,probe:async()=>({ok:true}),
+    record:async e=>{f.events.push(e);return badHandoff&&e.phase==='browser_recovery_handoff'?{...e,proof:null}:e;},browser:{callTool:async()=>{change({snapshot,group,schemas,state:f.state,controller});return {content:[]};}}});
+  const body=async args=>JSON.parse((await recovery.call('dock_browser_recovery',{operation_id:'apply',...args},{signal:controller.signal})).content[0].text);
+  const started=await body({action:'start'});
+  if(lostBaseline)return {f,end:started};
+  assert.equal(started.phase,'browser');
+  await recovery.call('browser_click',{element:'Complete',ref:'done'});
+  f.state.release=()=>({...proved(),graph:{nodes:f.graph.nodes,links:[],foreign_links:[]}});
+  return {f,portReads,snapshot,end:await body({action:'finish',actions_performed:['Completed settings']})};
+}
+
+test('recovery verifies the fresh filter process and both requested output schemas before release',async()=>{
+  const {f,portReads,end}=await recoverTable(({snapshot,group})=>snapshot.processes.push(...group('2')));
+  assert.equal(end.phase,'dock');
+  assert.equal(end.verification.recovered_output?.execution.execution_id,'doc:root:2');
+  assert.deepEqual(end.verification.recovered_output.ports.map(p=>p.schema[0].name),['Accepted','Rejected']);
+  assert.deepEqual(portReads,[0,1]);
+  assert.deepEqual(end.verification.original_operation,{operation_id:'apply',status:'FAILED',phase:'node_released',
+    configuration:{status:'unknown'},execution:{status:'not_requested',execution_id:null}});
+  assert.equal(f.calls.filter(c=>c==='configure').length,1);
+  assert.ok(!f.calls.includes('finish'));
+  const phases=f.events.map(e=>e.phase);
+  assert.deepEqual(f.events.find(e=>e.phase==='browser_recovery_handoff').proof.execution_baseline.roots,
+    [{process_id:'1',record_id:'group1',completed:true}]);
+  assert.ok(phases.lastIndexOf('node_port_output_read')>=0&&phases.lastIndexOf('node_port_output_read')<phases.indexOf('node_operation_released'));
+  assert.ok(phases.indexOf('browser_recovery_receipt')<phases.indexOf('operation_abandoned'));
+});
+
+test('the old active filter output stays readable without confirming recovery or authorizing Execute',async()=>{
+  const {f,portReads,end}=await recoverTable(()=>{});
+  assert.equal(end.phase,'dock');
+  assert.equal(end.verification.recovered_output,null);
+  assert.deepEqual(portReads,[]);
+  assert.equal(end.verification.next_step.tool,'dock_node_read');
+  assert.match(end.verification.next_step.instruction,/fresh execution.*not verified/);
+  const source=end.verification.receipt_id;
+  await dispatchNodeApi(f.runtime,'dock_node_read',{operation_id:'current',source_operation_id:source});
+  const read=await dispatchNodeApi(f.runtime,'dock_node_wait',{operation_id:'current',timeout_ms:1000});
+  assert.equal(read.outcome.status,'SUCCEEDED',JSON.stringify(read.outcome.error));
+  assert.equal(read.outcome.output.execution.execution_id,'doc:root:1');
+  for(const source_operation_id of [source,'current'])await assert.rejects(
+    dispatchNodeApi(f.runtime,'dock_node_read',{operation_id:'repeat',source_operation_id,execution:'execute'}),/Cannot execute/);
+  assert.equal(f.calls.filter(c=>c==='configure').length,1);
+  assert.ok(!f.calls.includes('finish'));
+});
+
+test('a mismatched second filter port retains only the quiet-graph recovery facts',async()=>{
+  const {portReads,end}=await recoverTable(({snapshot,group,schemas})=>{
+    snapshot.processes.push(...group('2'));schemas[1][0].name='OldField';
+  });
+  assert.deepEqual(portReads,[0,1]);
+  assert.equal(end.verification.recovered_output,null);
+  assert.deepEqual(end.verification.facts,['node_released_on_quiet_graph','no_wizard_dialog_or_mask']);
+});
+
+test('a different durable schema acknowledgement leaves the original recovery ownership unsettled',async()=>{
+  const {f,portReads,end}=await recoverTable(({snapshot,group,state})=>{
+    snapshot.processes.push(...group('2'));
+    state.ack=e=>e.phase==='browser_recovery_receipt'?{...e,receipt:{...e.receipt,recovered_output:null}}:e;
+  });
+  assert.deepEqual(portReads,[0,1]);
+  assert.equal(end.verification.status,'unresolved');
+  assert.match(end.verification.reason,/acknowledgement differs/);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+  assert.ok(!f.events.some(e=>e.phase==='operation_abandoned'));
+});
+
+test('cancellation during recovery receipt writing retains the lease after all port reads',async()=>{
+  const {f,end}=await recoverTable(({snapshot,group,state,controller})=>{
+    snapshot.processes.push(...group('2'));
+    state.ack=e=>{if(e.phase==='browser_recovery_receipt')controller.abort();return e;};
+  });
+  assert.equal(end.verification.status,'unresolved');
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+  assert.ok(!f.events.some(e=>e.phase==='operation_abandoned'));
+});
+
+test('a text import stopped in open verifies its requested port without entering configure',async()=>{
+  const {f,portReads,end}=await recoverTable(({snapshot,group})=>snapshot.processes.push(...group('2')),
+    {nodeType:'imports.text',stopPhase:'open'});
+  assert.equal(end.verification.recovered_output?.execution.execution_id,'doc:root:2');
+  assert.deepEqual(portReads,[0]);
+  assert.ok(!f.calls.includes('configure')&&!f.calls.includes('finish'));
+});
+
+for(const scenario of ['missing cache','foreign child','two new groups','changed root'])test('table recovery rejects '+scenario,async()=>{
+  const {end,portReads}=await recoverTable(({snapshot,group})=>{
+    const next=group('2');snapshot.processes.push(...next);
+    if(scenario==='foreign child')next[1].owner.node_id='foreign';
+    if(scenario==='two new groups')snapshot.processes.push(...group('3'));
+    if(scenario==='changed root')snapshot.root_id='replacement';
+  },{cache:scenario!=='missing cache'});
+  assert.equal(end.phase,'dock');
+  assert.equal(end.verification.recovered_output,null);
+  assert.deepEqual(portReads,[]);
+});
+
+test('a late second port response retains the original phase and cannot publish fresh output',async()=>{
+  const {f,end}=await recoverTable(({snapshot,group,state})=>{snapshot.processes.push(...group('2'));state.latePort=1;});
+  assert.equal(end.verification.status,'unresolved');
+  assert.equal(f.runtime.nodeApplyStatus('apply').outcome.output.pending_phase,'configure');
+  assert.ok(!f.events.some(e=>['browser_recovery_receipt','node_operation_released'].includes(e.phase)));
+});
+
+test('a lost process-history read does not open the browser',async()=>{
+  const {f,end}=await recoverTable(()=>assert.fail('browser opened after a lost history read'),{lostBaseline:true});
+  assert.notEqual(end.phase,'browser');
+  assert.match(JSON.stringify(end),/process history reply lost/);
+  assert.equal(f.runtime.nodeApplyStatus('apply').outcome.output.pending_phase,'configure');
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+test('a mismatched handoff acknowledgement cannot admit the browser with an unrecorded baseline',async()=>{
+  await assert.rejects(recoverTable(()=>assert.fail('Browser received unconfirmed handoff'),{badHandoff:true}),/handoff.*acknowledgement differs/);
+});
 
 test('terminal Excel configure hands off without cleanup and finishes only after fresh native quiet proof', async () => {
   let wizard = true, observations = 0;

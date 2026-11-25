@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+import { journalCopy } from './execution-journal.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
 // Temporary browser recovery: the same model receives a fixed allowlist of
@@ -210,7 +212,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       await journal({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
         attested_by_model: attested });
       const verification = await Promise.resolve().then(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
-        step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved', facts: [],
+        step: current.step, attested, signal: extra?.signal, remainingMs:remaining(current.budget).ms_left })).catch(error => ({ status: 'unresolved', facts: [],
           reason: error.message, uncertain: true }));
       // The verifier's own release gestures may end with an unknown outcome too.
       if (verification.uncertain) uncertain ??= { operation_id: current.operation_id, tool: browserRecoveryToolName,
@@ -274,7 +276,13 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
 
   // Evidence that cannot be written leaves the outcome unproven: it blocks like an unknown effect.
   async function journal(event, textBlocks) {
-    try { return await record(event, textBlocks); }
+    try {
+      const expected=event.phase==='browser_recovery_handoff'&&event.proof?.execution_baseline?journalCopy(event):null;
+      const ack=await record(event,textBlocks);
+      if(expected&&(!ack||!isDeepStrictEqual(expected,Object.fromEntries(Object.keys(expected).map(k=>[k,ack[k]])),true)))
+        throw Error('Browser recovery handoff journal acknowledgement differs');
+      return ack;
+    }
     catch (error) {
       uncertain ??= { operation_id: event.operation_id, tool: null, reason: 'Journal write failed: ' + String(error.message).slice(0, 400) };
       throw error;

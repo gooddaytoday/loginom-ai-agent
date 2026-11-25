@@ -821,8 +821,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         }
         return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});
       },
-      async releasePending(state,{signal}={}) {
-        const deadline=now()+NODE_RELEASE_BUDGET_MS;
+      recoveryChannel:enter,
+      async releasePending(state,{signal,deadline=now()+NODE_RELEASE_BUDGET_MS}={}) {
         enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
         signal?.throwIfAborted();
         return releasePendingNode({operation,channel,deadline,now,readReceipt});
