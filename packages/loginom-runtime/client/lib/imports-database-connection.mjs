@@ -157,7 +157,8 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    const tiles=document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
    if(controller.Node.data.node!==b.module||view?.constructor?.name!=='ListViewForm'||!root?.isConnected
     ||tiles.length!==1||!root.contains(tiles[0]))throw Error('Module connections entry owner differs');
-   return {module:b.module,controller,view,root,tile:tiles[0]};
+   const previousError=bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox?.cfg;
+   return {module:b.module,controller,view,root,tile:tiles[0],previousError};
   },{b:owner,tid:connections});
   try{
    await click(connections,true);
@@ -169,15 +170,16 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
      const windows=[...document.querySelectorAll('.x-window')].filter(visible);
      if(!windows.length)return null;
      const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
-     const dialog=windows[0],native=Ext.getCmp(dialog.id);
-     const find=tid=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')].filter(visible);return es.length===1&&dialog.contains(es[0])?es[0]:null;};
-     const title=find('msgbox;p.h;p.t'),message=find('msgbox;cnt'),ok=find('msgbox;tlb;ok');
-     const button=ok&&Ext.getCmp(ok.id);
+     const dialog=windows[0],native=bg.ext?.errormessage?.ErrorMsg?.FInstance?.FMessageBox;
+     const titles=dialog.querySelectorAll('[data-tid="msgbox;p.h;p.t"]');
+     const message=native?.msg?.el?.dom,button=native?.msgButtons?.ok,ok=button?.el?.dom;
      if(c!==b.controller||c.Node.data.node!==b.module||c.FController!==b.view||b.view.FView.el.dom!==b.root
       ||!b.root.isConnected||!b.tile.isConnected||!b.root.contains(b.tile)||windows.length!==1
-      ||native?.el?.dom!==dialog||title?.textContent.trim()!=='Loginom '+build
-      ||message?.innerText.trim().split(/\r?\n/,1)[0].trim()!==errorText||ok?.textContent.trim()!=='OK'
-      ||button?.el?.dom!==ok||button.disabled!==false)throw Error('Connections navigation dialog owner differs');
+      ||native?.el?.dom!==dialog||Ext.getCmp(dialog.id)!==native||!native.cfg||native.cfg===b.previousError
+      ||titles.length!==1||titles[0].textContent.trim()!=='Loginom '+build
+      ||!message||!dialog.contains(message)||message.innerText.trim()!==errorText
+      ||!ok||!dialog.contains(ok)||Ext.getCmp(ok.id)!==button||ok.getAttribute('data-tid')!=='msgbox;tlb;ok'
+      ||!visible(ok)||ok.textContent.trim()!=='OK'||button.disabled!==false)throw Error('Connections navigation dialog owner differs');
      return ok;
     },{b:opening,build:t.build,errorText});
     const button=handle.asElement();

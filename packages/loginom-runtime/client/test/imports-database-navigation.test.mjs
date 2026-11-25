@@ -30,11 +30,13 @@ async function failedNavigation(t,fault){
  class ListViewForm { FView={el:{dom:root}}; }
  moduleController=new ListViewForm();
  const modal=element('msgbox'),title=element('msg-title','Loginom '+build);
- const message=element('msg-text',fault==='foreign window'?'Other operation failed.':errorText+'\nПодробности');
+ const message=element('msg-text',fault==='foreign window'?'Other operation failed.':errorText);
  const ok=element('msg-ok','OK',85);
  modal.contains=e=>[title,message,ok].includes(e);
  const windows=[modal,...(fault==='extra window'?[element('other-window')]:[])];
- const components=new Map([modal,ok].map(e=>[e.id,{el:{dom:e},disabled:false}]));
+ const button={el:{dom:ok},disabled:false};
+ const native={el:{dom:modal},cfg:{},msg:{el:{dom:message}},msgButtons:{ok:button}};
+ const components=new Map([[modal.id,native],[ok.id,button]]);
  const byTid=new Map([[moduleTid,moduleTile],[connectionsTid,connections],[workflowTid,workflowTile],[flow.tab_tid,tab]]);
  const dialogElements=new Map([['msgbox;p.h;p.t',title],['msgbox;cnt',message],['msgbox;tlb;ok',ok]]);
  const all=sel=>{
@@ -49,7 +51,8 @@ async function failedNavigation(t,fault){
  Object.assign(doc,{querySelectorAll:all,elementFromPoint:x=>[moduleTile,connections,workflowTile,ok].find(e=>e.getBoundingClientRect().left<x&&e.getBoundingClientRect().right>x)});
  modal.querySelectorAll=sel=>all(sel).filter(e=>modal.contains(e));
  const globals={document:doc,location:{origin},innerWidth:200,innerHeight:200,__loginomDockPreparationV1:preparation,
-  bg:{app:{Version:build,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}}}}}}},
+  bg:{ext:{errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign native window'?null:native}}}},
+   app:{Version:build,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}}}}}}},
   Ext:{getCmp:id=>components.get(id)}};
  const previous=Object.fromEntries(Object.keys(globals).map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
  for(const [k,v] of Object.entries(globals))Object.defineProperty(globalThis,k,{configurable:true,value:v});
@@ -59,6 +62,7 @@ async function failedNavigation(t,fault){
  const click=async(x)=>{
   if(x===25){calls.push('module');surface='module';active.Controller.Node.data.node=module;active.Controller.FController=moduleController;}
   if(x===45){calls.push('open connections');dialogOpen=true;
+   if(fault!=='stale dialog')native.cfg={};
    if(fault==='wrong view owner')active.Controller.FController=new ListViewForm();}
   if(x===85){calls.push('dismiss');if(fault==='lost click')throw Error('Click reply lost');dialogOpen=false;
    if(fault==='owner changed after dismissal')active.Controller.FController=new ListViewForm();}
@@ -91,7 +95,7 @@ test('a connections navigation refusal closes its own dialog and restores the qu
  assert.deepEqual(result.pre_target_checkpoint,{graph:{...graph,dom_epoch:2},navigation_refused:true});
 });
 
-for(const fault of ['foreign window','extra window','wrong view owner','lost click','owner changed after dismissal','busy graph','changed graph']){
+for(const fault of ['foreign window','foreign native window','extra window','stale dialog','wrong view owner','lost click','owner changed after dismissal','busy graph','changed graph']){
  test('connections navigation retains pending cleanup for '+fault,async t=>{
   const {calls,result}=await failedNavigation(t,fault);
   assert.equal(result.cleanup_complete,false);
