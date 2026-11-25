@@ -7,6 +7,28 @@ import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock,scriptGraphFixture} from './support/workspace-ui-fixture.mjs';
 
+test('private quiet graph observation refuses only visible port menus even outside the scanned root',async()=>{
+ const page=new Page(),menu=page.add('div','mn');
+ const tid='MF;TF-1;ModelForm;cmpDiagram';
+ page.add('button',tid,'Graph');
+ const observed=await page.observe();
+ const ref=observed.ui.elements.find(element=>element.tid===tid).ref;
+ const node={verified:true,surface:'graph',locked:false,document_id:'doc',workflow_id:'wf',node_id:'node'};
+ const primitive=vm.runInContext('('+workspaceUiCapability.toString()+')',page.context);
+ const read=options=>primitive(page,{mode:'observe',expected_build:build,expected_origin:origin,kind:'workspace-ui',
+  prepared_node_context:{node,workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},root_ref:ref,...options},async()=>node);
+ assert.equal((await read({})).status,'SUCCEEDED');
+ assert.equal((await read({quiet_graph_observation:true})).error?.code,'UI_PORT_MENU_VISIBLE');
+ menu.attrs.hidden='';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+ delete menu.attrs.hidden;menu.attrs['data-tid']='different-menu';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+ menu.attrs.class='x-menu';
+ assert.equal((await read({quiet_graph_observation:true})).error?.code,'UI_PORT_MENU_VISIBLE');
+ menu.attrs.hidden='';
+ assert.equal((await read({quiet_graph_observation:true})).status,'SUCCEEDED');
+});
+
 test('error toast template is private and requires the native error class, component and message structure',async()=>{
  for(const fault of [null,'info','native','messages']) {
   const page=new Page(),toast=page.add('div','toast');toast.attrs.class='x-window bg-notify-msg-color-'+(fault==='info'?'info':'error');
