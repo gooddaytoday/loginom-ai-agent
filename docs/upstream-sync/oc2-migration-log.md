@@ -25124,3 +25124,9 @@ packages/product        bun test                    75 pass, 3 fail — workspac
 ### Найдено, не чинил
 
 - `v0.4.0:standalone-run.ts` отвечал кодом 2 (`CLI_ARGUMENT_INVALID`) на `--attach`, `--mini`, `--interactive`; в v2 не проверялось.
+
+После `core.longpaths` (run 45697721689, `5d344c1bfb`) Windows упал дальше: `run exe uucode_generate (tables.zig)` —
+`failed to spawn … uucode_generate.exe: FileNotFound`, рабочий каталог генератора внутри
+`target\…\build\loginom-ai-agent-pty-<hash>\out\ghostty-<sha>\zig-pkg\uucode-0.2.0-<hash>` длиннее MAX_PATH: путь
+`D:\a\loginom-ai-agent-test\loginom-ai-agent-test` на 30 символов длиннее upstream. Каталог Cargo на Windows перенесён в
+`$RUNNER_TEMP/pt` (`CARGO_TARGET_DIR` из `setup-rust-pty`), шаги pty берут бинарник из `${CARGO_TARGET_DIR:-target}`.
