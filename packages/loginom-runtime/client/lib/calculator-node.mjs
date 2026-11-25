@@ -202,6 +202,11 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
       return verified({not_applicable:true,mappings:[]});
      }
      enter(ctx);
+     const request=operation.nodeApply.request;
+     if(implementation?.skipInputMapping&&request.inputs.length===0&&mappings.length===0){
+      const graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+      if(implementation.skipInputMapping(graph,ctx.node))return verified({not_applicable:true,mappings:[]});
+     }
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
      if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,
       {inputCount:operation.colUnionInputCount,preflight:targetPreflight});
