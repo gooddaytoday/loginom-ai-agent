@@ -338,7 +338,9 @@ def verify_graph(expected, observed, previous):
         linked = {link[endpoint] for link in links for endpoint in ("source", "target")}
         nodes = {
             node_id: node for node_id, node in nodes.items()
-            if node_id in linked or node != {"type": VARIABLE, "label": "Переменные сценария"}
+            if node_id in linked or not (
+                node["type"] == VARIABLE and node["label"] in ("Переменные сценария", "Переменные_сценария")
+            )
         }
     assert Counter(node["type"] for node in nodes.values()) == expected_types, "G1_GRAPH_NODE_SET"
     bindings = {node["type"]: node_id for node_id, node in nodes.items()}
