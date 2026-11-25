@@ -587,15 +587,16 @@ def result_message(call):
 
 
 class PatternAudit:
-    def __init__(self, run, calls, operations, wizards):
+    def __init__(self, run, calls, operations, wizards, journal_turns):
         self.run = run
         self.calls = calls
         self.operations = operations
         self.wizards = wizards
+        self.journal_turns = journal_turns
         self.cases = []
         self.index = {id(call): index for index, call in enumerate(calls)}
         self.results = sorted((call for call in calls if call.state['status'] in {'completed', 'error'}),
-                              key=lambda call: (call.result_timestamp, call.journal, call.result_line))
+                              key=lambda call: (journal_turns[call.journal], call.result_timestamp, call.result_line))
         self.by_operation = defaultdict(list)
         for call in calls:
             if call.operation:
@@ -636,7 +637,8 @@ class PatternAudit:
         if node_type is None:
             node_type = target.get('type') or step.get('node_type')
         self.cases.append(dict(
-            run=self.run.name, pattern=group, name=PATTERNS[group], variant=variant,
+            run=self.run.name, turn=self.journal_turns[call.journal],
+            pattern=group, name=PATTERNS[group], variant=variant,
             location=self.location(call), tool=call.tool, operation_id=call.operation,
             node=node or result_subject(call) or step.get('node_id'), node_type=node_type,
             trigger=dict(code=code, initiator=initiator, location=self.location(source, True) if source else None,
@@ -1069,6 +1071,7 @@ def model_journals(run):
 def pattern_run(run):
     warnings = []
     results = {}
+    planned_turns = {}
     terminal_basis = 'archived_journal_end'
     if (run / 'results.json').is_file():
         try:
@@ -1082,6 +1085,13 @@ def pattern_run(run):
                     {key: case[key] for key in ('scenario', 'status', 'failed_phase') if key in case}
                     for case in (root.get('runs') or []) if isinstance(case, dict)
                 ]
+                for case in root.get('runs') or []:
+                    if not isinstance(case, dict) or not isinstance(case.get('scenario'), str):
+                        continue
+                    for turn in case.get('turns') or []:
+                        if (isinstance(turn, dict) and isinstance(turn.get('case'), str)
+                                and type(turn.get('turn')) is int and turn['turn'] > 0):
+                            planned_turns[run / case['scenario'] / turn['case'] / 'model.stdout'] = turn['turn']
                 if results.get('finished') or results.get('phase') == 'complete':
                     terminal_basis = 'results.json'
                 elif results.get('phase'):
@@ -1090,17 +1100,28 @@ def pattern_run(run):
             warnings.append(f'results.json: {error}')
     journals = model_journals(run)
     grouped = defaultdict(lambda: defaultdict(list))
+    journal_order = defaultdict(list)
     for path in journals:
         scenario = path.relative_to(run).parts[0] if path.parent != run else '.'
+        first = 0
         try:
-            calls = tool_calls(path, journal_events(path))
-            if path.stat().st_size == 0:
+            stat = path.stat()
+            events = list(journal_events(path))
+            stamp = next((e['timestamp'] for _, e in events if e.get('timestamp')), None)
+            first = (runtime_time(stamp) if isinstance(stamp, str) else stamp) or stat.st_mtime_ns // 1_000_000
+            calls = tool_calls(path, events)
+            if stat.st_size == 0:
                 warnings.append(f'{path.relative_to(run)}: empty model journal')
         except (OSError, ValueError) as error:
             warnings.append(str(error))
-            continue
+            calls = []
+        journal_order[scenario].append((first, path))
         for call in calls:
             grouped[scenario][call.session].append(call)
+    journal_turns = {}
+    for order in journal_order.values():
+        for turn, (_, path) in enumerate(sorted(order), 1):
+            journal_turns[path] = planned_turns.get(path, turn)
 
     cases = []
     runtime_journals = []
@@ -1112,8 +1133,8 @@ def pattern_run(run):
         runtime_journals.extend(str(path.relative_to(run)) for path in paths)
         operations, wizards = runtime_evidence(run, paths, warnings)
         for session in grouped[str(scope.relative_to(run))].values():
-            calls = sorted(session, key=lambda call: (call.timestamp, call.journal, call.line))
-            audit = PatternAudit(run, calls, operations, wizards)
+            calls = sorted(session, key=lambda call: (journal_turns[call.journal], call.timestamp, call.line))
+            audit = PatternAudit(run, calls, operations, wizards, journal_turns)
             audit.wizard_cycles()
             audit.recreated_nodes()
             audit.repeats_after_recovery()
@@ -1122,9 +1143,16 @@ def pattern_run(run):
             if terminal_basis:
                 audit.deadlock(terminal_basis)
             cases.extend(audit.cases)
+    counts = Counter((case['location'].rsplit(':', 1)[0], case['pattern']) for case in cases)
+    turns = []
+    for scenario, order in sorted(journal_order.items()):
+        for _, path in sorted(order, key=lambda item: journal_turns[item[1]]):
+            journal = str(path.relative_to(run))
+            turns.append(dict(scenario=scenario, turn=journal_turns[path], journal=journal,
+                              counts={pattern: counts[journal, pattern] for pattern in PATTERNS}))
     return dict(run=run.name, model_journals=[str(path.relative_to(run)) for path in journals],
                 runtime_journals=runtime_journals, results=results or None,
-                warnings=warnings, cases=cases)
+                warnings=warnings, cases=cases, turns=turns)
 
 
 def pattern_report(directories):
@@ -1160,6 +1188,12 @@ def pattern_markdown(report):
                      ('pattern', 'variant', 'code', 'initiator', 'cases', 'runs')) + ' |')
     present = {row['pattern'] for row in report['summary']}
     lines.extend(f'| {key} | {name} | — | — | 0 | 0 |' for key, name in PATTERNS.items() if key not in present)
+    lines += ['', '| Прогон | Сценарий | Ход | a | b | c | d | e | f | g |',
+              '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+    for run in report['runs']:
+        for turn in run['turns']:
+            values = [run['run'], turn['scenario'], turn['turn'], *turn['counts'].values()]
+            lines.append('| ' + ' | '.join(map(cell, values)) + ' |')
     return '\n'.join(lines)
 
 

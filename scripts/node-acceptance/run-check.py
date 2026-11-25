@@ -2,7 +2,7 @@
 """Quiet, detached live acceptance runner. Python 3 standard library only."""
 import argparse
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import fcntl
 import hashlib
@@ -33,6 +33,7 @@ MODEL = os.environ.get('RUN_CHECK_MODEL') or 'openai/gpt-6.1-sol'
 VARIANT = os.environ.get('RUN_CHECK_VARIANT', 'medium' if MODEL == 'openai/gpt-6.1-sol' else '')
 AUTH = Path(os.environ['RUN_CHECK_AUTH']).expanduser() if os.environ.get('RUN_CHECK_AUTH') else Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json'
 D76_STATUS = 'PASS с ограничением платформы D76'
+MAX_CASE_TURNS = 8
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
 # LAB-1869: native Enrich autosync reorders RowID/Key on cold Execute.
@@ -310,14 +311,17 @@ def scenario(name, case_root=None, *, cases=None):
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
         src = Path(cases).resolve() / name
         if (src / 'task.md').is_file():
-            assert src.resolve().parent == Path(cases).resolve(), 'Case must stay in its assigned directory'
+            if src.resolve().parent != Path(cases).resolve():
+                raise ValueError('Case must stay in its assigned directory')
             # Optional case.json: `base` continues a sibling case in the same chat;
             # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
             if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
                 raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
             base = extra.get('base')
-            if base is not None and (base == name or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', base) or not (Path(cases).resolve() / base / 'task.md').is_file()):
+            if base == name:
+                raise ValueError(f'Case base cycle: {name} → {name}')
+            if base is not None and (not isinstance(base, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', base) or not (Path(cases).resolve() / base / 'task.md').is_file()):
                 raise ValueError(f'{name}/case.json: base must name another case in the same directory')
             files = extra.get('input_files')
             if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
@@ -1459,6 +1463,23 @@ def rest_query_expected(case, package, initial=False):
     return expected
 
 
+def scenario_steps(name, case_root=None, *, cases=None):
+    """Resolve private cases root-first, retaining the built-in Path-based pairs."""
+    def resolve(step, spec, trail):
+        if step in trail:
+            raise ValueError('Case base cycle: ' + ' → '.join((*trail, step)))
+        if len(trail) >= MAX_CASE_TURNS:
+            raise ValueError(f'Case chain exceeds {MAX_CASE_TURNS} turns: {name}')
+        base = spec.get('base')
+        if base is None:
+            return [(step, spec)]
+        if isinstance(base, Path):
+            return [(base, dict(source=base, prompt=base / 'task.md', data=base / 'data')), (step, spec)]
+        return [*resolve(base, scenario(base, case_root, cases=cases), (*trail, step)), (step, spec)]
+
+    return resolve(name, scenario(name, case_root, cases=cases), ())
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('rest_query_initial'):
@@ -1548,9 +1569,15 @@ def expected_for(case, package, cold=False):
         expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
     else:
         expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
+    if case.get('attach_all') and 'graph' in expected:
+        validate_graph_contract(expected['graph'])
+        expected.setdefault('nodes', [])
+        if 'columns' not in expected:
+            expected.setdefault('outputs', [])
     if 'outputs' not in expected:
         expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
-                        outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
+                        outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes', 'graph']}],
+                        **({'graph': expected['graph']} if 'graph' in expected else {}))
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
     if case.get('logreg_kfold'):
@@ -1967,6 +1994,111 @@ def records(path):
     for n, line in enumerate(path.read_text(errors='replace').splitlines(), 1):
         try: yield n, json.loads(line)
         except ValueError: continue
+
+
+def validate_graph_contract(graph):
+    def nonempty(value):
+        return isinstance(value, str) and bool(value.strip())
+
+    if (not isinstance(graph, dict) or set(graph) - {'nodes', 'links'}
+            or not isinstance(graph.get('nodes'), list) or not graph['nodes']
+            or not isinstance(graph.get('links', []), list)):
+        raise ValueError('CASE_GRAPH_INVALID: expected nodes and optional links')
+    ids = set()
+    for node in graph['nodes']:
+        if (not isinstance(node, dict) or set(node) - {'id', 'type', 'label', 'label_contains'}
+                or not all(nonempty(node.get(k)) for k in ('id', 'type')) or node['id'] in ids
+                or ('label' in node and 'label_contains' in node)
+                or any(not nonempty(node[k]) for k in ('label', 'label_contains') if k in node)):
+            raise ValueError(f'CASE_GRAPH_INVALID_NODE: {node!r}')
+        ids.add(node['id'])
+    for link in graph.get('links', []):
+        if (not isinstance(link, dict) or set(link) - {'source', 'target', 'output', 'input'}
+                or not all(nonempty(link.get(k)) and link[k] in ids for k in ('source', 'target'))
+                or any(type(link[k]) is not int or link[k] < 0 for k in ('output', 'input') if k in link)):
+            raise ValueError(f'CASE_GRAPH_INVALID_LINK: {link!r}')
+
+
+def observed_case_graph(profile, since):
+    """Read the latest complete graph already observed during this turn."""
+    observations = []
+    for path in sorted(profile.rglob('execution-events.jsonl')):
+        for line, event in records(path):
+            observed_at = event.get('recorded_at', '')
+            if event.get('phase') == 'node_target_checkpoint':
+                state = event['target_state']
+                graph = state.get('final_graph') or state.get('last_graph') or {}
+                if graph.get('complete') is True:
+                    observations.append((observed_at, path, line, True, graph))
+            elif observed_at >= since and event.get('phase') in {'observation_completed', 'node_observation_completed'}:
+                outcome = event.get('outcome', {})
+                graph = outcome.get('output', {})
+                if (outcome.get('status') == 'SUCCEEDED' and graph.get('scan', {}).get('complete') is True
+                        and graph.get('graph_identity', {}).get('status') == 'observed'
+                        and not graph.get('observation_filter') and isinstance(graph.get('nodes'), list)
+                        and len(graph['nodes']) < 200 and isinstance(graph.get('links'), list)):
+                    observations.append((observed_at, path, line, False, graph))
+    known_types = {}
+    evidence = None
+    for observed_at, path, line, native, graph in sorted(observations):
+        if native:
+            nodes = {n['ref']['node_id']: dict(type=n['type'], label=n.get('label') or '')
+                     for n in graph['nodes']}
+            known_types.update({node_id: node['type'] for node_id, node in nodes.items()})
+            links = [*graph['links'], *graph.get('variable_links', [])]
+        else:
+            captions = {n['node_label']: n['label_text'] for element in graph.get('ui', {}).get('elements', [])
+                        if (n := element.get('graph_node') or {}).get('part') == 'label' and n.get('label_text')}
+            labels = {}
+            nodes = {}
+            variable_ports = {}
+            for node in graph['nodes']:
+                if node_id := node.get('node_id'):
+                    key = node['node_ref']['node_label']
+                    labels[key] = node_id
+                    nodes[node_id] = dict(type=node.get('type') or known_types.get(node_id),
+                                          label=captions.get(key, key))
+                    for direction in ('input', 'output'):
+                        for port in node.get('variable_' + direction + 's', []):
+                            variable_ports[node_id, direction, port['native_index']] = port['port']
+            links = []
+            prefix = graph['graph_identity']['native_prefix']
+            for raw in graph['links']:
+                match = re.fullmatch(r'([^|]+)\|Output_([^|]+?)-(\d+)\|([^|]+)\|Input_([^|]+?)-(\d+)',
+                                     raw.removeprefix(prefix))
+                if match and (source := labels.get(match[1])) and (target := labels.get(match[4])):
+                    output, input_port = int(match[3]), int(match[6])
+                    if match[2] == 'Var':
+                        output = variable_ports.get((source, 'output', output))
+                    if match[5] == 'Var':
+                        input_port = variable_ports.get((target, 'input', input_port))
+                    links.append(dict(source=source, output=output, target=target, input=input_port))
+        if observed_at >= since:
+            evidence = dict(location=f'{path.relative_to(profile)}:{line}', nodes=nodes, links=links)
+    if evidence is None:
+        raise AssertionError('CASE_GRAPH_EVIDENCE_MISSING: no complete graph observation during this turn')
+    return evidence
+
+
+def check_case_graph(expected, observed):
+    bindings = {}
+    for want in expected['nodes']:
+        candidates = [node_id for node_id, node in observed['nodes'].items()
+                      if node['type'] == want['type']
+                      and ('label' not in want or want['label'] == node['label'])
+                      and ('label_contains' not in want or want['label_contains'] in node['label'])]
+        assert candidates, f"CASE_GRAPH_NODE_MISSING: {want!r} at {observed['location']}"
+        assert len(candidates) == 1 and candidates[0] not in bindings.values(), (
+            f"CASE_GRAPH_NODE_AMBIGUOUS: {want!r} at {observed['location']}")
+        bindings[want['id']] = candidates[0]
+    for link in expected.get('links', []):
+        want = dict(link, source=bindings[link['source']], target=bindings[link['target']])
+        assert any(all(have.get(k) == value for k, value in want.items()) for have in observed['links']), (
+            f"CASE_GRAPH_LINK_MISSING: {link!r} at {observed['location']}")
+
+
+def graph_only(spec, expected):
+    return spec.get('attach_all') and 'graph' in expected and not expected['outputs']
 
 
 def fs_effect_execution_evidence(journals):
@@ -2556,6 +2688,7 @@ class Runner:
         rejection = expected.get('rejection')
         refusal = expected.get('refusal')
         execution_error = expected.get('execution_error')
+        only_graph = graph_only(spec, expected)
         lgd_corrupt = spec.get('lgd') == 'corrupt'
         if refusal is not None:
             assert (isinstance(refusal, dict) and set(refusal) == {'text'}
@@ -2584,8 +2717,8 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+        if only_graph or spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -2596,7 +2729,10 @@ class Runner:
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
             if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial') and not spec.get('binding_initial') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
-        destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
+        export_prefix = self.out.name + '-' + folder.parent.name + '-'
+        if spec.get('attach_all') and folder.name != folder.parent.name:
+            export_prefix += folder.name + '-'
+        destinations = [login['package_directory'].rstrip('/') + '/' + export_prefix + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
@@ -2620,7 +2756,7 @@ class Runner:
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
@@ -2735,7 +2871,12 @@ class Runner:
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
-            if target.exists(): continue
+            if target.exists():
+                if not spec.get('attach_all'):
+                    continue
+                # Preserve paths admitted by earlier turns when filenames recur.
+                target = workspace / '.turn-inputs' / folder.name / file.name
+                target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(file, target)
             if spec.get('lgd') and target.suffix.lower() == '.lgd':
                 # Native binary input uses the existing local-path admission flow.
@@ -2744,6 +2885,7 @@ class Runner:
                 command += ['--file', target]
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
+        graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         if spec.get('two_turn'):
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
@@ -2768,8 +2910,17 @@ class Runner:
         else:
             self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
-        session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
+        observed_session = next((e['sessionID'] for _, e in events if e.get('sessionID')), None)
+        assert observed_session, 'MODEL_SESSION_MISSING'
+        assert not (spec.get('attach_all') and session and observed_session != session), 'CASE_SESSION_CHANGED'
+        session = observed_session
         replies = model_replies(events)
+        if spec.get('attach_all') and 'graph' in expected:
+            self.current['graph'] = 'FAIL'
+            observed = observed_case_graph(profile, graph_start)
+            write(folder / 'graph-observed.json', observed)
+            check_case_graph(expected['graph'], observed)
+            self.current['graph'] = 'PASS'
         if spec.get('two_turn'):
             self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
             self.current['two-turn'] = 'PASS'
@@ -3183,6 +3334,9 @@ class Runner:
         if rejection:
             self.current.update(csv='— (expected rejection)', cold='— (expected rejection)')
             return session, expected, None, None
+        if only_graph:
+            self.current.update(csv='— (graph only)', cold='— (graph only)')
+            return session, expected, None, None
         if spec.get('lgd') == 'roundtrip':
             if spec.get('lgd_case'): check_lgd_export_case(replies, spec['lgd_case'], lgd_destination, lgd_initial_destination)
             assert any(o.get('status') == 'SUCCEEDED' and o.get('configuration', {}).get('readback', {}).get('kind') == 'lgd_export'
@@ -3532,31 +3686,46 @@ class Runner:
                 workspace.mkdir()
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
+                active_turn = None
                 try:
+                    case = r['scenario']
+                    steps = scenario_steps(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    spec = steps[-1][1]
+                    r['turns'] = [dict(turn=number, case=step.parent.name if isinstance(step, Path) else step, status='NOT_RUN')
+                                  for number, (step, _) in enumerate(steps, 1)]
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
                     self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     (profile / 'data/auth.json').symlink_to(AUTH)
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
-                    case = r['scenario']
-                    spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     if spec.get('fs_case') == 'paths':
                         r['package'] = self.fs_directory('paths', login) + '/original/paths.lgp'
                     if spec.get('source_package'):
                         write(folder / 'source-config.json', dict(login=login, package=r['package']))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
-                    base = spec['base']
                     session = None
-                    for step in ([base, case] if base else [case]):
+                    for (step, _), turn in zip(steps, r['turns']):
+                        active_turn = turn
+                        turn['status'] = 'PENDING'
                         r.update(csv='—', save='—', cleanup='—')
-                        stage = folder / (step.parent.name if isinstance(step, Path) else step)
+                        r.pop('graph', None)
+                        stage = folder / turn['case']
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                        turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
+                                    status='FAIL' if r.get('failure_class') else 'PASS')
+                        active_turn = None
+                        if spec.get('attach_all') and r.get('failure_class'):
+                            break
+                    if spec.get('attach_all') and r.get('failure_class'):
+                        r['status'] = 'FAIL'
+                        self.save()
+                        continue
                     if spec.get('fs_case'):
                         self.fs_files(spec, folder, login, build, 'fs-warm')
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
+                    if self.options['cold'] and not graph_only(spec, expected) and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
                         if spec.get('fs_case') == 'paths' or spec.get('text_file_variable'):
@@ -3596,6 +3765,9 @@ class Runner:
                         r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
                     else:
                         self.failure(r, error, folder)
+                    if active_turn is not None:
+                        active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
+                                           status=r['status'])
                 finally:
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
@@ -3633,11 +3805,11 @@ def main():
     names = scenario_names(args.scenarios, args.case_root)
     assert 'types300' not in names or args.cold, 'TYPES300_COLD_REQUIRED'
     for name in names:
-        spec = scenario(name, args.case_root, cases=args.cases)
-        if spec.get('generated'): continue
-        assert spec['prompt'].is_file(), 'Scenario prompt missing'
-        assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
-        expected_for(spec, '/preflight/package.lgp')
+        for step, spec in scenario_steps(name, args.case_root, cases=args.cases):
+            if spec.get('generated') or isinstance(step, Path): continue
+            assert spec['prompt'].is_file(), 'Scenario prompt missing'
+            assert args.case_root or spec.get('oracle', spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
+            expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
         pair_login(read(pair / (role + '.json')), role + '.json')

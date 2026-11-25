@@ -220,6 +220,36 @@ class BughuntAuditTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         return report['runs'][0]['cases']
 
+    def test_patterns_number_turns_even_when_case_names_sort_backwards(self):
+        root = self.temp_run([])
+        scenario = root / 'sample'
+        (scenario / 'sample/model.stdout').unlink()
+        names = ['z-root', 'm-group', 'a-export']
+        for i, name in enumerate(names):
+            folder = scenario / name
+            folder.mkdir()
+            events = [dict(type='text', timestamp=100 + i, part=dict(text='done'))]
+            if i < 2:
+                events.insert(0, dict(self.dock('node_apply', {'status': 'SUCCEEDED'}, operation_id=name),
+                                      timestamp=100 + i, sessionID='one-chat'))
+            (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)), encoding='utf-8')
+        results = root / 'results.json'
+        results.write_text(json.dumps(dict(finished=4, runs=[dict(scenario='sample', turns=[
+            dict(turn=i, case=name) for i, name in enumerate(names, 1)])])), encoding='utf-8')
+        _, report = self.report('--patterns', root)
+        findings = report['runs'][0]
+        turns = findings['turns']
+        self.assertEqual([turn['journal'].split('/')[1] for turn in turns], names)
+        self.assertEqual([turn['turn'] for turn in turns], [1, 2, 3])
+        self.assertEqual([turn['counts']['d'] for turn in turns], [0, 1, 0])
+        self.assertEqual([sum(turn['counts'].values()) for turn in turns], [0, 1, 0])
+        self.assertEqual([case['turn'] for case in findings['cases'] if case['pattern'] == 'd'], [2])
+        markdown = self.run_audit('--patterns', root)
+        self.assertIn('| Прогон | Сценарий | Ход | a | b | c | d | e | f | g |', markdown.stdout)
+        results.unlink()
+        _, archived = self.report('--patterns', root)
+        self.assertEqual(archived['runs'][0]['turns'], turns)
+
     def test_multiple_json_blocks_and_separate_error_result(self):
         call = self.dock('node_apply', operation_id='original')
         call['part'].update(callID='call')
