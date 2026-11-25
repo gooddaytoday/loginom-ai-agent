@@ -1,6 +1,19 @@
 name: Loginom macOS candidate
 
+# Builds the unsigned macOS arm64 candidate: the product CLI (tar.gz) and the Desktop app (.app tarball) from one commit.
+# Run it with workflow_dispatch, or call it from a release workflow (workflow_call). Signing is ad-hoc only, as in 0.4;
+# Developer ID and notarization are stage G, re-checking resource hashes after signing is B5.1l.
+
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: Candidate version (empty uses run number)
+        type: string
+      browser_recovery:
+        description: Bake temporary browser recovery into this candidate (demo and acceptance builds)
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -24,62 +37,89 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  macos:
+  # loginom-ai-agent-pty for macOS arm64 comes from the reusable pty build (it also builds Linux and Windows).
+  pty:
     # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration
     # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).
     if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)
+    uses: ./.github/workflows/loginom-pty.yml
+
+  macos:
+    needs: pty
     runs-on: macos-15
     timeout-minutes: 120
     env:
       LOGINOM_AI_AGENT_CHANNEL: dev
+      LOGINOM_AI_AGENT_VERSION: ${{ inputs.version || format('0.1.4-macos.{0}', github.run_number) }}
       # Independent of the channel: an explicit candidate input bakes browser recovery.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ inputs.browser_recovery && '1' || '0' }}
+      LOGINOM_AI_AGENT_TARGET: darwin-arm64
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "24.19.0"
-          architecture: arm64
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version-file: package.json
-      - name: Provision locked build inputs
+      - name: Check runner
         run: |
           test "$(uname -m)" = arm64
           test "$(sw_vers -productVersion | cut -d. -f1)" = 15
-          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/loginom-browsers"
-          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
-          echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
-          bun install --frozen-lockfile --filter loginom-ai-agent --filter '@opencode-ai/desktop' --filter 'opencode' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
-          node packages/desktop/node_modules/electron/install.js
-          echo "LOGINOM_AI_AGENT_NODE_SOURCE=$(command -v node)" >> "$GITHUB_ENV"
-          echo "LOGINOM_AI_AGENT_TEST_NODE=$(command -v node)" >> "$GITHUB_ENV"
-          cd packages/loginom-runtime/client
-          npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
-          node node_modules/playwright/cli.js install chromium
-      - name: Source checks
-        run: bun packages/desktop/scripts/check-macos.ts "$RUNNER_TEMP/source-checks.json"
+      # Pinned Node and Chromium from packages/product/loginom-release.json; exports the *_SOURCE variables.
+      - uses: ./.github/actions/setup-loginom-inputs
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          # Bun skips the Electron download script, so run it with the pinned Node.
+          "$LOGINOM_AI_AGENT_NODE_SOURCE" packages/desktop/node_modules/electron/install.js
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-ai-agent-pty-aarch64-apple-darwin
+          path: ${{ runner.temp }}/pty
+      - name: Select the pty binary
+        run: |
+          # upload-artifact drops the executable bit.
+          chmod +x "$RUNNER_TEMP/pty/loginom-ai-agent-pty"
+          (cd "$RUNNER_TEMP/pty" && shasum -a 256 -c SHA256SUMS)
+          echo "LOGINOM_AI_AGENT_PTY_BIN=$RUNNER_TEMP/pty/loginom-ai-agent-pty" >> "$GITHUB_ENV"
       - name: Read system proxy
         run: bun packages/loginom-host/script/system-proxy-smoke.ts
-      - name: Build and verify both products
+      - name: Build the product CLI
         env:
-          CANDIDATE_VERSION: ${{ inputs.version || format('0.1.4-macos.{0}', github.run_number) }}
-          # Bundling the backend into Electron exceeds Node's default 2 GiB heap on this runner.
+          # Bundling the backend exceeds Node's default 2 GiB heap on this runner.
           NODE_OPTIONS: --max-old-space-size=4096
-        run: bun packages/desktop/scripts/build-macos.ts --output "$RUNNER_TEMP/candidate" --version "$CANDIDATE_VERSION"
+        run: |
+          mkdir -p "$RUNNER_TEMP/candidate"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/candidate/cli"
+      # Desktop bundles the CLI from packages/cli/dist and fails without it; it never downloads one.
+      - name: Build the CLI that Desktop bundles
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: bun run --cwd packages/cli build --skip-install --skip-web-ui
+      - name: Build and pack Desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          bun run --cwd packages/desktop build
+          bun run --cwd packages/desktop pack
+      - name: Verify and collect
+        run: |
+          candidate="$RUNNER_TEMP/candidate"
+          cp dist/desktop/*.app.tar "$candidate/"
+          check="$RUNNER_TEMP/cli-check"
+          mkdir "$check"
+          tar -xpzf "$candidate"/loginom-ai-agent-cli-*-darwin-arm64.tar.gz -C "$check"
+          test "$("$check/bin/loginom-ai-agent-cli" --version)" = "$LOGINOM_AI_AGENT_VERSION"
+          bun packages/loginom-host/script/verify-cli-candidate.ts "$check" "$GITHUB_WORKSPACE"
+          (cd "$candidate" && shasum -a 256 *.app.tar *.tar.gz > SHA256SUMS && cat SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: loginom-macos15-arm64-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/candidate/*.dmg
-            ${{ runner.temp }}/candidate/*.zip
+            ${{ runner.temp }}/candidate/*.app.tar
             ${{ runner.temp }}/candidate/*.tar.gz
             ${{ runner.temp }}/candidate/*.sha256
-            ${{ runner.temp }}/candidate/*.json
             ${{ runner.temp }}/candidate/SHA256SUMS
             ${{ runner.temp }}/candidate/cli/cli-manifest.json
-            ${{ runner.temp }}/source-checks.json
           retention-days: 14

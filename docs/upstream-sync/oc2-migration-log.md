@@ -24915,3 +24915,49 @@ Run 45689615930 форка (`fe60098d89`), задание `loginom-checks` с н
 
 Работа workflow и действия целиком; Linux-сборка на 22.04 без обёртки; macOS arm64; Windows MSVC (`+crt-static`, Zig на
 Windows, первый прогон `daemon/windows.rs`, `play` с `cmd.exe`); кэш Cargo; `check-process-daemon` на `macos-15`.
+
+## B5.1k — сборка macOS
+
+25.11.2026. Ветка `b51k-macos-build` от `oc2-migration` (`840be7c3bb`). Эталон — `v0.4.0`.
+
+### Выбор меньшего варианта
+
+- **Артефакт Desktop — `.app.tar`, не DMG/ZIP.** `pack.ts` на macOS строит `.app` (`--dir`, `identity=null`) и пакует его в
+  `loginom-ai-agent-mac-arm64.app.tar`; цели `dmg` и `zip` в конфиге есть, но `pack.ts` их не вызывает. DMG/ZIP и подпись
+  `.app` — B5.1l (и `.github/release/sign-desktop-macos.sh`, он пока на именах upstream). Поэтому приёмка «`.dmg`/`.zip`» не
+  выполнена: в артефакте `.app.tar`, CLI `tar.gz`, `SHA256SUMS`.
+- **`check-macos.ts` и `build-macos.ts` не портированы.** Тесты `product`, `loginom-host` и `desktop` на Linux гоняет B5.1m;
+  сборку целиком заменяют шаги workflow. Тесты `macos-smoke*`, `release/verify-macos.ts` — этап G (по таблице B4).
+- **Установка зависимостей без `--filter`:** полный `bun install --frozen-lockfile`. Имена пакетов в фильтрах 0.4 не
+  существуют в v2, а урезанный набор фильтров не проверить без macOS.
+- **pty — из reusable `loginom-pty.yml` целиком** (собирает все три платформы; выбрать одну цель нельзя). Красный Windows pty
+  блокирует macOS, пока `loginom-pty.yml` не позеленеет.
+
+### Что сделано
+
+- `.github/workflows/loginom-macos.yml`: добавлен `workflow_call` (входы `version`, `browser_recovery`), `workflow_dispatch`
+  сохранён. Задания: `pty` (вызов `loginom-pty.yml`) и `macos` (`macos-15`, arm64). Шаги: pinned Node и Chromium
+  (`setup-loginom-inputs`), `bun install`, `electron/install.js`, скачивание `loginom-ai-agent-pty-aarch64-apple-darwin`,
+  `chmod +x`, проверка `SHA256SUMS`, `LOGINOM_AI_AGENT_PTY_BIN`, `system-proxy-smoke.ts`, CLI
+  (`loginom-host/script/build-cli.ts` → `tar.gz` + `.sha256`, ad-hoc подпись внутри скрипта), CLI для Desktop
+  (`packages/cli` `build --skip-install --skip-web-ui`, `LOGINOM_AI_AGENT_TARGET=darwin-arm64` → `packages/cli/dist`),
+  Desktop `build` и `pack`, проверка: `loginom-ai-agent-cli --version` = версия, `verify-cli-candidate.ts`, `SHA256SUMS`;
+  артефакт `loginom-macos15-arm64-<run_number>`. Секретов нет.
+- `loginom-host/script/{resume-oracle,tui-multichat-acceptance,cli-permission-acceptance}.ts`: `{ readonly: true }` заменён
+  на `PRAGMA query_only = ON` (4 места).
+- `product/test/ci-workflows.test.ts` не менялся: `loginom-macos` уже в `PRODUCT`, нового файла нет. `catalog.json` не менялся.
+
+### Проверки (Linux, Bun 1.4.4)
+
+- YAML разобран `python3 yaml`. `uptime` 10, поэтому тяжёлые сборки не запускались.
+- `packages/product`: 81 pass, 2 fail — `CI triggers` и `path literals`, оба про `loginom-windows.yml` (задача i). Закрыт
+  `workspace packages` (`--filter` в `loginom-macos.yml`); `repo-paths` теперь 7/2.
+- `packages/loginom-host` `bun typecheck` — 0 ошибок. `catalog-check.py` код 0; `apply-identity --check` 0 файлов;
+  `bun run check` код 0 (39 задач).
+
+### Проверит только CI на GitHub
+
+Всё выполнение на macOS 15 arm64: сборка pty (зависит от `loginom-pty.yml`); `build-cli.ts` (`Bun.revision` против notice,
+`codesign`, Keychain-помощник); сборка `packages/cli` с `--skip-web-ui` — хватит ли Desktop такого CLI; `electron-builder
+--dir`; `verify-cli-candidate.ts` (дерево исходников не должно стать грязным после сборки Desktop); кучи `NODE_OPTIONS` 4 ГБ;
+время.
