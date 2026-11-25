@@ -1981,7 +1981,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
 
     def test_graph_contract_checks_current_snapshot_captions_direction_and_ports(self):
         want = dict(nodes=[dict(id='import', type='imports.text', label='Продажи'),
-                           dict(id='group', type='transform.group_data', label_contains='регионам')],
+                           dict(id='group', type='transform.group_data', label_contains='по регионам')],
                     links=[dict(source='import', target='group', output=0, input=0)])
         runner.validate_graph_contract(want)
         for malformed in [dict(nodes=want['nodes'] * 2), dict(nodes=want['nodes'], links=[dict(source='import', target='unknown')]),
@@ -2003,7 +2003,7 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                               dict(node_id='g', node_ref=dict(node_label='Выручка_по_регионам'))],
                        links=['A;Graph;Продажи|Output_Data-0|Выручка_по_регионам|Input_Data-0'],
                        ui=dict(elements=[dict(graph_node=dict(part='label', node_label='Выручка_по_регионам',
-                                                              label_text='Выручка по регионам'))]))
+                                                              label_text='Выручка порегионам'))]))
             current = dict(recorded_at=since, phase='observation_completed',
                            outcome=dict(status='SUCCEEDED', output=raw))
             path.write_text(json.dumps(checkpoint) + '\n')
@@ -2013,6 +2013,12 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             graph = runner.observed_case_graph(profile, since)
             self.assertEqual(graph['location'], 'execution-events.jsonl:2')
             runner.check_case_graph(want, graph)
+            caption = raw['ui']['elements'][0]['graph_node']
+            caption['label_text'] = 'Выручка_по_регионам'
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_NODE_MISSING'):
+                runner.check_case_graph(want, runner.observed_case_graph(profile, since))
+            caption['label_text'] = 'Выручка порегионам'
             for changed in [dict(want['links'][0], input=1), dict(source='group', target='import')]:
                 with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_LINK_MISSING'):
                     runner.check_case_graph(dict(want, links=[changed]), graph)

@@ -2038,13 +2038,13 @@ def observed_case_graph(profile, since):
                         and not graph.get('observation_filter') and isinstance(graph.get('nodes'), list)
                         and len(graph['nodes']) < 200 and isinstance(graph.get('links'), list)):
                     observations.append((observed_at, path, line, False, graph))
-    known_types = {}
+    known_nodes = {}
     evidence = None
     for observed_at, path, line, native, graph in sorted(observations):
         if native:
             nodes = {n['ref']['node_id']: dict(type=n['type'], label=n.get('label') or '')
                      for n in graph['nodes']}
-            known_types.update({node_id: node['type'] for node_id, node in nodes.items()})
+            known_nodes.update(nodes)
             links = [*graph['links'], *graph.get('variable_links', [])]
         else:
             captions = {n['node_label']: n['label_text'] for element in graph.get('ui', {}).get('elements', [])
@@ -2056,8 +2056,15 @@ def observed_case_graph(profile, since):
                 if node_id := node.get('node_id'):
                     key = node['node_ref']['node_label']
                     labels[key] = node_id
-                    nodes[node_id] = dict(type=node.get('type') or known_types.get(node_id),
-                                          label=captions.get(key, key))
+                    known = known_nodes.get(node_id, {})
+                    native_label = known.get('label', '')
+                    caption = captions.get(key)
+                    # SVG text can omit a space at a line break. Preserve the
+                    # native caption when the control key and visible text agree.
+                    if (native_label and re.sub(r'\s', '_', native_label) == key
+                            and (not caption or re.sub(r'\s', '', caption) == re.sub(r'\s', '', native_label))):
+                        caption = native_label
+                    nodes[node_id] = dict(type=node.get('type') or known.get('type'), label=caption or key)
                     for direction in ('input', 'output'):
                         for port in node.get('variable_' + direction + 's', []):
                             variable_ports[node_id, direction, port['native_index']] = port['port']
