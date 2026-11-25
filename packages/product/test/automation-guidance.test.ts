@@ -27,7 +27,8 @@ test("frequent recoverable mistakes have concrete preventive forms within the en
     "new upstream node AND a different destination",
   ]) expect(skill).toContain(hint)
   // 0.4.0 hint growth: REST replacement (#1235) and XLSX/REST type hints (#1239), each verified live.
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 2_000)
+  // LAB-2020: internal guard below the owner's 40 000 B budget, never above 39 000.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(38_500)
 })
 
 test("existing Import edits retain verified source and Close requires a complete first form", () => {
