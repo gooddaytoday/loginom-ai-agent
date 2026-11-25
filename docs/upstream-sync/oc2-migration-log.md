@@ -25066,3 +25066,11 @@ baseline-средой; скачивание артефакта pty из вызв
 Весь прогон: `setup-loginom-inputs` на Linux, `build-cli.ts` с baseline Bun, `--version` CLI, сборка CLI для Desktop с
 `--skip-web-ui`, память Desktop `build`, `xvfb-run bun test` Desktop (может оказаться красным на тестах, которым нужен не
 виртуальный дисплей), AppImage, deb, rpm, время (лимит 120 мин), `safeStorage` на раннере без setuid `chrome-sandbox`.
+
+## B5.1f-ci Первая сборка pty на GitHub
+
+Run 45694260129 форка (`06ac4c97c9`): `pty (x86_64-unknown-linux-gnu)` и `pty (aarch64-apple-darwin)` — success,
+`pty (x86_64-pc-windows-msvc)` — failure: `build.rs` скачивает Ghostty через git в глубокий `OUT_DIR` Cargo, git
+отвечает `unable to open loose object …: Filename too long`. Upstream (`check-process-daemon.yml`,
+`release-process-daemon.yml`) включает `core.longpaths` перед сборкой на Windows; то же добавлено в ветку Windows действия
+`setup-rust-pty`.
