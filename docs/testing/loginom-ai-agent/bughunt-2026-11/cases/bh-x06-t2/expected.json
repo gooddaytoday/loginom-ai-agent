@@ -38,5 +38,31 @@
       "sort"
     ]
   },
-  "outputs": []
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Revenue",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Revenue": 290
+        },
+        {
+          "Revenue": 195
+        },
+        {
+          "Revenue": 410
+        },
+        {
+          "Revenue": 200
+        }
+      ]
+    }
+  ]
 }

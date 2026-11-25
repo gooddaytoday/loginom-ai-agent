@@ -1,5 +1,6 @@
 {
   "base": "bh-x00-t1",
+  "output_mode": "ports",
   "budget": {
     "max_nodes": 1
   },

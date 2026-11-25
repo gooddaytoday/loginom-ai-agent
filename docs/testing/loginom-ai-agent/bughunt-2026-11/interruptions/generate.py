@@ -19,7 +19,7 @@ case = Path(__file__).resolve().parent
 expected = json.loads((case / 'expected.json').read_text())
 for output in expected['outputs']:
     threshold = 200 if case.name == 'bh-x06' else 100
-    seed = 'bh-x06-t1' if case.name == 'bh-x06' else 'bh-x00-t1'
+    seed = 'bh-x06-t1' if case.name.startswith('bh-x06') else 'bh-x00-t1'
     with (case.parent / seed / 'data/sales.csv').open(newline='') as file:
         values = [int(row['Revenue']) for row in csv.DictReader(file)]
     output['rows'] = [{'Revenue': value} for value in values if value > threshold]
@@ -46,16 +46,17 @@ def contracts():
     final = 'Продолжи. Проверь настройку фильтра, выполни его и покажи все подходящие строки.'
     yield 'bh-x00-t1', seed, input_graph, dict(budget=dict(max_nodes=1)), None
     yield 'bh-x00-t2', add_filter, filter_graph, dict(base='bh-x00-t1', budget=dict(max_nodes=1)), None
-    yield 'bh-x03-t2', add_filter, filter_graph, dict(
-        base='bh-x00-t1', budget=dict(max_nodes=1),
-        manual_edit=dict(kind='move', node=dict(type=FILTER), position=dict(x=480, y=224))), None
+    show_filter = add_filter + ' Покажи подходящие строки.'
+    yield 'bh-x03-t2', show_filter, filter_graph, dict(
+        base='bh-x00-t1', output_mode='ports', budget=dict(max_nodes=1),
+        manual_edit=dict(kind='move', node=dict(type=FILTER), position=dict(x=480, y=224))), 100
     yield 'bh-x06-t1', seed, input_graph, dict(
         budget=dict(max_nodes=1), manual_edit=dict(kind='create', type=SORT)), None
-    yield ('bh-x06-t2', add_filter,
+    yield ('bh-x06-t2', show_filter,
            graph(sales, row_filter, sorting, links=(('sales', 'filter'),), retain=('sales', 'sort')),
-           dict(base='bh-x06-t1', budget=dict(max_nodes=1),
+           dict(base='bh-x06-t1', output_mode='ports', budget=dict(max_nodes=1),
                 manual_edit=dict(kind='connect', source=dict(type=FILTER), target=dict(type=SORT),
-                                 output=0, input=0)), None)
+                                 output=0, input=0)), 100)
     # The unconnected sort is present before the user's gesture.
     final_sort = graph(sales, row_filter, sorting, links=(('sales', 'filter'), ('filter', 'sort')),
                        retain=('sales', 'filter', 'sort'))
