@@ -649,12 +649,18 @@ export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
 A private case may add `case.json` with `base` (another case in the same
-`--cases` directory), `input_files` (attachments of this turn) and `budget`
-(read only by `bughunt-audit.py`). Pass the last case to `--scenarios`. The
+`--cases` directory), `input_files` (files for this turn), `budget`
+(read by `bughunt-audit.py`) and boolean `no_save`. Pass the last case to `--scenarios`. The
 runner follows `base` to the root and runs up to eight turns in one CLI chat
 with the same profile, workspace and package. It rejects cycles before
 launching. The root attaches the files in `data/` by default, in any format.
 A continuation attaches only its listed `input_files`.
+
+With `"no_save": true`, the runner omits the generated Save request and fails
+the turn on any Save attempt. If a later turn follows, the chain uses one
+interactive CLI process to retain the unsaved draft. Input files in this
+transport are provided by local workspace path. Leave `no_save` unset on a
+turn that should receive the generated Save request.
 
 Any turn may add `graph` to `expected.json`. The runner checks the latest
 complete graph recorded during the turn in the existing runtime journal.

@@ -83,22 +83,23 @@ def shutdown_signature(profile, exit_code, complete):
                 failed_ack_count=sum(known(a) for a in acks))
 
 
-def run(config):
+def exchange(config, prompt):
+    """Yield each completed turn and receive the next prompt in the same CLI."""
     folder, profile = Path(config['folder']), Path(config['profile'])
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 140, 0, 0))
-    child = subprocess.Popen([config['executable'], config['workspace'], '--headless', '--model', 'openai/gpt-6.1-sol',
-                              '--dangerously-skip-permissions', '--prompt', config['prompts'][0]],
+    child = subprocess.Popen([config['executable'], config['workspace'], '--headless', '--model',
+                              config.get('model', 'openai/gpt-6.1-sol'),
+                              '--dangerously-skip-permissions', '--prompt', prompt],
                              stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
-                             env=dict(os.environ, TERM='xterm-256color'))
+                             env=dict(config.get('env', os.environ), TERM='xterm-256color'))
     os.close(slave)
-    turn, session, finishing, exit_sent, first_completed = 1, None, None, False, False
-    deadline = time.monotonic() + 1800
-    error = None
+    turn, session, finishing, exit_sent, recorded = 1, None, None, False, False
+    end = config.get('deadline', float('inf'))
+    deadline = min(end, time.time() + 1800)
     def interrupted(signum, frame):
         raise KeyboardInterrupt
-    signal.signal(signal.SIGINT, interrupted)
-    signal.signal(signal.SIGTERM, interrupted)
+    previous = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGINT, signal.SIGTERM)}
     def boundary(kind, parts=(), native_execution=None):
         execution_ids = set()
         def visit(value):
@@ -130,7 +131,7 @@ def run(config):
                         os.write(master, b'\x04'); exit_sent = True
                     if time.monotonic() - finishing > 60: raise TimeoutError('TWO_TURN_EXIT_TIMEOUT')
                     continue
-                if time.monotonic() > deadline: raise TimeoutError('TWO_TURN_MODEL_TIMEOUT')
+                if time.time() > deadline: raise TimeoutError('INTERACTIVE_MODEL_TIMEOUT')
                 try: messages, parts = transcript(profile)
                 except sqlite3.OperationalError: continue
                 sessions = {m['sessionID'] for m in messages}
@@ -141,28 +142,36 @@ def run(config):
                     session = actual
                 if any(m.get('role') == 'assistant' and m.get('error') for m in messages):
                     raise RuntimeError('TWO_TURN_MODEL_ERROR')
-                if config.get('require_medium'):
+                if config.get('require_medium') or config.get('model'):
+                    provider, model = config.get('model', 'openai/gpt-6.1-sol').split('/', 1)
+                    variant = config.get('variant') or ('medium' if config.get('require_medium') else None)
                     for message in messages:
                         if message.get('role') == 'user':
-                            assert message.get('model') == dict(providerID='openai', modelID='gpt-6.1-sol', variant='medium'), 'TWO_TURN_MODEL_VARIANT_CHANGED'
+                            actual = message.get('model', {})
+                            assert (actual.get('providerID'), actual.get('modelID'), actual.get('variant')) == (provider, model, variant), 'INTERACTIVE_MODEL_CHANGED'
                 if not completed_turn(messages, turn): continue
-                if turn == 1:
-                    if not first_completed:
-                        boundary('completed', parts); first_completed = True
-                    native = pending_execution(profile) if config.get('kind') == 'read-wait-running' else None
-                    if config.get('kind') == 'read-wait-running' and native is None: continue
-                    turn = 2; boundary('submitted', parts, native)
+                if not recorded:
+                    boundary('completed', parts); recorded = True
+                needs_native = turn == 1 and config.get('kind') == 'read-wait-running'
+                native = pending_execution(profile) if needs_native else None
+                if needs_native and native is None: continue
+                user = [m for m in messages if m.get('role') == 'user'][-1]
+                ids = {m['id'] for m in messages if m.get('parentID') == user['id']}
+                prompt = yield [event for event in transcript_events(parts) if event['part']['messageID'] in ids]
+                if prompt is not None:
+                    turn += 1
+                    recorded = False
+                    boundary('submitted', parts, native)
                     # Bracketed paste keeps newlines inside this one user message.
-                    os.write(master, b'\x1b[200~' + config['prompts'][1].encode() + b'\x1b[201~')
+                    os.write(master, b'\x1b[200~' + prompt.encode() + b'\x1b[201~')
                     time.sleep(.2)
                     os.write(master, b'\r')
+                    if config.get('model'): deadline = min(end, time.time() + 1800)
                 else:
-                    boundary('completed', parts)
                     os.write(master, b'\x1b')
                     finishing = time.monotonic()
-    except BaseException as exc:
-        error = exc
     finally:
+        for sig, handler in previous.items(): signal.signal(sig, handler)
         if child.poll() is None:
             # Only our exact child, never a process name or a workspace daemon.
             assert child.pid != config['daemon_pid'], 'Cannot terminate daemon'
@@ -175,15 +184,31 @@ def run(config):
                 except subprocess.TimeoutExpired:
                     child.kill(); child.wait()
         os.close(master)
-        messages, parts = transcript(profile)
-        for part in parts:
-            if part['type'] not in ['tool', 'text']: continue
-            print(json.dumps(dict(type='tool_use' if part['type'] == 'tool' else 'text',
-                                  sessionID=part['sessionID'], part=part), ensure_ascii=False), flush=True)
-    if error: raise error
-    signature = shutdown_signature(profile, child.returncode, completed_turn(messages, 2))
+    messages, _ = transcript(profile)
+    complete = completed_turn(messages, turn)
+    signature = shutdown_signature(profile, child.returncode, complete) if not config.get('model') else None
     if signature: (folder / 'shutdown-signature.json').write_text(json.dumps(signature) + '\n')
-    assert (child.returncode == 0 or signature) and completed_turn(messages, 2), 'TWO_TURN_INCOMPLETE'
+    assert (child.returncode == 0 or signature) and complete and finishing is not None, 'INTERACTIVE_MODEL_INCOMPLETE'
+
+
+def transcript_events(parts):
+    for part in parts:
+        if part['type'] in ['tool', 'text']:
+            yield dict(type='tool_use' if part['type'] == 'tool' else 'text', sessionID=part['sessionID'], part=part)
+
+
+def run(config):
+    prompts = config['prompts']
+    with closing(exchange(config, prompts[0])) as turns:
+        try:
+            next(turns)
+            for prompt in prompts[1:]:
+                turns.send(prompt)
+            assert next(turns, None) is None, 'TWO_TURN_INCOMPLETE'
+        finally:
+            _, parts = transcript(Path(config['profile']))
+            for event in transcript_events(parts):
+                print(json.dumps(event, ensure_ascii=False), flush=True)
 
 
 if __name__ == '__main__':

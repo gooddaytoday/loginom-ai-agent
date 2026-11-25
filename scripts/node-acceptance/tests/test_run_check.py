@@ -1,5 +1,5 @@
 import copy
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 import csv
 import importlib.util
 import io
@@ -175,8 +175,12 @@ for(const change of [d=>{d.schema.pop();d.sample.forEach(r=>r.pop());},
     def test_real_pty_waits_for_owned_native_start_before_second_turn(self):
         self.check_pty_transport('read-wait-running')
 
-    def check_pty_transport(self, kind):
+    def test_real_pty_exchange_scopes_events_to_each_turn_of_a_four_turn_case(self):
+        self.check_pty_transport('stepwise', ['stepwise', 'second', 'third', 'fourth'])
+
+    def check_pty_transport(self, kind, prompts=None):
         with tempfile.TemporaryDirectory() as directory:
+            prompts = prompts or [kind, 'second']
             root=Path(directory); profile=root/'profile'; (profile/'data').mkdir(parents=True)
             fake=root/'fake-cli'
             fake.write_text(r'''#!/usr/bin/env python3
@@ -186,7 +190,9 @@ db=sqlite3.connect(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE']+'/data/loginom-ai-
 db.execute('create table message(id text,session_id text,data text,time_created integer)')
 db.execute('create table part(id text,session_id text,message_id text,data text,time_created integer)')
 def turn(n):
- db.execute('insert into message values(?,?,?,?)',(f'u{n}','chat',json.dumps(dict(role='user')),n*2))
+ user=dict(role='user')
+ if sys.argv[-1]=='stepwise': user['model']=dict(providerID='deepseek',modelID='deepseek-flash')
+ db.execute('insert into message values(?,?,?,?)',(f'u{n}','chat',json.dumps(user),n*2))
  db.execute('insert into message values(?,?,?,?)',(f'a{n}','chat',json.dumps(dict(role='assistant',parentID=f'u{n}',finish='stop',time=dict(completed=time.time()))),n*2+1))
  db.execute('insert into part values(?,?,?,?,?)',(f'p{n}','chat',f'a{n}',json.dumps(dict(type='tool',state=dict(status='completed',output=json.dumps(dict(execution=dict(execution_id=f'native-{n}')))))),n))
  db.commit()
@@ -197,20 +203,32 @@ if sys.argv[-1]=='read-wait-running':
  pending=dict(verified=True,root_id='root',node_context=dict(verified=True,document_id='doc',node_id='node'),processes=[dict(process_id='1.1',owner=dict(verified=True,source='native_process_model_identity',node_id='node'),progress_state=dict(verified=True,source='native_progress_record',state='running'))])
  events=[dict(phase='node_apply_prepared',operation_id='js',request=dict(target=dict(type='programming.javascript'))),dict(operation_id='js',recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),outcome=dict(output=dict(node_processes=pending)))]
  p.write_text(''.join(json.dumps(e)+'\n' for e in events))
-data=b''
-while b'\r' not in data: data+=os.read(sys.stdin.fileno(),4096)
-assert b'second' in data
-turn(2)
+for n, prompt in enumerate([b'second',b'third',b'fourth'] if sys.argv[-1]=='stepwise' else [b'second'],2):
+ data=b''
+ while b'\r' not in data: data+=os.read(sys.stdin.fileno(),4096)
+ assert prompt in data
+ turn(n)
 data=b''
 while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
 ''')
             fake.chmod(0o755)
-            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),kind=kind,prompts=[kind,'second'],daemon_pid=1)
+            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),kind=kind,prompts=prompts,daemon_pid=1)
+            script = runner.REPO/'scripts/node-acceptance/run-check-two-turn.py'
             runner.write(root/'transport.json',config)
-            result=subprocess.run([sys.executable,str(runner.REPO/'scripts/node-acceptance/run-check-two-turn.py'),str(root/'transport.json')],env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile)),capture_output=True,text=True,timeout=15)
-            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            env = dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
+            if kind == 'stepwise':
+                exchange = runner.runpy.run_path(str(script))['exchange']
+                with closing(exchange(dict(config, model='deepseek/deepseek-flash', env=env), prompts[0])) as transport:
+                    for turn, prompt in enumerate(prompts, 1):
+                        events = transport.send(prompt) if turn > 1 else next(transport)
+                        self.assertEqual([(e['sessionID'], e['part']['id']) for e in events], [('chat', f'p{turn}')])
+                    self.assertIsNone(next(transport, None))
+            else:
+                result=subprocess.run([sys.executable,str(script),str(root/'transport.json')],env=env,capture_output=True,text=True,timeout=15)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             turns=[e for _,e in runner.records(root/'turns.jsonl')]
-            self.assertEqual([(t['turn'],t['event']) for t in turns],[(1,'submitted'),(1,'completed'),(2,'submitted'),(2,'completed')])
+            self.assertEqual([(t['turn'],t['event']) for t in turns],
+                             [(n, event) for n in range(1, len(prompts) + 1) for event in ('submitted', 'completed')])
             self.assertEqual(len({t['cli_pid'] for t in turns}),1)
             self.assertEqual(turns[1]['execution_ids'],['native-1'])
             self.assertEqual(turns[3]['execution_ids'],['native-1','native-2'])
@@ -1910,10 +1928,47 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             runner.write(follow / 'case.json', dict(base='base-case', input_files=['rules.json'], budget=dict(max_tool_calls=40)))
             case = runner.scenario('follow-up', cases=root)
             self.assertEqual((case['base'], case['input_files'], case['attach_all']), ('base-case', ['rules.json'], True))
-            for bad in [dict(base='follow-up'), dict(base='missing'), dict(input_files=['absent.csv']), dict(input_files=['../x']), dict(retries=2)]:
+            for bad in [dict(base='follow-up'), dict(base='missing'), dict(input_files=['absent.csv']), dict(input_files=['../x']), dict(retries=2), dict(no_save='true')]:
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
                     runner.write(follow / 'case.json', bad)
                     runner.scenario('follow-up', cases=root)
+
+    def test_no_save_turn_uses_the_original_prompt_and_rejects_save_attempts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            case, stage, profile, workspace = (root / name for name in ('no-save', 'stage', 'profile', 'workspace'))
+            for folder in (case, stage, profile, workspace):
+                folder.mkdir()
+            prompt = 'Добавь узел.'
+            (case / 'task.md').write_text(prompt)
+            runner.write(case / 'case.json', dict(no_save=True))
+            node = dict(type='imports.text')
+            runner.write(case / 'expected.json', dict(nodes=[node], outputs=[], graph=dict(nodes=[dict(id='import', **node)], links=[])))
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, dict(cases=root), {}
+
+            for action in (None, 'package.save_as', 'package.save_checkpoint'):
+                def phase(name, command, folder, **kwargs):
+                    self.assertEqual(name, 'model')
+                    self.assertEqual(command[-1], prompt)
+                    event = dict(type='text', sessionID='chat', part=dict(text='Готово'))
+                    if action:
+                        event = dict(type='tool_use', sessionID='chat', part=dict(
+                            tool='loginom_dock_action_run', state=dict(status='error', input=dict(action_key=action))))
+                    (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                    runner.write(profile / 'runtime-close-model.json', dict(closed_ack=True))
+
+                with self.subTest(action=action), patch.object(instance, 'phase', side_effect=phase), \
+                        patch.object(runner, 'observed_case_graph', return_value=dict(nodes={'id':node}, links=[])):
+                    def model():
+                        return instance.model('no-save', stage, profile, workspace, '/own/run.lgp',
+                                              {'package_directory': '/own'}, root / 'build')
+                    if action:
+                        with self.assertRaisesRegex(AssertionError, 'UNREQUESTED_SAVE'):
+                            model()
+                    else:
+                        self.assertEqual(model()[0], 'chat')
+                        self.assertEqual(instance.current['save'], '0')
 
     def test_private_case_chains_resolve_root_first_and_limit_depth(self):
         with tempfile.TemporaryDirectory() as directory:

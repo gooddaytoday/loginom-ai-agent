@@ -77,7 +77,7 @@ def write(path, value):
 
 
 def daemon_pid():
-    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+    return json.loads(subprocess.check_output([os.environ.get('MULTICA_CLI_PATH', 'multica'), 'daemon', 'status', '--output', 'json']))['pid']
 
 
 def git(*args, cwd=REPO):
@@ -314,10 +314,14 @@ def scenario(name, case_root=None, *, cases=None):
             if src.resolve().parent != Path(cases).resolve():
                 raise ValueError('Case must stay in its assigned directory')
             # Optional case.json: `base` continues a sibling case in the same chat;
-            # `input_files` limits attachments; `budget` is read only by bughunt-audit.py.
+            # `input_files` limits attachments; `no_save` omits Save and rejects attempts;
+            # `budget` is read only by bughunt-audit.py.
             extra = read(src / 'case.json') if (src / 'case.json').is_file() else {}
-            if set(extra) - {'base', 'input_files', 'budget', 'notes'}:
-                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes')
+            if set(extra) - {'base', 'input_files', 'budget', 'notes', 'no_save'}:
+                raise ValueError(f'{name}/case.json: allowed keys are base, input_files, budget, notes, no_save')
+            no_save = extra.get('no_save', False)
+            if type(no_save) is not bool:
+                raise ValueError(f'{name}/case.json: no_save must be a boolean')
             base = extra.get('base')
             if base == name:
                 raise ValueError(f'Case base cycle: {name} → {name}')
@@ -327,7 +331,7 @@ def scenario(name, case_root=None, *, cases=None):
             if files is not None and not (isinstance(files, list) and all(isinstance(f, str) and '/' not in f and (src / 'data' / f).is_file() for f in files)):
                 raise ValueError(f'{name}/case.json: input_files must list files in data/')
             return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=base, external=True,
-                        attach_all=True, **({'input_files': files} if files is not None else {}))
+                        attach_all=True, no_save=no_save, **({'input_files': files} if files is not None else {}))
     if case_root is not None:
         if name not in SCENARIOS and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', name):
             raise ValueError('Invalid external case name')
@@ -1645,6 +1649,17 @@ def save_confirmed(case, receipt, package):
             and output.get('package_ref') == dict(kind='package', path=package, active_identity=package))
 
 
+def check_main_cleanup(profile, filename, *, known_ack=False):
+    if filename:
+        cleanups = [read(p) for p in profile.rglob(filename)]
+        assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                                and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
+    acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
+    assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False
+                        and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0
+                        and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+
+
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -2762,8 +2777,11 @@ class Runner:
         if not spec.get('upload_only'):
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
-            prompt += f'\nСохрани пакет как {package}.'
-            if not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('no_save'):
+                prompt += f'\nСохрани пакет как {package}.'
+            if not only_graph and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+                prompt += '\n' if spec.get('no_save') else ' '
+                prompt += 'Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else 'Доставь все итоговые книги Excel.' if spec.get('excel_mode') else 'Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
@@ -2875,6 +2893,7 @@ class Runner:
             delivered = read(folder / 'text-folder-inputs' / 'result.json')
             assert [d['destination'] for d in delivered['delivered']] == [b['destination'] for b in books], 'TEXT_FOLDER_INPUT_DELIVERY_MISSING'
             files = []
+        interactive = getattr(self, 'case_interactive', False)
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
@@ -2888,12 +2907,32 @@ class Runner:
             if spec.get('lgd') and target.suffix.lower() == '.lgd':
                 # Native binary input uses the existing local-path admission flow.
                 prompt += f'\nИсходный файл LGD: {target}.'
+            elif interactive:
+                # The TUI accepts text prompts. Use the product's local-path admission flow.
+                prompt += f'\nИсходный файл: {target}'
             else:
                 command += ['--file', target]
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         graph_start = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-        if spec.get('two_turn'):
+        if interactive:
+            self.report.update(phase='model', phase_folder=str(folder))
+            self.save()
+            if self.case_exchange is None:
+                if VARIANT:
+                    (profile / 'state').mkdir(exist_ok=True)
+                    write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={MODEL:VARIANT}))
+                exchange = runpy.run_path(str(REPO / 'scripts/node-acceptance/run-check-two-turn.py'))['exchange']
+                self.case_exchange = exchange(dict(executable=str(command[0]), workspace=str(workspace),
+                    profile=str(profile), folder=str(folder.parent), model=MODEL, variant=VARIANT,
+                    env=env, deadline=self.deadline, daemon_pid=daemon_pid()), prompt)
+                turn_events = next(self.case_exchange)
+            else:
+                turn_events = self.case_exchange.send(prompt)
+            with (folder / 'model.stdout').open('w') as out:
+                for event in turn_events:
+                    out.write(json.dumps(event, ensure_ascii=False) + '\n')
+        elif spec.get('two_turn'):
             assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
             assert MODEL == 'openai/gpt-6.1-sol', 'TWO_TURN_REQUIRES_DEFAULT_MODEL'
             # Unique physical name prevents collisions with prior attempts (#1157).
@@ -2922,6 +2961,12 @@ class Runner:
         assert not (spec.get('attach_all') and session and observed_session != session), 'CASE_SESSION_CHANGED'
         session = observed_session
         replies = model_replies(events)
+        if spec.get('no_save'):
+            saves = {'package.save_as', 'package.save_checkpoint'}
+            assert not any(event.get('type') == 'tool_use'
+                           and event['part'].get('state', {}).get('input', {}).get('action_key') in saves
+                           for _, event in events), 'UNREQUESTED_SAVE'
+            assert not any(reply.get('action_key') in saves for _, reply in replies), 'UNREQUESTED_SAVE'
         if spec.get('attach_all') and 'graph' in expected:
             self.current['graph'] = 'FAIL'
             observed = observed_case_graph(profile, graph_start)
@@ -3104,8 +3149,11 @@ class Runner:
             assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
             self.current.update(save='0', cleanup='main PASS', upload='ready', cold='—', csv='—')
             return session, expected, None, None
-        assert any(save_confirmed(spec, o, package) for _, o in replies), 'SAVE_NOT_CONFIRMED'
-        self.current['save'] = 'PASS'
+        if spec.get('no_save'):
+            self.current['save'] = '0'
+        else:
+            assert any(save_confirmed(spec, o, package) for _, o in replies), 'SAVE_NOT_CONFIRMED'
+            self.current['save'] = 'PASS'
         if refusal:
             allowed = {n['type'] for n in expected['nodes']}
             for _, event in events:
@@ -3279,13 +3327,12 @@ class Runner:
                 matched_trees += 1
             assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
-        cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
-        acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
-        assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
-        known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
-        assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
-        if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
-        self.current['cleanup'] = 'main PASS'
+        if not interactive:
+            known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
+            filename = None if spec.get('no_save') else 'package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json'
+            check_main_cleanup(profile, filename, known_ack=known_ack)
+            if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
+            self.current['cleanup'] = 'main PASS' if filename else 'runtime ACK'
         if spec.get('reopened_cleanup'):
             # #986: the final cleanup must bind the package reopened by Save As.
             assert any(save_confirmed(spec, o, package) and o.get('action_key') == 'package.save_as'
@@ -3694,10 +3741,13 @@ class Runner:
                 r.update(profile=str(profile), package=login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + r['scenario'] + '.lgp', model=MODEL + ('/' + VARIANT if VARIANT else ''))
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 active_turn = None
+                self.case_interactive, self.case_exchange = False, None
                 try:
                     case = r['scenario']
                     steps = scenario_steps(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     spec = steps[-1][1]
+                    # A headless CLI process closes owned scratch drafts at shutdown.
+                    self.case_interactive = any(step_spec.get('no_save') for _, step_spec in steps[:-1])
                     r['turns'] = [dict(turn=number, case=step.parent.name if isinstance(step, Path) else step, status='NOT_RUN')
                                   for number, (step, _) in enumerate(steps, 1)]
                     if r['scenario'] in D87 and not self.options.get('case_root'):
@@ -3725,6 +3775,13 @@ class Runner:
                         active_turn = None
                         if spec.get('attach_all') and r.get('failure_class'):
                             break
+                    if self.case_exchange is not None and not r.get('failure_class'):
+                        active_turn = r['turns'][-1]
+                        assert next(self.case_exchange, None) is None, 'INTERACTIVE_CASE_INCOMPLETE'
+                        filename = 'package-cleanup.json' if any(t.get('save') == 'PASS' for t in r['turns']) else None
+                        check_main_cleanup(profile, filename)
+                        r['cleanup'] = active_turn['cleanup'] = 'main PASS' if filename else 'runtime ACK'
+                        active_turn = None
                     if spec.get('attach_all') and r.get('failure_class'):
                         r['status'] = 'FAIL'
                         self.save()
@@ -3732,7 +3789,7 @@ class Runner:
                     if spec.get('fs_case'):
                         self.fs_files(spec, folder, login, build, 'fs-warm')
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
-                    if self.options['cold'] and not graph_only(spec, expected) and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
+                    if self.options['cold'] and not spec.get('no_save') and not graph_only(spec, expected) and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
                         if spec.get('fs_case') == 'paths' or spec.get('text_file_variable'):
@@ -3776,6 +3833,8 @@ class Runner:
                         active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class') if k in r},
                                            status=r['status'])
                 finally:
+                    if self.case_exchange is not None:
+                        self.case_exchange.close()
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
