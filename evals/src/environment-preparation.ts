@@ -104,7 +104,7 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
           if (view.username === old.username) await setupProfile(scoped, command)
         }
         if (operation === "prepare") await ensureProfile(scoped, command)
-        await assertAuth(scoped, command)
+        await assertAuth(scoped, command, lease.slot.historyDir)
         const checked = await verifyProfile(scoped, command)
         const cleanup = await cleanupSlotStorage(file, environment.server, lease, admin, checked.processCleanup, [])
         const proof = path.join(file.controller.stateDir, `cleanup-${commandId}-${lease.slot.id}.json`)

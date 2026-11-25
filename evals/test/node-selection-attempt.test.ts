@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test"
 import { Database } from "bun:sqlite"
 import { createHash } from "node:crypto"
-import { chmod, mkdtemp, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { evalsRoot } from "../src/config"
 import { loadTasks } from "../src/task"
-import { copySelectionToolOutputs, readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
+import { copySelectionJournals, copySelectionToolOutputs, openSelectionDatabase, readSelectionAttemptReceipts, readSelectionSnapshot, reserveAttempt, runSelectionAttempt, selectionAttempt, selectionExitCode, selectionModelStarted } from "../script/run-node-selection-attempt"
 
 test("an attempt cannot escape the pinned task through its identifier", () => {
   expect(() => selectionAttempt({}, "../foreign-task", 1)).toThrow("SELECTION_TASK_INVALID")
@@ -62,6 +62,26 @@ test("terminal collection preserves the full failed tool field before any cleanu
     const manifest = await Bun.file(path.join(directory, "tool-outputs.json")).json()
     expect(manifest).toHaveLength(1)
     expect(await Bun.file(path.join(directory, manifest[0].path)).text()).toBe("NODE_APPLY_STOPPED: own complete failure")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("a session without a Dock call has no Host runtime directory and no journals", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-journals-test-"))
+  try {
+    const profile = path.join(root, "profile"), directory = path.join(root, "attempt")
+    // The profile of a run that never called Dock: the Host's other directories exist, runtime does not.
+    await mkdir(path.join(profile, "loginom/connection"), { recursive: true })
+    await mkdir(directory)
+    expect(await copySelectionJournals(profile, "ses_no_dock", directory)).toEqual([])
+    expect(await Bun.file(path.join(directory, "runtime")).exists()).toBe(false)
+    // With the directory, the journals of that chat alone are copied.
+    const chat = new Bun.CryptoHasher("sha256").update("ses_dock").digest("hex")
+    const journal = `generations/1/chats/${chat}/attempts/1/session.json`
+    await Bun.write(path.join(profile, "loginom/runtime", journal), "{}")
+    await Bun.write(path.join(profile, "loginom/runtime/generations/1/chats/other/attempts/1/session.json"), "{}")
+    const copied = await copySelectionJournals(profile, "ses_dock", directory)
+    expect(copied.map((item) => item.path)).toEqual([path.join("runtime", journal)])
+    expect(await Bun.file(path.join(directory, "runtime", journal)).text()).toBe("{}")
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
@@ -232,32 +252,75 @@ function writeV2Run(filename: string) {
   database.close()
 }
 
-// Sanitized shape of the 2026-10-13 pilot: no private paths, prompt, attachments or credentials.
-const refreshIncident = {
-  sessionID: "ses_pilot", parentID: null, childSessionIDs: [],
+// B2.7b2 dump of a provider refusing the request with 401: an assistant without content, then the idle row of the failure.
+const refusal = { type: "provider.auth", message: "Token refresh failed: HTTP 401", status: 401 }
+const refusedModel = {
+  sessionID: "ses_refused", parentID: null, childSessionIDs: [],
   messages: [
-    { id: "msg_user", sessionID: "ses_pilot", role: "user", time: { created: 1791885819742 } },
-    { id: "msg_assistant", sessionID: "ses_pilot", parentID: "msg_user", role: "assistant",
-      modelID: "gpt-6-sol-fast", providerID: "openai",
-      error: { name: "UnknownError", data: { message: "Token refresh failed: HTTP 401" } },
-      time: { created: 1791885819802, completed: 1791885820833 },
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    },
+    { id: "msg_user", sessionID: "ses_refused", role: "user", time: { created: 1795431142053 }, text: "Ещё раз", files: [] },
+    { id: "msg_assistant", sessionID: "ses_refused", role: "assistant", providerID: "openai", modelID: "gpt-6-sol-fast",
+      time: { created: 1795431142103, completed: 1795431142141 }, finish: "error", error: refusal },
+    { id: "msg_idle", sessionID: "ses_refused", role: "idle", time: { created: 1795431142176 }, outcome: "failed", error: refusal },
   ],
-  parts: [
-    { id: "prt_1", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
-    { id: "prt_2", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
-    { id: "prt_3", messageID: "msg_user", sessionID: "ses_pilot", type: "text" },
-    { id: "prt_4", messageID: "msg_user", sessionID: "ses_pilot", type: "file" },
-  ],
+  parts: [],
 }
 
-test("the observed OAuth refresh failure proves no inference, while assistant creation alone does not", () => {
-  expect(selectionModelStarted(refreshIncident, 1)).toBe(false)
-  expect(selectionModelStarted(refreshIncident, null)).toBe(null)
-  const unknown = structuredClone(refreshIncident)
-  unknown.messages[1]!.error!.data.message = "An unknown failure"
+test("a 401 of the model's provider proves no inference, while assistant creation alone does not", () => {
+  expect(selectionModelStarted(refusedModel, 1)).toBe(false)
+  expect(selectionModelStarted(refusedModel, null)).toBe(null)
+  expect(selectionModelStarted(refusedModel, 2)).toBe(null)
+  const unknown = structuredClone(refusedModel)
+  unknown.messages[1]!.error = { type: "provider.unknown", message: "An unknown failure", status: 500 }
   expect(selectionModelStarted(unknown, 1)).toBe(null)
+  const idleOk = structuredClone(refusedModel)
+  idleOk.messages[2]!.outcome = "succeeded"
+  expect(selectionModelStarted(idleOk, 1)).toBe(null)
+})
+
+test("a refused request that left a part is not taken for a refusal before inference", () => {
+  const withText = structuredClone(refusedModel)
+  withText.parts = [{ id: "msg_assistant/0", messageID: "msg_assistant", sessionID: "ses_refused", type: "text" }] as never
+  expect(selectionModelStarted(withText, 1)).toBe(true)
+})
+
+// The refused request read through the tables, as the snapshot reads a run (B2.7b2: dump-v2 `failed`).
+test("a 401 refusal row of OpenCode 2 reads as a refusal before inference", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-401-"))
+  const filename = path.join(root, "snapshot.db")
+  try {
+    writeV2Run(filename)
+    const database = new Database(filename)
+    database.run("INSERT INTO session_v2 VALUES (?, NULL, ?, ?)", ["ses_401", "title-401", 1795431142000])
+    for (const [id, type, seq, data] of [
+      ["msg_401_user", "user", 5, { time: { created: 1795431142053 }, text: "Ещё раз", files: [] }],
+      ["msg_401_assistant", "assistant", 6, { time: { created: 1795431142103, completed: 1795431142141 }, agent: "build", model, content: [], finish: "error", error: refusal }],
+      ["msg_401_idle", "idle", 8, { time: { created: 1795431142176 }, outcome: "failed", error: refusal }],
+    ] as const) database.run("INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?)", [id, "ses_401", type, seq, data.time.created, JSON.stringify(data)])
+    database.close()
+    const snapshot = readSelectionSnapshot(filename, "ses_401")
+    expect(snapshot.parts).toEqual([])
+    expect(selectionModelStarted(snapshot, 1)).toBe(false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("the snapshot connection cannot write, and does not create a missing file", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "selection-snapshot-readonly-"))
+  const filename = path.join(root, "snapshot.db")
+  try {
+    writeV2Run(filename)
+    const database = openSelectionDatabase(filename)
+    try {
+      expect(() => database.run("CREATE TABLE written (id TEXT)")).toThrow()
+      expect(() => database.run("DELETE FROM session_v2")).toThrow()
+      expect(database.query("SELECT count(*) AS count FROM session_v2").get()).toEqual({ count: 1 })
+    } finally { database.close() }
+    expect(() => readSelectionSnapshot(path.join(root, "missing.db"), "ses")).toThrow()
+    expect(await Bun.file(path.join(root, "missing.db")).exists()).toBe(false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test("collector preserves export and save receipts alongside completed Help with JavaScript imports", () => {

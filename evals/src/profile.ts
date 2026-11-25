@@ -372,7 +372,7 @@ export async function setupProfile(config: EvalConfig, command: AgentCommand) {
   }
 }
 
-export async function assertAuth(config: EvalConfig, command: AgentCommand) {
+export async function assertAuth(config: EvalConfig, command: AgentCommand, historyDir?: string) {
   const providerId = config.agent.model.split("/")[0] ?? ""
   // The product CLI on OpenCode 2 has neither a shared OAuth store nor `providers status` with its receipt
   // (`shared-oauth-status-v1`): no command reports a login's generation, principal or refresh state (B2.7b2).
@@ -393,14 +393,21 @@ export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   const integrations = await new Response(listed.stdout).json().catch(() => undefined) as { id?: unknown }[] | undefined
   if (listed.exitCode !== 0 || !Array.isArray(integrations))
     // Not its stderr: no redaction knows the keys of data/auth.json; the output stays in the management evidence.
-    throw new EvalFailure(`AUTH_LIST_FAILED: auth list завершился кодом ${listed.exitCode}`, 2)
+    return refuseAuth(config, `AUTH_LIST_FAILED: auth list завершился кодом ${listed.exitCode}`, historyDir)
   if (integrations.some((integration) => integration.id === providerId)) return
-  throw new EvalFailure(
+  return refuseAuth(config,
     `Нет ключа провайдера "${providerId}" для прогона в eval-профиле ${config.profileDir}: новая база его не получает.\n` +
       `Запишите ключ в ${path.join(config.profileDir, "data", "auth.json")} (формат 0.4: каждая новая база берёт ключи оттуда) ` +
       "или задайте EVAL_AGENT_PROVIDER_* в evals/.env; `auth login` хранит ключ только в базе, а она уходит в архив после попытки.",
-    2,
+    historyDir,
   )
+}
+
+// The check's `auth list` created a database in the profile; a refusal leaves no run to take it to the archive, and the
+// next admission would stop on it. A failed move does not hide the refusal.
+async function refuseAuth(config: EvalConfig, message: string, historyDir?: string): Promise<never> {
+  await archiveProfileHistory(config.profileDir, "auth-refused", historyDir).catch(() => undefined)
+  throw new EvalFailure(message, 2)
 }
 
 export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {

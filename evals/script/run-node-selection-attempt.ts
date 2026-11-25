@@ -232,18 +232,7 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
     result.modelStarted = selectionModelStarted(snapshot, result.cliExitCode)
     await Bun.write(path.join(attempt.directory, "parts.json"), JSON.stringify(snapshot, null, 2) + "\n")
     await save()
-    const runtime = path.join(plan.pins.profile, "loginom/runtime")
-    const chat = createHash("sha256").update(result.sessionID).digest("hex")
-    const journals: { source: string; path: string; sha256: string }[] = []
-    for await (const relative of new Bun.Glob(`generations/*/chats/${chat}/attempts/*/{execution-events.jsonl,session.json,terminal-close.jsonl}`).scan(runtime)) {
-      const source = path.join(runtime, relative)
-      if (!(await realpath(source)).startsWith((await realpath(runtime)) + path.sep) || !(await lstat(source)).isFile())
-        throw Error("SELECTION_JOURNAL_PATH_INVALID")
-      const destination = path.join(attempt.directory, "runtime", relative)
-      await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 })
-      await cp(source, destination)
-      journals.push({ source, path: path.relative(attempt.directory, destination), sha256: await hashFile(destination) })
-    }
+    const journals = await copySelectionJournals(plan.pins.profile, result.sessionID, attempt.directory)
     await Bun.write(path.join(attempt.directory, "runtime-journals.json"), JSON.stringify(journals, null, 2) + "\n")
     // A terminal CLI permits copying its own complete local tool history even
     // when cleanup failed. This does not admit a Host or touch server artifacts.
@@ -317,6 +306,25 @@ export async function runSelectionAttempt(pinsFile: string, taskID: string, numb
   return result
 }
 
+// Host journals of the session's chat. The Host of OpenCode 2 creates its runtime directory when Dock first works: a
+// session without a Dock call has none, and that is no journals, not a failure.
+export async function copySelectionJournals(profile: string, sessionID: string, directory: string) {
+  const runtime = path.join(profile, "loginom/runtime")
+  if (!await exists(runtime)) return []
+  const chat = createHash("sha256").update(sessionID).digest("hex")
+  const journals: { source: string; path: string; sha256: string }[] = []
+  for await (const relative of new Bun.Glob(`generations/*/chats/${chat}/attempts/*/{execution-events.jsonl,session.json,terminal-close.jsonl}`).scan(runtime)) {
+    const source = path.join(runtime, relative)
+    if (!(await realpath(source)).startsWith((await realpath(runtime)) + path.sep) || !(await lstat(source)).isFile())
+      throw Error("SELECTION_JOURNAL_PATH_INVALID")
+    const destination = path.join(directory, "runtime", relative)
+    await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 })
+    await cp(source, destination)
+    journals.push({ source, path: path.relative(directory, destination), sha256: await hashFile(destination) })
+  }
+  return journals
+}
+
 export function readSelectionAttemptReceipts(parts: Record<string, unknown>[]) {
   return readNodeEvents(parts
     .filter((part) => typeof part.tool === "string" && part.tool.startsWith("loginom_dock_"))
@@ -332,21 +340,19 @@ export function selectionModelStarted(snapshot: ReturnType<typeof readSelectionS
   const assistants = snapshot.messages.filter((message) => message.role === "assistant")
   if (snapshot.parts.some((part) => assistants.some((message) => message.id === part.messageID) &&
     ["step-start", "step-finish", "text", "reasoning", "tool"].includes(String(part.type)))) return true
-  const users = snapshot.messages.filter((message) => message.role === "user")
-  const assistant = assistants[0]
-  if (cliExitCode !== 1 || snapshot.parentID !== null || snapshot.childSessionIDs.length ||
-    snapshot.messages.length !== 2 || users.length !== 1 || assistants.length !== 1 || !assistant ||
-    assistant.parentID !== users[0]!.id || assistant.providerID !== "openai" ||
-    !record(assistant.error) || assistant.error.name !== "UnknownError" || !record(assistant.error.data) ||
-    assistant.error.data.message !== "Token refresh failed: HTTP 401" ||
+  // OpenCode 2 stores a refused provider request as an assistant message with no content, then the idle row with the same
+  // error (B2.7b2 dump): a 401 of the model's provider, before any inference. Anything else stays unconfirmed.
+  const [user, assistant, idle] = snapshot.messages
+  if (cliExitCode !== 1 || snapshot.parentID !== null || snapshot.childSessionIDs.length || snapshot.messages.length !== 3 ||
+    user?.role !== "user" || assistant?.role !== "assistant" || idle?.role !== "idle" || snapshot.parts.length ||
+    !providerAuthRefused(assistant.error) || idle.outcome !== "failed" || !providerAuthRefused(idle.error) ||
     !record(assistant.time) || typeof assistant.time.created !== "number" || typeof assistant.time.completed !== "number" ||
-    assistant.time.completed < assistant.time.created || !record(assistant.tokens) || !record(assistant.tokens.cache) ||
-    [assistant.tokens.input, assistant.tokens.output, assistant.tokens.reasoning, assistant.tokens.cache.read,
-      assistant.tokens.cache.write].some((value) => value !== 0) || !snapshot.parts.length ||
-    snapshot.parts.some((part) => part.messageID !== users[0]!.id)) return null
-  // Observed pilot failure: OpenAI OAuth refresh is awaited before the inference fetch.
-  // A durable assistant row is created earlier and does not prove dispatch on its own.
+    assistant.time.completed < assistant.time.created) return null
   return false
+}
+
+function providerAuthRefused(error: unknown) {
+  return record(error) && error.type === "provider.auth" && error.status === 401
 }
 
 // The session tables of OpenCode 2, read as diagnostics read them since B1.9: an existing file, a connection that cannot
@@ -354,11 +360,17 @@ export function selectionModelStarted(snapshot: ReturnType<typeof readSelectionS
 // its model gives providerID/modelID/variant; an assistant's content (session_part rows, then inline, as history.ts
 // reads it) gives the parts, and a tool there gives `tool`, `state.output`/`state.error` text and `state.time` as the
 // run's tool_use events do.
+// Read-write only so that a WAL database opens; `query_only` makes any statement that would change it fail.
+export function openSelectionDatabase(filename: string) {
+  const database = new Database(filename, { readwrite: true, create: false, strict: true })
+  database.run("PRAGMA query_only = ON")
+  return database
+}
+
 export function readSelectionSnapshot(filename: string, sessionID: string,
   fallback?: { title: string; startedAt: number; finishedAt: number }) {
-  const database = new Database(filename, { readwrite: true, create: false, strict: true })
+  const database = openSelectionDatabase(filename)
   try {
-    database.run("PRAGMA query_only = ON")
     database.run("BEGIN")
     const matches = !sessionID && fallback ? database.query<{ id: string }, [string, number, number]>(
       "SELECT id FROM session_v2 WHERE title = ? AND parent_id IS NULL AND time_created >= ? AND time_created <= ?")

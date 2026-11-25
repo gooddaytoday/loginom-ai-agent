@@ -176,7 +176,7 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
         cleanupSecrets: [scoped.loginom.password, scoped.dock.apiKey, scoped.agent.provider?.apiKey ?? ""] }
       const context = { lease, config: scoped, command, cleanup: path.join(file.controller.stateDir, `cleanup-${commandId}-${lease.slot.id}.json`), confirmed: false }
       contexts.push(context)
-      await assertAuth(scoped, command)
+      await assertAuth(scoped, command, lease.slot.historyDir)
       const checked = await verifyProfile(scoped, command)
       const cleanup = await cleanupSlotStorage(file, environment.server, lease, admin, checked.processCleanup, [])
       await writeSlotCleanup(context, cleanup)
