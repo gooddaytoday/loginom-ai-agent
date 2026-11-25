@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "type": "imports.excel",
+      "label": "Заказы"
+    },
+    {
+      "type": "imports.excel",
+      "label": "Товары"
+    },
+    {
+      "type": "transform.join_data",
+      "label": "Заказы с категориями"
+    },
+    {
+      "type": "transform.group_data",
+      "label": "Выручка по категориям"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "orders",
+        "type": "imports.excel",
+        "label": "Заказы"
+      },
+      {
+        "id": "products",
+        "type": "imports.excel",
+        "label": "Товары"
+      },
+      {
+        "id": "join",
+        "type": "transform.join_data",
+        "label": "Заказы с категориями"
+      },
+      {
+        "id": "totals",
+        "type": "transform.group_data",
+        "label": "Выручка по категориям"
+      }
+    ],
+    "links": [
+      {
+        "source": "orders",
+        "target": "join",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "products",
+        "target": "join",
+        "output": 0,
+        "input": 1
+      },
+      {
+        "source": "join",
+        "target": "totals",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [],
+  "tables": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_node_label": "Выручка по категориям",
+      "output_port": 0,
+      "column_order": "exact",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "TotalRevenue",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Category": "Книги",
+          "TotalRevenue": 26.75
+        },
+        {
+          "Category": "Кофе",
+          "TotalRevenue": 19.75
+        }
+      ]
+    }
+  ]
+}

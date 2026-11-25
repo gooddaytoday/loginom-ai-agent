@@ -1,0 +1,8 @@
+{
+  "budget": {
+    "max_nodes": 0,
+    "max_errors": 0
+  },
+  "base": "bh-w48-t1",
+  "input_files": []
+}

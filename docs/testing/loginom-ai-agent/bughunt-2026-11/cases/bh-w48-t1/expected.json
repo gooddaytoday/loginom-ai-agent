@@ -1,0 +1,72 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Платежи"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "payments",
+        "type": "imports.text",
+        "label": "Платежи"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [],
+  "tables": [
+    {
+      "output_node_type": "imports.text",
+      "output_node_label": "Платежи",
+      "output_port": 0,
+      "column_order": "exact",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "X",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "X": "31.12.2024",
+          "Amount": 12.5,
+          "Note": "Аванс"
+        },
+        {
+          "X": "01.01.2025",
+          "Amount": 7.25,
+          "Note": "Оплата"
+        },
+        {
+          "X": "15.04.2025",
+          "Amount": -3.75,
+          "Note": "Возврат"
+        },
+        {
+          "X": "31.12.2025",
+          "Amount": 18.5,
+          "Note": "Оплата"
+        },
+        {
+          "X": "01.01.2026",
+          "Amount": 9.25,
+          "Note": "Перенос"
+        }
+      ]
+    }
+  ]
+}

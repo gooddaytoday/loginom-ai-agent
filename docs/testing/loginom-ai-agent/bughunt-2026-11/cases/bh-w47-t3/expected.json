@@ -1,0 +1,107 @@
+{
+  "nodes": [
+    {
+      "type": "imports.excel",
+      "label": "Заказы"
+    },
+    {
+      "type": "imports.excel",
+      "label": "Товары"
+    },
+    {
+      "type": "transform.join_data",
+      "label": "Заказы с категориями"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "orders",
+        "type": "imports.excel",
+        "label": "Заказы"
+      },
+      {
+        "id": "products",
+        "type": "imports.excel",
+        "label": "Товары"
+      },
+      {
+        "id": "join",
+        "type": "transform.join_data",
+        "label": "Заказы с категориями"
+      }
+    ],
+    "links": [
+      {
+        "source": "orders",
+        "target": "join",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "products",
+        "target": "join",
+        "output": 0,
+        "input": 1
+      }
+    ]
+  },
+  "outputs": [],
+  "tables": [
+    {
+      "output_node_type": "transform.join_data",
+      "output_node_label": "Заказы с категориями",
+      "output_port": 0,
+      "column_order": "exact",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ProductID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 101,
+          "ProductID": 8,
+          "Revenue": 13.25,
+          "Category": "Кофе"
+        },
+        {
+          "OrderID": 102,
+          "ProductID": 7,
+          "Revenue": 22.5,
+          "Category": "Книги"
+        },
+        {
+          "OrderID": 103,
+          "ProductID": 8,
+          "Revenue": 6.5,
+          "Category": "Кофе"
+        },
+        {
+          "OrderID": 104,
+          "ProductID": 9,
+          "Revenue": 4.25,
+          "Category": "Книги"
+        }
+      ]
+    }
+  ]
+}

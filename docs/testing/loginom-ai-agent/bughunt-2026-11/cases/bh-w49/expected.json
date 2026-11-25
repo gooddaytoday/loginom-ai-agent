@@ -1,0 +1,92 @@
+{
+  "nodes": [
+    {
+      "type": "imports.database",
+      "label": "Заказы"
+    },
+    {
+      "type": "imports.database",
+      "label": "Заказы с категориями"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "orders",
+        "type": "imports.database",
+        "label": "Заказы"
+      },
+      {
+        "id": "query",
+        "type": "imports.database",
+        "label": "Заказы с категориями"
+      },
+      {
+        "id": "export",
+        "type": "exports.text"
+      }
+    ],
+    "links": [
+      {
+        "source": "query",
+        "target": "export",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "column_order": "exact",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ProductID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Revenue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 201,
+          "ProductID": 10,
+          "Revenue": 15.25,
+          "Category": "Чай"
+        },
+        {
+          "OrderID": 202,
+          "ProductID": 20,
+          "Revenue": 2.5,
+          "Category": "Книги"
+        },
+        {
+          "OrderID": 203,
+          "ProductID": 10,
+          "Revenue": 4.75,
+          "Category": "Чай"
+        }
+      ],
+      "export_destination": "joined_orders.csv"
+    }
+  ],
+  "tables": []
+}

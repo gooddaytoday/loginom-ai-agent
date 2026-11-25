@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label": "Январь"
+    },
+    {
+      "type": "imports.text",
+      "label": "Февраль"
+    },
+    {
+      "type": "transform.union_data",
+      "label": "Общий список"
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "jan",
+        "type": "imports.text",
+        "label": "Январь"
+      },
+      {
+        "id": "feb",
+        "type": "imports.text",
+        "label": "Февраль"
+      },
+      {
+        "id": "union",
+        "type": "transform.union_data",
+        "label": "Общий список"
+      }
+    ],
+    "links": [
+      {
+        "source": "jan",
+        "target": "union",
+        "output": 0,
+        "input": 0
+      },
+      {
+        "source": "feb",
+        "target": "union",
+        "output": 0,
+        "input": 1
+      }
+    ]
+  },
+  "outputs": [],
+  "tables": [
+    {
+      "output_node_type": "transform.union_data",
+      "output_node_label": "Общий список",
+      "output_port": 0,
+      "column_order": "exact",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "ReceiptID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ReceiptID": 1001,
+          "Item": "Кофе, молотый",
+          "Amount": 7.25
+        },
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        },
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        },
+        {
+          "ReceiptID": 1002,
+          "Item": "Чай; чёрный",
+          "Amount": 3.75
+        },
+        {
+          "ReceiptID": 1003,
+          "Item": "Книга",
+          "Amount": 18.5
+        },
+        {
+          "ReceiptID": 1003,
+          "Item": "Книга",
+          "Amount": 19.5
+        }
+      ]
+    }
+  ]
+}
