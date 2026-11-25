@@ -514,6 +514,69 @@ test('a durable node recovery acknowledgement arriving after cancellation cannot
   assert.equal(f.calls.filter(call => call === 'finish').length, 1);
 });
 
+test('a timely exact journal acknowledgement continues the same recovered node', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'dock-recovery-ack-exact-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'test-recovery-ack-exact' } });
+  const f = fixture();
+  await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'apply', ...args })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  f.state.release = proved;
+  let saved;
+  f.state.ack = async event => {
+    if (event.phase !== 'browser_recovery_receipt') return event;
+    saved = await record(event);
+    return saved;
+  };
+  const ended = await call({ action: 'finish', actions_performed: ['Reviewed https://fixture.test'] });
+  const raw = f.events.find(event => event.phase === 'browser_recovery_receipt');
+  assert.equal(raw.receipt.attested_by_model.actions_performed[0], 'Reviewed https://fixture.test');
+  assert.equal(saved.receipt.attested_by_model.actions_performed[0], 'Reviewed https://fixture.test/');
+  assert.equal(ended.verification.status, 'continuable', ended.verification.reason);
+  assert.equal(ended.phase, 'dock');
+  assert.equal(ended.verification.original_operation.operation_id, 'apply');
+  assert.equal(ended.verification.next_step.tool, 'dock_node_apply');
+  assert.match(ended.verification.next_step.instruction, /"kind":"existing"/);
+  assert.equal(f.runtime.nodeApplyStatus('apply').outcome.output.node.node_id, node.node_id);
+  assert.equal(f.runtime.hasUnsettledWork(), false);
+});
+
+test('a changed recovery acknowledgement keeps the original node outcome and ownership', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'dock-recovery-ack-changed-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'test-recovery-ack-changed' } });
+  const f = fixture();
+  const original = await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: f.runtime,
+    probe: async () => ({ ok: true }), record });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'apply', ...args })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  f.state.release = proved;
+  f.state.ack = async event => {
+    if (event.phase !== 'browser_recovery_receipt') return event;
+    const saved = await record(event);
+    return { ...saved, receipt: { ...saved.receipt, status: 'completed' } };
+  };
+  const ended = await call({ action: 'finish', actions_performed: ['Reviewed https://fixture.test'] });
+  assert.equal(ended.verification.status, 'unresolved');
+  assert.match(ended.verification.reason, /acknowledgement differs/);
+  assert.equal(ended.stopped.cleanup.state, 'retained_uncertain');
+  const status = await dispatchNodeApi(f.runtime, 'dock_node_status', { operation_id: 'apply' });
+  assert.deepEqual(status.outcome, original.outcome);
+  assert.deepEqual(status.progress, original.progress);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  assert.throws(() => f.runtime.startNodeApply(f.request('other')), /Browser recovery holds/);
+  assert.ok(f.events.some(event => event.phase === 'browser_recovery_receipt'));
+  assert.ok(!f.events.some(event => event.phase === 'operation_abandoned'));
+});
+
 test('T3: public finish offers only an existing-output read after repeated failure with unknown execution', async () => {
   const f = fixture();
   const accepted = [];
@@ -688,12 +751,13 @@ function exportFixture() {
     recoveryReadExport: async state => { reads.push(state.node.node_id);
       return { artifact_id: 'file-1', destination: '/user/out.csv', bytes: 42, sha256: 'a'.repeat(64), execution_id: 'exec' }; } };
   const handler = { revision: '1', fileOutput: true, modes: ['delimited'], validate: () => {}, configure: ok };
+  const state = {};
   const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery: true,
     execute: async () => { throw Error('Unexpected public transport'); },
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['exports.text', handler]]),
     nodeApplyDriverFactory: ({ operation }) => { operationRef = operation; return drivers; },
-    onRecord: async e => { events.push(e); return e; } });
-  return { runtime, events, reads };
+    onRecord: async e => { events.push(e); return state.ack ? state.ack(e) : e; } });
+  return { runtime, events, reads, state };
 }
 
 test('T4: an unconfirmed export download is recovered by a verified re-read without a new export', async () => {
@@ -716,6 +780,61 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(settled.status, 'FAILED');
   assert.equal(settled.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
   assert.equal(settled.output.next_step.tool, 'dock_action_run');
+});
+
+test('a timely exact journal acknowledgement accepts the original export file', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'dock-recovery-ack-export-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'test-recovery-ack-export' } });
+  const fx = exportFixture();
+  fx.runtime.startNodeApply({ ...request('export'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
+  assert.equal((await fx.runtime.waitNodeApply('export', { timeoutMs: 1000 })).outcome.status, 'FAILED');
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: fx.runtime,
+    probe: async () => ({ ok: true }), record });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'export', ...args })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  let saved;
+  fx.state.ack = async event => {
+    if (event.phase !== 'browser_recovery_receipt') return event;
+    saved = await record(event);
+    return saved;
+  };
+  const ended = await call({ action: 'finish', actions_performed: ['Reviewed https://fixture.test'] });
+  const raw = fx.events.find(event => event.phase === 'browser_recovery_receipt');
+  assert.equal(raw.receipt.attested_by_model.actions_performed[0], 'Reviewed https://fixture.test');
+  assert.equal(saved.receipt.attested_by_model.actions_performed[0], 'Reviewed https://fixture.test/');
+  assert.equal(ended.verification.status, 'completed', ended.verification.reason);
+  assert.equal(ended.verification.file_artifacts[0].sha256, 'a'.repeat(64));
+  assert.deepEqual(fx.reads, ['new']);
+  assert.equal(fx.runtime.nodeApplyStatus('export').outcome.status, 'FAILED');
+  assert.equal(fx.runtime.nodeApplyStatus('export').outcome.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
+});
+
+test('a changed export acknowledgement keeps the original download unconfirmed', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'dock-recovery-ack-export-changed-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const record = createExecutionJournal({ directory, metadata: { sessionId: 'test-recovery-ack-export-changed' } });
+  const fx = exportFixture();
+  fx.runtime.startNodeApply({ ...request('export'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
+  const original = await fx.runtime.waitNodeApply('export', { timeoutMs: 1000 });
+  const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), executor: fx.runtime,
+    probe: async () => ({ ok: true }), record });
+  const call = async args => JSON.parse((await recovery.call('dock_browser_recovery',
+    { operation_id: 'export', ...args })).content[0].text);
+  assert.equal((await call({ action: 'start' })).phase, 'browser');
+  fx.state.ack = async event => {
+    if (event.phase !== 'browser_recovery_receipt') return event;
+    const saved = await record(event);
+    return { ...saved, receipt: { ...saved.receipt, file_artifacts: [{ ...saved.receipt.file_artifacts[0], sha256: 'b'.repeat(64) }] } };
+  };
+  const ended = await call({ action: 'finish', actions_performed: ['Reviewed https://fixture.test'] });
+  assert.equal(ended.verification.status, 'unresolved');
+  assert.match(ended.verification.reason, /acknowledgement differs/);
+  assert.equal(ended.stopped.cleanup.state, 'retained_uncertain');
+  assert.equal(fx.runtime.nodeApplyStatus('export').outcome.output.next_step.tool, original.outcome.output.next_step.tool);
+  assert.equal(fx.runtime.nodeApplyStatus('export').outcome.output.browser_recovery, undefined);
+  assert.equal(recovery.refusesDock('dock_node_apply'), true);
 });
 
 test('handoff proves callback completion independently from UI cleanup', async () => {

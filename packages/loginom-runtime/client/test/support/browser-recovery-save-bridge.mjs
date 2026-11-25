@@ -242,14 +242,15 @@ test('a confirmed Save followed by an independent read: '+scenario,async t=>{
     assert.equal(started.structuredContent.reason,'SAVE_STATE_UNCONFIRMED');
     const refused=await save('other-save');
     assert.equal(refused.isError,true);
+    const attested=scenario==='P5'?['Reviewed https://fixture.test']:['Closed a notification over the scenario'];
     const finished=await client.callTool({name:'dock_browser_recovery',arguments:{action:'finish',operation_id:'own-save',
-      actions_performed:['Closed a notification over the scenario']}});
+      actions_performed:attested}});
     const verification=finished.structuredContent.verification;
     assert.equal(finished.structuredContent.phase,'dock');
     assert.equal(verification.status,modified?'continuable':'completed');
     assert.equal(verification.state.modified,modified);
     assert.ok(verification.facts.includes(modified?'package_modified_after_save':'package_unmodified_after_save'));
-    assert.deepEqual(verification.attested_by_model.actions_performed,['Closed a notification over the scenario']);
+    assert.deepEqual(verification.attested_by_model.actions_performed,attested);
     if(scenario==='P5'){
       assert.equal(state(await inspect('own-save'))?.modified,false);
     }
@@ -258,7 +259,9 @@ test('a confirmed Save followed by an independent read: '+scenario,async t=>{
     assert.equal(f.stateReads,2);
     assert.deepEqual(journal.filter(e=>e.phase==='acceptance_fault_triggered').map(e=>[e.condition,e.operation_id,e.package_path]),
       scenario==='P5'?[['P5','own-save',path]]:[]);
-    assert.ok(journal.some(e=>e.phase==='browser_recovery_receipt'&&e.receipt.id==='own-save:br-save'));
+    const receipt=journal.find(e=>e.phase==='browser_recovery_receipt'&&e.receipt.id==='own-save:br-save');
+    assert.ok(receipt);
+    if(scenario==='P5')assert.equal(receipt.receipt.attested_by_model.actions_performed[0],'Reviewed https://fixture.test/');
     const again=await client.callTool({name:'dock_browser_recovery',arguments:{action:'start',operation_id:'own-save'}});
     assert.equal(again.isError,true);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}

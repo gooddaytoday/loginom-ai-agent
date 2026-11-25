@@ -3030,7 +3030,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           + receipt.id + '" and use the default execution policy. Do not re-apply the failed procedure.' } : result.next_step;
       const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: request.contract_revision,
         phase: 'browser_recovery_receipt', receipt };
-      const expected=fingerprint('ack',checkOutput?journalCopy(event):event);
+      const expected=fingerprint('ack',journalCopy(event));
       const ack = await onRecord(event);
       if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== expected)
         throw new Error('Browser recovery receipt journal acknowledgement differs');
@@ -3083,7 +3083,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: operation.nodeApply.request.contract_revision,
       phase: 'browser_recovery_receipt', receipt };
     const ack = await onRecord(event);
-    if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
+    if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', journalCopy(event)))
       throw new Error('Browser recovery receipt journal acknowledgement differs');
     operation.exportRecovered = true;
     if (operation.outcome?.output) {
