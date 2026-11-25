@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.group_data"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "transform.filter_data"
+      },
+      {
+        "type": "imports.text"
+      },
+      {
+        "type": "transform.calculator"
+      },
+      {
+        "type": "transform.group_data"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text"
+        },
+        "target": {
+          "type": "transform.filter_data"
+        }
+      },
+      {
+        "source": {
+          "type": "transform.filter_data"
+        },
+        "target": {
+          "type": "transform.calculator"
+        }
+      },
+      {
+        "source": {
+          "type": "transform.calculator"
+        },
+        "target": {
+          "type": "transform.group_data"
+        }
+      }
+    ]
+  },
+  "tables": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Месяц",
+          "label": "Месяц",
+          "type": "string",
+          "name_any": true
+        },
+        {
+          "name": "Количество",
+          "label": "Количество",
+          "type": "integer",
+          "name_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Месяц": "2025-01",
+          "Количество": 1
+        },
+        {
+          "Месяц": "2025-02",
+          "Количество": 2
+        },
+        {
+          "Месяц": "2026-01",
+          "Количество": 2
+        },
+        {
+          "Месяц": "2026-02",
+          "Количество": 1
+        }
+      ]
+    }
+  ]
+}

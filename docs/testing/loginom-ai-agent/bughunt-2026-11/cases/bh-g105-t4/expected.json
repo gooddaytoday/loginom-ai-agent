@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "transform.group_data"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text"
+      },
+      {
+        "type": "programming.javascript"
+      },
+      {
+        "type": "transform.group_data"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text"
+        },
+        "target": {
+          "type": "programming.javascript"
+        }
+      },
+      {
+        "source": {
+          "type": "programming.javascript"
+        },
+        "target": {
+          "type": "transform.group_data"
+        }
+      }
+    ]
+  },
+  "tables": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "День недели",
+          "label": "День недели",
+          "type": "string",
+          "name_any": true
+        },
+        {
+          "name": "Количество",
+          "label": "Количество",
+          "type": "integer",
+          "name_any": true
+        }
+      ],
+      "rows": [
+        {
+          "День недели": "Воскресенье",
+          "Количество": 3
+        },
+        {
+          "День недели": "Понедельник",
+          "Количество": 3
+        },
+        {
+          "День недели": "Вторник",
+          "Количество": 1
+        },
+        {
+          "День недели": "Среда",
+          "Количество": 1
+        },
+        {
+          "День недели": "Четверг",
+          "Количество": 1
+        },
+        {
+          "День недели": "Пятница",
+          "Количество": 1
+        },
+        {
+          "День недели": "Суббота",
+          "Количество": 1
+        }
+      ]
+    }
+  ]
+}

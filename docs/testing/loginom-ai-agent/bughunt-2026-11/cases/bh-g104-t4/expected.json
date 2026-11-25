@@ -1,0 +1,114 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text"
+      },
+      {
+        "type": "variables.user"
+      },
+      {
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "imports.text"
+        },
+        "target": {
+          "type": "transform.filter_data"
+        }
+      },
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "output": 4,
+        "kind": "control"
+      }
+    ]
+  },
+  "tables": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Заказ",
+          "label": "Заказ",
+          "type": "integer",
+          "name_any": true
+        },
+        {
+          "name": "Дата",
+          "label": "Дата",
+          "type": "datetime",
+          "name_any": true
+        },
+        {
+          "name": "Сумма",
+          "label": "Сумма",
+          "type": "real",
+          "name_any": true,
+          "tolerance": {
+            "abs": 1e-09
+          }
+        },
+        {
+          "name": "Канал",
+          "label": "Канал",
+          "type": "string",
+          "name_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Заказ": 306,
+          "Дата": "2026-11-06T00:00:00.000",
+          "Сумма": 800.01,
+          "Канал": "Сайт"
+        },
+        {
+          "Заказ": 307,
+          "Дата": "2026-11-06T00:00:00.000",
+          "Сумма": 1400.5,
+          "Канал": null
+        },
+        {
+          "Заказ": 309,
+          "Дата": "2026-11-09T00:00:00.000",
+          "Сумма": 920.75,
+          "Канал": "Офис"
+        }
+      ]
+    }
+  ],
+  "variables": [
+    {
+      "node": {
+        "type": "variables.user"
+      },
+      "label": "Порог",
+      "type": "number",
+      "value": 800
+    }
+  ]
+}

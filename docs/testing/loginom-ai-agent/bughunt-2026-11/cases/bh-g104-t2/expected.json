@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.user"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "imports.text"
+      },
+      {
+        "type": "variables.user"
+      }
+    ],
+    "links": []
+  },
+  "variables": [
+    {
+      "node": {
+        "type": "variables.user"
+      },
+      "label": "Порог",
+      "type": "number",
+      "value": 500
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [],
+  "graph": {
+    "nodes": [
+      {
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": []
+  }
+}
