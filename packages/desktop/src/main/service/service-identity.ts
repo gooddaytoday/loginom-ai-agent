@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs"
+import { mkdir, rename, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 import { productChannel, productSlug } from "@loginom-ai-agent/product"
@@ -41,6 +43,48 @@ export function serviceFile() {
 }
 
 /**
+ * The window that owns the service (B4.16, decision В-97 п. 3): its pid in a file beside the registration, which the
+ * service reads (`LOGINOM_AI_AGENT_SERVICE_OWNER`, `cli/src/service-owner.ts`). Each window that connects takes it over,
+ * so a window that returns after a crash keeps the service its predecessor left; the service stops once the owner is gone
+ * for a minute. Written before the service starts, with the environment variable `ownerEnvironment` returns.
+ */
+export function ownerFile() {
+  return path.join(path.dirname(serviceFile()), `service-${identity}.owner`)
+}
+
+export async function claimService() {
+  const file = ownerFile()
+  const temp = `${file}.${process.pid}.tmp`
+
+  await mkdir(path.dirname(file), { recursive: true })
+  await writeFile(temp, String(process.pid))
+  await rename(temp, file)
+}
+
+export function ownerEnvironment() {
+  return { LOGINOM_AI_AGENT_SERVICE_OWNER: ownerFile() }
+}
+
+/**
+ * The service command without the descriptors of the window (B4.16). The service inherits every descriptor Electron has
+ * not marked close-on-exec (on Linux the DevTools socket and the installation files, 84 of them in B0.4), and a service
+ * outlives its window. Bash closes all above stderr, which stays the pipe the client reads startup failures from, and
+ * `exec`s the command, so the pid in the registration is the service's. Other systems and a host without bash start the
+ * command as it is.
+ */
+export function withoutWindowDescriptors(command: readonly string[], platform = process.platform) {
+  if (platform !== "linux" || !existsSync("/bin/bash")) return command
+
+  return [
+    "/bin/bash",
+    "-c",
+    'for fd in /proc/self/fd/*; do n=${fd##*/}; if [ "$n" -gt 2 ]; then eval "exec $n>&-"; fi; done; exec "$@"',
+    "bash",
+    ...command,
+  ]
+}
+
+/**
  * The data directory of Desktop's service, as the CLI takes it (`Global.Path.data` in packages/util): its Host keeps the
  * Loginom connection in `<data>/loginom` (B2.3). Read at call time, after the shell environment is in place, as the
  * service inherits it.
@@ -60,6 +104,8 @@ export async function stopService() {
   const { Service } = await import("@opencode/client/service")
 
   await Service.stop({ file: serviceFile() })
+  // Nobody owns a service that is gone; a service of another window must not find this window's pid.
+  await rm(ownerFile(), { force: true })
 }
 
 /**
