@@ -100,6 +100,10 @@ export function createServerSourceRegistry({getBinding}) {
       if(!source)throw Error('Verified storage source reference is missing');
       return structuredClone(source);
     },
+    markReopen(ref) {
+      const source=sources.get(ref);
+      if(source)source.reopen=true;
+    },
     referenceForPath(path) {
       const binding=getBinding();
       const entry=[...sources.entries()].findLast(([,s])=>s.path===path&&JSON.stringify(s.binding)===JSON.stringify(binding));
@@ -236,7 +240,7 @@ export function serverDownloadBudget(bytes) {
 
 // The browser writes to disk; this registry transports only paths and metadata.
 // Cache identity is private authority for the backend exact-scan receipt.
-export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now}) {
+export function createServerDownloadRegistry({directory,inspect,download,recover,now=Date.now,withSource=(_ref,_options,read)=>read()}) {
   const jobs=new Map();
   const native=s=>JSON.stringify([s.destination,s.bytes,s.mtime,s.origin,s.account,s.document_id]);
   const local=s=>({size:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs,file_id:`${s.dev}:${s.ino}`});
@@ -275,33 +279,36 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           timer=setTimeout(()=>job.controller.abort(Error(code)),deadline-now());
         };
         try {
-          job.source=await inspect(request.server_source_ref,{signal:job.controller.signal,storageSession:'capture'});job.controller.signal.throwIfAborted();
-          job.deadline=job.started+serverDownloadBudget(job.source.bytes);
-          if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
-          job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
-          if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
-          await mkdir(directory,{recursive:true,mode:0o700});
-          const root=await lstat(directory);
-          // Windows reports POSIX-like 0o777 for every directory: privacy is
-          // its ACL. Replace inherited access with the current user and SYSTEM
-          // only after refusing links (icacls would act on a link target).
-          if(root.isSymbolicLink()||!root.isDirectory()||process.platform!=='win32'&&(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');
-          try{protectWindowsDirectory(directory);}catch{throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');}
-          job.directory=await mkdtemp(join(directory,'source-'));await chmod(job.directory,0o700);
-          job.path=join(job.directory,basename(job.source.destination));job.phase='downloading';
-          await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,
-            signal:job.controller.signal,deadline:job.deadline,onProgress:bytes=>{
-              // Check expiry before accepting growth: late or repeated status
-              // replies cannot revive a stalled transfer.
-              arm();job.controller.signal.throwIfAborted();
-              if(!Number.isSafeInteger(bytes)||bytes<0||bytes>job.source.bytes)throw Error('LOGINOM_DOWNLOAD_FAILED');
-              if(bytes>(job.bytes??0)){job.bytes=bytes;job.lastProgress=now();arm();}
-            }});
-          job.controller.signal.throwIfAborted();job.phase='verifying';
-          const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline,
-            storageSession:'verify',operation_id:request.operation_id}),copy=await lstat(job.path);
-          if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
-            throw Error('LOGINOM_FILE_CHANGED');
+          const {after,copy}=await withSource(request.server_source_ref,{signal:job.controller.signal},async()=>{
+            job.source=await inspect(request.server_source_ref,{signal:job.controller.signal,storageSession:'capture'});job.controller.signal.throwIfAborted();
+            job.deadline=job.started+serverDownloadBudget(job.source.bytes);
+            if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
+            job.lastProgress=job.started;arm();job.controller.signal.throwIfAborted();
+            if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
+            await mkdir(directory,{recursive:true,mode:0o700});
+            const root=await lstat(directory);
+            // Windows reports POSIX-like 0o777 for every directory: privacy is
+            // its ACL. Replace inherited access with the current user and SYSTEM
+            // only after refusing links (icacls would act on a link target).
+            if(root.isSymbolicLink()||!root.isDirectory()||process.platform!=='win32'&&(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');
+            try{protectWindowsDirectory(directory);}catch{throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');}
+            job.directory=await mkdtemp(join(directory,'source-'));await chmod(job.directory,0o700);
+            job.path=join(job.directory,basename(job.source.destination));job.phase='downloading';
+            await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,
+              signal:job.controller.signal,deadline:job.deadline,onProgress:bytes=>{
+                // Check expiry before accepting growth: late or repeated status
+                // replies cannot revive a stalled transfer.
+                arm();job.controller.signal.throwIfAborted();
+                if(!Number.isSafeInteger(bytes)||bytes<0||bytes>job.source.bytes)throw Error('LOGINOM_DOWNLOAD_FAILED');
+                if(bytes>(job.bytes??0)){job.bytes=bytes;job.lastProgress=now();arm();}
+              }});
+            job.controller.signal.throwIfAborted();job.phase='verifying';
+            const after=await inspect(request.server_source_ref,{signal:job.controller.signal,deadline:job.deadline,
+              storageSession:'verify',operation_id:request.operation_id}),copy=await lstat(job.path);
+            if(native(after)!==native(job.source)||!copy.isFile()||copy.isSymbolicLink()||copy.size!==job.source.bytes)
+              throw Error('LOGINOM_FILE_CHANGED');
+            return {after,copy};
+          });
           await chmod(job.path,0o600);job.identity=local(await lstat(job.path));
           job.controller.signal.throwIfAborted();
           if(now()>=job.deadline)throw Error('LOGINOM_DOWNLOAD_DEADLINE');
