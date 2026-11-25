@@ -23,6 +23,7 @@ import { databasePath } from "./database-path"
 import { CliProfile } from "./profile"
 import { CliResources } from "./resources"
 import { NetworkMode } from "./network-mode"
+import { ServiceOwner } from "./service-owner"
 import { ShutdownDeadline } from "./shutdown-deadline"
 
 export type Mode = "default" | "service" | "stdio"
@@ -188,6 +189,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
               onListen: (address, shutdown) =>
                 Effect.gen(function* () {
                   if (!config.password) yield* ServiceConfig.password(password)
+                  // Loginom AI Agent (B4.16, В-97 п. 3): Desktop's service stops when its window is gone.
+                  yield* ServiceOwner.watch(shutdown)
                   return yield* ServiceRegistration.register({
                     address,
                     password,

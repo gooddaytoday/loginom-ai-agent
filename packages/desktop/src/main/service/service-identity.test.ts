@@ -121,7 +121,7 @@ describe("service-identity", () => {
       path.join("loginom-ai-agent-beta", "service-desktop.json"),
     ].map((file) => path.join(root, file))
 
-    const services = await Promise.all(files.map(liveService))
+    const services = await Promise.all(files.map((file) => liveService(file)))
     const registrations = await Promise.all(files.map((file) => fs.readFile(file, "utf8")))
 
     await desktop({ LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: root }, true)
@@ -184,6 +184,136 @@ describe("service-identity", () => {
     })
   })
 })
+
+// B4.16, decision В-97 п. 3: the service follows its window. The service side (`cli/test/service-owner.test.ts`) stops once
+// the pid in the owner file is gone for a minute; the window side writes that file, hands its path to the service and
+// does not hand the window's descriptors on.
+describe("service owner", () => {
+  test("the owner file sits beside the registration, holds the window's pid and passes to the next window", async () => {
+    const root = await temporary("desktop-service-owner-")
+    const window = { LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: root }
+    const file = path.join(root, "loginom-ai-agent-dev", "service-desktop.owner")
+
+    const first = await claim(window)
+    expect(first.environment).toEqual({ LOGINOM_AI_AGENT_SERVICE_OWNER: file })
+    expect(first.file).toBe(file)
+    expect(await fs.readFile(file, "utf8")).toBe(String(first.pid))
+
+    // A window that returns after a crash takes the service over, and leaves no temporary file behind.
+    const next = await claim(window)
+    expect(next.pid).not.toBe(first.pid)
+    expect(await fs.readFile(file, "utf8")).toBe(String(next.pid))
+    expect(await fs.readdir(path.dirname(file))).toEqual(["service-desktop.owner"])
+  })
+
+  test("a quit takes its claim back, and leaves the owner of every other service", async () => {
+    const root = await temporary("desktop-service-owner-quit-")
+    const own = path.join(root, "loginom-ai-agent-dev", "service-desktop.owner")
+
+    const foreign = [
+      path.join(root, "loginom-ai-agent", "service-desktop.owner"),
+      path.join(root, "loginom-ai-agent-dev", "service-cli-0123abcd.owner"),
+    ]
+
+    await Promise.all(
+      [own, ...foreign].map((file) => fs.mkdir(path.dirname(file), { recursive: true }).then(() => fs.writeFile(file, "1"))),
+    )
+    await desktop({ LOGINOM_AI_AGENT_CHANNEL: "dev", XDG_STATE_HOME: root }, true)
+
+    expect(await Bun.file(own).exists()).toBe(false)
+    expect(await Promise.all(foreign.map((file) => Bun.file(file).exists()))).toEqual([true, true])
+  })
+
+  // The next start of the app finds a service its window left and that does not answer, and removes it by the pid in
+  // its registration. A service of the same channel's CLI profile or of another channel stays.
+  test("the next start replaces an orphan that does not answer, and leaves foreign services alone", async () => {
+    const root = await temporary("desktop-service-orphan-")
+    const own = path.join(root, "loginom-ai-agent-dev", "service-desktop.json")
+
+    const foreign = [
+      path.join(root, "loginom-ai-agent-dev", "service-cli-0123abcd.json"),
+      path.join(root, "loginom-ai-agent-beta", "service-desktop.json"),
+    ]
+
+    const orphan = await liveService(own, "hanging")
+    const others = await Promise.all(foreign.map((file) => liveService(file)))
+
+    // The contender fails at once; only what ensure did to the orphan matters here.
+    await Service.ensure({ file: own, command: [process.execPath, fixture, own + ".contender", "failed"] }).catch(
+      () => undefined,
+    )
+
+    expect(await Promise.race([orphan.exited.then(() => "gone"), Bun.sleep(5_000).then(() => "running")])).toBe("gone")
+    expect(others.map((service) => service.exitCode)).toEqual([null, null])
+  }, 60_000)
+
+  test.skipIf(process.platform !== "linux")("the service gets no descriptor of the window but its stderr", async () => {
+    const { withoutWindowDescriptors } = await import("./service-identity")
+
+    // Bash stands for Electron: what it opens without close-on-exec passes to every child, as Chromium's sockets do.
+    const descriptors = async (wrap: boolean) => {
+      const command = ["sleep", "30"]
+
+      const child = Bun.spawn(
+        [
+          "/bin/bash",
+          "-c",
+          'exec 7>/dev/null 8</dev/null 9>/dev/null; exec "$@"',
+          "bash",
+          ...(wrap ? withoutWindowDescriptors(command) : command),
+        ],
+        { stdin: "ignore", stdout: "ignore", stderr: "pipe" },
+      )
+
+      cleanup.push(async () => {
+        child.kill("SIGKILL")
+        await child.exited
+      })
+
+      // `exec` replaces the process, so the pid is the service's; wait until it is `sleep`.
+      const deadline = Date.now() + 5_000
+
+      while (!(await fs.readFile(`/proc/${child.pid}/cmdline`, "utf8").catch(() => "")).startsWith("sleep")) {
+        if (Date.now() > deadline) throw new Error("the wrapped command did not start")
+        await Bun.sleep(10)
+      }
+
+      return (await fs.readdir(`/proc/${child.pid}/fd`)).map(Number).sort((a, b) => a - b)
+    }
+
+    // Without the wrapper the three descriptors pass on; with it only stdin, stdout and stderr remain.
+    expect(await descriptors(false)).toEqual([0, 1, 2, 7, 8, 9])
+    expect(await descriptors(true)).toEqual([0, 1, 2])
+  })
+
+  test("other systems start the command as it is", async () => {
+    const { withoutWindowDescriptors } = await import("./service-identity")
+
+    expect(withoutWindowDescriptors(["cli", "serve"], "win32")).toEqual(["cli", "serve"])
+    expect(withoutWindowDescriptors(["cli", "serve"], "darwin")).toEqual(["cli", "serve"])
+  })
+})
+
+// Claims the service in a fresh process, as a window does, and reports what it wrote.
+async function claim(env: Record<string, string>) {
+  const script = `
+    const { claimService, ownerEnvironment, ownerFile } = await import("./service-identity")
+    await claimService()
+    console.log(JSON.stringify({ pid: process.pid, file: ownerFile(), environment: ownerEnvironment() }))
+  `
+
+  const home = await temporary("desktop-service-owner-home-")
+
+  const stdout = await output([process.execPath, "-e", script], import.meta.dir, {
+    PATH: process.env.PATH,
+    HOME: home,
+    USERPROFILE: home,
+    ...env,
+  })
+
+  // SAFETY: the script above prints exactly this shape.
+  return JSON.parse(stdout) as { pid: number; file: string; environment: Record<string, string> }
+}
 
 async function temporary(prefix: string) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
@@ -292,9 +422,9 @@ async function output(cmd: string[], cwd: string, env: Record<string, string | u
   return stdout.trim()
 }
 
-async function liveService(file: string) {
+async function liveService(file: string, mode = "soft") {
   await fs.mkdir(path.dirname(file), { recursive: true })
-  const service = Bun.spawn([process.execPath, fixture, file, "soft"], { stdout: "ignore", stderr: "ignore" })
+  const service = Bun.spawn([process.execPath, fixture, file, mode], { stdout: "ignore", stderr: "ignore" })
 
   cleanup.push(async () => {
     service.kill("SIGKILL")

@@ -11,7 +11,14 @@ import { cleanStages } from "./cli-stages"
 import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
-import { serviceEnvironment, serviceFile, stopService } from "./service-identity"
+import {
+  claimService,
+  ownerEnvironment,
+  serviceEnvironment,
+  serviceFile,
+  stopService,
+  withoutWindowDescriptors,
+} from "./service-identity"
 import { takeSidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
@@ -73,12 +80,12 @@ const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: Background
       env: setup.env,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
-      command: [
+      command: withoutWindowDescriptors([
         ...setup.cli.command,
         "serve",
         "--service",
         ...(setup.isolated ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
-      ],
+      ]),
       onStart: (reason, previousVersion) =>
         runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
     })
@@ -121,7 +128,9 @@ const prepare = Effect.fn("BackgroundService.prepare")(function* (mode: Backgrou
   // Loginom AI Agent (B4.8a): a packaged app's service takes its Loginom resources, or the app does not start it.
   const resources = yield* Effect.promise(() => LoginomResources.serviceEnvironment(installation))
   // Loginom AI Agent (B4.9): its own identity and port, and the version the installer verified the resources with.
-  const env = { ...serviceEnvironment(installation.version), ...resources }
+  const env = { ...serviceEnvironment(installation.version), ...resources, ...ownerEnvironment() }
+  // Loginom AI Agent (B4.16): this window owns the service it starts or adopts; its predecessor's claim ends here.
+  yield* Effect.promise(claimService)
 
   return { cli, client, env, file, isolated, version }
 })
