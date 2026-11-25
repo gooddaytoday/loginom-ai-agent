@@ -34,7 +34,7 @@ ref (`dock_storage_list`). `source.kind:"verified_sources"`; order `sources` by
 `name`/`relative_path`/`absolute_path` adds string FileName; suffix `_time` adds
 datetime FileTime (`none` disables). Outside CSV `columns`.
 Relative: beside saved package.
-Readback: FileTime: non-NULL, not local mtime.
+FileTime: non-NULL, not local mtime.
 
 Mask: `source_mask` in an owned directory, `*` only in filename; never `source_path(s)`.
 Requested Export/Save goes outside the mask directory. 1 file: plain path; 2+ (max 16): mask.

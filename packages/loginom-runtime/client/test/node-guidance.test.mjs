@@ -30,7 +30,7 @@ test('each supported regression selection mode delivers complete import and outp
   assert.match(description.guidance,/type:"integer", data_kind:"Непрерывный"/,mode);
   assert.match(description.guidance,/read\.ports:\[0,1\]/,mode);
   assert.match(description.guidance,/exports\.text/,mode);
-  assert.match(description.guidance,/сохрани пакет/,mode);
+  assert.doesNotMatch(description.guidance,/сохрани пакет/i,mode);
   assert.doesNotMatch(description.guidance,/как в forward выше/,mode);
   assert.match(description.guidance,new RegExp('mode:"'+mode+'"'),mode);
  }
@@ -64,7 +64,7 @@ test('text Import delimited guidance keeps every rule in compact English',async 
   /CP1251/,/garbled/,/rare types/,/download\/sampling/,/full sample settings/,/settings\.columns`, no Reform/,/order/,/overwrite=reject/,
   /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved.node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
   /variant_as_general_type:true/,/redetect strings/,/auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
-  /Calculator\/JS/,/Export\/Save outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/,/parallel_processing:false\/true/,/max_threads:"auto"\|2\|4\|8\|16\|32/,/full row multisets\/duplicates\/NULL/])assert.match(text,rule);
+  /Calculator\/JS/,/Requested Export\/Save goes outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/,/parallel_processing:false\/true/,/max_threads:"auto"\|2\|4\|8\|16\|32/,/full row multisets\/duplicates\/NULL/])assert.match(text,rule);
  assert.match(text,/Rerun \(new CsvPath, Save\/reopen\): SAME Import, `parameters:\{settings:\{\}\}` WITHOUT `source`, `bindings:\[\]`/);
  assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);

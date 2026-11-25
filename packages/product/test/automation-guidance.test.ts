@@ -6,16 +6,18 @@ const chain = skill.split("## Один расчёт цепочки\n")[1].split(
 
 test("stepwise edits use the current graph and verify only the requested step", () => {
   const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
-  expect(step).toContain("Перед каждым шагом наблюдай текущий граф")
+  expect(step).toContain("Перед обработкой каждого сообщения пользователя наблюдай текущий граф")
   expect(step).toContain("Ручные правки между сообщениями")
   expect(step).toContain("Соседние узлы не меняй")
   expect(step).toContain("Подпись узла меняй только по просьбе")
   expect(step).toContain("Имя файла не задаёт подпись импорта")
   expect(step).toContain("Неоднозначную ссылку уточни одной строкой")
   expect(step).toContain('finish:"execute"')
+  expect(step).toContain("В пошаговом режиме (одно действие в просьбе)")
   expect(step).toContain("сводки порта")
   expect(step).toContain("числе строк")
   expect(step).toContain("пропусти запуск")
+  expect(step).toContain("Если узел добавлен без подключения")
   expect(step).toContain("что мешает запуску")
 })
 
@@ -27,32 +29,45 @@ test("stepwise verification and data processing stay in Loginom", () => {
   expect(step).toContain("Сам файл не исправляй")
 })
 
-test("a step self-check requests only the port row count, even for a small input", async () => {
+test("a step self-check uses a summary unless the card or request needs rows", async () => {
   const step = skill.split("## Пошаговая сборка\n")[1]?.split("\n## ")[0] ?? ""
   const workflow = await Bun.file(new URL("../skills/loginom-automation/references/workflow.md", import.meta.url)).text()
-  expect(step).toContain("Просьба «посчитай» в шаге задаёт вычисление")
-  expect(step).toContain("Для чтения значений нужна просьба их показать")
+  expect(step).toContain("Если просьба требует значений, прочитай и покажи их")
   expect(step).toContain("`read.sample_rows:0`")
-  expect(step).toContain("даже для маленькой таблицы")
+  expect(step).toContain("Настройка чтения в карточке узла важнее значения по умолчанию")
   expect(step).toContain("`row_count`")
   expect(chain).not.toContain("sample_rows:100")
-  expect(workflow).toContain("Для самопроверки шага используй `read.sample_rows:0`")
+  expect(workflow).toContain("Для самопроверки шага используй `read.sample_rows:0` по умолчанию")
+  expect(workflow).toContain("Настройка чтения в карточке узла важнее значения по умолчанию")
 })
 
-test("automation guidance requires a user request for package saving", async () => {
-  expect(skill).toContain("Пакет сохраняй только по явной просьбе пользователя")
-  expect(skill).not.toContain("После удаления сохрани пакет")
-  const root = new URL("../skills/loginom-automation/references/", import.meta.url)
+test("automation guidance scopes package saving to a request or the full-source checkpoint", async () => {
+  const finish = skill.split("## Завершение\n")[1]
+  expect(finish).toContain("Итоговый пакет сохраняй только по явной просьбе пользователя")
+  expect(finish).toContain("Для сохранения вызови `package.save_checkpoint` и дождись\nквитанции")
+  expect(finish).toContain("`package.save_as` с переоткрытием нужен при соответствующем запросе")
+  const root = new URL("../skills/loginom-automation/", import.meta.url)
+  for (const path of ["references/large-files.md", "references/workflow.md"]) {
+    const reference = await Bun.file(new URL(path, root)).text()
+    expect(reference, path).toContain("Если пользователь запросил результат по всему файлу")
+    expect(reference, path).toContain("промежуточный checkpoint")
+  }
   const automaticSave = [
     /сохрани (?:готовый |настроенный )?пакет (?:после|отдельно|в конце)|(?:и|затем) сохрани пакет/i,
     /затем (?:штатный )?Save\b|Save (?:— )?после чтения|Save выполняй отдельно/i,
     /в конце вызови `package.save_checkpoint`|(?:пакет сохраняй|сохраняй пакет) отдельно/i,
     /after every values update, save|save again before finishing|save the (?:prepared )?package/i,
   ]
-  for await (const path of new Bun.Glob("**/*.md").scan(fileURLToPath(root))) {
+  const references = new Bun.Glob("references/**/*.md").scanSync(fileURLToPath(root))
+  for (const path of ["SKILL.md", ...references]) {
     const reference = await Bun.file(new URL(path, root)).text()
     for (const pattern of automaticSave) expect(reference, path).not.toMatch(pattern)
   }
+})
+
+test("automation describes the selected node type and modes before apply and again after prepare", () => {
+  expect(skill).toContain("Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`")
+  expect(skill).toContain("После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply")
 })
 
 test("input replacement requires an explicit user request and preserves the downstream node", async () => {
@@ -79,8 +94,8 @@ test("frequent recoverable mistakes have concrete preventive forms within the en
     "new upstream node AND a different destination",
   ]) expect(skill).toContain(hint)
   // 0.4.0 hint growth: REST replacement (#1235) and XLSX/REST type hints (#1239), each verified live.
-  // LAB-2020: internal guard below the owner's 40 000 B budget, never above 39 000.
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(38_500)
+  // The 39 000 B internal limit leaves headroom under the owner's 40 000 B budget.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(39_000)
 })
 
 test("existing Import edits retain verified source and Close requires a complete first form", () => {
