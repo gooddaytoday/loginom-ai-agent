@@ -458,18 +458,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
-    async reconcileInputPortOpening(reference) {
+    async reconcileInputPortOpening(reference,{port,native_index,port_guid,surface},{release=false}={}) {
       checkBudget();
       if(!preparedNodeContext||reference.action_key!=='node.input_port.open.internal'
         ||reference.id!==reference.operation_id||!reference.operation_id?.startsWith(operation.id+':n'))
         throw Error('The original input opening receipt is required');
-      const code=makePreparedInputPortReconcileCode(preparedNodeContext,{port:0,operation_id:reference.operation_id,
-        origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
+      const code=makePreparedInputPortReconcileCode(preparedNodeContext,{port,operation_id:reference.operation_id,
+        origin:targetOrigin,build:targetBuild,deadline:operation.deadline},release?{native_index,port_guid,surface}:undefined);
       const owner=await execute(code,{timeout:Math.max(1,operation.deadline-now())});
       checkBudget();
       await entry('node_port_opening_reconciled',{reference:structuredClone(reference),outcome:structuredClone(owner)});
       if(owner?.status!=='SUCCEEDED'||owner.verified!==true||owner.cleanup_complete!==true
-        ||owner.opening_operation_id!==reference.operation_id||owner.direction!=='input'||owner.port!==0||owner.native_index!==0
+        ||owner.opening_operation_id!==reference.operation_id||owner.direction!=='input'||owner.port!==port||owner.native_index!==native_index
+        ||owner.port_guid!==port_guid||owner.surface!==(release?'graph':surface)||release&&owner.phase!=='released'
         ||owner.document_id!==preparedNodeContext.document_id||owner.workflow_id!==preparedNodeContext.workflow_ref.workflow_id
         ||owner.node_id!==preparedNodeContext.node.node_id)throw Error('The stopped input opening owner could not be reconciled');
       return structuredClone(owner);
@@ -514,7 +515,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readPython = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readSupernode = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readPython = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readSupernode = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard, quietGraph = false } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -529,7 +530,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleProcessConsole?.quiet&&!launchConfirmed)throw Error('Console epoch settlement requires a confirmed launch');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
-      if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
+      if((releaseWizard||quietGraph)&&!preparedNodeContext)throw Error('Node release requires its prepared node');
       if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
         ||!settleWizard.root_ref&&settleWizard.graph_only!==true||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
       if(settleWizard?.union_opening&&(operation.nodeApply?.request?.target?.type!=='variables.column_union'
@@ -582,6 +583,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       };
       const readUi = options => {
         if(ownedErrorToast)options={...options,node_error_toast_observation:true};
+        if(quietGraph)options={...options,quiet_graph_observation:true};
         if(!settleOutputPort)return read(makeWorkspaceUiCode(options),{timeout:readTimeout()});
         // Capture before transport: dispatch and browser reads consume one allowance.
         const readDeadline=Math.min(deadline,now()+OUTPUT_SETTLEMENT_READ_MS);

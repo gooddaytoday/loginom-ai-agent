@@ -385,7 +385,15 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.export_destination_conflict=refusal.verification==='text_export_conflict_rejected';
       }
-      const inputRefusal={'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused','exports.text':'text_export_binding_refused'}[request.target.type];
+      const joinClosed=refusal?.proof?.closed;
+      const joinInputRefusal=name==='input_mapping'&&request.target.type==='transform.join_data'&&request.target.kind==='new'
+        &&operation.cleanupConfirmed===true&&!operation.transportUncertain
+        &&joinClosed?.verified===true&&joinClosed.cleanup_complete===true&&joinClosed.mode==='close'
+        &&joinClosed.draft_discarded===true&&joinClosed.settings_applied===false&&joinClosed.execution_started===false
+        &&joinClosed.node_context?.verified===true&&joinClosed.node_context.surface==='graph'&&joinClosed.node_context.locked===false
+        &&['document_id','workflow_id','node_id'].every(k=>joinClosed.node_context[k]===state.node?.[k]);
+      const inputRefusal=joinInputRefusal?'join_first_input_schema_refused':
+        {'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused','exports.text':'text_export_binding_refused'}[request.target.type];
       if(name==='input_mapping'&&inputRefusal&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&(['exports.excel','exports.text'].includes(request.target.type)?refusal.settings_unchanged===false&&refusal.input_saved===true:refusal.settings_unchanged===true)
