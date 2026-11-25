@@ -235,7 +235,17 @@ export async function createBridge(config, session, { browserTransport: managedB
     // The recovery lease is a temporary part of the catalog outside its hashed static tools.
     // T4 for saves: a confirmed Save whose package state could not be read. The
     // runtime rereads path and dirty state itself after the model's browser work.
-    const saveRecoveries = new Map();
+    const currentSave = operationId => {
+      const save = lastSavedPackage;
+      const prepared = session.metadata.workspacePreparation;
+      if (save && save.operation_id === operationId && save.preparation === prepared
+        && save.document_id === prepared?.state?.document_id
+        && !saveAdmissions.values().some(admission => admission.sequence > save.sequence)) return save;
+    };
+    const pendingSaveRecovery = operationId => {
+      const save = currentSave(operationId);
+      if (save?.recoveryPending) return save;
+    };
     const readSavedState = async save => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
@@ -247,7 +257,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     };
     const recoveryExecutor = actionRuntime && {
       browserRecoveryBasis(operationId) {
-        const save = saveRecoveries.get(operationId);
+        const save = pendingSaveRecovery(operationId);
         if (!save) return actionRuntime.browserRecoveryBasis(operationId);
         if (actionRuntime.hasUnsettledWork()) throw new Error('Another Dock operation is unsettled; resolve it before browser recovery');
         return { reason: 'SAVE_STATE_UNCONFIRMED', step: { key: ['save', save.document_id, save.path].join('|'), kind: 'save',
@@ -256,13 +266,14 @@ export async function createBridge(config, session, { browserTransport: managedB
             + 'scenario (dialogs, masks, notifications) and return to the saved package graph. Do not save or change the package.' } };
       },
       async browserRecoveryHandoff(operationId) {
-        if (!saveRecoveries.has(operationId)) return actionRuntime.browserRecoveryHandoff(operationId);
+        if (!pendingSaveRecovery(operationId)) return actionRuntime.browserRecoveryHandoff(operationId);
         return actionRuntime.hasUnsettledWork() ? { stopped: false, reason: 'Another Dock operation is unsettled' }
           : { stopped: true, proof: { receipt_state: 'save_settled' } };
       },
       async verifyBrowserRecovery(input) {
-        const save = saveRecoveries.get(input.operationId);
-        if (input.step.kind !== 'save' || !save) return actionRuntime.verifyBrowserRecovery(input);
+        if (input.step.kind !== 'save') return actionRuntime.verifyBrowserRecovery(input);
+        const save = pendingSaveRecovery(input.operationId);
+        if (!save) return { status: 'unresolved', facts: [], reason: 'The saved package recovery no longer owns the prepared workspace' };
         const state = await readSavedState(save).catch(error => ({ error: String(error.message).slice(0, 500) }));
         if (state.error || typeof state.modified !== 'boolean')
           return { status: 'unresolved', facts: [], reason: state.error ?? 'Saved package state unavailable' };
@@ -270,14 +281,14 @@ export async function createBridge(config, session, { browserTransport: managedB
           source_operation_id: input.operationId, step: structuredClone(input.step), state, attested_by_model: input.attested,
           facts: ['saved_package_path_observed', state.modified ? 'package_modified_after_save' : 'package_unmodified_after_save'] };
         await recordExecution({ phase: 'browser_recovery_receipt', operation_id: input.operationId, receipt });
-        saveRecoveries.delete(input.operationId);
+        save.recoveryPending = false;
         return { status: receipt.status, facts: receipt.facts, receipt_id: receipt.id, state,
           next_step: state.modified ? { tool: 'dock_action_run', instruction: 'The open package has changes after the save. '
             + 'Save it again with package.save_checkpoint, the same path and a NEW operation_id.' }
             : { tool: 'dock_action_run', instruction: 'The saved package is confirmed unmodified. Continue the task.' } };
       },
       stopBrowserRecovery(input) {
-        return saveRecoveries.has(input.operationId) ? { state: 'retained', reason: 'The save receipt remains valid; its package state stays unconfirmed.' }
+        return pendingSaveRecovery(input.operationId) ? { state: 'retained', reason: 'The save receipt remains valid; its package state stays unconfirmed.' }
           : actionRuntime.stopBrowserRecovery(input);
       },
     };
@@ -564,7 +575,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
               sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
-              document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
+              document_id:session.metadata.workspacePreparation?.state?.document_id,preparation:session.metadata.workspacePreparation}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
                 : request.params.name === 'dock_operation_recover' ? await actionRuntime.recover(args.operation_id,
@@ -589,10 +600,14 @@ export async function createBridge(config, session, { browserTransport: managedB
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
             const confirmedSave=saveRequest?outcome:request.params.name==='dock_operation_inspect'
               &&outcome.status==='SUCCEEDED'&&outcome.action_key==='operation.inspect'
-              &&outcome.operation_id===args.operation_id&&outcome.output?.state==='resolved'
-              &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
+              &&(args.operation_id===undefined||outcome.operation_id===args.operation_id)&&outcome.output?.state==='resolved'
+              &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===outcome.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
+            if(admission&&confirmedSave.action_key===admission.action_key
+              &&(!saveRequest||outcome.operation_id===operationId&&outcome.action_key===args.action_key&&outcome.cleanup_complete===true)
+              &&['NOT_APPLIED','FAILED'].includes(confirmedSave.status)&&confirmedSave.effect_possible===false)
+              saveAdmissions.delete(confirmedSave.operation_id);
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -601,17 +616,19 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
-                document_id:admission.document_id,sequence:admission.sequence};
+                document_id:admission.document_id,sequence:admission.sequence,preparation:admission.preparation};
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
-                reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
+                reopenedSave={path:admission.path,preparation:admission.preparation};
             }
             const savedOutcome = confirmedSave ?? outcome;
+            const save = savedOutcome.status==='SUCCEEDED' && savedOutcome.action_key===admission?.action_key
+              && savedOutcome.output?.package_ref?.path===lastSavedPackage?.path ? currentSave(savedOutcome.operation_id) : null;
             let normalizedWorkspace = null;
             let workspaceBindingAdvice = null;
             const saveContinuations = savedOutcome.output?.workflow_continuations
               ?? savedOutcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
-            if (savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)
+            if (save
                 && savedOutcome.trace?.some(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true
                   && (savedOutcome.output?.reopened === true && e.reopened === true || e.recovered_reopen === true))) {
               const beforeBinding = Object.fromEntries(['workspacePreparation','workspaceReady','targetIdentity','workflowRef']
@@ -633,6 +650,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     return state;
                   },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
                 if(userProfile)userWorkflows.remember({...normalizedWorkspace,previous_workflow_ref:previous.workflow_ref});
+                save.preparation=session.metadata.workspacePreparation;
               } catch {
                 // The bind is read-only. Keep the prior preparation so an
                 // explicit existing_workflow request can replace it normally.
@@ -647,7 +665,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     workflow_ref:{document_id:previous?.document_id,...(continuation?.workflow_ref??previous?.workflow_ref)}}}};
               }
             }
-            if (userProfile && savedOutcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key))
+            if (userProfile && save)
               for (const continuation of saveContinuations) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
@@ -656,28 +674,25 @@ export async function createBridge(config, session, { browserTransport: managedB
               document_id:normalizedWorkspace.document_id,workflow_ref:normalizedWorkspace.workflow_ref,package_ref:normalizedWorkspace.package_ref,
               instruction:'Save rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(workspaceBindingAdvice)reply.content.push({type:'text',text:JSON.stringify(workspaceBindingAdvice)});
-            if(savedOutcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(savedOutcome.action_key)&&savedOutcome.output?.package_ref?.path){
+            if(save){
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
               // rather than discovering it only during isolated shutdown.
-              const path=savedOutcome.output.package_ref.path;
+              const path=save.path;
               let observation;
               try{
                 if(acceptanceSaveReadPackage===path && savedOutcome.action_key==='package.save_checkpoint'
-                  && savedOutcome.output.save_completed===true && lastSavedPackage?.operation_id===operationId
-                  && savedOutcome.operation_id===operationId && lastSavedPackage.path===path
-                  && lastSavedPackage.document_id===session.metadata.workspacePreparation?.state?.document_id){
+                  && savedOutcome.output.save_completed===true && save.operation_id===operationId){
                   acceptanceSaveReadPackage=undefined;
                   const recorded=await recordExecution({phase:'acceptance_fault_triggered',condition:'P5',operation_id:operationId,package_path:path}).catch(()=>null);
                   if(recorded)throw Error('Saved package state read failed');
                 }
-                const state=await readSavedState({path});
+                const state=await readSavedState(save);
                 observation={state,advice:savedPackageStateAdvice(state,savedOutcome)};
               }catch{
                 // A read failure must not erase the completed save or invite
                 // a retry of an uncertain save gesture.
-                if(recovery.enabled)saveRecoveries.set(savedOutcome.operation_id,{path:savedOutcome.output.package_ref.path,
-                  document_id:session.metadata.workspacePreparation?.state?.document_id});
+                if(recovery.enabled)save.recoveryPending=true;
                 reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_state',save_operation_id:savedOutcome.operation_id,
                   package_path:savedOutcome.output.package_ref.path,modified:null,state:'unavailable',
                   instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
@@ -685,6 +700,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
               }
               if(observation){
+                save.recoveryPending=false;
                 await recordExecution({phase:'saved_package_state_observed',operation_id:savedOutcome.operation_id,...observation})
                   .catch(()=>console.error('Loginom Dock could not record saved_package_state_observed.'));
                 reply.content.push({type:'text',text:JSON.stringify(observation.advice)});

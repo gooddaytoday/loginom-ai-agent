@@ -9,7 +9,7 @@ import {join} from 'node:path';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {inspectReferenceFile} from '../lib/file-reference.mjs';
 
-function fixture(name='data.csv') {
+function fixture(name='data.csv',browserRecovery=false) {
   const page=new Page(),baseSnapshot=page.uiSnapshot.bind(page),baseLocator=page.locator.bind(page);
   let submitted=0,released=0,staged=0;
   const timeouts=[];
@@ -27,7 +27,7 @@ function fixture(name='data.csv') {
   const store={list:()=>[structuredClone(artifact)],getUploadGrant(id,grant){if(id!==artifact.artifact_id || grant!==artifact.upload.grant_id)throw new Error('not authorized');return structuredClone(artifact);},
     stageUpload:async()=>{staged++;return {path:'/private/staged/'+name,verify:async()=>artifact,release:async()=>{released++;}};}};
   const events=[];
-  const rt=runtime(page,{artifactStore:store,onRecord:async event=>events.push(event)});
+  const rt=runtime(page,{artifactStore:store,browserRecovery,onRecord:async event=>events.push(event)});
   const request=async()=>({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
     observationId:(await rt.observe()).output.observation_id,operationId:'upload-1'});
   const native=()=>{
@@ -118,7 +118,7 @@ for(const fault of [null,'journal','missing_ack','cleanup','proof','cancel'])tes
 });
 
 test('upload uses the admitted path once and leaves server verification pending',async()=>{
-  const f=fixture(),request=await f.request();
+  const f=fixture('data.csv',true),request=await f.request();
   const result=await f.rt.upload(request);
   assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.upload_submitted,true);
   assert.equal(result.output.destination,'/test/data.csv');
@@ -127,6 +127,8 @@ test('upload uses the admitted path once and leaves server verification pending'
   assert.deepEqual(f.counts(),{submitted:1,released:0,staged:1});
   const inspected=await f.rt.inspect({operationId:'upload-1'});
   assert.equal(inspected.output.state,'pending');assert.deepEqual(inspected.output.recovery_options,[]);
+  assert.equal(inspected.output.next_steps.some(step=>step.tool==='dock_browser_recovery'),false);
+  assert.throws(()=>f.rt.browserRecoveryBasis('upload-1'),/No browser recovery trigger/);
   assert.equal(inspected.output.outcome.output.upload_submitted,true);
   await assert.rejects(()=>f.rt.upload({...request,operationId:'upload-2'}),/pending/);
   await assert.rejects(()=>f.rt.upload({...request,observationId:'changed'}),/different/);

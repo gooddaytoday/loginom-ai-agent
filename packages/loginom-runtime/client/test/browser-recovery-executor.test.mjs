@@ -287,6 +287,9 @@ test('T3: the same phase failing again after a recovery is continued through a f
   // Dock continues over the existing node; the broken finish predicate fails again.
   f.state.release = () => { throw Error('Release verifier unavailable for this surface'); };
   await stopAtFinish(f, 'apply-2', { kind: 'existing', type: 'imports.text', ref: node });
+  const previous = (await f.runtime.inspect({ operationId: 'apply' })).output;
+  assert.equal(previous.next_steps.some(step => step.tool === 'dock_browser_recovery'), false);
+  assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
   const advice = (await f.runtime.inspect({ operationId: 'apply-2' })).output;
   assert.equal(advice.browser_recovery, 'REPEATED_PHASE_FAILURE');
   const basis = f.runtime.browserRecoveryBasis('apply-2');

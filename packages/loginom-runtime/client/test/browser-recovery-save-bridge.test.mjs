@@ -10,7 +10,7 @@ test('browser recovery rereads an unconfirmed saved package state through the ma
   const result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
     fileURLToPath(new URL('./support/browser-recovery-save-bridge.mjs', import.meta.url))], { env, timeout: 60000 })
     .catch(error => error);
-  assert.match(result.stdout, /pass 8/, result.stdout + result.stderr);
+  assert.match(result.stdout, /pass 20\b/, result.stdout + result.stderr);
   assert.match(result.stdout, /fail 0/);
   assert.match(result.stdout + result.stderr, /Loginom Dock could not record saved_package_state_observed\./);
 });
