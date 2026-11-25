@@ -56,19 +56,25 @@ async function sourceNavigation(t,fault,options={}) {
 
 test('a confirmed Excel destination conflict leaves the node and links uncreated',async t=>{
  const support=createExcelExportNodeSupport({storageDirectories:{packages:'/worker',inputs:'/worker',exports:'/worker'}});
- const steps=[];
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+  navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
+ const workflow={status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'d',workflow_ref};
+ const steps=[];let exists=true;
  const f=await sourceNavigation(t,undefined,{...support,
-  nodeTargetAdapterFactory:()=>({observe:async()=>{steps.push('graph');throw Error('Unexpected graph observation');}}),
+  nodeTargetAdapterFactory:()=>({
+   activateWorkflow:async()=>{steps.push('activate');throw Error('Lost workflow reply');},
+   readWorkflowReceipt:async()=>({output:{state:'completed',receipt:workflow}}),
+   verifyWorkflow:async()=>workflow,
+   observe:async()=>{steps.push('graph');throw Error('End of test at graph observation');},
+  }),
  });
  const destination='/worker/report.xlsx',evaluate=f.page.evaluate.bind(f.page);
  f.page.evaluate=async(fn,arg)=>{
   if(!fn.toString().includes('directory,destination})'))return evaluate(fn,arg);
   assert.equal(arg.destination,destination);
   steps.push('destination');
-  return {verified:true,destination,exists:true};
+  return {verified:true,destination,exists};
  };
- const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
-  navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
  const request={operation_id:'export-conflict',contract_revision:'1.0.0',document_id:'d',workflow_ref,
   target:{kind:'new',type:'exports.excel'},inputs:[{source:{document_id:'d',workflow_id:'flow',node_id:'table'},output:0,input:0}],
   mode:'xlsx',parameters:{excel_export:{destination,sheet_name:'Report',header:'labels',overwrite:'reject'}},mappings:[],finish:'execute',
@@ -82,6 +88,15 @@ test('a confirmed Excel destination conflict leaves the node and links uncreated
  assert.equal(f.records.find(e=>e.phase==='node_phase_refused')?.receipt.proof.destination,destination);
  assert.deepEqual(await f.runtime.runNodeApply(request),outcome);
  assert.deepEqual(steps,['destination']);
+ // Early evidence is kept outside the source fingerprint so workflow recovery
+ // can recheck the same source without reissuing the Files navigation.
+ exists=false;
+ const next={...request,operation_id:'export-after-conflict'};
+ assert.equal((await f.runtime.runNodeApply(next)).output.pending_phase,'workflow');
+ await f.runtime.inspect({operationId:next.operation_id});
+ await f.runtime.runNodeApply(next,{resume:true});
+ assert.ok(f.records.some(e=>e.phase==='node_continuation_checked'&&e.boundary==='workflow'&&e.verified));
+ assert.deepEqual(steps,['destination','destination','activate','graph']);
 });
 
 test('Import binding consumes its observed file witness after Files returns to the graph',async t=>{

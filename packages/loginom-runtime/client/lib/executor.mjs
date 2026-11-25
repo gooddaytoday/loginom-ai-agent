@@ -3447,7 +3447,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               operation_id:${JSON.stringify(id)},phase:'inspect',effect_possible:false,cleanup_complete:true,trace:[],error:null,
               output:await (${readStorageDestination.toString()})(page,${JSON.stringify(task)})})`,{timeout:Math.max(1,deadline-now())});
             guard();
-            if(response.status!=='SUCCEEDED'||response.operation_id!==id||response.output?.verified!==true)throw Error('Exact Excel destination could not be verified in Files');
+            if(response.status!=='SUCCEEDED'||response.operation_id!==id||response.action_key!=='storage.export_destination'
+              ||response.cleanup_complete!==true||response.effect_possible!==false||response.output?.verified!==true)
+              throw Error('Exact Excel destination could not be verified in Files');
             return response.output;
           }
           if(listing)return listStorageDirectory({destination,pattern:request.pattern,guard,ready,roots,read,act});
@@ -4293,8 +4295,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const nodeHistory=()=>[...operations.values()].map((o,sequence)=>({o,sequence})).filter(({o})=>o!==operation&&o.action.capability==='node.apply')
         .map(({o,sequence})=>structuredClone({sequence,request:o.parameters,outcome:o.outcome,cleanup_confirmed:o.cleanupConfirmed,
           source:o.nodeApply?.phases.find(p=>p.phase==='source')?.value?.source,scan_receipt:o.scanReceipt}));
-      let admissionSources=null,admissionFailure=null,admissionUncertainty=null,excelDestinationProof=null;
-      if(!operation&&(serverDownloads||request.target.type==='exports.excel'&&getStorageBinding())){
+      let admissionSources=null,admissionFailure=null,admissionUncertainty=null;
+      const checkExcelDestination=request.target.type==='exports.excel'&&getStorageBinding()?.document_id===request.document_id;
+      if(!operation&&(serverDownloads||checkExcelDestination)){
         const proofs=new Map(),deadline=Math.min(admissionDeadline,now()+request.budgets.configure_ms);
         const resolve=async(ref,receipt=scanReceipt)=>{
           if(!proofs.has(ref)){
@@ -4308,21 +4311,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return serverDownloads.bind(proofs.get(ref),receipt);
         };
         try{
-          if(getStorageBinding()?.document_id===request.document_id){
-            excelDestinationProof=await preflightExcelExportDestination(request,async path=>{
+          if(checkExcelDestination){
+            const proof=await preflightExcelExportDestination(request,async path=>{
               const result=await runtime.serverDownload({operation_id:randomUUID(),path},null,
                 {signal,sourceOperation:operationId,deadlineAt:deadline,exportDestination:true});
               return result.output;
             });
+            if(proof)await onRecord({operation_id:operationId,phase:'excel_export_destination_preflight_completed',proof});
           }
-          const history=nodeHistory();
-          if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
-            const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
-            await verifyDeferredTextImportSources(request,history,resolve);
+          if(serverDownloads){
+            const history=nodeHistory();
+            if(request.finish==='execute'&&history.some(e=>e.request.parameters?.source_switch)){
+              const {verifyDeferredTextImportSources}=await import('./text-import-node.mjs');
+              await verifyDeferredTextImportSources(request,history,resolve);
+            }
+            if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+            if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
+              for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
           }
-          if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
-          if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
-            for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
         }catch(error){
           if(running||pending&&pending.id!==error.storageNavigationOperationId)throw error;
           if(error.storageNavigationOperationId){
@@ -4417,14 +4423,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               needsWorkflowActivation:ctx=>operation.nodeTargetAdapter.needsWorkflowActivation(
                 {document_id:request.document_id,workflow_ref:request.workflow_ref},ctx)}:{}),
             verifySource:async(...args)=>{
-              try{
-                if(admissionFailure)throw admissionFailure;
-                const source=await originalSource(...args);
-                return excelDestinationProof?{...source,destination_preflight:excelDestinationProof}:source;
-              }
+              try{if(admissionFailure)throw admissionFailure;return await originalSource(...args);}
               // Admission observations are valid for this initial source phase
               // only. Resume/continuation must obtain fresh native evidence.
-              finally{admissionSources=null;admissionFailure=null;excelDestinationProof=null;}
+              finally{admissionSources=null;admissionFailure=null;}
             },
             verifyContinuation:async(state,ctx)=>{
               if(state.target_reconciled && !state.phases.some(p=>p.phase==='target')){
@@ -4474,7 +4476,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                   throw Error('Complete owned graph required before node preflight');
               }
               if(stepwiseInput)await observeStepwiseSourceFreshness({request,operationId:operation.id,history:nodeHistory(),record:onRecord,
-                observe:binding=>executeNodeScript(makeStepwiseSourceObservationCode(binding),{timeout:Math.max(1,ctx.deadline-now())})});
+                observe:async binding=>{
+                  try{return await executeNodeScript(makeStepwiseSourceObservationCode(binding),{timeout:Math.max(1,ctx.deadline-now()),signal:ctx.signal});}
+                  catch{ctx.signal?.throwIfAborted();return {processes:null,ports:null};}
+                }});
               if(!existingRead&&beforeTarget)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
             };
             try{
