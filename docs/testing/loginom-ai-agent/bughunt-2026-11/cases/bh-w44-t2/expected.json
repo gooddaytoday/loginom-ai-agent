@@ -1,0 +1,86 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "source"
+    ],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text",
+        "label": "Строки заказов"
+      },
+      {
+        "id": "monthly",
+        "type": "programming.python"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "monthly",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "programming.python",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "rows": [
+        {
+          "month": "2025-01",
+          "revenue": 37672.0
+        },
+        {
+          "month": "2025-02",
+          "revenue": 221110.65
+        },
+        {
+          "month": "2025-03",
+          "revenue": 40049.45
+        },
+        {
+          "month": "2025-04",
+          "revenue": 99213.59
+        },
+        {
+          "month": "2025-05",
+          "revenue": 626235.53
+        },
+        {
+          "month": "2025-06",
+          "revenue": 77700.13
+        },
+        {
+          "month": "2025-07",
+          "revenue": 69896.78
+        },
+        {
+          "month": "2025-08",
+          "revenue": 49781.36
+        },
+        {
+          "month": "2025-09",
+          "revenue": 262.97
+        }
+      ],
+      "columns": [
+        {
+          "name": "month",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}

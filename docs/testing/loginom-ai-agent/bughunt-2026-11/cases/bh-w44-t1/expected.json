@@ -1,0 +1,377 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "rows": [
+        {
+          "order_date": "2025-09-16",
+          "status": "Выполнен",
+          "quantity": 3,
+          "unit_price": 92.27,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-03-06",
+          "status": "Выполнен",
+          "quantity": 10,
+          "unit_price": 1148.96,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-03-06",
+          "status": "Выполнен",
+          "quantity": 4,
+          "unit_price": 1237.55,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-03-06",
+          "status": "Выполнен",
+          "quantity": 8,
+          "unit_price": 1433.34,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-03-06",
+          "status": "Выполнен",
+          "quantity": 2,
+          "unit_price": 6931.47,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-02-28",
+          "status": "Выполнен",
+          "quantity": 5,
+          "unit_price": 44222.13,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-04-25",
+          "status": "Выполнен",
+          "quantity": 1,
+          "unit_price": 2184.97,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-04-25",
+          "status": "Выполнен",
+          "quantity": 4,
+          "unit_price": 8268.76,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-04-25",
+          "status": "Выполнен",
+          "quantity": 10,
+          "unit_price": 6203.99,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-04-25",
+          "status": "Выполнен",
+          "quantity": 1,
+          "unit_price": 169.28,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-04-25",
+          "status": "Выполнен",
+          "quantity": 5,
+          "unit_price": 745.18,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-06-18",
+          "status": "Выполнен",
+          "quantity": 6,
+          "unit_price": 11850.1,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-06-18",
+          "status": "Выполнен",
+          "quantity": 1,
+          "unit_price": 6599.53,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-05-27",
+          "status": "Выполнен",
+          "quantity": 3,
+          "unit_price": 8722.93,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-05-27",
+          "status": "Выполнен",
+          "quantity": 5,
+          "unit_price": 52184.27,
+          "discount_pct": 10
+        },
+        {
+          "order_date": "2025-05-27",
+          "status": "Выполнен",
+          "quantity": 7,
+          "unit_price": 52027.52,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-05-27",
+          "status": "Выполнен",
+          "quantity": 8,
+          "unit_price": 130.61,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-01-17",
+          "status": "Отменён",
+          "quantity": 10,
+          "unit_price": 882.98,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-01-17",
+          "status": "Отменён",
+          "quantity": 3,
+          "unit_price": 14831.36,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-01-17",
+          "status": "Отменён",
+          "quantity": 4,
+          "unit_price": 1108.23,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-01-17",
+          "status": "Отменён",
+          "quantity": 5,
+          "unit_price": 14831.36,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-01-17",
+          "status": "Отменён",
+          "quantity": 4,
+          "unit_price": 8514.46,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-08-21",
+          "status": "Выполнен",
+          "quantity": 1,
+          "unit_price": 1840.6,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-08-21",
+          "status": "Выполнен",
+          "quantity": 8,
+          "unit_price": 2425.28,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-08-21",
+          "status": "Выполнен",
+          "quantity": 7,
+          "unit_price": 1600.77,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-08-21",
+          "status": "Выполнен",
+          "quantity": 9,
+          "unit_price": 1956.58,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-04-23",
+          "status": "Возврат",
+          "quantity": 6,
+          "unit_price": 68.58,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-04-23",
+          "status": "Возврат",
+          "quantity": 3,
+          "unit_price": 7809.38,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-05-17",
+          "status": "Возврат",
+          "quantity": 6,
+          "unit_price": 10002.26,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-05-17",
+          "status": "Возврат",
+          "quantity": 8,
+          "unit_price": 58334.86,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-05-17",
+          "status": "Возврат",
+          "quantity": 5,
+          "unit_price": 553.06,
+          "discount_pct": 10
+        },
+        {
+          "order_date": "2025-05-17",
+          "status": "Возврат",
+          "quantity": 9,
+          "unit_price": 13705.25,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-09-24",
+          "status": "Возврат",
+          "quantity": 6,
+          "unit_price": 103.16,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-09-24",
+          "status": "Возврат",
+          "quantity": 2,
+          "unit_price": 1600.77,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-09-24",
+          "status": "Возврат",
+          "quantity": 5,
+          "unit_price": 1727.8,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-07-25",
+          "status": "Отменён",
+          "quantity": 3,
+          "unit_price": 726.31,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-01-26",
+          "status": "Выполнен",
+          "quantity": 6,
+          "unit_price": 153.66,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-01-26",
+          "status": "Выполнен",
+          "quantity": 4,
+          "unit_price": 9187.51,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-07-13",
+          "status": "Выполнен",
+          "quantity": 6,
+          "unit_price": 13705.25,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-08-04",
+          "status": "Возврат",
+          "quantity": 4,
+          "unit_price": 14134.94,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-08-04",
+          "status": "Возврат",
+          "quantity": 6,
+          "unit_price": 5612.87,
+          "discount_pct": 10
+        },
+        {
+          "order_date": "2025-08-04",
+          "status": "Возврат",
+          "quantity": 7,
+          "unit_price": 2181.72,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-08-04",
+          "status": "Возврат",
+          "quantity": 7,
+          "unit_price": 35041.47,
+          "discount_pct": null
+        },
+        {
+          "order_date": "2025-03-28",
+          "status": "Отменён",
+          "quantity": 3,
+          "unit_price": 12601.03,
+          "discount_pct": 10
+        },
+        {
+          "order_date": "2025-03-28",
+          "status": "Отменён",
+          "quantity": 10,
+          "unit_price": 37401.11,
+          "discount_pct": 15
+        },
+        {
+          "order_date": "2025-06-22",
+          "status": "Отменён",
+          "quantity": 9,
+          "unit_price": 57340.36,
+          "discount_pct": 5
+        },
+        {
+          "order_date": "2025-02-15",
+          "status": "Возврат",
+          "quantity": 4,
+          "unit_price": 2237.83,
+          "discount_pct": 15
+        }
+      ],
+      "columns": [
+        {
+          "name": "order_date",
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "type": "string"
+        },
+        {
+          "name": "quantity",
+          "type": "integer"
+        },
+        {
+          "name": "unit_price",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        },
+        {
+          "name": "discount_pct",
+          "type": "integer"
+        }
+      ]
+    }
+  ]
+}

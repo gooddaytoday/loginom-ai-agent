@@ -1,0 +1,20 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "source"
+    ],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text"
+      },
+      {
+        "id": "limit",
+        "type": "variables.calculator"
+      }
+    ],
+    "links": []
+  },
+  "outputs": []
+}

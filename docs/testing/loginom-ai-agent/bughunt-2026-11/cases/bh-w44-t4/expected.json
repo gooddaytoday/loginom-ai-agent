@@ -1,0 +1,103 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "source",
+      "monthly"
+    ],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text",
+        "label": "Строки заказов"
+      },
+      {
+        "id": "monthly",
+        "type": "programming.python"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "monthly",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "programming.python",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "rows": [
+        {
+          "month": "2025-01",
+          "revenue": 37672.0,
+          "moving_avg": 37672.0
+        },
+        {
+          "month": "2025-02",
+          "revenue": 221110.65,
+          "moving_avg": 129391.33
+        },
+        {
+          "month": "2025-03",
+          "revenue": 40049.45,
+          "moving_avg": 99610.7
+        },
+        {
+          "month": "2025-04",
+          "revenue": 99213.59,
+          "moving_avg": 99511.42
+        },
+        {
+          "month": "2025-05",
+          "revenue": 626235.53,
+          "moving_avg": 204856.24
+        },
+        {
+          "month": "2025-06",
+          "revenue": 77700.13,
+          "moving_avg": 183663.56
+        },
+        {
+          "month": "2025-07",
+          "revenue": 69896.78,
+          "moving_avg": 189034.36
+        },
+        {
+          "month": "2025-08",
+          "revenue": 49781.36,
+          "moving_avg": 160479.47
+        },
+        {
+          "month": "2025-09",
+          "revenue": 262.97,
+          "moving_avg": 153848.39
+        }
+      ],
+      "columns": [
+        {
+          "name": "month",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        },
+        {
+          "name": "moving_avg",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}

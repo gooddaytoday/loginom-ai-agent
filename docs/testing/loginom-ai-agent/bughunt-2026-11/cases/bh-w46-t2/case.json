@@ -1,0 +1,15 @@
+{
+  "output_mode": "ports",
+  "budget": {
+    "max_nodes": 1
+  },
+  "base": "bh-w46-t1",
+  "input_files": [],
+  "manual_edit": {
+    "kind": "rename",
+    "node": {
+      "type": "transform.group_data"
+    },
+    "label": "Свод цен"
+  }
+}

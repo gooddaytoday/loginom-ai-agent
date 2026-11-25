@@ -1,0 +1,56 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [
+      "source",
+      "limit"
+    ],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text"
+      },
+      {
+        "id": "limit",
+        "type": "variables.calculator"
+      },
+      {
+        "id": "filter",
+        "type": "transform.filter_data"
+      }
+    ],
+    "links": [
+      {
+        "source": "source",
+        "target": "filter",
+        "output": 0,
+        "input": 0
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "rows": [
+        {
+          "order_id": 1001
+        },
+        {
+          "order_id": 1300
+        },
+        {
+          "order_id": 1500
+        }
+      ],
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        }
+      ]
+    }
+  ]
+}

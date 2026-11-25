@@ -1,0 +1,156 @@
+{
+  "graph": {
+    "exact": true,
+    "retain": [],
+    "nodes": [
+      {
+        "id": "source",
+        "type": "imports.text"
+      }
+    ],
+    "links": []
+  },
+  "outputs": [
+    {
+      "output_node_type": "imports.text",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "rows": [
+        {
+          "category": "Продукты",
+          "list_price": 1007.35
+        },
+        {
+          "category": "Одежда",
+          "list_price": 6945.62
+        },
+        {
+          "category": "Одежда",
+          "list_price": 10089.18
+        },
+        {
+          "category": "Продукты",
+          "list_price": 1108.23
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 42815.07
+        },
+        {
+          "category": "Продукты",
+          "list_price": 128.02
+        },
+        {
+          "category": "Одежда",
+          "list_price": 6599.53
+        },
+        {
+          "category": "Электроника",
+          "list_price": 1956.58
+        },
+        {
+          "category": "Продукты",
+          "list_price": 153.66
+        },
+        {
+          "category": "Электроника",
+          "list_price": 36017.23
+        },
+        {
+          "category": "Электроника",
+          "list_price": 11005.39
+        },
+        {
+          "category": "Электроника",
+          "list_price": 21807.65
+        },
+        {
+          "category": "Электроника",
+          "list_price": 3445.01
+        },
+        {
+          "category": "Электроника",
+          "list_price": 89432.84
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 37878.41
+        },
+        {
+          "category": "Продукты",
+          "list_price": 1120.64
+        },
+        {
+          "category": "Одежда",
+          "list_price": 12601.03
+        },
+        {
+          "category": "Книги",
+          "list_price": 1057.13
+        },
+        {
+          "category": "Продукты",
+          "list_price": 442.56
+        },
+        {
+          "category": "Книги",
+          "list_price": 2001.47
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 17581.73
+        },
+        {
+          "category": "Одежда",
+          "list_price": 14742.29
+        },
+        {
+          "category": "Электроника",
+          "list_price": 48154.79
+        },
+        {
+          "category": "Одежда",
+          "list_price": 6463.98
+        },
+        {
+          "category": "Книги",
+          "list_price": 1929.6
+        },
+        {
+          "category": "Книги",
+          "list_price": 1889.59
+        },
+        {
+          "category": "Бытовая техника",
+          "list_price": 52027.52
+        },
+        {
+          "category": "Электроника",
+          "list_price": 4765.5
+        },
+        {
+          "category": "Продукты",
+          "list_price": 638.87
+        },
+        {
+          "category": "Электроника",
+          "list_price": 13941.29
+        }
+      ],
+      "columns": [
+        {
+          "name": "category",
+          "type": "string"
+        },
+        {
+          "name": "list_price",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-06
+          }
+        }
+      ]
+    }
+  ]
+}
