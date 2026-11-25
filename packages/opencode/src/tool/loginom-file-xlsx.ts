@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { mkdir, open, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { posix, join, resolve } from "node:path"
 import { Parser } from "htmlparser2"
 import { ZipReader, ZipWriter, TextReader, type Entry } from "@zip.js/zip.js"
+import { readProfileFileIdentity, verifyProfileFileIdentity, type ProfileSource } from "./loginom-file-profile-core"
 
 const MiB = 1024 * 1024
 const CELL = MiB
@@ -12,7 +13,6 @@ const MAX_XML = 4 * 1024 * MiB
 const LIMIT = "LOGINOM_FILE_XLSX_LIMIT"
 type Handle = Awaited<ReturnType<typeof open>>
 type Kind = "string" | "integer" | "real" | "datetime" | "boolean"
-type Identity = { canonical_path: string; size: number; mtime: number; ctime: number; file_id: string }
 type Cell = { col: number; type: string; style: number; value: string; formula: boolean; cached: boolean }
 type Row = { number: number; cells: Cell[] }
 type Sheet = { name: string; visibility: string; path: string }
@@ -51,11 +51,9 @@ type Scan = {
   missing_cached_values: number
   observed_dimension: string
 }
-type Stored = {
+type Stored = ProfileSource & {
   format: "xlsx"
   profile_id: string
-  source: string
-  identity: Identity
   sheets: Sheet[]
   sheet: Sheet
   date_system: "1900" | "1904"
@@ -96,25 +94,6 @@ const escape = (s: string) =>
 const namespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 const relationshipNS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
-async function identity(path: string): Promise<Identity> {
-  const canonical_path = await realpath(path)
-  const s = await stat(canonical_path)
-  if (!s.isFile()) fail("LOGINOM_FILE_NOT_REGULAR", path)
-  return { canonical_path, size: s.size, mtime: s.mtimeMs, ctime: s.ctimeMs, file_id: `${s.dev}:${s.ino}` }
-}
-async function unchanged(p: Pick<Stored, "source" | "identity">, handle?: Handle) {
-  const current = await identity(p.source).catch(() => undefined)
-  const s = await handle?.stat()
-  if (
-    JSON.stringify(current) !== JSON.stringify(p.identity) ||
-    (s &&
-      (`${s.dev}:${s.ino}` !== p.identity.file_id ||
-        s.size !== p.identity.size ||
-        s.mtimeMs !== p.identity.mtime ||
-        s.ctimeMs !== p.identity.ctime))
-  )
-    fail("LOGINOM_FILE_CHANGED", p.source)
-}
 function profilePath(dir: string, id: string) {
   if (!/^[a-f0-9-]{36}$/.test(id)) invalid("unknown session profile_id")
   return join(dir, `${id}.json`)
@@ -364,7 +343,7 @@ class Workbook {
   dateSystem: "1900" | "1904" = "1900"
   sstComplete = true
   constructor(
-    private p: Pick<Stored, "source" | "identity">,
+    private p: ProfileSource,
     dir: string,
     private budget: { bytes: number; stop?: number; deadline?: number },
     private signal?: AbortSignal,
@@ -373,7 +352,7 @@ class Workbook {
   }
   async init() {
     this.handle = await open(this.p.identity.canonical_path, "r")
-    await unchanged(this.p, this.handle)
+    await verifyProfileFileIdentity(this.p, this.handle)
     this.zip = new ZipReader(new FileReader(this.handle, this.p.identity.size), { useWebWorkers: false })
     await this.strings.init()
     let total = 0
@@ -600,7 +579,7 @@ class Workbook {
     await this.strings.close()
   }
   async check() {
-    await unchanged(this.p, this.handle)
+    await verifyProfileFileIdentity(this.p, this.handle)
   }
 }
 
@@ -623,12 +602,13 @@ function dimension(first: number, last: number, width: number) {
 export async function profileXlsx(path: string, dir: string, options: XlsxOptions = {}) {
   const started = performance.now(),
     source = resolve(path),
-    original = await identity(source)
+    original = await readProfileFileIdentity(source)
   if (options.authorized_path && original.canonical_path !== options.authorized_path) fail("LOGINOM_FILE_CHANGED", path)
   if (options.rows_to_skip) invalid("Excel runtime has no rows_to_skip; select a tabular sheet")
   await mkdir(dir, { recursive: true, mode: 0o700 })
   const budget = { bytes: 0, stop: QUICK, deadline: started + 4800 }
-  const book = new Workbook({ source, identity: original }, dir, budget, options.signal)
+  const profileSource = { source, identity: original, file_id_exact: true } as const
+  const book = new Workbook(profileSource, dir, budget, options.signal)
   try {
     await book.init()
     const sheet = options.sheet_name ? book.sheets.find((s) => s.name === options.sheet_name) : book.sheets[0]
@@ -636,8 +616,7 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
     const p: Stored = {
       format: "xlsx",
       profile_id: randomUUID(),
-      source,
-      identity: original,
+      ...profileSource,
       sheets: book.sheets,
       sheet,
       date_system: book.dateSystem,
@@ -841,14 +820,14 @@ function xlsxReply(p: Stored, cursor = 0) {
 }
 export async function pageXlsx(id: string, dir: string, continuation = "0") {
   const p = await load(id, dir)
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   if (!/^\d+$/.test(continuation) || Number(continuation) >= p.columns.length) invalid("invalid continuation")
   return xlsxReply(p, Number(continuation))
 }
 
 export async function scanXlsx(id: string, dir: string, options: { signal?: AbortSignal } = {}) {
   const p = await load(id, dir)
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   const lock = await open(join(dir, `${id}.lock`), "wx", 0o600)
   const started = performance.now(),
     budget = { bytes: 0 },
@@ -975,7 +954,7 @@ export async function sampleXlsx(
   options: { seed?: number; max_records?: number; max_bytes?: number; signal?: AbortSignal } = {},
 ) {
   const p = await load(id, dir)
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   const limit = Math.max(1, Math.min(QUICK, options.max_bytes ?? QUICK)),
     capacity = Math.max(1, Math.min(100000, options.max_records ?? 1000))
   const seed = options.seed ?? 1,

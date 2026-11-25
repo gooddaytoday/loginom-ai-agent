@@ -2,11 +2,19 @@ import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { mkdir, open, readFile, readdir, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
+import {
+  fileStatIdentity,
+  inspectReferenceFile,
+  openReferenceFile,
+  type FileStatIdentity,
+} from "../../../loginom-runtime/client/lib/file-reference.mjs"
 import { resolveTextImportEncoding } from "../../../loginom-runtime/client/lib/text-import-encoding.mjs"
 import type { XlsxOptions } from "./loginom-file-xlsx"
 
 const MiB = 1024 * 1024
 const MAX_BYTES = 8 * MiB
+export const MAX_BYTE_ADMISSION = 16 * MiB
+const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
 const BLOCK = 256 * 1024
 const SQLITE_HEADER = Buffer.from("SQLite format 3\x00")
 // Include the binary bytes after BGDATA so a text column named BGDATA cannot match.
@@ -55,16 +63,15 @@ export type ProfileOptions = XlsxOptions & {
   signal?: AbortSignal
   authorized_path?: string
 }
-type Identity = { canonical_path: string; size: number; mtime: number; ctime: number; file_id: string }
-type Stored = {
+type Identity = { canonical_path: string } & FileStatIdentity
+export type ProfileSource = { source: string; identity: Identity; file_id_exact?: true }
+type Stored = ProfileSource & {
   format?: "csv" | "xlsx"
   sheet?: { name: string }
   sheets?: { name: string }[]
   header_rows?: number
   blank_rows?: "import" | "skip"
   profile_id: string
-  source: string
-  identity: Identity
   encoding: { name: Encoding; bom_bytes: number; ambiguity?: string }
   dialect: {
     delimiter: string
@@ -105,29 +112,41 @@ function failure(code: string, detail: string): never {
   throw Error(`${code}: ${detail}`)
 }
 
-async function identity(path: string): Promise<Identity> {
+export async function readProfileFileIdentity(path: string): Promise<Identity> {
   const canonical = await realpath(path)
-  const s = await stat(canonical)
+  const s = await stat(canonical, { bigint: true })
   if (!s.isFile()) failure("LOGINOM_FILE_NOT_REGULAR", path)
-  if (!Number.isSafeInteger(s.size)) failure("LOGINOM_FILE_TOO_LARGE", "unsafe file size")
-  return { canonical_path: canonical, size: s.size, mtime: s.mtimeMs, ctime: s.ctimeMs, file_id: `${s.dev}:${s.ino}` }
+  if (s.size > MAX_SAFE_INTEGER) failure("LOGINOM_FILE_TOO_LARGE", "unsafe file size")
+  return { canonical_path: canonical, ...fileStatIdentity(s) }
 }
 
-async function unchanged(p: Pick<Stored, "source" | "identity">) {
-  const current = await identity(p.source).catch(() => undefined)
-  if (JSON.stringify(current) !== JSON.stringify(p.identity)) failure("LOGINOM_FILE_CHANGED", p.source)
+// Legacy profiles can prove an ID only in the range where number stats were exact.
+function hasExactFileId(p: ProfileSource) {
+  const { file_id } = p.identity
+  return (
+    p.file_id_exact === true ||
+    (/^\d+:\d+$/.test(file_id) && file_id.split(":").every((part) => BigInt(part) <= MAX_SAFE_INTEGER))
+  )
 }
 
-async function checkHandle(handle: Awaited<ReturnType<typeof open>>, expected: Identity) {
-  const s = await handle.stat()
+export async function verifyProfileFileIdentity(p: ProfileSource, handle?: Awaited<ReturnType<typeof open>>) {
+  const current = await readProfileFileIdentity(p.source).catch(() => undefined)
+  if (!hasExactFileId(p) || JSON.stringify(current) !== JSON.stringify(p.identity))
+    failure("LOGINOM_FILE_CHANGED", p.source)
+  if (handle) await checkHandle(handle, p.identity, p.source)
+}
+
+async function checkHandle(handle: Awaited<ReturnType<typeof open>>, expected: Identity, path = expected.canonical_path) {
+  const s = await handle.stat({ bigint: true })
+  const { size, mtime, ctime, file_id } = fileStatIdentity(s)
   if (
     !s.isFile() ||
-    `${s.dev}:${s.ino}` !== expected.file_id ||
-    s.size !== expected.size ||
-    s.mtimeMs !== expected.mtime ||
-    s.ctimeMs !== expected.ctime
+    file_id !== expected.file_id ||
+    size !== expected.size ||
+    mtime !== expected.mtime ||
+    ctime !== expected.ctime
   )
-    failure("LOGINOM_FILE_CHANGED", expected.canonical_path)
+    failure("LOGINOM_FILE_CHANGED", path)
 }
 
 function profilePath(dir: string, id: string) {
@@ -150,10 +169,24 @@ export async function loadProfile(id: string, dir: string): Promise<Stored> {
 // Private backend receipt: the model supplies only an ID, never a row count.
 export async function exactScanReceipt(id: string, dir: string) {
   const p = await loadProfile(id, dir)
-  await unchanged(p)
-  if (p.scan?.status !== "exact" || p.scan.first_violation || !Number.isSafeInteger(p.scan.records)
-    || p.scan.records! < 0 || !/^[a-f0-9]{64}$/.test(p.scan.sha256 ?? "")) return undefined
-  return { profile_id: p.profile_id, records: p.scan.records!, sha256: p.scan.sha256!,
+  const scan = p.scan
+  const exact =
+    scan?.status === "exact" &&
+    !scan.first_violation &&
+    Number.isSafeInteger(scan.records) &&
+    scan.records! >= 0 &&
+    /^[a-f0-9]{64}$/.test(scan.sha256 ?? "")
+  await verifyProfileFileIdentity(p).catch(async (error) => {
+    if (
+      p.format !== "xlsx" ||
+      !exact ||
+      !hasExactFileId(p) ||
+      !(await matchesExactWorkbookBytes(p.source, p.identity, () => scan.sha256))
+    )
+      throw error
+  })
+  if (!exact) return undefined
+  return { profile_id: p.profile_id, records: scan.records!, sha256: scan.sha256!,
     bytes: p.identity.size, identity: p.identity, basis: "backend_exact_scan" as const,
     ...(p.format === "xlsx" ? { xlsx: { sheet_name: p.sheet!.name, sheet_index: p.sheets!.findIndex(s => s.name === p.sheet!.name) + 1,
       header_rows: p.header_rows!, blank_rows: p.blank_rows! } } : {}) }
@@ -161,12 +194,13 @@ export async function exactScanReceipt(id: string, dir: string) {
 
 // Only exact scans for this original identity constrain full-file staging.
 // Neither the model nor a quick profile can supply a trusted full-file digest.
-export async function exactFileDigest(expected: Identity, dir: string) {
+export async function exactFileDigest(expected: Identity, dir: string, format?: "xlsx") {
   const names = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return []
     throw error
   })
   const digests = new Set<string>()
+  let matchedFormat = format === undefined
   for (const name of names) {
     if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue
     const profile = await loadProfile(name.slice(0, -5), dir)
@@ -176,12 +210,49 @@ export async function exactFileDigest(expected: Identity, dir: string) {
       )
     )
       continue
-    if (profile.scan?.status !== "exact") continue
+    if (profile.scan?.status !== "exact" || !hasExactFileId(profile)) continue
     if (!/^[a-f0-9]{64}$/.test(profile.scan.sha256 ?? "")) throw Error("LOGINOM_FILE_CHANGED")
     digests.add(profile.scan.sha256!)
+    matchedFormat ||= profile.format === format
   }
   if (digests.size > 1) throw Error("LOGINOM_FILE_CHANGED")
-  return digests.values().next().value
+  return matchedFormat ? digests.values().next().value : undefined
+}
+
+// A trusted exact scan can resolve a timestamp change on the same small workbook.
+// Check the held handle and path around the read, then bind any bytes being admitted to that scan too.
+export async function matchesExactWorkbookBytes(
+  path: string,
+  expected: Pick<Identity, "canonical_path" | "file_id" | "size">,
+  digest: () => string | undefined | Promise<string | undefined>,
+  admissionBytes?: Buffer,
+) {
+  if (expected.size > MAX_BYTE_ADMISSION || !/^\d+:[1-9]\d*$/.test(expected.file_id)) return false
+  try {
+    const current = await inspectReferenceFile(path)
+    if (
+      current.canonical_path !== expected.canonical_path ||
+      current.file_id !== expected.file_id ||
+      current.size !== expected.size
+    )
+      return false
+
+    const sha256 = await digest()
+    if (!sha256 || !/^[a-f0-9]{64}$/.test(sha256)) return false
+    const file = await openReferenceFile({ ...current, sha256 })
+    try {
+      const bytes = await file.readBytes(MAX_BYTE_ADMISSION)
+      return (
+        (await realpath(path)) === current.canonical_path &&
+        (!admissionBytes || bytes.equals(admissionBytes)) &&
+        createHash("sha256").update(bytes).digest("hex") === sha256
+      )
+    } finally {
+      await file.close()
+    }
+  } catch {
+    return false
+  }
 }
 
 function decode(bytes: Buffer, encoding: Encoding, partial = false) {
@@ -538,7 +609,7 @@ async function* boundaries(path: string) {
 
 export async function profileFile(path: string, dir: string, options: ProfileOptions = {}) {
   const source = resolve(path)
-  const detected = await identity(source)
+  const detected = await readProfileFileIdentity(source)
   if (options.authorized_path && options.authorized_path !== detected.canonical_path)
     failure("LOGINOM_FILE_CHANGED", path)
   const magic = await open(detected.canonical_path, "r")
@@ -555,7 +626,7 @@ export async function profileFile(path: string, dir: string, options: ProfileOpt
       failure("LOGINOM_FILE_XLSX_UNSUPPORTED", "encrypted XLSX / legacy OLE workbook")
     const binary = BINARY_FORMATS.find(({ header }) => bytes.subarray(0, header.length).equals(header))
     if (binary) {
-      await unchanged({ source, identity: detected })
+      await verifyProfileFileIdentity({ source, identity: detected, file_id_exact: true })
       await checkHandle(magic, detected)
       return {
         format: binary.format,
@@ -569,7 +640,7 @@ export async function profileFile(path: string, dir: string, options: ProfileOpt
     await magic.close()
   }
   const started = performance.now()
-  const original = await identity(source)
+  const original = await readProfileFileIdentity(source)
   if (options.authorized_path && options.authorized_path !== original.canonical_path)
     failure("LOGINOM_FILE_CHANGED", source)
   await mkdir(dir, { recursive: true, mode: 0o700 })
@@ -589,6 +660,7 @@ export async function profileFile(path: string, dir: string, options: ProfileOpt
       profile_id: id,
       source,
       identity: original,
+      file_id_exact: true,
       encoding,
       dialect: {
         delimiter: inferred.delimiter,
@@ -720,7 +792,7 @@ export async function profileFile(path: string, dir: string, options: ProfileOpt
     }
     for (const c of p.columns) c.null_fraction = c.nulls / Math.max(1, c.observations)
     p.coverage.elapsed_ms = Math.round(performance.now() - started)
-    await unchanged(p)
+    await verifyProfileFileIdentity(p)
     await checkHandle(handle, original)
     await save(p, dir)
     return reply(p)
@@ -816,7 +888,7 @@ export async function profilePage(id: string, dir: string, continuation = "0") {
     const { pageXlsx } = await import("./loginom-file-xlsx")
     return pageXlsx(id, dir, continuation)
   }
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   if (!/^\d+$/.test(continuation) || Number(continuation) >= p.columns.length)
     failure("LOGINOM_FILE_FORMAT_AMBIGUOUS", "invalid continuation")
   return reply(p, Number(continuation))
@@ -828,7 +900,7 @@ export async function scanFile(id: string, dir: string, options: { signal?: Abor
     const { scanXlsx } = await import("./loginom-file-xlsx")
     return scanXlsx(id, dir, options)
   }
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   const lock = await open(join(dir, `${id}.lock`), "wx", 0o600)
   const started = performance.now()
   const indexPath = join(dir, `${id}.${randomUUID()}.idx`)
@@ -867,7 +939,7 @@ export async function scanFile(id: string, dir: string, options: { signal?: Abor
       if (indices.length) await index.write(Buffer.concat(indices))
     }
     complete = !options.signal?.aborted && p.scan.bytes_read === p.identity.size
-    await unchanged(p)
+    await verifyProfileFileIdentity(p)
     await checkHandle(input, p.identity)
     if (complete) {
       p.scan.status = "exact"
@@ -903,7 +975,7 @@ export async function sampleFile(
     const { sampleXlsx } = await import("./loginom-file-xlsx")
     return sampleXlsx(id, dir, options)
   }
-  await unchanged(p)
+  await verifyProfileFileIdentity(p)
   const maxRecords = Math.max(1, Math.min(100000, options.max_records ?? 1000))
   const limit = Math.max(1, Math.min(MAX_BYTES, options.max_bytes ?? MAX_BYTES))
   const seed = options.seed ?? 1
@@ -968,7 +1040,7 @@ export async function sampleFile(
         offset += n
       }
     }
-    await unchanged(p)
+    await verifyProfileFileIdentity(p)
     await checkHandle(input, p.identity)
     const manifest = {
       profile_id: id,

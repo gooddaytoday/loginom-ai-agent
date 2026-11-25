@@ -1,15 +1,21 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
+import type { BigIntStats, Stats } from "node:fs"
+import * as fs from "node:fs/promises"
 import { mkdtemp, readFile, rm, writeFile, appendFile, readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
 import { ZipWriter, Uint8ArrayWriter, TextReader, ZipReader, Uint8ArrayReader, TextWriter } from "@zip.js/zip.js"
 import {
   profileFile,
   scanFile,
   sampleFile,
   profilePage,
+  exactFileDigest,
   exactScanReceipt,
+  loadProfile,
 } from "../../src/tool/loginom-file-profile-core"
+import { inspectReferenceFile } from "../../../loginom-runtime/client/lib/file-reference.mjs"
 import { validateExcelParameters } from "../../../loginom-runtime/client/lib/imports-excel-parameters.mjs"
 
 const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -62,6 +68,68 @@ async function contents(path: string) {
     await zip.close()
   }
 }
+
+test("an exact XLSX scan and an attachment agree on an inode above 2^53", async () => {
+  await fixture(header + `<row r="2">${text("A", 2, "North")}${num("B", 2, "25")}</row>`, async (path, dir) => {
+    const mtime = 1_700_000_000
+    await fs.utimes(path, mtime, mtime)
+    const { stat, lstat } = fs
+    const original = await stat(path, { bigint: true })
+    const file = await fs.open(path, "r")
+    const prototype = Object.getPrototypeOf(file) as fs.FileHandle
+    const fstat = prototype.stat
+    await file.close()
+
+    const first = 2n ** 53n + 3n
+    const second = first + 1n
+    expect(Number(first)).toBe(Number(second))
+    let inode = first
+    const withInode = (info: Stats | BigIntStats | undefined) => {
+      if (info && typeof info.ino === "bigint" && info.ino === original.ino && info.dev === original.dev)
+        info.ino = inode
+      if (info && typeof info.ino === "number" && info.ino === Number(original.ino) && info.dev === Number(original.dev))
+        info.ino = Number(inode)
+      return info
+    }
+    const withPathStat = (read: typeof stat) =>
+      (async (...args: Parameters<typeof stat>) => withInode(await read(...args))) as typeof stat
+    const pathStat = spyOn(fs, "stat").mockImplementation(withPathStat(stat))
+    const linkStat = spyOn(fs, "lstat").mockImplementation(withPathStat(lstat))
+    const handleStat = spyOn(prototype, "stat").mockImplementation(
+      (async function (this: fs.FileHandle, ...args: Parameters<fs.FileHandle["stat"]>) {
+        return withInode(await fstat.apply(this, args))
+      }) as fs.FileHandle["stat"],
+    )
+    try {
+      const attachment = await inspectReferenceFile(path)
+      const p = await profile(path, dir)
+      const scan = await scanFile(p.profile_id, dir)
+      const stored = await loadProfile(p.profile_id, dir)
+      expect(attachment.file_id).toBe(`${original.dev}:${first}`)
+      expect(stored.identity.file_id).toBe(attachment.file_id)
+      expect(await exactFileDigest(attachment, dir, "xlsx")).toBe(scan.sha256!)
+      await delay(30)
+      await fs.utimes(path, mtime + 1, mtime)
+      expect((await exactScanReceipt(p.profile_id, dir))?.sha256).toBe(scan.sha256!)
+
+      inode = second
+      await expect(exactScanReceipt(p.profile_id, dir)).rejects.toThrow("LOGINOM_FILE_CHANGED")
+      const rounded = { ...attachment, file_id: `${original.dev}:${Number(first)}` }
+      expect(await exactFileDigest(rounded, dir, "xlsx")).toBeUndefined()
+
+      // A legacy rounded ID could name a different real inode with identical bytes.
+      delete stored.file_id_exact
+      stored.identity.file_id = rounded.file_id
+      await writeFile(join(dir, p.profile_id + ".json"), JSON.stringify(stored))
+      expect(await exactFileDigest(rounded, dir, "xlsx")).toBeUndefined()
+      await expect(exactScanReceipt(p.profile_id, dir)).rejects.toThrow("LOGINOM_FILE_CHANGED")
+    } finally {
+      handleStat.mockRestore()
+      linkStat.mockRestore()
+      pathStat.mockRestore()
+    }
+  })
+})
 
 test("Boolean XLSX settings preserve false, true and NULL for the Excel runtime", async () => {
   await fixture(
